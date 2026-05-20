@@ -734,6 +734,11 @@
                 totalsRow.appendChild(th);
             }
 
+            // Sub Category column - empty
+            const thSub = document.createElement('th');
+            thSub.dataset.colId = 'subcategory';
+            totalsRow.appendChild(thSub);
+
             // Unit columns - empty cells
             for (let i = 0; i < maxUnitColumns; i++) {
                 const th = document.createElement('th');
@@ -777,12 +782,13 @@
         }
 
         buildTableHeader();
-        // Delivery Chalan: rebuild header with only # and Product columns
+        // Delivery Chalan: rebuild header with #, Product, Sub Category columns
         (function() {
             const hr = document.getElementById('itemsTableHeader');
             hr.innerHTML = '';
             const th1 = document.createElement('th'); th1.width='4%'; th1.textContent='#'; th1.className='text-center'; hr.appendChild(th1);
-            const th2 = document.createElement('th'); th2.width='60%'; th2.textContent='Product'; hr.appendChild(th2);
+            const th2 = document.createElement('th'); th2.width='40%'; th2.textContent='Product'; hr.appendChild(th2);
+            const th3 = document.createElement('th'); th3.width='20%'; th3.textContent='Sub Category'; th3.dataset.colId='subcategory'; hr.appendChild(th3);
             const ph = document.createElement('th'); ph.id='unitColumnsPlaceholder'; ph.style.display='none'; hr.appendChild(ph);
         })();
         // buildTotalsRow will be called after data loads with maxUnitColumns
@@ -1101,6 +1107,11 @@
                     }
                 }
 
+                // Sub Category column
+                const subCatTd = row.insertCell();
+                subCatTd.dataset.colId = 'subcategory';
+                subCatTd.textContent = item.subcategory_name || '';
+
                 // Unit columns - show unit name and quantity
                 for (let i = 0; i < maxUnitColumns; i++) {
                     const td = row.insertCell();
@@ -1169,12 +1180,17 @@
                         td.textContent = '';
                     }
 
-                    // Product column
+                        // Product column
                     const productCol = columnConfig.find(c => c.id === 'product');
                     if (!productCol || productCol.visible !== false) {
                         const td = row.insertCell();
                         td.innerHTML = `<span style="${textColor}">${indent}${item.product_name}</span>`;
                     }
+
+                    // Sub Category column (child)
+                    const subCatTdChild = row.insertCell();
+                    subCatTdChild.dataset.colId = 'subcategory';
+                    subCatTdChild.textContent = item.subcategory_name || '';
 
                     // Unit columns - show unit name and quantity for child
                     for (let i = 0; i < maxUnitColumns; i++) {
@@ -1207,6 +1223,12 @@
                         if (colId === 'foc' && !enableFOC) td.style.display = 'none';
                     });
                 });
+            }
+
+            // Auto-hide Sub Category column if no item has a subcategory
+            const hasSubcategory = items.some(item => item.subcategory_name);
+            if (!hasSubcategory) {
+                document.querySelectorAll('[data-col-id="subcategory"]').forEach(el => el.style.display = 'none');
             }
 
             // Update totals row

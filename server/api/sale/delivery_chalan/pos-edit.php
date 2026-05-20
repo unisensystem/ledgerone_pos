@@ -71,6 +71,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
                    1      AS stock_affects,
                    1      AS invoice_affects,
                    u.uom_name,
+                   sc.subcategory_name,
                    0            AS sale_price,
                    0            AS gross_amount,
                    0            AS discount_percent,
@@ -83,8 +84,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
                    NULL         AS parent_row_id,
                    'sale_on_tp' AS scheme
             FROM delivery_chalan_items dci
-            LEFT JOIN products p ON dci.product_id = p.id
-            LEFT JOIN uom      u ON dci.uom_id     = u.id
+            LEFT JOIN products      p  ON dci.product_id    = p.id
+            LEFT JOIN uom           u  ON dci.uom_id        = u.id
+            LEFT JOIN subcategories sc ON p.subcategory_id  = sc.id
             WHERE dci.delivery_chalan_id = ? AND dci.tenant_id = ?
             ORDER BY dci.id
         ");
