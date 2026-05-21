@@ -5455,11 +5455,17 @@ function initTableDropdownDynamic(container, row) {
             }
             loadProductStock(product.id);
             
-            // Focus first unit input
-            const firstUnitInput = row.querySelector('.unit-input');
-            if (firstUnitInput) {
-                firstUnitInput.focus();
-            }
+            // Focus first unit input after DOM settles
+            setTimeout(() => {
+                const firstUnitInput = row.querySelector('.unit-input');
+                if (firstUnitInput) {
+                    firstUnitInput.focus();
+                    if (firstUnitInput.select) firstUnitInput.select();
+                } else {
+                    const priceInput = row.querySelector('.price-cell input');
+                    if (priceInput) priceInput.focus();
+                }
+            }, 0);
         }
     });
     

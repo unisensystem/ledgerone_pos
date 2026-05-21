@@ -209,18 +209,18 @@ function updateRowUnitCells(row) {
                     const cf = Number(inp.dataset.conversionFactor) || 1;
                     totalQty = Number(totalQty) + Number(qty * cf);
                 });
-                
+
                 const priceInput = row.querySelector('.price-cell input');
                 const price = priceInput ? (Number(priceInput.value) || 0) : 0;
-                
+
                 if (typeof validateStockForRow === 'function') {
                     validateStockForRow(row);
                 }
-                
+
                 if (typeof SCHEME_TYPES !== 'undefined') {
                     const schemeSelect = row.querySelector('.scheme-select');
                     const activeScheme = schemeSelect ? schemeSelect.value : SCHEME_TYPES.SALE_ON_TP;
-                    
+
                     if ((activeScheme === SCHEME_TYPES.LESS || activeScheme === SCHEME_TYPES.LESS_SPECIAL) && typeof calculateLessSchemeAmounts === 'function') {
                         if (activeScheme === SCHEME_TYPES.LESS) {
                             calculateLessSchemeAmounts(row, {});
@@ -233,10 +233,51 @@ function updateRowUnitCells(row) {
                         return;
                     }
                 }
-                
+
                 calculateRowAmounts(row, Number(totalQty), Number(price));
             });
-            
+
+            input.addEventListener('keydown', function(e) {
+                const nextFieldKey = (typeof shortcuts !== 'undefined' && shortcuts.nextField) ? shortcuts.nextField : 'Tab';
+                const prevFieldKey = (typeof shortcuts !== 'undefined' && shortcuts.prevField) ? shortcuts.prevField : 'Shift+Tab';
+                let key = e.key;
+                if (key.length === 1 && key.match(/[a-z]/i)) key = key.toUpperCase();
+                let combo = '';
+                if (e.ctrlKey) combo += 'Ctrl+';
+                if (e.altKey) combo += 'Alt+';
+                if (e.shiftKey && key.length > 1) combo += 'Shift+';
+                combo += key;
+
+                if (combo === nextFieldKey) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const allUnitInputs = Array.from(row.querySelectorAll('.unit-input'));
+                    const currentIdx = allUnitInputs.indexOf(this);
+                    if (currentIdx < allUnitInputs.length - 1) {
+                        allUnitInputs[currentIdx + 1].focus();
+                        if (allUnitInputs[currentIdx + 1].select) allUnitInputs[currentIdx + 1].select();
+                    } else {
+                        const priceInput = row.querySelector('.price-cell input');
+                        if (priceInput) {
+                            priceInput.focus();
+                            if (priceInput.select) setTimeout(() => priceInput.select(), 0);
+                        }
+                    }
+                } else if (combo === prevFieldKey) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const allUnitInputs = Array.from(row.querySelectorAll('.unit-input'));
+                    const currentIdx = allUnitInputs.indexOf(this);
+                    if (currentIdx > 0) {
+                        allUnitInputs[currentIdx - 1].focus();
+                        if (allUnitInputs[currentIdx - 1].select) allUnitInputs[currentIdx - 1].select();
+                    } else {
+                        const searchInput = row.querySelector('.search-input');
+                        if (searchInput) searchInput.focus();
+                    }
+                }
+            });
+
             container.appendChild(input);
             cell.appendChild(container);
         } else {
