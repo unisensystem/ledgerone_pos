@@ -618,13 +618,18 @@ function initializePage(permissions) {
                     const itemCodeInput = currentRow.querySelector('.item-code');
                     const hasProduct = itemCodeInput && itemCodeInput.value && itemCodeInput.value.trim() !== '';
                     if (hasProduct) {
-                        addRowDynamic();
-                        setTimeout(() => {
-                            const tbody = document.getElementById('itemsTable').getElementsByTagName('tbody')[0];
-                            const newRow = tbody.rows[tbody.rows.length - 1];
-                            const newSearchInput = newRow.querySelector('.search-input');
-                            if (newSearchInput) newSearchInput.focus();
-                        }, 0);
+                        if (currentRow.nextElementSibling) {
+                            const nextSearchInput = currentRow.nextElementSibling.querySelector('.search-input');
+                            if (nextSearchInput) nextSearchInput.focus();
+                        } else {
+                            addRowDynamic();
+                            setTimeout(() => {
+                                const tbody = document.getElementById('itemsTable').getElementsByTagName('tbody')[0];
+                                const newRow = tbody.rows[tbody.rows.length - 1];
+                                const newSearchInput = newRow.querySelector('.search-input');
+                                if (newSearchInput) newSearchInput.focus();
+                            }, 0);
+                        }
                     } else {
                         const summaryCard = Array.from(document.querySelectorAll('.card')).find(card => {
                             const title = card.querySelector('.card-title');
@@ -643,6 +648,18 @@ function initializePage(permissions) {
                                 summaryFocusable[0].focus();
                                 if (summaryFocusable[0].select) setTimeout(() => summaryFocusable[0].select(), 0);
                             }
+                        }
+                        // Delete the empty row after moving focus (only if more than one row exists)
+                        const tbody = document.getElementById('itemsTable').getElementsByTagName('tbody')[0];
+                        if (tbody.rows.length > 1) {
+                            const rowSearchInput = currentRow.querySelector('.search-input');
+                            if (rowSearchInput && rowSearchInput.dropdownOptions) {
+                                rowSearchInput.dropdownOptions.remove();
+                            }
+                            currentRow.remove();
+                            updateSerialNumbers();
+                            recalculateMaxColumns();
+                            updateInvoiceSummaryDynamic();
                         }
                     }
                 } else {
