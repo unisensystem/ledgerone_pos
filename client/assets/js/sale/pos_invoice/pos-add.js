@@ -5350,11 +5350,23 @@ function initTableDropdownDynamic(container, row) {
             if (selectedIndex >= 0 && visibleOptions[selectedIndex]) {
                 visibleOptions[selectedIndex].click();
             } else if (visibleOptions.length > 0) {
-                visibleOptions[0].click();
+                // Only auto-select the first item if Enter is NOT configured as the nextField key
+                let combo = '';
+                if (e.ctrlKey) combo += 'Ctrl+';
+                if (e.altKey) combo += 'Alt+';
+                if (e.shiftKey && e.key.length > 1) combo += 'Shift+';
+                combo += e.key;
+                const isNextField = (typeof shortcuts !== 'undefined') && shortcuts.nextField === combo;
+                if (!isNextField) {
+                    visibleOptions[0].click();
+                } else {
+                    // Enter is nextField — close dropdown and let the global handler navigate
+                    optionsContainer.style.display = 'none';
+                }
             }
         }
     });
-    
+
     function updateSelectionDynamic(visibleOptions) {
         visibleOptions.forEach((option, index) => {
             option.style.backgroundColor = index === selectedIndex ? 'var(--surface-1)' : '';
