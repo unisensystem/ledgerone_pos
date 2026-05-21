@@ -615,13 +615,34 @@ function initializePage(permissions) {
                 const isNetAmountCell = currentRow && currentRow.parentElement.tagName === 'TBODY' &&
                     currentCell && currentCell.classList.contains('net-cell');
                 if (isNetAmountCell) {
-                    if (currentRow.nextElementSibling) {
-                        const firstInput = currentRow.nextElementSibling.cells[1]?.querySelector('.search-input');
-                        if (firstInput) firstInput.focus();
+                    const itemCodeInput = currentRow.querySelector('.item-code');
+                    const hasProduct = itemCodeInput && itemCodeInput.value && itemCodeInput.value.trim() !== '';
+                    if (hasProduct) {
+                        addRowDynamic().then(() => {
+                            const tbody = document.getElementById('itemsTable').getElementsByTagName('tbody')[0];
+                            const newRow = tbody.rows[tbody.rows.length - 1];
+                            const newSearchInput = newRow.cells[1]?.querySelector('.search-input');
+                            if (newSearchInput) newSearchInput.focus();
+                        });
                     } else {
-                        // Focus on Add Item button when on last row's Net Amount cell
-                        const addRowBtn = document.getElementById('addRowBtn');
-                        if (addRowBtn) addRowBtn.focus();
+                        const summaryCard = Array.from(document.querySelectorAll('.card')).find(card => {
+                            const title = card.querySelector('.card-title');
+                            return title && title.textContent.trim() === 'Invoice Summary';
+                        });
+                        if (summaryCard) {
+                            const summaryFocusable = Array.from(summaryCard.querySelectorAll(
+                                'input:not([type="hidden"]):not([disabled]):not([readonly]):not([tabindex="-1"]), ' +
+                                'select:not([disabled]):not([tabindex="-1"]), ' +
+                                'textarea:not([disabled]):not([readonly]):not([tabindex="-1"])'
+                            )).filter(el => {
+                                const style = window.getComputedStyle(el);
+                                return style.display !== 'none' && style.visibility !== 'hidden' && el.offsetParent !== null;
+                            });
+                            if (summaryFocusable.length > 0) {
+                                summaryFocusable[0].focus();
+                                if (summaryFocusable[0].select) setTimeout(() => summaryFocusable[0].select(), 0);
+                            }
+                        }
                     }
                 } else {
                     nextElement.focus();
