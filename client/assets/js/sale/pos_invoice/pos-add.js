@@ -618,12 +618,13 @@ function initializePage(permissions) {
                     const itemCodeInput = currentRow.querySelector('.item-code');
                     const hasProduct = itemCodeInput && itemCodeInput.value && itemCodeInput.value.trim() !== '';
                     if (hasProduct) {
-                        addRowDynamic().then(() => {
+                        addRowDynamic();
+                        setTimeout(() => {
                             const tbody = document.getElementById('itemsTable').getElementsByTagName('tbody')[0];
                             const newRow = tbody.rows[tbody.rows.length - 1];
-                            const newSearchInput = newRow.cells[1]?.querySelector('.search-input');
+                            const newSearchInput = newRow.querySelector('.search-input');
                             if (newSearchInput) newSearchInput.focus();
-                        });
+                        }, 0);
                     } else {
                         const summaryCard = Array.from(document.querySelectorAll('.card')).find(card => {
                             const title = card.querySelector('.card-title');
