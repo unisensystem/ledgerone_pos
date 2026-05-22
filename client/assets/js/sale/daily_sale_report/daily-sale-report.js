@@ -30,6 +30,145 @@ const billsGeneratedItem = document.getElementById('bills-generated-item');
 // Selected sales officers map: { id -> name }
 let selectedSalesOfficers = {};
 
+// Searchable select instances
+let searchableInvoiceType, searchableSupplierMan, searchableVendor;
+let searchableCity, searchableCityZone, searchableArea, searchableCompany;
+
+// Wraps a <select> element with a searchable custom dropdown
+function makeSearchable(selectId) {
+    const select = document.getElementById(selectId);
+    if (!select) return null;
+
+    const wrapper = document.createElement('div');
+    wrapper.className = 'searchable-select';
+
+    const trigger = document.createElement('div');
+    trigger.className = 'searchable-select-trigger';
+
+    const labelEl = document.createElement('span');
+    labelEl.className = 'searchable-select-label';
+
+    const iconEl = document.createElement('i');
+    iconEl.className = 'fas fa-chevron-down searchable-select-icon';
+
+    trigger.appendChild(labelEl);
+    trigger.appendChild(iconEl);
+
+    const panel = document.createElement('div');
+    panel.className = 'searchable-select-panel';
+
+    const searchWrap = document.createElement('div');
+    searchWrap.className = 'searchable-select-search-wrap';
+
+    const searchInput = document.createElement('input');
+    searchInput.type = 'text';
+    searchInput.className = 'searchable-select-search-input';
+    searchInput.placeholder = 'Search...';
+    searchWrap.appendChild(searchInput);
+
+    const list = document.createElement('div');
+    list.className = 'searchable-select-list';
+
+    panel.appendChild(searchWrap);
+    panel.appendChild(list);
+    wrapper.appendChild(trigger);
+    wrapper.appendChild(panel);
+
+    select.parentNode.insertBefore(wrapper, select);
+    select.style.display = 'none';
+    wrapper.appendChild(select);
+
+    let isOpen = false;
+
+    function updateLabel() {
+        const idx = select.selectedIndex;
+        const text = idx >= 0 ? select.options[idx].text : (select.options[0]?.text || 'Select...');
+        labelEl.textContent = text;
+        labelEl.style.color = select.value === '' ? 'var(--subtext)' : 'var(--body)';
+    }
+
+    function buildList(filter) {
+        list.innerHTML = '';
+        const f = (filter || '').toLowerCase();
+        let found = 0;
+        Array.from(select.options).forEach(opt => {
+            if (f && !opt.text.toLowerCase().includes(f)) return;
+            const item = document.createElement('div');
+            item.className = 'searchable-select-item' + (opt.value === select.value ? ' selected' : '');
+            item.textContent = opt.text;
+            item.addEventListener('mousedown', function(e) {
+                e.preventDefault();
+                select.value = opt.value;
+                updateLabel();
+                closeDropdown();
+                searchInput.value = '';
+                select.dispatchEvent(new Event('change'));
+            });
+            list.appendChild(item);
+            found++;
+        });
+        if (found === 0) {
+            const empty = document.createElement('div');
+            empty.className = 'searchable-select-empty';
+            empty.textContent = 'No results found';
+            list.appendChild(empty);
+        }
+    }
+
+    function openDropdown() {
+        // Close any other open searchable dropdowns
+        document.querySelectorAll('.searchable-select-panel.open').forEach(p => {
+            if (p !== panel) p.classList.remove('open');
+        });
+        document.querySelectorAll('.searchable-select-trigger.open').forEach(t => {
+            if (t !== trigger) t.classList.remove('open');
+        });
+        buildList('');
+        panel.classList.add('open');
+        trigger.classList.add('open');
+        isOpen = true;
+        setTimeout(() => searchInput.focus(), 10);
+    }
+
+    function closeDropdown() {
+        panel.classList.remove('open');
+        trigger.classList.remove('open');
+        isOpen = false;
+    }
+
+    trigger.addEventListener('click', function(e) {
+        e.stopPropagation();
+        if (isOpen) closeDropdown();
+        else openDropdown();
+    });
+
+    searchInput.addEventListener('input', function() {
+        buildList(this.value);
+    });
+
+    searchInput.addEventListener('click', function(e) {
+        e.stopPropagation();
+    });
+
+    document.addEventListener('click', function() {
+        if (isOpen) closeDropdown();
+    });
+
+    updateLabel();
+
+    return {
+        refresh() {
+            updateLabel();
+            if (isOpen) buildList(searchInput.value);
+        },
+        reset() {
+            select.value = select.options[0]?.value ?? '';
+            searchInput.value = '';
+            updateLabel();
+        }
+    };
+}
+
 // Initialize the application
 function init() {
     // Set default dates
@@ -38,9 +177,18 @@ function init() {
     document.getElementById('date-from').valueAsDate = firstDay;
     document.getElementById('date-to').valueAsDate = today;
 
+    // Initialize searchable selects
+    searchableInvoiceType = makeSearchable('invoice-type');
+    searchableSupplierMan = makeSearchable('supplier-man');
+    searchableVendor = makeSearchable('vendor');
+    searchableCity = makeSearchable('city-filter');
+    searchableCityZone = makeSearchable('city-zone-filter');
+    searchableArea = makeSearchable('area-filter');
+    searchableCompany = makeSearchable('company');
+
     // Set up event listeners
     setupEventListeners();
-    
+
     // Load filters and initial data
     loadCompanies();
     loadFilters();
@@ -52,15 +200,53 @@ function init() {
 
 function initSalesOfficerDropdown() {
     const trigger = document.getElementById('sales-officer-trigger');
-    const options = document.getElementById('sales-officer-options');
+    const optionsEl = document.getElementById('sales-officer-options');
+
+    // Insert sticky search input as first child of the options container
+    const searchWrap = document.createElement('div');
+    searchWrap.className = 'multi-select-search-wrap';
+    const searchInput = document.createElement('input');
+    searchInput.type = 'text';
+    searchInput.className = 'multi-select-search-input';
+    searchInput.placeholder = 'Search officers...';
+    searchWrap.appendChild(searchInput);
+    optionsEl.insertBefore(searchWrap, optionsEl.firstChild);
+
+    function filterOfficers(val) {
+        const f = val.toLowerCase();
+        optionsEl.querySelectorAll('.multi-select-option').forEach(opt => {
+            opt.style.display = (f && !opt.textContent.toLowerCase().includes(f)) ? 'none' : '';
+        });
+    }
+
+    searchInput.addEventListener('input', function(e) {
+        e.stopPropagation();
+        filterOfficers(this.value);
+    });
+
+    searchInput.addEventListener('click', function(e) {
+        e.stopPropagation();
+    });
+
     trigger.addEventListener('click', function(e) {
         e.stopPropagation();
         trigger.classList.toggle('open');
-        options.classList.toggle('open');
+        optionsEl.classList.toggle('open');
+        if (optionsEl.classList.contains('open')) {
+            setTimeout(() => searchInput.focus(), 10);
+        } else {
+            searchInput.value = '';
+            filterOfficers('');
+        }
     });
+
     document.addEventListener('click', function() {
-        trigger.classList.remove('open');
-        options.classList.remove('open');
+        if (optionsEl.classList.contains('open')) {
+            trigger.classList.remove('open');
+            optionsEl.classList.remove('open');
+            searchInput.value = '';
+            filterOfficers('');
+        }
     });
 }
 
@@ -86,6 +272,7 @@ async function loadCities() {
                 option.textContent = city.city_name;
                 citySelect.appendChild(option);
             });
+            searchableCity?.refresh();
         }
     } catch (error) {
         console.error('Error loading cities:', error);
@@ -96,6 +283,8 @@ async function loadCityZones(cityId) {
     const cityZoneSelect = document.getElementById('city-zone-filter');
     cityZoneSelect.innerHTML = '<option value="">All City Zones</option>';
     document.getElementById('area-filter').innerHTML = '<option value="">All Areas</option>';
+    searchableCityZone?.refresh();
+    searchableArea?.refresh();
     if (!cityId) return;
     try {
         const response = await fetch(`../../../../server/api/sale/daily_sale_report/get-city-zones.php?city_id=${cityId}`);
@@ -107,6 +296,7 @@ async function loadCityZones(cityId) {
                 option.textContent = zone.city_zone_name;
                 cityZoneSelect.appendChild(option);
             });
+            searchableCityZone?.refresh();
         }
     } catch (error) {
         console.error('Error loading city zones:', error);
@@ -131,6 +321,7 @@ async function loadAreas(cityZoneId) {
                 areaSelect.appendChild(option);
             });
             if (currentVal) areaSelect.value = currentVal;
+            searchableArea?.refresh();
         }
     } catch (error) {
         console.error('Error loading areas:', error);
@@ -146,7 +337,7 @@ async function loadCompanies() {
     try {
         const response = await fetch('../../../../server/api/sale/daily_sale_report/get-companies.php');
         const result = await response.json();
-        
+
         if (result.success) {
             const companySelect = document.getElementById('company');
             result.companies.forEach(company => {
@@ -155,6 +346,7 @@ async function loadCompanies() {
                 option.textContent = company.company_name;
                 companySelect.appendChild(option);
             });
+            searchableCompany?.refresh();
         }
     } catch (error) {
         console.error('Error loading companies:', error);
@@ -165,11 +357,11 @@ async function loadFilters() {
     try {
         const response = await fetch('../../../../server/api/sale/daily_sale_report/get-filters.php');
         const result = await response.json();
-        
+
         if (result.success) {
-            // Populate sales officers as checkboxes
+            // Populate sales officers — preserve the search wrap by only removing option labels
             const salesOfficerOptions = document.getElementById('sales-officer-options');
-            salesOfficerOptions.innerHTML = '';
+            salesOfficerOptions.querySelectorAll('.multi-select-option').forEach(el => el.remove());
             result.salesOfficers.forEach(officer => {
                 const label = document.createElement('label');
                 label.className = 'multi-select-option';
@@ -188,7 +380,7 @@ async function loadFilters() {
                 label.appendChild(document.createTextNode(officer.full_name));
                 salesOfficerOptions.appendChild(label);
             });
-            
+
             // Populate supplier men
             const supplierManSelect = document.getElementById('supplier-man');
             supplierManSelect.innerHTML = '<option value="">All Supplier Men</option>';
@@ -198,7 +390,8 @@ async function loadFilters() {
                 option.textContent = man.full_name;
                 supplierManSelect.appendChild(option);
             });
-            
+            searchableSupplierMan?.refresh();
+
             // Populate vendors
             const vendorSelect = document.getElementById('vendor');
             vendorSelect.innerHTML = '<option value="">All Vendors</option>';
@@ -208,6 +401,7 @@ async function loadFilters() {
                 option.textContent = vendor.supplier_name;
                 vendorSelect.appendChild(option);
             });
+            searchableVendor?.refresh();
         }
     } catch (error) {
         console.error('Error loading filters:', error);
@@ -225,7 +419,7 @@ function setupEventListeners() {
     resetBtn.addEventListener('click', handleReset);
     exportBtn.addEventListener('click', handleExport);
     printBtn.addEventListener('click', handlePrint);
-    
+
     // City cascading (top-down)
     document.getElementById('city-filter').addEventListener('change', function() {
         loadCityZones(this.value);
@@ -244,16 +438,16 @@ function setupEventListeners() {
             if (result.success && result.hierarchy) {
                 const h = result.hierarchy;
 
-                // Set City
                 document.getElementById('city-filter').value = h.city_id;
+                searchableCity?.refresh();
 
-                // Load City Zones for that city, then set the correct one
                 await loadCityZones(h.city_id);
                 document.getElementById('city-zone-filter').value = h.city_zone_id;
+                searchableCityZone?.refresh();
 
-                // Reload areas for that city zone, keep area selection
                 await loadAreas(h.city_zone_id);
                 document.getElementById('area-filter').value = areaId;
+                searchableArea?.refresh();
             }
         } catch (error) {
             console.error('Error loading area hierarchy:', error);
@@ -292,7 +486,7 @@ function generateReference() {
 // Fetch report data from API
 async function fetchReportData() {
     loading.classList.add('active');
-    
+
     const reportType = itemWiseToggle.classList.contains('active') ? 'item-wise' : 'bill-wise';
     const invoiceType = document.getElementById('invoice-type').value;
     const officerIds = getSelectedOfficerIds();
@@ -304,7 +498,7 @@ async function fetchReportData() {
     const cityId = document.getElementById('city-filter').value;
     const cityZoneId = document.getElementById('city-zone-filter').value;
     const areaId = document.getElementById('area-filter').value;
-    
+
     const params = new URLSearchParams({
         report_type: reportType,
         ...(invoiceType && { invoice_type: invoiceType }),
@@ -318,11 +512,11 @@ async function fetchReportData() {
         ...(areaId && { area_id: areaId })
     });
     officerIds.forEach(id => params.append('sales_officer_ids[]', id));
-    
+
     try {
         const response = await fetch(`../../../../server/api/sale/daily_sale_report/daily-sale-report.php?${params}`);
         const result = await response.json();
-        
+
         if (result.success) {
             if (reportType === 'item-wise') {
                 itemWiseData = result.data;
@@ -358,12 +552,10 @@ function loadItemWiseData() {
     const endIndex = startIndex + itemsPerPage;
     const paginatedData = itemWiseData.slice(startIndex, endIndex);
 
-    // Group by sales_officer_name if multiple officers selected
     const officerIds = getSelectedOfficerIds();
     const groupByOfficer = officerIds.length > 1;
 
     if (groupByOfficer) {
-        // Group items by officer
         const groups = {};
         paginatedData.forEach(item => {
             const key = item.sales_officer_name || 'Unknown';
@@ -373,7 +565,6 @@ function loadItemWiseData() {
 
         let globalIndex = startIndex;
         Object.entries(groups).forEach(([officerName, items]) => {
-            // Officer header row
             const headerRow = document.createElement('tr');
             headerRow.innerHTML = `<td colspan="6" style="background: var(--surface-2); font-weight: 600; font-size: 13px; padding: 8px 16px; color: var(--primary);">${officerName}</td>`;
             itemWiseDataContainer.appendChild(headerRow);
@@ -483,7 +674,6 @@ function loadBillWiseData() {
 // Update summary card
 function updateSummary() {
     if (itemWiseToggle.classList.contains('active')) {
-        // Item-wise summary
         const totalQty = itemWiseData.filter(item => !item.isChild).reduce((sum, item) => {
             return sum + item.units.reduce((unitSum, u) => unitSum + parseInt(u.qty), 0);
         }, 0);
@@ -492,12 +682,10 @@ function updateSummary() {
         totalSalesEl.textContent = `${currencySymbol}${totalAmount.toLocaleString()}`;
         totalItemsEl.textContent = totalQty.toLocaleString();
         netAmountEl.textContent = `${currencySymbol}${totalAmount.toLocaleString()}`;
-        
-        // Hide Bills Generated in item-wise view
+
         itemsSoldItem.style.display = 'block';
         billsGeneratedItem.style.display = 'none';
     } else {
-        // Bill-wise summary
         const totalBills = billWiseData.length;
         const totalNetAmount = billWiseData.reduce((sum, item) => sum + parseFloat(item.netAmount || 0), 0);
 
@@ -505,8 +693,7 @@ function updateSummary() {
         totalItemsEl.textContent = '-';
         totalBillsEl.textContent = totalBills;
         netAmountEl.textContent = `${currencySymbol}${totalNetAmount.toLocaleString()}`;
-        
-        // Show Bills Generated in bill-wise view
+
         itemsSoldItem.style.display = 'none';
         billsGeneratedItem.style.display = 'block';
     }
@@ -523,18 +710,32 @@ function handleSearch() {
 
 // Handle reset
 function handleReset() {
-    document.getElementById('invoice-type').value = '';
+    searchableInvoiceType?.reset();
+
     // Reset sales officers
     selectedSalesOfficers = {};
     document.querySelectorAll('#sales-officer-options input[type="checkbox"]').forEach(cb => cb.checked = false);
+    const officerSearchInput = document.querySelector('.multi-select-search-input');
+    if (officerSearchInput) {
+        officerSearchInput.value = '';
+        document.querySelectorAll('#sales-officer-options .multi-select-option').forEach(opt => {
+            opt.style.display = '';
+        });
+    }
     updateSalesOfficerLabel();
-    document.getElementById('supplier-man').value = '';
-    document.getElementById('vendor').value = '';
-    document.getElementById('company').value = '';
+
+    searchableSupplierMan?.reset();
+    searchableVendor?.reset();
+    searchableCompany?.reset();
+
     document.getElementById('city-filter').value = '';
+    searchableCity?.reset();
+
     document.getElementById('city-zone-filter').innerHTML = '<option value="">All City Zones</option>';
+    searchableCityZone?.reset();
+
     document.getElementById('area-filter').innerHTML = '<option value="">All Areas</option>';
-    loadAllAreas();
+    loadAllAreas(); // reloads areas and calls searchableArea.refresh()
 
     // Reset to default dates
     const today = new Date();
@@ -542,11 +743,9 @@ function handleReset() {
     document.getElementById('date-from').valueAsDate = firstDay;
     document.getElementById('date-to').valueAsDate = today;
 
-    // Hide reference
     referenceCard.style.display = 'none';
     referenceNumber.textContent = '-';
 
-    // Reload data
     currentPage = 1;
     fetchReportData();
 }
@@ -571,7 +770,7 @@ function handlePrint() {
     const cityZoneId = document.getElementById('city-zone-filter').value;
     const areaId = document.getElementById('area-filter').value;
     const refNum = generateReference();
-    
+
     const params = new URLSearchParams({
         report_type: reportType,
         reference: refNum,
@@ -586,25 +785,23 @@ function handlePrint() {
         ...(areaId && { area_id: areaId })
     });
     officerIds.forEach(id => params.append('sales_officer_ids[]', id));
-    
+
     window.open(`print.php?${params}`, '_blank');
 }
 
 // Render pagination
 function renderPagination(totalItems) {
     const totalPages = Math.ceil(totalItems / itemsPerPage);
-    
+
     if (totalPages <= 1) {
         paginationContainer.innerHTML = '';
         return;
     }
-    
+
     let html = '';
-    
-    // Previous button
+
     html += `<button ${currentPage === 1 ? 'disabled' : ''} onclick="changePage(${currentPage - 1})">&lsaquo;</button>`;
-    
-    // Page numbers
+
     for (let i = 1; i <= totalPages; i++) {
         if (i === 1 || i === totalPages || (i >= currentPage - 1 && i <= currentPage + 1)) {
             html += `<button class="${i === currentPage ? 'active' : ''}" onclick="changePage(${i})">${i}</button>`;
@@ -612,10 +809,9 @@ function renderPagination(totalItems) {
             html += `<button disabled>...</button>`;
         }
     }
-    
-    // Next button
+
     html += `<button ${currentPage === totalPages ? 'disabled' : ''} onclick="changePage(${currentPage + 1})">&rsaquo;</button>`;
-    
+
     paginationContainer.innerHTML = html;
 }
 
