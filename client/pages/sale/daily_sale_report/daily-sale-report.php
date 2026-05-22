@@ -33,7 +33,6 @@ $currency_symbol = $currency['symbol'];
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>LedgerOne ERP - Daily Sales Report</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/css/tom-select.min.css">
     <link rel="stylesheet" href="../../../assets/css/sale/daily_sale_report/daily-sale-report.css">
 </head>
 <body>
@@ -96,7 +95,15 @@ $currency_symbol = $currency['symbol'];
                 
                 <div class="form-group">
                     <label class="form-label">Sales Officer</label>
-                    <select id="sales-officer" multiple placeholder="All Sales Officers"></select>
+                    <div class="multi-select-dropdown" id="sales-officer-dropdown">
+                        <div class="multi-select-trigger" id="sales-officer-trigger">
+                            <span id="sales-officer-label">All Sales Officers</span>
+                            <i class="fas fa-chevron-down"></i>
+                        </div>
+                        <div class="multi-select-options" id="sales-officer-options">
+                            <!-- Options loaded dynamically -->
+                        </div>
+                    </div>
                 </div>
                 
                 <div class="form-group">
@@ -235,7 +242,6 @@ $currency_symbol = $currency['symbol'];
         </div>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/js/tom-select.complete.min.js"></script>
     <script>
         const currencySymbol = '<?php echo $currency_symbol; ?>';
     </script>
