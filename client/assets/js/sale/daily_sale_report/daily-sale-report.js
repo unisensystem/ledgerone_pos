@@ -31,6 +31,7 @@ const billsGeneratedItem = document.getElementById('bills-generated-item');
 let selectedSalesOfficers = {};
 
 // Searchable-select instances (returned by makeSearchable)
+let searchableFilters = {};
 let ssInvoiceType, ssSupplierMan, ssVendor, ssCity, ssCityZone, ssArea, ssCompany;
 
 /* ─────────────────────────────────────────────────────────────
@@ -41,22 +42,26 @@ let ssInvoiceType, ssSupplierMan, ssVendor, ssCity, ssCityZone, ssArea, ssCompan
 function makeSearchable(selectId) {
     const select = document.getElementById(selectId);
     if (!select) return null;
+    if (select.dataset.searchableReady === 'true') return null;
+    select.dataset.searchableReady = 'true';
 
-    // --- Trigger: readonly text input that shows the chosen value ---
     const trigger = document.createElement('input');
     trigger.type = 'text';
     trigger.readOnly = true;
     trigger.className = 'ss-trigger form-input';
     trigger.autocomplete = 'off';
+    trigger.setAttribute('role', 'combobox');
+    trigger.setAttribute('aria-expanded', 'false');
+    trigger.setAttribute('aria-haspopup', 'listbox');
 
-    // --- Panel: appended to <body> so it is never overflow-clipped ---
     const panel = document.createElement('div');
     panel.className = 'ss-panel';
+    panel.setAttribute('role', 'listbox');
 
     const searchInput = document.createElement('input');
     searchInput.type = 'text';
     searchInput.className = 'ss-search';
-    searchInput.placeholder = 'Search...';
+    searchInput.placeholder = select.dataset.searchPlaceholder || 'Search...';
     searchInput.autocomplete = 'off';
 
     const list = document.createElement('div');
@@ -64,9 +69,8 @@ function makeSearchable(selectId) {
 
     panel.appendChild(searchInput);
     panel.appendChild(list);
-    document.body.appendChild(panel);   // lives on <body>
+    document.body.appendChild(panel);
 
-    // Insert trigger before the original select, then hide the select
     select.parentNode.insertBefore(trigger, select);
     select.style.display = 'none';
 
@@ -87,6 +91,8 @@ function makeSearchable(selectId) {
             if (f && opt.text.toLowerCase().indexOf(f) === -1) return;
             const item = document.createElement('div');
             item.className = 'ss-item' + (opt.value === select.value ? ' ss-selected' : '');
+            item.setAttribute('role', 'option');
+            item.setAttribute('aria-selected', opt.value === select.value ? 'true' : 'false');
             item.textContent = opt.text;
             item.addEventListener('mousedown', function(e) {
                 e.preventDefault();
@@ -94,7 +100,7 @@ function makeSearchable(selectId) {
                 syncTrigger();
                 closePanel();
                 searchInput.value = '';
-                select.dispatchEvent(new Event('change'));
+                select.dispatchEvent(new Event('change', { bubbles: true }));
             });
             list.appendChild(item);
             count++;
@@ -109,25 +115,32 @@ function makeSearchable(selectId) {
 
     function positionPanel() {
         const rect = trigger.getBoundingClientRect();
-        panel.style.top   = (rect.bottom + window.scrollY + 4) + 'px';
-        panel.style.left  = (rect.left + window.scrollX) + 'px';
+        panel.style.top   = (rect.bottom + 4) + 'px';
+        panel.style.left  = rect.left + 'px';
         panel.style.width = rect.width + 'px';
     }
 
     function openPanel() {
-        // Close every other open panel first
         document.querySelectorAll('.ss-panel.ss-open').forEach(function(p) {
             if (p !== panel) p.classList.remove('ss-open');
+        });
+        document.querySelectorAll('.multi-select-options.open').forEach(function(p) {
+            p.classList.remove('open');
+        });
+        document.querySelectorAll('.multi-select-trigger.open').forEach(function(t) {
+            t.classList.remove('open');
         });
         positionPanel();
         buildList('');
         panel.classList.add('ss-open');
+        trigger.setAttribute('aria-expanded', 'true');
         isOpen = true;
         setTimeout(function() { searchInput.focus(); }, 10);
     }
 
     function closePanel() {
         panel.classList.remove('ss-open');
+        trigger.setAttribute('aria-expanded', 'false');
         isOpen = false;
     }
 
@@ -144,16 +157,30 @@ function makeSearchable(selectId) {
         e.stopPropagation();
     });
 
+    searchInput.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+            closePanel();
+            trigger.focus();
+        }
+    });
+
+    trigger.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter' || e.key === ' ' || e.key === 'ArrowDown') {
+            e.preventDefault();
+            openPanel();
+        }
+    });
+
     document.addEventListener('click', function() {
         if (isOpen) closePanel();
     });
 
     window.addEventListener('scroll', function() {
-        if (isOpen) closePanel();
+        if (isOpen) positionPanel();
     }, true);
 
     window.addEventListener('resize', function() {
-        if (isOpen) closePanel();
+        if (isOpen) positionPanel();
     });
 
     syncTrigger();
@@ -167,8 +194,24 @@ function makeSearchable(selectId) {
             if (select.options.length > 0) select.value = select.options[0].value;
             searchInput.value = '';
             syncTrigger();
+            if (isOpen) buildList('');
         }
     };
+}
+
+function initSearchableFilters() {
+    searchableFilters = {};
+    document.querySelectorAll('select.searchable-filter').forEach(function(select) {
+        searchableFilters[select.id] = makeSearchable(select.id);
+    });
+
+    ssInvoiceType = searchableFilters['invoice-type'];
+    ssSupplierMan = searchableFilters['supplier-man'];
+    ssVendor = searchableFilters.vendor;
+    ssCity = searchableFilters['city-filter'];
+    ssCityZone = searchableFilters['city-zone-filter'];
+    ssArea = searchableFilters['area-filter'];
+    ssCompany = searchableFilters.company;
 }
 
 /* ─────────────────────────────────────────────────────────────
@@ -208,6 +251,12 @@ function initSalesOfficerDropdown() {
     trigger.addEventListener('click', function(e) {
         e.stopPropagation();
         const wasOpen = optionsEl.classList.contains('open');
+        document.querySelectorAll('.ss-panel.ss-open').forEach(function(panel) {
+            panel.classList.remove('ss-open');
+        });
+        document.querySelectorAll('.ss-trigger[aria-expanded="true"]').forEach(function(openTrigger) {
+            openTrigger.setAttribute('aria-expanded', 'false');
+        });
         trigger.classList.toggle('open');
         optionsEl.classList.toggle('open');
         if (!wasOpen) {
@@ -404,14 +453,8 @@ function init() {
     document.getElementById('date-from').valueAsDate = firstDay;
     document.getElementById('date-to').valueAsDate   = today;
 
-    // Convert every <select> into a searchable dropdown
-    ssInvoiceType  = makeSearchable('invoice-type');
-    ssSupplierMan  = makeSearchable('supplier-man');
-    ssVendor       = makeSearchable('vendor');
-    ssCity         = makeSearchable('city-filter');
-    ssCityZone     = makeSearchable('city-zone-filter');
-    ssArea         = makeSearchable('area-filter');
-    ssCompany      = makeSearchable('company');
+    // Convert every marked filter <select> into a searchable dropdown.
+    initSearchableFilters();
 
     // Sales Officer search
     initSalesOfficerDropdown();

@@ -85,7 +85,7 @@ $currency_symbol = $currency['symbol'];
             <div class="form-row">
                 <div class="form-group">
                     <label class="form-label">Type</label>
-                    <select class="form-input" id="invoice-type">
+                    <select class="form-input searchable-filter" id="invoice-type" data-search-placeholder="Search types...">
                         <option value="">All Types</option>
                         <option value="Cash">Cash</option>
                         <option value="Credit">Credit</option>
@@ -108,14 +108,14 @@ $currency_symbol = $currency['symbol'];
                 
                 <div class="form-group">
                     <label class="form-label">Supplier Man</label>
-                    <select class="form-input" id="supplier-man">
+                    <select class="form-input searchable-filter" id="supplier-man" data-search-placeholder="Search supplier men...">
                         <option value="">All Supplier Men</option>
                     </select>
                 </div>
                 
                 <div class="form-group">
                     <label class="form-label">Vendor</label>
-                    <select class="form-input" id="vendor">
+                    <select class="form-input searchable-filter" id="vendor" data-search-placeholder="Search vendors...">
                         <option value="">All Vendors</option>
                         <option value="v1">Vendor A</option>
                         <option value="v2">Vendor B</option>
@@ -126,21 +126,21 @@ $currency_symbol = $currency['symbol'];
                 
                 <div class="form-group">
                     <label class="form-label">City</label>
-                    <select class="form-input" id="city-filter">
+                    <select class="form-input searchable-filter" id="city-filter" data-search-placeholder="Search cities...">
                         <option value="">All Cities</option>
                     </select>
                 </div>
                 
                 <div class="form-group">
                     <label class="form-label">City Zone</label>
-                    <select class="form-input" id="city-zone-filter">
+                    <select class="form-input searchable-filter" id="city-zone-filter" data-search-placeholder="Search city zones...">
                         <option value="">All City Zones</option>
                     </select>
                 </div>
                 
                 <div class="form-group">
                     <label class="form-label">Area</label>
-                    <select class="form-input" id="area-filter">
+                    <select class="form-input searchable-filter" id="area-filter" data-search-placeholder="Search areas...">
                         <option value="">All Areas</option>
                     </select>
                 </div>
@@ -157,7 +157,7 @@ $currency_symbol = $currency['symbol'];
                 
                 <div class="form-group">
                     <label class="form-label">Company</label>
-                    <select class="form-input" id="company">
+                    <select class="form-input searchable-filter" id="company" data-search-placeholder="Search companies...">
                         <option value="">All Companies</option>
                     </select>
                 </div>
