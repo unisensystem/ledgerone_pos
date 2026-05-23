@@ -163,13 +163,21 @@ try {
                                     (sub.unit_base_in_total / NULLIF(agg.total_base_in, 0)) * agg.total_base_opening / NULLIF(sub.unit_cf, 0)
                                 END,
                             0) as opening_balance,
-                            COALESCE(
-                                CASE WHEN sub.unit_cf <= 1 THEN
-                                    ROUND((sub.unit_base_in_total / NULLIF(agg.total_base_in, 0)) * agg.total_base_closing)
-                                ELSE
-                                    (sub.unit_base_in_total / NULLIF(agg.total_base_in, 0)) * agg.total_base_closing / NULLIF(sub.unit_cf, 0)
-                                END,
-                            0) as current_stock
+                            CASE
+                                WHEN agg.total_base_in > 0 THEN
+                                    CASE WHEN sub.unit_cf <= 1 THEN
+                                        ROUND((sub.unit_base_in_total / NULLIF(agg.total_base_in, 0)) * agg.total_base_closing)
+                                    ELSE
+                                        (sub.unit_base_in_total / NULLIF(agg.total_base_in, 0)) * agg.total_base_closing / NULLIF(sub.unit_cf, 0)
+                                    END
+                                WHEN agg.total_base_out > 0 THEN
+                                    CASE WHEN sub.unit_cf <= 1 THEN
+                                        ROUND((sub.unit_base_out_total / NULLIF(agg.total_base_out, 0)) * agg.total_base_closing)
+                                    ELSE
+                                        (sub.unit_base_out_total / NULLIF(agg.total_base_out, 0)) * agg.total_base_closing / NULLIF(sub.unit_cf, 0)
+                                    END
+                                ELSE 0
+                            END as current_stock
                         FROM (
                             SELECT
                                 p.id as product_id,
@@ -187,6 +195,7 @@ try {
                                 p.min_stock_level,
                                 p.max_stock_level,
                                 COALESCE(SUM(sl.qty_in * {$conversionFactor}), 0) as unit_base_in_total,
+                                COALESCE(SUM(sl.qty_out * {$conversionFactor}), 0) as unit_base_out_total,
                                 COALESCE(AVG({$conversionFactor}), 1) as unit_cf,
                                 COALESCE(SUM(CASE WHEN (? IS NULL OR sl.transaction_date >= ?) AND (? IS NULL OR sl.transaction_date <= ?) THEN sl.qty_in ELSE 0 END), 0) as total_qty_in,
                                 COALESCE(SUM(CASE WHEN (? IS NULL OR sl.transaction_date >= ?) AND (? IS NULL OR sl.transaction_date <= ?) THEN sl.qty_out ELSE 0 END), 0) as total_qty_out,
@@ -208,6 +217,7 @@ try {
                             SELECT
                                 sl2.product_id, sl2.branch_id, sl2.account_id,
                                 COALESCE(SUM(sl2.qty_in * {$conversionFactor2}), 0) as total_base_in,
+                                COALESCE(SUM(sl2.qty_out * {$conversionFactor2}), 0) as total_base_out,
                                 COALESCE(SUM((sl2.qty_in - sl2.qty_out) * {$conversionFactor2}), 0) as total_base_closing,
                                 COALESCE(SUM(CASE WHEN ? IS NULL OR sl2.transaction_date < ? THEN
                                     (sl2.qty_in - sl2.qty_out) * {$conversionFactor2}
