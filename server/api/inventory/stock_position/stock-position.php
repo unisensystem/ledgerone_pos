@@ -120,10 +120,10 @@ try {
                 $sql .= " GROUP BY p.id, sl.branch_id, sl.account_id, COALESCE(u.base_unit_id, u.id) ORDER BY COALESCE(p.parent_product_id, p.id), p.parent_product_id IS NULL DESC, p.name";
 
             } else {
-                // Show in original units with proportional distribution to prevent negative stock.
+                // Show in original units with proportional distribution across unit types.
                 // Deductions recorded in base units (e.g. FOC in Pieces) are distributed across all
                 // unit types proportionally based on each unit's share of total incoming base units.
-                // This may produce fractional quantities (e.g. 1.5 Cartons) but never negative values.
+                // May produce fractional quantities (e.g. 1.5 Cartons) and negative values are allowed.
                 $conversionFactor2 = "COALESCE(CASE WHEN u2.base_unit_id IS NOT NULL AND u2.unit_scope = 'universal' THEN u2.conversion_factor WHEN puc2.conversion_factor IS NOT NULL THEN puc2.conversion_factor ELSE 1 END, 1)";
 
                 $filterSub = ""; $filterAgg = "";
@@ -163,13 +163,13 @@ try {
                                     (sub.unit_base_in_total / NULLIF(agg.total_base_in, 0)) * agg.total_base_opening / NULLIF(sub.unit_cf, 0)
                                 END,
                             0) as opening_balance,
-                            GREATEST(0, COALESCE(
+                            COALESCE(
                                 CASE WHEN sub.unit_cf <= 1 THEN
                                     ROUND((sub.unit_base_in_total / NULLIF(agg.total_base_in, 0)) * agg.total_base_closing)
                                 ELSE
                                     (sub.unit_base_in_total / NULLIF(agg.total_base_in, 0)) * agg.total_base_closing / NULLIF(sub.unit_cf, 0)
                                 END,
-                            0)) as current_stock
+                            0) as current_stock
                         FROM (
                             SELECT
                                 p.id as product_id,
