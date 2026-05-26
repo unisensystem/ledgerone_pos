@@ -266,6 +266,6 @@ $currency_symbol = $currency['symbol'];
     <script>
         const currencySymbol = '<?php echo $currency_symbol; ?>';
     </script>
-    <script src="../../../assets/js/sale/daily_sale_report/daily-sale-report.js"></script>
+    <script src="../../../assets/js/sale/daily_sale_report/daily-sale-report.js?v=<?php echo filemtime(__DIR__ . '/../../../assets/js/sale/daily_sale_report/daily-sale-report.js'); ?>"></script>
 </body>
 </html>
