@@ -596,9 +596,24 @@ body {
   background: var(--surface-1);
 }
 
+.multi-select-empty {
+  padding: 12px 14px;
+  font-size: 13px;
+  color: var(--subtext);
+  text-align: center;
+}
+
 .multi-select-option input[type="checkbox"] {
   width: 14px;
   height: 14px;
   cursor: pointer;
   accent-color: var(--primary);
+}
+
+.group-header-cell {
+  background: var(--surface-2);
+  font-weight: 600;
+  font-size: 13px;
+  padding: 8px 16px;
+  color: var(--primary);
 }

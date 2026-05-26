@@ -85,12 +85,13 @@ $currency_symbol = $currency['symbol'];
             <div class="form-row">
                 <div class="form-group">
                     <label class="form-label">Type</label>
-                    <select class="form-input searchable-filter" id="invoice-type" data-search-placeholder="Search types...">
-                        <option value="">All Types</option>
-                        <option value="Cash">Cash</option>
-                        <option value="Credit">Credit</option>
-                        <option value="OutStation">Out Station</option>
-                    </select>
+                    <div class="multi-select-dropdown" id="invoice-type-dropdown">
+                        <div class="multi-select-trigger" id="invoice-type-trigger">
+                            <span id="invoice-type-label">All Types</span>
+                            <i class="fas fa-chevron-down"></i>
+                        </div>
+                        <div class="multi-select-options" id="invoice-type-options"></div>
+                    </div>
                 </div>
                 
                 <div class="form-group">
@@ -108,41 +109,57 @@ $currency_symbol = $currency['symbol'];
                 
                 <div class="form-group">
                     <label class="form-label">Supplier Man</label>
-                    <select class="form-input searchable-filter" id="supplier-man" data-search-placeholder="Search supplier men...">
-                        <option value="">All Supplier Men</option>
-                    </select>
+                    <div class="multi-select-dropdown" id="supplier-man-dropdown">
+                        <div class="multi-select-trigger" id="supplier-man-trigger">
+                            <span id="supplier-man-label">All Supplier Men</span>
+                            <i class="fas fa-chevron-down"></i>
+                        </div>
+                        <div class="multi-select-options" id="supplier-man-options"></div>
+                    </div>
                 </div>
                 
                 <div class="form-group">
                     <label class="form-label">Vendor</label>
-                    <select class="form-input searchable-filter" id="vendor" data-search-placeholder="Search vendors...">
-                        <option value="">All Vendors</option>
-                        <option value="v1">Vendor A</option>
-                        <option value="v2">Vendor B</option>
-                        <option value="v3">Vendor C</option>
-                        <option value="v4">Vendor D</option>
-                    </select>
+                    <div class="multi-select-dropdown" id="vendor-dropdown">
+                        <div class="multi-select-trigger" id="vendor-trigger">
+                            <span id="vendor-label">All Vendors</span>
+                            <i class="fas fa-chevron-down"></i>
+                        </div>
+                        <div class="multi-select-options" id="vendor-options"></div>
+                    </div>
                 </div>
                 
                 <div class="form-group">
                     <label class="form-label">City</label>
-                    <select class="form-input searchable-filter" id="city-filter" data-search-placeholder="Search cities...">
-                        <option value="">All Cities</option>
-                    </select>
+                    <div class="multi-select-dropdown" id="city-filter-dropdown">
+                        <div class="multi-select-trigger" id="city-filter-trigger">
+                            <span id="city-filter-label">All Cities</span>
+                            <i class="fas fa-chevron-down"></i>
+                        </div>
+                        <div class="multi-select-options" id="city-filter-options"></div>
+                    </div>
                 </div>
                 
                 <div class="form-group">
                     <label class="form-label">City Zone</label>
-                    <select class="form-input searchable-filter" id="city-zone-filter" data-search-placeholder="Search city zones...">
-                        <option value="">All City Zones</option>
-                    </select>
+                    <div class="multi-select-dropdown" id="city-zone-filter-dropdown">
+                        <div class="multi-select-trigger" id="city-zone-filter-trigger">
+                            <span id="city-zone-filter-label">All City Zones</span>
+                            <i class="fas fa-chevron-down"></i>
+                        </div>
+                        <div class="multi-select-options" id="city-zone-filter-options"></div>
+                    </div>
                 </div>
                 
                 <div class="form-group">
                     <label class="form-label">Area</label>
-                    <select class="form-input searchable-filter" id="area-filter" data-search-placeholder="Search areas...">
-                        <option value="">All Areas</option>
-                    </select>
+                    <div class="multi-select-dropdown" id="area-filter-dropdown">
+                        <div class="multi-select-trigger" id="area-filter-trigger">
+                            <span id="area-filter-label">All Areas</span>
+                            <i class="fas fa-chevron-down"></i>
+                        </div>
+                        <div class="multi-select-options" id="area-filter-options"></div>
+                    </div>
                 </div>
                 
                 <div class="form-group">
@@ -157,9 +174,13 @@ $currency_symbol = $currency['symbol'];
                 
                 <div class="form-group">
                     <label class="form-label">Company</label>
-                    <select class="form-input searchable-filter" id="company" data-search-placeholder="Search companies...">
-                        <option value="">All Companies</option>
-                    </select>
+                    <div class="multi-select-dropdown" id="company-dropdown">
+                        <div class="multi-select-trigger" id="company-trigger">
+                            <span id="company-label">All Companies</span>
+                            <i class="fas fa-chevron-down"></i>
+                        </div>
+                        <div class="multi-select-options" id="company-options"></div>
+                    </div>
                 </div>
             </div>
             

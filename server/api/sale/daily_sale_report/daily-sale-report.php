@@ -19,22 +19,79 @@ if (!$user_id || !$tenant_id) {
     exit;
 }
 
+function getIntArrayParam($arrayName, $singleName = null) {
+    $values = [];
+    if (isset($_GET[$arrayName])) {
+        $values = array_filter(array_map('intval', (array)$_GET[$arrayName]));
+    } elseif ($singleName && !empty($_GET[$singleName])) {
+        $values = [intval($_GET[$singleName])];
+    }
+    return array_values(array_unique($values));
+}
+
+function getStringArrayParam($arrayName, $singleName = null) {
+    $values = [];
+    if (isset($_GET[$arrayName])) {
+        $values = array_filter(array_map('trim', (array)$_GET[$arrayName]));
+    } elseif ($singleName && !empty($_GET[$singleName])) {
+        $values = [trim($_GET[$singleName])];
+    }
+    return array_values(array_unique($values));
+}
+
+function addInFilter(&$sql, &$params, $column, $values) {
+    if (empty($values)) return;
+    $placeholders = implode(',', array_fill(0, count($values), '?'));
+    $sql .= " AND $column IN ($placeholders)";
+    $params = array_merge($params, $values);
+}
+
+function addInvoiceTypeFilter(&$sql, &$params, $invoiceTypes) {
+    if (empty($invoiceTypes)) return;
+
+    $normalTypes = array_values(array_diff($invoiceTypes, ['OutStation']));
+    $conditions = [];
+
+    if (in_array('OutStation', $invoiceTypes, true)) {
+        $conditions[] = "c.is_out_station = 1";
+    }
+
+    if (!empty($normalTypes)) {
+        $placeholders = implode(',', array_fill(0, count($normalTypes), '?'));
+        $conditions[] = "si.invoice_type IN ($placeholders)";
+        $params = array_merge($params, $normalTypes);
+    }
+
+    if (!empty($conditions)) {
+        $sql .= " AND (" . implode(' OR ', $conditions) . ")";
+    }
+}
+
+function addBillVendorFilter(&$sql, &$params, $vendorIds) {
+    if (empty($vendorIds)) return;
+    $placeholders = implode(',', array_fill(0, count($vendorIds), '?'));
+    $sql .= " AND EXISTS (
+        SELECT 1
+        FROM sale_invoice_items sii_vendor
+        JOIN products p_vendor ON sii_vendor.product_id = p_vendor.id
+        WHERE sii_vendor.sale_invoice_id = si.id
+          AND p_vendor.vendor_id IN ($placeholders)
+    )";
+    $params = array_merge($params, $vendorIds);
+}
+
 try {
     $report_type = $_GET['report_type'] ?? 'item-wise';
-    $sales_officer_ids = isset($_GET['sales_officer_ids']) ? array_filter(array_map('intval', (array)$_GET['sales_officer_ids'])) : [];
-    // backward compat with single sales_officer_id
-    if (empty($sales_officer_ids) && !empty($_GET['sales_officer_id'])) {
-        $sales_officer_ids = [intval($_GET['sales_officer_id'])];
-    }
-    $supplier_man_id = $_GET['supplier_man_id'] ?? null;
-    $vendor_id = $_GET['vendor_id'] ?? null;
-    $company_id = $_GET['company_id'] ?? null;
+    $invoice_types = getStringArrayParam('invoice_types', 'invoice_type');
+    $sales_officer_ids = getIntArrayParam('sales_officer_ids', 'sales_officer_id');
+    $supplier_man_ids = getIntArrayParam('supplier_man_ids', 'supplier_man_id');
+    $vendor_ids = getIntArrayParam('vendor_ids', 'vendor_id');
+    $company_ids = getIntArrayParam('company_ids', 'company_id');
+    $city_ids = getIntArrayParam('city_ids', 'city_id');
+    $city_zone_ids = getIntArrayParam('city_zone_ids', 'city_zone_id');
+    $area_ids = getIntArrayParam('area_ids', 'area_id');
     $date_from = $_GET['date_from'] ?? null;
     $date_to = $_GET['date_to'] ?? null;
-    $invoice_type = $_GET['invoice_type'] ?? null;
-    $city_id = $_GET['city_id'] ?? null;
-    $city_zone_id = $_GET['city_zone_id'] ?? null;
-    $area_id = $_GET['area_id'] ?? null;
 
     if ($report_type === 'item-wise') {
         // Item-wise report query - get all unit variations
@@ -68,41 +125,14 @@ try {
             $sql .= " AND si.sale_date <= ?";
             $params[] = $date_to;
         }
-        if (!empty($sales_officer_ids)) {
-            $placeholders = implode(',', array_fill(0, count($sales_officer_ids), '?'));
-            $sql .= " AND si.sale_officer_id IN ($placeholders)";
-            $params = array_merge($params, $sales_officer_ids);
-        }
-        if ($supplier_man_id) {
-            $sql .= " AND si.supplier_man_id = ?";
-            $params[] = $supplier_man_id;
-        }
-        if ($vendor_id) {
-            $sql .= " AND p.vendor_id = ?";
-            $params[] = $vendor_id;
-        }
-        if ($company_id) {
-            $sql .= " AND si.company_id = ?";
-            $params[] = $company_id;
-        }
-        if ($invoice_type === 'OutStation') {
-            $sql .= " AND c.is_out_station = 1";
-        } elseif ($invoice_type) {
-            $sql .= " AND si.invoice_type = ?";
-            $params[] = $invoice_type;
-        }
-        if ($city_id) {
-            $sql .= " AND c.city_id = ?";
-            $params[] = $city_id;
-        }
-        if ($city_zone_id) {
-            $sql .= " AND c.city_zone_id = ?";
-            $params[] = $city_zone_id;
-        }
-        if ($area_id) {
-            $sql .= " AND c.area_id = ?";
-            $params[] = $area_id;
-        }
+        addInFilter($sql, $params, 'si.sale_officer_id', $sales_officer_ids);
+        addInFilter($sql, $params, 'si.supplier_man_id', $supplier_man_ids);
+        addInFilter($sql, $params, 'p.vendor_id', $vendor_ids);
+        addInFilter($sql, $params, 'si.company_id', $company_ids);
+        addInvoiceTypeFilter($sql, $params, $invoice_types);
+        addInFilter($sql, $params, 'c.city_id', $city_ids);
+        addInFilter($sql, $params, 'c.city_zone_id', $city_zone_ids);
+        addInFilter($sql, $params, 'c.area_id', $area_ids);
         
         $sql .= " ORDER BY si.sale_officer_id, p.id, u.uom_name";
         
@@ -187,37 +217,14 @@ try {
             $sql .= " AND si.sale_date <= ?";
             $params[] = $date_to;
         }
-        if (!empty($sales_officer_ids)) {
-            $placeholders = implode(',', array_fill(0, count($sales_officer_ids), '?'));
-            $sql .= " AND si.sale_officer_id IN ($placeholders)";
-            $params = array_merge($params, $sales_officer_ids);
-        }
-        if ($supplier_man_id) {
-            $sql .= " AND si.supplier_man_id = ?";
-            $params[] = $supplier_man_id;
-        }
-        if ($company_id) {
-            $sql .= " AND si.company_id = ?";
-            $params[] = $company_id;
-        }
-        if ($invoice_type === 'OutStation') {
-            $sql .= " AND c.is_out_station = 1";
-        } elseif ($invoice_type) {
-            $sql .= " AND si.invoice_type = ?";
-            $params[] = $invoice_type;
-        }
-        if ($city_id) {
-            $sql .= " AND c.city_id = ?";
-            $params[] = $city_id;
-        }
-        if ($city_zone_id) {
-            $sql .= " AND c.city_zone_id = ?";
-            $params[] = $city_zone_id;
-        }
-        if ($area_id) {
-            $sql .= " AND c.area_id = ?";
-            $params[] = $area_id;
-        }
+        addInFilter($sql, $params, 'si.sale_officer_id', $sales_officer_ids);
+        addInFilter($sql, $params, 'si.supplier_man_id', $supplier_man_ids);
+        addBillVendorFilter($sql, $params, $vendor_ids);
+        addInFilter($sql, $params, 'si.company_id', $company_ids);
+        addInvoiceTypeFilter($sql, $params, $invoice_types);
+        addInFilter($sql, $params, 'c.city_id', $city_ids);
+        addInFilter($sql, $params, 'c.city_zone_id', $city_zone_ids);
+        addInFilter($sql, $params, 'c.area_id', $area_ids);
         
         $sql .= " ORDER BY si.bill_no DESC";
         

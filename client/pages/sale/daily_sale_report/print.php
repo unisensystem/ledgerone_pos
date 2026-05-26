@@ -29,57 +29,100 @@ $stmt = $pdo->prepare("SELECT company_name, address, phone, email FROM companies
 $stmt->execute([$tenant_id]);
 $tenant = $stmt->fetch();
 
+function getIntArrayParam($arrayName, $singleName = null) {
+    $values = [];
+    if (isset($_GET[$arrayName])) {
+        $values = array_filter(array_map('intval', (array)$_GET[$arrayName]));
+    } elseif ($singleName && !empty($_GET[$singleName])) {
+        $values = [intval($_GET[$singleName])];
+    }
+    return array_values(array_unique($values));
+}
+
+function getStringArrayParam($arrayName, $singleName = null) {
+    $values = [];
+    if (isset($_GET[$arrayName])) {
+        $values = array_filter(array_map('trim', (array)$_GET[$arrayName]));
+    } elseif ($singleName && !empty($_GET[$singleName])) {
+        $values = [trim($_GET[$singleName])];
+    }
+    return array_values(array_unique($values));
+}
+
+function getNamesByIds($pdo, $table, $nameColumn, $ids, $tenantId) {
+    if (empty($ids)) return 'All';
+    $placeholders = implode(',', array_fill(0, count($ids), '?'));
+    $stmt = $pdo->prepare("SELECT id, $nameColumn FROM $table WHERE id IN ($placeholders) AND tenant_id = ?");
+    $stmt->execute(array_merge($ids, [$tenantId]));
+    $rows = $stmt->fetchAll(PDO::FETCH_KEY_PAIR);
+    return !empty($rows) ? implode(', ', array_values($rows)) : 'All';
+}
+
+function addInFilter(&$sql, &$params, $column, $values) {
+    if (empty($values)) return;
+    $placeholders = implode(',', array_fill(0, count($values), '?'));
+    $sql .= " AND $column IN ($placeholders)";
+    $params = array_merge($params, $values);
+}
+
+function addInvoiceTypeFilter(&$sql, &$params, $invoiceTypes) {
+    if (empty($invoiceTypes)) return;
+
+    $normalTypes = array_values(array_diff($invoiceTypes, ['OutStation']));
+    $conditions = [];
+
+    if (in_array('OutStation', $invoiceTypes, true)) {
+        $conditions[] = "c.is_out_station = 1";
+    }
+
+    if (!empty($normalTypes)) {
+        $placeholders = implode(',', array_fill(0, count($normalTypes), '?'));
+        $conditions[] = "si.invoice_type IN ($placeholders)";
+        $params = array_merge($params, $normalTypes);
+    }
+
+    if (!empty($conditions)) {
+        $sql .= " AND (" . implode(' OR ', $conditions) . ")";
+    }
+}
+
+function addBillVendorFilter(&$sql, &$params, $vendorIds) {
+    if (empty($vendorIds)) return;
+    $placeholders = implode(',', array_fill(0, count($vendorIds), '?'));
+    $sql .= " AND EXISTS (
+        SELECT 1
+        FROM sale_invoice_items sii_vendor
+        JOIN products p_vendor ON sii_vendor.product_id = p_vendor.id
+        WHERE sii_vendor.sale_invoice_id = si.id
+          AND p_vendor.vendor_id IN ($placeholders)
+    )";
+    $params = array_merge($params, $vendorIds);
+}
+
 // Get report parameters
 $report_type = $_GET['report_type'] ?? 'item-wise';
 $reference = $_GET['reference'] ?? null;
-$sales_officer_ids = isset($_GET['sales_officer_ids']) ? array_filter(array_map('intval', (array)$_GET['sales_officer_ids'])) : [];
-// backward compat
-if (empty($sales_officer_ids) && !empty($_GET['sales_officer_id'])) {
-    $sales_officer_ids = [intval($_GET['sales_officer_id'])];
-}
-$supplier_man_id = $_GET['supplier_man_id'] ?? null;
-$vendor_id = $_GET['vendor_id'] ?? null;
-$company_id = $_GET['company_id'] ?? null;
+$invoice_types = getStringArrayParam('invoice_types', 'invoice_type');
+$sales_officer_ids = getIntArrayParam('sales_officer_ids', 'sales_officer_id');
+$supplier_man_ids = getIntArrayParam('supplier_man_ids', 'supplier_man_id');
+$vendor_ids = getIntArrayParam('vendor_ids', 'vendor_id');
+$company_ids = getIntArrayParam('company_ids', 'company_id');
+$city_ids = getIntArrayParam('city_ids', 'city_id');
+$city_zone_ids = getIntArrayParam('city_zone_ids', 'city_zone_id');
+$area_ids = getIntArrayParam('area_ids', 'area_id');
 $date_from = $_GET['date_from'] ?? null;
 $date_to = $_GET['date_to'] ?? null;
 
-// Get sales officer names
-$sales_officer_names = 'All';
-if (!empty($sales_officer_ids)) {
-    $placeholders = implode(',', array_fill(0, count($sales_officer_ids), '?'));
-    $stmt = $pdo->prepare("SELECT id, full_name FROM employees WHERE id IN ($placeholders) AND tenant_id = ?");
-    $stmt->execute(array_merge($sales_officer_ids, [$tenant_id]));
-    $officers = $stmt->fetchAll(PDO::FETCH_KEY_PAIR);
-    $sales_officer_names = implode(', ', array_values($officers));
-} else {
-    $officers = [];
-}
-
-// Get supplier man name
-$supplier_man_name = 'All';
-if ($supplier_man_id) {
-    $stmt = $pdo->prepare("SELECT full_name FROM employees WHERE id = ? AND tenant_id = ?");
-    $stmt->execute([$supplier_man_id, $tenant_id]);
-    $sm = $stmt->fetch();
-    if ($sm) $supplier_man_name = $sm['full_name'];
-}
-
-// Get vendor name
-$vendor_name = 'All';
-if ($vendor_id) {
-    $stmt = $pdo->prepare("SELECT supplier_name FROM suppliers WHERE id = ? AND tenant_id = ?");
-    $stmt->execute([$vendor_id, $tenant_id]);
-    $vendor = $stmt->fetch();
-    if ($vendor) $vendor_name = $vendor['supplier_name'];
-}
-
-$company_name = 'All';
-if ($company_id) {
-    $stmt = $pdo->prepare("SELECT company_name FROM companies WHERE id = ? AND tenant_id = ?");
-    $stmt->execute([$company_id, $tenant_id]);
-    $company = $stmt->fetch();
-    if ($company) $company_name = $company['company_name'];
-}
+$invoice_type_names = empty($invoice_types)
+    ? 'All'
+    : implode(', ', array_map(function($type) { return $type === 'OutStation' ? 'Out Station' : $type; }, $invoice_types));
+$sales_officer_names = getNamesByIds($pdo, 'employees', 'full_name', $sales_officer_ids, $tenant_id);
+$supplier_man_name = getNamesByIds($pdo, 'employees', 'full_name', $supplier_man_ids, $tenant_id);
+$vendor_name = getNamesByIds($pdo, 'suppliers', 'supplier_name', $vendor_ids, $tenant_id);
+$company_name = getNamesByIds($pdo, 'companies', 'company_name', $company_ids, $tenant_id);
+$city_name = getNamesByIds($pdo, 'cities', 'city_name', $city_ids, $tenant_id);
+$city_zone_name = getNamesByIds($pdo, 'city_zones', 'city_zone_name', $city_zone_ids, $tenant_id);
+$area_name = getNamesByIds($pdo, 'areas', 'area_name', $area_ids, $tenant_id);
 
 // Fetch report data
 if ($report_type === 'item-wise') {
@@ -99,6 +142,7 @@ if ($report_type === 'item-wise') {
             JOIN sale_invoice si ON sii.sale_invoice_id = si.id
             JOIN products p ON sii.product_id = p.id
             LEFT JOIN uom u ON sii.uom_id = u.id
+            LEFT JOIN customers c ON si.customer_id = c.id
             LEFT JOIN employees e ON si.sale_officer_id = e.id
             WHERE si.tenant_id = ? AND si.status = 'Posted'";
     
@@ -106,14 +150,14 @@ if ($report_type === 'item-wise') {
     
     if ($date_from) { $sql .= " AND si.sale_date >= ?"; $params[] = $date_from; }
     if ($date_to)   { $sql .= " AND si.sale_date <= ?"; $params[] = $date_to; }
-    if (!empty($sales_officer_ids)) {
-        $ph = implode(',', array_fill(0, count($sales_officer_ids), '?'));
-        $sql .= " AND si.sale_officer_id IN ($ph)";
-        $params = array_merge($params, $sales_officer_ids);
-    }
-    if ($supplier_man_id) { $sql .= " AND si.supplier_man_id = ?"; $params[] = $supplier_man_id; }
-    if ($vendor_id)       { $sql .= " AND p.vendor_id = ?"; $params[] = $vendor_id; }
-    if ($company_id)      { $sql .= " AND si.company_id = ?"; $params[] = $company_id; }
+    addInFilter($sql, $params, 'si.sale_officer_id', $sales_officer_ids);
+    addInFilter($sql, $params, 'si.supplier_man_id', $supplier_man_ids);
+    addInFilter($sql, $params, 'p.vendor_id', $vendor_ids);
+    addInFilter($sql, $params, 'si.company_id', $company_ids);
+    addInvoiceTypeFilter($sql, $params, $invoice_types);
+    addInFilter($sql, $params, 'c.city_id', $city_ids);
+    addInFilter($sql, $params, 'c.city_zone_id', $city_zone_ids);
+    addInFilter($sql, $params, 'c.area_id', $area_ids);
     
     $sql .= " ORDER BY si.sale_officer_id, p.id, u.uom_name";
     
@@ -167,13 +211,14 @@ if ($report_type === 'item-wise') {
     
     if ($date_from) { $sql .= " AND si.sale_date >= ?"; $params[] = $date_from; }
     if ($date_to)   { $sql .= " AND si.sale_date <= ?"; $params[] = $date_to; }
-    if (!empty($sales_officer_ids)) {
-        $ph = implode(',', array_fill(0, count($sales_officer_ids), '?'));
-        $sql .= " AND si.sale_officer_id IN ($ph)";
-        $params = array_merge($params, $sales_officer_ids);
-    }
-    if ($supplier_man_id) { $sql .= " AND si.supplier_man_id = ?"; $params[] = $supplier_man_id; }
-    if ($company_id)      { $sql .= " AND si.company_id = ?"; $params[] = $company_id; }
+    addInFilter($sql, $params, 'si.sale_officer_id', $sales_officer_ids);
+    addInFilter($sql, $params, 'si.supplier_man_id', $supplier_man_ids);
+    addBillVendorFilter($sql, $params, $vendor_ids);
+    addInFilter($sql, $params, 'si.company_id', $company_ids);
+    addInvoiceTypeFilter($sql, $params, $invoice_types);
+    addInFilter($sql, $params, 'c.city_id', $city_ids);
+    addInFilter($sql, $params, 'c.city_zone_id', $city_zone_ids);
+    addInFilter($sql, $params, 'c.area_id', $area_ids);
     
     $sql .= " ORDER BY si.sale_officer_id, si.bill_no DESC";
     
@@ -350,10 +395,14 @@ if ($report_type === 'item-wise') {
         <div class="report-info">
             <div>
                 <strong>Reference #:</strong> <?php echo htmlspecialchars($reference ?? 'N/A'); ?><br>
+                <strong>Type:</strong> <?php echo htmlspecialchars($invoice_type_names); ?><br>
                 <strong>Sales Officer:</strong> <?php echo htmlspecialchars($sales_officer_names); ?><br>
                 <strong>Supplier Man:</strong> <?php echo htmlspecialchars($supplier_man_name); ?><br>
                 <strong>Vendor:</strong> <?php echo htmlspecialchars($vendor_name); ?><br>
-                <strong>Company:</strong> <?php echo htmlspecialchars($company_name); ?>
+                <strong>Company:</strong> <?php echo htmlspecialchars($company_name); ?><br>
+                <strong>City:</strong> <?php echo htmlspecialchars($city_name); ?><br>
+                <strong>City Zone:</strong> <?php echo htmlspecialchars($city_zone_name); ?><br>
+                <strong>Area:</strong> <?php echo htmlspecialchars($area_name); ?>
             </div>
             <div>
                 <strong>Date Range:</strong> <?php echo $date_from ? date('d-M-Y', strtotime($date_from)) : 'N/A'; ?> to <?php echo $date_to ? date('d-M-Y', strtotime($date_to)) : 'N/A'; ?>
@@ -389,7 +438,7 @@ if ($report_type === 'item-wise') {
                             $sNo++;
                             if (!$item['is_child']) $totalAmount += $item['amount'];
                             $indent = $item['is_child'] ? 'padding-left: 30px;' : '';
-                            $arrow  = $item['is_child'] ? '↳ ' : '';
+                            $arrow  = $item['is_child'] ? '&rarr; ' : '';
                     ?>
                         <tr>
                             <td class="text-center"><?php echo $sNo; ?></td>
