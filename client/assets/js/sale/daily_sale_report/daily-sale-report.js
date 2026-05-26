@@ -289,6 +289,12 @@ function appendArrayParams(params, name, values) {
     });
 }
 
+function bindClick(element, handler) {
+    if (element) {
+        element.addEventListener('click', handler);
+    }
+}
+
 async function loadCities() {
     try {
         const res = await fetch('../../../../server/api/sale/daily_sale_report/get-cities.php');
@@ -379,6 +385,33 @@ async function loadFilters() {
 }
 
 function init() {
+    const requiredElements = [
+        itemWiseToggle,
+        billWiseToggle,
+        itemWiseReport,
+        billWiseReport,
+        itemWiseDataContainer,
+        billWiseDataContainer,
+        loading,
+        reportCount,
+        paginationContainer,
+        totalSalesEl,
+        totalItemsEl,
+        totalBillsEl,
+        netAmountEl,
+        referenceCard,
+        referenceNumber,
+        itemsSoldItem,
+        billsGeneratedItem,
+        document.getElementById('date-from'),
+        document.getElementById('date-to')
+    ];
+
+    if (requiredElements.some(function(element) { return !element; })) {
+        console.warn('Daily Sale Report script skipped because the DSR page markup is not available.');
+        return;
+    }
+
     const today = new Date();
     const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
     document.getElementById('date-from').valueAsDate = firstDay;
@@ -386,13 +419,13 @@ function init() {
 
     initMultiSelects();
 
-    searchBtn.addEventListener('click', handleSearch);
-    resetBtn.addEventListener('click', handleReset);
-    exportBtn.addEventListener('click', handleExport);
-    printBtn.addEventListener('click', handlePrint);
+    bindClick(searchBtn, handleSearch);
+    bindClick(resetBtn, handleReset);
+    bindClick(exportBtn, handleExport);
+    bindClick(printBtn, handlePrint);
 
-    itemWiseToggle.addEventListener('click', function() { switchReportType('item'); });
-    billWiseToggle.addEventListener('click', function() { switchReportType('bill'); });
+    bindClick(itemWiseToggle, function() { switchReportType('item'); });
+    bindClick(billWiseToggle, function() { switchReportType('bill'); });
 
     loadCompanies();
     loadFilters();
