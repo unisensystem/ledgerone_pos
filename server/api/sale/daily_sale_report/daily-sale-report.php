@@ -92,6 +92,14 @@ try {
     $area_ids = getIntArrayParam('area_ids', 'area_id');
     $date_from = $_GET['date_from'] ?? null;
     $date_to = $_GET['date_to'] ?? null;
+    $has_search_filters = !empty($invoice_types)
+        || !empty($sales_officer_ids)
+        || !empty($supplier_man_ids)
+        || !empty($vendor_ids)
+        || !empty($company_ids)
+        || !empty($city_ids)
+        || !empty($city_zone_ids)
+        || !empty($area_ids);
 
     if ($report_type === 'item-wise') {
         // Item-wise report query - get all unit variations
@@ -134,16 +142,19 @@ try {
         addInFilter($sql, $params, 'c.city_zone_id', $city_zone_ids);
         addInFilter($sql, $params, 'c.area_id', $area_ids);
         
-        $sql .= " ORDER BY si.sale_officer_id, p.id, u.uom_name";
+        $sql .= $has_search_filters
+            ? " ORDER BY si.sale_officer_id, p.id, u.uom_name"
+            : " ORDER BY p.id, u.uom_name";
         
         $stmt = $pdo->prepare($sql);
         $stmt->execute($params);
         $rawData = $stmt->fetchAll(PDO::FETCH_ASSOC);
         
-        // Group by officer+product and combine units with quantities
+        // With no filters, show one row per product across all invoices/officers.
+        // Once filters are applied, preserve the officer-aware grouping used by DSR.
         $grouped = [];
         foreach ($rawData as $item) {
-            $key = $item['sale_officer_id'] . '_' . $item['id'];
+            $key = $has_search_filters ? $item['sale_officer_id'] . '_' . $item['id'] : $item['id'];
             if (!isset($grouped[$key])) {
                 $grouped[$key] = [
                     'id' => $item['id'],
@@ -154,7 +165,7 @@ try {
                     'rate' => $item['rate'],
                     'amount' => 0,
                     'units' => [],
-                    'sales_officer_name' => $item['sales_officer_name']
+                    'sales_officer_name' => $has_search_filters ? $item['sales_officer_name'] : 'All Sales Officers'
                 ];
             }
             

@@ -112,6 +112,14 @@ $city_zone_ids = getIntArrayParam('city_zone_ids', 'city_zone_id');
 $area_ids = getIntArrayParam('area_ids', 'area_id');
 $date_from = $_GET['date_from'] ?? null;
 $date_to = $_GET['date_to'] ?? null;
+$has_search_filters = !empty($invoice_types)
+    || !empty($sales_officer_ids)
+    || !empty($supplier_man_ids)
+    || !empty($vendor_ids)
+    || !empty($company_ids)
+    || !empty($city_ids)
+    || !empty($city_zone_ids)
+    || !empty($area_ids);
 
 $invoice_type_names = empty($invoice_types)
     ? 'All'
@@ -159,17 +167,20 @@ if ($report_type === 'item-wise') {
     addInFilter($sql, $params, 'c.city_zone_id', $city_zone_ids);
     addInFilter($sql, $params, 'c.area_id', $area_ids);
     
-    $sql .= " ORDER BY si.sale_officer_id, p.id, u.uom_name";
+    $sql .= $has_search_filters
+        ? " ORDER BY si.sale_officer_id, p.id, u.uom_name"
+        : " ORDER BY p.id, u.uom_name";
     
     $stmt = $pdo->prepare($sql);
     $stmt->execute($params);
     $rawData = $stmt->fetchAll(PDO::FETCH_ASSOC);
     
-    // Group by officer -> product
+    // With no filters, show one row per product across all invoices/officers.
+    // Once filters are applied, preserve the officer-aware grouping used by DSR.
     $byOfficer = [];
     foreach ($rawData as $item) {
-        $officerName = $item['sales_officer_name'];
-        $key = $item['sale_officer_id'] . '_' . $item['id'];
+        $officerName = $has_search_filters ? $item['sales_officer_name'] : 'All Sales Officers';
+        $key = $has_search_filters ? $item['sale_officer_id'] . '_' . $item['id'] : $item['id'];
         if (!isset($byOfficer[$officerName])) $byOfficer[$officerName] = [];
         if (!isset($byOfficer[$officerName][$key])) {
             $byOfficer[$officerName][$key] = [
