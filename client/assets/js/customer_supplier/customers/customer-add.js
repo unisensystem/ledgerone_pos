@@ -696,8 +696,8 @@ document.addEventListener('DOMContentLoaded', function () {
             });
     }
 
-    function loadRegionHierarchy(countryId) {
-        fetch(`../../../../server/api/customer_supplier/customers/get-region-hierarchy.php?country_id=${countryId}`)
+    function loadRegionHierarchy(regionId) {
+        fetch(`../../../../server/api/customer_supplier/customers/get-region-hierarchy.php?region_id=${regionId}`)
             .then(response => response.json())
             .then(data => {
                 if (data.success && data.hierarchy) {
