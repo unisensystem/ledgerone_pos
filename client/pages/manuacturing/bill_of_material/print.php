@@ -100,7 +100,7 @@ $company = $stmt->fetch(PDO::FETCH_ASSOC);
 </head>
 <body>
 
-<div class="print-controls">
+<div class="print-controls no-print">
     <button class="btn-back" onclick="window.location.href='list.php'">← Back</button>
     <button class="btn-pdf" onclick="printAsPDF()">⬇ Save PDF</button>
     <button class="btn-print" onclick="window.print()">🖨 Print</button>

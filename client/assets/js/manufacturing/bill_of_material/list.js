@@ -5,6 +5,40 @@
     let allBoms = [];
     let rawMaterials = [];
     let productUOMCache = {};
+    let selectedIds = new Set();
+
+    function updateSelectionUI() {
+        const count = selectedIds.size;
+        const printSelectedBtn = document.getElementById('printSelectedBtn');
+        const selectedCount = document.getElementById('selectedCount');
+        printSelectedBtn.style.display = count > 0 ? 'inline-flex' : 'none';
+        selectedCount.textContent = count;
+        const allCheckboxes = document.querySelectorAll('#tableBody .row-checkbox');
+        const selectAll = document.getElementById('selectAllCheckbox');
+        if (allCheckboxes.length > 0) {
+            selectAll.checked = [...allCheckboxes].every(cb => cb.checked);
+            selectAll.indeterminate = !selectAll.checked && [...allCheckboxes].some(cb => cb.checked);
+        } else {
+            selectAll.checked = false;
+            selectAll.indeterminate = false;
+        }
+    }
+
+    document.getElementById('selectAllCheckbox').addEventListener('change', function() {
+        const checkboxes = document.querySelectorAll('#tableBody .row-checkbox');
+        checkboxes.forEach(cb => {
+            cb.checked = this.checked;
+            const id = parseInt(cb.dataset.id);
+            this.checked ? selectedIds.add(id) : selectedIds.delete(id);
+        });
+        updateSelectionUI();
+    });
+
+    document.getElementById('printSelectedBtn').addEventListener('click', function() {
+        if (selectedIds.size === 0) return;
+        const ids = [...selectedIds].join(',');
+        window.open(`bulk-print.php?ids=${ids}`, '_blank');
+    });
 
     async function loadBOMs() {
         try {
@@ -56,8 +90,11 @@
         const tbody = document.getElementById('tableBody');
         tbody.innerHTML = '';
         
+        selectedIds.clear();
+        updateSelectionUI();
+
         if (data.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding:32px; color:#6B7280;">No BOM entries found</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; padding:32px; color:#6B7280;">No BOM entries found</td></tr>';
             return;
         }
 
@@ -84,7 +121,20 @@
                 console.error('Error loading materials:', err);
             }
             
-            tr.innerHTML = `
+            const checkboxCell = document.createElement('td');
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.className = 'row-checkbox';
+            checkbox.dataset.id = bom.id;
+            checkbox.checked = selectedIds.has(bom.id);
+            checkbox.addEventListener('change', function() {
+                this.checked ? selectedIds.add(bom.id) : selectedIds.delete(bom.id);
+                updateSelectionUI();
+            });
+            checkboxCell.appendChild(checkbox);
+            tr.appendChild(checkboxCell);
+
+            tr.innerHTML += `
                 <td><strong>${bom.bom_code}</strong></td>
                 <td><strong>${bom.fg_code} - ${bom.fg_name}</strong></td>
                 <td><span class="version-pill">v${bom.version}</span></td>

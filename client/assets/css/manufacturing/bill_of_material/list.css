@@ -191,10 +191,16 @@ th {
 }
 
 th:nth-child(1) {
-    width: 18%;
+    width: 40px;
+    text-align: center;
+    padding: 0 8px;
 }
 
-th:nth-child(5) {
+th:nth-child(2) {
+    width: 14%;
+}
+
+th:nth-child(6) {
     width: 25%;
 }
 
@@ -206,6 +212,11 @@ td {
 }
 
 td:nth-child(1) {
+    text-align: center;
+    padding: 0 8px;
+}
+
+td:nth-child(2) {
     font-size: 1.05rem;
     font-weight: 500;
 }
@@ -238,7 +249,9 @@ tbody tr:nth-child(even) {
 
 .actions-cell {
     display: flex;
+    align-items: center;
     gap: 6px;
+    height: 44px;
 }
 
 .version-pill {
@@ -263,6 +276,16 @@ tbody tr:nth-child(even) {
     font-size: 12px;
     color: #2F3B4C;
     border-left: 2px solid #1F7BFF;
+}
+
+#selectAllCheckbox,
+.row-checkbox {
+    width: 16px;
+    height: 16px;
+    accent-color: #1F7BFF;
+    cursor: pointer;
+    display: block;
+    margin: 0 auto;
 }
 
 .success-message {
