@@ -150,11 +150,12 @@ if (!$user_id) {
                             <tr>
                                 <th width="3%">S#</th>
                                 <th width="15%">Product Code / Name</th>
+                                <!-- Dynamic unit headers inserted here by JS -->
+                                <th width="8%" class="scheme-header">Scheme</th>
                                 <th width="8%"><span id="salePriceLabel">Sale Price</span></th>
                                 <th width="8%"><span id="grossAmountLabel">Gross Amount</span></th>
                                 <th width="5%">Disc %</th>
                                 <th width="8%"><span id="discountAmountLabel">Disc Amt</span></th>
-                                <th width="5%">T.O Disc %</th>
                                 <th width="8%">T.O Amt</th>
                                 <th width="5%">GST %</th>
                                 <th width="8%">GST Amt</th>
@@ -169,11 +170,12 @@ if (!$user_id) {
                         <tfoot>
                             <tr class="totals-row">
                                 <th colspan="2">Totals</th>
+                                <!-- Dynamic unit total cells inserted here by JS -->
+                                <th></th>
                                 <th id="totalSalePrice">0.00</th>
                                 <th id="totalGrossAmount">0.00</th>
                                 <th></th>
                                 <th id="totalDiscountAmountItems">0.00</th>
-                                <th></th>
                                 <th id="totalTradeOfferAmount">0.00</th>
                                 <th></th>
                                 <th id="totalGstAmount">0.00</th>

@@ -98,12 +98,11 @@ try {
             tenant_id, sale_invoice_id, product_id, uom_id,
             quantity, sale_price, gross_amount, discount_percent,
             discount_amount, trade_offer_percent, trade_offer_amount,
-            gst_percent, gst_amount, foc_quantity, net_amount, created_by, updated_by
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            gst_percent, gst_amount, foc_quantity, scheme, net_amount, created_by, updated_by
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ");
 
     foreach ($input['items'] as $item) {
-        // Each item can have multiple unit entries
         $isFirstEntry = true;
         foreach ($item['unitEntries'] as $unitEntry) {
             $item_stmt->execute([
@@ -121,6 +120,7 @@ try {
                 $item['gstPercent'] ?? 0.00,
                 $isFirstEntry ? $item['gstAmount'] : 0,
                 $item['focQty'] ?? 0,
+                $item['scheme'] ?? 'sale_on_tp',
                 $isFirstEntry ? $item['netAmount'] : 0,
                 $user_id,
                 $user_id

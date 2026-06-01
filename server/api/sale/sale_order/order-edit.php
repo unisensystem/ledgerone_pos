@@ -138,6 +138,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
                 'uom_group_id' => $firstItem['uom_group_id'],
                 'default_unit_id' => $firstItem['default_unit_id'],
                 'sale_price' => $firstItem['sale_price'],
+                'scheme' => $firstItem['scheme'] ?? 'sale_on_tp',
                 'gross_amount' => $totalGross,
                 'discount_percent' => $firstItem['discount_percent'],
                 'discount_amount' => $totalDiscount,
@@ -217,12 +218,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
                 tenant_id, sale_invoice_id, product_id, uom_id,
                 quantity, sale_price, gross_amount, discount_percent,
                 discount_amount, trade_offer_percent, trade_offer_amount,
-                gst_percent, gst_amount, foc_quantity, net_amount, created_by, updated_by
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                gst_percent, gst_amount, foc_quantity, scheme, net_amount, created_by, updated_by
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ");
 
         foreach ($input['items'] as $item) {
-            // Each item can have multiple unit entries
             $isFirstEntry = true;
             foreach ($item['unitEntries'] as $unitEntry) {
                 $item_stmt->execute([
@@ -240,6 +240,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
                     $item['gstPercent'] ?? 0.00,
                     $isFirstEntry ? $item['gstAmount'] : 0,
                     $item['focQty'] ?? 0,
+                    $item['scheme'] ?? 'sale_on_tp',
                     $isFirstEntry ? $item['netAmount'] : 0,
                     $user_id,
                     $user_id

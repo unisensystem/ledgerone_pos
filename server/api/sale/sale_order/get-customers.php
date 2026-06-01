@@ -16,7 +16,7 @@ if (!$tenant_id) {
 }
 
 try {
-    $stmt = $pdo->prepare("SELECT id, customer_code, customer_name, current_balance, address, default_discount_percentage, credit_limit FROM customers WHERE (tenant_id = ? OR tenant_id = 0) AND status = 'ACTIVE' ORDER BY customer_name");
+    $stmt = $pdo->prepare("SELECT id, customer_code, customer_name, current_balance, address, default_discount_percentage, credit_limit, associated_sales_officer_id, supplier_man_id FROM customers WHERE (tenant_id = ? OR tenant_id = 0) AND status = 'ACTIVE' ORDER BY customer_name");
     $stmt->execute([$tenant_id]);
     $customers = $stmt->fetchAll(PDO::FETCH_ASSOC);
     

@@ -94,6 +94,7 @@
                 <td class="actions-cell">
                     <button class="btn-icon" onclick="viewBOM(${bom.id})" title="View"><i class="las la-eye"></i></button>
                     <button class="btn-icon" onclick="editBOM(${bom.id})" title="Edit"><i class="las la-pencil-alt"></i></button>
+                    <button class="btn-icon" onclick="window.open('print.php?id=${bom.id}','_blank')" title="Print / PDF"><i class="las la-print"></i></button>
                     <button class="btn-icon" onclick="deleteBOM(${bom.id})" title="Delete"><i class="las la-trash"></i></button>
                 </td>
             `;

@@ -16,7 +16,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const resetBtn = document.getElementById('resetBtn');
     const form = document.getElementById('invoiceForm');
 
-    Promise.all([loadCustomers(), loadBranches(), loadProducts(), loadUOM(), loadCurrencies(), loadCompanies()]).then(() => {
+    Promise.all([loadCustomers(), loadBranches(), loadProducts(), loadUOM(), loadCurrencies(), loadCompanies(), loadEmployees()]).then(() => {
         initSearchableDropdown('customerCodeSearch', 'customerCodeOptions', 'customerCode');
         initSearchableDropdown('branchSearch', 'branchOptions', 'branch');
         applyInvoiceSettings();
@@ -151,12 +151,39 @@ document.addEventListener('DOMContentLoaded', function () {
                     codeOption.className = 'dropdown-option';
                     codeOption.setAttribute('data-value', customer.id);
                     codeOption.setAttribute('data-balance', customer.current_balance);
+                    codeOption.setAttribute('data-sales-officer', customer.associated_sales_officer_id || '');
+                    codeOption.setAttribute('data-supplier-man', customer.supplier_man_id || '');
                     codeOption.textContent = `${customer.customer_code} - ${customer.customer_name}`;
                     codeOptions.appendChild(codeOption);
                 });
             }
         } catch (error) {
             console.error('Error loading customers:', error);
+        }
+    }
+
+    async function loadEmployees() {
+        try {
+            const response = await fetch('../../../../server/api/sale/pos_invoice/get-employees.php');
+            const data = await response.json();
+            if (data.success) {
+                const salesOfficerSelect = document.getElementById('salesOfficer');
+                salesOfficerSelect.innerHTML = '<option value="">Select Sales Officer</option>';
+                const supplierManSelect = document.getElementById('supplierMan');
+                supplierManSelect.innerHTML = '<option value="">Select Supplier Man</option>';
+                data.employees.forEach(employee => {
+                    const opt1 = document.createElement('option');
+                    opt1.value = employee.id;
+                    opt1.textContent = `${employee.employee_id} - ${employee.full_name}`;
+                    salesOfficerSelect.appendChild(opt1);
+                    const opt2 = document.createElement('option');
+                    opt2.value = employee.id;
+                    opt2.textContent = `${employee.employee_id} - ${employee.full_name}`;
+                    supplierManSelect.appendChild(opt2);
+                });
+            }
+        } catch (error) {
+            console.error('Error loading employees:', error);
         }
     }
 
@@ -304,7 +331,12 @@ document.addEventListener('DOMContentLoaded', function () {
         cell1.appendChild(codeContainer);
         initTableDropdownDynamic(codeContainer, row);
 
-        const priceCell = row.insertCell(2);
+        // Scheme cell
+        const schemeCell = row.insertCell(2);
+        schemeCell.className = 'scheme-cell';
+        schemeCell.appendChild(createSchemeCell(row));
+
+        const priceCell = row.insertCell(3);
         priceCell.className = 'price-cell';
         const priceInput = document.createElement('input');
         priceInput.type = 'number';
@@ -317,7 +349,7 @@ document.addEventListener('DOMContentLoaded', function () {
         });
         priceCell.appendChild(priceInput);
 
-        const grossCell = row.insertCell(3);
+        const grossCell = row.insertCell(4);
         grossCell.className = 'gross-cell';
         const grossInput = document.createElement('input');
         grossInput.type = 'text';
@@ -327,7 +359,7 @@ document.addEventListener('DOMContentLoaded', function () {
         grossInput.tabIndex = -1;
         grossCell.appendChild(grossInput);
 
-        const discPercentCell = row.insertCell(4);
+        const discPercentCell = row.insertCell(5);
         discPercentCell.className = 'disc-percent-cell';
         const discPercentInput = document.createElement('input');
         discPercentInput.type = 'number';
@@ -341,7 +373,7 @@ document.addEventListener('DOMContentLoaded', function () {
         });
         discPercentCell.appendChild(discPercentInput);
 
-        const discAmountCell = row.insertCell(5);
+        const discAmountCell = row.insertCell(6);
         discAmountCell.className = 'disc-amount-cell';
         const discAmountInput = document.createElement('input');
         discAmountInput.type = 'number';
@@ -351,20 +383,6 @@ document.addEventListener('DOMContentLoaded', function () {
         discAmountInput.value = '0.00';
         discAmountCell.appendChild(discAmountInput);
 
-        const toPercentCell = row.insertCell(6);
-        toPercentCell.className = 'to-percent-cell';
-        const toPercentInput = document.createElement('input');
-        toPercentInput.type = 'number';
-        toPercentInput.className = 'table-input';
-        toPercentInput.min = '0';
-        toPercentInput.max = '100';
-        toPercentInput.step = '0.01';
-        toPercentInput.value = '0';
-        toPercentInput.addEventListener('input', function () {
-            calculateTotalQuantity(row);
-        });
-        toPercentCell.appendChild(toPercentInput);
-
         const toAmountCell = row.insertCell(7);
         toAmountCell.className = 'to-amount-cell';
         const toAmountInput = document.createElement('input');
@@ -373,6 +391,8 @@ document.addEventListener('DOMContentLoaded', function () {
         toAmountInput.min = '0';
         toAmountInput.step = '0.01';
         toAmountInput.value = '0.00';
+        toAmountInput.readOnly = true;
+        toAmountInput.style.background = '#f0f0f0';
         toAmountCell.appendChild(toAmountInput);
 
         const gstPercentCell = row.insertCell(8);
@@ -407,6 +427,8 @@ document.addEventListener('DOMContentLoaded', function () {
         focInput.min = '0';
         focInput.step = '0.01';
         focInput.value = '0';
+        focInput.readOnly = true;
+        focInput.style.background = '#f0f0f0';
         focCell.appendChild(focInput);
 
         const netCell = row.insertCell(11);
@@ -459,7 +481,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
         searchInput.addEventListener('input', filterOptionsDynamic);
 
-        optionsContainer.addEventListener('click', function (e) {
+        optionsContainer.addEventListener('click', async function (e) {
             if (e.target.classList.contains('dropdown-option')) {
                 const product = JSON.parse(e.target.getAttribute('data-product'));
                 searchInput.value = `${product.code} - ${product.name}`;
@@ -471,13 +493,15 @@ document.addEventListener('DOMContentLoaded', function () {
 
                 row.querySelector('.price-cell input').value = product.sale_price || 0;
                 row.querySelector('.disc-percent-cell input').value = product.default_discount || 0;
-                row.querySelector('.to-percent-cell input').value = product.trade_offer_discount || 0;
                 row.querySelector('.gst-percent-cell input').value = product.sales_tax || 0;
-                row.querySelector('.foc-cell input').value = product.default_foc || 0;
 
                 optionsContainer.style.display = 'none';
                 recalculateMaxColumns();
-                calculateTotalQuantity(row);
+
+                // Apply default scheme after product selected
+                const schemeSelect = row.querySelector('.scheme-select');
+                if (schemeSelect) await onSchemeChange(row, schemeSelect.value);
+                else calculateTotalQuantity(row);
             }
         });
 
@@ -520,6 +544,14 @@ document.addEventListener('DOMContentLoaded', function () {
                 if (hiddenInputId === 'customerCode') {
                     const balance = parseFloat(e.target.getAttribute('data-balance'));
                     document.getElementById('previousBalance').value = `${balance >= 0 ? 'Dr' : 'Cr'} ${Math.abs(balance).toFixed(2)}`;
+
+                    const salesOfficerId = e.target.getAttribute('data-sales-officer');
+                    if (salesOfficerId) document.getElementById('salesOfficer').value = salesOfficerId;
+
+                    const supplierManId = e.target.getAttribute('data-supplier-man');
+                    if (supplierManId && supplierManId !== '' && supplierManId !== 'null') {
+                        document.getElementById('supplierMan').value = supplierManId;
+                    }
                 }
 
                 optionsContainer.style.display = 'none';
@@ -589,11 +621,11 @@ document.addEventListener('DOMContentLoaded', function () {
             items.push({
                 productId: productId,
                 unitEntries: unitEntries,
+                scheme: row.querySelector('.scheme-select')?.value || 'sale_on_tp',
                 salePrice: parseFloat(row.querySelector('.price-cell input').value) || 0,
                 grossAmount: parseFloat(row.querySelector('.gross-cell input').value) || 0,
                 discountPercent: parseFloat(row.querySelector('.disc-percent-cell input').value) || 0,
                 discountAmount: parseFloat(row.querySelector('.disc-amount-cell input').value) || 0,
-                tradeOfferPercent: parseFloat(row.querySelector('.to-percent-cell input').value) || 0,
                 tradeOfferAmount: parseFloat(row.querySelector('.to-amount-cell input').value) || 0,
                 gstPercent: parseFloat(row.querySelector('.gst-percent-cell input').value) || 0,
                 gstAmount: parseFloat(row.querySelector('.gst-amount-cell input').value) || 0,
@@ -609,6 +641,8 @@ document.addEventListener('DOMContentLoaded', function () {
             branchId: document.getElementById('branch').value,
             currencyId: document.getElementById('currency').value,
             previousBalance: document.getElementById('previousBalance').value,
+            salesOfficerId: document.getElementById('salesOfficer').value || null,
+            supplierManId: document.getElementById('supplierMan').value || null,
             totalBill: parseFloat(document.getElementById('totalBill').textContent),
             totalDiscountPercent: parseFloat(document.getElementById('totalDiscountPercent').value) || 0,
             totalDiscountAmount: parseFloat(document.getElementById('totalDiscountAmount').value) || 0,
@@ -688,6 +722,8 @@ document.addEventListener('DOMContentLoaded', function () {
                 
                 document.getElementById('currency').value = invoiceData.currency_id;
                 document.getElementById('remarks').value = invoiceData.remarks || '';
+                document.getElementById('salesOfficer').value = invoiceData.sale_officer_id || '';
+                document.getElementById('supplierMan').value = invoiceData.supplier_man_id || '';
 
                 updateCurrencySymbols();
 
@@ -713,13 +749,14 @@ document.addEventListener('DOMContentLoaded', function () {
                         lastRow.querySelector('.price-cell input').value = item.sale_price;
                         lastRow.querySelector('.disc-percent-cell input').value = item.discount_percent;
                         lastRow.querySelector('.disc-amount-cell input').value = item.discount_amount;
-                        lastRow.querySelector('.to-percent-cell input').value = item.trade_offer_percent || 0;
                         lastRow.querySelector('.to-amount-cell input').value = item.trade_offer_amount || 0;
                         lastRow.querySelector('.gst-percent-cell input').value = item.gst_percent || 0;
                         lastRow.querySelector('.gst-amount-cell input').value = item.gst_amount || 0;
                         lastRow.querySelector('.foc-cell input').value = item.foc_quantity || 0;
                         lastRow.querySelector('.gross-cell input').value = item.gross_amount;
                         lastRow.querySelector('.net-cell input').value = item.net_amount;
+                        const schemeSelect = lastRow.querySelector('.scheme-select');
+                        if (schemeSelect && item.scheme) schemeSelect.value = item.scheme;
                     }
                 });
 
