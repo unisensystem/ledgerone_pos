@@ -153,14 +153,22 @@ function updateDropdown(dropdownElement, products) {
         window.dataCache.products.set(parseInt(p.id), p);
     });
 
+    const displayMode = localStorage.getItem('productDisplayMode') || 'code_and_name';
     const html = products.map(p => {
         const codes = [];
         if (p.qr_code) codes.push(p.qr_code);
         if (p.barcode) codes.push(p.barcode);
-        const codeDisplay = codes.length > 0 ? ` (${codes.join(' - ')})` : '';
+        const codeDisplay = displayMode === 'code_and_name' && codes.length > 0 ? ` (${codes.join(' - ')})` : '';
         const photo = p.photo ? `<img src="../../../assets/uploads/products/${p.photo}" alt="${p.name}" style="width: 30px; height: 30px; object-fit: cover; margin-right: 8px; border-radius: 4px;">` : '';
-        // Use data-product (full JSON) so initTableDropdownDynamic click handler can read all fields
-        return `<div class="dropdown-option" data-product='${JSON.stringify(p)}' style="display: flex; align-items: center;">${photo}${p.code} - ${p.name}${codeDisplay}</div>`;
+        let displayText = '';
+        if (displayMode === 'code_only') {
+            displayText = p.code;
+        } else if (displayMode === 'name_only') {
+            displayText = p.name;
+        } else {
+            displayText = `${p.code} - ${p.name}`;
+        }
+        return `<div class="dropdown-option" data-product='${JSON.stringify(p)}' style="display: flex; align-items: center;">${photo}${displayText}${codeDisplay}</div>`;
     }).join('');
 
     dropdownElement.innerHTML = html;

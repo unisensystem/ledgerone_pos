@@ -34,6 +34,9 @@ if (!$user_id) {
                 <button type="button" class="btn btn-secondary" id="viewDraftsBtn">
                     <i class="fas fa-file-alt"></i> View Draft Orders
                 </button>
+                <button type="button" class="btn btn-secondary" id="fieldsSettingsBtn">
+                    <i class="fas fa-columns"></i> Fields Settings
+                </button>
                 <button type="button" class="btn btn-secondary" id="invoiceSettingsBtn">
                     <i class="fas fa-cog"></i> Order Settings
                 </button>
@@ -79,7 +82,7 @@ if (!$user_id) {
                         </div>
                         <div class="error-message" id="customerCodeError">Please select a customer code</div>
                     </div>
-                    <div class="form-group full-width" id="customerAddressGroup">
+                    <div class="form-group" id="customerAddressGroup">
                         <label>Customer Address</label>
                         <div id="customerAddress" style="padding: 10px; background: var(--surface-2); border-radius: var(--radius); min-height: 40px; color: var(--subtext);">Select a customer to view address</div>
                     </div>
@@ -280,6 +283,21 @@ if (!$user_id) {
         </div>
     </div>
 
+    <!-- Fields Settings Modal -->
+    <div class="modal" id="fieldsSettingsModal">
+        <div class="modal-content" style="max-height: 90vh; overflow-y: auto; width: 500px;">
+            <h3 class="modal-title">Fields Settings</h3>
+            <p style="font-size: 13px; color: var(--subtext); margin-bottom: 16px;">Toggle fields to show/hide. Required fields are always visible.</p>
+            <div id="fieldsSettingsContainer" style="margin: 20px 0;">
+                <!-- Fields will be populated by JavaScript -->
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-secondary" id="closeFieldsSettingsBtn">Close</button>
+                <button class="btn btn-primary" id="saveFieldsSettingsBtn">Save Settings</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Draft Invoices Modal -->
     <div class="modal" id="draftsModal">
         <div class="modal-content" style="width: 800px; max-width: 95%;">
@@ -389,31 +407,6 @@ if (!$user_id) {
         </div>
     </div>
 
-    <!-- Print Settings Modal -->
-    <div class="modal" id="printSettingsModal">
-        <div class="modal-content">
-            <h3 class="modal-title">Print Settings</h3>
-            <p>Configure your print preferences:</p>
-            <div style="margin: 20px 0;">
-                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
-                    <input type="checkbox" id="enableRememberPrint" style="width: auto;">
-                    <span>Remember my print choice</span>
-                </label>
-                <div id="printPreferenceSection" style="margin-top: 15px; display: none;">
-                    <p style="margin-bottom: 10px; font-size: 14px;">Current preference:</p>
-                    <select id="printPreference" class="table-input" style="width: 100%;">
-                        <option value="full">Full Invoice</option>
-                        <option value="thermal">Thermal Invoice</option>
-                    </select>
-                </div>
-            </div>
-            <div class="modal-actions">
-                <button class="btn btn-secondary" id="closePrintSettingsBtn">Close</button>
-                <button class="btn btn-primary" id="savePrintSettingsBtn">Save Settings</button>
-            </div>
-        </div>
-    </div>
-
     <!-- Overlay Modal -->
     <div class="modal" id="overlayModal" style="display: none;">
         <div class="modal-content" style="width: 95%; max-width: 1200px; height: 90vh; padding: 0; overflow: hidden;">
@@ -428,6 +421,7 @@ if (!$user_id) {
     </div>
 
     <script src="../../../assets/js/sale/sale_order/order-add-uom.js"></script>
+    <script src="../../../assets/js/sale/sale_order/fields-settings.js"></script>
     <script src="../../../assets/js/sale/sale_order/order-add.js"></script>
 </body>
 </html>

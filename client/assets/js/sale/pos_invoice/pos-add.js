@@ -1,4 +1,4 @@
-// Global variables for products and UOM data
+﻿// Global variables for products and UOM data
 let uomData = [];
 let branchesData = [];
 let companiesData = [];
@@ -41,6 +41,17 @@ const defaultShortcuts = {
 };
 
 let shortcuts = { ...defaultShortcuts };
+
+// Function to get product display text based on display mode setting
+function getProductDisplayText(product) {
+    const displayMode = localStorage.getItem('productDisplayMode') || 'code_and_name';
+    if (displayMode === 'code_only') {
+        return product.code;
+    } else if (displayMode === 'name_only') {
+        return product.name;
+    }
+    return `${product.code} - ${product.name}`;
+}
 
 document.addEventListener('DOMContentLoaded', function () {
     // Check permissions
@@ -140,6 +151,8 @@ function initializePage(permissions) {
         'enableCashDiscountAmount',
         'enableInvoiceCashDiscountPercent',
         'enableInvoiceCashDiscountAmount',
+        'enableExtraDiscount1',
+        'enableExtraDiscount2',
         'enableShippingFees',
         'enableAmountPaidPaymentMethod'
     ];
@@ -859,18 +872,7 @@ function initializePage(permissions) {
             const data = await response.json();
 
             if (data.success) {
-                // Cities (selecting a city shows ALL customers in that city)
-                (data.cities || []).forEach(city => {
-                    const option = document.createElement('div');
-                    option.className = 'dropdown-option';
-                    option.setAttribute('data-value', `city_${city.id}`);
-                    option.setAttribute('data-filter-type', 'city');
-                    option.setAttribute('data-city-id', city.id);
-                    option.textContent = city.city_name;
-                    optionsContainer.appendChild(option);
-                });
-
-                // Areas shown as "CityName / AreaName"
+                // Areas shown as "AreaName / CityName" - FIRST
                 (data.areas || []).forEach(area => {
                     const option = document.createElement('div');
                     option.className = 'dropdown-option';
@@ -878,7 +880,18 @@ function initializePage(permissions) {
                     option.setAttribute('data-filter-type', 'area');
                     option.setAttribute('data-city-id', area.city_id);
                     option.setAttribute('data-area-id', area.area_id);
-                    option.textContent = `${area.city_name} / ${area.area_name}`;
+                    option.textContent = `${area.area_name} / ${area.city_name}`;
+                    optionsContainer.appendChild(option);
+                });
+
+                // Cities (selecting a city shows ALL customers in that city) - SECOND
+                (data.cities || []).forEach(city => {
+                    const option = document.createElement('div');
+                    option.className = 'dropdown-option';
+                    option.setAttribute('data-value', `city_${city.id}`);
+                    option.setAttribute('data-filter-type', 'city');
+                    option.setAttribute('data-city-id', city.id);
+                    option.textContent = city.city_name;
                     optionsContainer.appendChild(option);
                 });
             }
@@ -1836,9 +1849,10 @@ function initializePage(permissions) {
             const codes = [];
             if (product.qr_code) codes.push(product.qr_code);
             if (product.barcode) codes.push(product.barcode);
-            const codeDisplay = codes.length > 0 ? ` (${codes.join(' - ')})` : '';
+            const codeDisplay = (localStorage.getItem('productDisplayMode') || 'code_and_name') === 'code_and_name' && codes.length > 0 ? ` (${codes.join(' - ')})` : '';
             const photoHtml = product.photo ? `<img src="../../../assets/uploads/products/${product.photo}" alt="${product.name}" style="width: 30px; height: 30px; object-fit: cover; margin-right: 8px; border-radius: 4px;">` : '';
-            return `<div class="dropdown-option" data-value="${product.id}" data-mrp="${product.mrp}" data-tp="${product.trade_price}" data-unit="${product.default_unit_id}" style="display: flex; align-items: center;">${photoHtml}${product.code} - ${product.name}${codeDisplay}</div>`;
+            const productDisplayText = getProductDisplayText(product);
+            return `<div class="dropdown-option" data-value="${product.id}" data-mrp="${product.mrp}" data-tp="${product.trade_price}" data-unit="${product.default_unit_id}" data-display-text="${productDisplayText}" style="display: flex; align-items: center;">${photoHtml}${productDisplayText}${codeDisplay}</div>`;
         }).join('');
         codeContainer.innerHTML = `
             <input type="text" class="search-input table-input" placeholder="Search product...">
@@ -2564,7 +2578,7 @@ function initializePage(permissions) {
         optionsContainer.addEventListener('click', async function (e) {
             if (e.target.classList.contains('dropdown-option')) {
                 const value = e.target.getAttribute('data-value');
-                const displayText = e.target.textContent;
+                const displayText = e.target.getAttribute('data-display-text') || e.target.textContent;
                 const mrp = e.target.getAttribute('data-mrp');
                 const tp = e.target.getAttribute('data-tp');
                 const unitId = e.target.getAttribute('data-unit');
@@ -3856,6 +3870,11 @@ function loadInvoiceSettings() {
     const filteringRadio = document.querySelector(`input[name="productFilteringMode"][value="${productFilteringMode}"]`);
     if (filteringRadio) filteringRadio.checked = true;
     
+    // Load product display preference
+    const productDisplayMode = localStorage.getItem('productDisplayMode') || 'code_and_name';
+    const displayRadio = document.querySelector(`input[name="productDisplayMode"][value="${productDisplayMode}"]`);
+    if (displayRadio) displayRadio.checked = true;
+    
     // Load other settings
     document.getElementById('enableTradeOfferAmount').checked = localStorage.getItem('enableTradeOfferAmount') === 'true';
     document.getElementById('enableFOC').checked = localStorage.getItem('enableFOC') === 'true';
@@ -3866,6 +3885,8 @@ function loadInvoiceSettings() {
     document.getElementById('enableShippingFees').checked = localStorage.getItem('enableShippingFees') === 'true';
     document.getElementById('enablePrintQRCode').checked = localStorage.getItem('enablePrintQRCode') === 'true';
     document.getElementById('enableAmountPaidPaymentMethod').checked = localStorage.getItem('enableAmountPaidPaymentMethod') === 'true';
+    document.getElementById('enableExtraDiscount1').checked = localStorage.getItem('enableExtraDiscount1') === 'true';
+    document.getElementById('enableExtraDiscount2').checked = localStorage.getItem('enableExtraDiscount2') === 'true';
 }
 
 // Save invoice settings to localStorage
@@ -3882,6 +3903,11 @@ function saveInvoiceSettings() {
     const selectedFilteringMode = document.querySelector('input[name="productFilteringMode"]:checked')?.value || 'showAll';
     localStorage.setItem('productFilteringMode', selectedFilteringMode);
     
+    // Save product display preference
+    const selectedDisplayMode = document.querySelector('input[name="productDisplayMode"]:checked')?.value || 'code_and_name';
+    const previousDisplayMode = localStorage.getItem('productDisplayMode');
+    localStorage.setItem('productDisplayMode', selectedDisplayMode);
+    
     // Save other settings
     localStorage.setItem('enableTradeOfferAmount', document.getElementById('enableTradeOfferAmount').checked);
     localStorage.setItem('enableFOC', document.getElementById('enableFOC').checked);
@@ -3889,10 +3915,64 @@ function saveInvoiceSettings() {
     localStorage.setItem('enableCashDiscountAmount', document.getElementById('enableCashDiscountAmount').checked);
     localStorage.setItem('enableInvoiceCashDiscountPercent', document.getElementById('enableInvoiceCashDiscountPercent').checked);
     localStorage.setItem('enableInvoiceCashDiscountAmount', document.getElementById('enableInvoiceCashDiscountAmount').checked);
+    localStorage.setItem('enableExtraDiscount1', document.getElementById('enableExtraDiscount1').checked);
+    localStorage.setItem('enableExtraDiscount2', document.getElementById('enableExtraDiscount2').checked);
     localStorage.setItem('enableShippingFees', document.getElementById('enableShippingFees').checked);
     localStorage.setItem('enablePrintQRCode', document.getElementById('enablePrintQRCode').checked);
     localStorage.setItem('enableAmountPaidPaymentMethod', document.getElementById('enableAmountPaidPaymentMethod').checked);
     alert('Invoice settings saved successfully!');
+    
+    // Refresh product dropdowns if display mode changed
+    if (previousDisplayMode !== selectedDisplayMode) {
+        refreshProductDisplayInDropdowns();
+    }
+}
+
+// Refresh product display format in all existing dropdowns
+function refreshProductDisplayInDropdowns() {
+    const itemsTable = document.getElementById('itemsTable');
+    if (!itemsTable) return;
+    
+    const tbody = itemsTable.querySelector('tbody');
+    const rows = tbody.getElementsByTagName('tr');
+    
+    for (let row of rows) {
+        const searchableDropdown = row.querySelector('.searchable-dropdown');
+        if (!searchableDropdown) continue;
+        
+        // Get the search input to find which product is selected
+        const searchInput = searchableDropdown.querySelector('.search-input');
+        const hiddenInput = searchableDropdown.querySelector('input[type="hidden"]');
+        
+        if (!hiddenInput.value) continue; // Skip if no product selected
+        
+        // Find the product data
+        const productId = hiddenInput.value;
+        const product = productsData.find(p => p.id == productId);
+        
+        if (!product) continue;
+        
+        // Update the search input display text with new format
+        const productDisplayText = getProductDisplayText(product);
+        searchInput.value = productDisplayText;
+        
+        // Get and update the dropdown options
+        const dropdownOptions = searchInput.dropdownOptions;
+        if (dropdownOptions) {
+            // Regenerate the dropdown options HTML with new display format
+            const newOptionsHtml = productsData.map(prod => {
+                const codes = [];
+                if (prod.qr_code) codes.push(prod.qr_code);
+                if (prod.barcode) codes.push(prod.barcode);
+                const codeDisplay = (localStorage.getItem('productDisplayMode') || 'code_and_name') === 'code_and_name' && codes.length > 0 ? ` (${codes.join(' - ')})` : '';
+                const photoHtml = prod.photo ? `<img src="../../../assets/uploads/products/${prod.photo}" alt="${prod.name}" style="width: 30px; height: 30px; object-fit: cover; margin-right: 8px; border-radius: 4px;">` : '';
+                const prodDisplayText = getProductDisplayText(prod);
+                return `<div class="dropdown-option" data-value="${prod.id}" data-mrp="${prod.mrp}" data-tp="${prod.trade_price}" data-unit="${prod.default_unit_id}" data-display-text="${prodDisplayText}" style="display: flex; align-items: center;">${photoHtml}${prodDisplayText}${codeDisplay}</div>`;
+            }).join('');
+            
+            dropdownOptions.innerHTML = newOptionsHtml;
+        }
+    }
 }
 
 // Apply invoice settings to show/hide columns
@@ -3904,6 +3984,8 @@ function applyInvoiceSettings() {
     const enableTaxation = false;
     const enableInvoiceCashDiscountPercent = localStorage.getItem('enableInvoiceCashDiscountPercent') === 'true';
     const enableInvoiceCashDiscountAmount = localStorage.getItem('enableInvoiceCashDiscountAmount') === 'true';
+    const enableExtraDiscount1 = localStorage.getItem('enableExtraDiscount1') === 'true';
+    const enableExtraDiscount2 = localStorage.getItem('enableExtraDiscount2') === 'true';
     const enableShippingFees = localStorage.getItem('enableShippingFees') === 'true';
 
     // Hide/show table columns by class name (works with dynamic unit columns)
@@ -4066,6 +4148,46 @@ function applyInvoiceSettings() {
         remainingBalanceItem.style.display = enableAmountPaidPaymentMethod ? '' : 'none';
         const input = document.getElementById('remainingBalance');
         if (input) input.disabled = !enableAmountPaidPaymentMethod;
+    }
+
+    // Extra Discount 1 fields
+    const extraDiscount1PercentItem = document.getElementById('extraDiscount1Percent')?.closest('.summary-item');
+    const extraDiscount1AmountItem = document.getElementById('extraDiscount1Amount')?.closest('.summary-item');
+    if (extraDiscount1PercentItem) {
+        extraDiscount1PercentItem.style.display = enableExtraDiscount1 ? '' : 'none';
+        const input = document.getElementById('extraDiscount1Percent');
+        if (input) {
+            input.disabled = !enableExtraDiscount1;
+            if (!enableExtraDiscount1) input.value = '0';
+        }
+    }
+    if (extraDiscount1AmountItem) {
+        extraDiscount1AmountItem.style.display = enableExtraDiscount1 ? '' : 'none';
+        const input = document.getElementById('extraDiscount1Amount');
+        if (input) {
+            input.disabled = !enableExtraDiscount1;
+            if (!enableExtraDiscount1) input.value = '0.00';
+        }
+    }
+
+    // Extra Discount 2 fields
+    const extraDiscount2PercentItem = document.getElementById('extraDiscount2Percent')?.closest('.summary-item');
+    const extraDiscount2AmountItem = document.getElementById('extraDiscount2Amount')?.closest('.summary-item');
+    if (extraDiscount2PercentItem) {
+        extraDiscount2PercentItem.style.display = enableExtraDiscount2 ? '' : 'none';
+        const input = document.getElementById('extraDiscount2Percent');
+        if (input) {
+            input.disabled = !enableExtraDiscount2;
+            if (!enableExtraDiscount2) input.value = '0';
+        }
+    }
+    if (extraDiscount2AmountItem) {
+        extraDiscount2AmountItem.style.display = enableExtraDiscount2 ? '' : 'none';
+        const input = document.getElementById('extraDiscount2Amount');
+        if (input) {
+            input.disabled = !enableExtraDiscount2;
+            if (!enableExtraDiscount2) input.value = '0.00';
+        }
     }
     
     // Recalculate all rows after applying settings
@@ -4945,6 +5067,21 @@ async function loadCustomers() {
     }
 }
 
+// Helper function to get formatted product display text based on settings
+function getProductDisplayText(product) {
+    const displayMode = localStorage.getItem('productDisplayMode') || 'code_and_name';
+    
+    switch(displayMode) {
+        case 'code_only':
+            return product.code;
+        case 'name_only':
+            return product.name;
+        case 'code_and_name':
+        default:
+            return `${product.code} - ${product.name}`;
+    }
+}
+
 // Load products - global function
 async function loadProducts() {
     try {
@@ -5078,9 +5215,10 @@ async function addRowDynamic() {
         const codes = [];
         if (product.qr_code) codes.push(product.qr_code);
         if (product.barcode) codes.push(product.barcode);
-        const codeDisplay = codes.length > 0 ? ` (${codes.join(' - ')})` : '';
+        const codeDisplay = (localStorage.getItem('productDisplayMode') || 'code_and_name') === 'code_and_name' && codes.length > 0 ? ` (${codes.join(' - ')})` : '';
         const photoHtml = product.photo ? `<img src="../../../assets/uploads/products/${product.photo}" alt="${product.name}" style="width: 30px; height: 30px; object-fit: cover; margin-right: 8px; border-radius: 4px;">` : '';
-        return `<div class="dropdown-option" data-product='${JSON.stringify(product)}' style="display: flex; align-items: center;">${photoHtml}${product.code} - ${product.name}${codeDisplay}</div>`;
+        const productDisplayText = getProductDisplayText(product);
+        return `<div class="dropdown-option" data-product='${JSON.stringify(product)}' data-display-text="${productDisplayText}" style="display: flex; align-items: center;">${photoHtml}${productDisplayText}${codeDisplay}</div>`;
     }).join('');
     
     codeContainer.innerHTML = `
@@ -5400,7 +5538,8 @@ function initTableDropdownDynamic(container, row) {
             justSelected = true;
             prevSearchText = '';
             const product = JSON.parse(e.target.getAttribute('data-product'));
-            searchInput.value = `${product.code} - ${product.name}`;
+            const productDisplayText = getProductDisplayText(product);
+            searchInput.value = productDisplayText;
             hiddenInput.value = product.id;
             
             // Get UOM details

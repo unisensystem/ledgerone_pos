@@ -404,6 +404,7 @@ tbody tr:hover {
   margin-bottom: 8px;
   background: var(--surface-0);
   color: var(--body);
+  font-weight: 500;
 }
 
 .dropdown-options {
@@ -425,15 +426,19 @@ tbody tr:hover {
   padding: 10px 12px;
   cursor: pointer;
   border-bottom: 1px solid var(--border-default);
+  color: var(--body);
+  font-weight: 500;
 }
 
 .dropdown-option:hover {
   background: #d1e3f8;
+  color: var(--heading);
 }
 
 .dropdown-option.selected {
   background: #1a6cdc !important;
   color: white;
+  font-weight: 600;
 }
 
 .dropdown-option:last-child {
@@ -764,6 +769,38 @@ td:not(:has(.unit-input)):not(:has(button)):not(.price-cell):not(.gross-cell):no
   font-weight: 700;
   color: var(--success);
   font-size: 13px;
+}
+
+/* Product Code / Name cell styling */
+td:nth-child(2) input,
+td:nth-child(2) .search-input {
+  background: linear-gradient(135deg, #fef3c7 0%, #ffffff 100%);
+  border-color: #d97706;
+  border: 1.5px solid #d97706;
+  color: #92400e;
+  font-weight: 600;
+}
+
+td:nth-child(2) input:focus,
+td:nth-child(2) .search-input:focus {
+  border-color: #d97706;
+  box-shadow: 0 0 0 3px rgba(217, 119, 6, 0.15);
+}
+
+/* Scheme cell styling */
+td:nth-child(3) input,
+td:nth-child(3) select {
+  background: linear-gradient(135deg, #dbeafe 0%, #ffffff 100%);
+  border-color: #3b82f6;
+  border: 1.5px solid #3b82f6;
+  color: #1e40af;
+  font-weight: 600;
+}
+
+td:nth-child(3) input:focus,
+td:nth-child(3) select:focus {
+  border-color: #1e40af;
+  box-shadow: 0 0 0 3px rgba(30, 64, 175, 0.15);
 }
 
 /* Table header for dynamic columns */

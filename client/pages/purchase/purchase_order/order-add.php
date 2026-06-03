@@ -27,9 +27,14 @@ if (!$user_id) {
     <div class="container">
         <div class="header">
             <h1 class="page-title">Purchase Order</h1>
-            <button type="button" class="btn btn-secondary" id="invoiceSettingsBtn">
-                <i class="fas fa-cog"></i> Order Settings
-            </button>
+            <div style="display: flex; gap: 12px;">
+                <button type="button" class="btn btn-secondary" id="fieldsSettingsBtn">
+                    <i class="fas fa-columns"></i> Fields Settings
+                </button>
+                <button type="button" class="btn btn-secondary" id="invoiceSettingsBtn">
+                    <i class="fas fa-cog"></i> Order Settings
+                </button>
+            </div>
         </div>
 
         <form id="invoiceForm">
@@ -233,6 +238,21 @@ if (!$user_id) {
         </div>
     </div>
 
+    <!-- Fields Settings Modal -->
+    <div class="modal" id="fieldsSettingsModal">
+        <div class="modal-content" style="max-height: 90vh; overflow-y: auto; width: 500px;">
+            <h3 class="modal-title">Fields Settings</h3>
+            <p style="font-size: 13px; color: var(--subtext); margin-bottom: 16px;">Toggle fields to show/hide. Required fields are always visible.</p>
+            <div id="fieldsSettingsContainer" style="margin: 20px 0;">
+                <!-- Fields will be populated by JavaScript -->
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-secondary" id="closeFieldsSettingsBtn">Close</button>
+                <button class="btn btn-primary" id="saveFieldsSettingsBtn">Save Settings</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Invoice Settings Modal -->
     <div class="modal" id="settingsModal">
         <div class="modal-content">
@@ -312,6 +332,7 @@ if (!$user_id) {
     </div>
 
     <script src="../../../assets/js/purchase/purchase_order/order-add-uom.js"></script>
+    <script src="../../../assets/js/purchase/purchase_order/fields-settings.js"></script>
     <script src="../../../assets/js/purchase/purchase_order/order-add.js"></script>
 </body>
 </html>

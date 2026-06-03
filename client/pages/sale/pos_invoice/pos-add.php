@@ -47,18 +47,74 @@ if (!$user_id) {
             <div class="card">
                 <h2 class="card-title">Invoice Details</h2>
                 <div class="form-grid">
+                    <!-- 1. Sale Date -->
                     <div class="form-group" id="saleDateGroup">
                         <label for="saleDate" class="required">Sale Date</label>
                         <input type="date" id="saleDate" required tabindex="-1">
                     </div>
+                    
+                    <!-- 2. Invoice Type -->
+                    <div class="form-group" id="invoiceTypeGroup">
+                        <label for="invoiceType">Invoice Type</label>
+                        <select id="invoiceType" tabindex="-1">
+                            <option value="Credit">Credit</option>
+                            <option value="Cash">Cash</option>
+                        </select>
+                    </div>
+                    
+                    <!-- 3. Due Date -->
+                    <div class="form-group" id="dueDateGroup">
+                        <label for="dueDate">Due Date</label>
+                        <input type="date" id="dueDate" tabindex="-1">
+                    </div>
+                    
+                    <!-- 4. Company -->
+                    <div class="form-group" id="companyGroup">
+                        <label for="company" class="required">Company</label>
+                        <div class="searchable-dropdown">
+                            <input type="text" class="search-input" placeholder="Search company..." id="companySearch" autocomplete="off">
+                            <div class="dropdown-options" id="companyOptions">
+                                <!-- Options loaded dynamically -->
+                            </div>
+                            <input type="hidden" id="company" required>
+                        </div>
+                        <div class="error-message" id="companyError">Please select a company</div>
+                    </div>
+                    
+                    <!-- 5. Branch -->
+                    <div class="form-group" id="branchGroup">
+                        <label for="branch" class="required">Branch</label>
+                        <div class="searchable-dropdown">
+                            <input type="text" class="search-input" placeholder="Search branch..." id="branchSearch" autocomplete="off">
+                            <div class="dropdown-options" id="branchOptions">
+                                <!-- Options loaded dynamically -->
+                            </div>
+                            <input type="hidden" id="branch" required>
+                        </div>
+                        <div class="error-message" id="branchError">Please select a branch</div>
+                    </div>
+                    
+                    <!-- 6. Currency -->
+                    <div class="form-group" id="currencyGroup">
+                        <label for="currency" class="required">Currency</label>
+                        <select id="currency" required tabindex="-1">
+                            <option value="">Select Currency</option>
+                            <!-- Options loaded dynamically -->
+                        </select>
+                        <div class="error-message" id="currencyError">Please select a currency</div>
+                    </div>
+                    
+                    <!-- 7. Area / City -->
                     <div class="form-group" id="areaCityGroup">
-                        <label for="areaCitySearch">Area/City</label>
+                        <label for="areaCitySearch">Area / City</label>
                         <div class="searchable-dropdown">
                             <input type="text" class="search-input" placeholder="Search area or city..." id="areaCitySearch" autocomplete="off" tabindex="-1">
                             <div class="dropdown-options" id="areaCityOptions"></div>
                             <input type="hidden" id="areaCity">
                         </div>
                     </div>
+                    
+                    <!-- 8. Customer Code -->
                     <div class="form-group">
                         <label for="customerCode" class="required">Customer Code</label>
                         <div style="display: flex; gap: 8px; align-items: flex-start;">
@@ -75,6 +131,8 @@ if (!$user_id) {
                         </div>
                         <div class="error-message" id="customerCodeError">Please select a customer code</div>
                     </div>
+                    
+                    <!-- 9. Sub Account -->
                     <div class="form-group" id="subAccountGroup">
                         <label for="subAccount">Sub Account</label>
                         <select id="subAccount" tabindex="-1">
@@ -82,15 +140,8 @@ if (!$user_id) {
                             <!-- Options loaded dynamically -->
                         </select>
                     </div>
-
-                    <div class="form-group" id="brandGroup">
-                        <label for="brand">Brand</label>
-                        <select id="brand" tabindex="-1">
-                            <option value="">Select Brand</option>
-                            <!-- Options loaded dynamically -->
-                        </select>
-                    </div>
-
+                    
+                    <!-- 10. Sale Order# -->
                     <div class="form-group" id="saleOrderGroup">
                         <label for="saleOrder">Sale Order#</label>
                         <div class="searchable-dropdown">
@@ -101,37 +152,17 @@ if (!$user_id) {
                             <input type="hidden" id="saleOrder">
                         </div>
                     </div>
-
-                    <div class="form-group" id="companyGroup">
-                        <label for="company" class="required">Company</label>
-                        <div class="searchable-dropdown">
-                            <input type="text" class="search-input" placeholder="Search company..." id="companySearch" autocomplete="off">
-                            <div class="dropdown-options" id="companyOptions">
-                                <!-- Options loaded dynamically -->
-                            </div>
-                            <input type="hidden" id="company" required>
-                        </div>
-                        <div class="error-message" id="companyError">Please select a company</div>
-                    </div>
-                    <div class="form-group" id="branchGroup">
-                        <label for="branch" class="required">Branch</label>
-                        <div class="searchable-dropdown">
-                            <input type="text" class="search-input" placeholder="Search branch..." id="branchSearch" autocomplete="off">
-                            <div class="dropdown-options" id="branchOptions">
-                                <!-- Options loaded dynamically -->
-                            </div>
-                            <input type="hidden" id="branch" required>
-                        </div>
-                        <div class="error-message" id="branchError">Please select a branch</div>
-                    </div>
-                    <div class="form-group" id="currencyGroup">
-                        <label for="currency" class="required">Currency</label>
-                        <select id="currency" required tabindex="-1">
-                            <option value="">Select Currency</option>
+                    
+                    <!-- 11. Brand -->
+                    <div class="form-group" id="brandGroup">
+                        <label for="brand">Brand</label>
+                        <select id="brand" tabindex="-1">
+                            <option value="">Select Brand</option>
                             <!-- Options loaded dynamically -->
                         </select>
-                        <div class="error-message" id="currencyError">Please select a currency</div>
                     </div>
+                    
+                    <!-- 12. Sales Officer -->
                     <div class="form-group" id="salesOfficerGroup">
                         <label for="salesOfficer">Sales Officer</label>
                         <select id="salesOfficer" tabindex="-1">
@@ -139,6 +170,8 @@ if (!$user_id) {
                             <!-- Options loaded dynamically -->
                         </select>
                     </div>
+                    
+                    <!-- 13. Supplier Man -->
                     <div class="form-group" id="supplierManGroup">
                         <label for="supplierMan">Supplier Man</label>
                         <select id="supplierMan" tabindex="-1">
@@ -146,24 +179,17 @@ if (!$user_id) {
                             <!-- Options loaded dynamically -->
                         </select>
                     </div>
-                    <div class="form-group" id="invoiceTypeGroup">
-                        <label for="invoiceType">Invoice Type</label>
-                        <select id="invoiceType" tabindex="-1">
-                            <option value="Credit">Credit</option>
-                            <option value="Cash">Cash</option>
-                        </select>
-                    </div>
-                    <div class="form-group" id="dueDateGroup">
-                        <label for="dueDate">Due Date</label>
-                        <input type="date" id="dueDate" tabindex="-1">
-                    </div>
-                    <div class="form-group" id="biltyNoGroup">
-                        <label for="biltyNo">Bilty No</label>
-                        <input type="text" id="biltyNo" placeholder="Enter bilty number" tabindex="-1">
-                    </div>
+                    
+                    <!-- 14. Transport Name -->
                     <div class="form-group" id="transportNameGroup">
                         <label for="transportName">Transport Name</label>
                         <input type="text" id="transportName" placeholder="Enter transport name" tabindex="-1">
+                    </div>
+                    
+                    <!-- 15. Bilty No -->
+                    <div class="form-group" id="biltyNoGroup">
+                        <label for="biltyNo">Bilty No</label>
+                        <input type="text" id="biltyNo" placeholder="Enter bilty number" tabindex="-1">
                     </div>
 
                 </div>
@@ -482,6 +508,38 @@ if (!$user_id) {
                             <div>
                                 <span style="font-size: 13px; font-weight: 500; display: block;">Sales Officer Filter</span>
                                 <span style="font-size: 11px; color: var(--subtext);">Filter by selected officer</span>
+                            </div>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Product Display Section -->
+                <div style="margin-bottom: 28px; padding: 16px; background: var(--surface-2); border-radius: var(--radius); border-left: 4px solid var(--success);">
+                    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 16px;">
+                        <i class="fas fa-barcode" style="color: var(--success); font-size: 16px;"></i>
+                        <h4 style="margin: 0; color: var(--heading); font-size: 15px; font-weight: 600;">Product Code / Name Display</h4>
+                    </div>
+                    
+                    <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px;">
+                        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 10px; background: var(--surface-1); border-radius: 6px; transition: all 0.2s;" onmouseover="this.style.background='var(--surface-0)'" onmouseout="this.style.background='var(--surface-1)'">
+                            <input type="radio" name="productDisplayMode" value="code_and_name" id="productDisplayCodeAndName" style="width: auto;" checked>
+                            <div>
+                                <span style="font-size: 13px; font-weight: 500; display: block;">Code & Name</span>
+                                <span style="font-size: 11px; color: var(--subtext);">CODE - NAME</span>
+                            </div>
+                        </label>
+                        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 10px; background: var(--surface-1); border-radius: 6px; transition: all 0.2s;" onmouseover="this.style.background='var(--surface-0)'" onmouseout="this.style.background='var(--surface-1)'">
+                            <input type="radio" name="productDisplayMode" value="code_only" id="productDisplayCodeOnly" style="width: auto;">
+                            <div>
+                                <span style="font-size: 13px; font-weight: 500; display: block;">Code Only</span>
+                                <span style="font-size: 11px; color: var(--subtext);">Show code only</span>
+                            </div>
+                        </label>
+                        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 10px; background: var(--surface-1); border-radius: 6px; transition: all 0.2s;" onmouseover="this.style.background='var(--surface-0)'" onmouseout="this.style.background='var(--surface-1)'">
+                            <input type="radio" name="productDisplayMode" value="name_only" id="productDisplayNameOnly" style="width: auto;">
+                            <div>
+                                <span style="font-size: 13px; font-weight: 500; display: block;">Name Only</span>
+                                <span style="font-size: 11px; color: var(--subtext);">Show name only</span>
                             </div>
                         </label>
                     </div>
