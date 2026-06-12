@@ -607,6 +607,48 @@ if (!$user_id) {
                     </div>
                 </div>
 
+                <!-- Default Fields AutoFill Section -->
+                <div style="margin-bottom: 28px; padding: 16px; background: var(--surface-2); border-radius: var(--radius); border-left: 4px solid var(--warning);">
+                    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 16px;">
+                        <i class="fas fa-magic" style="color: var(--warning); font-size: 16px;"></i>
+                        <h4 style="margin: 0; color: var(--heading); font-size: 15px; font-weight: 600;">Auto-Fill Default Values</h4>
+                    </div>
+                    
+                    <div style="margin-bottom: 16px;">
+                        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 10px; background: var(--surface-1); border-radius: 6px; transition: all 0.2s;" onmouseover="this.style.background='var(--surface-0)'" onmouseout="this.style.background='var(--surface-1)'">
+                            <input type="checkbox" id="enableDefaultFieldsAutofill" style="width: auto;">
+                            <div>
+                                <span style="font-size: 13px; font-weight: 500;">Enable Auto-Fill</span>
+                                <span style="font-size: 11px; color: var(--subtext); display: block;">Automatically populate frequently used fields from previous invoices</span>
+                            </div>
+                        </label>
+                    </div>
+
+                    <div style="padding: 12px; background: var(--surface-0); border-radius: 6px; border-left: 3px solid var(--info); font-size: 12px; color: var(--body);">
+                        <strong style="display: block; margin-bottom: 8px;">Tracked Fields:</strong>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                            <div>• Invoice Type</div>
+                            <div>• Branch</div>
+                            <div>• Area / City</div>
+                            <div>• Brand</div>
+                            <div>• Sales Officer</div>
+                            <div>• Supplier Man</div>
+                        </div>
+                        <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border-default);">
+                            <strong style="display: block; margin-bottom: 8px;">Currently Saved:</strong>
+                            <div id="defaultFieldsSummary" style="font-size: 11px; color: var(--subtext);">
+                                Loading...
+                            </div>
+                        </div>
+                    </div>
+
+                    <div style="margin-top: 12px; display: flex; gap: 8px;">
+                        <button type="button" class="btn btn-secondary" id="clearDefaultFieldsBtn" style="padding: 6px 12px; font-size: 12px;">
+                            <i class="fas fa-trash"></i> Clear Saved Values
+                        </button>
+                    </div>
+                </div>
+
                 <!-- Print Section -->
                 <div style="padding: 16px; background: var(--surface-2); border-radius: var(--radius); border-left: 4px solid var(--error);">
                     <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 16px;">
@@ -988,6 +1030,9 @@ if (!$user_id) {
     <script src="../../../assets/js/sale/pos_invoice/pos-tax-calculation.js?v=<?php echo time(); ?>"></script>
     <script src="../../../assets/js/sale/pos_invoice/withholding-tax.js?v=<?php echo time(); ?>"></script>
     <script src="../../../assets/js/sale/pos_invoice/stock-validation.js?v=<?php echo time(); ?>"></script>
+    <script src="../../../assets/js/sale/pos_invoice/default-fields-autofill.js?v=<?php echo time(); ?>"></script>
+    <script src="../../../assets/js/sale/pos_invoice/default-fields-autofill-settings.js?v=<?php echo time(); ?>"></script>
+    <script src="../../../assets/js/sale/pos_invoice/autofill-debug.js?v=<?php echo time(); ?>"></script>
     <script src="../../../assets/js/sale/pos_invoice/pos-add.js?v=<?php echo time(); ?>"></script>
     <script src="../../../assets/js/sale/pos_invoice/tax-integration.js?v=<?php echo time(); ?>"></script>
     <script src="../../../assets/js/sale/pos_invoice/supplier-product-filter.js?v=<?php echo time(); ?>"></script>
