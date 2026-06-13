@@ -601,7 +601,7 @@ function initializePage(permissions) {
             }
         } else if (combo === shortcuts.addCustomer) {
             e.preventDefault();
-            openOverlay('../../customer_supplier/customers/customer-add.php');
+            quickAddCustomer();
         } else if (combo === shortcuts.salesReturn) {
             e.preventDefault();
             document.getElementById('salesReturnBtn').click();
@@ -878,8 +878,11 @@ function initializePage(permissions) {
                     option.className = 'dropdown-option';
                     option.setAttribute('data-value', `area_${area.area_id}`);
                     option.setAttribute('data-filter-type', 'area');
-                    option.setAttribute('data-city-id', area.city_id);
                     option.setAttribute('data-area-id', area.area_id);
+                    option.setAttribute('data-city-id', area.city_id);
+                    option.setAttribute('data-city-zone-id', area.city_zone_id || '');
+                    option.setAttribute('data-region-id', area.region_id || '');
+                    option.setAttribute('data-country-id', area.country_id || '');
                     option.textContent = `${area.area_name} / ${area.city_name}`;
                     optionsContainer.appendChild(option);
                 });
@@ -891,6 +894,8 @@ function initializePage(permissions) {
                     option.setAttribute('data-value', `city_${city.id}`);
                     option.setAttribute('data-filter-type', 'city');
                     option.setAttribute('data-city-id', city.id);
+                    option.setAttribute('data-region-id', city.region_id || '');
+                    option.setAttribute('data-country-id', city.country_id || '');
                     option.textContent = city.city_name;
                     optionsContainer.appendChild(option);
                 });
@@ -5861,6 +5866,108 @@ function validateForm() {
             break;
         }
     }
-    
+
     return isValid;
+}
+
+async function quickAddCustomer() {
+    const nameInput = document.getElementById('customerCodeSearch');
+    const typedName = nameInput ? nameInput.value.trim() : '';
+
+    // If nothing is typed, fall back to the full customer form
+    if (!typedName) {
+        openOverlay('../../customer_supplier/customers/customer-add.php');
+        return;
+    }
+
+    const companyId = document.getElementById('company')?.value;
+    if (!companyId) {
+        alert('Please select a company first.');
+        return;
+    }
+
+    // Collect area/city hierarchy IDs from the selected dropdown option
+    const areaCityHidden = document.getElementById('areaCity');
+    const areaCityValue  = areaCityHidden ? areaCityHidden.value : '';
+
+    let areaId = null, cityId = null, cityZoneId = null, regionId = null, countryId = null;
+
+    if (areaCityValue) {
+        const selectedOpt = document.querySelector(`#areaCityOptions [data-value="${areaCityValue}"]`);
+        if (selectedOpt) {
+            const filterType = selectedOpt.getAttribute('data-filter-type');
+            if (filterType === 'area') {
+                areaId      = selectedOpt.getAttribute('data-area-id')     || null;
+                cityId      = selectedOpt.getAttribute('data-city-id')     || null;
+                cityZoneId  = selectedOpt.getAttribute('data-city-zone-id') || null;
+                regionId    = selectedOpt.getAttribute('data-region-id')   || null;
+                countryId   = selectedOpt.getAttribute('data-country-id')  || null;
+            } else if (filterType === 'city') {
+                cityId      = selectedOpt.getAttribute('data-city-id')     || null;
+                regionId    = selectedOpt.getAttribute('data-region-id')   || null;
+                countryId   = selectedOpt.getAttribute('data-country-id')  || null;
+            }
+        }
+    }
+
+    const salesOfficerId = document.getElementById('salesOfficer')?.value || null;
+
+    if (!confirm(`Add "${typedName}" as a new customer?`)) return;
+
+    try {
+        const response = await fetch('../../../../server/api/sale/pos_invoice/quick-add-customer.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                customerName:   typedName,
+                companyId:      companyId,
+                areaId:         areaId,
+                cityId:         cityId,
+                cityZoneId:     cityZoneId,
+                regionId:       regionId,
+                countryId:      countryId,
+                salesOfficerId: salesOfficerId
+            })
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+            const c = data.customer;
+
+            // Add to global customers array and cache
+            customersData.push(c);
+            if (window.dataCache) dataCache.customers.set(c.id, c);
+
+            // Add option to the customer dropdown
+            const codeOptions = document.getElementById('customerCodeOptions');
+            if (codeOptions) {
+                const newOpt = document.createElement('div');
+                newOpt.className = 'dropdown-option';
+                newOpt.setAttribute('data-value', c.id);
+                newOpt.setAttribute('data-balance', c.current_balance || 0);
+                newOpt.setAttribute('data-address', c.address || '');
+                newOpt.setAttribute('data-discount', c.default_discount_percentage || 0);
+                newOpt.setAttribute('data-sales-officer', c.associated_sales_officer_id || '');
+                newOpt.setAttribute('data-supplier-man', c.supplier_man_id || '');
+                newOpt.setAttribute('data-credit-limit', c.credit_limit || 0);
+                newOpt.setAttribute('data-withholding-tax', c.advance_income_tax_percentage || 0);
+                newOpt.textContent = `${c.customer_code} | ${c.customer_name} | ${c.address || 'N/A'}`;
+                codeOptions.appendChild(newOpt);
+            }
+
+            // Auto-select the newly created customer
+            const searchInput = document.getElementById('customerCodeSearch');
+            const hiddenInput = document.getElementById('customerCode');
+            if (searchInput) searchInput.value = `${c.customer_code} | ${c.customer_name} | ${c.address || 'N/A'}`;
+            if (hiddenInput) hiddenInput.value = c.id;
+
+            alert(`Customer "${c.customer_name}" added successfully!\nCode: ${c.customer_code}`);
+        } else {
+            alert('Failed to add customer: ' + data.message);
+        }
+    } catch (err) {
+        console.error('Quick add customer error:', err);
+        alert('An error occurred while adding the customer.');
+    }
 }

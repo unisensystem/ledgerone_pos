@@ -125,7 +125,7 @@ if (!$user_id) {
                                 </div>
                                 <input type="hidden" id="customerCode" required>
                             </div>
-                            <button type="button" class="btn btn-secondary" style="height: 40px; padding: 0 12px;" onclick="openOverlay('../../customer_supplier/customers/customer-add.php')" title="Add New Customer">
+                            <button type="button" class="btn btn-secondary" style="height: 40px; padding: 0 12px;" onclick="quickAddCustomer()" title="Quick-add typed name as new customer, or opens full form if field is empty">
                                 <i class="fas fa-plus"></i>
                             </button>
                         </div>
