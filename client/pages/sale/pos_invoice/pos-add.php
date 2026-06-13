@@ -53,22 +53,7 @@ if (!$user_id) {
                         <input type="date" id="saleDate" required tabindex="-1">
                     </div>
                     
-                    <!-- 2. Invoice Type -->
-                    <div class="form-group" id="invoiceTypeGroup">
-                        <label for="invoiceType">Invoice Type</label>
-                        <select id="invoiceType" tabindex="-1">
-                            <option value="Credit">Credit</option>
-                            <option value="Cash">Cash</option>
-                        </select>
-                    </div>
-                    
-                    <!-- 3. Due Date -->
-                    <div class="form-group" id="dueDateGroup">
-                        <label for="dueDate">Due Date</label>
-                        <input type="date" id="dueDate" tabindex="-1">
-                    </div>
-                    
-                    <!-- 4. Company -->
+                    <!-- 2. Company -->
                     <div class="form-group" id="companyGroup">
                         <label for="company" class="required">Company</label>
                         <div class="searchable-dropdown">
@@ -81,7 +66,7 @@ if (!$user_id) {
                         <div class="error-message" id="companyError">Please select a company</div>
                     </div>
                     
-                    <!-- 5. Branch -->
+                    <!-- 3. Branch -->
                     <div class="form-group" id="branchGroup">
                         <label for="branch" class="required">Branch</label>
                         <div class="searchable-dropdown">
@@ -94,17 +79,49 @@ if (!$user_id) {
                         <div class="error-message" id="branchError">Please select a branch</div>
                     </div>
                     
-                    <!-- 6. Currency -->
-                    <div class="form-group" id="currencyGroup">
-                        <label for="currency" class="required">Currency</label>
-                        <select id="currency" required tabindex="-1">
-                            <option value="">Select Currency</option>
-                            <!-- Options loaded dynamically -->
+                    <!-- 4. Invoice Type -->
+                    <div class="form-group" id="invoiceTypeGroup">
+                        <label for="invoiceType">Invoice Type</label>
+                        <select id="invoiceType" tabindex="-1">
+                            <option value="Credit">Credit</option>
+                            <option value="Cash">Cash</option>
                         </select>
-                        <div class="error-message" id="currencyError">Please select a currency</div>
                     </div>
                     
-                    <!-- 7. Area / City -->
+                    <!-- 5. Due Date -->
+                    <div class="form-group" id="dueDateGroup">
+                        <label for="dueDate">Due Date</label>
+                        <input type="date" id="dueDate" tabindex="-1">
+                    </div>
+                    
+                    <!-- 6. Brand -->
+                    <div class="form-group" id="brandGroup">
+                        <label for="brand">Brand</label>
+                        <select id="brand" tabindex="-1">
+                            <option value="">Select Brand</option>
+                            <!-- Options loaded dynamically -->
+                        </select>
+                    </div>
+                    
+                    <!-- 7. Sales Officer -->
+                    <div class="form-group" id="salesOfficerGroup">
+                        <label for="salesOfficer">Sales Officer</label>
+                        <select id="salesOfficer" tabindex="-1">
+                            <option value="">Select Sales Officer</option>
+                            <!-- Options loaded dynamically -->
+                        </select>
+                    </div>
+                    
+                    <!-- 8. Supplier Man -->
+                    <div class="form-group" id="supplierManGroup">
+                        <label for="supplierMan">Supplier Man</label>
+                        <select id="supplierMan" tabindex="-1">
+                            <option value="">Select Supplier Man</option>
+                            <!-- Options loaded dynamically -->
+                        </select>
+                    </div>
+                    
+                    <!-- 9. Area / City -->
                     <div class="form-group" id="areaCityGroup">
                         <label for="areaCitySearch">Area / City</label>
                         <div class="searchable-dropdown">
@@ -114,7 +131,7 @@ if (!$user_id) {
                         </div>
                     </div>
                     
-                    <!-- 8. Customer Code -->
+                    <!-- 10. Customer Code -->
                     <div class="form-group">
                         <label for="customerCode" class="required">Customer Code</label>
                         <div style="display: flex; gap: 8px; align-items: flex-start;">
@@ -132,7 +149,7 @@ if (!$user_id) {
                         <div class="error-message" id="customerCodeError">Please select a customer code</div>
                     </div>
                     
-                    <!-- 9. Sub Account -->
+                    <!-- 11. Sub Account -->
                     <div class="form-group" id="subAccountGroup">
                         <label for="subAccount">Sub Account</label>
                         <select id="subAccount" tabindex="-1">
@@ -141,7 +158,7 @@ if (!$user_id) {
                         </select>
                     </div>
                     
-                    <!-- 10. Sale Order# -->
+                    <!-- 12. Sale Order# -->
                     <div class="form-group" id="saleOrderGroup">
                         <label for="saleOrder">Sale Order#</label>
                         <div class="searchable-dropdown">
@@ -153,31 +170,14 @@ if (!$user_id) {
                         </div>
                     </div>
                     
-                    <!-- 11. Brand -->
-                    <div class="form-group" id="brandGroup">
-                        <label for="brand">Brand</label>
-                        <select id="brand" tabindex="-1">
-                            <option value="">Select Brand</option>
+                    <!-- 13. Currency -->
+                    <div class="form-group" id="currencyGroup">
+                        <label for="currency" class="required">Currency</label>
+                        <select id="currency" required tabindex="-1">
+                            <option value="">Select Currency</option>
                             <!-- Options loaded dynamically -->
                         </select>
-                    </div>
-                    
-                    <!-- 12. Sales Officer -->
-                    <div class="form-group" id="salesOfficerGroup">
-                        <label for="salesOfficer">Sales Officer</label>
-                        <select id="salesOfficer" tabindex="-1">
-                            <option value="">Select Sales Officer</option>
-                            <!-- Options loaded dynamically -->
-                        </select>
-                    </div>
-                    
-                    <!-- 13. Supplier Man -->
-                    <div class="form-group" id="supplierManGroup">
-                        <label for="supplierMan">Supplier Man</label>
-                        <select id="supplierMan" tabindex="-1">
-                            <option value="">Select Supplier Man</option>
-                            <!-- Options loaded dynamically -->
-                        </select>
+                        <div class="error-message" id="currencyError">Please select a currency</div>
                     </div>
                     
                     <!-- 14. Transport Name -->
