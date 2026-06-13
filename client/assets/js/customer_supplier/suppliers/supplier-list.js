@@ -247,6 +247,9 @@ document.addEventListener('DOMContentLoaded', function () {
         editSalesmanDropdown.style.display = 'none';
     }
 
+    // Escape modal's overflow-y:auto by anchoring the dropdown to body with position:fixed
+    document.body.appendChild(editSalesmanDropdown);
+
     // Attached once — always references the current editEmployees / editSelectedSalesmen
     editSalesmanSearch.addEventListener('input', function () {
         const term = this.value.toLowerCase();
@@ -256,6 +259,11 @@ document.addEventListener('DOMContentLoaded', function () {
             !editSelectedSalesmen.find(s => s.id === String(e.id))
         );
         if (filtered.length > 0) {
+            const rect = editSalesmanChipsContainer.getBoundingClientRect();
+            editSalesmanDropdown.style.position = 'fixed';
+            editSalesmanDropdown.style.top   = (rect.bottom + 2) + 'px';
+            editSalesmanDropdown.style.left  = rect.left + 'px';
+            editSalesmanDropdown.style.width = rect.width + 'px';
             editSalesmanDropdown.innerHTML = filtered.map(e => `
                 <div class="edit-salesman-dropdown-item" data-id="${e.id}" data-name="${e.full_name}">${e.full_name}</div>
             `).join('');

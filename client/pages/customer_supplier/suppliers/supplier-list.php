@@ -186,7 +186,7 @@ $currency_symbol = $currency['symbol'] ?? '$';
                                 <div id="editSalesmanChipsList" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:4px;"></div>
                                 <input type="text" id="editSalesmanSearch" placeholder="Search salesman..." autocomplete="off" style="border:none;outline:none;background:transparent;width:100%;font-size:14px;padding:2px 4px;">
                             </div>
-                            <div id="editSalesmanDropdown" style="display:none;position:absolute;z-index:9999;background:var(--surface-1,#fff);border:1px solid var(--border-default,#ccc);border-radius:8px;max-height:200px;overflow-y:auto;box-shadow:0 4px 12px rgba(0,0,0,.1);min-width:200px;"></div>
+                            <div id="editSalesmanDropdown" style="display:none;z-index:9999;background:var(--surface-1,#fff);border:1px solid var(--border-default,#ccc);border-radius:8px;max-height:200px;overflow-y:auto;box-shadow:0 4px 12px rgba(0,0,0,.1);"></div>
                             <input type="hidden" id="editSalesmanIds" value="">
                         </div>
                         <div class="form-group col-4">
