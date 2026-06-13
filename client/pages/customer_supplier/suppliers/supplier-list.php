@@ -36,6 +36,14 @@ $currency_symbol = $currency['symbol'] ?? '$';
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="../../../assets/css/customer_supplier/suppliers/supplier-list.css">
+    <style>
+        .edit-salesman-chip { display:inline-flex; align-items:center; gap:4px; background:var(--primary,#4f46e5); color:#fff; border-radius:999px; padding:2px 10px; font-size:13px; }
+        .edit-salesman-chip .chip-remove { cursor:pointer; font-size:16px; line-height:1; opacity:.8; }
+        .edit-salesman-chip .chip-remove:hover { opacity:1; }
+        .edit-salesman-dropdown-item { padding:8px 12px; cursor:pointer; font-size:14px; }
+        .edit-salesman-dropdown-item:hover { background:var(--surface-2,#f3f4f6); }
+        .edit-salesman-dropdown-item.disabled { opacity:.4; pointer-events:none; }
+    </style>
 </head>
 
 <body class="light-mode">
@@ -174,16 +182,19 @@ $currency_symbol = $currency['symbol'] ?? '$';
                         </div>
                         <div class="form-group col-4">
                             <label>Salesman</label>
-                            <select id="editSalesman">
-                                <option value="">Select Salesman</option>
-                            </select>
-                        </div>
-                        <div class="form-group col-4">
-                            <label>Brand Name</label>
-                            <input type="text" id="editSupplierName" required>
+                            <div id="editSalesmanChipsContainer" style="border:1px solid var(--border-default,#ccc);border-radius:8px;padding:6px 8px;background:var(--input-bg,#fff);cursor:text;position:relative;">
+                                <div id="editSalesmanChipsList" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:4px;"></div>
+                                <input type="text" id="editSalesmanSearch" placeholder="Search salesman..." autocomplete="off" style="border:none;outline:none;background:transparent;width:100%;font-size:14px;padding:2px 4px;">
+                            </div>
+                            <div id="editSalesmanDropdown" style="display:none;position:absolute;z-index:9999;background:var(--surface-1,#fff);border:1px solid var(--border-default,#ccc);border-radius:8px;max-height:200px;overflow-y:auto;box-shadow:0 4px 12px rgba(0,0,0,.1);min-width:200px;"></div>
+                            <input type="hidden" id="editSalesmanIds" value="">
                         </div>
                         <div class="form-group col-4">
                             <label class="required">Supplier Name</label>
+                            <input type="text" id="editSupplierName" required>
+                        </div>
+                        <div class="form-group col-4">
+                            <label>Brand Name</label>
                             <input type="text" id="editBrandName">
                         </div>
                         <div class="form-group col-12">

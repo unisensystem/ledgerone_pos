@@ -198,7 +198,7 @@ document.addEventListener('DOMContentLoaded', function () {
         openEditModal(currentViewingId);
     });
 
-    // Edit Modal (placeholder - to be implemented)
+    // Edit Modal
     function openEditModal(id) {
         const editModal = document.getElementById('editModal');
         const editModalClose = document.getElementById('editModalClose');
@@ -207,6 +207,69 @@ document.addEventListener('DOMContentLoaded', function () {
         const editSaveBtn = document.getElementById('editSaveBtn');
 
         let currentEditingId = id;
+
+        // Salesman multi-select state for this edit session
+        let editEmployees = [];
+        let editSelectedSalesmen = [];
+
+        const editSalesmanSearch = document.getElementById('editSalesmanSearch');
+        const editSalesmanChipsList = document.getElementById('editSalesmanChipsList');
+        const editSalesmanDropdown = document.getElementById('editSalesmanDropdown');
+        const editSalesmanIdsInput = document.getElementById('editSalesmanIds');
+        const editSalesmanChipsContainer = document.getElementById('editSalesmanChipsContainer');
+
+        function renderEditSalesmanChips() {
+            editSalesmanChipsList.innerHTML = editSelectedSalesmen.map(s => `
+                <div class="edit-salesman-chip">
+                    <span>${s.name}</span>
+                    <span class="chip-remove" data-id="${s.id}">×</span>
+                </div>
+            `).join('');
+            editSalesmanChipsList.querySelectorAll('.chip-remove').forEach(btn => {
+                btn.addEventListener('click', function () {
+                    editSelectedSalesmen = editSelectedSalesmen.filter(s => s.id !== this.dataset.id);
+                    renderEditSalesmanChips();
+                    editSalesmanIdsInput.value = editSelectedSalesmen.map(s => s.id).join(',');
+                });
+            });
+        }
+
+        function addEditSalesmanChip(id, name) {
+            if (editSelectedSalesmen.find(s => s.id === id)) return;
+            editSelectedSalesmen.push({ id, name });
+            renderEditSalesmanChips();
+            editSalesmanIdsInput.value = editSelectedSalesmen.map(s => s.id).join(',');
+        }
+
+        editSalesmanSearch.addEventListener('input', function () {
+            const term = this.value.toLowerCase();
+            if (!term) { editSalesmanDropdown.style.display = 'none'; return; }
+            const filtered = editEmployees.filter(e =>
+                e.full_name.toLowerCase().includes(term) &&
+                !editSelectedSalesmen.find(s => s.id === String(e.id))
+            );
+            if (filtered.length > 0) {
+                editSalesmanDropdown.innerHTML = filtered.map(e => `
+                    <div class="edit-salesman-dropdown-item" data-id="${e.id}" data-name="${e.full_name}">${e.full_name}</div>
+                `).join('');
+                editSalesmanDropdown.style.display = 'block';
+            } else {
+                editSalesmanDropdown.style.display = 'none';
+            }
+        });
+
+        editSalesmanDropdown.addEventListener('click', function (e) {
+            const item = e.target.closest('.edit-salesman-dropdown-item');
+            if (item) {
+                addEditSalesmanChip(item.dataset.id, item.dataset.name);
+                editSalesmanSearch.value = '';
+                editSalesmanDropdown.style.display = 'none';
+            }
+        });
+
+        editSalesmanChipsContainer.addEventListener('click', function () {
+            editSalesmanSearch.focus();
+        });
 
         // Fetch supplier data
         fetch(`../../../../server/api/customer_supplier/suppliers/supplier-edit.php?id=${id}`)
@@ -226,6 +289,7 @@ document.addEventListener('DOMContentLoaded', function () {
         function populateEditForm(supplier) {
             document.getElementById('editSupplierCode').value = supplier.supplier_code;
             document.getElementById('editSupplierName').value = supplier.supplier_name;
+            document.getElementById('editBrandName').value = supplier.brand_name || '';
             document.getElementById('editAddress').value = supplier.address || '';
             document.getElementById('editPrimaryPhone').value = supplier.primary_phone || '';
             document.getElementById('editSecondaryPhone').value = supplier.secondary_phone || '';
@@ -245,28 +309,27 @@ document.addEventListener('DOMContentLoaded', function () {
                         editCompany.innerHTML = '<option value="">Select Company</option>';
                         data.companies.forEach(company => {
                             const option = new Option(company.company_name, company.id);
-                            if (company.id == supplier.company_id) {
-                                option.selected = true;
-                            }
+                            if (company.id == supplier.company_id) option.selected = true;
                             editCompany.appendChild(option);
                         });
                     }
                 });
 
-            // Load employees for salesman
+            // Load employees and pre-populate salesman chips
+            editSelectedSalesmen = [];
             fetch('../../../../server/api/customer_supplier/suppliers/get-employees.php')
                 .then(response => response.json())
                 .then(data => {
                     if (data.success) {
-                        const editSalesman = document.getElementById('editSalesman');
-                        editSalesman.innerHTML = '<option value="">Select Salesman</option>';
-                        data.employees.forEach(employee => {
-                            const option = new Option(employee.full_name, employee.id);
-                            if (employee.id == supplier.salesman_id) {
-                                option.selected = true;
-                            }
-                            editSalesman.appendChild(option);
-                        });
+                        editEmployees = data.employees;
+                        // Pre-select existing salesman(s) — salesman_id may be a single id or comma-separated
+                        if (supplier.salesman_id) {
+                            const existingIds = String(supplier.salesman_id).split(',').map(s => s.trim()).filter(Boolean);
+                            existingIds.forEach(sid => {
+                                const emp = data.employees.find(e => String(e.id) === sid);
+                                if (emp) addEditSalesmanChip(String(emp.id), emp.full_name);
+                            });
+                        }
                     }
                 });
 
@@ -362,7 +425,20 @@ document.addEventListener('DOMContentLoaded', function () {
         function closeEditModal() {
             editModal.classList.remove('show');
             editSupplierForm.reset();
+            editSelectedSalesmen = [];
+            editSalesmanChipsList.innerHTML = '';
+            editSalesmanIdsInput.value = '';
+            editSalesmanDropdown.style.display = 'none';
         }
+
+        // Close salesman dropdown when clicking outside
+        document.addEventListener('click', function (e) {
+            if (editModal.classList.contains('show') &&
+                !editSalesmanChipsContainer.contains(e.target) &&
+                !editSalesmanDropdown.contains(e.target)) {
+                editSalesmanDropdown.style.display = 'none';
+            }
+        });
 
         editModalClose.addEventListener('click', closeEditModal);
         editCancelBtn.addEventListener('click', closeEditModal);
@@ -399,8 +475,9 @@ document.addEventListener('DOMContentLoaded', function () {
             const formData = {
                 id: currentEditingId,
                 companyId: document.getElementById('editCompany').value,
-                salesmanId: document.getElementById('editSalesman').value || null,
+                salesmanId: document.getElementById('editSalesmanIds').value || null,
                 supplierName: document.getElementById('editSupplierName').value.trim(),
+                brandName: document.getElementById('editBrandName').value.trim(),
                 address: document.getElementById('editAddress').value.trim(),
                 primaryPhone: document.getElementById('editPrimaryPhone').value.trim(),
                 secondaryPhone: document.getElementById('editSecondaryPhone').value.trim(),
