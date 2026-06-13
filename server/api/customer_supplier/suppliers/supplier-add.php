@@ -52,7 +52,7 @@ try {
     $data = [
         'tenant_id' => $tenant_id,
         'company_id' => (int)$input['companyId'],
-        'salesman_id' => !empty($input['salesmanId']) ? (int)$input['salesmanId'] : null,
+        'salesman_id' => !empty($input['salesmanId']) ? trim($input['salesmanId']) : null,
         'supplier_code' => $supplier_code,
         'supplier_name' => trim($input['supplierName']),
         'address' => !empty($input['address']) ? trim($input['address']) : null,

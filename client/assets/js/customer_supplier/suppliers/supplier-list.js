@@ -167,14 +167,18 @@ document.addEventListener('DOMContentLoaded', function () {
         document.getElementById('viewCreatedAt').textContent = new Date(supplier.created_at).toLocaleDateString();
         document.getElementById('viewUpdatedAt').textContent = new Date(supplier.updated_at).toLocaleDateString();
 
-        // Load salesman name
+        // Load salesman name(s)
         if (supplier.salesman_id) {
+            const ids = String(supplier.salesman_id).split(',').map(s => s.trim()).filter(Boolean);
             fetch('../../../../server/api/customer_supplier/suppliers/get-employees.php')
                 .then(response => response.json())
                 .then(data => {
                     if (data.success) {
-                        const employee = data.employees.find(e => e.id == supplier.salesman_id);
-                        document.getElementById('viewSalesman').textContent = employee ? employee.full_name : '-';
+                        const names = ids.map(id => {
+                            const emp = data.employees.find(e => String(e.id) === id);
+                            return emp ? emp.full_name : null;
+                        }).filter(Boolean);
+                        document.getElementById('viewSalesman').textContent = names.length ? names.join(', ') : '-';
                     }
                 });
         } else {
@@ -279,6 +283,7 @@ document.addEventListener('DOMContentLoaded', function () {
             addEditSalesmanChip(item.dataset.id, item.dataset.name);
             editSalesmanSearch.value = '';
             editSalesmanDropdown.style.display = 'none';
+            editSalesmanSearch.focus();
         }
     });
 

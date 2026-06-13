@@ -23,10 +23,10 @@ if (!$sales_officer_id) {
 }
 
 try {
-    // First, get all suppliers where salesman_id = sales_officer_id
+    // First, get all suppliers where sales_officer_id is in the comma-separated salesman_id field
     $supplierStmt = $pdo->prepare("
-        SELECT id FROM suppliers 
-        WHERE tenant_id = ? AND salesman_id = ?
+        SELECT id FROM suppliers
+        WHERE tenant_id = ? AND FIND_IN_SET(?, salesman_id)
     ");
     $supplierStmt->execute([$tenant_id, $sales_officer_id]);
     $suppliers = $supplierStmt->fetchAll(PDO::FETCH_COLUMN);

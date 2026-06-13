@@ -72,7 +72,7 @@ try {
         $stmt = $pdo->prepare($sql);
         $stmt->execute([
             !empty($input['companyId']) ? (int)$input['companyId'] : null,
-            !empty($input['salesmanId']) ? (int)explode(',', $input['salesmanId'])[0] : null,
+            !empty($input['salesmanId']) ? trim($input['salesmanId']) : null,
             trim($input['supplierName']),
             !empty($input['brandName']) ? trim($input['brandName']) : null,
             !empty($input['address']) ? trim($input['address']) : null,
