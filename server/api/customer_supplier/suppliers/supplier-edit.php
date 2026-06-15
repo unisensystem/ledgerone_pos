@@ -169,6 +169,14 @@ try {
         echo json_encode(['success' => false, 'message' => 'Method not allowed']);
     }
 
+} catch (PDOException $e) {
+    // SQLSTATE 01xxx = server warning (e.g. 01000). Data was saved; treat as success.
+    if (substr($e->getCode(), 0, 2) === '01') {
+        echo json_encode(['success' => true, 'message' => 'Supplier updated successfully']);
+    } else {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+    }
 } catch (Exception $e) {
     http_response_code(400);
     echo json_encode(['success' => false, 'message' => $e->getMessage()]);

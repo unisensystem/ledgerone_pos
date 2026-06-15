@@ -7,6 +7,7 @@ let currentInvoice = {
 };
 
 let isSaving = false;
+let preSelectedProduct = null;
 
 let productsData = [];
 let customersData = [];
@@ -411,21 +412,28 @@ document.addEventListener('DOMContentLoaded', async function() {
     document.getElementById('quickAddBtn').addEventListener('click', async function() {
         const productInput = document.getElementById('quickProduct').value.trim();
         const qty = parseFloat(document.getElementById('quickQty').value) || 1;
-        
+
         if (!productInput) return;
-        
+
+        if (preSelectedProduct) {
+            const p = preSelectedProduct;
+            preSelectedProduct = null;
+            selectProduct(p);
+            return;
+        }
+
         // Search for partial matches
-        const partialMatches = productsData.filter(p => 
+        const partialMatches = productsData.filter(p =>
             p.name.toLowerCase().includes(productInput.toLowerCase())
         );
-        
-        const product = productsData.find(p => 
-            p.name.toLowerCase() === productInput.toLowerCase() ||
+
+        const product = productsData.find(p =>
+            p.name.trim().toLowerCase() === productInput.toLowerCase() ||
             p.code.toLowerCase() === productInput.toLowerCase() ||
             (p.barcode && p.barcode.toLowerCase() === productInput.toLowerCase()) ||
             (p.qr_code && p.qr_code.toLowerCase() === productInput.toLowerCase())
         );
-        
+
         if (product) {
             selectProduct(product);
         } else if (partialMatches.length === 1) {
@@ -450,6 +458,7 @@ document.addEventListener('DOMContentLoaded', async function() {
                     const product = productsData.find(p => p.name === productName);
                     if (product) {
                         this.value = product.name;
+                        preSelectedProduct = product;
                         suggestions.style.display = 'none';
                         document.getElementById('quickQty').focus();
                         document.getElementById('quickQty').select();
@@ -462,6 +471,7 @@ document.addEventListener('DOMContentLoaded', async function() {
                     const product = productsData.find(p => p.name === productName);
                     if (product) {
                         this.value = product.name;
+                        preSelectedProduct = product;
                         suggestions.style.display = 'none';
                         document.getElementById('quickQty').focus();
                         document.getElementById('quickQty').select();
@@ -528,6 +538,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     });
     
     document.getElementById('quickProduct').addEventListener('input', function(e) {
+        preSelectedProduct = null;
         const searchTerm = e.target.value.trim().toLowerCase();
         const suggestions = document.getElementById('productSuggestions');
         
@@ -585,6 +596,7 @@ document.addEventListener('DOMContentLoaded', async function() {
                 });
                 div.addEventListener('click', function() {
                     document.getElementById('quickProduct').value = product.name;
+                    preSelectedProduct = product;
                     suggestions.style.display = 'none';
                     document.getElementById('quickQty').focus();
                     document.getElementById('quickQty').select();
