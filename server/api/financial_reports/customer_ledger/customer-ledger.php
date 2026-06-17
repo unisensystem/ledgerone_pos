@@ -684,18 +684,44 @@ try {
         $running_balance = $opening_balance;
         
         // Add main account opening balance (only if not filtering by sub account)
-        if (!$sub_account_id && $main_account_opening != 0) {
-            $result[] = [
-                'date' => $from_date ?: 'Opening Balance',
-                'description' => $from_date ? 'Soft Opening Balance' : 'Opening Balance',
-                'reference' => 'OB-MAIN',
-                'debit' => 0,
-                'credit' => 0,
-                'running_balance' => $main_account_opening,
-                'type' => 'opening_balance',
-                'sub_account_id' => null
-            ];
-            $running_balance = $main_account_opening;
+        if (!$sub_account_id) {
+            // Fetch individual opening balance invoices
+            $ob_stmt = $pdo->prepare("SELECT invoice_number, debit, invoice_date FROM opening_balance_invoices WHERE tenant_id = ? AND customer_id = ? ORDER BY invoice_date ASC, id ASC");
+            $ob_stmt->execute([$tenant_id, $customer_id]);
+            $ob_invoices = $ob_stmt->fetchAll(PDO::FETCH_ASSOC);
+
+            if (!empty($ob_invoices)) {
+                // Show individual OB invoice rows
+                $ob_running = 0;
+                foreach ($ob_invoices as $obi) {
+                    $ob_amount = floatval($obi['debit']);
+                    $ob_running += $ob_amount;
+                    $result[] = [
+                        'date' => $obi['invoice_date'] ?: 'Opening Balance',
+                        'description' => 'Opening Balance',
+                        'reference' => $obi['invoice_number'] ?: 'OB-MAIN',
+                        'debit' => $ob_amount,
+                        'credit' => 0,
+                        'running_balance' => $ob_running,
+                        'type' => 'opening_balance',
+                        'sub_account_id' => null
+                    ];
+                }
+                $running_balance = $main_account_opening;
+            } elseif ($main_account_opening != 0) {
+                // Fallback: single OB row
+                $result[] = [
+                    'date' => $from_date ?: 'Opening Balance',
+                    'description' => $from_date ? 'Soft Opening Balance' : 'Opening Balance',
+                    'reference' => 'OB-MAIN',
+                    'debit' => 0,
+                    'credit' => 0,
+                    'running_balance' => $main_account_opening,
+                    'type' => 'opening_balance',
+                    'sub_account_id' => null
+                ];
+                $running_balance = $main_account_opening;
+            }
         }
         
         // Process main account transactions (sub_account_id = null) - only if not filtering by sub account

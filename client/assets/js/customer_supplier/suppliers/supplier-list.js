@@ -39,9 +39,9 @@ document.addEventListener('DOMContentLoaded', function () {
             const row = document.createElement('tr');
             row.innerHTML = `
                 <td><span class="customer-code">${supplier.supplier_code}</span></td>
-                <td><span class="customer-name">${supplier.supplier_name}</span></td>
+                <td><span class="customer-name">${supplier.supplier_name || '-'}</span></td>
+                <td><span class="customer-name">${supplier.brand_name}</span></td>
                 <td>${supplier.primary_phone || '-'}</td>
-                <td>${supplier.email || '-'}</td>
                 <td><span class="status-badge status-${status}">${status.charAt(0).toUpperCase() + status.slice(1)}</span></td>
                 <td>
                     <div class="action-buttons">

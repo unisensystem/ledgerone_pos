@@ -108,6 +108,7 @@ function fetchVouchers(page = 1) {
                 
                 renderVouchers(vouchers);
                 updatePagination(data.pagination);
+                renderSummary(data.summary);
             }
         })
         .catch(error => console.error('Error fetching vouchers:', error));
@@ -605,3 +606,43 @@ thirtyDaysAgo.setDate(today.getDate() - 30);
 
 document.getElementById('dateFrom').valueAsDate = thirtyDaysAgo;
 document.getElementById('dateTo').valueAsDate = today;
+
+// Payment method icons map
+const methodIcons = {
+    'cash': 'fas fa-money-bill-wave',
+    'cheque': 'fas fa-money-check',
+    'check': 'fas fa-money-check',
+    'bank': 'fas fa-university',
+    'transfer': 'fas fa-exchange-alt',
+    'online': 'fas fa-globe',
+    'card': 'fas fa-credit-card',
+};
+
+function getMethodIcon(name) {
+    const key = (name || '').toLowerCase();
+    for (const k in methodIcons) {
+        if (key.includes(k)) return methodIcons[k];
+    }
+    return 'fas fa-coins';
+}
+
+function renderSummary(summary) {
+    if (!summary) return;
+    const sym = (vouchers[0] && vouchers[0].currencySymbol) ? vouchers[0].currencySymbol : '';
+    document.getElementById('summaryTotalValue').textContent = sym + Number(summary.grand_total).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+    const methodsDiv = document.getElementById('summaryMethods');
+    methodsDiv.innerHTML = '';
+    (summary.by_payment_method || []).forEach(item => {
+        const card = document.createElement('div');
+        card.className = 'summary-card summary-method-card';
+        card.innerHTML = `
+            <div class="summary-icon"><i class="${getMethodIcon(item.payment_method)}"></i></div>
+            <div class="summary-info">
+                <div class="summary-label">${item.payment_method}</div>
+                <div class="summary-value">${sym}${Number(item.total).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+            </div>
+        `;
+        methodsDiv.appendChild(card);
+    });
+}

@@ -112,9 +112,38 @@ try {
     $stmt->execute($params);
     $vouchers = $stmt->fetchAll(PDO::FETCH_ASSOC);
     
+    // Summary: total + payment method wise (same filters)
+    $summaryStmt = $pdo->prepare("
+        SELECT 
+            a.name as payment_method,
+            SUM(rv.amount) as total
+        FROM receive_voucher rv
+        LEFT JOIN customers cu ON rv.customer_id = cu.id
+        LEFT JOIN accounts a ON rv.payment_method_id = a.id
+        WHERE $whereClause
+        GROUP BY rv.payment_method_id, a.name
+        ORDER BY total DESC
+    ");
+    $summaryStmt->execute($params);
+    $summaryRows = $summaryStmt->fetchAll(PDO::FETCH_ASSOC);
+
+    $grandTotal = 0;
+    $paymentSummary = [];
+    foreach ($summaryRows as $row) {
+        $grandTotal += floatval($row['total']);
+        $paymentSummary[] = [
+            'payment_method' => $row['payment_method'] ?? 'Unknown',
+            'total' => floatval($row['total'])
+        ];
+    }
+
     echo json_encode([
-        'success' => true, 
+        'success' => true,
         'data' => $vouchers,
+        'summary' => [
+            'grand_total' => $grandTotal,
+            'by_payment_method' => $paymentSummary
+        ],
         'pagination' => [
             'current_page' => $page,
             'total_pages' => $totalPages,

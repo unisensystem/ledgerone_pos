@@ -464,12 +464,14 @@ document.addEventListener('DOMContentLoaded', function () {
         data.forEach((row) => {
             if (row.type === 'opening_balance') {
                 const balance = parseFloat(row.running_balance) || 0;
+                const debit = parseFloat(row.debit) || 0;
+                totalDebit += debit;
                 tbody.innerHTML += `
-                    <tr>
+                    <tr style="background: rgba(31,123,255,0.04);">
                         <td>${row.date}</td>
                         <td>${row.description}</td>
                         <td>${row.reference}</td>
-                        <td></td>
+                        <td>${debit > 0 ? currentCurrencySymbol + debit.toFixed(2) : ''}</td>
                         <td></td>
                         <td class="${balance >= 0 ? 'balance-positive' : 'balance-negative'}">${currentCurrencySymbol}${Math.abs(balance).toFixed(2)} ${balance >= 0 ? 'Dr' : 'Cr'}</td>
                     </tr>
@@ -561,7 +563,13 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         });
         
-        const finalBalance = openingBalance + totalDebit - totalCredit;
+        let lastRunningBalance = openingBalance;
+        data.forEach((row) => {
+            if (row.running_balance !== undefined) {
+                lastRunningBalance = parseFloat(row.running_balance) || 0;
+            }
+        });
+
         tbody.innerHTML += `
             <tr class="totals-row">
                 <td><strong>Totals</strong></td>
@@ -569,7 +577,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 <td></td>
                 <td><strong>${currentCurrencySymbol}${totalDebit.toFixed(2)}</strong></td>
                 <td><strong>${currentCurrencySymbol}${totalCredit.toFixed(2)}</strong></td>
-                <td><strong class="${finalBalance >= 0 ? 'balance-positive' : 'balance-negative'}">${currentCurrencySymbol}${Math.abs(finalBalance).toFixed(2)} ${finalBalance >= 0 ? 'Dr' : 'Cr'}</strong></td>
+                <td><strong class="${lastRunningBalance >= 0 ? 'balance-positive' : 'balance-negative'}">${currentCurrencySymbol}${Math.abs(lastRunningBalance).toFixed(2)} ${lastRunningBalance >= 0 ? 'Dr' : 'Cr'}</strong></td>
             </tr>
         `;
         

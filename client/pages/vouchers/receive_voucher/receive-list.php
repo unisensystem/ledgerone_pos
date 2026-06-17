@@ -94,6 +94,18 @@ if (!$user_id) {
             </div>
         </div>
 
+        <!-- Summary Cards -->
+        <div class="summary-section" id="summarySection">
+            <div class="summary-card summary-total" id="summaryTotal">
+                <div class="summary-icon"><i class="fas fa-wallet"></i></div>
+                <div class="summary-info">
+                    <div class="summary-label">Total Amount</div>
+                    <div class="summary-value" id="summaryTotalValue">0.00</div>
+                </div>
+            </div>
+            <div class="summary-methods" id="summaryMethods"></div>
+        </div>
+
         <!-- Table Section -->
         <div class="table-container">
             <div class="table-header">
