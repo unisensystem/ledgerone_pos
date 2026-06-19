@@ -49,7 +49,7 @@ function renderTable() {
     const tbody = document.getElementById('projectTableBody');
 
     if (!page.length) {
-        tbody.innerHTML = `<tr><td colspan="11"><div class="empty-state"><i class="fas fa-folder-open"></i><p>No projects found</p></div></td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="10"><div class="empty-state"><i class="fas fa-folder-open"></i><p>No projects found</p></div></td></tr>`;
         renderPagination(0);
         return;
     }
@@ -61,7 +61,6 @@ function renderTable() {
             <td><strong>${p.project_name}</strong></td>
             <td>${p.city_name || '—'}</td>
             <td>${p.project_manager_name || '—'}</td>
-            <td>${p.team_leader_name || '—'}</td>
             <td><span class="badge badge-active" style="background:#f0f4ff;color:var(--primary);">${p.team_count} member${p.team_count != 1 ? 's' : ''}</span></td>
             <td>${fmt(p.start_date)}</td>
             <td>${fmt(p.end_date)}</td>
@@ -109,23 +108,19 @@ window.viewProject = async function(id) {
     if (!result.success) { showToast('Failed to load project', 'error'); return; }
     const p = result.data;
 
-    const teamChips = p.team_members.length
-        ? p.team_members.map(m => `<span class="tag">${m.full_name}</span>`).join('')
-        : '<span style="color:var(--subtext);font-size:13px;">No team members assigned</span>';
+    const teamMembers = p.team_members.length
+        ? p.team_members.map(m => m.full_name).join(', ')
+        : '—';
 
-    document.getElementById('viewModalBody').innerHTML = `
-        <div class="detail-grid">
-            <div class="detail-item"><label>Project Code</label><p><span class="project-code">${p.project_code}</span></p></div>
-            <div class="detail-item"><label>Project Name</label><p>${p.project_name}</p></div>
-            <div class="detail-item"><label>City</label><p>${p.city_name || '—'}</p></div>
-            <div class="detail-item"><label>Status</label><p>${statusBadge(p.status)}</p></div>
-            <div class="detail-item"><label>Start Date</label><p>${fmt(p.start_date)}</p></div>
-            <div class="detail-item"><label>End Date</label><p>${fmt(p.end_date)}</p></div>
-            <div class="detail-item"><label>Project Manager</label><p>${p.project_manager_name || '—'}</p></div>
-            <div class="detail-item"><label>Team Leader</label><p>${p.team_leader_name || '—'}</p></div>
-            <div class="detail-item full"><label>Team Members</label><div class="team-chips">${teamChips}</div></div>
-            ${p.description ? `<div class="detail-item full"><label>Description</label><p style="font-weight:400;color:var(--body)">${p.description}</p></div>` : ''}
-        </div>`;
+    document.getElementById('viewProjectCode').textContent = p.project_code;
+    document.getElementById('viewProjectName').textContent = p.project_name;
+    document.getElementById('viewCity').textContent = p.city_name || '—';
+    document.getElementById('viewStatus').innerHTML = statusBadge(p.status);
+    document.getElementById('viewStartDate').textContent = fmt(p.start_date);
+    document.getElementById('viewEndDate').textContent = fmt(p.end_date);
+    document.getElementById('viewProjectManager').textContent = p.project_manager_name || '—';
+    document.getElementById('viewTeamMembers').textContent = teamMembers;
+    document.getElementById('viewDescription').textContent = p.description || '—';
 
     document.getElementById('viewEditBtn').onclick = () => window.location.href = `project-edit.php?id=${id}`;
     openModal('viewModal');

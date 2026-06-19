@@ -49,7 +49,7 @@ if (!$project_id) { header('Location: project-list.php'); exit(); }
             </div>
 
             <div class="form-group">
-                <label for="city" class="required">City</label>
+                <label for="city">City</label>
                 <div class="input-wrapper">
                     <select id="city" name="city_id">
                         <option value="">Select City</option>
@@ -69,7 +69,7 @@ if (!$project_id) { header('Location: project-list.php'); exit(); }
             </div>
 
             <div class="form-group">
-                <label for="startDate" class="required">Start Date</label>
+                <label for="startDate">Start Date</label>
                 <div class="input-wrapper">
                     <input type="date" id="startDate" name="start_date">
                     <div class="error-message" id="startDateError">Start date is required</div>
@@ -77,7 +77,7 @@ if (!$project_id) { header('Location: project-list.php'); exit(); }
             </div>
 
             <div class="form-group">
-                <label for="endDate" class="required">End Date</label>
+                <label for="endDate">End Date</label>
                 <div class="input-wrapper">
                     <input type="date" id="endDate" name="end_date">
                     <div class="error-message" id="endDateError">End date is required</div>
@@ -93,7 +93,7 @@ if (!$project_id) { header('Location: project-list.php'); exit(); }
                 </div>
             </div>
 
-            <div class="form-group">
+            <div class="form-group" style="display: none;">
                 <label>Team Leader</label>
                 <div class="input-wrapper searchable-select">
                     <input type="text" id="teamLeader" placeholder="Search employee..." autocomplete="off">

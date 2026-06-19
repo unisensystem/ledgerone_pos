@@ -54,7 +54,6 @@ if (!$user_id) { header('Location: ../../auth/login.html'); exit(); }
                         <th>Project Name</th>
                         <th>City</th>
                         <th>Manager</th>
-                        <th>Team Leader</th>
                         <th>Team</th>
                         <th>Start Date</th>
                         <th>End Date</th>
@@ -63,7 +62,7 @@ if (!$user_id) { header('Location: ../../auth/login.html'); exit(); }
                     </tr>
                 </thead>
                 <tbody id="projectTableBody">
-                    <tr><td colspan="11" class="empty-state"><i class="fas fa-spinner fa-spin"></i> Loading...</td></tr>
+                    <tr><td colspan="10" class="empty-state"><i class="fas fa-spinner fa-spin"></i> Loading...</td></tr>
                 </tbody>
             </table>
         </div>
@@ -79,7 +78,46 @@ if (!$user_id) { header('Location: ../../auth/login.html'); exit(); }
             <h3 class="modal-title">Project Details</h3>
             <button class="modal-close" onclick="closeModal('viewModal')"><i class="fas fa-times"></i></button>
         </div>
-        <div class="modal-body" id="viewModalBody"></div>
+        <div class="modal-body">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
+                <div>
+                    <p style="font-size:12px;color:var(--text-muted);text-transform:uppercase;margin-bottom:4px;">Project Code</p>
+                    <p style="font-size:15px;font-weight:600;" id="viewProjectCode">-</p>
+                </div>
+                <div>
+                    <p style="font-size:12px;color:var(--text-muted);text-transform:uppercase;margin-bottom:4px;">Project Name</p>
+                    <p style="font-size:15px;font-weight:600;" id="viewProjectName">-</p>
+                </div>
+                <div>
+                    <p style="font-size:12px;color:var(--text-muted);text-transform:uppercase;margin-bottom:4px;">City</p>
+                    <p style="font-size:15px;font-weight:600;" id="viewCity">-</p>
+                </div>
+                <div>
+                    <p style="font-size:12px;color:var(--text-muted);text-transform:uppercase;margin-bottom:4px;">Status</p>
+                    <p style="font-size:15px;font-weight:600;" id="viewStatus">-</p>
+                </div>
+                <div>
+                    <p style="font-size:12px;color:var(--text-muted);text-transform:uppercase;margin-bottom:4px;">Start Date</p>
+                    <p style="font-size:15px;font-weight:600;" id="viewStartDate">-</p>
+                </div>
+                <div>
+                    <p style="font-size:12px;color:var(--text-muted);text-transform:uppercase;margin-bottom:4px;">End Date</p>
+                    <p style="font-size:15px;font-weight:600;" id="viewEndDate">-</p>
+                </div>
+                <div>
+                    <p style="font-size:12px;color:var(--text-muted);text-transform:uppercase;margin-bottom:4px;">Project Manager</p>
+                    <p style="font-size:15px;font-weight:600;" id="viewProjectManager">-</p>
+                </div>
+                <div>
+                    <p style="font-size:12px;color:var(--text-muted);text-transform:uppercase;margin-bottom:4px;">Team Members</p>
+                    <p style="font-size:15px;font-weight:600;" id="viewTeamMembers">-</p>
+                </div>
+            </div>
+            <div style="margin-top:20px;">
+                <p style="font-size:12px;color:var(--text-muted);text-transform:uppercase;margin-bottom:4px;">Description</p>
+                <p style="font-size:15px;" id="viewDescription">-</p>
+            </div>
+        </div>
         <div class="modal-footer">
             <button class="btn btn-secondary" onclick="closeModal('viewModal')">Close</button>
             <button class="btn btn-primary" id="viewEditBtn"><i class="fas fa-edit"></i> Edit</button>
