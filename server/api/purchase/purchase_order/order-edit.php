@@ -47,13 +47,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
                 co.city as company_city,
                 co.state as company_state,
                 co.zipcode as company_zipcode,
-                co.logo_url
+                co.logo_url,
+                p.project_code,
+                p.project_name,
+                pc.city_name as project_city_name
             FROM purchase_order pi
             LEFT JOIN suppliers s ON pi.supplier_id = s.id
             LEFT JOIN branches b ON pi.branch_id = b.id
             LEFT JOIN branches pb ON b.parent_branch_id = pb.id
             LEFT JOIN ledgerone_public.currencies c ON pi.currency_id = c.id
             LEFT JOIN companies co ON pi.company_id = co.id
+            LEFT JOIN projects p ON pi.project_id = p.id
+            LEFT JOIN project_cities pc ON p.project_city_id = pc.id
             WHERE pi.id = ? AND pi.tenant_id = ?
         ");
         $stmt->execute([$invoice_id, $tenant_id]);
@@ -181,7 +186,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
         $stmt = $pdo->prepare("
             UPDATE purchase_order SET
                 company_id = ?, currency_id = ?, purchase_date = ?, supplier_id = ?, branch_id = ?,
-                previous_balance = ?, total_bill = ?, total_discount_percent = ?,
+                project_id = ?, previous_balance = ?, total_bill = ?, total_discount_percent = ?,
                 total_discount_amount = ?, total_gst_percent = ?, total_gst_amount = ?,
                 shipping_fees = ?, net_amount = ?, supplier_invoice_no = ?, 
                 supplier_invoice_date = ?, bilty_no = ?, transport_name = ?, remarks = ?, updated_by = ?
@@ -193,6 +198,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
             $input['purchaseDate'],
             $input['supplierId'],
             $input['branchId'],
+            $input['projectId'] ?? null,
             extractBalanceAmount($input['previousBalance'] ?? '0.00'),
             $input['totalBill'],
             $input['totalDiscountPercent'] ?? 0.00,

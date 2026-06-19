@@ -244,6 +244,12 @@ $currency_symbol = $currency['symbol'] ?? '$';
                                 <option value="">Select Supplier Man</option>
                             </select>
                         </div>
+                        <div class="form-group col-6">
+                            <label><i class="fas fa-project-diagram"></i> Project</label>
+                            <select id="editProject">
+                                <option value="">Select Project</option>
+                            </select>
+                        </div>
                         <div class="form-group col-4">
                             <label>Country</label>
                             <select id="editCountry">
@@ -498,6 +504,10 @@ $currency_symbol = $currency['symbol'] ?? '$';
                     <div class="form-group col-6">
                         <label>Supplier Man</label>
                         <div class="view-field" id="viewSupplierMan"></div>
+                    </div>
+                    <div class="form-group col-6">
+                        <label><i class="fas fa-project-diagram"></i> Project</label>
+                        <div class="view-field" id="viewProject"></div>
                     </div>
                     <div class="form-group col-4">
                         <label>Country</label>

@@ -45,6 +45,7 @@ try {
     $cheque_no = !empty($input['cheque_no']) ? $input['cheque_no'] : null;
     $cheque_date = !empty($input['cheque_date']) ? $input['cheque_date'] : null;
     $description = !empty($input['description']) ? $input['description'] : null;
+    $project_id = !empty($input['project_id']) ? $input['project_id'] : null;
 
     // Get current voucher details for payment method check
     $stmt = $pdo->prepare("SELECT payment_method_id FROM payment_voucher WHERE id = ? AND tenant_id = ?");
@@ -60,13 +61,13 @@ try {
     $stmt = $pdo->prepare("
         UPDATE payment_voucher 
         SET voucher_date = ?, company_id = ?, sub_account_id = ?, bill_no = ?, amount = ?, currency_id = ?, 
-            payment_method_id = ?, bank_account_id = ?, cheque_no = ?, cheque_date = ?, description = ?, updated_by = ?
+            payment_method_id = ?, bank_account_id = ?, cheque_no = ?, cheque_date = ?, description = ?, project_id = ?, updated_by = ?
         WHERE id = ? AND tenant_id = ?
     ");
     
     $stmt->execute([
         $voucher_date, $company_id, $sub_account_id, $bill_no, $amount, $currency_id,
-        $payment_method_id, $bank_account_id, $cheque_no, $cheque_date, $description, $user_id,
+        $payment_method_id, $bank_account_id, $cheque_no, $cheque_date, $description, $project_id, $user_id,
         $voucher_id, $tenant_id
     ]);
     

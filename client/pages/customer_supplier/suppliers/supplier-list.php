@@ -229,6 +229,12 @@ $currency_symbol = $currency['symbol'] ?? '$';
                             <label>AIT %</label>
                             <input type="number" id="editAitPercent" step="0.01" min="0" max="100">
                         </div>
+                        <div class="form-group col-6">
+                            <label><i class="fas fa-project-diagram"></i> Project</label>
+                            <select id="editProject">
+                                <option value="">Select Project</option>
+                            </select>
+                        </div>
                         <div class="form-group col-12">
                             <label>Sub Accounts</label>
                             <div class="table-container">
@@ -363,6 +369,10 @@ $currency_symbol = $currency['symbol'] ?? '$';
                     <div class="form-group col-6">
                         <label>AIT %</label>
                         <div class="view-field" id="viewAitPercent"></div>
+                    </div>
+                    <div class="form-group col-6">
+                        <label><i class="fas fa-project-diagram"></i> Project</label>
+                        <div class="view-field" id="viewProject"></div>
                     </div>
                     <div class="form-group col-6">
                         <label>Current Balance</label>

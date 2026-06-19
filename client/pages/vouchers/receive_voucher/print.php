@@ -66,13 +66,16 @@ try {
             co.city,
             co.state,
             co.zipcode,
-            co.logo_url
+            co.logo_url,
+            p.project_code,
+            p.project_name
         FROM receive_voucher rv
         LEFT JOIN customers cu ON rv.customer_id = cu.id
         LEFT JOIN accounts a ON rv.payment_method_id = a.id
         LEFT JOIN ledgerone_public.currencies c ON rv.currency_id = c.id
         LEFT JOIN bank_accounts ba ON rv.bank_account_id = ba.id
         LEFT JOIN companies co ON rv.company_id = co.id
+        LEFT JOIN projects p ON rv.project_id = p.id
         WHERE rv.id = ? AND rv.tenant_id = ?
     ");
     $stmt->execute([$voucher_id, $tenant_id]);
@@ -340,6 +343,12 @@ try {
             <tr>
                 <th>Bill No</th>
                 <td><?php echo htmlspecialchars($voucher['bill_no']); ?></td>
+            </tr>
+            <?php endif; ?>
+            <?php if ($voucher['project_code']): ?>
+            <tr>
+                <th>Project</th>
+                <td><?php echo htmlspecialchars($voucher['project_code'] . ' - ' . $voucher['project_name']); ?></td>
             </tr>
             <?php endif; ?>
             <?php if ($voucher['bank_name']): ?>

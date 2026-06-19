@@ -161,7 +161,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
                 company_id = ?, currency_id = ?, sale_date = ?, customer_id = ?, branch_id = ?,
                 previous_balance = ?, total_bill = ?, total_discount_percent = ?,
                 total_discount_amount = ?, extra_discount_1_amount = ?, extra_discount_2_amount = ?, shipping_fees = ?,
-                net_amount = ?, sale_invoice_no = ?,
+                net_amount = ?, sale_invoice_no = ?, project_id = ?,
                 amount_refunded = ?, payment_method = ?, bank_account_id = ?, sale_officer_id = ?, supplier_man_id = ?, sub_account_id = ?, remarks = ?, status = ?, updated_by = ?
             WHERE id = ? AND tenant_id = ?
         ");
@@ -180,6 +180,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
             $input['shippingFees'] ?? 0.00,
             $input['netAmount'],
             $input['saleInvoiceId'] ?? null,
+            $input['projectId'] ?? null,
             $input['amountPaid'] ?? 0.00,
             $input['paymentMethod'] ?? null,
             $input['bankAccountId'] ?? null,

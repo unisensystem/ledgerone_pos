@@ -182,6 +182,13 @@ $currency_symbol = $currency['symbol'];
                         <div class="multi-select-options" id="company-options"></div>
                     </div>
                 </div>
+                
+                <div class="form-group">
+                    <label class="form-label">Project</label>
+                    <select class="form-input" id="project">
+                        <option value="">All Projects</option>
+                    </select>
+                </div>
             </div>
             
             <div class="button-group">

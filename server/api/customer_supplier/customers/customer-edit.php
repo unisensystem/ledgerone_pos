@@ -24,7 +24,7 @@ try {
             throw new Exception('Customer ID is required');
         }
         
-        $stmt = $pdo->prepare("SELECT c.*, cc.category_name as customer_category_name, s.brand_name FROM customers c LEFT JOIN customer_categories cc ON c.customer_category_id = cc.id LEFT JOIN suppliers s ON c.brand_id = s.id WHERE c.id = ? AND c.tenant_id = ?");
+        $stmt = $pdo->prepare("SELECT c.*, cc.category_name as customer_category_name, s.brand_name, p.project_name, p.project_code, ci.city_name as project_city_name FROM customers c LEFT JOIN customer_categories cc ON c.customer_category_id = cc.id LEFT JOIN suppliers s ON c.brand_id = s.id LEFT JOIN projects p ON c.project_id = p.id LEFT JOIN cities ci ON ci.id = p.city_id WHERE c.id = ? AND c.tenant_id = ?");
         $stmt->execute([$customer_id, $tenant_id]);
         $customer = $stmt->fetch(PDO::FETCH_ASSOC);
         
@@ -69,7 +69,8 @@ try {
                 area_id = ?, 
                 associated_sales_officer_id = ?, 
                 supplier_man_id = ?, 
-                is_sales_tax_registered = ?, 
+                project_id = ?, 
+                is_sales_tax_registered = ?,, 
                 strn = ?, 
                 is_filer = ?, 
                 ntn = ?, 
@@ -105,6 +106,7 @@ try {
             !empty($input['areaId']) ? (int)$input['areaId'] : null,
             !empty($input['salesOfficerId']) ? (int)$input['salesOfficerId'] : null,
             !empty($input['supplierManId']) ? (int)$input['supplierManId'] : null,
+            !empty($input['projectId']) ? (int)$input['projectId'] : null,
             isset($input['isSalesTaxRegistered']) ? (int)$input['isSalesTaxRegistered'] : 0,
             !empty($input['strn']) ? trim($input['strn']) : null,
             isset($input['isFiler']) ? (int)$input['isFiler'] : 0,

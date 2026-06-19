@@ -242,6 +242,16 @@ if (!$user_id) {
                         </h3>
 
                         <div class="form-group col-6">
+                            <label for="project">
+                                <i class="fas fa-project-diagram"></i>
+                                Project
+                            </label>
+                            <select id="project">
+                                <option value="">Select Project</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group col-6">
                             <label for="openingDebit">
                                 <i class="fas fa-money-bill-wave"></i>
                                 Opening Debit (Dr) Amount

@@ -8,6 +8,9 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // Load sale invoices for dropdown
     loadSaleInvoices();
+    
+    // Load projects
+    loadProjects();
 
     // Override save to use delivery_chalan API
     overrideSaveInvoice();
@@ -76,6 +79,29 @@ function initSaleInvoiceDropdown() {
     }
 }
 
+// Load projects dropdown
+async function loadProjects() {
+    try {
+        const response = await fetch('../../../../server/api/master_setup/project_setup/get-projects-dropdown.php');
+        const data = await response.json();
+        if (data.success) {
+            const projectSelect = document.getElementById('project');
+            if (projectSelect) {
+                projectSelect.innerHTML = '<option value="">Select Project</option>';
+                data.data.forEach(project => {
+                    const option = document.createElement('option');
+                    option.value = project.id;
+                    const label = `${project.project_code} - ${project.project_name}${project.city_name ? ' - ' + project.city_name : ''}`;
+                    option.textContent = label;
+                    projectSelect.appendChild(option);
+                });
+            }
+        }
+    } catch (error) {
+        console.error('Error loading projects:', error);
+    }
+}
+
 // Fetch sale invoice items and populate table
 async function loadSaleInvoiceItems(invoiceId) {
     try {
@@ -106,6 +132,10 @@ async function loadSaleInvoiceItems(invoiceId) {
         // Auto-fill currency
         const currencyEl = document.getElementById('currency');
         if (currencyEl) currencyEl.value = invoice.currency_id;
+        
+        // Auto-fill project
+        const projectEl = document.getElementById('project');
+        if (projectEl && invoice.project_id) projectEl.value = invoice.project_id;
 
         // Clear existing rows and add items
         const tbody = document.getElementById('itemsTable').getElementsByTagName('tbody')[0];
@@ -200,6 +230,7 @@ function overrideSaveInvoice() {
             companyId: document.getElementById('company')?.value || null,
             branchId: document.getElementById('branch')?.value,
             currencyId: document.getElementById('currency')?.value,
+            projectId: document.getElementById('project')?.value || null,
             salesOfficerId: document.getElementById('salesOfficer')?.value || null,
             supplierManId: document.getElementById('supplierMan')?.value || null,
             biltyNo: document.getElementById('biltyNo')?.value || null,

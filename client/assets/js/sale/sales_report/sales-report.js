@@ -7,16 +7,19 @@ document.getElementById('current-date').textContent = new Date().toLocaleDateStr
 });
 
 loadCompanies();
+loadProjects();
 
 async function fetchReportData() {
     const dateFrom = document.getElementById('date-from').value;
     const dateTo = document.getElementById('date-to').value;
     const reportType = document.getElementById('report-type').value;
     const company = document.getElementById('company').value;
+    const project = document.getElementById('project').value;
 
     try {
         let url = `../../../../server/api/sale/sales_report/sales-report.php?date_from=${dateFrom}&date_to=${dateTo}&report_type=${reportType}`;
         if (company) url += `&company_id=${company}`;
+        if (project) url += `&project_id=${project}`;
         
         const response = await fetch(url);
         const result = await response.json();
@@ -47,6 +50,26 @@ function updateDashboard() {
     populateSupplierManTable();
     initializeCharts();
     filterReportType();
+}
+
+// Load Projects
+async function loadProjects() {
+    try {
+        const response = await fetch('../../../../server/api/master_setup/project_setup/get-projects-dropdown.php');
+        const data = await response.json();
+        
+        if (data.success) {
+            const select = document.getElementById('project');
+            data.projects.forEach(project => {
+                const option = document.createElement('option');
+                option.value = project.id;
+                option.textContent = `${project.project_code} - ${project.project_name}${project.city_name ? ' - ' + project.city_name : ''}`;
+                select.appendChild(option);
+            });
+        }
+    } catch (error) {
+        console.error('Error loading projects:', error);
+    }
 }
 
 // Load Companies

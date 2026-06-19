@@ -1,0 +1,1 @@
+ALTER TABLE payment_voucher ADD COLUMN IF NOT EXISTS project_id INT NULL DEFAULT NULL;

@@ -33,6 +33,7 @@ if (!$voucher_id) {
 $input = json_decode(file_get_contents('php://input'), true);
 $date = $input['date'] ?? null;
 $description = $input['description'] ?? null;
+$project_id = $input['project_id'] ?? null;
 $entries = $input['entries'] ?? [];
 
 if (!$date || !$description || empty($entries)) {
@@ -59,8 +60,8 @@ try {
     $total_items = count($entries);
     
     // Update expense_voucher
-    $stmt = $pdo->prepare("UPDATE expense_voucher SET date = ?, company_id = ?, description = ?, total_amount = ?, total_items = ? WHERE id = ? AND tenant_id = ?");
-    $stmt->execute([$date, $input['company_id'], $description, $total_amount, $total_items, $voucher_id, $tenant_id]);
+    $stmt = $pdo->prepare("UPDATE expense_voucher SET date = ?, company_id = ?, description = ?, total_amount = ?, total_items = ?, project_id = ? WHERE id = ? AND tenant_id = ?");
+    $stmt->execute([$date, $input['company_id'], $description, $total_amount, $total_items, $project_id, $voucher_id, $tenant_id]);
     
     // Insert new lines and ledger entries
     foreach ($entries as $entry) {

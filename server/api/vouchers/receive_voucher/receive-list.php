@@ -60,6 +60,12 @@ try {
         $params[] = $company_id;
     }
     
+    $project_id = $_GET['project_id'] ?? '';
+    if ($project_id) {
+        $where[] = 'rv.project_id = ?';
+        $params[] = $project_id;
+    }
+    
     if ($search) {
         $where[] = '(rv.voucher_number LIKE ? OR cu.customer_name LIKE ? OR rv.bill_no LIKE ?)';
         $searchTerm = '%' . $search . '%';
@@ -95,16 +101,20 @@ try {
             rv.cheque_no,
             rv.recovery_officer_id,
             rv.company_id,
+            rv.project_id,
             cu.customer_name,
             cu.customer_code,
             a.name as payment_method,
             c.symbol as currency_symbol,
-            e.full_name as recovery_officer
+            e.full_name as recovery_officer,
+            p.project_code,
+            p.project_name
         FROM receive_voucher rv
         LEFT JOIN customers cu ON rv.customer_id = cu.id
         LEFT JOIN accounts a ON rv.payment_method_id = a.id
         LEFT JOIN ledgerone_public.currencies c ON rv.currency_id = c.id
         LEFT JOIN employees e ON rv.recovery_officer_id = e.id
+        LEFT JOIN projects p ON rv.project_id = p.id
         WHERE $whereClause
         ORDER BY rv.created_at DESC
         LIMIT $limit OFFSET $offset

@@ -177,6 +177,12 @@ if (!$user_id) {
                         <label for="transportName">Transport Name</label>
                         <input type="text" id="transportName" placeholder="Enter transport name" tabindex="-1">
                     </div>
+                    <div class="form-group" id="projectGroup">
+                        <label for="project">Project</label>
+                        <select id="project" tabindex="-1">
+                            <option value="">Select Project</option>
+                        </select>
+                    </div>
 
                 </div>
             </div>

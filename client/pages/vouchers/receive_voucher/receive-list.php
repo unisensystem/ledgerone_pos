@@ -57,6 +57,12 @@ if (!$user_id) {
                     </select>
                 </div>
                 <div class="filter-group">
+                    <label for="projectFilter">Project</label>
+                    <select id="projectFilter">
+                        <option value="">All Projects</option>
+                    </select>
+                </div>
+                <div class="filter-group">
                     <label for="customerFilter">Customer</label>
                     <div class="searchable-dropdown">
                         <input type="text" class="search-input" placeholder="Search customer..." id="customerFilterSearch" autocomplete="off">
@@ -131,6 +137,7 @@ if (!$user_id) {
                         <th>Date</th>
                         <th>Customer</th>
                         <th>Bill No</th>
+                        <th>Project</th>
                         <th>Amount</th>
                         <th>Payment Method</th>
                         <th>Recovery Officer</th>
@@ -190,6 +197,12 @@ if (!$user_id) {
                             <label for="editCurrency">Currency</label>
                             <select id="editCurrency" required>
                                 <option value="">Select Currency</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="editProject">Project</label>
+                            <select id="editProject">
+                                <option value="">Select Project</option>
                             </select>
                         </div>
                         <div class="form-group">

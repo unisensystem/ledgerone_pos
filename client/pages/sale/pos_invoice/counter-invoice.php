@@ -988,6 +988,13 @@ $user_employee_id = $user['employee_id'] ?? null;
                 </div>
 
                 <div class="form-group-micro">
+                    <div class="form-label">PROJECT</div>
+                    <select id="project" class="font-bold">
+                        <option value="">Select Project</option>
+                    </select>
+                </div>
+
+                <div class="form-group-micro">
                     <div class="form-label">PAYMENT METHOD</div>
                     <select id="paymentMethod">
                         <option value="cash" selected>Cash</option>

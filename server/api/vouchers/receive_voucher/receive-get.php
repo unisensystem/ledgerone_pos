@@ -35,6 +35,7 @@ try {
             rv.sub_account_id,
             rv.bill_no,
             rv.dsr_no,
+            rv.project_id,
             rv.amount,
             rv.currency_id,
             rv.payment_method_id,

@@ -16,7 +16,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const resetBtn = document.getElementById('resetBtn');
     const form = document.getElementById('invoiceForm');
 
-    Promise.all([loadCustomers(), loadBranches(), loadProducts(), loadUOM(), loadCurrencies(), loadCompanies(), loadEmployees()]).then(() => {
+    Promise.all([loadCustomers(), loadBranches(), loadProducts(), loadUOM(), loadCurrencies(), loadCompanies(), loadEmployees(), loadProjects()]).then(() => {
         initSearchableDropdown('customerCodeSearch', 'customerCodeOptions', 'customerCode');
         initSearchableDropdown('branchSearch', 'branchOptions', 'branch');
         applyInvoiceSettings();
@@ -253,6 +253,30 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         } catch (error) {
             console.error('Error loading currencies:', error);
+        }
+    }
+
+    async function loadProjects() {
+        try {
+            const response = await fetch('../../../../server/api/master_setup/project_setup/get-projects-dropdown.php');
+            const data = await response.json();
+            if (data.success && data.data && data.data.length > 0) {
+                const sel = document.getElementById('project');
+                sel.innerHTML = '<option value="">Select Project</option>';
+                data.data.forEach(p => {
+                    const opt = document.createElement('option');
+                    opt.value = p.id;
+                    opt.textContent = `${p.project_code} - ${p.project_name}${p.city_name ? ' - ' + p.city_name : ''}`;
+                    sel.appendChild(opt);
+                });
+            } else {
+                const sel = document.getElementById('project');
+                sel.innerHTML = '<option value="">No Projects Available</option>';
+            }
+        } catch (error) {
+            console.error('Error loading projects:', error);
+            const sel = document.getElementById('project');
+            sel.innerHTML = '<option value="">Error Loading Projects</option>';
         }
     }
 
@@ -641,6 +665,7 @@ document.addEventListener('DOMContentLoaded', function () {
             branchId: document.getElementById('branch').value,
             currencyId: document.getElementById('currency').value,
             previousBalance: document.getElementById('previousBalance').value,
+            projectId: document.getElementById('project').value || null,
             salesOfficerId: document.getElementById('salesOfficer').value || null,
             supplierManId: document.getElementById('supplierMan').value || null,
             totalBill: parseFloat(document.getElementById('totalBill').textContent),
@@ -724,6 +749,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 document.getElementById('remarks').value = invoiceData.remarks || '';
                 document.getElementById('salesOfficer').value = invoiceData.sale_officer_id || '';
                 document.getElementById('supplierMan').value = invoiceData.supplier_man_id || '';
+                document.getElementById('project').value = invoiceData.project_id || '';
 
                 updateCurrencySymbols();
 

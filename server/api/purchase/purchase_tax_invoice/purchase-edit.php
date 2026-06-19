@@ -49,7 +49,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
                 co.city as company_city,
                 co.state as company_state,
                 co.zipcode as company_zipcode,
-                co.logo_url
+                co.logo_url,
+                pr.project_code,
+                pr.project_name
             FROM purchase_invoice pi
             LEFT JOIN suppliers s ON pi.supplier_id = s.id
             LEFT JOIN branches b ON pi.branch_id = b.id
@@ -58,6 +60,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
             LEFT JOIN purchase_order po ON pi.purchase_order_id = po.id
             LEFT JOIN supplier_sub_accounts sa ON pi.sub_account_id = sa.id
             LEFT JOIN companies co ON pi.company_id = co.id
+            LEFT JOIN projects pr ON pi.project_id = pr.id
             WHERE pi.id = ? AND pi.tenant_id = ?
         ");
         $stmt->execute([$invoice_id, $tenant_id]);
@@ -114,7 +117,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
                 previous_balance = ?, total_bill = ?, total_discount_percent = ?,
                 total_discount_amount = ?, total_gst_percent = ?, total_gst_amount = ?,
                 shipping_fees = ?, net_amount = ?, supplier_invoice_no = ?, 
-                supplier_invoice_date = ?, purchase_order_id = ?, bilty_no = ?, transport_name = ?, remarks = ?, sub_account_id = ?, updated_by = ?
+                supplier_invoice_date = ?, purchase_order_id = ?, bilty_no = ?, transport_name = ?, remarks = ?, sub_account_id = ?, project_id = ?, updated_by = ?
             WHERE id = ? AND tenant_id = ?
         ");
         $stmt->execute([
@@ -138,6 +141,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
             $input['transportName'],
             $input['remarks'] ?? null,
             $input['subAccountId'] ?? null,
+            $input['projectId'] ?? null,
             $user_id,
             $invoice_id,
             $tenant_id

@@ -43,6 +43,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
                 cur.name as currency_name,
                 e.full_name as sales_officer_name,
                 sm.full_name as supplier_man_name,
+                p.project_name, p.project_code AS proj_code, ci.city_name AS project_city,
                 COALESCE(rv.amount, 0) as amount_paid,
                 CASE 
                     WHEN rv.payment_method_id = 1 THEN 'Cash'
@@ -56,6 +57,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
             LEFT JOIN ledgerone_public.currencies cur ON si.currency_id = cur.id
             LEFT JOIN employees e ON si.sale_officer_id = e.id
             LEFT JOIN employees sm ON si.supplier_man_id = sm.id
+            LEFT JOIN projects p ON p.id = si.project_id
+            LEFT JOIN cities ci ON ci.id = p.city_id
             LEFT JOIN receive_voucher rv ON si.bill_no = rv.bill_no AND si.tenant_id = rv.tenant_id
             WHERE si.id = ? AND si.tenant_id = ?
         ");
@@ -183,7 +186,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
         $stmt = $pdo->prepare("
             UPDATE sale_order SET
                 company_id = ?, currency_id = ?, sale_date = ?, customer_id = ?, branch_id = ?,
-                previous_balance = ?, sale_officer_id = ?, supplier_man_id = ?, bilty_no = ?, transport_name = ?, total_bill = ?, total_discount_percent = ?,
+                previous_balance = ?, sale_officer_id = ?, supplier_man_id = ?, project_id = ?, bilty_no = ?, transport_name = ?, total_bill = ?, total_discount_percent = ?,
                 total_discount_amount = ?, net_amount = ?, remarks = ?, status = ?, updated_by = ?
             WHERE id = ? AND tenant_id = ?
         ");
@@ -196,6 +199,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
             extractBalanceAmount($input['previousBalance'] ?? '0.00'),
             $input['salesOfficerId'] ?? null,
             $input['supplierManId'] ?? null,
+            !empty($input['projectId']) ? (int)$input['projectId'] : null,
             $input['biltyNo'] ?? null,
             $input['transportName'] ?? null,
             $input['totalBill'],

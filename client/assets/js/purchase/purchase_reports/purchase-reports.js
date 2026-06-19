@@ -14,6 +14,8 @@ const tableHeaders = {
 // Initialize with item-wise report
 document.addEventListener('DOMContentLoaded', function () {
     loadCompanies();
+    loadProjects();
+    loadSuppliers();
     fetchReportData('item', 'last30');
 
     // Add event listeners to view details buttons
@@ -132,12 +134,56 @@ async function loadCompanies() {
     }
 }
 
+// Load Projects
+async function loadProjects() {
+    try {
+        const response = await fetch('../../../../server/api/master_setup/project_setup/get-projects-dropdown.php');
+        const result = await response.json();
+        
+        if (result.success) {
+            const projectSelect = document.getElementById('project');
+            result.projects.forEach(project => {
+                const option = document.createElement('option');
+                option.value = project.id;
+                option.textContent = `${project.project_code} - ${project.project_name}`;
+                projectSelect.appendChild(option);
+            });
+        }
+    } catch (error) {
+        console.error('Error loading projects:', error);
+    }
+}
+
+// Load Suppliers
+async function loadSuppliers() {
+    try {
+        const response = await fetch('../../../../server/api/purchase/purchase_reports/get-suppliers.php');
+        const result = await response.json();
+        
+        if (result.success) {
+            const supplierSelect = document.getElementById('supplier');
+            result.suppliers.forEach(supplier => {
+                const option = document.createElement('option');
+                option.value = supplier.id;
+                option.textContent = `${supplier.supplier_code} - ${supplier.supplier_name}`;
+                supplierSelect.appendChild(option);
+            });
+        }
+    } catch (error) {
+        console.error('Error loading suppliers:', error);
+    }
+}
+
 // Fetch report data from API
 async function fetchReportData(reportType, dateRange) {
     const company = document.getElementById('company').value;
+    const project = document.getElementById('project').value;
+    const supplier = document.getElementById('supplier').value;
     try {
         let url = `../../../../server/api/purchase/purchase_reports/purchase-reports.php?type=${reportType}&date_range=${dateRange}`;
         if (company) url += `&company_id=${company}`;
+        if (project) url += `&project_id=${project}`;
+        if (supplier) url += `&supplier_id=${supplier}`;
         
         const response = await fetch(url);
         const result = await response.json();

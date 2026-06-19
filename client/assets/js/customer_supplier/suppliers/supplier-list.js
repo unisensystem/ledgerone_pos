@@ -161,6 +161,14 @@ document.addEventListener('DOMContentLoaded', function () {
         document.getElementById('viewOpeningCredit').textContent = `${currencySymbol}${parseFloat(supplier.opening_credit_amount || 0).toFixed(2)}`;
         document.getElementById('viewAitPercent').textContent = `${parseFloat(supplier.ait_percent || 0).toFixed(2)}%`;
         document.getElementById('viewCurrentBalance').textContent = `${currencySymbol}${parseFloat(supplier.current_balance || 0).toFixed(2)}`;
+
+        // Project
+        const projEl = document.getElementById('viewProject');
+        if (supplier.project_code) {
+            projEl.textContent = `${supplier.project_code} - ${supplier.project_name}${supplier.project_city_name ? ' - ' + supplier.project_city_name : ''}`;
+        } else {
+            projEl.textContent = '-';
+        }
         document.getElementById('viewStatus').innerHTML = supplier.is_blacklisted ?
             '<span class="status-badge status-blacklisted">Blacklisted</span>' :
             '<span class="status-badge status-active">Active</span>';
@@ -302,6 +310,7 @@ document.addEventListener('DOMContentLoaded', function () {
     function closeEditModal() {
         editModal.classList.remove('show');
         editSupplierForm.reset();
+        document.getElementById('editProject').value = '';
         resetEditSalesmanChips();
     }
 
@@ -330,6 +339,7 @@ document.addEventListener('DOMContentLoaded', function () {
             id:             currentEditingId,
             companyId:      document.getElementById('editCompany').value,
             salesmanId:     editSalesmanIdsInput.value || null,
+            projectId:      document.getElementById('editProject').value || null,
             supplierName:   document.getElementById('editSupplierName').value.trim(),
             brandName:      document.getElementById('editBrandName').value.trim(),
             address:        document.getElementById('editAddress').value.trim(),
@@ -437,6 +447,9 @@ document.addEventListener('DOMContentLoaded', function () {
         document.getElementById('editAitPercent').value    = supplier.ait_percent   || 0;
         document.getElementById('editBlacklist').checked   = supplier.is_blacklisted == 1;
 
+        // Project
+        loadEditProjects(supplier.project_id);
+
         // Companies
         fetch('../../../../server/api/customer_supplier/suppliers/get-companies.php')
             .then(r => r.json())
@@ -494,6 +507,23 @@ document.addEventListener('DOMContentLoaded', function () {
                     tbody.appendChild(row);
                     attachSubAccountRowListeners(row);
                 });
+            });
+    }
+
+    function loadEditProjects(selectedId) {
+        fetch('../../../../server/api/master_setup/project_setup/get-projects-dropdown.php')
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    const sel = document.getElementById('editProject');
+                    sel.innerHTML = '<option value="">Select Project</option>';
+                    data.data.forEach(p => {
+                        const label = `${p.project_code} - ${p.project_name}${p.city_name ? ' - ' + p.city_name : ''}`;
+                        const opt = new Option(label, p.id);
+                        if (p.id == selectedId) opt.selected = true;
+                        sel.appendChild(opt);
+                    });
+                }
             });
     }
 

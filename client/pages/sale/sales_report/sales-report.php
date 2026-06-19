@@ -68,6 +68,12 @@ $currency_symbol = $currency['symbol'];
                 </select>
             </div>
             <div class="filter-group">
+                <label for="project">Project</label>
+                <select id="project" class="form-input">
+                    <option value="">All Projects</option>
+                </select>
+            </div>
+            <div class="filter-group">
                 <label for="report-type">Report Type</label>
                 <select id="report-type" class="form-input">
                     <option value="all">All Reports</option>

@@ -191,6 +191,7 @@
                 <p><strong>Currency:</strong> <span id="currency">Loading...</span></p>
                 <p><strong>Sales Officer:</strong> <span id="salesOfficer">-</span></p>
                 <p><strong>Supplier Man:</strong> <span id="supplierMan">-</span></p>
+                <p><strong>Project:</strong> <span id="projectName">-</span></p>
                 <p><strong>Bilty No:</strong> <span id="biltyNo">-</span></p>
                 <p><strong>Transport:</strong> <span id="transportName">-</span></p>
                 <p><strong>Remarks:</strong> <span id="remarks">-</span></p>
@@ -373,6 +374,10 @@
             document.getElementById('currency').textContent = invoice.currency_name;
             document.getElementById('salesOfficer').textContent = invoice.sales_officer_name || '-';
             document.getElementById('supplierMan').textContent = invoice.supplier_man_name || '-';
+            const projLabel = invoice.project_name
+                ? `${invoice.proj_code} - ${invoice.project_name}${invoice.project_city ? ' - ' + invoice.project_city : ''}`
+                : '-';
+            document.getElementById('projectName').textContent = projLabel;
             document.getElementById('biltyNo').textContent = invoice.bilty_no || '-';
             document.getElementById('transportName').textContent = invoice.transport_name || '-';
             document.getElementById('remarks').textContent = invoice.remarks || '-';

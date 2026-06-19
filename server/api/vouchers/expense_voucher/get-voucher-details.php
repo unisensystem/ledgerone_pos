@@ -35,6 +35,7 @@ try {
             ev.total_amount, 
             ev.total_items, 
             ev.company_id,
+            ev.project_id,
             c.company_name
         FROM expense_voucher ev
         LEFT JOIN companies c ON ev.company_id = c.id

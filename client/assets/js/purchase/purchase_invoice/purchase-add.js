@@ -20,7 +20,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const form = document.getElementById('invoiceForm');
 
     // Load all data, then initialize dropdowns and add first row
-    Promise.all([loadSuppliers(), loadBranches(), loadProducts(), loadUOM(), loadCurrencies(), loadCompanies(), loadPurchaseOrders()]).then(() => {
+    Promise.all([loadSuppliers(), loadBranches(), loadProducts(), loadUOM(), loadCurrencies(), loadCompanies(), loadPurchaseOrders(), loadProjects()]).then(() => {
         initSearchableDropdown('supplierCodeSearch', 'supplierCodeOptions', 'supplierCode');
         initSearchableDropdown('branchSearch', 'branchOptions', 'branch');
         initSearchableDropdown('purchaseOrderSearch', 'purchaseOrderOptions', 'purchaseOrder');
@@ -239,6 +239,32 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
+    // Load projects from API
+    async function loadProjects() {
+        try {
+            const response = await fetch('../../../../server/api/master_setup/project_setup/get-projects-dropdown.php');
+            const data = await response.json();
+
+            if (data.success && Array.isArray(data.projects) && data.projects.length > 0) {
+                const projectSelect = document.getElementById('project');
+                if (!projectSelect) {
+                    console.error('Project select element not found');
+                    return;
+                }
+                projectSelect.innerHTML = '<option value="">Select Project</option>';
+
+                data.projects.forEach(project => {
+                    const option = document.createElement('option');
+                    option.value = project.id;
+                    option.textContent = `${project.project_code} - ${project.project_name}${project.city_name ? ' - ' + project.city_name : ''}`;
+                    projectSelect.appendChild(option);
+                });
+            }
+        } catch (error) {
+            console.error('Error loading projects:', error);
+        }
+    }
+
     // Load purchase orders from API
     async function loadPurchaseOrders() {
         try {
@@ -429,6 +455,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 document.getElementById('branchSearch').value = branchText;
                 document.getElementById('branch').value = invoice.branch_id || '';
                 document.getElementById('currency').value = invoice.currency_id || '';
+                document.getElementById('project').value = invoice.project_id || '';
                 document.getElementById('previousBalance').value = invoice.previous_balance || '0.00';
                 document.getElementById('remarks').value = invoice.remarks || '';
 
@@ -1863,6 +1890,7 @@ document.addEventListener('DOMContentLoaded', function () {
             purchaseOrderId: document.getElementById('purchaseOrder')?.value || null,
             subAccountId: document.getElementById('subAccount')?.value || null,
             currencyId: document.getElementById('currency')?.value,
+            projectId: document.getElementById('project')?.value || null,
             previousBalance: parseFloat(document.getElementById('previousBalance')?.value) || 0,
             totalBill: parseFloat(document.getElementById('totalBill')?.textContent),
             totalDiscountPercent: parseFloat(document.getElementById('totalDiscountPercent')?.value) || 0,
@@ -1994,6 +2022,7 @@ document.addEventListener('DOMContentLoaded', function () {
         document.getElementById('branchSearch').value = '';
         document.getElementById('branch').value = '';
         document.getElementById('previousBalance').value = '0.00';
+        document.getElementById('project').value = '';
 
         // Reset currency to base currency
         loadCurrencies();

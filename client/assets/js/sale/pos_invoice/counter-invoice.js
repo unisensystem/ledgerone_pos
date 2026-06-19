@@ -3,7 +3,8 @@ let currentInvoice = {
     items: [],
     customer: null,
     branch: null,
-    currency: null
+    currency: null,
+    project: null
 };
 
 let isSaving = false;
@@ -17,6 +18,7 @@ let currenciesData = [];
 let bankAccountsData = [];
 let uomData = [];
 let supplierMenData = [];
+let projectsData = [];
 
 // Default shortcuts
 const defaultShortcuts = {
@@ -44,7 +46,8 @@ document.addEventListener('DOMContentLoaded', async function() {
         loadCurrencies(),
         loadBankAccounts(),
         loadUOM(),
-        loadSupplierMen()
+        loadSupplierMen(),
+        loadProjects()
     ]);
     
     // Load branches and companies and wait for them to complete
@@ -223,6 +226,11 @@ document.addEventListener('DOMContentLoaded', async function() {
     document.getElementById('currency').addEventListener('change', function() {
         const selectedOption = this.options[this.selectedIndex];
         currentInvoice.currency = parseInt(selectedOption.getAttribute('data-id'));
+    });
+    
+    document.getElementById('project').addEventListener('change', function() {
+        currentInvoice.project = this.value ? parseInt(this.value) : null;
+        localStorage.setItem('lastSelectedProject', this.value || '');
     });
     
     document.getElementById('paymentMethod').addEventListener('change', function() {
@@ -764,6 +772,12 @@ window.loadDraft = async function(draftId) {
             if (currencyOption) {
                 document.getElementById('currency').value = currencyOption.value;
                 currentInvoice.currency = invoice.currency_id;
+            }
+            
+            // Set project
+            if (invoice.project_id) {
+                document.getElementById('project').value = invoice.project_id;
+                currentInvoice.project = invoice.project_id;
             }
             
             // Set payment method
@@ -1659,6 +1673,7 @@ async function saveInvoice(status = 'Posted') {
         customerId: currentInvoice.customer,
         branchId: currentInvoice.branch,
         currencyId: currentInvoice.currency,
+        projectId: currentInvoice.project || null,
         salesOfficerId: userEmployeeId,
         previousBalance: currentInvoice.previousBalance || 'Dr 0.00',
         paymentMethod: document.getElementById('paymentMethod').value || 'cash',
@@ -1786,5 +1801,32 @@ async function loadSupplierMen() {
             option.textContent = `${sm.employee_id} - ${sm.full_name}`;
             supplierManSelect.appendChild(option);
         });
+    }
+}
+
+async function loadProjects() {
+    try {
+        const response = await fetch('../../../../server/api/master_setup/project_setup/get-projects-dropdown.php');
+        const data = await response.json();
+        if (data.success) {
+            projectsData = data.data;
+            const projectSelect = document.getElementById('project');
+            projectSelect.innerHTML = '<option value="">Select Project</option>';
+            data.data.forEach(project => {
+                const option = document.createElement('option');
+                option.value = project.id;
+                const label = `${project.project_code} - ${project.project_name}${project.city_name ? ' - ' + project.city_name : ''}`;
+                option.textContent = label;
+                projectSelect.appendChild(option);
+            });
+            
+            const savedProjectId = localStorage.getItem('lastSelectedProject');
+            if (savedProjectId && data.data.find(p => p.id == savedProjectId)) {
+                projectSelect.value = savedProjectId;
+                currentInvoice.project = parseInt(savedProjectId);
+            }
+        }
+    } catch (error) {
+        console.error('Error loading projects:', error);
     }
 }

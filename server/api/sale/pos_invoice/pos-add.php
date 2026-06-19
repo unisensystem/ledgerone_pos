@@ -78,8 +78,8 @@ try {
             total_bill, total_discount_percent, total_discount_amount,
             extra_discount_1_percent, extra_discount_1_amount, extra_discount_2_percent, extra_discount_2_amount,
             shipping_fees, net_amount, withholding_tax_percent, withholding_tax_amount, amount_paid_auto_fill,
-            invoice_type, due_date, remarks, status, created_by, updated_by
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            invoice_type, due_date, remarks, status, created_by, updated_by, project_id
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ");
 
     $stmt->execute([
@@ -115,7 +115,8 @@ try {
         $input['remarks'] ?? null,
         $input['status'] ?? 'Posted',
         $user_id,
-        $user_id
+        $user_id,
+        (!empty($input['projectId']) && $input['projectId'] !== null && intval($input['projectId']) > 0) ? intval($input['projectId']) : null
     ]);
 
     $invoice_id = $pdo->lastInsertId();

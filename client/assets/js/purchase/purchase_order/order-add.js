@@ -20,7 +20,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const form = document.getElementById('invoiceForm');
 
     // Load all data, then initialize dropdowns and add first row
-    Promise.all([loadSuppliers(), loadBranches(), loadProducts(), loadUOM(), loadCurrencies(), loadCompanies()]).then(() => {
+    Promise.all([loadSuppliers(), loadBranches(), loadProducts(), loadUOM(), loadCurrencies(), loadCompanies(), loadProjects()]).then(() => {
         initSearchableDropdown('supplierCodeSearch', 'supplierCodeOptions', 'supplierCode');
         initSearchableDropdown('branchSearch', 'branchOptions', 'branch');
 
@@ -177,6 +177,31 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
+    // Load companies from API
+    async function loadCompanies() {
+        try {
+            const response = await fetch('../../../../server/api/purchase/purchase_order/get-companies.php');
+            const data = await response.json();
+
+            if (data.success) {
+                const companySelect = document.getElementById('company');
+                companySelect.innerHTML = '<option value="">Select Company</option>';
+
+                data.companies.forEach(company => {
+                    const option = document.createElement('option');
+                    option.value = company.id;
+                    option.textContent = company.company_name;
+                    if (data.companies.length === 1) {
+                        option.selected = true;
+                    }
+                    companySelect.appendChild(option);
+                });
+            }
+        } catch (error) {
+            console.error('Error loading companies:', error);
+        }
+    }
+
     // Load currencies from API
     async function loadCurrencies() {
         try {
@@ -210,32 +235,33 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
-    // Load companies from API
-    async function loadCompanies() {
+    // Load projects from API
+    async function loadProjects() {
         try {
-            const response = await fetch('../../../../server/api/purchase/purchase_order/get-companies.php');
+            const response = await fetch('../../../../server/api/master_setup/project_setup/get-projects-dropdown.php');
             const data = await response.json();
 
-            if (data.success) {
-                const companySelect = document.getElementById('company');
-                companySelect.innerHTML = '<option value="">Select Company</option>';
-
-                data.companies.forEach(company => {
-                    const option = document.createElement('option');
-                    option.value = company.id;
-                    option.textContent = `${company.company_code} - ${company.company_name}`;
-                    companySelect.appendChild(option);
-                });
-
-                // Auto-select if only one company
-                if (data.companies.length === 1) {
-                    companySelect.value = data.companies[0].id;
+            if (data.success && Array.isArray(data.projects) && data.projects.length > 0) {
+                const projectSelect = document.getElementById('project');
+                if (!projectSelect) {
+                    console.error('Project select element not found');
+                    return;
                 }
+                projectSelect.innerHTML = '<option value="">Select Project</option>';
+
+                data.projects.forEach(project => {
+                    const option = document.createElement('option');
+                    option.value = project.id;
+                    option.textContent = `${project.project_code} - ${project.project_name}${project.city_name ? ' - ' + project.city_name : ''}`;
+                    projectSelect.appendChild(option);
+                });
             }
         } catch (error) {
-            console.error('Error loading companies:', error);
+            console.error('Error loading projects:', error);
         }
     }
+
+
 
     // Update currency symbols in labels and values
     function updateCurrencySymbols() {
@@ -282,6 +308,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 document.getElementById('branchSearch').value = branchText;
                 document.getElementById('branch').value = invoice.branch_id;
                 document.getElementById('currency').value = invoice.currency_id;
+                document.getElementById('project').value = invoice.project_id || '';
                 document.getElementById('previousBalance').value = invoice.previous_balance;
                 document.getElementById('remarks').value = invoice.remarks || '';
 
@@ -1642,6 +1669,7 @@ document.addEventListener('DOMContentLoaded', function () {
             supplierId: document.getElementById('supplierCode').value,
             branchId: document.getElementById('branch').value,
             currencyId: document.getElementById('currency').value,
+            projectId: document.getElementById('project').value || null,
             previousBalance: parseFloat(document.getElementById('previousBalance').value) || 0,
             totalBill: parseFloat(document.getElementById('totalBill').textContent),
             totalDiscountPercent: parseFloat(document.getElementById('totalDiscountPercent').value) || 0,
@@ -1773,6 +1801,7 @@ document.addEventListener('DOMContentLoaded', function () {
         document.getElementById('branchSearch').value = '';
         document.getElementById('branch').value = '';
         document.getElementById('previousBalance').value = '0.00';
+        document.getElementById('project').value = '';
 
         // Reset currency to base currency
         loadCurrencies();

@@ -3,6 +3,7 @@ let expenseData = [];
 let allExpenseAccounts = [];
 let allCostCenters = [];
 let allCompanies = [];
+let allProjects = [];
 
 // DOM Elements
 const tableBody = document.getElementById('tableBody');
@@ -26,6 +27,7 @@ const paginationInfo = document.getElementById('paginationInfo');
 const filterExpenseAccount = document.getElementById('filterExpenseAccount');
 const filterCostCenter = document.getElementById('filterCostCenter');
 const filterCompany = document.getElementById('filterCompany');
+const filterProject = document.getElementById('filterProject');
 
 // State
 let currentPage = 1;
@@ -53,13 +55,15 @@ async function fetchExpenseVouchers() {
 // Fetch dropdown data
 async function fetchDropdownData() {
     try {
-        const [expenseRes, companyRes] = await Promise.all([
+        const [expenseRes, companyRes, projectRes] = await Promise.all([
             fetch('../../../../server/api/vouchers/expense_voucher/get-expense-accounts.php'),
-            fetch('../../../../server/api/vouchers/expense_voucher/get-companies.php')
+            fetch('../../../../server/api/vouchers/expense_voucher/get-companies.php'),
+            fetch('../../../../server/api/master_setup/project_setup/get-projects-dropdown.php')
         ]);
         
         const expenseData = await expenseRes.json();
         const companyData = await companyRes.json();
+        const projectData = await projectRes.json();
         
         if (expenseData.success) {
             allExpenseAccounts = expenseData.data;
@@ -73,6 +77,16 @@ async function fetchDropdownData() {
                 option.value = company.id;
                 option.textContent = company.company_name;
                 filterCompany.appendChild(option);
+            });
+        }
+        
+        if (projectData.success) {
+            allProjects = projectData.data;
+            projectData.data.forEach(project => {
+                const option = document.createElement('option');
+                option.value = project.id;
+                option.textContent = `${project.project_code} - ${project.project_name} - ${project.city_name}`;
+                filterProject.appendChild(option);
             });
         }
     } catch (error) {
@@ -242,7 +256,7 @@ function renderTable() {
     if (filteredData.length === 0) {
         tableBody.innerHTML = `
                     <tr>
-                        <td colspan="8">
+                        <td colspan="9">
                             <div class="empty-state">
                                 <div class="empty-icon">
                                     <i class="fas fa-file-invoice-dollar"></i>
@@ -280,6 +294,7 @@ function renderTable() {
                     <td><strong>${expense.voucher_no}</strong></td>
                     <td>${formattedDate}</td>
                     <td>${expense.description}</td>
+                    <td>${expense.project_name || '-'}</td>
                     <td>${expense.total_items} items</td>
                     <td class="amount">${formattedAmount}</td>
                     <td>
@@ -420,6 +435,7 @@ function filterData() {
     const expenseAccountId = filterExpenseAccount.dataset.id || '';
     const costCenterId = filterCostCenter.dataset.id || '';
     const companyId = filterCompany.value;
+    const projectId = filterProject.value;
 
     filteredData = expenseData.filter(expense => {
         // Search filter
@@ -451,6 +467,11 @@ function filterData() {
         
         // Company filter
         if (companyId && expense.company_id != companyId) {
+            return false;
+        }
+        
+        // Project filter
+        if (projectId && expense.project_id != projectId) {
             return false;
         }
 
@@ -674,6 +695,7 @@ function resetFilters() {
     filterCostCenter.value = '';
     delete filterCostCenter.dataset.id;
     filterCompany.value = '';
+    filterProject.value = '';
     
     // Reload all data
     fetchExpenseVouchers();

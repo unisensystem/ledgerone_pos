@@ -22,6 +22,7 @@ document.addEventListener('DOMContentLoaded', function () {
     // Load companies and employees
     loadCompanies();
     loadEmployees();
+    loadProjects();
 
     function loadCompanies() {
         fetch('../../../../server/api/customer_supplier/suppliers/get-companies.php')
@@ -42,6 +43,20 @@ document.addEventListener('DOMContentLoaded', function () {
             .then(data => {
                 if (data.success) {
                     employees = data.employees;
+                }
+            });
+    }
+
+    function loadProjects() {
+        fetch('../../../../server/api/master_setup/project_setup/get-projects-dropdown.php')
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    const sel = document.getElementById('project');
+                    data.data.forEach(p => {
+                        const label = `${p.project_code} - ${p.project_name}${p.city_name ? ' - ' + p.city_name : ''}`;
+                        sel.appendChild(new Option(label, p.id));
+                    });
                 }
             });
     }
@@ -241,6 +256,7 @@ document.addEventListener('DOMContentLoaded', function () {
         });
 
         const formData = {
+            projectId: document.getElementById('project').value || null,
             companyId: companySelect.value,
             salesmanId: salesmanIdsInput.value || null,
             supplierName: document.getElementById('supplierName').value.trim(),
@@ -269,6 +285,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 setTimeout(() => {
                     form.reset();
                     document.getElementById('supplierCode').value = 'Auto Generated';
+                    document.getElementById('project').value = '';
                     selectedSalesmen = [];
                     updateSalesmanChips();
                     updateSalesmanIdsInput();

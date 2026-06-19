@@ -364,6 +364,25 @@ async function loadCompanies() {
     }
 }
 
+async function loadProjects() {
+    try {
+        const res = await fetch('../../../../server/api/master_setup/project_setup/get-projects-dropdown.php');
+        const data = await res.json();
+        if (data.projects) {
+            const select = document.getElementById('project');
+            select.innerHTML = '<option value="">All Projects</option>';
+            data.projects.forEach(function(project) {
+                const option = document.createElement('option');
+                option.value = project.id;
+                option.textContent = project.project_code + ' - ' + project.project_name + (project.city_name ? ' - ' + project.city_name : '');
+                select.appendChild(option);
+            });
+        }
+    } catch (e) {
+        console.error('loadProjects:', e);
+    }
+}
+
 async function loadFilters() {
     try {
         const res = await fetch('../../../../server/api/sale/daily_sale_report/get-filters.php');
@@ -428,6 +447,7 @@ function init() {
     bindClick(billWiseToggle, function() { switchReportType('bill'); });
 
     loadCompanies();
+    loadProjects();
     loadFilters();
     loadCities();
     loadCityZones();
@@ -467,10 +487,12 @@ function buildReportParams(includeReference) {
     const params = new URLSearchParams({ report_type: reportType });
     const dateFrom = document.getElementById('date-from').value;
     const dateTo = document.getElementById('date-to').value;
+    const project = document.getElementById('project').value;
 
     if (includeReference) params.set('reference', generateReference());
     if (dateFrom) params.set('date_from', dateFrom);
     if (dateTo) params.set('date_to', dateTo);
+    if (project) params.set('project_id', project);
 
     appendArrayParams(params, 'invoice_types', getSelectedIds('invoiceTypes'));
     appendArrayParams(params, 'sales_officer_ids', getSelectedIds('salesOfficers'));
@@ -678,6 +700,7 @@ function handleReset() {
     const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
     document.getElementById('date-from').valueAsDate = firstDay;
     document.getElementById('date-to').valueAsDate = today;
+    document.getElementById('project').value = '';
 
     referenceCard.style.display = 'none';
     referenceNumber.textContent = '-';

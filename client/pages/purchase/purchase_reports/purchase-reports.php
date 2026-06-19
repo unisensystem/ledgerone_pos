@@ -86,6 +86,18 @@ $currency_symbol = $currency['symbol'];
                 </select>
             </div>
             <div class="report-type">
+                <label class="filter-label">Project</label>
+                <select class="filter-select" id="project">
+                    <option value="">All Projects</option>
+                </select>
+            </div>
+            <div class="report-type">
+                <label class="filter-label">Supplier</label>
+                <select class="filter-select" id="supplier">
+                    <option value="">All Suppliers</option>
+                </select>
+            </div>
+            <div class="report-type">
                 <label class="filter-label">Report Type</label>
                 <select class="filter-select" id="reportType">
                     <option value="all" selected>All Reports</option>

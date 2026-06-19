@@ -3,21 +3,24 @@ let expenseAccounts = [];
 let paymentMethods = [];
 let bankAccounts = [];
 let companies = [];
+let projects = [];
 
 // Fetch data from API
 async function fetchDropdownData() {
     try {
-        const [expenseRes, paymentRes, bankRes, companyRes] = await Promise.all([
+        const [expenseRes, paymentRes, bankRes, companyRes, projectRes] = await Promise.all([
             fetch('../../../../server/api/vouchers/expense_voucher/get-expense-accounts.php'),
             fetch('../../../../server/api/vouchers/expense_voucher/get-payment-methods.php'),
             fetch('../../../../server/api/vouchers/expense_voucher/get-bank-accounts.php'),
-            fetch('../../../../server/api/vouchers/expense_voucher/get-companies.php')
+            fetch('../../../../server/api/vouchers/expense_voucher/get-companies.php'),
+            fetch('../../../../server/api/master_setup/project_setup/get-projects-dropdown.php')
         ]);
         
         const expenseData = await expenseRes.json();
         const paymentData = await paymentRes.json();
         const bankData = await bankRes.json();
         const companyData = await companyRes.json();
+        const projectData = await projectRes.json();
         
         if (expenseData.success) {
             expenseAccounts = expenseData.data;
@@ -39,6 +42,16 @@ async function fetchDropdownData() {
                 if (index === 0 && companyData.data.length === 1) {
                     option.selected = true;
                 }
+            });
+        }
+        if (projectData.success) {
+            projects = projectData.data;
+            const projectSelect = document.getElementById('project');
+            projectData.data.forEach(p => {
+                const option = document.createElement('option');
+                option.value = p.id;
+                option.textContent = `${p.project_code} - ${p.project_name}${p.city_name ? ' - ' + p.city_name : ''}`;
+                projectSelect.appendChild(option);
             });
         }
     } catch (error) {
@@ -90,6 +103,9 @@ async function loadVoucherForEdit(voucherId) {
             setTimeout(() => {
                 if (voucher.company_id) {
                     document.getElementById('company').value = voucher.company_id;
+                }
+                if (voucher.project_id) {
+                    document.getElementById('project').value = voucher.project_id;
                 }
             }, 100);
             
@@ -432,6 +448,7 @@ async function validateAndPost() {
                 body: JSON.stringify({
                     date: dateInput.value,
                     company_id: document.getElementById('company').value,
+                    project_id: document.getElementById('project').value || null,
                     voucher_number: document.getElementById('voucher').value,
                     description: description.value,
                     entries: expenseData

@@ -32,6 +32,7 @@ try {
     $search = $_GET['search'] ?? '';
     $status = $_GET['status'] ?? '';
     $company_id = $_GET['company_id'] ?? '';
+    $project_id = $_GET['project_id'] ?? '';
     
     // Build WHERE clause
     $whereConditions = [];
@@ -69,6 +70,11 @@ try {
             $params[] = $company_id;
         }
         
+        if ($project_id) {
+            $whereConditions[] = 'pv.project_id = ?';
+            $params[] = $project_id;
+        }
+        
         $whereClause = 'WHERE pv.tenant_id = ? AND ' . implode(' AND ', $whereConditions);
         
         // Get total count for customers
@@ -91,14 +97,17 @@ try {
                 pv.amount,
                 pv.bill_no,
                 pv.company_id,
+                pv.project_id,
                 c.customer_name as supplier_name,
                 c.customer_code as supplier_code,
                 a.name as payment_method,
-                cur.symbol as currency_symbol
+                cur.symbol as currency_symbol,
+                p.project_name
             FROM payment_voucher pv
             LEFT JOIN customers c ON pv.customer_id = c.id
             LEFT JOIN accounts a ON pv.payment_method_id = a.id
             LEFT JOIN ledgerone_public.currencies cur ON pv.currency_id = cur.id
+            LEFT JOIN projects p ON pv.project_id = p.id
             $whereClause
             ORDER BY pv.created_at DESC
             LIMIT $limit OFFSET $offset
@@ -135,6 +144,11 @@ try {
             $params[] = $company_id;
         }
         
+        if ($project_id) {
+            $whereConditions[] = 'pv.project_id = ?';
+            $params[] = $project_id;
+        }
+        
         $whereClause = 'WHERE pv.tenant_id = ? AND ' . implode(' AND ', $whereConditions);
         
         // Get total count for suppliers
@@ -157,14 +171,17 @@ try {
                 pv.amount,
                 pv.bill_no,
                 pv.company_id,
+                pv.project_id,
                 s.supplier_name,
                 s.supplier_code,
                 a.name as payment_method,
-                c.symbol as currency_symbol
+                c.symbol as currency_symbol,
+                p.project_name
             FROM payment_voucher pv
             LEFT JOIN suppliers s ON pv.supplier_id = s.id
             LEFT JOIN accounts a ON pv.payment_method_id = a.id
             LEFT JOIN ledgerone_public.currencies c ON pv.currency_id = c.id
+            LEFT JOIN projects p ON pv.project_id = p.id
             $whereClause
             ORDER BY pv.created_at DESC
             LIMIT $limit OFFSET $offset

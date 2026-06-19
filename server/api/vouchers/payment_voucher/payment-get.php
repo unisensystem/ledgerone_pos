@@ -31,10 +31,13 @@ try {
             s.supplier_name,
             s.supplier_code,
             c.customer_name,
-            c.customer_code
+            c.customer_code,
+            p.project_code,
+            p.project_name
         FROM payment_voucher pv
         LEFT JOIN suppliers s ON pv.supplier_id = s.id
         LEFT JOIN customers c ON pv.customer_id = c.id
+        LEFT JOIN projects p ON pv.project_id = p.id
         WHERE pv.id = ? AND pv.tenant_id = ?
     ");
     $stmt->execute([$voucher_id, $tenant_id]);

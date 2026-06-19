@@ -26,6 +26,7 @@ $input = json_decode(file_get_contents('php://input'), true);
 $date = $input['date'] ?? null;
 $voucher_number = $input['voucher_number'] ?? null;
 $description = $input['description'] ?? null;
+$project_id = $input['project_id'] ?? null;
 $entries = $input['entries'] ?? [];
 
 if (!$date || !$voucher_number || !$description || empty($entries)) {
@@ -43,10 +44,10 @@ try {
     
     // Insert into expense_voucher
     $stmt = $pdo->prepare("
-        INSERT INTO expense_voucher (tenant_id, company_id, voucher_no, date, description, total_amount, total_items)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO expense_voucher (tenant_id, company_id, voucher_no, date, description, total_amount, total_items, project_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     ");
-    $stmt->execute([$tenant_id, $input['company_id'], $voucher_number, $date, $description, $total_amount, $total_items]);
+    $stmt->execute([$tenant_id, $input['company_id'], $voucher_number, $date, $description, $total_amount, $total_items, $project_id]);
     $voucher_id = $pdo->lastInsertId();
     
     foreach ($entries as $entry) {

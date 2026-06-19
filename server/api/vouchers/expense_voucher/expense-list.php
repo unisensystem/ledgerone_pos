@@ -17,6 +17,8 @@ if (!$user_id || $tenant_id === null) {
 }
 
 try {
+    $project_id = $_GET['project_id'] ?? null;
+    
     $stmt = $pdo->prepare("
         SELECT 
             ev.id,
@@ -25,12 +27,21 @@ try {
             ev.description,
             ev.total_amount,
             ev.total_items,
-            ev.company_id
+            ev.company_id,
+            ev.project_id,
+            p.project_name
         FROM expense_voucher ev
+        LEFT JOIN projects p ON ev.project_id = p.id
         WHERE ev.tenant_id = ?
+        " . ($project_id ? "AND ev.project_id = ?" : "") . "
         ORDER BY ev.id DESC
     ");
-    $stmt->execute([$tenant_id]);
+    
+    if ($project_id) {
+        $stmt->execute([$tenant_id, $project_id]);
+    } else {
+        $stmt->execute([$tenant_id]);
+    }
     $vouchers = $stmt->fetchAll(PDO::FETCH_ASSOC);
     
     echo json_encode(['success' => true, 'data' => $vouchers]);

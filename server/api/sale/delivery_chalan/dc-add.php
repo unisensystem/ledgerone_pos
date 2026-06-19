@@ -29,10 +29,10 @@ try {
     $stmt = $pdo->prepare("
         INSERT INTO delivery_chalan (
             tenant_id, chalan_no, sale_invoice_id, delivery_date,
-            customer_id, company_id, branch_id, currency_id,
+            customer_id, company_id, branch_id, currency_id, project_id,
             sale_officer_id, supplier_man_id, bilty_no, transport_name,
             remarks, status, created_by, updated_by
-        ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+        ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
     ");
     $stmt->execute([
         $tenant_id,
@@ -43,6 +43,7 @@ try {
         $input['companyId'] ?? null,
         $input['branchId'],
         $input['currencyId'] ?? null,
+        $input['projectId'] ?? null,
         $input['salesOfficerId'] ?? null,
         $input['supplierManId'] ?? null,
         $input['biltyNo'] ?? null,

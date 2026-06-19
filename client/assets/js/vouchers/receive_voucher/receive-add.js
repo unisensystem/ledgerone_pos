@@ -21,6 +21,7 @@ let customers = [];
 let bills = [];
 let employees = [];
 let companies = [];
+let projects = [];
 let currentCustomerId = null;
 
 // Fetch customers from API
@@ -69,6 +70,24 @@ fetch('../../../../server/api/vouchers/receive_voucher/get-companies.php')
         }
     })
     .catch(error => console.error('Error fetching companies:', error));
+
+// Fetch projects from API
+fetch('../../../../server/api/master_setup/project_setup/get-projects-dropdown.php')
+    .then(response => response.json())
+    .then(data => {
+        if (data.success && Array.isArray(data.data)) {
+            projects = data.data;
+            const projectSelect = document.getElementById('project');
+            data.data.forEach(project => {
+                const option = document.createElement('option');
+                option.value = project.id;
+                const cityName = project.city_name || 'N/A';
+                option.textContent = `${project.project_code} - ${project.project_name} - ${cityName}`;
+                projectSelect.appendChild(option);
+            });
+        }
+    })
+    .catch(error => console.error('Error fetching projects:', error));
 
 // Fetch bills for selected customer
 function fetchBillsForCustomer(customerCode) {
@@ -559,6 +578,7 @@ function addBulkRow() {
         <td><select class="bulk-sub-account"><option value="">Select</option></select></td>
         <td><input type="text" class="bulk-bill" placeholder="Bill no" autocomplete="off"></td>
         <td><input type="text" class="bulk-dsr" placeholder="DSR-B-24-26-20251231-20260112"></td>
+        <td><select class="bulk-project"><option value="">Select</option></select></td>
         <td><select class="bulk-currency" required></select></td>
         <td><input type="number" class="bulk-amount" step="0.01" min="0" placeholder="0.00" required></td>
         <td><input type="text" class="bulk-rem-balance" readonly></td>
@@ -621,6 +641,7 @@ function populateRowSelects(row) {
     const currencySelect = row.querySelector('.bulk-currency');
     const paymentSelect = row.querySelector('.bulk-payment');
     const bankSelect = row.querySelector('.bulk-bank');
+    const projectSelect = row.querySelector('.bulk-project');
     
     currencySelect.innerHTML = '';
     currenciesData.forEach((c, index) => {
@@ -640,6 +661,12 @@ function populateRowSelects(row) {
     bankSelect.innerHTML = '<option value="">Select</option>';
     bankAccountsData.forEach(b => {
         bankSelect.innerHTML += `<option value="${b.id}">${b.bank_name} - ${b.account_number}</option>`;
+    });
+    
+    projectSelect.innerHTML = '<option value="">Select</option>';
+    projects.forEach(p => {
+        const cityName = p.city_name || 'N/A';
+        projectSelect.innerHTML += `<option value="${p.id}">${p.project_code} - ${p.project_name} - ${cityName}</option>`;
     });
 }
 
@@ -839,6 +866,7 @@ document.getElementById('postBulkBtn').addEventListener('click', async function(
         formData.append('sub_account_id', row.querySelector('.bulk-sub-account').value || null);
         formData.append('bill_no', row.querySelector('.bulk-bill').value || null);
         formData.append('dsr_no', row.querySelector('.bulk-dsr').value || null);
+        formData.append('project_id', row.querySelector('.bulk-project').value || null);
         formData.append('amount', row.querySelector('.bulk-amount').value);
         formData.append('currency_id', row.querySelector('.bulk-currency').value);
         formData.append('payment_method_id', row.querySelector('.bulk-payment').value);
@@ -934,6 +962,7 @@ form.addEventListener('submit', function (e) {
     formData.append('sub_account_id', document.getElementById('subAccount').value || null);
     formData.append('bill_no', document.getElementById('billNo').value.split(' - ')[0] || null);
     formData.append('dsr_no', document.getElementById('dsrNo').value || null);
+    formData.append('project_id', document.getElementById('project').value || null);
     formData.append('amount', document.getElementById('amount').value);
     formData.append('currency_id', document.getElementById('currency').value);
     formData.append('payment_method_id', document.getElementById('paymentMethod').value);

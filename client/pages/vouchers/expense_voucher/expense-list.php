@@ -131,6 +131,13 @@ $currency_symbol = $currency['symbol'];
                 </div>
 
                 <div class="form-group">
+                    <label for="filterProject">Project</label>
+                    <select id="filterProject">
+                        <option value="">All Projects</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
                     <label for="filterCostCenter">Cost Center</label>
                     <div class="searchable-dropdown">
                         <input type="text" id="filterCostCenter" placeholder="Search cost center...">
@@ -193,6 +200,7 @@ $currency_symbol = $currency['symbol'];
                             <th>Voucher #</th>
                             <th>Date</th>
                             <th>Description</th>
+                            <th>Project</th>
                             <th>Expense Account</th>
                             <th>Amount</th>
                             <th>Actions</th>

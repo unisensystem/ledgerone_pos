@@ -186,6 +186,7 @@
             <div class="invoice-info">
                 <h3>Invoice Information</h3>
                 <p><strong>Branch:</strong> <span id="branchName">Loading...</span></p>
+                <p><strong>Project:</strong> <span id="projectName">-</span></p>
                 <p><strong>Currency:</strong> <span id="currency">Loading...</span></p>
                 <p><strong>Remarks:</strong> <span id="remarks">-</span></p>
             </div>
@@ -396,6 +397,7 @@
                 `${invoice.branch_name} (${invoice.branch_type}) - Parent: ${invoice.parent_branch_name}` : 
                 `${invoice.branch_name} (${invoice.branch_type})`;
             document.getElementById('branchName').textContent = branchText;
+            document.getElementById('projectName').textContent = invoice.project_code ? `${invoice.project_code} - ${invoice.project_name}` : '-';
             document.getElementById('currency').textContent = invoice.currency_name;
             document.getElementById('remarks').textContent = invoice.remarks || '-';
             

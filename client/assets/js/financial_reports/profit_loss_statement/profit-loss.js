@@ -4,6 +4,7 @@ const endDateEl = document.getElementById('endDate');
 const branchFilterEl = document.getElementById('branchFilter');
 const companyFilterEl = document.getElementById('companyFilter');
 const currencyFilterEl = document.getElementById('currencyFilter');
+const projectFilterEl = document.getElementById('projectFilter');
 const detailLevelEl = document.getElementById('detailLevel');
 const includeGraphsEl = document.getElementById('includeGraphs');
 const generateReportBtn = document.getElementById('generateReportBtn');
@@ -55,6 +56,7 @@ endDateEl.value = formatDate(lastDay);
 // Load companies
 loadCompanies();
 loadCurrencies();
+loadProjects();
 
 async function loadCompanies() {
     try {
@@ -97,6 +99,30 @@ async function loadCurrencies() {
     }
 }
 
+// Load projects
+async function loadProjects() {
+    try {
+        const response = await fetch('../../../../server/api/master_setup/project_setup/get-projects-dropdown.php');
+        const result = await response.json();
+        
+        if (result.success) {
+            projectFilterEl.innerHTML = '<option value="">All Projects</option>';
+            result.data.forEach(project => {
+                projectFilterEl.innerHTML += `<option value="${project.id}">${project.project_code} - ${project.project_name} - ${project.city_name}</option>`;
+            });
+        }
+    } catch (error) {
+        console.error('Error loading projects:', error);
+    }
+}
+
+// Regenerate report when project changes
+projectFilterEl.addEventListener('change', async function() {
+    if (reportResults.style.display !== 'none') {
+        await generateReport();
+    }
+});
+
 // Update currency symbol when currency changes
 currencyFilterEl.addEventListener('change', async function() {
     const selectedOption = currencyFilterEl.options[currencyFilterEl.selectedIndex];
@@ -127,7 +153,7 @@ function calculatePercentage(amount, totalRevenue) {
 }
 
 // Fetch P&L data from API
-async function fetchPLData(startDate, endDate, branchId, companyId, currencyId) {
+async function fetchPLData(startDate, endDate, branchId, companyId, currencyId, projectId) {
     let url = `../../../../server/api/financial_reports/profit_loss_statement/profit-loss.php?start_date=${startDate}&end_date=${endDate}`;
     if (branchId && branchId !== 'all') {
         url += `&branch_id=${branchId}`;
@@ -137,6 +163,9 @@ async function fetchPLData(startDate, endDate, branchId, companyId, currencyId) 
     }
     if (currencyId) {
         url += `&currency_id=${currencyId}`;
+    }
+    if (projectId) {
+        url += `&project_id=${projectId}`;
     }
     const response = await fetch(url);
     const result = await response.json();
@@ -192,7 +221,7 @@ async function generateReport() {
         validationMessage.style.display = 'flex';
 
         // Fetch data from API
-        const data = await fetchPLData(startDateEl.value, endDateEl.value, branchFilterEl.value, companyFilterEl.value, currencyFilterEl.value);
+        const data = await fetchPLData(startDateEl.value, endDateEl.value, branchFilterEl.value, companyFilterEl.value, currencyFilterEl.value, projectFilterEl.value);
         
         console.log('API Response:', data);
         console.log('Sales Revenue:', data.sales_revenue);
@@ -429,9 +458,10 @@ async function generateReport() {
 // Reset form to default values
 function resetForm() {
     startDateEl.value = formatDate(firstDay);
-    endDateEl.value = formatDate(today); // Use today's date
+    endDateEl.value = formatDate(today);
     branchFilterEl.value = 'all';
     companyFilterEl.value = '';
+    projectFilterEl.value = '';
     document.getElementById('comparativePeriod').value = 'none';
     detailLevelEl.value = 'detailed';
     includeGraphsEl.value = 'yes';

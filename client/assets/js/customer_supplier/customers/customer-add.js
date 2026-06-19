@@ -19,6 +19,7 @@ document.addEventListener('DOMContentLoaded', function () {
         { id: 'identityCard', label: 'Identity Card No', visible: false },
         { id: 'salesOfficer', label: 'Associated Sales Officer', visible: false },
         { id: 'supplierMan', label: 'Supplier Man', visible: false },
+        { id: 'project', label: 'Project', visible: false },
         { id: 'country', label: 'Country', visible: false },
         { id: 'region', label: 'Region', visible: false },
         { id: 'city', label: 'City', visible: false },
@@ -516,6 +517,7 @@ document.addEventListener('DOMContentLoaded', function () {
         $('#area').select2({ placeholder: 'Select Area', allowClear: true });
         $('#salesOfficer').select2({ placeholder: 'Select Sales Officer', allowClear: true });
         $('#supplierMan').select2({ placeholder: 'Select Supplier Man', allowClear: true });
+        $('#project').select2({ placeholder: 'Select Project', allowClear: true });
     });
 
     // Load territory data
@@ -527,6 +529,7 @@ document.addEventListener('DOMContentLoaded', function () {
     loadSalesOfficers();
     loadSupplierMen();
     loadCompanies();
+    loadProjects();
 
     $('#country').on('change', function() {
         const countryId = this.value;
@@ -796,6 +799,21 @@ document.addEventListener('DOMContentLoaded', function () {
                     if (data.companies.length === 1) {
                         $('#company').val(data.companies[0].id).trigger('change');
                     }
+                }
+            });
+    }
+
+    function loadProjects() {
+        fetch('../../../../server/api/master_setup/project_setup/get-projects-dropdown.php')
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    data.data.forEach(project => {
+                        const label = `${project.project_code} - ${project.project_name}${project.city_name ? ' - ' + project.city_name : ''}`;
+                        const option = new Option(label, project.id);
+                        $('#project').append(option);
+                    });
+                    $('#project').trigger('change');
                 }
             });
     }
@@ -1102,6 +1120,7 @@ document.addEventListener('DOMContentLoaded', function () {
             cityId: citySelect.value || null,
             cityZoneId: cityZoneSelect.value || null,
             areaId: areaSelect.value || null,
+            projectId: document.getElementById('project').value || null,
             salesOfficerId: salesOfficerSelect.value || null,
             supplierManId: supplierManSelect.value || null,
             isSalesTaxRegistered: isSalesTaxRegistered.checked ? 1 : 0,
@@ -1145,6 +1164,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     $('#cityZone').empty().append('<option value="">Select City Zone</option>').prop('disabled', true);
                     loadAllAreas();
                     $('#country').val('').trigger('change');
+                    $('#project').val('').trigger('change');
                     $('#salesOfficer').val('').trigger('change');
                     $('#supplierMan').val('').trigger('change');
                     // Reset company if multiple companies exist
@@ -1197,6 +1217,7 @@ document.addEventListener('DOMContentLoaded', function () {
             $('#cityZone').empty().append('<option value="">Select City Zone</option>').prop('disabled', true);
             loadAllAreas();
             $('#country').val('').trigger('change');
+            $('#project').val('').trigger('change');
             $('#salesOfficer').val('').trigger('change');
             $('#supplierMan').val('').trigger('change');
             // Reset company if multiple companies exist

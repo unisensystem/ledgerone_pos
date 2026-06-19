@@ -327,6 +327,16 @@ document.addEventListener('DOMContentLoaded', function () {
         } else {
             document.getElementById('viewSupplierMan').textContent = '';
         }
+
+        // Project
+        if (customer.project_id) {
+            const projLabel = customer.project_code
+                ? `${customer.project_code} - ${customer.project_name}${customer.project_city_name ? ' - ' + customer.project_city_name : ''}`
+                : '-';
+            document.getElementById('viewProject').textContent = projLabel;
+        } else {
+            document.getElementById('viewProject').textContent = '-';
+        }
         
         // Territory fields
         if (customer.country_id) {
@@ -591,6 +601,7 @@ document.addEventListener('DOMContentLoaded', function () {
         $('#editCityZone').select2({ placeholder: 'Select City Zone', allowClear: true, dropdownParent: $('#editModal') });
         $('#editArea').select2({ placeholder: 'Select Area', allowClear: true, dropdownParent: $('#editModal') });
         $('#editSupplierMan').select2({ placeholder: 'Select Supplier Man', allowClear: true, dropdownParent: $('#editModal') });
+        $('#editProject').select2({ placeholder: 'Select Project', allowClear: true, dropdownParent: $('#editModal') });
         
         // Load initial data
         loadEditCountries();
@@ -600,6 +611,7 @@ document.addEventListener('DOMContentLoaded', function () {
         loadEditCustomerTypes();
         loadEditCustomerCategories();
         loadEditBrands();
+        loadEditProjects();
         
         // Territory cascading
         $('#editCountry').on('change', function() {
@@ -774,6 +786,20 @@ document.addEventListener('DOMContentLoaded', function () {
                 }
             });
     }
+
+    function loadEditProjects() {
+        return fetch('../../../../server/api/master_setup/project_setup/get-projects-dropdown.php')
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    $('#editProject').empty().append('<option value="">Select Project</option>');
+                    data.data.forEach(project => {
+                        const label = `${project.project_code} - ${project.project_name}${project.city_name ? ' - ' + project.city_name : ''}`;
+                        $('#editProject').append(new Option(label, project.id));
+                    });
+                }
+            });
+    }
     
     // Load suppliers for edit modal
     fetch('../../../../server/api/customer_supplier/customers/get-suppliers.php')
@@ -836,6 +862,11 @@ document.addEventListener('DOMContentLoaded', function () {
         
         // Supplier Man
         $('#editSupplierMan').val(customer.supplier_man_id || '').trigger('change');
+
+        // Project — wait for options to load then set value
+        loadEditProjects().then(() => {
+            $('#editProject').val(customer.project_id || '').trigger('change');
+        });
         
         // Territory - load cascading data
         if (customer.country_id) {
@@ -1190,6 +1221,7 @@ document.addEventListener('DOMContentLoaded', function () {
         $('#editArea').prop('disabled', true).empty().append('<option value="">Select Area</option>').trigger('change');
         $('#editCountry').val('').trigger('change');
         $('#editSalesOfficer').val('').trigger('change');
+        $('#editProject').val('').trigger('change');
         $('#editCustomerCategory').val('').trigger('change');
         $('#editBrandName').val('').trigger('change');
         // Hide conditional fields
@@ -1229,6 +1261,7 @@ document.addEventListener('DOMContentLoaded', function () {
             identityCard: document.getElementById('editIdentityCard').value.trim(),
             salesOfficerId: $('#editSalesOfficer').val() || null,
             supplierManId: $('#editSupplierMan').val() || null,
+            projectId: $('#editProject').val() || null,
             countryId: $('#editCountry').val() || null,
             regionId: $('#editRegion').val() || null,
             cityId: $('#editCity').val() || null,

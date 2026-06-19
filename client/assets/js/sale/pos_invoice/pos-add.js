@@ -365,7 +365,7 @@ function initializePage(permissions) {
     const form = document.getElementById('invoiceForm');
 
     // Load all data, then initialize dropdowns and add first row
-    Promise.all([loadCustomersLocal(), loadCompanies(), loadBranches(), loadProductsLocal(), loadUOM(), loadUOMGroupUnits(), loadCurrencies(), loadBankAccounts(), loadEmployees(), loadSaleOrders(), loadBrandsData()]).then(() => {
+    Promise.all([loadCustomersLocal(), loadCompanies(), loadBranches(), loadProductsLocal(), loadUOM(), loadUOMGroupUnits(), loadCurrencies(), loadBankAccounts(), loadEmployees(), loadSaleOrders(), loadBrandsData(), loadProjects()]).then(() => {
         initSearchableDropdown('customerCodeSearch', 'customerCodeOptions', 'customerCode');
         initSearchableDropdown('companySearch', 'companyOptions', 'company');
         initSearchableDropdown('branchSearch', 'branchOptions', 'branch');
@@ -1164,6 +1164,28 @@ function initializePage(permissions) {
         }
     }
 
+    async function loadProjects() {
+        try {
+            const response = await fetch('../../../../server/api/sale/pos_invoice/get-projects-dropdown.php');
+            const data = await response.json();
+            const sel = document.getElementById('project');
+            sel.innerHTML = '<option value="">Select Project</option>';
+            if (data.success && data.data && data.data.length > 0) {
+                data.data.forEach(p => {
+                    const opt = document.createElement('option');
+                    opt.value = p.id;
+                    opt.textContent = `${p.project_code} - ${p.project_name}${p.city_name ? ' - ' + p.city_name : ''}`;
+                    sel.appendChild(opt);
+                });
+                console.log('Projects loaded:', data.data.length, 'projects');
+            } else {
+                console.warn('No projects returned:', data);
+            }
+        } catch (error) {
+            console.error('Error loading projects:', error);
+        }
+    }
+
     // Load sub accounts for selected customer
     async function loadSubAccounts(customerId) {
         try {
@@ -1355,7 +1377,27 @@ function initializePage(permissions) {
                     }
                 }
 
+                // Set invoice type and due date
+                const invoiceTypeEl2 = document.getElementById('invoiceType');
+                if (invoiceTypeEl2 && invoice.invoice_type) {
+                    invoiceTypeEl2.value = invoice.invoice_type;
+                    const dueDateGroupEl2 = document.getElementById('dueDateGroup');
+                    if (dueDateGroupEl2) dueDateGroupEl2.style.display = invoice.invoice_type === 'Credit' ? '' : 'none';
+                }
+                const dueDateEl2 = document.getElementById('dueDate');
+                if (dueDateEl2 && invoice.due_date) dueDateEl2.value = invoice.due_date;
 
+                // Set project - wait for options to be ready
+                if (invoice.project_id) {
+                    const projectEl = document.getElementById('project');
+                    if (projectEl) {
+                        // If options not yet populated, retry once after brief delay
+                        if (projectEl.options.length <= 1) {
+                            await loadProjects();
+                        }
+                        projectEl.value = invoice.project_id;
+                    }
+                }
 
                 // Update currency symbols
                 updateCurrencySymbols();
@@ -3655,6 +3697,9 @@ function saveInvoice(status = 'Posted') {
         previousBalance: document.getElementById('previousBalance')?.value || '0.00',
         salesOfficerId: document.getElementById('salesOfficer')?.value || null,
         supplierManId: document.getElementById('supplierMan')?.value || null,
+        projectId: (() => { const v = document.getElementById('project')?.value; const n = parseInt(v); return (!isNaN(n) && n > 0) ? n : null; })(),
+        invoiceType: document.getElementById('invoiceType')?.value || 'Cash',
+        dueDate: document.getElementById('dueDate')?.value || null,
         biltyNo: document.getElementById('biltyNo')?.value || null,
         transportName: document.getElementById('transportName')?.value || null,
         totalBill: parseFloat(document.getElementById('totalBill').textContent),

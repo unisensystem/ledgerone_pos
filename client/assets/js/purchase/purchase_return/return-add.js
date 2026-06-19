@@ -20,7 +20,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const form = document.getElementById('invoiceForm');
 
     // Load all data, then initialize dropdowns and add first row
-    Promise.all([loadSuppliers(), loadBranches(), loadProducts(), loadUOM(), loadCurrencies(), loadCompanies(), loadPurchaseInvoices()]).then(() => {
+    Promise.all([loadSuppliers(), loadBranches(), loadProducts(), loadUOM(), loadCurrencies(), loadCompanies(), loadPurchaseInvoices(), loadProjects()]).then(() => {
         initSearchableDropdown('supplierCodeSearch', 'supplierCodeOptions', 'supplierCode');
         initSearchableDropdown('branchSearch', 'branchOptions', 'branch');
         initSearchableDropdown('purchaseInvoiceSearch', 'purchaseInvoiceOptions', 'purchaseInvoice');
@@ -240,6 +240,36 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
+    // Load projects from API
+    async function loadProjects() {
+        try {
+            const response = await fetch('../../../../server/api/master_setup/project_setup/get-projects-dropdown.php');
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            
+            const data = await response.json();
+            const projectSelect = document.getElementById('project');
+            projectSelect.innerHTML = '<option value="">Select Project</option>';
+            
+            if (data.success && Array.isArray(data.projects) && data.projects.length > 0) {
+                data.projects.forEach(project => {
+                    const cityName = project.city_name || 'N/A';
+                    const option = document.createElement('option');
+                    option.value = project.id;
+                    option.textContent = `${project.project_code} - ${project.project_name} (${cityName})`;
+                    projectSelect.appendChild(option);
+                });
+                
+                if (data.projects.length === 1) {
+                    projectSelect.value = data.projects[0].id;
+                }
+            } else if (!data.success) {
+                console.warn('Projects API returned error:', data.message);
+            }
+        } catch (error) {
+            console.error('Error loading projects:', error);
+        }
+    }
+
     // Load purchase invoices from API
     async function loadPurchaseInvoices() {
         try {
@@ -444,6 +474,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 document.getElementById('currency').value = returnData.currency_id;
                 document.getElementById('previousBalance').value = returnData.previous_balance;
                 document.getElementById('remarks').value = returnData.remarks || '';
+                document.getElementById('project').value = returnData.project_id || '';
 
                 updateCurrencySymbols();
 
@@ -1828,6 +1859,7 @@ document.addEventListener('DOMContentLoaded', function () {
             purchaseInvoiceId: document.getElementById('purchaseInvoice').value || null,
             subAccountId: document.getElementById('subAccount').value || null,
             currencyId: document.getElementById('currency').value,
+            projectId: document.getElementById('project')?.value || null,
             previousBalance: parseFloat(document.getElementById('previousBalance').value) || 0,
             totalBill: parseFloat(document.getElementById('totalBill').textContent),
             totalDiscountPercent: parseFloat(document.getElementById('totalDiscountPercent').value) || 0,

@@ -191,6 +191,15 @@ if (!$user_id) {
                         <label for="biltyNo">Bilty No</label>
                         <input type="text" id="biltyNo" placeholder="Enter bilty number" tabindex="-1">
                     </div>
+                    
+                    <!-- 16. Project -->
+                    <div class="form-group" id="projectGroup">
+                        <label for="project">Project</label>
+                        <select id="project" tabindex="-1">
+                            <option value="">Select Project</option>
+                            <!-- Options loaded dynamically -->
+                        </select>
+                    </div>
 
                 </div>
             </div>

@@ -113,6 +113,14 @@ $user_employee_id = $user['employee_id'] ?? null;
                         </select>
                     </div>
                     <div class="header-item">
+                        <div class="header-label">PROJECT</div>
+                        <div style="position: relative;">
+                            <input type="text" id="projectSearch" placeholder="Search project..." autocomplete="off" style="font-weight: 600;">
+                            <div id="projectOptions" class="dropdown-options"></div>
+                            <input type="hidden" id="project">
+                        </div>
+                    </div>
+                    <div class="header-item">
                         <div class="header-label">BRANCH</div>
                         <div style="position: relative;">
                             <input type="text" id="branchSearch" placeholder="Search branch..." autocomplete="off" style="font-weight: 600;">

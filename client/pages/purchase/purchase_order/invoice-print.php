@@ -184,6 +184,7 @@
                 <h3>Order Information</h3>
                 <p><strong>Branch:</strong> <span id="branchName">Loading...</span></p>
                 <p><strong>Currency:</strong> <span id="currency">Loading...</span></p>
+                <p><strong>Project:</strong> <span id="projectName">-</span></p>
                 <p><strong>Remarks:</strong> <span id="remarks">-</span></p>
             </div>
         </div>
@@ -331,11 +332,11 @@
             document.getElementById('companyPhone').textContent = invoice.company_phone ? `Phone: ${invoice.company_phone}` : '';
             document.getElementById('companyEmail').textContent = invoice.company_email ? `Email: ${invoice.company_email}` : '';
         
-        // Set company logo
-        const logoElement = document.getElementById('companyLogo');
-        if (invoice.logo_url && logoElement) {
-            logoElement.src = `../../../assets/uploads/company_logo/${invoice.logo_url}`;
-        }
+            // Set company logo
+            const logoElement = document.getElementById('companyLogo');
+            if (invoice.logo_url && logoElement) {
+                logoElement.src = `../../../assets/uploads/company_logo/${invoice.logo_url}`;
+            }
         }
         
         function populateInvoiceData(invoice, items) {
@@ -353,6 +354,7 @@
                 `${invoice.branch_name} (${invoice.branch_type})`;
             document.getElementById('branchName').textContent = branchText;
             document.getElementById('currency').textContent = invoice.currency_name;
+            document.getElementById('projectName').textContent = invoice.project_name ? `${invoice.project_code} - ${invoice.project_name}${invoice.project_city_name ? ' - ' + invoice.project_city_name : ''}` : '-';
             document.getElementById('remarks').textContent = invoice.remarks || '-';
             
             // Set currency symbol for amounts

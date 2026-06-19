@@ -132,6 +132,13 @@ if (!$user_id) {
                                 <!-- Options will be populated by JS -->
                             </select>
                         </div>
+                        <div class="form-group">
+                            <label for="project">Project</label>
+                            <select id="project">
+                                <option value="">Select Project</option>
+                                <!-- Options will be populated by JS -->
+                            </select>
+                        </div>
                         <div class="form-group full-width">
                             <label for="attachment">Attachment</label>
                             <input type="file" id="attachment" accept=".png,.jpg,.jpeg,.gif,.pdf,.webp,.avif">
@@ -199,6 +206,7 @@ if (!$user_id) {
                             <th>Currency</th>
                             <th>Amount</th>
                             <th>Payment Method</th>
+                            <th>Project</th>
                             <th>Bank Account</th>
                             <th>Cheque Date</th>
                             <th>Description</th>

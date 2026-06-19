@@ -59,6 +59,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_GET['action'])) {
                 customer_id      = ?,
                 contact_person   = ?,
                 salesman_id      = ?,
+                project_id       = ?,
                 payment_term_id  = ?,
                 terms_conditions = ?,
                 remarks          = ?,
@@ -77,6 +78,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_GET['action'])) {
                 (int)$input['customer_id'],
                 $input['contact_person'] ?: null,
                 !empty($input['salesman_id'])     ? (int)$input['salesman_id']     : null,
+                !empty($input['project_id'])      ? (int)$input['project_id']      : null,
                 !empty($input['payment_term_id']) ? (int)$input['payment_term_id'] : null,
                 $input['terms_conditions'] ?: null,
                 $input['remarks']          ?: null,
@@ -499,6 +501,16 @@ const editData = {
           </div>
         </div>
 
+        <!-- Project row -->
+        <div class="fg fg-4" style="margin-bottom:9px">
+          <div class="f">
+            <label>Project</label>
+            <select id="projectSel">
+              <option value="">Select Project</option>
+            </select>
+          </div>
+        </div>
+
         <div class="fg">
           <div class="f">
             <label>Remarks</label>
@@ -614,7 +626,7 @@ async function init() {
   showSpinner(true);
   await Promise.all([
     loadCustomers(), loadProducts(),
-    loadUnits(), loadPaymentTerms(), loadSalesmen()
+    loadUnits(), loadPaymentTerms(), loadSalesmen(), loadProjects()
   ]);
   populateForm();
   showSpinner(false);
@@ -666,6 +678,18 @@ async function loadSalesmen() {
     salesmen.map(e => `<option value="${e.id}">${e.name}</option>`).join('');
 }
 
+async function loadProjects() {
+  const r = await fetch('../../../../server/api/master_setup/project_setup/get-projects-dropdown.php');
+  const d = await r.json();
+  if (!d.success) return;
+  const sel = document.getElementById('projectSel');
+  sel.innerHTML = '<option value="">Select Project</option>' +
+    d.data.map(p => {
+      const label = `${p.project_code} - ${p.project_name}${p.city_name ? ' - ' + p.city_name : ''}`;
+      return `<option value="${p.id}">${label}</option>`;
+    }).join('');
+}
+
 // ── PRE-POPULATE FORM FROM editData ──────────────────────────
 function populateForm() {
   const q = editData.quotation;
@@ -676,6 +700,7 @@ function populateForm() {
   document.getElementById('contactPerson').value     = q.contact_person || '';
   document.getElementById('partyType').value         = q.party_type     || '';
   document.getElementById('salesmanSel').value       = q.salesman_id    || '';
+  document.getElementById('projectSel').value         = q.project_id     || '';
   document.getElementById('paymentTermSel').value    = q.payment_term_id|| '';
   document.getElementById('termsConditions').value   = q.terms_conditions|| '';
   document.getElementById('remarks').value           = q.remarks        || '';
@@ -1080,6 +1105,7 @@ async function updateQuotation() {
     contact_person:   document.getElementById('contactPerson').value,
     party_type:       document.getElementById('partyType').value,
     salesman_id:      document.getElementById('salesmanSel').value,
+    project_id:       document.getElementById('projectSel').value || null,
     payment_term_id:  document.getElementById('paymentTermSel').value,
     terms_conditions: document.getElementById('termsConditions').value,
     remarks:          document.getElementById('remarks').value,

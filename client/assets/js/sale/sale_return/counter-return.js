@@ -1,5 +1,5 @@
-let currentReturn = { items: [], customer: null, branch: null, currency: null, salesOfficer: null, supplierMan: null, subAccount: null, company: null, invoiceLevelTaxes: [], invoiceTotalBill: null, invoiceDiscountAmount: 0, extraDiscount1Amount: 0, extraDiscount2Amount: 0, shippingFees: 0 };
-let productsData = [], customersData = [], branchesData = [], currenciesData = [], bankAccountsData = [], uomData = [], invoicesData = [], employeesData = [], subAccountsData = [], companiesData = [];
+let currentReturn = { items: [], customer: null, branch: null, currency: null, salesOfficer: null, supplierMan: null, subAccount: null, company: null, project: null, invoiceLevelTaxes: [], invoiceTotalBill: null, invoiceDiscountAmount: 0, extraDiscount1Amount: 0, extraDiscount2Amount: 0, shippingFees: 0 };
+let productsData = [], customersData = [], branchesData = [], currenciesData = [], bankAccountsData = [], uomData = [], invoicesData = [], employeesData = [], subAccountsData = [], companiesData = [], projectsData = [];
 
 const defaultShortcuts = { product: 'F1', customer: 'F2', branch: 'F3', qty: 'F4', save: 'F10', clear: 'F12' };
 let shortcuts = { ...defaultShortcuts };
@@ -9,7 +9,7 @@ const editId = urlParams.get('edit');
 const isEditMode = !!editId;
 
 document.addEventListener('DOMContentLoaded', async function() {
-    await Promise.all([loadProducts(), loadCustomers(), loadBranches(), loadCurrencies(), loadBankAccounts(), loadUOM(), loadSaleInvoices(), loadEmployees(), loadCompanies()]);
+    await Promise.all([loadProducts(), loadCustomers(), loadBranches(), loadCurrencies(), loadBankAccounts(), loadUOM(), loadSaleInvoices(), loadEmployees(), loadCompanies(), loadProjects()]);
     loadShortcuts();
     updateDate();
     await loadNextReturnNo();
@@ -37,6 +37,15 @@ document.addEventListener('DOMContentLoaded', async function() {
     initDropdown('invoiceSearch', 'invoiceOptions', 'saleInvoice', invoicesData, (i) => `${i.bill_no} - ${i.customer_name} (${i.sale_date})`, (id) => loadInvoiceData(id));
     initDropdown('salesOfficerSearch', 'salesOfficerOptions', 'salesOfficer', employeesData, (e) => `${e.employee_id} - ${e.full_name}`, (id) => currentReturn.salesOfficer = parseInt(id));
     initDropdown('supplierManSearch', 'supplierManOptions', 'supplierMan', employeesData, (e) => `${e.employee_id} - ${e.full_name}`, (id) => currentReturn.supplierMan = parseInt(id));
+    initDropdown('projectSearch', 'projectOptions', 'project', projectsData, (p) => `${p.project_code} - ${p.project_name}${p.city_name ? ' - ' + p.city_name : ''}`, (id) => { currentReturn.project = parseInt(id); localStorage.setItem('lastSelectedProject', id); });
+    
+    const savedProjectId = localStorage.getItem('lastSelectedProject');
+    if (savedProjectId && projectsData.find(p => p.id == savedProjectId)) {
+        const project = projectsData.find(p => p.id == savedProjectId);
+        document.getElementById('projectSearch').value = `${project.project_code} - ${project.project_name}${project.city_name ? ' - ' + project.city_name : ''}`;
+        document.getElementById('project').value = savedProjectId;
+        currentReturn.project = parseInt(savedProjectId);
+    }
     
     const savedBranchId = localStorage.getItem('lastSelectedBranch');
     if (savedBranchId && branchesData.find(b => b.id == savedBranchId)) {
@@ -147,6 +156,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         if (!e.target.closest('#invoiceSearch') && !e.target.closest('#invoiceOptions')) document.getElementById('invoiceOptions').style.display = 'none';
         if (!e.target.closest('#salesOfficerSearch') && !e.target.closest('#salesOfficerOptions')) document.getElementById('salesOfficerOptions').style.display = 'none';
         if (!e.target.closest('#supplierManSearch') && !e.target.closest('#supplierManOptions')) document.getElementById('supplierManOptions').style.display = 'none';
+        if (!e.target.closest('#projectSearch') && !e.target.closest('#projectOptions')) document.getElementById('projectOptions').style.display = 'none';
         if (!e.target.closest('.quick-entry')) document.getElementById('productSuggestions').style.display = 'none';
     });
 });
@@ -661,6 +671,7 @@ async function saveReturn() {
         invoice_id: isEditMode ? editId : undefined,
         saleDate: document.getElementById('currentDate').value,
         companyId: currentReturn.company,
+        projectId: currentReturn.project,
         customerId: currentReturn.customer,
         branchId: currentReturn.branch,
         currencyId: currentReturn.currency,
@@ -998,6 +1009,16 @@ async function loadEditData(returnId) {
             }
         }
 
+        // Project
+        if (inv.project_id) {
+            const project = projectsData.find(p => p.id == inv.project_id);
+            if (project) {
+                document.getElementById('projectSearch').value = `${project.project_code} - ${project.project_name}${project.city_name ? ' - ' + project.city_name : ''}`;
+                document.getElementById('project').value = inv.project_id;
+                currentReturn.project = parseInt(inv.project_id);
+            }
+        }
+
         // Sub Account
         if (inv.sub_account_id) {
             await loadSubAccounts(inv.customer_id);
@@ -1248,4 +1269,10 @@ function filterInvoicesByCustomer(customerId) {
     
     // Update dropdown data
     invoiceSearch.updateData(filteredInvoices);
+}
+
+async function loadProjects() {
+    const response = await fetch('../../../../server/api/master_setup/project_setup/get-projects-dropdown.php');
+    const data = await response.json();
+    if (data.success) projectsData = data.projects;
 }

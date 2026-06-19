@@ -350,7 +350,8 @@ function initializePage(permissions) {
     const form = document.getElementById('invoiceForm');
 
     // Load all data, then initialize dropdowns and add first row
-    Promise.all([loadCustomersLocal(), loadCompanies(), loadBranches(), loadProductsLocal(), loadUOM(), loadUOMGroupUnits(), loadCurrencies(), loadBankAccounts(), loadEmployees(), loadSaleOrders()]).then(() => {
+    Promise.all([loadCustomersLocal(), loadCompanies(), loadBranches(), loadProductsLocal(), loadUOM(), loadUOMGroupUnits(), loadCurrencies(), loadBankAccounts(), loadEmployees(), loadSaleOrders(), loadProjects()]).then(() => {
+        console.log('All data loaded. Project dropdown populated.');
         initSearchableDropdown('customerCodeSearch', 'customerCodeOptions', 'customerCode');
         initSearchableDropdown('companySearch', 'companyOptions', 'company');
         initSearchableDropdown('branchSearch', 'branchOptions', 'branch');
@@ -1059,6 +1060,28 @@ function initializePage(permissions) {
         }
     }
 
+    // Load projects from API
+    async function loadProjects() {
+        try {
+            const response = await fetch('../../../../server/api/master_setup/project_setup/get-projects-dropdown.php');
+            const data = await response.json();
+            if (data.success) {
+                const projectSelect = document.getElementById('project');
+                if (!projectSelect) return;
+                projectSelect.innerHTML = '<option value="">Select Project</option>';
+                data.data.forEach(project => {
+                    const label = `${project.project_code} - ${project.project_name}${project.city_name ? ' - ' + project.city_name : ''}`;
+                    const option = document.createElement('option');
+                    option.value = project.id;
+                    option.textContent = label;
+                    projectSelect.appendChild(option);
+                });
+            }
+        } catch (error) {
+            console.error('Error loading projects:', error);
+        }
+    }
+
     // Load sale orders from API
     async function loadSaleOrders() {
         try {
@@ -1248,6 +1271,11 @@ function initializePage(permissions) {
                 if (biltyNoEl) biltyNoEl.value = invoice.bilty_no || '';
                 const transportNameEl = document.getElementById('transportName');
                 if (transportNameEl) transportNameEl.value = invoice.transport_name || '';
+                const projectEl = document.getElementById('project');
+                if (projectEl) {
+                    projectEl.value = invoice.project_id || '';
+                    console.log('Project set to:', projectEl.value);
+                }
 
                 // Load sub accounts and set value
                 if (invoice.customer_id) {
@@ -3043,6 +3071,11 @@ function initializePage(permissions) {
         if (branch) branch.value = '';
         if (fuelingStationSearch) fuelingStationSearch.value = '';
         if (fuelingStation) fuelingStation.value = '';
+        const projectResetEl = document.getElementById('project');
+        if (projectResetEl) {
+            projectResetEl.value = '';
+            console.log('Project reset');
+        }
 
         // Reset invoice type and due date
         const invoiceTypeEl = document.getElementById('invoiceType');
@@ -3494,6 +3527,7 @@ function saveInvoice(status = 'Posted') {
         supplierManId: document.getElementById('supplierMan')?.value || null,
         biltyNo: document.getElementById('biltyNo')?.value || null,
         transportName: document.getElementById('transportName')?.value || null,
+        projectId: document.getElementById('project')?.value ? parseInt(document.getElementById('project').value) : null,
         totalBill: parseFloat(document.getElementById('totalBill').textContent),
         totalDiscountPercent: parseFloat(document.getElementById('totalDiscountPercent')?.value) || 0,
         totalDiscountAmount: parseFloat(document.getElementById('totalDiscountAmount')?.value),
@@ -4234,7 +4268,7 @@ document.getElementById('fieldSettingsModal').addEventListener('click', function
 });
 
 function loadFieldSettings() {
-    const fields = ['hideBillNoStandard', 'hideSaleDateStandard', 'hidePreviousBalanceStandard', 'hideSubAccountStandard', 'hideCustomerAddressStandard', 'hideSaleOrderStandard', 'hideBranchStandard', 'hideCurrencyStandard', 'hideSalesOfficerStandard', 'hideBiltyNoStandard', 'hideTransportNameStandard', 'hideRemarksStandard'];
+    const fields = ['hideBillNoStandard', 'hideSaleDateStandard', 'hidePreviousBalanceStandard', 'hideSubAccountStandard', 'hideCustomerAddressStandard', 'hideSaleOrderStandard', 'hideBranchStandard', 'hideCurrencyStandard', 'hideSalesOfficerStandard', 'hideBiltyNoStandard', 'hideTransportNameStandard', 'hideRemarksStandard', 'hideProjectStandard'];
     fields.forEach(id => {
         const el = document.getElementById(id);
         if (el) el.checked = localStorage.getItem(id) === 'true';

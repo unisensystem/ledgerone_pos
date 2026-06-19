@@ -121,6 +121,13 @@ if (!$user_id) {
                         </select>
                         <div class="error-message" id="currencyError">Please select a currency</div>
                     </div>
+                    <div class="form-group">
+                        <label for="project">Project</label>
+                        <select id="project" tabindex="-1">
+                            <option value="">Select Project</option>
+                            <!-- Options loaded dynamically -->
+                        </select>
+                    </div>
                     <div class="form-group full-width">
                         <label for="remarks">Remarks</label>
                         <textarea id="remarks" placeholder="Enter any additional remarks" tabindex="-1"></textarea>

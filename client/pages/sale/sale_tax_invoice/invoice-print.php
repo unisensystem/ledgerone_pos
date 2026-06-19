@@ -1,1362 +1,361 @@
-﻿<!DOCTYPE html>
-<html lang="en">
+<?php
+require_once '../../../../includes/dashboard.php';
+session_start();
 
+$user_id = $_SESSION['user_id'] ?? null;
+$tenant_id = $_SESSION['tenant_id'] ?? null;
+
+if (!$user_id || !$tenant_id) {
+    header('Location: ../../auth/login.html');
+    exit();
+}
+
+$invoice_id = $_GET['id'] ?? null;
+if (!$invoice_id) {
+    die('Invoice ID is required');
+}
+
+try {
+    // Get invoice data
+    $stmt = $pdo->prepare("
+        SELECT 
+            si.*,
+            c.customer_name,
+            c.customer_code,
+            c.address,
+            c.primary_phone,
+            c.email,
+            co.company_name,
+            co.logo,
+            co.address as company_address,
+            co.phone as company_phone,
+            b.branch_name,
+            b.branch_code,
+            u.full_name as created_by_name
+        FROM sale_invoice si
+        LEFT JOIN customers c ON si.customer_id = c.id
+        LEFT JOIN companies co ON si.company_id = co.id
+        LEFT JOIN branches b ON si.branch_id = b.id
+        LEFT JOIN employees u ON si.created_by = u.id
+        WHERE si.id = ? AND si.tenant_id = ?
+    ");
+    $stmt->execute([$invoice_id, $tenant_id]);
+    $invoice = $stmt->fetch(PDO::FETCH_ASSOC);
+
+    if (!$invoice) {
+        die('Invoice not found');
+    }
+
+    // Get items
+    $itemStmt = $pdo->prepare("
+        SELECT 
+            sii.*,
+            p.name as product_name,
+            p.code as product_code,
+            u.uom_name
+        FROM sale_invoice_items sii
+        LEFT JOIN products p ON sii.product_id = p.id
+        LEFT JOIN uom u ON sii.uom_id = u.id
+        WHERE sii.sale_invoice_id = ? AND sii.tenant_id = ?
+        ORDER BY COALESCE(sii.parent_row_id, sii.id), sii.id
+    ");
+    $itemStmt->execute([$invoice_id, $tenant_id]);
+    $items = $itemStmt->fetchAll(PDO::FETCH_ASSOC);
+
+} catch (Exception $e) {
+    die('Error: ' . $e->getMessage());
+}
+?>
+<!DOCTYPE html>
+<html>
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sale Invoice - Print</title>
+    <title>Invoice <?php echo $invoice['bill_no']; ?></title>
     <style>
-        @media print {
-            body {
-                margin: 0;
-            }
-
-            .no-print {
-                display: none;
-            }
-        }
-
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
         }
-
         body {
             font-family: Arial, sans-serif;
             font-size: 12px;
             line-height: 1.4;
-            color: #333;
+            background: #f5f5f5;
+        }
+        .page {
+            width: 210mm;
+            height: 297mm;
+            margin: 10mm auto;
+            padding: 15mm;
             background: white;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
         }
-
-        .invoice-container {
-            max-width: 800px;
-            margin: 20px auto;
-            padding: 20px;
-            background: white;
-            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        .header {
+            border-bottom: 2px solid #000;
+            padding-bottom: 10px;
+            margin-bottom: 15px;
         }
-
-        .invoice-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 30px;
-            border-bottom: 2px solid #333;
-            padding-bottom: 20px;
-        }
-
-        .company-info h1 {
-            font-size: 24px;
-            color: #333;
-            margin-bottom: 5px;
-        }
-
-        .invoice-details {
-            text-align: right;
-        }
-
-        .invoice-details h2 {
-            font-size: 20px;
-            color: #666;
-            margin-bottom: 10px;
-        }
-
-        .invoice-meta {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 30px;
-            margin-bottom: 30px;
-        }
-
-        .supplier-info,
-        .invoice-info {
-            padding: 15px;
-            border: 1px solid #ddd;
-            border-radius: 5px;
-        }
-
-        .supplier-info h3,
-        .invoice-info h3 {
-            font-size: 14px;
-            margin-bottom: 10px;
-            color: #333;
-            border-bottom: 1px solid #eee;
-            padding-bottom: 5px;
-        }
-
-        .items-table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-bottom: 20px;
-        }
-
-        .items-table th,
-        .items-table td {
-            border: 1px solid #ddd;
-            padding: 8px;
-            text-align: left;
-        }
-
-        .items-table th {
-            background-color: #f5f5f5;
-            font-weight: bold;
-            font-size: 11px;
-        }
-
-        .items-table td {
-            font-size: 11px;
-        }
-
-        .text-right {
-            text-align: right;
-        }
-
-        .text-center {
-            text-align: center;
-        }
-
-        .totals-section {
-            display: flex;
-            justify-content: flex-end;
-            margin-top: 20px;
-        }
-
-        .totals-table {
-            width: 300px;
-        }
-
-        .totals-table td {
-            padding: 5px 10px;
-            border: none;
-        }
-
-        .totals-table .total-row {
-            font-weight: bold;
-            border-top: 2px solid #333;
-        }
-
-        .totals-horizontal-2 {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 20px;
-            width: 100%;
-        }
-
-        .totals-horizontal-3 {
+        .header-row {
             display: grid;
             grid-template-columns: 1fr 1fr 1fr;
             gap: 20px;
-            width: 100%;
+            align-items: start;
         }
-
-        .totals-horizontal-2 .totals-item,
-        .totals-horizontal-3 .totals-item {
-            display: flex;
-            justify-content: space-between;
-            padding: 8px 12px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            background: #f9f9f9;
-        }
-
-        .totals-horizontal-2 .totals-item.total-row,
-        .totals-horizontal-3 .totals-item.total-row {
-            background: #e8e8e8;
+        .company-info {
             font-weight: bold;
-            border: 2px solid #333;
-        }
-
-        .totals-horizontal-2 .totals-item#totalBalance,
-        .totals-horizontal-2 .totals-item.totalBalance,
-        .totals-horizontal-3 .totals-item#totalBalance,
-        .totals-horizontal-3 .totals-item.totalBalance {
-            background: #f0f8ff;
-            border: 1px solid #b3d9ff;
-            color: #1f7bff;
-            font-weight: bold;
-        }
-
-        .totals-horizontal-2 .totals-item#previousBalance,
-        .totals-horizontal-2 .totals-item.previousBalance,
-        .totals-horizontal-3 .totals-item#previousBalance,
-        .totals-horizontal-3 .totals-item.previousBalance {
-            background: #fff8f0;
-            border: 1px solid #ffc9a3;
-            color: #ff8c42;
-            font-weight: bold;
-        }
-
-        .print-btn {
-            background: #007bff;
-            color: white;
-            border: none;
-            padding: 10px 20px;
-            border-radius: 5px;
-            cursor: pointer;
-            margin-bottom: 20px;
-        }
-
-        .print-btn:hover {
-            background: #0056b3;
-        }
-
-        .print-btn.active {
-            background: #28a745;
-        }
-
-        @media print {
-            @page {
-                size: var(--page-size);
-            }
-        }
-
-        /* A5 Optimization */
-        body.a5-mode {
-            font-size: 8px;
-            line-height: 1.1;
-        }
-
-        .a5-mode .invoice-container {
-            max-width: 550px;
-            padding: 10px;
-        }
-
-        .a5-mode .invoice-header {
-            margin-bottom: 10px;
-            padding-bottom: 8px;
-        }
-
-        .a5-mode .company-info h1 {
             font-size: 14px;
-            margin-bottom: 2px;
         }
-
-        .a5-mode .company-info p {
-            font-size: 8px;
-            margin-bottom: 1px;
+        .title {
+            text-align: center;
+            font-size: 16px;
+            font-weight: bold;
         }
-
-        .a5-mode .company-logo {
-            max-width: 60px !important;
-            max-height: 40px !important;
-            margin-bottom: 4px !important;
+        .invoice-no {
+            text-align: right;
+            font-size: 11px;
         }
-
-        .a5-mode .invoice-details h2 {
-            font-size: 12px;
-            margin-bottom: 4px;
+        .invoice-no div {
+            margin: 2px 0;
         }
-
-        .a5-mode .invoice-details p {
-            font-size: 8px;
-        }
-
-        .a5-mode .invoice-meta {
-            gap: 10px;
+        .section {
             margin-bottom: 10px;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
         }
-
-        .a5-mode .supplier-info,
-        .a5-mode .invoice-info,
-        .a5-mode .customer-info {
-            padding: 6px;
+        .section-left, .section-right {
+            font-size: 11px;
         }
-
-        .a5-mode .supplier-info h3,
-        .a5-mode .invoice-info h3,
-        .a5-mode .customer-info h3 {
-            font-size: 9px;
-            margin-bottom: 3px;
-            padding-bottom: 2px;
+        .section-left div, .section-right div {
+            margin: 2px 0;
         }
-
-        .a5-mode .supplier-info p,
-        .a5-mode .invoice-info p,
-        .a5-mode .customer-info p {
-            font-size: 8px;
-            line-height: 1.15;
+        .label {
+            font-weight: bold;
+            display: inline-block;
+            width: 80px;
         }
-
-        .a5-mode .items-table {
-            margin-bottom: 8px;
+        .items-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 10px 0;
+            font-size: 11px;
         }
-
-        .a5-mode .items-table th,
-        .a5-mode .items-table td {
-            padding: 3px 2px;
-            font-size: 7px;
+        .items-table th {
+            background: #f0f0f0;
+            border: 1px solid #000;
+            padding: 5px;
+            text-align: left;
+            font-weight: bold;
         }
-
-        .a5-mode .items-table th {
-            font-size: 7px;
+        .items-table td {
+            border: 1px solid #000;
+            padding: 5px;
+            text-align: right;
         }
-
-        .a5-mode .totals-section {
-            margin-top: 8px;
+        .items-table td:first-child,
+        .items-table td:nth-child(2) {
+            text-align: left;
         }
-
-        .a5-mode .totals-table td {
-            padding: 2px 4px;
-            font-size: 8px;
+        .totals {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 20px;
+            margin: 15px 0;
         }
-
-        .a5-mode .totals-horizontal-2 .totals-item,
-        .a5-mode .totals-horizontal-3 .totals-item {
-            padding: 4px 6px;
-            font-size: 8px;
+        .totals-left {
+            font-size: 11px;
         }
-
-        .a5-mode div[style*="margin-top: 20px"] {
-            margin-top: 8px !important;
+        .totals-right {
+            font-size: 11px;
         }
-
-        .a5-mode div[style*="margin-top: 30px"] {
-            margin-top: 10px !important;
+        .totals-right-item {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            margin: 3px 0;
+            padding: 3px;
+            border-bottom: 1px solid #ddd;
         }
-
-        .a5-mode div[style*="padding: 15px"] {
-            padding: 6px !important;
+        .totals-right-item:last-child {
+            border-bottom: 2px solid #000;
+            font-weight: bold;
+            font-size: 12px;
         }
-
-        .a5-mode div[style*="padding: 12px"] {
-            padding: 5px !important;
+        .footer {
+            margin-top: 30px;
+            border-top: 2px solid #000;
+            padding-top: 10px;
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 20px;
+            font-size: 11px;
+            text-align: center;
         }
-
-        .a5-mode div[style*="font-size: 11px"] {
-            font-size: 7px !important;
+        .footer div {
+            border-top: 1px solid #000;
+            padding-top: 30px;
+            min-height: 40px;
         }
-
-        .a5-mode div[style*="font-size: 10px"] {
-            font-size: 7px !important;
-        }
-
-        .a5-mode div[style*="font-size: 13px"] {
-            font-size: 8px !important;
-        }
-
-        .a5-mode #qrCode {
-            transform: scale(0.6);
-            transform-origin: center;
-        }
-
-        .a5-mode div[style*="margin-bottom: 50px"] {
-            margin-bottom: 10px !important;
-        }
-
-        .a5-mode div[style*="border-bottom: 1px solid"] {
-            margin-bottom: 2px !important;
-        }
-
-        .a5-mode div[style*="gap: 50px"] {
-            gap: 15px !important;
-        }
-
-        .a5-mode span[style*="font-size: 10px"] {
-            font-size: 6px !important;
+        @media print {
+            body {
+                background: white;
+            }
+            .page {
+                margin: 0;
+                box-shadow: none;
+                width: 100%;
+                height: auto;
+            }
         }
     </style>
 </head>
-
 <body>
-    <div class="no-print">
-        <button class="print-btn" onclick="window.print()">Print Invoice</button>
-        <button class="print-btn" onclick="setPaperSize('A3')" id="btnA3">A3</button>
-        <button class="print-btn" onclick="setPaperSize('A4')" id="btnA4">A4</button>
-        <button class="print-btn" onclick="setPaperSize('A5')" id="btnA5">A5</button>
-    </div>
-
-    <div class="invoice-container">
-        <div class="invoice-header">
-            <div class="company-info">
-                <h1 id="companyName">Loading...</h1>
-                <p id="companyAddress">Loading...</p>
-                <p id="companyCityState">Loading...</p>
-                <p id="companyPhone">Loading...</p>
-                <p id="companyEmail">Loading...</p>
-            </div>
-            <div class="invoice-details">
-                <h2>SALE INVOICE</h2>
-                <p><strong>Invoice #:</strong> <span id="invoiceNo">Loading...</span></p>
-                <p><strong>Date:</strong> <span id="invoiceDate">Loading...</span></p>
+    <div class="page">
+        <!-- Header -->
+        <div class="header">
+            <div class="header-row">
+                <div class="company-info">
+                    <?php echo htmlspecialchars($invoice['company_name']); ?>
+                    <div style="font-size: 10px; font-weight: normal;">
+                        <?php echo htmlspecialchars($invoice['company_address']); ?>
+                    </div>
+                </div>
+                <div class="title">SALE INVOICE</div>
+                <div class="invoice-no">
+                    <div><span class="label">Bill #:</span> <?php echo htmlspecialchars($invoice['bill_no']); ?></div>
+                    <div><span class="label">Date:</span> <?php echo date('d-m-Y', strtotime($invoice['sale_date'])); ?></div>
+                </div>
             </div>
         </div>
 
-        <div class="invoice-meta">
-            <div class="customer-info">
-                <h3>Customer Information</h3>
-                <p><strong>Name:</strong> <span id="customerName">Loading...</span></p>
-                <p><strong>Address:</strong> <span id="customerAddress">Loading...</span></p>
-                <p><strong>Phone:</strong> <span id="customerPhone">-</span></p>
-                <p><strong>Email:</strong> <span id="customerEmail">-</span></p>
+        <!-- Customer & Branch Info -->
+        <div class="section">
+            <div class="section-left">
+                <div><span class="label">Customer:</span> <?php echo htmlspecialchars($invoice['customer_code'] . ' - ' . $invoice['customer_name']); ?></div>
+                <div><span class="label">Address:</span> <?php echo htmlspecialchars($invoice['address']); ?></div>
+                <div><span class="label">Phone:</span> <?php echo htmlspecialchars($invoice['primary_phone']); ?></div>
             </div>
-            <div class="invoice-info">
-                <h3>Invoice Information</h3>
-                <p><strong>Branch:</strong> <span id="branchName">Loading...</span></p>
-                <p><strong>Currency:</strong> <span id="currency">Loading...</span></p>
-                <p><strong>Sales Officer:</strong> <span id="salesOfficer">-</span></p>
-                <p><strong>Supplier Man:</strong> <span id="supplierMan">-</span></p>
-                <p><strong>Bilty No:</strong> <span id="biltyNo">-</span></p>
-                <p><strong>Transport:</strong> <span id="transportName">-</span></p>
-                <p><strong>Remarks:</strong> <span id="remarks">-</span></p>
+            <div class="section-right">
+                <div><span class="label">Branch:</span> <?php echo htmlspecialchars($invoice['branch_name']); ?></div>
+                <div><span class="label">Invoice Type:</span> <?php echo htmlspecialchars($invoice['invoice_type']); ?></div>
             </div>
         </div>
 
+        <!-- Items Table -->
         <table class="items-table">
             <thead>
-                <tr id="itemsTableHeader">
-                    <!-- Headers will be populated dynamically -->
+                <tr>
+                    <th width="5%">#</th>
+                    <th width="25%">Product</th>
+                    <th width="10%">Unit</th>
+                    <th width="10%">Qty</th>
+                    <th width="12%">Unit Price</th>
+                    <th width="12%">Discount</th>
+                    <th width="12%">Tax</th>
+                    <th width="14%">Net Amount</th>
                 </tr>
             </thead>
-            <tbody id="itemsTableBody">
+            <tbody>
+                <?php 
+                $serial = 0;
+                foreach ($items as $item): 
+                    if ($item['parent_row_id']) continue; // Skip child items
+                    $serial++;
+                ?>
                 <tr>
-                    <td colspan="14" class="text-center">Loading items...</td>
+                    <td><?php echo $serial; ?></td>
+                    <td><?php echo htmlspecialchars($item['product_name']); ?></td>
+                    <td><?php echo htmlspecialchars($item['uom_name']); ?></td>
+                    <td><?php echo number_format($item['quantity'], 2); ?></td>
+                    <td><?php echo number_format($item['sale_price'], 2); ?></td>
+                    <td><?php echo number_format($item['discount_amount'], 2); ?></td>
+                    <td><?php echo number_format($item['tax_amount'], 2); ?></td>
+                    <td><?php echo number_format($item['net_amount'], 2); ?></td>
                 </tr>
+                <?php endforeach; ?>
             </tbody>
-            <tfoot>
-                <tr style="background-color: #f5f5f5; font-weight: bold;">
-                    <!-- Totals row will be built dynamically -->
-                </tr>
-            </tfoot>
         </table>
 
-        <div class="totals-section">
-            <table class="totals-table" id="totalsTable">
-                <tr>
-                    <td>Total Bill:</td>
-                    <td class="text-right" id="totalBill">0.00</td>
-                </tr>
-                <tr id="discountPercentRow" style="display: none;">
-                    <td>Discount (%):</td>
-                    <td class="text-right" id="discountPercent">0.00%</td>
-                </tr>
-                <tr id="discountAmountRow" style="display: none;">
-                    <td>Discount Amount:</td>
-                    <td class="text-right" id="discountAmount">0.00</td>
-                </tr>
-                <tr id="shippingFeesRow" style="display: none;">
-                    <td>Shipping Fees:</td>
-                    <td class="text-right" id="shippingFees">0.00</td>
-                </tr>
-                <tr class="total-row">
-                    <td>Net Amount:</td>
-                    <td class="text-right" id="netAmount">0.00</td>
-                </tr>
-                <tr>
-                    <td>Amount Paid:</td>
-                    <td class="text-right" id="amountPaid">0.00</td>
-                </tr>
-                <tr>
-                    <td>Payment Method:</td>
-                    <td class="text-right" id="paymentMethod">-</td>
-                </tr>
-                <tr>
-                    <td>Remaining Balance:</td>
-                    <td class="text-right" id="remainingBalance">0.00</td>
-                </tr>
-                <tr style="border-top: 2px solid #ddd; height: 8px;">
-                    <td colspan="2"></td>
-                </tr>
-                <tr style="background-color: #fff8f0; border: 1px solid #ffc9a3;">
-                    <td style="font-weight: bold; padding: 10px; color: #ff8c42;">Previous Balance:</td>
-                    <td class="text-right" id="previousBalanceAmount" style="font-weight: bold; padding: 10px; color: #ff8c42;">0.00</td>
-                </tr>
-                <tr style="background-color: #f0f8ff; border: 1px solid #b3d9ff;">
-                    <td style="font-weight: bold; padding: 10px; color: #1f7bff;">Total Balance:</td>
-                    <td class="text-right" id="totalBalance" style="font-weight: bold; padding: 10px; color: #1f7bff;">0.00</td>
-                </tr>
-            </table>
+        <!-- Totals -->
+        <div class="totals">
+            <div class="totals-left">
+                <div><strong>Amount in Words:</strong></div>
+                <div style="min-height: 30px; padding: 5px; border: 1px solid #ddd;">
+                    <?php 
+                    function numberToWords($num) {
+                        $ones = array('', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine');
+                        $teens = array('Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen');
+                        $tens = array('', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety');
+                        
+                        if ($num == 0) return 'Zero';
+                        
+                        $words = '';
+                        while ($num > 0) {
+                            if ($num >= 1000000) {
+                                $words .= numberToWords(intval($num / 1000000)) . ' Million ';
+                                $num %= 1000000;
+                            } elseif ($num >= 1000) {
+                                $words .= numberToWords(intval($num / 1000)) . ' Thousand ';
+                                $num %= 1000;
+                            } elseif ($num >= 100) {
+                                $words .= $ones[intval($num / 100)] . ' Hundred ';
+                                $num %= 100;
+                            } elseif ($num >= 20) {
+                                $words .= $tens[intval($num / 10)];
+                                $num %= 10;
+                                if ($num > 0) $words .= ' ' . $ones[$num];
+                                $num = 0;
+                            } else {
+                                if ($num >= 10) {
+                                    $words .= $teens[$num - 10];
+                                } else {
+                                    $words .= $ones[$num];
+                                }
+                                $num = 0;
+                            }
+                        }
+                        return trim($words);
+                    }
+                    echo numberToWords(intval($invoice['net_amount'])) . ' Rupees only';
+                    ?>
+                </div>
+            </div>
+            <div class="totals-right">
+                <div class="totals-right-item">
+                    <div>Total Bill:</div>
+                    <div><?php echo number_format($invoice['total_bill'], 2); ?></div>
+                </div>
+                <div class="totals-right-item">
+                    <div>Discount:</div>
+                    <div><?php echo number_format($invoice['total_discount_amount'], 2); ?></div>
+                </div>
+                <div class="totals-right-item">
+                    <div>Shipping:</div>
+                    <div><?php echo number_format($invoice['shipping_fees'] ?? 0, 2); ?></div>
+                </div>
+                <div class="totals-right-item">
+                    <div>Net Amount:</div>
+                    <div><?php echo number_format($invoice['net_amount'], 2); ?></div>
+                </div>
+            </div>
         </div>
 
-        <div style="margin-top: 20px; padding: 15px; background-color: #f9f9f9; border-radius: 5px;" id="amountInWordsSection">
-            <p><strong>Amount in Words:</strong> <span id="amountInWords">Loading...</span></p>
-        </div>
-
-        <div style="margin-top: 30px; display: grid; grid-template-columns: 1fr 1fr; gap: 50px;" id="signaturesSection">
+        <!-- Footer -->
+        <div class="footer">
             <div>
-                <p style="margin-bottom: 50px;"><strong>Customer Signature:</strong></p>
-                <div style="border-bottom: 1px solid #333; width: 200px; margin-bottom: 5px;"></div>
-                <p style="font-size: 11px; color: #666;" id="signatureDate1">Date: ___________</p>
+                <strong>Authorized By</strong>
             </div>
             <div>
-                <p style="margin-bottom: 50px;"><strong>Authorized Signature:</strong></p>
-                <div style="border-bottom: 1px solid #333; width: 200px; margin-bottom: 5px;"></div>
-                <p style="font-size: 11px; color: #666;" id="signatureDate2">Date: ___________</p>
+                <strong>Checked By</strong>
             </div>
-        </div>
-
-        <div
-            style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #ddd; font-size: 11px; color: #666; display: flex; justify-content: space-between; align-items: flex-start;">
             <div>
-                <p id="generatedBySection"><strong>Generated by:</strong> <span id="generatedBy">Loading...</span></p>
-                <p id="generatedOnSection"><strong>Generated on:</strong> <span id="generatedOn"></span></p>
-            </div>
-            <div id="qrCodeSection" style="display: none;">
-                <div id="qrCode" style="display: inline-block;"></div>
-                <p style="font-size: 10px; color: #999; margin-top: 3px;">Scan to view and verify invoice</p>
-            </div>
-        </div>
-
-        <div
-            style="margin-top: 20px; text-align: center; font-size: 10px; color: #999; border-top: 1px solid #eee; padding-top: 10px;">
-            <p><em>This is a System Generated Invoice</em></p>
-            <div style="margin-top: 10px;">
-                <div>Software by: UNISEN SYSTEMS</div>
-                <div>Contact: +92 346 8918711 | +92 335 3789981</div>
-                <div>Email: support@unisensystems.com</div>
-                <div>www.unisensystems.com</div>
+                <strong>Received By</strong>
             </div>
         </div>
     </div>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
     <script>
-        // Paper size management
-        function setPaperSize(size) {
-            localStorage.setItem('invoicePaperSize', size);
-            document.documentElement.style.setProperty('--page-size', size);
-            
-            // Add/remove A5 class
-            if (size === 'A5') {
-                document.body.classList.add('a5-mode');
-            } else {
-                document.body.classList.remove('a5-mode');
-            }
-            
-            // Update button states
-            document.querySelectorAll('.print-btn').forEach(btn => btn.classList.remove('active'));
-            document.getElementById('btn' + size).classList.add('active');
-        }
-        
-        // Load saved paper size
-        const savedSize = localStorage.getItem('invoicePaperSize') || 'A4';
-        setPaperSize(savedSize);
-        
-        // Default column configuration
-        const defaultColumns = [
-            { id: 'serial', label: '#', width: '4%' },
-            { id: 'product', label: 'Product', width: '20%' },
-            { id: 'unit', label: 'Unit', width: '6%' },
-            { id: 'pcs', label: 'Pcs', width: '4%' },
-            { id: 'ctn', label: 'Ctn', width: '4%' },
-            { id: 'dz', label: 'Dz', width: '4%' },
-            { id: 'qty', label: 'Qty', width: '6%' },
-            { id: 'price', label: 'Unit Price', width: '8%' },
-            { id: 'gross', label: 'Gross Amt', width: '8%' },
-            { id: 'disc_pct', label: 'Disc %', width: '5%' },
-            { id: 'disc_amt', label: 'Disc Amt', width: '8%' },
-            { id: 'to_amt', label: 'T.O Amt', width: '8%' },
-            { id: 'gst_pct', label: 'GST %', width: '5%' },
-            { id: 'gst_amt', label: 'GST Amt', width: '8%' },
-            { id: 'foc', label: 'FOC Qty', width: '5%' },
-            { id: 'net', label: 'Net Amt', width: '9%' }
-        ];
-
-        // Load customization
-        const saved = localStorage.getItem('printColumnCustomization');
-        const columnConfig = saved ? JSON.parse(saved) : defaultColumns;
-
-        // Apply invoice settings to hide/show columns
-        const enableCarton = localStorage.getItem('enableCarton') === 'true';
-        const enableDozen = localStorage.getItem('enableDozen') === 'true';
-        const enableCashDiscountPercent = localStorage.getItem('enableCashDiscountPercent') === 'true';
-        const enableCashDiscountAmount = localStorage.getItem('enableCashDiscountAmount') === 'true';
-        const enableTradeOfferDiscount = localStorage.getItem('enableTradeOfferDiscount') === 'true';
-        const enableTradeOfferAmount = localStorage.getItem('enableTradeOfferAmount') === 'true';
-        const enableTaxation = localStorage.getItem('enableTaxation') === 'true';
-        const enableFOC = localStorage.getItem('enableFOC') === 'true';
-        const enableShippingFees = localStorage.getItem('enableShippingFees') === 'true';
-
-        // Get totals layout preference
-        const totalsLayout = localStorage.getItem('totalsLayout') || 'vertical';
-
-        // Apply totals layout
-        function applyTotalsLayout() {
-            const totalsSection = document.querySelector('.totals-section');
-            const totalsTable = document.getElementById('totalsTable');
-
-            if (totalsLayout === 'horizontal-2') {
-                totalsSection.style.justifyContent = 'stretch';
-                totalsTable.style.display = 'none';
-
-                const container = document.createElement('div');
-                container.className = 'totals-horizontal-2';
-                container.id = 'totalsHorizontal';
-                totalsSection.appendChild(container);
-            } else if (totalsLayout === 'horizontal-3') {
-                totalsSection.style.justifyContent = 'stretch';
-                totalsTable.style.display = 'none';
-
-                const container = document.createElement('div');
-                container.className = 'totals-horizontal-3';
-                container.id = 'totalsHorizontal';
-                totalsSection.appendChild(container);
-            }
-        }
-
-        applyTotalsLayout();
-
-        // Get child display preference
-        const childDisplayMode = localStorage.getItem('childDisplayMode') || 'separate';
-
-        // Build table header based on customization
-        function buildTableHeader() {
-            const headerRow = document.getElementById('itemsTableHeader');
-            headerRow.innerHTML = '';
-
-            // First, determine max unit columns needed
-            let maxUnitColumns = 0;
-            
-            // We'll calculate this when we load the data
-            // For now, add Serial and Product columns
-            const serialCol = columnConfig.find(c => c.id === 'serial');
-            if (!serialCol || serialCol.visible !== false) {
-                const th = document.createElement('th');
-                th.width = '4%';
-                th.textContent = '#';
-                th.className = 'text-center';
-                th.dataset.colId = 'serial';
-                headerRow.appendChild(th);
-            }
-
-            const productCol = columnConfig.find(c => c.id === 'product');
-            if (!productCol || productCol.visible !== false) {
-                const th = document.createElement('th');
-                th.width = '20%';
-                th.textContent = 'Product';
-                th.dataset.colId = 'product';
-                headerRow.appendChild(th);
-            }
-
-            // Unit columns will be added dynamically when data loads
-            // Add a placeholder that we'll replace
-            const unitPlaceholder = document.createElement('th');
-            unitPlaceholder.id = 'unitColumnsPlaceholder';
-            unitPlaceholder.style.display = 'none';
-            headerRow.appendChild(unitPlaceholder);
-
-            // Add remaining columns
-            const remainingCols = ['price', 'gross', 'disc_pct', 'disc_amt', 'to_amt', 'gst_pct', 'gst_amt', 'foc', 'net'];
-            remainingCols.forEach(colId => {
-                const col = columnConfig.find(c => c.id === colId);
-                if (col && col.visible === false) return;
-
-                const th = document.createElement('th');
-                th.dataset.colId = colId;
-                th.className = 'text-right';
-
-                switch(colId) {
-                    case 'price': th.textContent = 'Unit Price'; th.width = '8%'; break;
-                    case 'gross': th.textContent = 'Gross Amt'; th.width = '8%'; break;
-                    case 'disc_pct': th.textContent = 'Disc %'; th.width = '5%'; break;
-                    case 'disc_amt': th.textContent = 'Disc Amt'; th.width = '8%'; break;
-                    case 'to_amt': th.textContent = 'T.O Amt'; th.width = '8%'; break;
-                    case 'gst_pct': th.textContent = 'Tax %'; th.width = '5%'; break;
-                    case 'gst_amt': th.textContent = 'Tax Amt'; th.width = '8%'; break;
-                    case 'foc': th.textContent = 'FOC Qty'; th.width = '5%'; break;
-                    case 'net': th.textContent = 'Net Amt'; th.width = '9%'; break;
-                }
-
-                // Apply visibility based on settings
-                if (colId === 'disc_pct' && !enableCashDiscountPercent) th.style.display = 'none';
-                if (colId === 'disc_amt' && !enableCashDiscountAmount) th.style.display = 'none';
-                if (colId === 'to_amt' && !enableTradeOfferAmount) th.style.display = 'none';
-                if (colId === 'gst_pct' && !enableTaxation) th.style.display = 'none';
-                if (colId === 'gst_amt' && !enableTaxation) th.style.display = 'none';
-                if (colId === 'foc' && !enableFOC) th.style.display = 'none';
-
-                headerRow.appendChild(th);
-            });
-        }
-
-        // Function to add unit columns to header
-        function addUnitColumnsToHeader(maxUnitColumns) {
-            const headerRow = document.getElementById('itemsTableHeader');
-            const placeholder = document.getElementById('unitColumnsPlaceholder');
-            
-            if (!placeholder) return;
-
-            // Insert unit columns before the placeholder
-            for (let i = 0; i < maxUnitColumns; i++) {
-                const th = document.createElement('th');
-                th.width = '8%';
-                th.className = 'text-right';
-                th.textContent = `Unit ${i + 1}`;
-                th.dataset.colId = `unit_${i}`;
-                headerRow.insertBefore(th, placeholder);
-            }
-
-            // Remove placeholder
-            placeholder.remove();
-        }
-
-        // Build totals row based on customization
-        function buildTotalsRow(maxUnitColumns) {
-            const totalsRow = document.querySelector('.items-table tfoot tr');
-            totalsRow.innerHTML = '';
-
-            // Serial column
-            const serialCol = columnConfig.find(c => c.id === 'serial');
-            if (!serialCol || serialCol.visible !== false) {
-                const th = document.createElement('th');
-                th.textContent = '';
-                totalsRow.appendChild(th);
-            }
-
-            // Product column with "Totals" text
-            const productCol = columnConfig.find(c => c.id === 'product');
-            if (!productCol || productCol.visible !== false) {
-                const th = document.createElement('th');
-                th.textContent = 'Totals';
-                totalsRow.appendChild(th);
-            }
-
-            // Unit columns - empty cells
-            for (let i = 0; i < maxUnitColumns; i++) {
-                const th = document.createElement('th');
-                th.className = 'text-right';
-                th.textContent = '';
-                totalsRow.appendChild(th);
-            }
-
-            // Remaining columns with totals
-            const remainingCols = [
-                { id: 'price', label: '', hasTotal: true, totalId: 'totalUnitPrice' },
-                { id: 'gross', label: '', hasTotal: true, totalId: 'totalGrossAmount' },
-                { id: 'disc_pct', label: '', hasTotal: false },
-                { id: 'disc_amt', label: '', hasTotal: true, totalId: 'totalDiscountAmountItems' },
-                { id: 'to_amt', label: '', hasTotal: true, totalId: 'totalTradeOfferAmountItems' },
-                { id: 'gst_pct', label: '', hasTotal: false },
-                { id: 'gst_amt', label: '', hasTotal: true, totalId: 'totalGstAmountItems' },
-                { id: 'foc', label: '', hasTotal: true, totalId: 'totalFocQty' },
-                { id: 'net', label: '', hasTotal: true, totalId: 'totalNetAmountItems' }
-            ];
-
-            remainingCols.forEach(colDef => {
-                const col = columnConfig.find(c => c.id === colDef.id);
-                if (col && col.visible === false) return;
-
-                const th = document.createElement('th');
-                th.className = 'text-right';
-                th.dataset.colId = colDef.id;
-
-                if (colDef.hasTotal) {
-                    th.id = colDef.totalId;
-                    th.textContent = '0.00';
-                }
-
-                // Apply visibility
-                if (colDef.id === 'disc_pct' && !enableCashDiscountPercent) th.style.display = 'none';
-                if (colDef.id === 'disc_amt' && !enableCashDiscountAmount) th.style.display = 'none';
-                if (colDef.id === 'to_amt' && !enableTradeOfferAmount) th.style.display = 'none';
-                if (colDef.id === 'gst_pct' && !enableTaxation) th.style.display = 'none';
-                if (colDef.id === 'gst_amt' && !enableTaxation) th.style.display = 'none';
-                if (colDef.id === 'foc' && !enableFOC) th.style.display = 'none';
-
-                totalsRow.appendChild(th);
-            });
-        }
-
-        buildTableHeader();
-        // buildTotalsRow will be called after data loads with maxUnitColumns
-
-        // Apply column visibility
-        document.querySelectorAll('.disc-pct-col').forEach(el => el.style.display = enableCashDiscountPercent ? 'table-cell' : 'none');
-        document.querySelectorAll('.disc-amt-col').forEach(el => el.style.display = enableCashDiscountAmount ? 'table-cell' : 'none');
-        document.querySelectorAll('.to-pct-col').forEach(el => el.style.display = enableTradeOfferDiscount ? 'table-cell' : 'none');
-        document.querySelectorAll('.to-amt-col').forEach(el => el.style.display = enableTradeOfferAmount ? 'table-cell' : 'none');
-        document.querySelectorAll('.gst-pct-col').forEach(el => el.style.display = enableTaxation ? 'table-cell' : 'none');
-        document.querySelectorAll('.gst-amt-col').forEach(el => el.style.display = enableTaxation ? 'table-cell' : 'none');
-        document.querySelectorAll('.foc-col').forEach(el => el.style.display = enableFOC ? 'table-cell' : 'none');
-
-        // Get invoice ID from URL
-        const urlParams = new URLSearchParams(window.location.search);
-        const invoiceId = urlParams.get('id');
-
-        if (!invoiceId) {
-            alert('Invoice ID is required');
-            window.close();
-        }
-
-        // Fetch customer's closing balance from ledger
-        async function fetchCustomerClosingBalance(customerId, companyId) {
-            try {
-                const params = new URLSearchParams({
-                    customer_id: customerId,
-                    as_of_date: new Date().toISOString().split('T')[0] // Today's date
-                });
-                if (companyId) {
-                    params.append('company_id', companyId);
-                }
-                
-                const response = await fetch(`../../../../server/api/sale/sale_tax_invoice/get-customer-closing-balance.php?${params}`);
-                const data = await response.json();
-                
-                if (data.success) {
-                    return parseFloat(data.closing_balance);
-                } else {
-                    console.error('Error fetching closing balance:', data.message);
-                    return 0;
-                }
-            } catch (error) {
-                console.error('Error fetching closing balance:', error);
-                return 0;
-            }
-        }
-
-        // Load company, user and invoice data
-        async function loadData() {
-            try {
-                const [userResponse, invoiceResponse] = await Promise.all([
-                    fetch('../../../../server/api/sale/sale_tax_invoice/get-user.php'),
-                    fetch(`../../../../server/api/sale/sale_tax_invoice/pos-edit.php?id=${invoiceId}`)
-                ]);
-
-                const userData = await userResponse.json();
-                const invoiceData = await invoiceResponse.json();
-
-                if (userData.success) {
-                    document.getElementById('generatedBy').textContent = userData.user.full_name;
-                }
-
-                if (invoiceData.success) {
-                    // Load company data if company_id exists
-                    if (invoiceData.invoice.company_id) {
-                        const companyResponse = await fetch(`../../../../server/api/sale/sale_tax_invoice/get-company-by-id.php?id=${invoiceData.invoice.company_id}`);
-                        const companyData = await companyResponse.json();
-                        if (companyData.success) {
-                            populateCompanyData(companyData.company);
-                        }
-                    } else {
-                        // Fallback to tenant's default company
-                        const companyResponse = await fetch('../../../../server/api/sale/sale_tax_invoice/get-company.php');
-                        const companyData = await companyResponse.json();
-                        if (companyData.success) {
-                            populateCompanyData(companyData.company);
-                        }
-                    }
-                    
-                    // Fetch customer's closing balance before populating invoice data
-                    const closingBalanceData = await fetchCustomerClosingBalance(invoiceData.invoice.customer_id, invoiceData.invoice.company_id);
-                    populateInvoiceData(invoiceData.invoice, invoiceData.items, closingBalanceData);
-                } else {
-                    alert('Error loading invoice: ' + invoiceData.message);
-                }
-            } catch (error) {
-                alert('Error loading data: ' + error.message);
-            }
-        }
-
-        function populateCompanyData(company) {
-            // Set company logo only if exists
-            if (company.logo_url) {
-                const logoImg = document.createElement('img');
-                logoImg.src = `../../../assets/uploads/company_logo/${company.logo_url}`;
-                logoImg.alt = 'Company Logo';
-                logoImg.style.maxWidth = '120px';
-                logoImg.style.maxHeight = '80px';
-                logoImg.style.marginBottom = '10px';
-                logoImg.style.display = 'block';
-                const companyInfo = document.querySelector('.company-info');
-                companyInfo.insertBefore(logoImg, companyInfo.firstChild);
-            }
-
-            document.getElementById('companyName').textContent = company.company_name || company.legal_name || 'Company Name';
-            document.getElementById('companyAddress').textContent = company.address || '';
-            document.getElementById('companyCityState').textContent = `${company.city || ''}, ${company.state || ''} ${company.zipcode || ''}`.trim();
-            document.getElementById('companyPhone').textContent = company.phone ? `Phone: ${company.phone}` : '';
-            document.getElementById('companyEmail').textContent = company.email ? `Email: ${company.email}` : '';
-        }
-
-        function populateInvoiceData(invoice, items, closingBalanceData) {
-            // Populate header info
-            document.getElementById('invoiceNo').textContent = invoice.bill_no;
-            document.getElementById('invoiceDate').textContent = new Date(invoice.sale_date).toLocaleDateString();
-            document.getElementById('customerName').textContent = `${invoice.customer_code} - ${invoice.customer_name}`;
-
-            // Customer address
-            let addressText = '';
-            if (invoice.customer_address) addressText += invoice.customer_address;
-            const customerAddressEl = document.getElementById('customerAddress').closest('p');
-            if (localStorage.getItem('hidePrintCustomerAddress') === 'true') {
-                customerAddressEl.style.display = 'none';
-            } else {
-                document.getElementById('customerAddress').textContent = addressText || '-';
-            }
-
-            // Customer contact
-            const customerPhoneEl = document.getElementById('customerPhone').closest('p');
-            const customerEmailEl = document.getElementById('customerEmail').closest('p');
-            if (localStorage.getItem('hidePrintCustomerPhone') === 'true') {
-                customerPhoneEl.style.display = 'none';
-            } else {
-                document.getElementById('customerPhone').textContent = invoice.customer_phone || '-';
-            }
-            if (localStorage.getItem('hidePrintCustomerEmail') === 'true') {
-                customerEmailEl.style.display = 'none';
-            } else {
-                document.getElementById('customerEmail').textContent = invoice.customer_email || '-';
-            }
-
-            const previousBalanceEl = document.getElementById('previousBalance');
-            if (previousBalanceEl) {
-                previousBalanceEl.closest('p').style.display = 'none';
-            }
-
-            const branchText = invoice.parent_branch_name ?
-                `${invoice.branch_name} (${invoice.branch_type}) - Parent: ${invoice.parent_branch_name}` :
-                `${invoice.branch_name} (${invoice.branch_type})`;
-
-            const branchEl = document.getElementById('branchName').closest('p');
-            const currencyEl = document.getElementById('currency').closest('p');
-
-            if (localStorage.getItem('hidePrintBranch') === 'true') {
-                branchEl.style.display = 'none';
-            } else {
-                document.getElementById('branchName').textContent = branchText;
-            }
-
-            if (localStorage.getItem('hidePrintCurrency') === 'true') {
-                currencyEl.style.display = 'none';
-            } else {
-                document.getElementById('currency').textContent = invoice.currency_name;
-            }
-
-            const salesOfficerEl = document.getElementById('salesOfficer').closest('p');
-            const supplierManEl = document.getElementById('supplierMan').closest('p');
-            const biltyNoEl = document.getElementById('biltyNo').closest('p');
-            const transportNameEl = document.getElementById('transportName').closest('p');
-            const remarksEl = document.getElementById('remarks').closest('p');
-
-            if (localStorage.getItem('hidePrintSalesOfficer') === 'true') {
-                salesOfficerEl.style.display = 'none';
-            } else {
-                document.getElementById('salesOfficer').textContent = invoice.sales_officer_name || '-';
-            }
-            
-            if (localStorage.getItem('hidePrintSupplierMan') === 'true') {
-                supplierManEl.style.display = 'none';
-            } else {
-                document.getElementById('supplierMan').textContent = invoice.supplier_man_name || '-';
-            }
-            if (localStorage.getItem('hidePrintBiltyNo') === 'true') {
-                biltyNoEl.style.display = 'none';
-            } else {
-                document.getElementById('biltyNo').textContent = invoice.bilty_no || '-';
-            }
-            if (localStorage.getItem('hidePrintTransport') === 'true') {
-                transportNameEl.style.display = 'none';
-            } else {
-                document.getElementById('transportName').textContent = invoice.transport_name || '-';
-            }
-            if (localStorage.getItem('hidePrintRemarks') === 'true') {
-                remarksEl.style.display = 'none';
-            } else {
-                document.getElementById('remarks').textContent = invoice.remarks || '-';
-            }
-
-            // Set currency symbol for amounts
-            const currencySymbol = invoice.currency_symbol || '';
-
-            // Populate items
-            const tbody = document.getElementById('itemsTableBody');
-            tbody.innerHTML = '';
-
-            let totalQty = 0, totalPcs = 0, totalCtn = 0, totalDz = 0, totalUnitPrice = 0, totalGrossAmount = 0, totalDiscountAmountItems = 0, totalTradeOfferAmountItems = 0, totalGstAmountItems = 0, totalFocQty = 0, totalNetAmountItems = 0;
-
-            // Group items by product_id to reconstruct rows with multiple units
-            const itemsByProduct = {};
-            const childItems = [];
-            
-            items.forEach(item => {
-                if (item.parent_row_id === null) {
-                    const key = item.product_id;
-                    if (!itemsByProduct[key]) {
-                        itemsByProduct[key] = {
-                            baseItem: item,
-                            units: []
-                        };
-                    }
-                    itemsByProduct[key].units.push({
-                        uom_name: item.uom_name,
-                        quantity: item.quantity
-                    });
-                } else {
-                    childItems.push(item);
-                }
-            });
-
-            // Calculate max unit columns needed
-            let maxUnitColumns = 0;
-            Object.values(itemsByProduct).forEach(productGroup => {
-                maxUnitColumns = Math.max(maxUnitColumns, productGroup.units.length);
-            });
-
-            // Add unit columns to header
-            addUnitColumnsToHeader(maxUnitColumns);
-            
-            // Build totals row with unit columns
-            buildTotalsRow(maxUnitColumns);
-
-            // Render items
-            let serialNumber = 0;
-            Object.values(itemsByProduct).forEach(productGroup => {
-                serialNumber++;
-                const item = productGroup.baseItem;
-                const row = tbody.insertRow();
-
-                // Serial column
-                const serialCol = columnConfig.find(c => c.id === 'serial');
-                if (!serialCol || serialCol.visible !== false) {
-                    const td = row.insertCell();
-                    td.className = 'text-center';
-                    td.textContent = serialNumber;
-                }
-
-                // Product column
-                const productCol = columnConfig.find(c => c.id === 'product');
-                if (!productCol || productCol.visible !== false) {
-                    const td = row.insertCell();
-                    td.textContent = item.product_name;
-                    
-                    // Add children if inline mode
-                    if (childDisplayMode === 'inline') {
-                        const productChildren = childItems.filter(c => c.parent_row_id === item.id);
-                        if (productChildren.length > 0) {
-                            td.innerHTML += '<br><span style="font-size: 10px; color: #666;">(' +
-                                productChildren.map(c => `${c.product_name}: ${parseFloat(c.quantity).toFixed(2)}`).join(' | ') +
-                                ')</span>';
-                        }
-                    }
-                }
-
-                // Unit columns - show unit name and quantity
-                for (let i = 0; i < maxUnitColumns; i++) {
-                    const td = row.insertCell();
-                    td.className = 'text-right';
-                    
-                    if (i < productGroup.units.length) {
-                        const unit = productGroup.units[i];
-                        td.innerHTML = `<div style="font-size: 10px; color: #666; text-align: left; margin-bottom: 2px;">${unit.uom_name}</div><div>${parseFloat(unit.quantity).toFixed(2)}</div>`;
-                    } else {
-                        td.style.background = '#f8f9fa';
-                        td.style.color = '#dee2e6';
-                        td.innerHTML = '<span style="opacity: 0.3;">-</span>';
-                    }
-                }
-
-                // Remaining columns
-                const remainingData = [
-                    { id: 'price', value: currencySymbol + ' ' + parseFloat(item.sale_price).toFixed(2), visible: true },
-                    { id: 'gross', value: currencySymbol + ' ' + parseFloat(item.gross_amount).toFixed(2), visible: true },
-                    { id: 'disc_pct', value: parseFloat(item.discount_percent || 0).toFixed(2) + '%', visible: enableCashDiscountPercent },
-                    { id: 'disc_amt', value: currencySymbol + ' ' + parseFloat(item.discount_amount || 0).toFixed(2), visible: enableCashDiscountAmount },
-                    { id: 'to_amt', value: currencySymbol + ' ' + parseFloat(item.trade_offer_amount || 0).toFixed(2), visible: enableTradeOfferAmount },
-                    { id: 'gst_pct', value: parseFloat(item.tax_percent || 0).toFixed(2) + '%', visible: enableTaxation },
-                    { id: 'gst_amt', value: currencySymbol + ' ' + parseFloat(item.tax_amount || 0).toFixed(2), visible: enableTaxation },
-                    { id: 'foc', value: parseFloat(item.foc_quantity || 0).toFixed(2), visible: enableFOC },
-                    { id: 'net', value: currencySymbol + ' ' + parseFloat(item.net_amount).toFixed(2), visible: true }
-                ];
-
-                remainingData.forEach(colData => {
-                    const col = columnConfig.find(c => c.id === colData.id);
-                    if (col && col.visible === false) return;
-                    if (!colData.visible) return;
-
-                    const td = row.insertCell();
-                    td.className = 'text-right';
-                    td.textContent = colData.value;
-                    
-                    if (!colData.visible) {
-                        td.style.display = 'none';
-                    }
-                });
-
-                // Calculate totals (only count first unit to avoid duplication)
-                totalQty += productGroup.units.reduce((sum, u) => sum + parseFloat(u.quantity), 0);
-                totalPcs += parseFloat(item.piece || 0);
-                totalCtn += parseFloat(item.carton || 0);
-                totalDz += parseFloat(item.dozen || 0);
-                totalUnitPrice += parseFloat(item.sale_price);
-                totalGrossAmount += parseFloat(item.gross_amount);
-                totalDiscountAmountItems += parseFloat(item.discount_amount || 0);
-                totalTradeOfferAmountItems += parseFloat(item.trade_offer_amount || 0);
-                totalGstAmountItems += parseFloat(item.tax_amount || 0);
-                totalFocQty += parseFloat(item.foc_quantity || 0);
-                totalNetAmountItems += parseFloat(item.net_amount);
-            });
-            
-            // Render child items if separate mode
-            if (childDisplayMode !== 'inline') {
-                childItems.forEach(item => {
-                    const row = tbody.insertRow();
-                    const indent = '<span style="margin-left: 20px;">? </span>';
-                    const textColor = 'color: #666;';
-
-                    // Serial column
-                    const serialCol = columnConfig.find(c => c.id === 'serial');
-                    if (!serialCol || serialCol.visible !== false) {
-                        const td = row.insertCell();
-                        td.className = 'text-center';
-                        td.textContent = '';
-                    }
-
-                    // Product column
-                    const productCol = columnConfig.find(c => c.id === 'product');
-                    if (!productCol || productCol.visible !== false) {
-                        const td = row.insertCell();
-                        td.innerHTML = `<span style="${textColor}">${indent}${item.product_name}</span>`;
-                    }
-
-                    // Unit columns - show unit name and quantity for child
-                    for (let i = 0; i < maxUnitColumns; i++) {
-                        const td = row.insertCell();
-                        td.className = 'text-right';
-                        
-                        if (i === 0) {
-                            td.innerHTML = `<div style="font-size: 10px; color: #666; text-align: left; margin-bottom: 2px;">${item.uom_name || 'Unit'}</div><div>${parseFloat(item.quantity).toFixed(2)}</div>`;
-                        } else {
-                            td.style.background = '#f8f9fa';
-                            td.style.color = '#dee2e6';
-                            td.innerHTML = '<span style="opacity: 0.3;">-</span>';
-                        }
-                    }
-
-                    // Remaining columns - all dashes for child items
-                    const remainingCols = ['price', 'gross', 'disc_pct', 'disc_amt', 'to_amt', 'gst_pct', 'gst_amt', 'foc', 'net'];
-                    remainingCols.forEach(colId => {
-                        const col = columnConfig.find(c => c.id === colId);
-                        if (col && col.visible === false) return;
-
-                        const td = row.insertCell();
-                        td.className = 'text-right';
-                        td.textContent = '-';
-
-                        // Apply visibility
-                        if (colId === 'disc_pct' && !enableCashDiscountPercent) td.style.display = 'none';
-                        if (colId === 'disc_amt' && !enableCashDiscountAmount) td.style.display = 'none';
-                        if (colId === 'to_amt' && !enableTradeOfferAmount) td.style.display = 'none';
-                        if (colId === 'gst_pct' && !enableTaxation) td.style.display = 'none';
-                        if (colId === 'gst_amt' && !enableTaxation) td.style.display = 'none';
-                        if (colId === 'foc' && !enableFOC) td.style.display = 'none';
-                    });
-                });
-            }
-
-            // Update totals row
-            const totalQtyEl = document.getElementById('totalQty');
-            const totalPcsEl = document.getElementById('totalPcs');
-            const totalCtnEl = document.getElementById('totalCtn');
-            const totalDzEl = document.getElementById('totalDz');
-            const totalUnitPriceEl = document.getElementById('totalUnitPrice');
-            const totalGrossAmountEl = document.getElementById('totalGrossAmount');
-            const totalDiscountAmountItemsEl = document.getElementById('totalDiscountAmountItems');
-            const totalTradeOfferAmountItemsEl = document.getElementById('totalTradeOfferAmountItems');
-            const totalGstAmountItemsEl = document.getElementById('totalGstAmountItems');
-            const totalFocQtyEl = document.getElementById('totalFocQty');
-            const totalNetAmountItemsEl = document.getElementById('totalNetAmountItems');
-
-            if (totalQtyEl) totalQtyEl.textContent = totalQty.toFixed(2);
-            if (totalPcsEl) totalPcsEl.textContent = totalPcs.toFixed(2);
-            if (totalCtnEl) totalCtnEl.textContent = totalCtn.toFixed(2);
-            if (totalDzEl) totalDzEl.textContent = totalDz.toFixed(2);
-            if (totalUnitPriceEl) totalUnitPriceEl.textContent = `${currencySymbol} ${totalUnitPrice.toFixed(2)}`;
-            if (totalGrossAmountEl) totalGrossAmountEl.textContent = `${currencySymbol} ${totalGrossAmount.toFixed(2)}`;
-            if (totalDiscountAmountItemsEl) totalDiscountAmountItemsEl.textContent = `${currencySymbol} ${totalDiscountAmountItems.toFixed(2)}`;
-            if (totalTradeOfferAmountItemsEl) totalTradeOfferAmountItemsEl.textContent = `${currencySymbol} ${totalTradeOfferAmountItems.toFixed(2)}`;
-            if (totalGstAmountItemsEl) totalGstAmountItemsEl.textContent = `${currencySymbol} ${totalGstAmountItems.toFixed(2)}`;
-            if (totalFocQtyEl) totalFocQtyEl.textContent = totalFocQty.toFixed(2);
-            if (totalNetAmountItemsEl) totalNetAmountItemsEl.textContent = `${currencySymbol} ${totalNetAmountItems.toFixed(2)}`;
-
-            // Populate totals with currency symbol
-            const enableInvoiceCashDiscountPercent = localStorage.getItem('enableInvoiceCashDiscountPercent') === 'true';
-            const enableInvoiceCashDiscountAmount = localStorage.getItem('enableInvoiceCashDiscountAmount') === 'true';
-
-            // Calculate paid and balance from receive voucher
-            const amountPaid = parseFloat(invoice.amount_paid) || 0;
-            const remainingBalance = parseFloat(invoice.net_amount) - amountPaid;
-            
-            // Use closing balance from ledger
-            const closingBalance = closingBalanceData || 0;
-            const netAmount = parseFloat(invoice.net_amount);
-            const totalBalance = closingBalance; // Total Balance from customer ledger
-            const previousBalance = closingBalance - netAmount; // Total Balance - Current Invoice Amount
-
-            const totalBalanceCalculated = amountPaid - totalBalance;
-            const totalsData = [
-                { id: 'totalBill', label: localStorage.getItem('labelTotalBill') || 'Total Bill', value: `${currencySymbol} ${parseFloat(invoice.total_bill).toFixed(2)}`, show: localStorage.getItem('hidePrintTotalBill') !== 'true' },
-                { id: 'discountPercent', label: 'Discount (%)', value: parseFloat(invoice.total_discount_percent).toFixed(2) + '%', show: enableInvoiceCashDiscountPercent },
-                { id: 'discountAmount', label: localStorage.getItem('labelDiscountAmount') || 'Discount Amount', value: `${currencySymbol} ${parseFloat(invoice.total_discount_amount).toFixed(2)}`, show: enableInvoiceCashDiscountAmount },
-                { id: 'shippingFees', label: localStorage.getItem('labelShippingFees') || 'Shipping Fees', value: `${currencySymbol} ${parseFloat(invoice.shipping_fees || 0).toFixed(2)}`, show: enableShippingFees && invoice.shipping_fees },
-                { id: 'netAmount', label: localStorage.getItem('labelNetAmount') || 'Net Amount', value: `${currencySymbol} ${parseFloat(invoice.net_amount).toFixed(2)}`, show: localStorage.getItem('hidePrintNetAmount') !== 'true', isTotal: true },
-                { id: 'amountPaid', label: localStorage.getItem('labelAmountPaid') || 'Amount Paid', value: `${currencySymbol} ${amountPaid.toFixed(2)}`, show: localStorage.getItem('hidePrintAmountPaid') !== 'true' },
-                { id: 'paymentMethod', label: localStorage.getItem('labelPaymentMethod') || 'Payment Method', value: invoice.payment_method || '-', show: localStorage.getItem('hidePrintPaymentMethod') !== 'true' },
-                { id: 'remainingBalance', label: localStorage.getItem('labelRemainingBalance') || 'Remaining Balance', value: `${currencySymbol} ${remainingBalance.toFixed(2)}`, show: localStorage.getItem('hidePrintRemainingBalance') !== 'true' },
-                { id: 'previousBalance', label: 'Previous Balance', value: `${currencySymbol} ${Math.abs(previousBalance).toFixed(2)} Dr`, show: true, isSpecial: true },
-                { id: 'totalBalance', label: 'Total Balance', value: `${currencySymbol} ${Math.abs(totalBalanceCalculated).toFixed(2)} Dr`, show: true, isSpecial: true }
-            ];
-
-            if (totalsLayout === 'horizontal-2' || totalsLayout === 'horizontal-3') {
-                const container = document.getElementById('totalsHorizontal');
-                totalsData.filter(item => item.show).forEach(item => {
-                    const div = document.createElement('div');
-                    div.className = 'totals-item' + (item.isTotal ? ' total-row' : '') + (item.isSpecial ? ` ${item.id}` : '');
-                    div.id = item.id;
-                    div.innerHTML = `<span>${item.label}:</span><span>${item.value}</span>`;
-                    container.appendChild(div);
-                });
-            } else {
-                document.getElementById('totalBill').textContent = `${currencySymbol} ${parseFloat(invoice.total_bill).toFixed(2)}`;
-
-                if (enableInvoiceCashDiscountPercent) {
-                    document.getElementById('discountPercentRow').style.display = '';
-                    document.getElementById('discountPercent').textContent = parseFloat(invoice.total_discount_percent).toFixed(2) + '%';
-                }
-
-                if (enableInvoiceCashDiscountAmount) {
-                    document.getElementById('discountAmountRow').style.display = '';
-                    document.getElementById('discountAmount').textContent = `${currencySymbol} ${parseFloat(invoice.total_discount_amount).toFixed(2)}`;
-                }
-
-                if (enableShippingFees && invoice.shipping_fees && parseFloat(invoice.shipping_fees) > 0) {
-                    const shippingFeesRow = document.getElementById('shippingFeesRow');
-                    shippingFeesRow.style.display = '';
-                    shippingFeesRow.querySelector('td:first-child').textContent = localStorage.getItem('labelShippingFees') || 'Shipping Fees';
-                    document.getElementById('shippingFees').textContent = `${currencySymbol} ${parseFloat(invoice.shipping_fees).toFixed(2)}`;
-                }
-
-                document.getElementById('netAmount').textContent = `${currencySymbol} ${parseFloat(invoice.net_amount).toFixed(2)}`;
-                document.getElementById('amountPaid').textContent = `${currencySymbol} ${amountPaid.toFixed(2)}`;
-                document.getElementById('paymentMethod').textContent = invoice.payment_method || '-';
-                document.getElementById('remainingBalance').textContent = `${currencySymbol} ${remainingBalance.toFixed(2)}`;
-
-                // Set Previous Balance from sale_invoice.previous_balance column
-                const invoicePreviousBalance = parseFloat(invoice.previous_balance) || 0;
-                const previousBalanceSign = invoicePreviousBalance >= 0 ? 'Dr' : 'Cr';
-                document.getElementById('previousBalanceAmount').textContent = `${currencySymbol} ${Math.abs(invoicePreviousBalance).toFixed(2)} ${previousBalanceSign}`;
-                
-                // Calculate Total Balance with proper accounting sign handling
-                // Cr (Credit) is treated as negative, Dr (Debit) is positive
-                let previousBalanceForCalculation = Math.abs(invoicePreviousBalance);
-                if (previousBalanceSign === 'Cr') {
-                    previousBalanceForCalculation = -previousBalanceForCalculation;
-                }
-                
-                // Total Balance = Previous Balance + Remaining Balance
-                const totalBalanceValue = previousBalanceForCalculation + remainingBalance;
-                const totalBalanceSign = totalBalanceValue >= 0 ? 'Dr' : 'Cr';
-                
-                document.getElementById('totalBalance').textContent = `${currencySymbol} ${Math.abs(totalBalanceValue).toFixed(2)} ${totalBalanceSign}`;
-            }
-
-            // Convert net amount to words
-            const netAmountWords = numberToWords(Math.floor(parseFloat(invoice.net_amount)));
-            const cents = Math.round((parseFloat(invoice.net_amount) % 1) * 100);
-            const centsWords = cents > 0 ? ` and ${numberToWords(cents)} Cents` : '';
-            document.getElementById('amountInWords').textContent = `${netAmountWords}${centsWords} Only`;
-
-            // Apply hide settings
-            if (localStorage.getItem('hidePrintAmountInWords') === 'true') {
-                document.getElementById('amountInWordsSection').style.display = 'none';
-            }
-            if (localStorage.getItem('hidePrintSignatures') === 'true') {
-                document.getElementById('signaturesSection').style.display = 'none';
-            }
-            if (localStorage.getItem('hidePrintGeneratedBy') === 'true') {
-                document.getElementById('generatedBySection').style.display = 'none';
-            }
-            if (localStorage.getItem('hidePrintGeneratedOn') === 'true') {
-                document.getElementById('generatedOnSection').style.display = 'none';
-            }
-
-            // Generate QR Code if enabled
-            setTimeout(() => {
-                const enablePrintQRCode = localStorage.getItem('enablePrintQRCode') === 'true';
-                const qrCodeDiv = document.getElementById('qrCode');
-                if (enablePrintQRCode && typeof QRCode !== 'undefined' && qrCodeDiv && !qrCodeDiv.hasChildNodes()) {
-                    document.getElementById('qrCodeSection').style.display = 'block';
-
-                    // Generate secure token
-                    const token = CryptoJS.MD5(invoice.bill_no + 'LEDGERONE_SECRET_KEY').toString().substring(0, 16);
-                    const verifyUrl = `${window.location.origin}/ledgerone_erp/client/pages/sale/sale_tax_invoice/verify-invoice.php?invoice=${invoice.bill_no}&token=${token}`;
-
-                    new QRCode(qrCodeDiv, {
-                        text: verifyUrl,
-                        width: 100,
-                        height: 100,
-                        correctLevel: QRCode.CorrectLevel.H
-                    });
-                }
-            }, 500);
-        }
-
-        // Set generated on date
-        document.getElementById('generatedOn').textContent = new Date().toLocaleString();
-
-        // Load data on page load
-        loadData();
-
-        // Generate QR Code after data loads
-        window.addEventListener('load', function () {
-            const enablePrintQRCode = localStorage.getItem('enablePrintQRCode') === 'true';
-            if (enablePrintQRCode && typeof QRCode !== 'undefined') {
-                setTimeout(() => {
-                    const billNo = document.getElementById('invoiceNo').textContent;
-                    if (billNo && billNo !== 'Loading...') {
-                        document.getElementById('qrCodeSection').style.display = 'block';
-                        QRCode.toCanvas(document.getElementById('qrCode'), `INV-${billNo}`, {
-                            width: 150,
-                            margin: 1
-                        });
-                    }
-                }, 1000);
-            }
-        });
-
-        // Function to convert number to words
-        function numberToWords(num) {
-            const ones = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine'];
-            const teens = ['Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
-            const tens = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
-            const thousands = ['', 'Thousand', 'Million', 'Billion'];
-
-            if (num === 0) return 'Zero';
-
-            function convertHundreds(n) {
-                let result = '';
-                if (n >= 100) {
-                    result += ones[Math.floor(n / 100)] + ' Hundred ';
-                    n %= 100;
-                }
-                if (n >= 20) {
-                    result += tens[Math.floor(n / 10)] + ' ';
-                    n %= 10;
-                } else if (n >= 10) {
-                    result += teens[n - 10] + ' ';
-                    n = 0;
-                }
-                if (n > 0) {
-                    result += ones[n] + ' ';
-                }
-                return result;
-            }
-
-            let result = '';
-            let thousandIndex = 0;
-
-            while (num > 0) {
-                if (num % 1000 !== 0) {
-                    result = convertHundreds(num % 1000) + thousands[thousandIndex] + ' ' + result;
-                }
-                num = Math.floor(num / 1000);
-                thousandIndex++;
-            }
-
-            return result.trim();
-        }
+        window.print();
     </script>
 </body>
-
 </html>

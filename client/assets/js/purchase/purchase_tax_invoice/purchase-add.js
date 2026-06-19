@@ -18,7 +18,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const resetBtn = document.getElementById('resetBtn');
     const form = document.getElementById('invoiceForm');
 
-    Promise.all([loadSuppliers(), loadBranches(), loadProducts(), loadUOM(), loadCurrencies(), loadCompanies()]).then(() => {
+    Promise.all([loadSuppliers(), loadBranches(), loadProducts(), loadUOM(), loadCurrencies(), loadCompanies(), loadProjects()]).then(() => {
         initSearchableDropdown('supplierCodeSearch', 'supplierCodeOptions', 'supplierCode');
         initSearchableDropdown('branchSearch', 'branchOptions', 'branch');
         if (editMode) {
@@ -51,6 +51,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 document.getElementById('company').value = inv.company_id || 1;
                 document.getElementById('currency').value = inv.currency_id || 1;
                 document.getElementById('remarks').value = inv.remarks || '';
+                document.getElementById('project').value = inv.project_id || '';
                 
                 const supplierOption = document.querySelector(`#supplierCodeOptions .dropdown-option[data-value="${inv.supplier_id}"]`);
                 if (supplierOption) {
@@ -193,6 +194,31 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         } catch (error) {
             console.error('Error loading currencies:', error);
+        }
+    }
+
+    async function loadProjects() {
+        try {
+            const response = await fetch('../../../../server/api/master_setup/project_setup/get-projects-dropdown.php');
+            const data = await response.json();
+            
+            if (data.success && Array.isArray(data.projects) && data.projects.length > 0) {
+                const projectSelect = document.getElementById('project');
+                projectSelect.innerHTML = '<option value="">Select Project</option>';
+                
+                data.projects.forEach(project => {
+                    const option = document.createElement('option');
+                    option.value = project.id;
+                    option.textContent = `${project.project_code} - ${project.project_name} (${project.city_name})`;
+                    projectSelect.appendChild(option);
+                });
+                
+                if (data.projects.length === 1) {
+                    projectSelect.value = data.projects[0].id;
+                }
+            }
+        } catch (error) {
+            console.error('Error loading projects:', error);
         }
     }
 
@@ -631,6 +657,7 @@ document.addEventListener('DOMContentLoaded', function () {
             supplierId: document.getElementById('supplierCode').value,
             branchId: document.getElementById('branch').value,
             currencyId: document.getElementById('currency').value,
+            projectId: document.getElementById('project')?.value || null,
             remarks: document.getElementById('remarks').value,
             items: items,
             rpTotal: parseFloat(document.getElementById('summaryRPTotal').textContent),

@@ -157,6 +157,12 @@ if (!$user_id) {
                         <label for="transportName">Transport Name</label>
                         <input type="text" id="transportName" placeholder="Enter transport name" tabindex="-1">
                     </div>
+                    <div class="form-group" id="projectGroup">
+                        <label for="project">Project</label>
+                        <select id="project" tabindex="-1">
+                            <option value="">Select Project</option>
+                        </select>
+                    </div>
 
                 </div>
             </div>
@@ -883,6 +889,10 @@ if (!$user_id) {
                     <input type="checkbox" id="hideRemarksStandard" style="width: auto;">
                     <span>Hide Remarks</span>
                 </label>
+                <label style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px; cursor: pointer;">
+                    <input type="checkbox" id="hideProjectStandard" style="width: auto;">
+                    <span>Hide Project</span>
+                </label>
             </div>
             <div class="modal-actions">
                 <button class="btn btn-secondary" id="closeFieldSettingsBtn">Close</button>
@@ -891,6 +901,7 @@ if (!$user_id) {
         </div>
     </div>
 
+    <script src="../../../assets/js/sale/sale_tax_invoice/load-projects.js?v=<?php echo time(); ?>"></script>
     <script src="../../../assets/js/sale/sale_tax_invoice/pos-add-uom.js?v=<?php echo time(); ?>&debug=1"></script>
     <script src="../../../assets/js/sale/sale_tax_invoice/pos-add-scheme.js?v=<?php echo time(); ?>"></script>
     <script src="../../../assets/js/sale/sale_tax_invoice/invoice-level-taxes-dynamic.js?v=<?php echo time(); ?>"></script>

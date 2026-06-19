@@ -74,6 +74,12 @@ if (!$user_id) {
                     </select>
                 </div>
                 <div class="filter-group">
+                    <label for="projectFilter">Project</label>
+                    <select id="projectFilter">
+                        <option value="">All Projects</option>
+                    </select>
+                </div>
+                <div class="filter-group">
                     <label for="statusFilter">Status</label>
                     <select id="statusFilter">
                         <option value="">All Status</option>
@@ -132,6 +138,7 @@ if (!$user_id) {
                         <th>Date</th>
                         <th>Supplier</th>
                         <th>Bill No</th>
+                        <th>Project</th>
                         <th>Amount</th>
                         <th>Payment Method</th>
                         <th>Status</th>
@@ -212,6 +219,12 @@ if (!$user_id) {
                             <label for="editBankAccount">Bank Account</label>
                             <select id="editBankAccount">
                                 <option value="">Select Bank Account</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="editProject">Project</label>
+                            <select id="editProject">
+                                <option value="">Select Project</option>
                             </select>
                         </div>
                         <div class="form-group" id="editChequeNoGroup">

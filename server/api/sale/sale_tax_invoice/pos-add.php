@@ -30,6 +30,11 @@ try {
         throw new Exception('Invalid JSON data');
     }
 
+    // Normalize projectId: convert empty string to null
+    if (isset($input['projectId']) && ($input['projectId'] === '' || $input['projectId'] === '0')) {
+        $input['projectId'] = null;
+    }
+
     // Validate required fields
     $required = ['saleDate', 'customerId', 'branchId', 'items'];
     foreach ($required as $field) {
@@ -70,42 +75,47 @@ try {
     $stmt = $pdo->prepare("
         INSERT INTO sale_invoice (
             tenant_id, currency_id, bill_no, sale_date, customer_id, sub_account_id, company_id, branch_id,
-            previous_balance, sale_officer_id, supplier_man_id, sale_order_id, bilty_no, transport_name, total_bill, total_discount_percent,
+            previous_balance, sale_officer_id, supplier_man_id, sale_order_id, bilty_no, transport_name, project_id, total_bill, total_discount_percent,
             total_discount_amount, shipping_fees, net_amount, withholding_tax_percent, withholding_tax_amount, amount_paid_auto_fill,
             invoice_type, due_date, remarks, status, created_by, updated_by
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ");
 
     $stmt->execute([
-        $tenant_id,
-        $input['currencyId'],
-        $billNo,
-        $input['saleDate'],
-        $input['customerId'],
-        $input['subAccountId'] ?? null,
-        $input['companyId'] ?? null,
-        $input['branchId'],
-        extractBalanceAmount($input['previousBalance'] ?? '0.00'),
-        $input['salesOfficerId'] ?? null,
-        $input['supplierManId'] ?? null,
-        $input['saleOrderId'] ?? null,
-        $input['biltyNo'] ?? null,
-        $input['transportName'] ?? null,
-        $input['totalBill'],
-        $input['totalDiscountPercent'] ?? 0.00,
-        $input['totalDiscountAmount'] ?? 0.00,
-        $input['shippingFees'] ?? 0.00,
-        $input['netAmount'],
-        $withholdingTaxPercent,
-        $withholdingTaxAmount,
-        $input['amountPaidAutoFill'] ?? 'yes',
-        $input['invoiceType'] ?? 'Cash',
-        $input['dueDate'] ?? null,
-        $input['remarks'] ?? null,
-        $input['status'] ?? 'Posted',
-        $user_id,
-        $user_id
+        $tenant_id,                                           // 1
+        $input['currencyId'],                                 // 2
+        $billNo,                                              // 3
+        $input['saleDate'],                                   // 4
+        $input['customerId'],                                 // 5
+        $input['subAccountId'] ?? null,                       // 6
+        $input['companyId'] ?? null,                          // 7
+        $input['branchId'],                                   // 8
+        extractBalanceAmount($input['previousBalance'] ?? '0.00'), // 9
+        $input['salesOfficerId'] ?? null,                     // 10
+        $input['supplierManId'] ?? null,                      // 11
+        $input['saleOrderId'] ?? null,                        // 12
+        $input['biltyNo'] ?? null,                            // 13
+        $input['transportName'] ?? null,                      // 14
+        $input['projectId'] ?? null,                          // 15 - project_id (can be null if not selected)
+        $input['totalBill'],                                  // 16
+        $input['totalDiscountPercent'] ?? 0.00,               // 17
+        $input['totalDiscountAmount'] ?? 0.00,                // 18
+        $input['shippingFees'] ?? 0.00,                       // 19
+        $input['netAmount'],                                  // 20
+        $withholdingTaxPercent,                               // 21
+        $withholdingTaxAmount,                                // 22
+        $input['amountPaidAutoFill'] ?? 'yes',                // 23
+        $input['invoiceType'] ?? 'Cash',                      // 24
+        $input['dueDate'] ?? null,                            // 25
+        $input['remarks'] ?? null,                            // 26
+        $input['status'] ?? 'Posted',                         // 27
+        $user_id,                                             // 28
+        $user_id                                              // 29
     ]);
+    
+    if (!$stmt) {
+        throw new Exception('Failed to prepare INSERT statement: ' . implode(' | ', $pdo->errorInfo()));
+    }
 
     $invoice_id = $pdo->lastInsertId();
     $status = $input['status'] ?? 'Posted';

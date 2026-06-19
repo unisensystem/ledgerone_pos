@@ -17,11 +17,14 @@ $stQ = $pdo->prepare("
     SELECT q.*,
            c.customer_name, c.customer_code, c.primary_phone, c.address AS customer_address, c.email AS customer_email,
            CONCAT(e.full_name) AS salesman_name,
-           pt.term_name AS payment_term
+           pt.term_name AS payment_term,
+           p.project_name, p.project_code AS proj_code, ci.city_name AS project_city
     FROM quotations q
     LEFT JOIN customers     c  ON c.id  = q.customer_id    AND c.tenant_id  = q.tenant_id
     LEFT JOIN employees     e  ON e.id  = q.salesman_id    AND e.tenant_id  = q.tenant_id
     LEFT JOIN payment_terms pt ON pt.id = q.payment_term_id
+    LEFT JOIN projects      p  ON p.id  = q.project_id
+    LEFT JOIN cities        ci ON ci.id = p.city_id
     WHERE q.id = ? AND q.tenant_id = ? AND q.is_deleted = 0
 ");
 $stQ->execute([$id, $tenant_id]);
@@ -106,6 +109,11 @@ if (!empty($q['contact_person']))$metaItems[] = ['Contact Person', htmlspecialch
 if (!empty($q['payment_term'])) $metaItems[]  = ['Payment Terms', htmlspecialchars($q['payment_term']),                  'text'];
 if (!empty($q['salesman_name'])) $metaItems[] = ['Salesman',      htmlspecialchars($q['salesman_name']),                 'text'];
 if (!empty($q['party_type']))   $metaItems[]  = ['Party Type',    htmlspecialchars($q['party_type']),                    'text'];
+if (!empty($q['project_name'])) {
+    $projLabel = htmlspecialchars($q['proj_code'] . ' - ' . $q['project_name']);
+    if (!empty($q['project_city'])) $projLabel .= htmlspecialchars(' - ' . $q['project_city']);
+    $metaItems[] = ['Project', $projLabel, 'text'];
+}
 
 // Pad to even count so the 2-column grid always has complete rows
 if (count($metaItems) % 2 !== 0) $metaItems[] = ['', '', 'empty'];

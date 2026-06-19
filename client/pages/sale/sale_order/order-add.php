@@ -120,6 +120,12 @@ if (!$user_id) {
                             <!-- Options loaded dynamically -->
                         </select>
                     </div>
+                    <div class="form-group" id="projectGroup">
+                        <label for="project">Project</label>
+                        <select id="project" tabindex="-1">
+                            <option value="">Select Project</option>
+                        </select>
+                    </div>
                     <div class="form-group" id="biltyNoGroup">
                         <label for="biltyNo">Bilty No</label>
                         <input type="text" id="biltyNo" placeholder="Enter bilty number" tabindex="-1">

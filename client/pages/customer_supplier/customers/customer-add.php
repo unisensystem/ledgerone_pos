@@ -236,6 +236,16 @@ if (!$user_id) {
                                 <option value="">Select Supplier Man</option>
                             </select>
                         </div>
+
+                        <div class="form-group col-6">
+                            <label for="project">
+                                <i class="fas fa-project-diagram"></i>
+                                Project
+                            </label>
+                            <select id="project">
+                                <option value="">Select Project</option>
+                            </select>
+                        </div>
                     </div>
 
                     <!-- Territory Section -->

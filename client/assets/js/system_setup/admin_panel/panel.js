@@ -228,7 +228,7 @@ function renderPermissionsTree(permissions) {
         'Chart of Accounts': [],
         'Financial Reports': ['General Ledger', 'Customer Ledger', 'Supplier Ledger', 'Customer Aging', 'Supplier Aging', 'Recovery Sheet', 'Sales Officer-wise Recovery', 'Trial Balance', 'Balance Sheet', 'Profit & Loss Statement', 'Cash Flow', 'Financial Summary', 'Pending DSR Sheet'],
         'HRM': ['New Employee', 'Record Attendance', 'New Payroll', 'Employees Ledger'],
-        'Master Setup': ['Branch Setup', 'Territory Setup', 'Rate List Setup', 'Tax Rates Setup', 'Tax Regimes Setup'],
+        'Master Setup': ['Branch Setup', 'Territory Setup', 'Rate List Setup', 'Tax Rates Setup', 'Tax Regimes Setup', 'Project Setup'],
         'System Setup': ['Company Profile', 'Admin Panel', 'Currency Setup', 'Software Info']
     };
 
@@ -682,7 +682,7 @@ function openAddPermissionModal() {
         'Chart of Accounts': [],
         'Financial Reports': ['General Ledger', 'Customer Ledger', 'Supplier Ledger', 'Customer Aging', 'Supplier Aging', 'Recovery Sheet', 'Sales Officer-wise Recovery', 'Trial Balance', 'Balance Sheet', 'Profit & Loss Statement', 'Cash Flow', 'Pending DSR Sheet'],
         'HRM': ['New Employee', 'Record Attendance', 'New Payroll', 'Employees Ledger'],
-        'Master Setup': ['Branch Setup', 'Territory Setup', 'Rate List Setup', 'Tax Rates Setup', 'Tax Regimes Setup'],
+        'Master Setup': ['Branch Setup', 'Territory Setup', 'Rate List Setup', 'Tax Rates Setup', 'Tax Regimes Setup', 'Project Setup'],
         'System Setup': ['Company Profile', 'Admin Panel', 'Currency Setup', 'Software Info']
     };
 

@@ -60,11 +60,11 @@ try {
     $stmt = $pdo->prepare("
         INSERT INTO purchase_order (
             tenant_id, company_id, currency_id, bill_no, purchase_date, supplier_id, branch_id,
-            previous_balance, total_bill, total_discount_percent, 
+            project_id, previous_balance, total_bill, total_discount_percent, 
             total_discount_amount, total_gst_percent, total_gst_amount, 
             shipping_fees, net_amount, supplier_invoice_no, supplier_invoice_date, 
             bilty_no, transport_name, remarks, created_by, updated_by
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ");
     
     $stmt->execute([
@@ -75,6 +75,7 @@ try {
         $input['purchaseDate'],
         $input['supplierId'],
         $input['branchId'],
+        $input['projectId'] ?? null,
         extractBalanceAmount($input['previousBalance'] ?? '0.00'),
         $input['totalBill'],
         $input['totalDiscountPercent'] ?? 0.00,

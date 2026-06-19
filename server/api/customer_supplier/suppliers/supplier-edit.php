@@ -24,7 +24,7 @@ try {
             throw new Exception('Supplier ID is required');
         }
 
-        $stmt = $pdo->prepare("SELECT * FROM suppliers WHERE id = ? AND tenant_id = ?");
+        $stmt = $pdo->prepare("SELECT s.*, p.project_name, p.project_code, ci.city_name as project_city_name FROM suppliers s LEFT JOIN projects p ON p.id = s.project_id LEFT JOIN cities ci ON ci.id = p.city_id WHERE s.id = ? AND s.tenant_id = ?");
         $stmt->execute([$supplier_id, $tenant_id]);
         $supplier = $stmt->fetch(PDO::FETCH_ASSOC);
 
@@ -54,6 +54,7 @@ try {
         $sql = "UPDATE suppliers SET 
                 company_id = ?, 
                 salesman_id = ?, 
+                project_id = ?, 
                 supplier_name = ?, 
                 brand_name = ?, 
                 address = ?, 
@@ -73,6 +74,7 @@ try {
         $stmt->execute([
             !empty($input['companyId']) ? (int)$input['companyId'] : null,
             !empty($input['salesmanId']) ? trim($input['salesmanId']) : null,
+            !empty($input['projectId']) ? (int)$input['projectId'] : null,
             trim($input['supplierName']),
             !empty($input['brandName']) ? trim($input['brandName']) : null,
             !empty($input['address']) ? trim($input['address']) : null,

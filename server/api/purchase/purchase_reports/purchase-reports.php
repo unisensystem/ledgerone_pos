@@ -25,6 +25,8 @@ if (!$user_id || !$tenant_id) {
 $report_type = $_GET['type'] ?? 'item';
 $date_range = $_GET['date_range'] ?? 'last30';
 $company_id = $_GET['company_id'] ?? null;
+$project_id = $_GET['project_id'] ?? null;
+$supplier_id = $_GET['supplier_id'] ?? null;
 
 // Calculate date range
 $end_date = date('Y-m-d');
@@ -58,6 +60,8 @@ try {
     $summary = [];
     
     $company_filter = $company_id ? " AND pi.company_id = ?" : "";
+    $project_filter = $project_id ? " AND pi.project_id = ?" : "";
+    $supplier_filter = $supplier_id ? " AND pi.supplier_id = ?" : "";
     
     // Get summary statistics
     $stmt = $pdo->prepare("
@@ -69,10 +73,12 @@ try {
         FROM purchase_invoice_items pii
         JOIN purchase_invoice pi ON pii.purchase_invoice_id = pi.id
         JOIN products p ON pii.product_id = p.id
-        WHERE pi.tenant_id = ? AND pi.purchase_date BETWEEN ? AND ?{$company_filter}
+        WHERE pi.tenant_id = ? AND pi.purchase_date BETWEEN ? AND ?{$company_filter}{$project_filter}{$supplier_filter}
     ");
     $params = [$tenant_id, $start_date, $end_date];
     if ($company_id) $params[] = $company_id;
+    if ($project_id) $params[] = $project_id;
+    if ($supplier_id) $params[] = $supplier_id;
     $stmt->execute($params);
     $summary['item'] = $stmt->fetch(PDO::FETCH_ASSOC);
     
@@ -177,12 +183,14 @@ try {
                 JOIN products p ON pii.product_id = p.id
                 LEFT JOIN categories c ON p.category_id = c.id
                 JOIN suppliers s ON pi.supplier_id = s.id
-                WHERE pi.tenant_id = ? AND pi.purchase_date BETWEEN ? AND ?{$company_filter}
+                WHERE pi.tenant_id = ? AND pi.purchase_date BETWEEN ? AND ?{$company_filter}{$project_filter}{$supplier_filter}
                 GROUP BY p.id, p.code, p.name, c.category_name, s.supplier_name
                 ORDER BY total DESC
             ");
             $params = [$tenant_id, $start_date, $end_date];
             if ($company_id) $params[] = $company_id;
+            if ($project_id) $params[] = $project_id;
+            if ($supplier_id) $params[] = $supplier_id;
             $stmt->execute($params);
             $results = $stmt->fetchAll(PDO::FETCH_ASSOC);
             
@@ -244,12 +252,14 @@ try {
                 FROM purchase_invoice pi
                 JOIN suppliers s ON pi.supplier_id = s.id
                 LEFT JOIN purchase_invoice_items pii ON pi.id = pii.purchase_invoice_id
-                WHERE pi.tenant_id = ? AND pi.purchase_date BETWEEN ? AND ?{$company_filter}
+                WHERE pi.tenant_id = ? AND pi.purchase_date BETWEEN ? AND ?{$company_filter}{$project_filter}{$supplier_filter}
                 GROUP BY pi.id, pi.bill_no, pi.purchase_date, pi.net_amount, s.supplier_name
                 ORDER BY pi.purchase_date DESC
             ");
             $params = [$tenant_id, $start_date, $end_date];
             if ($company_id) $params[] = $company_id;
+            if ($project_id) $params[] = $project_id;
+            if ($supplier_id) $params[] = $supplier_id;
             $stmt->execute($params);
             $results = $stmt->fetchAll(PDO::FETCH_ASSOC);
             

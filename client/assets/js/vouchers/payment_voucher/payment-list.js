@@ -149,6 +149,22 @@ fetch('../../../../server/api/vouchers/payment_voucher/get-companies.php')
     })
     .catch(error => console.error('Error fetching companies:', error));
 
+// Fetch projects for filter
+fetch('../../../../server/api/master_setup/project_setup/get-projects-dropdown.php')
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            const projectFilter = document.getElementById('projectFilter');
+            data.data.forEach(p => {
+                const option = document.createElement('option');
+                option.value = p.id;
+                option.textContent = `${p.project_code} - ${p.project_name}`;
+                projectFilter.appendChild(option);
+            });
+        }
+    })
+    .catch(error => console.error('Error fetching projects:', error));
+
 // Fetch vouchers from API with pagination
 function fetchVouchers(page = 1) {
     let url = `../../../../server/api/vouchers/payment_voucher/payment-list.php?page=${page}&limit=${itemsPerPage}&payment_type=${currentPaymentType}`;
@@ -159,6 +175,7 @@ function fetchVouchers(page = 1) {
     const searchTerm = document.getElementById('searchInput').value;
     const statusFilter = document.getElementById('statusFilter').value;
     const companyFilter = document.getElementById('companyFilter').value;
+    const projectFilter = document.getElementById('projectFilter').value;
     
     if (dateFrom) url += `&date_from=${dateFrom}`;
     if (dateTo) url += `&date_to=${dateTo}`;
@@ -166,6 +183,7 @@ function fetchVouchers(page = 1) {
     if (statusFilter) url += `&status=${statusFilter}`;
     if (selectedSupplierCode) url += `&supplier_code=${selectedSupplierCode}`;
     if (companyFilter) url += `&company_id=${companyFilter}`;
+    if (projectFilter) url += `&project_id=${projectFilter}`;
     
     fetch(url)
         .then(response => response.json())
@@ -181,6 +199,7 @@ function fetchVouchers(page = 1) {
                     amount: parseFloat(voucher.amount),
                     currencySymbol: voucher.currency_symbol || '$',
                     paymentMethod: voucher.payment_method,
+                    projectName: voucher.project_name || '-',
                     companyId: voucher.company_id,
                     status: 'posted'
                 }));
@@ -243,6 +262,7 @@ function renderVouchers(vouchersToRender) {
                     <td>${formattedDate}</td>
                     <td>${voucher.supplier}</td>
                     <td>${voucher.billNo}</td>
+                    <td>${voucher.projectName}</td>
                     <td class="amount">${formattedAmount}</td>
                     <td>${voucher.paymentMethod}</td>
                     <td><span class="status ${statusClass}">${statusText}</span></td>
@@ -307,6 +327,7 @@ function resetFilters() {
     document.getElementById('supplierFilter').value = '';
     document.getElementById('statusFilter').value = '';
     document.getElementById('companyFilter').value = '';
+    document.getElementById('projectFilter').value = '';
     document.getElementById('searchInput').value = '';
     selectedSupplierCode = '';
     
@@ -491,6 +512,23 @@ function editVoucher(id) {
                         }
                     });
                 
+                // Fetch and populate projects
+                fetch('../../../../server/api/master_setup/project_setup/get-projects-dropdown.php')
+                    .then(r => r.json())
+                    .then(prData => {
+                        const prSelect = document.getElementById('editProject');
+                        prSelect.innerHTML = '<option value="">Select Project</option>';
+                        if (prData.success) {
+                            prData.data.forEach(p => {
+                                const option = document.createElement('option');
+                                option.value = p.id;
+                                option.textContent = `${p.project_code} - ${p.project_name}${p.city_name ? ' - ' + p.city_name : ''}`;
+                                if (p.id == voucher.project_id) option.selected = true;
+                                prSelect.appendChild(option);
+                            });
+                        }
+                    });
+
                 // Store voucher ID for saving
                 document.getElementById('editModal').dataset.voucherId = id;
                 document.getElementById('editModal').classList.add('show');
@@ -610,7 +648,8 @@ document.getElementById('saveEditBtn').addEventListener('click', function() {
         bank_account_id: document.getElementById('editBankAccount').value || null,
         cheque_no: document.getElementById('editChequeNo').value || null,
         cheque_date: document.getElementById('editChequeDate').value || null,
-        description: document.getElementById('editDescription').value || null
+        description: document.getElementById('editDescription').value || null,
+        project_id: document.getElementById('editProject').value || null
     };
     
     // Disable button to prevent double submission

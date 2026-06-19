@@ -7,6 +7,7 @@ let paymentMethods = [];
 let bankAccounts = [];
 let companies = [];
 let currencies = [];
+let projects = [];
 let userPermissions = { can_edit: false, can_delete: false };
 
 // Check permissions
@@ -51,12 +52,20 @@ fetch('../../../../server/api/vouchers/receive_voucher/get-companies.php')
         }
     });
 
-// Fetch currencies
-fetch('../../../../server/api/vouchers/receive_voucher/get-currencies.php')
+// Fetch projects for filter
+fetch('../../../../server/api/master_setup/project_setup/get-projects-dropdown.php')
     .then(response => response.json())
     .then(data => {
-        if (data.success) {
-            currencies = data.data;
+        if (data.success && Array.isArray(data.data)) {
+            projects = data.data;
+            const projectFilter = document.getElementById('projectFilter');
+            projects.forEach(project => {
+                const option = document.createElement('option');
+                option.value = project.id;
+                const cityName = project.city_name || 'N/A';
+                option.textContent = `${project.project_code} - ${project.project_name} - ${cityName}`;
+                projectFilter.appendChild(option);
+            });
         }
     });
 
@@ -80,6 +89,9 @@ function fetchVouchers(page = 1) {
     if (companyFilter) url += `&company_id=${companyFilter}`;
     if (searchTerm) url += `&search=${encodeURIComponent(searchTerm)}`;
     
+    const projectFilter = document.getElementById('projectFilter').value;
+    if (projectFilter) url += `&project_id=${projectFilter}`;
+    
     fetch(url)
         .then(response => response.json())
         .then(data => {
@@ -99,7 +111,8 @@ function fetchVouchers(page = 1) {
                     chequeDate: voucher.cheque_date,
                     chequeNo: voucher.cheque_no,
                     recoveryOfficer: voucher.recovery_officer,
-                    companyId: voucher.company_id,
+                    projectCode: voucher.project_code,
+                    projectName: voucher.project_name,
                     status: 'posted'
                 }));
                 
@@ -237,19 +250,20 @@ function renderVouchers(vouchersToRender) {
                     <td>${formattedDate}</td>
                     <td>${voucher.customer}</td>
                     <td>${voucher.billNo}</td>
+                    <td>${voucher.projectCode ? `${voucher.projectCode} - ${voucher.projectName}` : 'N/A'}</td>
                     <td class="amount">${formattedAmount}</td>
                     <td>${voucher.paymentMethod}</td>
                     <td>${voucher.recoveryOfficer || 'N/A'}</td>
                     <td><span class="status ${statusClass}">${statusText}</span></td>
                     <td>
                         <div class="actions">
-                            ${userPermissions.can_edit ? `<button class="action-btn edit" title="Edit" data-id="${voucher.id}">
+                            ${userPermissions.can_edit ? `<button class="action-btn edit" title="Edit" data-id="${voucher.id}" onclick="editVoucher(${voucher.id}); return false;">
                                 <i class="fas fa-edit"></i>
                             </button>` : ''}
-                            <button class="action-btn print" title="Print" data-id="${voucher.id}">
+                            <button class="action-btn print" title="Print" data-id="${voucher.id}" onclick="printVoucher(${voucher.id}); return false;">
                                 <i class="fas fa-print"></i>
                             </button>
-                            ${userPermissions.can_delete ? `<button class="action-btn delete" title="Delete" data-id="${voucher.id}">
+                            ${userPermissions.can_delete ? `<button class="action-btn delete" title="Delete" data-id="${voucher.id}" onclick="deleteVoucher(${voucher.id}); return false;">
                                 <i class="fas fa-trash"></i>
                             </button>` : ''}
                         </div>
@@ -257,28 +271,6 @@ function renderVouchers(vouchersToRender) {
                 `;
 
         tableBody.appendChild(row);
-    });
-
-    // Add event listeners to action buttons
-    document.querySelectorAll('.action-btn.edit').forEach(btn => {
-        btn.addEventListener('click', function () {
-            const id = this.getAttribute('data-id');
-            editVoucher(id);
-        });
-    });
-
-    document.querySelectorAll('.action-btn.print').forEach(btn => {
-        btn.addEventListener('click', function () {
-            const id = this.getAttribute('data-id');
-            printVoucher(id);
-        });
-    });
-
-    document.querySelectorAll('.action-btn.delete').forEach(btn => {
-        btn.addEventListener('click', function () {
-            const id = this.getAttribute('data-id');
-            deleteVoucher(id);
-        });
     });
 }
 
@@ -303,6 +295,7 @@ function resetFilters() {
     document.getElementById('recoveryOfficerFilter').value = '';
     document.getElementById('statusFilter').value = '';
     document.getElementById('companyFilter').value = '';
+    document.getElementById('projectFilter').value = '';
     document.getElementById('searchInput').value = '';
     
     fetchVouchers(1);
@@ -365,6 +358,10 @@ function printVoucher(id) {
 }
 
 function editVoucher(id) {
+    loadEditVoucher(id);
+}
+
+function loadEditVoucher(id) {
     // Fetch voucher details from API
     fetch(`../../../../server/api/vouchers/receive_voucher/receive-get.php?id=${id}`)
         .then(response => response.json())
@@ -426,6 +423,22 @@ function editVoucher(id) {
                     bankAccountSelect.appendChild(option);
                 });
                 
+                // Populate projects
+                const projectSelect = document.getElementById('editProject');
+                projectSelect.innerHTML = '<option value="">Select Project</option>';
+                if (projects && projects.length > 0) {
+                    projects.forEach(project => {
+                        const option = document.createElement('option');
+                        option.value = project.id;
+                        const cityName = project.city_name || 'N/A';
+                        option.textContent = `${project.project_code} - ${project.project_name} - ${cityName}`;
+                        if (project.id == voucher.project_id) {
+                            option.selected = true;
+                        }
+                        projectSelect.appendChild(option);
+                    });
+                }
+                
                 // Handle visibility based on payment method
                 handleEditPaymentMethodChange(voucher.payment_method_id);
                 
@@ -442,7 +455,7 @@ function editVoucher(id) {
             }
         })
         .catch(error => {
-            console.error('Error:', error);
+            console.error('Fetch error:', error);
             alert('Network error occurred');
         });
 }
@@ -543,6 +556,7 @@ document.getElementById('saveEditBtn').addEventListener('click', function() {
         bill_no: document.getElementById('editBillNo').value || null,
         amount: amount,
         currency_id: currencyId,
+        project_id: document.getElementById('editProject').value || null,
         payment_method_id: paymentMethodId,
         bank_account_id: document.getElementById('editBankAccount').value || null,
         cheque_date: document.getElementById('editChequeDate').value || null,

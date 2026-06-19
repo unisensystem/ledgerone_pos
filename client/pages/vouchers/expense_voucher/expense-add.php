@@ -118,6 +118,13 @@ $currency_symbol = $currency['symbol'] ?? '$';
                     <div class="error-text" id="companyError">Company is required</div>
                 </div>
 
+                <div class="form-group">
+                    <label for="project">Project</label>
+                    <select id="project">
+                        <option value="">Select Project</option>
+                    </select>
+                </div>
+
                 <div class="form-group full-width">
                     <label for="description" class="required">Description</label>
                     <textarea id="description" placeholder="Enter a brief description of this expense entry"></textarea>

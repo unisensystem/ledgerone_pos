@@ -24,6 +24,7 @@ $start_date = $_GET['start_date'] ?? null;
 $end_date = $_GET['end_date'] ?? null;
 $branch_id = $_GET['branch_id'] ?? null;
 $company_id = !empty($_GET['company_id']) ? $_GET['company_id'] : null;
+$project_id = !empty($_GET['project_id']) ? $_GET['project_id'] : null;
 $target_currency_id = $_GET['currency_id'] ?? null;
 
 if (!$start_date || !$end_date) {
@@ -52,6 +53,14 @@ try {
     if ($branch_id && $branch_id !== 'all') {
         $branch_condition = ' AND (b.id = ? OR b.parent_branch_id = ?)';
         $branch_params = [$branch_id, $branch_id];
+    }
+    
+    // Build project condition
+    $project_sql_sale = '';
+    $project_sql_purchase = '';
+    if ($project_id) {
+        $project_sql_sale = ' AND si.project_id = ?';
+        $project_sql_purchase = ' AND pi.project_id = ?';
     }
 
     // Get Sales Revenue from station_daily_usage (fuel products)
@@ -88,11 +97,13 @@ try {
         AND p.product_type = 'physical'
         $branch_condition
         " . ($company_id ? " AND si.company_id = ?" : "") . "
+        $project_sql_sale
         ORDER BY p.name
     ";
     $stmt = $pdo->prepare($sql);
     $params = array_merge([$tenant_id, $start_date, $end_date], $branch_params);
     if ($company_id) $params[] = $company_id;
+    if ($project_id) $params[] = $project_id;
     $stmt->execute($params);
     $other_sales_raw = $stmt->fetchAll(PDO::FETCH_ASSOC);
     
@@ -131,11 +142,13 @@ try {
         AND p.product_type = 'service'
         $branch_condition
         " . ($company_id ? " AND si.company_id = ?" : "") . "
+        $project_sql_sale
         ORDER BY p.name
     ";
     $stmt = $pdo->prepare($sql);
     $params = array_merge([$tenant_id, $start_date, $end_date], $branch_params);
     if ($company_id) $params[] = $company_id;
+    if ($project_id) $params[] = $project_id;
     $stmt->execute($params);
     $service_revenue_raw = $stmt->fetchAll(PDO::FETCH_ASSOC);
     
@@ -218,11 +231,13 @@ try {
         AND p.product_type = 'physical'
         $branch_condition
         " . ($company_id ? " AND si.company_id = ?" : "") . "
+        $project_sql_sale
         GROUP BY p.id, p.name
     ";
     $stmt = $pdo->prepare($sql);
     $params = array_merge([$tenant_id, $start_date, $end_date], $branch_params);
     if ($company_id) $params[] = $company_id;
+    if ($project_id) $params[] = $project_id;
     $stmt->execute($params);
     $other_sold = $stmt->fetchAll(PDO::FETCH_ASSOC);
     
@@ -244,9 +259,11 @@ try {
             AND pi.tenant_id = ?
             AND pi.purchase_date <= ?
             " . ($company_id ? " AND pi.company_id = ?" : "") . "
+            $project_sql_purchase
         ");
         $params_cogs = [$item['id'], $tenant_id, $end_date];
         if ($company_id) $params_cogs[] = $company_id;
+        if ($project_id) $params_cogs[] = $project_id;
         $stmt->execute($params_cogs);
         $purchase_data = $stmt->fetchAll(PDO::FETCH_ASSOC);
         

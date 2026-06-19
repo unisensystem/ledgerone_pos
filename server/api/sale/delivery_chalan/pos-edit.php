@@ -48,7 +48,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
             LEFT JOIN ledgerone_public.currencies cur ON dc.currency_id = cur.id
             LEFT JOIN employees  e   ON dc.sale_officer_id = e.id
             LEFT JOIN employees  sm  ON dc.supplier_man_id = sm.id
-            LEFT JOIN sale_invoice si ON dc.sale_invoice_id = si.id
+            LEFT JOIN projects   pr  ON dc.project_id         = pr.id
             WHERE dc.id = ? AND dc.tenant_id = ?
         ");
         $stmt->execute([$id, $tenant_id]);
@@ -131,6 +131,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
                 company_id      = ?,
                 branch_id       = ?,
                 currency_id     = ?,
+                project_id      = ?,
                 sale_officer_id = ?,
                 supplier_man_id = ?,
                 bilty_no        = ?,
@@ -146,6 +147,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
             $input['companyId']      ?? null,
             $input['branchId'],
             $input['currencyId']     ?? null,
+            $input['projectId']      ?? null,
             $input['salesOfficerId'] ?? null,
             $input['supplierManId']  ?? null,
             $input['biltyNo']        ?? null,
