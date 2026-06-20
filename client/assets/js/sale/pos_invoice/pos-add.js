@@ -59,20 +59,30 @@ document.addEventListener('DOMContentLoaded', function () {
         .then(response => {
             if (response.status === 403) {
                 window.location.href = '../../../../../errors/403.php';
-                return;
+                return null;
+            }
+            if (!response.ok) {
+                return null;
             }
             return response.json();
         })
         .then(data => {
-            if (!data) return;
+            if (!data) {
+                initializePage([]);
+                return;
+            }
             if (data.success) {
-                // Check if user has at least Add or Edit permission
                 if (!data.permissions.includes('Add') && !data.permissions.includes('Edit')) {
                     window.location.href = '../../../../../errors/403.php';
                     return;
                 }
                 initializePage(data.permissions);
+            } else {
+                initializePage([]);
             }
+        })
+        .catch(() => {
+            initializePage([]);
         });
 });
 
