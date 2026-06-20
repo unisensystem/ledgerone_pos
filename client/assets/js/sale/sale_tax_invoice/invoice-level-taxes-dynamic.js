@@ -174,18 +174,18 @@ function calculateInvoiceLevelTaxes() {
         if (!isTaxInclusive) totalExclusiveTax += taxAmount;
     });
 
-    // Net receivable = net_amount + all exclusive taxes (inclusive taxes are already inside net_amount)
+    // Net receivable = net_amount + exclusive taxes (callers may override this with withholding adjustments)
     const netReceivableEl = document.getElementById('netReceivable');
     if (netReceivableEl) {
         const baseNetAmount = window.currentNetAmount
-            || parseFloat(document.getElementById('netAmount')?.textContent)
-            || 0;
+            ?? parseFloat(document.getElementById('netAmount')?.textContent)
+            ?? 0;
         const netReceivable = baseNetAmount + totalExclusiveTax;
         netReceivableEl.textContent = netReceivable.toFixed(2);
         console.log('Net Receivable updated:', netReceivable);
     }
 
-    return totalInvoiceTax;
+    return totalExclusiveTax;
 }
 
 /**

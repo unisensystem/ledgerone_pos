@@ -366,19 +366,31 @@ function updateInvoiceSummaryDynamic() {
     
     document.getElementById('totalBill').textContent = totalBill.toFixed(2);
     document.getElementById('netAmount').textContent = netAmount.toFixed(2);
-    
+
+    // Expose totals for invoice-level tax base resolution
+    window.currentTotalBill = totalBill;
+    window.currentValueExclSalesTax = totalBill - finalDiscount;
+    window.currentNetAmount = netAmount;
+
     // Update withholding tax
     const withholdingTaxPercent = parseFloat(document.getElementById('withholdingTaxPercent')?.value) || 0;
     const withholdingTaxAmount = netAmount * (withholdingTaxPercent / 100);
-    const netReceivable = netAmount - withholdingTaxAmount;
-    
+    let netReceivable = netAmount - withholdingTaxAmount;
+
     if (document.getElementById('withholdingTaxAmount')) {
         document.getElementById('withholdingTaxAmount').textContent = withholdingTaxAmount.toFixed(2);
     }
+
+    // Apply invoice-level taxes (updates netReceivable element and returns exclusive tax total)
+    if (typeof calculateInvoiceLevelTaxes === 'function') {
+        const exclusiveTax = calculateInvoiceLevelTaxes() || 0;
+        netReceivable = netAmount - withholdingTaxAmount + exclusiveTax;
+    }
+
     if (document.getElementById('netReceivable')) {
         document.getElementById('netReceivable').textContent = netReceivable.toFixed(2);
     }
-    
+
     // Update remaining balance
     const amountPaid = parseFloat(document.getElementById('amountPaid')?.value) || 0;
     const remainingBalance = netReceivable - amountPaid;
