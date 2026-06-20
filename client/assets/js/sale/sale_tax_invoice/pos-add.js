@@ -2892,20 +2892,36 @@ function initializePage(permissions) {
             if (!this.value || this.value == '0') {
                 totalDiscountAmount.value = '0.00';
             }
-            updateInvoiceSummary();
+            if (typeof updateInvoiceSummaryDynamic === 'function') {
+                updateInvoiceSummaryDynamic();
+            } else {
+                updateInvoiceSummary();
+            }
         });
     }
 
     // Add event listener for total discount amount
     const totalDiscountAmount = document.getElementById('totalDiscountAmount');
     if (totalDiscountAmount) {
-        totalDiscountAmount.addEventListener('input', updateInvoiceSummaryFromAmount);
+        totalDiscountAmount.addEventListener('input', function() {
+            if (typeof updateInvoiceSummaryDynamic === 'function') {
+                updateInvoiceSummaryDynamic();
+            } else {
+                updateInvoiceSummaryFromAmount();
+            }
+        });
     }
 
     // Add event listener for total GST percent
     const totalGstPercent = document.getElementById('totalGstPercent');
     if (totalGstPercent) {
-        totalGstPercent.addEventListener('input', updateInvoiceSummary);
+        totalGstPercent.addEventListener('input', function() {
+            if (typeof updateInvoiceSummaryDynamic === 'function') {
+                updateInvoiceSummaryDynamic();
+            } else {
+                updateInvoiceSummary();
+            }
+        });
     }
 
     // Add event listener for total GST amount
@@ -2917,13 +2933,25 @@ function initializePage(permissions) {
     // Add event listener for shipping fees
     const shippingFees = document.getElementById('shippingFees');
     if (shippingFees) {
-        shippingFees.addEventListener('input', updateInvoiceSummary);
+        shippingFees.addEventListener('input', function() {
+            if (typeof updateInvoiceSummaryDynamic === 'function') {
+                updateInvoiceSummaryDynamic();
+            } else {
+                updateInvoiceSummary();
+            }
+        });
     }
 
     // Add event listener for withholding tax percent
     const withholdingTaxPercentEl = document.getElementById('withholdingTaxPercent');
     if (withholdingTaxPercentEl) {
-        withholdingTaxPercentEl.addEventListener('input', updateInvoiceSummary);
+        withholdingTaxPercentEl.addEventListener('input', function() {
+            if (typeof updateInvoiceSummaryDynamic === 'function') {
+                updateInvoiceSummaryDynamic();
+            } else {
+                updateInvoiceSummary();
+            }
+        });
     }
 
     // Invoice Type: show/hide Due Date and auto-fill Amount Paid for Cash
