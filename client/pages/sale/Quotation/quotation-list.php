@@ -792,6 +792,7 @@ function renderTable(rows) {
           <button class="ab ab-view"    onclick="doView(${r.id})"><i class="fas fa-eye"></i> View</button>
           <button class="ab ab-edit"    onclick="doEdit(${r.id})" ${isConverted?'disabled':''} title="${isConverted?'Cannot edit a converted quotation':'Edit'}"><i class="fas fa-edit"></i> Edit</button>
           <button class="ab ab-print"   onclick="doPrint(${r.id})"><i class="fas fa-print"></i> Print</button>
+          <button class="ab ab-print"   onclick="doPrint2(${r.id})" style="background:#7c3aed"><i class="fas fa-print"></i> Print 2</button>
           <button class="ab ab-convert" onclick="openConvertModal(${r.id})" ${cantConvert?'disabled':''} title="${isConverted?'Already converted':isRejected?'Cannot convert rejected quotation':'Convert to Sale Order'}">
             <i class="fas fa-exchange-alt"></i> ${isConverted?'Converted':'Convert SO'}
           </button>
@@ -837,9 +838,10 @@ function goPage(p) {
 }
 
 // ── ACTION: VIEW / EDIT / PRINT ───────────────────────────
-function doView(id)  { location.href=`quotation-view.php?id=${id}`; }
-function doEdit(id)  { location.href=`quotation-edit.php?id=${id}`; }
-function doPrint(id) { window.open(`quotation-print.php?id=${id}`,'_blank'); }
+function doView(id)   { location.href=`quotation-view.php?id=${id}`; }
+function doEdit(id)   { location.href=`quotation-edit.php?id=${id}`; }
+function doPrint(id)  { window.open(`quotation-print.php?id=${id}`,'_blank'); }
+function doPrint2(id) { window.open(`quotation-print-v2.php?id=${id}`,'_blank'); }
 
 // ── ACTION: CONVERT TO SO ─────────────────────────────────
 let pendingConvertData = null;

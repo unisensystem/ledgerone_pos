@@ -190,8 +190,9 @@
             <thead>
                 <tr>
                     <th width="5%">#</th>
-                    <th width="30%">Product</th>
-                    <th width="15%">Quantities</th>
+                    <th width="25%">Product</th>
+                    <th width="7%" id="printSizeHeader">Size</th>
+                    <th width="13%">Quantities</th>
                     <th width="10%" class="text-right">Trade Price</th>
                     <th width="10%" class="text-right">Gross Amt</th>
                     <th width="7%" class="text-right">Disc %</th>
@@ -299,6 +300,7 @@
         // Apply invoice settings to hide/show columns
         applyInvoiceSettings();
         function applyInvoiceSettings() {
+            const enableSize = localStorage.getItem('enableSize') === 'true';
             const enableInlineCashDiscount = localStorage.getItem('enableInlineCashDiscount') === 'true';
             const enableInlineCashDiscountAmount = localStorage.getItem('enableInlineCashDiscountAmount') === 'true';
             const enableTradeOffer = localStorage.getItem('enableTradeOffer') === 'true';
@@ -309,15 +311,16 @@
             const enableInvoiceCashDiscountAmount = localStorage.getItem('enableInvoiceCashDiscountAmount') === 'true';
             const enableShippingFees = localStorage.getItem('enableShippingFees') === 'true';
             
-            // Hide/show table headers
+            // Hide/show table headers (0=#, 1=Product, 2=Size, 3=Quantities, 4=TradePrice, 5=GrossAmt, 6=Disc%, 7=DiscAmt, 8=TO%, 9=TOAmt, 10=Tax%, 11=TaxAmt, 12=FOC, 13=NetAmt)
             const headers = document.querySelectorAll('.items-table thead th');
-            headers[5].style.display = enableInlineCashDiscount ? '' : 'none'; // Disc %
-            headers[6].style.display = enableInlineCashDiscountAmount ? '' : 'none'; // Disc Amt
-            headers[7].style.display = enableTradeOffer ? '' : 'none'; // TO %
-            headers[8].style.display = enableTradeOfferAmount ? '' : 'none'; // TO Amt
-            headers[9].style.display = enableTaxation ? '' : 'none'; // GST %
-            headers[10].style.display = enableTaxation ? '' : 'none'; // GST Amt
-            headers[11].style.display = enableFOC ? '' : 'none'; // FOC Qty
+            headers[2].style.display = enableSize ? '' : 'none'; // Size
+            headers[6].style.display = enableInlineCashDiscount ? '' : 'none'; // Disc %
+            headers[7].style.display = enableInlineCashDiscountAmount ? '' : 'none'; // Disc Amt
+            headers[8].style.display = enableTradeOffer ? '' : 'none'; // TO %
+            headers[9].style.display = enableTradeOfferAmount ? '' : 'none'; // TO Amt
+            headers[10].style.display = enableTaxation ? '' : 'none'; // GST %
+            headers[11].style.display = enableTaxation ? '' : 'none'; // GST Amt
+            headers[12].style.display = enableFOC ? '' : 'none'; // FOC Qty
             
             // Hide/show footer cells
             const footerCells = document.querySelectorAll('.items-table tfoot th');
@@ -407,6 +410,7 @@
             
             let totalUnitPrice = 0, totalGrossAmount = 0, totalDiscountAmountItems = 0, totalTradeOfferAmountItems = 0, totalGSTAmountItems = 0, totalFOCQty = 0, totalNetAmountItems = 0;
             
+            const enableSize = localStorage.getItem('enableSize') === 'true';
             const enableInlineCashDiscount = localStorage.getItem('enableInlineCashDiscount') === 'true';
             const enableInlineCashDiscountAmount = localStorage.getItem('enableInlineCashDiscountAmount') === 'true';
             const enableTradeOffer = localStorage.getItem('enableTradeOffer') === 'true';
@@ -439,6 +443,7 @@
                 row.innerHTML = `
                     <td class="text-center">${index + 1}</td>
                     <td>${item.product_name}</td>
+                    <td style="display: ${enableSize ? '' : 'none'}">${item.size || '-'}</td>
                     <td>${unitQtyDisplay || '-'}</td>
                     <td class="text-right">${currencySymbol} ${parseFloat(item.purchase_price).toFixed(2)}</td>
                     <td class="text-right">${currencySymbol} ${parseFloat(item.gross_amount).toFixed(2)}</td>

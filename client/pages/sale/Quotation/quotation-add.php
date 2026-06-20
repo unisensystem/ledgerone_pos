@@ -72,10 +72,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_GET['action'])) {
 
             $si = $pdo->prepare("INSERT INTO quotation_items
                 (quotation_id, tenant_id, sort_order, product_id, item_code, item_name,
-                 description, pack_type, quantity, qty_unit_id, unit_id,
+                 description, size, pack_type, quantity, qty_unit_id, unit_id,
                  rate, excl_tax, sales_tax_pct, sales_tax_amt,
                  further_tax_pct, further_tax_amt, incl_tax, line_total)
-                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)");
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)");
             foreach ($input['items'] as $i => $it) {
                 $si->execute([
                     $qid, $tid, $i + 1,
@@ -83,6 +83,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_GET['action'])) {
                     $it['item_code']   ?? null,
                     $it['item_name']   ?? '',
                     $it['description'] ?? null,
+                    $it['size']        ?? null,
                     $it['pack_type']   ?? 'Qty',
                     (float)($it['quantity']        ?? 1),
                     !empty($it['qty_unit_id']) ? (int)$it['qty_unit_id'] : null,
@@ -511,6 +512,7 @@ TAX: Exclusive of all Tax</textarea>
           <tr>
             <th style="width:260px">Item (Code | Name)</th>
             <th style="width:140px">Description</th>
+            <th style="width:100px">Size</th>
             <th style="width:80px">Qty</th>
             <th style="width:90px">Sale Unit</th>
             <th style="width:82px">Rate</th>
@@ -1001,6 +1003,7 @@ function addRow() {
       </div>
     </td>
     <td><input class="ti" id="desc-${id}" type="text" placeholder="Description"/></td>
+    <td><input class="ti" id="size-${id}" type="text" placeholder="Size"/></td>
     <td>
       <input class="ti" id="qty-${id}" type="number" value="1" min="0" step="any" oninput="calcRow(${id})" style="text-align:right"/>
     </td>
@@ -1099,6 +1102,7 @@ async function saveQuotation() {
       item_code:       prod?.code  || '',
       item_name:       prod?.name  || display,
       description:     document.getElementById(`desc-${rid}`)?.value || '',
+      size:            document.getElementById(`size-${rid}`)?.value || '',
       quantity:        qty,
       unit_id:         document.getElementById(`unit-${rid}`)?.value || null,
       rate,

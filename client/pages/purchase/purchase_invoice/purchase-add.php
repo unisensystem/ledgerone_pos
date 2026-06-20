@@ -155,7 +155,8 @@ if (!$user_id) {
                         <thead>
                             <tr>
                                 <th width="4%">S#</th>
-                                <th width="20%">Product Code / Name</th>
+                                    <th width="20%">Product Code / Name</th>
+                                <th width="8%" data-col="size">Size</th>
                                 <!-- Dynamic unit columns will be inserted here -->
                                 <th width="8%"><span id="purchasePriceLabel">Trade Price (TP)</span></th>
                                 <th width="8%"><span id="grossAmountLabel">Gross Amount</span></th>
@@ -176,6 +177,7 @@ if (!$user_id) {
                         <tfoot>
                             <tr class="totals-row">
                                 <th colspan="2">Totals</th>
+                                <th data-col="size"></th>
                                 <!-- Dynamic unit totals will be inserted here -->
                                 <th id="totalPurchasePrice">0.00</th>
                                 <th id="totalGrossAmount">0.00</th>
@@ -274,6 +276,11 @@ if (!$user_id) {
     <div class="modal" id="settingsModal">
         <div class="modal-content">
             <h3 class="modal-title">Invoice Settings</h3>
+            <div class="form-group">
+                <label>
+                    <input type="checkbox" id="enableSize"> Enable Size Column
+                </label>
+            </div>
             <div class="form-group">
                 <label>
                     <input type="checkbox" id="enableTradeOffer"> Enable Inline Trade Offer Discount %

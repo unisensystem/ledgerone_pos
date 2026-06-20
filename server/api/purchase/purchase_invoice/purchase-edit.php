@@ -156,6 +156,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
                         'tax_amount' => $totalGst,
                         'foc_quantity' => $totalFoc,
                         'net_amount' => $totalNet,
+                        'size' => $firstItem['size'] ?? '',
                         'unit_entries' => array_values($uomMap)
                     ];
                 }
@@ -238,9 +239,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
                 tenant_id, purchase_invoice_id, product_id, uom_id,
                 quantity, purchase_price, gross_amount, discount_percent,
                 discount_amount, trade_offer_percent, trade_offer_amount,
-                tax_percent, tax_amount, foc_quantity, net_amount,
+                tax_percent, tax_amount, foc_quantity, net_amount, size,
                 created_by, updated_by
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ");
         
         foreach ($input['items'] as $item) {
@@ -262,6 +263,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
                     $isFirstEntry ? $item['taxAmount'] : 0,
                     $item['focQty'] ?? 0,
                     $isFirstEntry ? $item['netAmount'] : 0,
+                    $item['size'] ?? null,
                     $user_id,
                     $user_id
                 ]);

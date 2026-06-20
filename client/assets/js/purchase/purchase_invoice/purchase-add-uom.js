@@ -37,19 +37,22 @@ function getProductUOMDetails(product) {
 // Update table headers based on max units
 function updateTableHeaders() {
     const headerRow = document.querySelector('#itemsTable thead tr');
-    const productHeader = headerRow.cells[1]; // Product Code / Name column
     
     // Clear existing dynamic headers
     const existingHeaders = headerRow.querySelectorAll('.unit-header');
     existingHeaders.forEach(header => header.remove());
 
-    // Add unit headers after product column (in reverse order for correct display)
+    // Insert after Size column (data-col="size") if present, else after product column (cell[1])
+    const sizeHeader = headerRow.querySelector('[data-col="size"]');
+    const insertAfter = sizeHeader || headerRow.cells[1];
+
+    // Add unit headers after size column (in reverse order for correct display)
     for (let i = maxUnitColumns - 1; i >= 0; i--) {
         const th = document.createElement('th');
         th.width = '8%';
         th.className = 'unit-header';
         th.textContent = `Unit ${i + 1}`;
-        productHeader.insertAdjacentElement('afterend', th);
+        insertAfter.insertAdjacentElement('afterend', th);
     }
 }
 
@@ -78,12 +81,14 @@ function updateFooterTotals() {
         });
     }
 
-    // Add total cells after "Totals" label (in reverse order for correct display)
+    // Add total cells after size column footer (in reverse order for correct display)
+    const sizeFooterCell = footerRow.querySelector('[data-col="size"]');
+    const insertTotalAfter = sizeFooterCell || totalsLabel;
     for (let i = maxUnitColumns - 1; i >= 0; i--) {
         const th = document.createElement('th');
         th.className = 'unit-total';
         th.textContent = unitTotals[i].toFixed(2);
-        totalsLabel.insertAdjacentElement('afterend', th);
+        insertTotalAfter.insertAdjacentElement('afterend', th);
     }
     
     // Update other totals
