@@ -226,7 +226,7 @@ function renderPermissionsTree(permissions) {
         'Banking': ['New Bank', 'Post Dated Cheques (PDCs)'],
         'Rent Management': ['Issue Rent', 'Rent List'],
         'Chart of Accounts': [],
-        'Financial Reports': ['General Ledger', 'Customer Ledger', 'Supplier Ledger', 'Customer Aging', 'Supplier Aging', 'Recovery Sheet', 'Sales Officer-wise Recovery', 'Trial Balance', 'Balance Sheet', 'Profit & Loss Statement', 'Cash Flow', 'Financial Summary', 'Pending DSR Sheet'],
+        'Financial Reports': ['General Ledger', 'Customer Ledger', 'Supplier Ledger', 'Customer Aging', 'Supplier Aging', 'Recovery Sheet', 'Sales Officer-wise Recovery', 'Trial Balance', 'Balance Sheet', 'Profit & Loss Statement', 'Cash Flow', 'Financial Summary', 'Pending DSR Sheet', 'Project Tracking'],
         'HRM': ['New Employee', 'Record Attendance', 'New Payroll', 'Employees Ledger'],
         'Master Setup': ['Branch Setup', 'Territory Setup', 'Rate List Setup', 'Tax Rates Setup', 'Tax Regimes Setup', 'Project Setup'],
         'System Setup': ['Company Profile', 'Admin Panel', 'Currency Setup', 'Software Info']
@@ -680,7 +680,7 @@ function openAddPermissionModal() {
         'Banking': ['New Bank', 'Post Dated Cheques (PDCs)'],
         'Rent Management': ['Issue Rent', 'Rent List'],
         'Chart of Accounts': [],
-        'Financial Reports': ['General Ledger', 'Customer Ledger', 'Supplier Ledger', 'Customer Aging', 'Supplier Aging', 'Recovery Sheet', 'Sales Officer-wise Recovery', 'Trial Balance', 'Balance Sheet', 'Profit & Loss Statement', 'Cash Flow', 'Pending DSR Sheet'],
+        'Financial Reports': ['General Ledger', 'Customer Ledger', 'Supplier Ledger', 'Customer Aging', 'Supplier Aging', 'Recovery Sheet', 'Sales Officer-wise Recovery', 'Trial Balance', 'Balance Sheet', 'Profit & Loss Statement', 'Cash Flow', 'Pending DSR Sheet', 'Project Tracking'],
         'HRM': ['New Employee', 'Record Attendance', 'New Payroll', 'Employees Ledger'],
         'Master Setup': ['Branch Setup', 'Territory Setup', 'Rate List Setup', 'Tax Rates Setup', 'Tax Regimes Setup', 'Project Setup'],
         'System Setup': ['Company Profile', 'Admin Panel', 'Currency Setup', 'Software Info']

@@ -59,11 +59,11 @@ function loadProjects() {
     fetch('../../../../server/api/master_setup/project_setup/get-projects-dropdown.php')
         .then(response => response.json())
         .then(data => {
-            if (data.success) {
-                bulkProjects = data.data;
+            if (data.success && Array.isArray(data.projects)) {
+                bulkProjects = data.projects;
                 const projectSelect = document.getElementById('project');
                 projectSelect.innerHTML = '<option value="">Select Project</option>';
-                data.data.forEach(p => {
+                data.projects.forEach(p => {
                     const opt = document.createElement('option');
                     opt.value = p.id;
                     opt.textContent = `${p.project_code} - ${p.project_name}${p.city_name ? ' - ' + p.city_name : ''}`;

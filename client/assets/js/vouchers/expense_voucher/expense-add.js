@@ -44,10 +44,10 @@ async function fetchDropdownData() {
                 }
             });
         }
-        if (projectData.success) {
-            projects = projectData.data;
+        if (projectData.success && Array.isArray(projectData.projects)) {
+            projects = projectData.projects;
             const projectSelect = document.getElementById('project');
-            projectData.data.forEach(p => {
+            projectData.projects.forEach(p => {
                 const option = document.createElement('option');
                 option.value = p.id;
                 option.textContent = `${p.project_code} - ${p.project_name}${p.city_name ? ' - ' + p.city_name : ''}`;

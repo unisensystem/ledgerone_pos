@@ -28,13 +28,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_GET['action'])) {
             $tid = (int)$GLOBALS['tenant_id'];
             $uid = (int)$GLOBALS['user_id'];
 
-            $st = $pdo->prepare("SELECT quotation_number FROM quotations
-                                  WHERE tenant_id=? AND is_deleted=0
-                                  ORDER BY id DESC LIMIT 1");
+            $st = $pdo->prepare("SELECT MAX(CAST(SUBSTRING(quotation_number, 5) AS UNSIGNED))
+                                  FROM quotations WHERE tenant_id=?");
             $st->execute([$tid]);
-            $last = $st->fetchColumn();
-            $num  = $last ? ((int)substr($last, 4)) + 1 : 1;
-            $qno  = 'QTN-' . str_pad($num, 4, '0', STR_PAD_LEFT);
+            $maxNum = (int)$st->fetchColumn();
+            $qno    = 'QTN-' . str_pad($maxNum + 1, 4, '0', STR_PAD_LEFT);
 
             $subtotal = $total_st = $total_ft = 0;
             foreach ($input['items'] as $item) {
@@ -165,12 +163,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_GET['action'])) {
 
         // ── 9. NEXT QTN NUMBER ────────────────────────────────
         if ($action === 'next_number') {
-            $st = $pdo->prepare("SELECT quotation_number FROM quotations
-                                  WHERE tenant_id=? AND is_deleted=0 ORDER BY id DESC LIMIT 1");
+            $st = $pdo->prepare("SELECT MAX(CAST(SUBSTRING(quotation_number, 5) AS UNSIGNED))
+                                  FROM quotations WHERE tenant_id=?");
             $st->execute([$tenant_id]);
-            $last = $st->fetchColumn();
-            $num  = $last ? ((int)substr($last, 4)) + 1 : 1;
-            $qno  = 'QTN-' . str_pad($num, 4, '0', STR_PAD_LEFT);
+            $maxNum = (int)$st->fetchColumn();
+            $qno    = 'QTN-' . str_pad($maxNum + 1, 4, '0', STR_PAD_LEFT);
             resp(true, ['number' => $qno]);
         }
 
@@ -712,15 +709,17 @@ async function loadSalesmen() {
 }
 
 async function loadProjects() {
-  const r = await fetch('../../../../server/api/master_setup/project_setup/get-projects-dropdown.php');
-  const d = await r.json();
-  if (!d.success) return;
-  const sel = document.getElementById('projectSel');
-  sel.innerHTML = '<option value="">Select Project</option>' +
-    d.data.map(p => {
-      const label = `${p.project_code} - ${p.project_name}${p.city_name ? ' - ' + p.city_name : ''}`;
-      return `<option value="${p.id}">${label}</option>`;
-    }).join('');
+  try {
+    const r = await fetch('../../../../server/api/master_setup/project_setup/get-projects-dropdown.php');
+    const d = await r.json();
+    if (!d.success || !Array.isArray(d.projects)) return;
+    const sel = document.getElementById('projectSel');
+    sel.innerHTML = '<option value="">Select Project</option>' +
+      d.projects.map(p => {
+        const label = `${p.project_code} - ${p.project_name}${p.city_name ? ' - ' + p.city_name : ''}`;
+        return `<option value="${p.id}">${label}</option>`;
+      }).join('');
+  } catch (e) { /* projects dropdown optional */ }
 }
 
 // ══ SEARCHABLE SELECT (header fields) ════════════════════════

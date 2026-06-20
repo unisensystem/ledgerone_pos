@@ -681,10 +681,10 @@ async function loadSalesmen() {
 async function loadProjects() {
   const r = await fetch('../../../../server/api/master_setup/project_setup/get-projects-dropdown.php');
   const d = await r.json();
-  if (!d.success) return;
+  if (!d.success || !Array.isArray(d.projects)) return;
   const sel = document.getElementById('projectSel');
   sel.innerHTML = '<option value="">Select Project</option>' +
-    d.data.map(p => {
+    d.projects.map(p => {
       const label = `${p.project_code} - ${p.project_name}${p.city_name ? ' - ' + p.city_name : ''}`;
       return `<option value="${p.id}">${label}</option>`;
     }).join('');

@@ -75,10 +75,10 @@ fetch('../../../../server/api/vouchers/receive_voucher/get-companies.php')
 fetch('../../../../server/api/master_setup/project_setup/get-projects-dropdown.php')
     .then(response => response.json())
     .then(data => {
-        if (data.success && Array.isArray(data.data)) {
-            projects = data.data;
+        if (data.success && Array.isArray(data.projects)) {
+            projects = data.projects;
             const projectSelect = document.getElementById('project');
-            data.data.forEach(project => {
+            data.projects.forEach(project => {
                 const option = document.createElement('option');
                 option.value = project.id;
                 const cityName = project.city_name || 'N/A';
