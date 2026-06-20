@@ -123,7 +123,7 @@ try {
     // ── Purchase Invoices ────────────────────────────────────────────────────
     $stmt = $pdo->prepare("
         SELECT pi.id, pi.bill_no, pi.purchase_date, pi.total_bill, pi.net_amount,
-               pi.status, s.supplier_name,
+               s.supplier_name,
                COUNT(pii.id) AS item_count,
                SUM(pii.quantity) AS total_qty
         FROM purchase_invoice pi
