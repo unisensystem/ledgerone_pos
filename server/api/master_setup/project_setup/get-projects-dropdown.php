@@ -15,7 +15,7 @@ try {
         ORDER BY p.project_name ASC
     ");
     $stmt->execute([$tenant_id]);
-    echo json_encode(['success' => true, 'data' => $stmt->fetchAll()]);
+    echo json_encode(['success' => true, 'projects' => $stmt->fetchAll()]);
 } catch (Exception $e) {
     echo json_encode(['success' => false, 'message' => $e->getMessage()]);
 }
