@@ -427,23 +427,35 @@ function updateInvoiceSummaryDynamic() {
     
     if (totalDiscountAmountEl) totalDiscountAmountEl.value = discountAmount.toFixed(2);
     if (netAmountEl) netAmountEl.textContent = netAmount.toFixed(2);
-    
+
+    // Expose totals for invoice-level tax base resolution
+    window.currentTotalBill = totalBill;
+    window.currentValueExclSalesTax = afterDiscount;
+    window.currentNetAmount = netAmount;
+
     // Calculate withholding tax
     const withholdingTaxPercentEl = document.getElementById('withholdingTaxPercent');
     const withholdingTaxPercent = parseFloat(withholdingTaxPercentEl?.value) || 0;
     const withholdingTaxAmount = netAmount * (withholdingTaxPercent / 100);
-    const netReceivable = netAmount - withholdingTaxAmount;
-    
+    let netReceivable = netAmount - withholdingTaxAmount;
+
     const withholdingTaxAmountEl = document.getElementById('withholdingTaxAmount');
     const netReceivableEl = document.getElementById('netReceivable');
-    
+
     if (withholdingTaxAmountEl) {
         withholdingTaxAmountEl.textContent = withholdingTaxAmount.toFixed(2);
     }
+
+    // Apply invoice-level taxes and factor exclusive tax into net receivable
+    if (typeof calculateInvoiceLevelTaxes === 'function') {
+        const exclusiveTax = calculateInvoiceLevelTaxes() || 0;
+        netReceivable = netAmount - withholdingTaxAmount + exclusiveTax;
+    }
+
     if (netReceivableEl) {
         netReceivableEl.textContent = netReceivable.toFixed(2);
     }
-    
+
     // Auto-fill Amount Paid when Invoice Type is Cash
     const amountPaidEl = document.getElementById('amountPaid');
     const invoiceTypeEl = document.getElementById('invoiceType');
@@ -458,11 +470,6 @@ function updateInvoiceSummaryDynamic() {
     const remainingBalanceEl = document.getElementById('remainingBalance');
     if (remainingBalanceEl) {
         remainingBalanceEl.value = remainingBalance.toFixed(2);
-    }
-
-    // Calculate invoice-level taxes
-    if (typeof calculateInvoiceLevelTaxes === 'function') {
-        calculateInvoiceLevelTaxes();
     }
 }
 

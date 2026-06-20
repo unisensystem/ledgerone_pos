@@ -84,14 +84,14 @@ function renderInvoiceLevelTaxColumns() {
 function resolveInvoiceBase(regime) {
     switch (regime.tax_base) {
         case 'total_bill':
-            return window.currentTotalBill || 0;
+            return window.currentTotalBill ?? 0;
         case 'value_excl_sales_tax':
-            return window.currentValueExclSalesTax || 0;
+            return window.currentValueExclSalesTax ?? 0;
         case 'net_amount':
         default:
             return window.currentNetAmount
-                || parseFloat(document.getElementById('netAmount')?.textContent)
-                || 0;
+                ?? parseFloat(document.getElementById('netAmount')?.textContent)
+                ?? 0;
     }
 }
 
@@ -174,15 +174,14 @@ function calculateInvoiceLevelTaxes() {
         if (!isTaxInclusive) totalExclusiveTax += taxAmount;
     });
 
-    // Net receivable = net_amount + exclusive taxes (callers may override this with withholding adjustments)
+    // Update Net Receivable with exclusive taxes added.
+    // Callers that handle withholding tax will override this immediately after.
     const netReceivableEl = document.getElementById('netReceivable');
     if (netReceivableEl) {
         const baseNetAmount = window.currentNetAmount
             ?? parseFloat(document.getElementById('netAmount')?.textContent)
             ?? 0;
-        const netReceivable = baseNetAmount + totalExclusiveTax;
-        netReceivableEl.textContent = netReceivable.toFixed(2);
-        console.log('Net Receivable updated:', netReceivable);
+        netReceivableEl.textContent = (baseNetAmount + totalExclusiveTax).toFixed(2);
     }
 
     return totalExclusiveTax;

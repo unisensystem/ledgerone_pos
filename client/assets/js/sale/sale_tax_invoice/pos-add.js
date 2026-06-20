@@ -2868,8 +2868,12 @@ function initializePage(permissions) {
                         // Defer to next macrotask to allow current calculations to complete
                         // Call updateInvoiceSummary which will calculate netAmount and then update tax display
                         setTimeout(() => {
-                            console.log('Deferred call: Calling updateInvoiceSummary() to recalculate with tax regimes');
-                            updateInvoiceSummary();
+                            console.log('Deferred call: Calling summary update to recalculate with tax regimes');
+                            if (typeof updateInvoiceSummaryDynamic === 'function') {
+                                updateInvoiceSummaryDynamic();
+                            } else {
+                                updateInvoiceSummary();
+                            }
                         }, 0);
                     } else {
                         console.log('No items in invoice yet. Tax regimes are ready.');
