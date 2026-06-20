@@ -63,18 +63,20 @@ try {
             tr.formula_template,
             tr.is_tax_inclusive,
             COALESCE(
-                (SELECT tr_rate.rate_percentage 
-                 FROM tax_rates tr_rate 
+                (SELECT tr_rate.rate_percentage
+                 FROM tax_rates tr_rate
                  WHERE tr_rate.tax_regime_id = tr.id
                    AND tr_rate.transaction_type = 'sale'
                    AND tr_rate.is_active = 1
                    AND (tr_rate.effective_from IS NULL OR tr_rate.effective_from <= NOW())
                    AND (tr_rate.effective_to IS NULL OR tr_rate.effective_to >= NOW())
                    AND (
-                       (tr_rate.customer_type_id = ? AND tr_rate.party_type = ? AND tr_rate.is_filer = ?)
-                       OR (tr_rate.customer_type_id = ? AND tr_rate.party_type = 'all')
-                       OR (tr_rate.party_type = 'all' AND tr_rate.customer_type_id IS NULL)
+                       (tr_rate.party_type = ? AND (tr_rate.is_filer = ? OR tr_rate.is_filer IS NULL))
+                       OR tr_rate.party_type = 'all'
                    )
+                 ORDER BY
+                   CASE WHEN tr_rate.party_type = ? THEN 0 ELSE 1 END,
+                   CASE WHEN tr_rate.is_filer = ? THEN 0 ELSE 1 END
                  LIMIT 1),
                 0
             ) as rate_percentage
@@ -94,7 +96,8 @@ try {
     
     $stmt = $pdo->prepare($baseQuery);
     
-    $params = [$customer_type_id, $party_type, $is_filer, $customer_type_id];
+    // params: party_type, is_filer (filter), party_type, is_filer (ORDER BY priority)
+    $params = [$party_type, $is_filer, $party_type, $is_filer];
     if ($company_country_id) {
         $params[] = $company_country_id;
     }
