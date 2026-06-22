@@ -277,6 +277,8 @@ body { font-family: "Segoe UI", Arial, sans-serif; font-size: 11.5px; color: #1a
         <th style="width:50px" class="r">Qty</th>
         <th style="width:60px">Unit</th>
         <th style="width:72px" class="r">Rate</th>
+        <th style="width:44px" class="r">Tax%</th>
+        <th style="width:72px" class="r">Tax Amt</th>
         <th style="width:82px" class="r">Amount</th>
       </tr>
     </thead>
@@ -298,6 +300,8 @@ body { font-family: "Segoe UI", Arial, sans-serif; font-size: 11.5px; color: #1a
         <td class="r"><?= fmtNum($it['quantity']) ?></td>
         <td><?= htmlspecialchars($it['unit_name'] ?? '—') ?></td>
         <td class="r"><?= fmtNum($it['rate']) ?></td>
+        <td class="r"><?= fmtNum($it['tax_pct']) ?>%</td>
+        <td class="r"><?= fmtNum($it['tax_amt']) ?></td>
         <td class="r" style="font-weight:700"><?= fmtNum($it['line_total']) ?></td>
       </tr>
       <?php endforeach; ?>
@@ -312,16 +316,16 @@ body { font-family: "Segoe UI", Arial, sans-serif; font-size: 11.5px; color: #1a
         <td>Subtotal</td>
         <td><?= fmtNum($q['subtotal']) ?></td>
       </tr>
-      <?php if ($q['total_sales_tax'] > 0): ?>
+      <?php if ((float)$q['discount_pct'] > 0 || (float)$q['discount_amt'] > 0): ?>
       <tr>
-        <td>Sales Tax</td>
-        <td><?= fmtNum($q['total_sales_tax']) ?></td>
+        <td>Discount (<?= fmtNum($q['discount_pct']) ?>%)</td>
+        <td>-<?= fmtNum($q['discount_amt']) ?></td>
       </tr>
       <?php endif; ?>
-      <?php if ($q['total_further_tax'] > 0): ?>
+      <?php if ((float)$q['invoice_tax_pct'] > 0 || (float)$q['invoice_tax_amt'] > 0): ?>
       <tr>
-        <td>Further Tax</td>
-        <td><?= fmtNum($q['total_further_tax']) ?></td>
+        <td>Tax (<?= fmtNum($q['invoice_tax_pct']) ?>%)</td>
+        <td><?= fmtNum($q['invoice_tax_amt']) ?></td>
       </tr>
       <?php endif; ?>
       <tr class="divider grand-row">

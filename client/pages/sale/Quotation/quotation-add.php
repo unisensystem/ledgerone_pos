@@ -34,13 +34,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_GET['action'])) {
             $maxNum = (int)$st->fetchColumn();
             $qno    = 'QTN-' . str_pad($maxNum + 1, 4, '0', STR_PAD_LEFT);
 
-            $subtotal = $total_st = $total_ft = 0;
+            // Calculate totals for database
+            $itemsSubtotalWithTax = 0;
             foreach ($input['items'] as $item) {
-                $subtotal += (float)($item['excl_tax']        ?? 0);
-                $total_st += (float)($item['sales_tax_amt']   ?? 0);
-                $total_ft += (float)($item['further_tax_amt'] ?? 0);
+                $qty = (float)($item['quantity'] ?? 1);
+                $rate = (float)($item['rate'] ?? 0);
+                $lineTotal = (float)($item['line_total'] ?? 0);
+                $itemsSubtotalWithTax += $lineTotal;
             }
-            $grand = $subtotal + $total_st + $total_ft;
+            
+            $discountPct = (float)($input['discount_pct'] ?? 0);
+            $discountAmt = $itemsSubtotalWithTax * $discountPct / 100;
+            $afterDiscount = $itemsSubtotalWithTax - $discountAmt;
+            
+            $invoiceTaxPct = (float)($input['tax_pct'] ?? 0);
+            $invoiceTaxAmt = $afterDiscount * $invoiceTaxPct / 100;
+            
+            $grandTotal = $afterDiscount + $invoiceTaxAmt;
 
             $pdo->beginTransaction();
 
@@ -48,9 +58,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_GET['action'])) {
                 (tenant_id, quotation_number, quotation_date, valid_till,
                  customer_id, contact_person, salesman_id, project_id, payment_term_id,
                  terms_conditions, remarks, footer_note, party_type, status,
-                 subtotal, total_sales_tax, total_further_tax, grand_total,
+                 subtotal, discount_pct, discount_amt, invoice_tax_pct, invoice_tax_amt, grand_total,
                  created_by, updated_by)
-                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,'draft',?,?,?,?,?,?)");
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,'draft',?,?,?,?,?,?,?,?)");
             $st->execute([
                 $tid,
                 $qno,
@@ -65,17 +75,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_GET['action'])) {
                 $input['remarks'] ?: null,
                 $input['footer_note'] ?: null,
                 $input['party_type']  ?: null,
-                $subtotal, $total_st, $total_ft, $grand,
+                $itemsSubtotalWithTax, $discountPct, $discountAmt, $invoiceTaxPct, $invoiceTaxAmt, $grandTotal,
                 $uid, $uid,
             ]);
             $qid = $pdo->lastInsertId();
 
             $si = $pdo->prepare("INSERT INTO quotation_items
                 (quotation_id, tenant_id, sort_order, product_id, item_code, item_name,
-                 description, size, pack_type, quantity, qty_unit_id, unit_id,
-                 rate, excl_tax, sales_tax_pct, sales_tax_amt,
-                 further_tax_pct, further_tax_amt, incl_tax, line_total)
-                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)");
+                 description, size, quantity, unit_id, rate, tax_pct, tax_amt, line_total)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)");
             foreach ($input['items'] as $i => $it) {
                 $si->execute([
                     $qid, $tid, $i + 1,
@@ -84,18 +92,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_GET['action'])) {
                     $it['item_name']   ?? '',
                     $it['description'] ?? null,
                     $it['size']        ?? null,
-                    $it['pack_type']   ?? 'Qty',
-                    (float)($it['quantity']        ?? 1),
-                    !empty($it['qty_unit_id']) ? (int)$it['qty_unit_id'] : null,
-                    !empty($it['unit_id'])     ? (int)$it['unit_id']     : null,
-                    (float)($it['rate']            ?? 0),
-                    (float)($it['excl_tax']        ?? 0),
-                    (float)($it['sales_tax_pct']   ?? 0),
-                    (float)($it['sales_tax_amt']   ?? 0),
-                    (float)($it['further_tax_pct'] ?? 0),
-                    (float)($it['further_tax_amt'] ?? 0),
-                    (float)($it['incl_tax']        ?? 0),
-                    (float)($it['line_total']      ?? 0),
+                    (float)($it['quantity'] ?? 1),
+                    !empty($it['unit_id']) ? (int)$it['unit_id'] : null,
+                    (float)($it['rate']     ?? 0),
+                    (float)($it['tax_pct']  ?? 0),
+                    (float)($it['tax_amt']  ?? 0),
+                    (float)($it['line_total'] ?? 0),
                 ]);
             }
 
@@ -515,13 +517,9 @@ TAX: Exclusive of all Tax</textarea>
             <th style="width:100px">Size</th>
             <th style="width:80px">Qty</th>
             <th style="width:90px">Sale Unit</th>
-            <th style="width:82px">Rate</th>
-            <th class="r" style="width:90px">Excl. Tax</th>
-            <th style="width:72px">ST %</th>
-            <th class="r" style="width:88px">ST Amt</th>
-            <th style="width:72px">FT %</th>
-            <th class="r" style="width:88px">FT Amt</th>
-            <th class="r" style="width:95px">Incl. Tax</th>
+            <th class="r" style="width:95px">Rate</th>
+            <th style="width:72px">Tax %</th>
+            <th class="r" style="width:88px">Tax Amt</th>
             <th class="r" style="width:95px">Amount</th>
             <th style="width:62px;text-align:center">Act</th>
           </tr>
@@ -537,12 +535,20 @@ TAX: Exclusive of all Tax</textarea>
         <div class="tv" id="totSubtotal">0.00</div>
       </div>
       <div class="tot-pill">
-        <div class="tl">Sales Tax</div>
-        <div class="tv" id="totST">0.00</div>
+        <div class="tl">Discount %</div>
+        <input type="number" id="discountPct" min="0" max="100" step="any" oninput="updateTotals()" placeholder="0" style="width:60px;height:24px;padding:0 6px;border:1px solid #d6dbe4;border-radius:4px;font-size:12px;text-align:center"/>
       </div>
       <div class="tot-pill">
-        <div class="tl">Further Tax</div>
-        <div class="tv" id="totFT">0.00</div>
+        <div class="tl">Discount Amt</div>
+        <div class="tv" id="totDiscount">0.00</div>
+      </div>
+      <div class="tot-pill">
+        <div class="tl">Tax %</div>
+        <input type="number" id="taxPct" min="0" max="100" step="any" oninput="updateTotals()" placeholder="0" style="width:60px;height:24px;padding:0 6px;border:1px solid #d6dbe4;border-radius:4px;font-size:12px;text-align:center"/>
+      </div>
+      <div class="tot-pill">
+        <div class="tl">Tax Amt</div>
+        <div class="tv" id="totTax">0.00</div>
       </div>
       <div class="tot-pill grand">
         <div class="tl">Grand Total</div>
@@ -933,9 +939,8 @@ function selectRSS(id, prodId) {
 function onProdFill(id, prod) {
   const desc = document.getElementById(`desc-${id}`);
   if (!desc.value) desc.value = prod.description || '';
-  document.getElementById(`rate-${id}`).value = prod.rate        || 0;
-  document.getElementById(`stp-${id}`).value  = prod.sales_tax   || 0;
-  document.getElementById(`ftp-${id}`).value  = prod.further_tax || 0;
+  document.getElementById(`rate-${id}`).value = prod.rate || 0;
+  document.getElementById(`tax-pct-${id}`).value = prod.sales_tax || 0;
   document.getElementById(`unit-${id}`).value = prod.unit_id || '';
   calcRow(id);
 }
@@ -1013,13 +1018,9 @@ function addRow() {
         ${units.map(u=>`<option value="${u.id}">${u.name}</option>`).join('')}
       </select>
     </td>
-    <td><input class="ti" id="rate-${id}" type="number" placeholder="0.00" min="0" step="any" oninput="calcRow(${id})"/></td>
-    <td><input class="ti" id="excl-${id}" type="number" placeholder="0.00" readonly style="text-align:right"/></td>
-    <td><input class="ti" id="stp-${id}" type="number" placeholder="%" min="0" max="100" step="any" oninput="calcRow(${id})" style="width:60px"/></td>
-    <td><input class="ti" id="sta-${id}" type="number" placeholder="0.00" readonly style="text-align:right"/></td>
-    <td><input class="ti" id="ftp-${id}" type="number" placeholder="%" min="0" max="100" step="any" oninput="calcRow(${id})" style="width:60px"/></td>
-    <td><input class="ti" id="fta-${id}" type="number" placeholder="0.00" readonly style="text-align:right"/></td>
-    <td><input class="ti" id="incl-${id}" type="number" placeholder="0.00" readonly style="text-align:right"/></td>
+    <td><input class="ti" id="rate-${id}" type="number" placeholder="0.00" min="0" step="any" oninput="calcRow(${id})" style="text-align:right"/></td>
+    <td><input class="ti" id="tax-pct-${id}" type="number" placeholder="%" min="0" max="100" step="any" oninput="calcRow(${id})" style="width:60px"/></td>
+    <td><input class="ti" id="tax-amt-${id}" type="number" placeholder="0.00" readonly style="text-align:right"/></td>
     <td><input class="ti" id="amt-${id}"  type="number" placeholder="0.00" readonly style="text-align:right;font-weight:700"/></td>
     <td>
       <div class="act-cell">
@@ -1041,38 +1042,48 @@ function removeRow(id) {
 }
 
 function calcRow(id) {
-  const qty  = parseFloat(document.getElementById(`qty-${id}`)?.value)  || 0;
-  const rate = parseFloat(document.getElementById(`rate-${id}`)?.value) || 0;
-  const excl = qty * rate;
-  const stp  = parseFloat(document.getElementById(`stp-${id}`)?.value)  || 0;
-  const sta  = excl * stp / 100;
-  const ftp  = parseFloat(document.getElementById(`ftp-${id}`)?.value)  || 0;
-  const fta  = excl * ftp / 100;
-  const incl = excl + sta + fta;
-  setV(`excl-${id}`, excl.toFixed(2));
-  setV(`sta-${id}`,  sta.toFixed(2));
-  setV(`fta-${id}`,  fta.toFixed(2));
-  setV(`incl-${id}`, incl.toFixed(2));
-  setV(`amt-${id}`,  incl.toFixed(2));
+  const qty     = parseFloat(document.getElementById(`qty-${id}`)?.value)     || 0;
+  const rate    = parseFloat(document.getElementById(`rate-${id}`)?.value)    || 0;
+  const taxPct  = parseFloat(document.getElementById(`tax-pct-${id}`)?.value) || 0;
+  
+  const subtotal = qty * rate;
+  const taxAmt   = subtotal * taxPct / 100;
+  const total    = subtotal + taxAmt;
+  
+  setV(`tax-amt-${id}`, taxAmt.toFixed(2));
+  setV(`amt-${id}`, total.toFixed(2));
   updateTotals();
 }
 
 function setV(id, v) { const el=document.getElementById(id); if(el) el.value=v; }
 
 function updateTotals() {
-  let sub=0, st=0, ft=0;
+  // Calculate items with their taxes
+  let itemsSubtotalWithTax = 0;  // Subtotal including item-level taxes
+  
   document.querySelectorAll('#itemsTbody tr').forEach(tr => {
     const rid = parseInt(tr.id.replace('row-',''));
     if (!rid) return;
-    sub += parseFloat(document.getElementById(`excl-${rid}`)?.value) || 0;
-    st  += parseFloat(document.getElementById(`sta-${rid}`)?.value)  || 0;
-    ft  += parseFloat(document.getElementById(`fta-${rid}`)?.value)  || 0;
+    const amt = parseFloat(document.getElementById(`amt-${rid}`)?.value) || 0;  // This is qty*rate + tax
+    itemsSubtotalWithTax += amt;
   });
-  const grand = sub + st + ft;
-  document.getElementById('totSubtotal').textContent = fmt(sub);
-  document.getElementById('totST').textContent       = fmt(st);
-  document.getElementById('totFT').textContent       = fmt(ft);
-  document.getElementById('totGrand').textContent    = fmt(grand);
+  
+  // Discount on subtotal (before invoice-level tax)
+  const discountPct = parseFloat(document.getElementById('discountPct')?.value) || 0;
+  const discountAmt = itemsSubtotalWithTax * discountPct / 100;
+  const afterDiscount = itemsSubtotalWithTax - discountAmt;
+  
+  // Invoice-level tax on after-discount amount
+  const invoiceTaxPct = parseFloat(document.getElementById('taxPct')?.value) || 0;
+  const invoiceTaxAmt = afterDiscount * invoiceTaxPct / 100;
+  
+  // Grand total = after discount + invoice tax
+  const grandTotal = afterDiscount + invoiceTaxAmt;
+  
+  document.getElementById('totSubtotal').textContent = fmt(itemsSubtotalWithTax);
+  document.getElementById('totDiscount').textContent = fmt(discountAmt);
+  document.getElementById('totTax').textContent = fmt(invoiceTaxAmt);
+  document.getElementById('totGrand').textContent = fmt(grandTotal);
 }
 
 function fmt(n){ return n.toLocaleString('en-PK',{minimumFractionDigits:2,maximumFractionDigits:2}); }
@@ -1097,6 +1108,9 @@ async function saveQuotation() {
     const rate = parseFloat(document.getElementById(`rate-${rid}`)?.value) || 0;
     if (qty <= 0 || rate <= 0) { valid=false; toast('Quantity and Rate must be > 0','err'); return; }
     const prod = products.find(p=>p.id==prodId);
+    const taxPct  = parseFloat(document.getElementById(`tax-pct-${rid}`)?.value)  || 0;
+    const taxAmt  = parseFloat(document.getElementById(`tax-amt-${rid}`)?.value)  || 0;
+    const amt     = parseFloat(document.getElementById(`amt-${rid}`)?.value)      || 0;
     items.push({
       product_id:      prodId,
       item_code:       prod?.code  || '',
@@ -1106,13 +1120,9 @@ async function saveQuotation() {
       quantity:        qty,
       unit_id:         document.getElementById(`unit-${rid}`)?.value || null,
       rate,
-      excl_tax:        parseFloat(document.getElementById(`excl-${rid}`)?.value) || 0,
-      sales_tax_pct:   parseFloat(document.getElementById(`stp-${rid}`)?.value)  || 0,
-      sales_tax_amt:   parseFloat(document.getElementById(`sta-${rid}`)?.value)  || 0,
-      further_tax_pct: parseFloat(document.getElementById(`ftp-${rid}`)?.value)  || 0,
-      further_tax_amt: parseFloat(document.getElementById(`fta-${rid}`)?.value)  || 0,
-      incl_tax:        parseFloat(document.getElementById(`incl-${rid}`)?.value) || 0,
-      line_total:      parseFloat(document.getElementById(`amt-${rid}`)?.value)  || 0,
+      tax_pct:         taxPct,
+      tax_amt:         taxAmt,
+      line_total:      amt,
     });
   });
   if (!valid || !items.length) return;
@@ -1129,6 +1139,8 @@ async function saveQuotation() {
     terms_conditions: document.getElementById('termsConditions').value,
     remarks:          document.getElementById('remarks').value,
     footer_note:      document.getElementById('footerNote').value,
+    discount_pct:     parseFloat(document.getElementById('discountPct').value) || 0,
+    tax_pct:          parseFloat(document.getElementById('taxPct').value) || 0,
     items,
   };
 

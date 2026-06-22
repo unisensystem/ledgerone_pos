@@ -274,21 +274,17 @@ body { font-family: "Segoe UI", Arial, sans-serif; font-size: 11.5px; color: #1a
         <th style="width:28px" class="c">#</th>
         <th style="width:90px">Code</th>
         <th>Item / Description</th>
-        <th style="width:80px">Sub-Category</th>
         <th style="width:50px" class="r">Qty</th>
         <th style="width:60px">Unit</th>
         <th style="width:72px" class="r">Rate</th>
-        <th style="width:78px" class="r">Excl. Tax</th>
-        <th style="width:44px" class="r">ST%</th>
-        <th style="width:72px" class="r">ST Amt</th>
-        <th style="width:44px" class="r">FT%</th>
-        <th style="width:72px" class="r">FT Amt</th>
+        <th style="width:44px" class="r">Tax%</th>
+        <th style="width:72px" class="r">Tax Amt</th>
         <th style="width:82px" class="r">Amount</th>
       </tr>
     </thead>
     <tbody>
     <?php if (empty($items)): ?>
-      <tr><td colspan="13" style="text-align:center;padding:16px;color:#9aa1ae">No items</td></tr>
+      <tr><td colspan="9" style="text-align:center;padding:16px;color:#9aa1ae">No items</td></tr>
     <?php else: ?>
       <?php foreach ($items as $i => $it): ?>
       <tr>
@@ -301,15 +297,11 @@ body { font-family: "Segoe UI", Arial, sans-serif; font-size: 11.5px; color: #1a
           <div class="item-desc"><?= htmlspecialchars($it['description']) ?></div>
           <?php endif; ?>
         </td>
-        <td><?= htmlspecialchars($it['subcategory_name'] ?? '—') ?></td>
         <td class="r"><?= fmtNum($it['quantity']) ?></td>
         <td><?= htmlspecialchars($it['unit_name'] ?? '—') ?></td>
         <td class="r"><?= fmtNum($it['rate']) ?></td>
-        <td class="r"><?= fmtNum($it['excl_tax']) ?></td>
-        <td class="r"><?= $it['sales_tax_pct']   > 0 ? fmtNum($it['sales_tax_pct']).'%'   : '—' ?></td>
-        <td class="r"><?= $it['sales_tax_amt']   > 0 ? fmtNum($it['sales_tax_amt'])        : '—' ?></td>
-        <td class="r"><?= $it['further_tax_pct'] > 0 ? fmtNum($it['further_tax_pct']).'%' : '—' ?></td>
-        <td class="r"><?= $it['further_tax_amt'] > 0 ? fmtNum($it['further_tax_amt'])      : '—' ?></td>
+        <td class="r"><?= fmtNum($it['tax_pct']) ?>%</td>
+        <td class="r"><?= fmtNum($it['tax_amt']) ?></td>
         <td class="r" style="font-weight:700"><?= fmtNum($it['line_total']) ?></td>
       </tr>
       <?php endforeach; ?>
@@ -324,16 +316,16 @@ body { font-family: "Segoe UI", Arial, sans-serif; font-size: 11.5px; color: #1a
         <td>Subtotal</td>
         <td><?= fmtNum($q['subtotal']) ?></td>
       </tr>
-      <?php if ($q['total_sales_tax'] > 0): ?>
+      <?php if ($q['discount_pct'] > 0 || $q['discount_amt'] > 0): ?>
       <tr>
-        <td>Sales Tax</td>
-        <td><?= fmtNum($q['total_sales_tax']) ?></td>
+        <td>Discount (<?= fmtNum($q['discount_pct']) ?>%)</td>
+        <td>-<?= fmtNum($q['discount_amt']) ?></td>
       </tr>
       <?php endif; ?>
-      <?php if ($q['total_further_tax'] > 0): ?>
+      <?php if ($q['invoice_tax_pct'] > 0 || $q['invoice_tax_amt'] > 0): ?>
       <tr>
-        <td>Further Tax</td>
-        <td><?= fmtNum($q['total_further_tax']) ?></td>
+        <td>Tax (<?= fmtNum($q['invoice_tax_pct']) ?>%)</td>
+        <td><?= fmtNum($q['invoice_tax_amt']) ?></td>
       </tr>
       <?php endif; ?>
       <tr class="divider grand-row">
