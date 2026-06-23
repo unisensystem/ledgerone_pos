@@ -377,14 +377,6 @@ async function validateAndPost() {
         hideError(dateInput, 'dateError');
     }
 
-    const description = document.getElementById('description');
-    if (!description.value.trim()) {
-        showError(description, 'descriptionError');
-        isValid = false;
-    } else {
-        hideError(description, 'descriptionError');
-    }
-
     // Validate expense entries
     const entries = document.querySelectorAll('#expenseEntries tr');
     if (entries.length === 0) {
@@ -450,26 +442,19 @@ async function validateAndPost() {
                     company_id: document.getElementById('company').value,
                     project_id: document.getElementById('project').value || null,
                     voucher_number: document.getElementById('voucher').value,
-                    description: description.value,
+                    description: document.getElementById('description').value,
                     entries: expenseData
                 })
             });
             const data = await response.json();
             
             if (data.success) {
-                showValidationMessage('success', IS_EDIT_MODE ? 'Voucher updated successfully!' : 'Voucher posted successfully! The expense entry has been saved to the system.');
+                const successMessage = IS_EDIT_MODE ? 'Voucher updated successfully!' : 'Voucher posted successfully! The expense entry has been saved to the system.';
+                showValidationMessage('success', successMessage);
                 
                 setTimeout(() => {
-                    if (IS_EDIT_MODE) {
-                        window.location.href = 'expense-list.php';
-                    } else {
-                        expenseEntries.innerHTML = '';
-                        addExpenseEntry();
-                        description.value = '';
-                        fetchNextVoucherNumber();
-                        validationMessage.className = 'validation-message';
-                    }
-                }, 3000);
+                    window.location.href = 'expense-list.php';
+                }, 2000);
             } else {
                 showValidationMessage('error', 'Error: ' + data.error);
             }

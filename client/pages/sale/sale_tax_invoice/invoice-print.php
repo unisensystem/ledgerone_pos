@@ -1,4 +1,5 @@
 <?php
+require_once '../../../../includes/connection.php';
 require_once '../../../../includes/dashboard.php';
 session_start();
 
@@ -26,7 +27,6 @@ try {
             c.primary_phone,
             c.email,
             co.company_name,
-            co.logo,
             co.address as company_address,
             co.phone as company_phone,
             b.branch_name,

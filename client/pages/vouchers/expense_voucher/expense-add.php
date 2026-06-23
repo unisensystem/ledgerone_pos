@@ -126,7 +126,7 @@ $currency_symbol = $currency['symbol'] ?? '$';
                 </div>
 
                 <div class="form-group full-width">
-                    <label for="description" class="required">Description</label>
+                    <label for="description">Description</label>
                     <textarea id="description" placeholder="Enter a brief description of this expense entry"></textarea>
                     <div class="error-text" id="descriptionError">Description is required</div>
                 </div>

@@ -29,7 +29,7 @@ $description = $input['description'] ?? null;
 $project_id = $input['project_id'] ?? null;
 $entries = $input['entries'] ?? [];
 
-if (!$date || !$voucher_number || !$description || empty($entries)) {
+if (!$date || !$voucher_number || empty($entries)) {
     http_response_code(400);
     echo json_encode(['error' => 'All fields are required']);
     exit();
