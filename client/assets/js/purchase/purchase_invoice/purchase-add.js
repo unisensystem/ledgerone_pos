@@ -20,7 +20,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const form = document.getElementById('invoiceForm');
 
     // Load all data, then initialize dropdowns and add first row
-    Promise.all([loadSuppliers(), loadBranches(), loadProducts(), loadUOM(), loadCurrencies(), loadCompanies(), loadPurchaseOrders(), loadProjects()]).then(() => {
+    Promise.all([loadSuppliers(), loadBranches(), loadProducts(), loadUOM(), loadCurrencies(), loadCompanies(), loadPurchaseOrders(), loadProjects(), fetchContainers()]).then(() => {
         initSearchableDropdown('supplierCodeSearch', 'supplierCodeOptions', 'supplierCode');
         initSearchableDropdown('branchSearch', 'branchOptions', 'branch');
         initSearchableDropdown('purchaseOrderSearch', 'purchaseOrderOptions', 'purchaseOrder');
@@ -288,6 +288,28 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
+    // Fetch containers from API
+    async function fetchContainers() {
+        try {
+            const response = await fetch('../../../../server/api/purchase/purchase_invoice/get-containers.php');
+            const data = await response.json();
+
+            if (data.success) {
+                const containerSelect = document.getElementById('container');
+                containerSelect.innerHTML = '<option value="">Select Container</option>';
+
+                data.containers.forEach(container => {
+                    const option = document.createElement('option');
+                    option.value = container.id;
+                    option.textContent = `${container.container_code} - ${container.container_name}`;
+                    containerSelect.appendChild(option);
+                });
+            }
+        } catch (error) {
+            console.error('Error loading containers:', error);
+        }
+    }
+
     // Load sub accounts from API
     async function loadSubAccounts(supplierId) {
         try {
@@ -454,6 +476,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     : `${invoice.branch_code} - ${invoice.branch_name} (${invoice.branch_type})`;
                 document.getElementById('branchSearch').value = branchText;
                 document.getElementById('branch').value = invoice.branch_id || '';
+                document.getElementById('container').value = invoice.container_id || '';
                 document.getElementById('currency').value = invoice.currency_id || '';
                 document.getElementById('project').value = invoice.project_id || '';
                 document.getElementById('previousBalance').value = invoice.previous_balance || '0.00';
@@ -1900,6 +1923,7 @@ document.addEventListener('DOMContentLoaded', function () {
             companyId: document.getElementById('company')?.value,
             supplierId: document.getElementById('supplierCode')?.value,
             branchId: document.getElementById('branch')?.value,
+            containerId: document.getElementById('container')?.value || null,
             purchaseOrderId: document.getElementById('purchaseOrder')?.value || null,
             subAccountId: document.getElementById('subAccount')?.value || null,
             currencyId: document.getElementById('currency')?.value,
@@ -2035,6 +2059,7 @@ document.addEventListener('DOMContentLoaded', function () {
         document.getElementById('supplierCode').value = '';
         document.getElementById('branchSearch').value = '';
         document.getElementById('branch').value = '';
+        document.getElementById('container').value = '';
         document.getElementById('previousBalance').value = '0.00';
         document.getElementById('project').value = '';
 

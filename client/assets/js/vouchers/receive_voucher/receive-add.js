@@ -22,6 +22,7 @@ let bills = [];
 let employees = [];
 let companies = [];
 let projects = [];
+let containers = [];
 let currentCustomerId = null;
 
 // Fetch customers from API
@@ -88,6 +89,23 @@ fetch('../../../../server/api/master_setup/project_setup/get-projects-dropdown.p
         }
     })
     .catch(error => console.error('Error fetching projects:', error));
+
+// Fetch containers from API
+fetch('../../../../server/api/vouchers/receive_voucher/get-containers.php')
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            containers = data.data;
+            const containerSelect = document.getElementById('container');
+            data.data.forEach(container => {
+                const option = document.createElement('option');
+                option.value = container.id;
+                option.textContent = `${container.container_code} - ${container.container_name}`;
+                containerSelect.appendChild(option);
+            });
+        }
+    })
+    .catch(error => console.error('Error fetching containers:', error));
 
 // Fetch bills for selected customer
 function fetchBillsForCustomer(customerCode) {
@@ -579,6 +597,7 @@ function addBulkRow() {
         <td><input type="text" class="bulk-bill" placeholder="Bill no" autocomplete="off"></td>
         <td><input type="text" class="bulk-dsr" placeholder="DSR-B-24-26-20251231-20260112"></td>
         <td><select class="bulk-project"><option value="">Select</option></select></td>
+        <td><select class="bulk-container"><option value="">Select</option></select></td>
         <td><select class="bulk-currency" required></select></td>
         <td><input type="number" class="bulk-amount" step="0.01" min="0" placeholder="0.00" required></td>
         <td><input type="text" class="bulk-rem-balance" readonly></td>
@@ -642,6 +661,7 @@ function populateRowSelects(row) {
     const paymentSelect = row.querySelector('.bulk-payment');
     const bankSelect = row.querySelector('.bulk-bank');
     const projectSelect = row.querySelector('.bulk-project');
+    const containerSelect = row.querySelector('.bulk-container');
     
     currencySelect.innerHTML = '';
     currenciesData.forEach((c, index) => {
@@ -667,6 +687,11 @@ function populateRowSelects(row) {
     projects.forEach(p => {
         const cityName = p.city_name || 'N/A';
         projectSelect.innerHTML += `<option value="${p.id}">${p.project_code} - ${p.project_name} - ${cityName}</option>`;
+    });
+    
+    containerSelect.innerHTML = '<option value="">Select</option>';
+    containers.forEach(c => {
+        containerSelect.innerHTML += `<option value="${c.id}">${c.container_code} - ${c.container_name}</option>`;
     });
 }
 
@@ -867,6 +892,7 @@ document.getElementById('postBulkBtn').addEventListener('click', async function(
         formData.append('bill_no', row.querySelector('.bulk-bill').value || null);
         formData.append('dsr_no', row.querySelector('.bulk-dsr').value || null);
         formData.append('project_id', row.querySelector('.bulk-project').value || null);
+        formData.append('container_id', row.querySelector('.bulk-container').value || null);
         formData.append('amount', row.querySelector('.bulk-amount').value);
         formData.append('currency_id', row.querySelector('.bulk-currency').value);
         formData.append('payment_method_id', row.querySelector('.bulk-payment').value);
@@ -912,17 +938,15 @@ document.getElementById('postBulkBtn').addEventListener('click', async function(
 });
 
 // Load data for bulk mode
-fetch('../../../../server/api/vouchers/receive_voucher/get-currencies.php')
-    .then(r => r.json())
-    .then(d => { if (d.success) currenciesData = d.data; });
-
-fetch('../../../../server/api/vouchers/receive_voucher/get-payment-methods.php')
-    .then(r => r.json())
-    .then(d => { if (d.success) paymentMethodsData = d.data; });
-
-fetch('../../../../server/api/vouchers/receive_voucher/get-bank-accounts.php')
-    .then(r => r.json())
-    .then(d => { if (d.success) bankAccountsData = d.data; });
+Promise.all([
+    fetch('../../../../server/api/vouchers/receive_voucher/get-currencies.php').then(r => r.json()),
+    fetch('../../../../server/api/vouchers/receive_voucher/get-payment-methods.php').then(r => r.json()),
+    fetch('../../../../server/api/vouchers/receive_voucher/get-bank-accounts.php').then(r => r.json())
+]).then(([currData, payData, bankData]) => {
+    if (currData.success) currenciesData = currData.data;
+    if (payData.success) paymentMethodsData = payData.data;
+    if (bankData.success) bankAccountsData = bankData.data;
+});
 
 // Form submission with lock state
 const form = document.getElementById('paymentVoucherForm');
@@ -963,6 +987,7 @@ form.addEventListener('submit', function (e) {
     formData.append('bill_no', document.getElementById('billNo').value.split(' - ')[0] || null);
     formData.append('dsr_no', document.getElementById('dsrNo').value || null);
     formData.append('project_id', document.getElementById('project').value || null);
+    formData.append('container_id', document.getElementById('container').value || null);
     formData.append('amount', document.getElementById('amount').value);
     formData.append('currency_id', document.getElementById('currency').value);
     formData.append('payment_method_id', document.getElementById('paymentMethod').value);

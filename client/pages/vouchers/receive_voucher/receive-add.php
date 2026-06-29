@@ -108,6 +108,13 @@ if (!$user_id) {
                             </select>
                         </div>
                         <div class="form-group">
+                            <label for="container">Container</label>
+                            <select id="container">
+                                <option value="">Select Container</option>
+                                <!-- Options will be populated by JS -->
+                            </select>
+                        </div>
+                        <div class="form-group">
                             <label for="amount" class="required">Amount</label>
                             <div class="currency-input">
                                 <span class="currency-symbol" id="currencySymbol">$</span>
@@ -217,6 +224,7 @@ if (!$user_id) {
                             <th>Bill No</th>
                             <th>DSR#</th>
                             <th>Project</th>
+                            <th>Container</th>
                             <th>Currency</th>
                             <th>Amount</th>
                             <th>Remaining Balance</th>

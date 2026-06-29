@@ -129,9 +129,18 @@ $currency_symbol = $currency['symbol'];
                         </select>
                         <div class="helper-text">Filter report by project</div>
                     </div>
+                    
+                    <div class="form-group">
+                        <label for="containerFilter">Container <span class="help-tip" title="Filter by container">?</span></label>
+                        <select id="containerFilter">
+                            <option value="">All Containers</option>
+                        </select>
+                        <div class="helper-text">Filter report by container</div>
+                    </div>
                 </div>
                 
                 <div class="form-row">
+                    <div class="form-group">
                         <label for="branchFilter">Branch <span class="help-tip" title="Filter by branch">?</span></label>
                         <select id="branchFilter">
                             <option value="all">All Branches</option>
@@ -150,9 +159,7 @@ $currency_symbol = $currency['symbol'];
                         </select>
                         <div class="helper-text">Filter report by branch</div>
                     </div>
-                </div>
-                
-                <div class="form-row">
+                    
                     <div class="form-group">
                         <label for="comparativePeriod">Comparative Period <span class="help-tip" title="Include data from previous period for comparison">?</span></label>
                         <select id="comparativePeriod">
@@ -173,7 +180,9 @@ $currency_symbol = $currency['symbol'];
                         </select>
                         <div class="helper-text">Controls how much detail is shown</div>
                     </div>
-                    
+                </div>
+                
+                <div class="form-row">
                     <div class="form-group">
                         <label for="includeGraphs">Include Visualizations <span class="help-tip" title="Show charts and graphs in the report">?</span></label>
                         <select id="includeGraphs">

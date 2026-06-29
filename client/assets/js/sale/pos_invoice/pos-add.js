@@ -375,7 +375,7 @@ function initializePage(permissions) {
     const form = document.getElementById('invoiceForm');
 
     // Load all data, then initialize dropdowns and add first row
-    Promise.all([loadCustomersLocal(), loadCompanies(), loadBranches(), loadProductsLocal(), loadUOM(), loadUOMGroupUnits(), loadCurrencies(), loadBankAccounts(), loadEmployees(), loadSaleOrders(), loadBrandsData(), loadProjects()]).then(() => {
+    Promise.all([loadCustomersLocal(), loadCompanies(), loadBranches(), loadProductsLocal(), loadUOM(), loadUOMGroupUnits(), loadCurrencies(), loadBankAccounts(), loadEmployees(), loadSaleOrders(), loadBrandsData(), loadProjects(), loadContainers()]).then(() => {
         initSearchableDropdown('customerCodeSearch', 'customerCodeOptions', 'customerCode');
         initSearchableDropdown('companySearch', 'companyOptions', 'company');
         initSearchableDropdown('branchSearch', 'branchOptions', 'branch');
@@ -1196,6 +1196,25 @@ function initializePage(permissions) {
         }
     }
 
+    async function loadContainers() {
+        try {
+            const response = await fetch('../../../../server/api/sale/pos_invoice/get-containers.php');
+            const data = await response.json();
+            const sel = document.getElementById('container');
+            sel.innerHTML = '<option value="">Select Container</option>';
+            if (data.success && data.data && data.data.length > 0) {
+                data.data.forEach(c => {
+                    const opt = document.createElement('option');
+                    opt.value = c.id;
+                    opt.textContent = `${c.container_code} - ${c.container_name}`;
+                    sel.appendChild(opt);
+                });
+            }
+        } catch (error) {
+            console.error('Error loading containers:', error);
+        }
+    }
+
     // Load sub accounts for selected customer
     async function loadSubAccounts(customerId) {
         try {
@@ -1406,6 +1425,17 @@ function initializePage(permissions) {
                             await loadProjects();
                         }
                         projectEl.value = invoice.project_id;
+                    }
+                }
+
+                // Set container
+                if (invoice.container_id) {
+                    const containerEl = document.getElementById('container');
+                    if (containerEl) {
+                        if (containerEl.options.length <= 1) {
+                            await loadContainers();
+                        }
+                        containerEl.value = invoice.container_id;
                     }
                 }
 
@@ -3703,11 +3733,13 @@ function saveInvoice(status = 'Posted') {
         companyId: document.getElementById('company').value || null,
         branchId: document.getElementById('branch').value,
         currencyId: document.getElementById('currency').value,
+        containerId: document.getElementById('container').value || null,
         saleOrderId: document.getElementById('saleOrder').value || null,
         previousBalance: document.getElementById('previousBalance')?.value || '0.00',
         salesOfficerId: document.getElementById('salesOfficer')?.value || null,
         supplierManId: document.getElementById('supplierMan')?.value || null,
         projectId: (() => { const v = document.getElementById('project')?.value; const n = parseInt(v); return (!isNaN(n) && n > 0) ? n : null; })(),
+        containerId: document.getElementById('container')?.value || null,
         invoiceType: document.getElementById('invoiceType')?.value || 'Cash',
         dueDate: document.getElementById('dueDate')?.value || null,
         biltyNo: document.getElementById('biltyNo')?.value || null,

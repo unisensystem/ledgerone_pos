@@ -5,6 +5,7 @@ const branchFilterEl = document.getElementById('branchFilter');
 const companyFilterEl = document.getElementById('companyFilter');
 const currencyFilterEl = document.getElementById('currencyFilter');
 const projectFilterEl = document.getElementById('projectFilter');
+const containerFilterEl = document.getElementById('containerFilter');
 const detailLevelEl = document.getElementById('detailLevel');
 const includeGraphsEl = document.getElementById('includeGraphs');
 const generateReportBtn = document.getElementById('generateReportBtn');
@@ -57,6 +58,7 @@ endDateEl.value = formatDate(lastDay);
 loadCompanies();
 loadCurrencies();
 loadProjects();
+loadContainers();
 
 async function loadCompanies() {
     try {
@@ -105,10 +107,10 @@ async function loadProjects() {
         const response = await fetch('../../../../server/api/master_setup/project_setup/get-projects-dropdown.php');
         const result = await response.json();
         
-        if (result.success) {
+        if (result.success && Array.isArray(result.projects)) {
             projectFilterEl.innerHTML = '<option value="">All Projects</option>';
-            result.data.forEach(project => {
-                projectFilterEl.innerHTML += `<option value="${project.id}">${project.project_code} - ${project.project_name} - ${project.city_name}</option>`;
+            result.projects.forEach(project => {
+                projectFilterEl.innerHTML += `<option value="${project.id}">${project.project_code} - ${project.project_name} - ${project.city_name || 'N/A'}</option>`;
             });
         }
     } catch (error) {
@@ -116,8 +118,32 @@ async function loadProjects() {
     }
 }
 
+// Load containers
+async function loadContainers() {
+    try {
+        const response = await fetch('../../../../server/api/financial_reports/get-containers.php');
+        const result = await response.json();
+        
+        if (result.success) {
+            containerFilterEl.innerHTML = '<option value="">All Containers</option>';
+            result.data.forEach(container => {
+                containerFilterEl.innerHTML += `<option value="${container.id}">${container.container_code} - ${container.container_name}</option>`;
+            });
+        }
+    } catch (error) {
+        console.error('Error loading containers:', error);
+    }
+}
+
 // Regenerate report when project changes
 projectFilterEl.addEventListener('change', async function() {
+    if (reportResults.style.display !== 'none') {
+        await generateReport();
+    }
+});
+
+// Regenerate report when container changes
+containerFilterEl.addEventListener('change', async function() {
     if (reportResults.style.display !== 'none') {
         await generateReport();
     }
@@ -153,7 +179,7 @@ function calculatePercentage(amount, totalRevenue) {
 }
 
 // Fetch P&L data from API
-async function fetchPLData(startDate, endDate, branchId, companyId, currencyId, projectId) {
+async function fetchPLData(startDate, endDate, branchId, companyId, currencyId, projectId, containerId) {
     let url = `../../../../server/api/financial_reports/profit_loss_statement/profit-loss.php?start_date=${startDate}&end_date=${endDate}`;
     if (branchId && branchId !== 'all') {
         url += `&branch_id=${branchId}`;
@@ -166,6 +192,9 @@ async function fetchPLData(startDate, endDate, branchId, companyId, currencyId, 
     }
     if (projectId) {
         url += `&project_id=${projectId}`;
+    }
+    if (containerId) {
+        url += `&container_id=${containerId}`;
     }
     const response = await fetch(url);
     const result = await response.json();
@@ -221,7 +250,7 @@ async function generateReport() {
         validationMessage.style.display = 'flex';
 
         // Fetch data from API
-        const data = await fetchPLData(startDateEl.value, endDateEl.value, branchFilterEl.value, companyFilterEl.value, currencyFilterEl.value, projectFilterEl.value);
+        const data = await fetchPLData(startDateEl.value, endDateEl.value, branchFilterEl.value, companyFilterEl.value, currencyFilterEl.value, projectFilterEl.value, containerFilterEl.value);
         
         console.log('API Response:', data);
         console.log('Sales Revenue:', data.sales_revenue);
@@ -462,6 +491,7 @@ function resetForm() {
     branchFilterEl.value = 'all';
     companyFilterEl.value = '';
     projectFilterEl.value = '';
+    containerFilterEl.value = '';
     document.getElementById('comparativePeriod').value = 'none';
     detailLevelEl.value = 'detailed';
     includeGraphsEl.value = 'yes';

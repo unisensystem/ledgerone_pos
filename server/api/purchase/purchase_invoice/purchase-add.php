@@ -59,12 +59,12 @@ try {
     // Insert purchase invoice
     $stmt = $pdo->prepare("
         INSERT INTO purchase_invoice (
-            tenant_id, company_id, currency_id, bill_no, purchase_date, supplier_id, branch_id,
+            tenant_id, company_id, currency_id, bill_no, purchase_date, supplier_id, branch_id, container_id,
             previous_balance, total_bill, total_discount_percent, 
             total_discount_amount, total_tax_percent, total_tax_amount, 
             shipping_fees, shipping_fees_type, net_amount, supplier_invoice_no, supplier_invoice_date, 
             purchase_order_id, bilty_no, transport_name, remarks, sub_account_id, project_id, created_by, updated_by
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ");
     
     $stmt->execute([
@@ -75,6 +75,7 @@ try {
         $input['purchaseDate'],
         $input['supplierId'],
         $input['branchId'],
+        $input['containerId'] ?? null,
         extractBalanceAmount($input['previousBalance'] ?? '0.00'),
         $input['totalBill'],
         $input['totalDiscountPercent'] ?? 0.00,

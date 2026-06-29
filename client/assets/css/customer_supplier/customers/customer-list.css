@@ -818,8 +818,20 @@ tbody tr:last-child td {
   flex-direction: column;
 }
 
+.col-3 {
+  grid-column: span 3;
+}
+
+.col-4 {
+  grid-column: span 4;
+}
+
 .col-6 {
   grid-column: span 6;
+}
+
+.col-8 {
+  grid-column: span 8;
 }
 
 .col-12 {

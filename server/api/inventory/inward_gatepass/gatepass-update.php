@@ -29,17 +29,17 @@ try {
         throw new Exception('Invalid input data');
     }
     
-    // Validate required fields
     if (empty($input['date']) || empty($input['company_id']) || empty($input['supplier_id']) || empty($input['branch_id']) || empty($input['items'])) {
         throw new Exception('Missing required fields');
     }
     
+    $container_id = $input['container_id'] ?? null;
+    
     $pdo->beginTransaction();
     
-    // Update inward_gatepass
     $stmt = $pdo->prepare("
         UPDATE inward_gatepass 
-        SET date = ?, company_id = ?, supplier_id = ?, branch_id = ? 
+        SET date = ?, company_id = ?, supplier_id = ?, branch_id = ?, container_id = ? 
         WHERE id = ? AND tenant_id = ?
     ");
     $stmt->execute([
@@ -47,6 +47,7 @@ try {
         $input['company_id'],
         $input['supplier_id'],
         $input['branch_id'],
+        $container_id,
         $input['id'],
         $tenant_id
     ]);

@@ -4,16 +4,18 @@ let paymentMethods = [];
 let bankAccounts = [];
 let companies = [];
 let projects = [];
+let containers = [];
 
 // Fetch data from API
 async function fetchDropdownData() {
     try {
-        const [expenseRes, paymentRes, bankRes, companyRes, projectRes] = await Promise.all([
+        const [expenseRes, paymentRes, bankRes, companyRes, projectRes, containerRes] = await Promise.all([
             fetch('../../../../server/api/vouchers/expense_voucher/get-expense-accounts.php'),
             fetch('../../../../server/api/vouchers/expense_voucher/get-payment-methods.php'),
             fetch('../../../../server/api/vouchers/expense_voucher/get-bank-accounts.php'),
             fetch('../../../../server/api/vouchers/expense_voucher/get-companies.php'),
-            fetch('../../../../server/api/master_setup/project_setup/get-projects-dropdown.php')
+            fetch('../../../../server/api/master_setup/project_setup/get-projects-dropdown.php'),
+            fetch('../../../../server/api/vouchers/expense_voucher/get-containers.php')
         ]);
         
         const expenseData = await expenseRes.json();
@@ -21,6 +23,7 @@ async function fetchDropdownData() {
         const bankData = await bankRes.json();
         const companyData = await companyRes.json();
         const projectData = await projectRes.json();
+        const containerData = await containerRes.json();
         
         if (expenseData.success) {
             expenseAccounts = expenseData.data;
@@ -52,6 +55,16 @@ async function fetchDropdownData() {
                 option.value = p.id;
                 option.textContent = `${p.project_code} - ${p.project_name}${p.city_name ? ' - ' + p.city_name : ''}`;
                 projectSelect.appendChild(option);
+            });
+        }
+        if (containerData.success) {
+            containers = containerData.data;
+            const containerSelect = document.getElementById('container');
+            containerData.data.forEach(c => {
+                const option = document.createElement('option');
+                option.value = c.id;
+                option.textContent = `${c.container_code} - ${c.container_name}`;
+                containerSelect.appendChild(option);
             });
         }
     } catch (error) {
@@ -106,6 +119,9 @@ async function loadVoucherForEdit(voucherId) {
                 }
                 if (voucher.project_id) {
                     document.getElementById('project').value = voucher.project_id;
+                }
+                if (voucher.container_id) {
+                    document.getElementById('container').value = voucher.container_id;
                 }
             }, 100);
             
@@ -441,6 +457,7 @@ async function validateAndPost() {
                     date: dateInput.value,
                     company_id: document.getElementById('company').value,
                     project_id: document.getElementById('project').value || null,
+                    container_id: document.getElementById('container').value || null,
                     voucher_number: document.getElementById('voucher').value,
                     description: document.getElementById('description').value,
                     entries: expenseData

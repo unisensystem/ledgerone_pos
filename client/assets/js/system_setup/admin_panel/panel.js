@@ -219,14 +219,14 @@ function renderPermissionsTree(permissions) {
         'Dashboard': [],
         'Customer / Supplier': ['New Customer', 'New Supplier', 'Leads'],
         'Sale': ['Sale Order', 'Create Quotation', 'Sale Invoice', 'Sale Tax Invoice', 'Meter Invoice', 'POS Invoice', 'Issue Delivery Challan', 'Sale Reports', 'Daily Sale Report', 'Sale Return'],
-        'Purchase': ['Purchase Order', 'New Purchase', 'Purchase Tax Invoice', 'Purchase Reports', 'Purchase Return'],
-        'Inventory': ['New Product', 'Stock Adjustment', 'Stock Transfer', 'Stock Position', 'Inward Gatepass', 'Outward Gatepass'],
+        'Purchase': ['Record Purchase Order', 'New Purchase', 'Purchase Tax Invoice', 'Purchase Reports', 'Purchase Return', 'Project Product Rates'],
+        'Inventory': ['New Product', 'Stock Adjustment', 'Stock Transfer', 'Stock Position', 'Inward Gatepass', 'Outward Gatepass', 'Container Setup'],
         'Manufacturing': ['Bill of Materials (BOM)', 'Unit Measurement', 'Machine Setup', 'Production Order', 'WIP Management', 'Production Completion', 'Production Expenses', 'Production Wastage', 'Production Report'],
         'Vouchers': ['Receive Voucher', 'Payment Voucher', 'Expense Voucher', 'Journal Entry', 'Cash Opening'],
         'Banking': ['New Bank', 'Post Dated Cheques (PDCs)'],
         'Rent Management': ['Issue Rent', 'Rent List'],
         'Chart of Accounts': [],
-        'Financial Reports': ['General Ledger', 'Customer Ledger', 'Supplier Ledger', 'Customer Aging', 'Supplier Aging', 'Recovery Sheet', 'Sales Officer-wise Recovery', 'Trial Balance', 'Balance Sheet', 'Profit & Loss Statement', 'Cash Flow', 'Financial Summary', 'Pending DSR Sheet', 'Project Tracking'],
+        'Financial Reports': ['General Ledger', 'Customer Ledger', 'Supplier Ledger', 'Customer Aging', 'Supplier Aging', 'Recovery Sheet', 'Sales Officer-wise Recovery', 'Trial Balance', 'Balance Sheet', 'Profit & Loss Statement', 'Cash Flow', 'Financial Summary', 'Pending DSR Sheet', 'Project Tracking', 'Container Tracking'],
         'HRM': ['New Employee', 'Record Attendance', 'New Payroll', 'Employees Ledger'],
         'Master Setup': ['Branch Setup', 'Territory Setup', 'Rate List Setup', 'Tax Rates Setup', 'Tax Regimes Setup', 'Project Setup'],
         'System Setup': ['Company Profile', 'Admin Panel', 'Currency Setup', 'Software Info']
@@ -234,7 +234,7 @@ function renderPermissionsTree(permissions) {
 
     const subPermissions = ['Add', 'Edit', 'Delete'];
     const noSubPermCategories = ['Dashboard', 'Financial Reports'];
-    const noSubPermForms = ['Sale Reports', 'Purchase Reports', 'Stock Position', 'Software Info', 'Company Profile', 'Employees Ledger', 'Post Dated Cheques (PDCs)', 'Daily Sale Report', 'Bill of Materials (BOM)', 'Production Wastage', 'Production Report', 'Tax Rates Setup', 'Tax Regimes Setup'];
+    const noSubPermForms = ['Sale Reports', 'Purchase Reports', 'Stock Position', 'Software Info', 'Company Profile', 'Employees Ledger', 'Post Dated Cheques (PDCs)', 'Daily Sale Report', 'Bill of Materials (BOM)', 'Production Wastage', 'Production Report', 'Tax Rates Setup', 'Tax Regimes Setup', 'Project Product Rates', 'Container Tracking'];
 
     // Create permission lookup map
     const permMap = {};
@@ -673,14 +673,14 @@ function openAddPermissionModal() {
         'Dashboard': [],
         'Customer / Supplier': ['New Customer', 'New Supplier', 'Leads'],
         'Sale': ['Sale Order', 'Create Quotation', 'Sale Invoice', 'Sale Tax Invoice', 'Meter Invoice', 'POS Invoice', 'Issue Delivery Challan', 'Sale Reports', 'Daily Sale Report', 'Sale Return'],
-        'Purchase': ['Purchase Order', 'New Purchase', 'Purchase Tax Invoice', 'Purchase Reports', 'Purchase Return'],
-        'Inventory': ['New Product', 'Stock Adjustment', 'Stock Transfer', 'Stock Position', 'Inward Gatepass', 'Outward Gatepass'],
+        'Purchase': ['Record Purchase Order', 'New Purchase', 'Purchase Tax Invoice', 'Purchase Reports', 'Purchase Return', 'Project Product Rates'],
+        'Inventory': ['New Product', 'Stock Adjustment', 'Stock Transfer', 'Stock Position', 'Inward Gatepass', 'Outward Gatepass', 'Container Setup'],
         'Manufacturing': ['Bill of Materials (BOM)', 'Unit Measurement', 'Machine Setup', 'Production Order', 'WIP Management', 'Production Completion', 'Production Expenses', 'Production Wastage', 'Production Report'],
         'Vouchers': ['Receive Voucher', 'Payment Voucher', 'Expense Voucher', 'Journal Entry', 'Cash Opening'],
         'Banking': ['New Bank', 'Post Dated Cheques (PDCs)'],
         'Rent Management': ['Issue Rent', 'Rent List'],
         'Chart of Accounts': [],
-        'Financial Reports': ['General Ledger', 'Customer Ledger', 'Supplier Ledger', 'Customer Aging', 'Supplier Aging', 'Recovery Sheet', 'Sales Officer-wise Recovery', 'Trial Balance', 'Balance Sheet', 'Profit & Loss Statement', 'Cash Flow', 'Pending DSR Sheet', 'Project Tracking'],
+        'Financial Reports': ['General Ledger', 'Customer Ledger', 'Supplier Ledger', 'Customer Aging', 'Supplier Aging', 'Recovery Sheet', 'Sales Officer-wise Recovery', 'Trial Balance', 'Balance Sheet', 'Profit & Loss Statement', 'Cash Flow', 'Financial Summary', 'Pending DSR Sheet', 'Project Tracking', 'Container Tracking'],
         'HRM': ['New Employee', 'Record Attendance', 'New Payroll', 'Employees Ledger'],
         'Master Setup': ['Branch Setup', 'Territory Setup', 'Rate List Setup', 'Tax Rates Setup', 'Tax Regimes Setup', 'Project Setup'],
         'System Setup': ['Company Profile', 'Admin Panel', 'Currency Setup', 'Software Info']

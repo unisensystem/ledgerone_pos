@@ -12,10 +12,12 @@ document.addEventListener('DOMContentLoaded', function () {
     let products = [];
     let units = [];
     let companies = [];
+    let containers = [];
     fetchCompanies();
     fetchBranches();
     fetchProducts();
     fetchUnits();
+    fetchContainers();
 
     // Initialize items table with one row
     let itemCounter = 1;
@@ -113,6 +115,26 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
+    async function fetchContainers() {
+        try {
+            const response = await fetch('../../../../server/api/inventory/stock_transfer/get-containers.php');
+            const data = await response.json();
+            
+            if (data.success && data.containers && data.containers.length > 0) {
+                containers = data.containers;
+                const containerSelect = document.getElementById('container');
+                containers.forEach(container => {
+                    const option = document.createElement('option');
+                    option.value = container.id;
+                    option.textContent = container.container_code + ' - ' + container.container_name;
+                    containerSelect.appendChild(option);
+                });
+            }
+        } catch (error) {
+            console.error('Error fetching containers:', error);
+        }
+    }
+
     async function loadTransferData(id) {
         try {
             const response = await fetch(`../../../../server/api/inventory/stock_transfer/transfer-get.php?id=${id}`);
@@ -130,6 +152,11 @@ document.addEventListener('DOMContentLoaded', function () {
                     setTimeout(() => {
                         document.getElementById('company').value = transfer.company_id;
                     }, 100);
+                }
+                
+                // Set container
+                if (transfer.container_id) {
+                    document.getElementById('container').value = transfer.container_id;
                 }
                 
                 // Set branches
@@ -493,6 +520,7 @@ document.addEventListener('DOMContentLoaded', function () {
             date: document.getElementById('date').value,
             from_location_id: fromBranchId,
             to_location_id: toBranchId,
+            container_id: document.getElementById('container').value || null,
             remarks: document.getElementById('remarks').value,
             items: items
         };

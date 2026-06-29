@@ -125,6 +125,13 @@ $currency_symbol = $currency['symbol'] ?? '$';
                     </select>
                 </div>
 
+                <div class="form-group">
+                    <label for="container">Container</label>
+                    <select id="container">
+                        <option value="">Select Container</option>
+                    </select>
+                </div>
+
                 <div class="form-group full-width">
                     <label for="description">Description</label>
                     <textarea id="description" placeholder="Enter a brief description of this expense entry"></textarea>

@@ -29,6 +29,7 @@ try {
     $date = $input['date'];
     $from_location_id = $input['from_location_id'];
     $to_location_id = $input['to_location_id'];
+    $container_id = $input['container_id'] ?? null;
     $remarks = $input['remarks'] ?? '';
     $items = $input['items'];
     
@@ -63,10 +64,10 @@ try {
     
     // Insert stock_transfer
     $stmt = $pdo->prepare(
-        "INSERT INTO stock_transfer (tenant_id, company_id, transfer_code, date, from_location_id, to_location_id, remarks, total_amount, total_items) 
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
+        "INSERT INTO stock_transfer (tenant_id, company_id, transfer_code, date, from_location_id, to_location_id, container_id, remarks, total_amount, total_items) 
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
     );
-    $stmt->execute([$tenant_id, $company_id, $transfer_code, $date, $from_location_id, $to_location_id, $remarks, $total_amount, $total_items]);
+    $stmt->execute([$tenant_id, $company_id, $transfer_code, $date, $from_location_id, $to_location_id, $container_id, $remarks, $total_amount, $total_items]);
     $transfer_id = $pdo->lastInsertId();
     
     // Insert stock_transfer_items

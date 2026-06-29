@@ -53,6 +53,7 @@ let bulkCurrencies = [];
 let bulkPaymentMethods = [];
 let bulkBankAccounts = [];
 let bulkProjects = [];
+let bulkContainers = [];
 
 // Load projects
 function loadProjects() {
@@ -74,6 +75,27 @@ function loadProjects() {
         .catch(error => console.error('Error fetching projects:', error));
 }
 loadProjects();
+
+// Load containers
+function loadContainers() {
+    fetch('../../../../server/api/vouchers/payment_voucher/get-containers.php')
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                bulkContainers = data.data;
+                const containerSelect = document.getElementById('container');
+                containerSelect.innerHTML = '<option value="">Select Container</option>';
+                data.data.forEach(c => {
+                    const opt = document.createElement('option');
+                    opt.value = c.id;
+                    opt.textContent = `${c.container_code} - ${c.container_name}`;
+                    containerSelect.appendChild(opt);
+                });
+            }
+        })
+        .catch(error => console.error('Error fetching containers:', error));
+}
+loadContainers();
 
 // Suppliers and customers data
 let suppliers = [];
@@ -609,6 +631,9 @@ form.addEventListener('submit', function (e) {
     const projectValue = document.getElementById('project').value;
     if (projectValue) formData.append('project_id', projectValue);
 
+    const containerValue = document.getElementById('container').value;
+    if (containerValue) formData.append('container_id', containerValue);
+
     const bankAccountValue = document.getElementById('bankAccount').value;
     if (bankAccountValue) formData.append('bank_account', bankAccountValue);
     
@@ -733,6 +758,11 @@ function addBulkRow() {
             </select>
         </td>
         <td>
+            <select class="bulk-container">
+                <option value="">Select Container</option>
+            </select>
+        </td>
+        <td>
             <select class="bulk-bank-account">
                 <option value="">Select Bank</option>
             </select>
@@ -834,6 +864,14 @@ function addBulkRow() {
         projectSelect.appendChild(opt);
     });
 
+    const containerSelect = row.querySelector('.bulk-container');
+    bulkContainers.forEach(c => {
+        const opt = document.createElement('option');
+        opt.value = c.id;
+        opt.textContent = `${c.container_code} - ${c.container_name}`;
+        containerSelect.appendChild(opt);
+    });
+
     const bankSelect = row.querySelector('.bulk-bank-account');
     bulkBankAccounts.forEach(b => {
         const opt = document.createElement('option');
@@ -890,6 +928,9 @@ document.getElementById('postBulkBtn').addEventListener('click', async function(
         
         const bulkProject = row.querySelector('.bulk-project').value;
         if (bulkProject) formData.append('project_id', bulkProject);
+
+        const bulkContainer = row.querySelector('.bulk-container').value;
+        if (bulkContainer) formData.append('container_id', bulkContainer);
 
         const bulkBankAccount = row.querySelector('.bulk-bank-account').value;
         if (bulkBankAccount) formData.append('bank_account', bulkBankAccount);

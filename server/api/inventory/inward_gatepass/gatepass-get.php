@@ -27,7 +27,7 @@ if (!$id) {
 try {
     // Fetch gatepass
     $stmt = $pdo->prepare("
-        SELECT gatepass_code, date, company_id, supplier_id, branch_id 
+        SELECT gatepass_code, date, company_id, supplier_id, branch_id, container_id 
         FROM inward_gatepass 
         WHERE id = ? AND tenant_id = ?
     ");

@@ -200,6 +200,15 @@ if (!$user_id) {
                             <!-- Options loaded dynamically -->
                         </select>
                     </div>
+                    
+                    <!-- 17. Container -->
+                    <div class="form-group" id="containerGroup">
+                        <label for="container">Container</label>
+                        <select id="container" tabindex="-1">
+                            <option value="">Select Container</option>
+                            <!-- Options loaded dynamically -->
+                        </select>
+                    </div>
 
                 </div>
             </div>

@@ -74,11 +74,11 @@ try {
     // Insert sale invoice
     $stmt = $pdo->prepare("
         INSERT INTO sale_invoice (
-            tenant_id, currency_id, bill_no, sale_date, customer_id, sub_account_id, company_id, branch_id,
+            tenant_id, currency_id, bill_no, sale_date, customer_id, sub_account_id, company_id, branch_id, container_id,
             previous_balance, sale_officer_id, supplier_man_id, sale_order_id, bilty_no, transport_name, project_id, total_bill, total_discount_percent,
             total_discount_amount, shipping_fees, net_amount, withholding_tax_percent, withholding_tax_amount, amount_paid_auto_fill,
             invoice_type, due_date, remarks, status, created_by, updated_by
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ");
 
     $stmt->execute([
@@ -90,27 +90,28 @@ try {
         $input['subAccountId'] ?? null,                       // 6
         $input['companyId'] ?? null,                          // 7
         $input['branchId'],                                   // 8
-        extractBalanceAmount($input['previousBalance'] ?? '0.00'), // 9
-        $input['salesOfficerId'] ?? null,                     // 10
-        $input['supplierManId'] ?? null,                      // 11
-        $input['saleOrderId'] ?? null,                        // 12
-        $input['biltyNo'] ?? null,                            // 13
-        $input['transportName'] ?? null,                      // 14
-        $input['projectId'] ?? null,                          // 15 - project_id (can be null if not selected)
-        $input['totalBill'],                                  // 16
-        $input['totalDiscountPercent'] ?? 0.00,               // 17
-        $input['totalDiscountAmount'] ?? 0.00,                // 18
-        $input['shippingFees'] ?? 0.00,                       // 19
-        $input['netAmount'],                                  // 20
-        $withholdingTaxPercent,                               // 21
-        $withholdingTaxAmount,                                // 22
-        $input['amountPaidAutoFill'] ?? 'yes',                // 23
-        $input['invoiceType'] ?? 'Cash',                      // 24
-        $input['dueDate'] ?? null,                            // 25
-        $input['remarks'] ?? null,                            // 26
-        $input['status'] ?? 'Posted',                         // 27
-        $user_id,                                             // 28
-        $user_id                                              // 29
+        $input['containerId'] ?? null,                        // 9 - container_id (optional)
+        extractBalanceAmount($input['previousBalance'] ?? '0.00'), // 10
+        $input['salesOfficerId'] ?? null,                     // 11
+        $input['supplierManId'] ?? null,                      // 12
+        $input['saleOrderId'] ?? null,                        // 13
+        $input['biltyNo'] ?? null,                            // 14
+        $input['transportName'] ?? null,                      // 15
+        $input['projectId'] ?? null,                          // 16 - project_id (can be null if not selected)
+        $input['totalBill'],                                  // 17
+        $input['totalDiscountPercent'] ?? 0.00,               // 18
+        $input['totalDiscountAmount'] ?? 0.00,                // 19
+        $input['shippingFees'] ?? 0.00,                       // 20
+        $input['netAmount'],                                  // 21
+        $withholdingTaxPercent,                               // 22
+        $withholdingTaxAmount,                                // 23
+        $input['amountPaidAutoFill'] ?? 'yes',                // 24
+        $input['invoiceType'] ?? 'Cash',                      // 25
+        $input['dueDate'] ?? null,                            // 26
+        $input['remarks'] ?? null,                            // 27
+        $input['status'] ?? 'Posted',                         // 28
+        $user_id,                                             // 29
+        $user_id                                              // 30
     ]);
     
     if (!$stmt) {

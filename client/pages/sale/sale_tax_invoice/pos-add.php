@@ -116,6 +116,13 @@ if (!$user_id) {
                         </div>
                         <div class="error-message" id="branchError">Please select a branch</div>
                     </div>
+                    <div class="form-group" id="containerGroup">
+                        <label for="container">Container</label>
+                        <select id="container" tabindex="-1">
+                            <option value="">Select Container</option>
+                            <!-- Options loaded dynamically -->
+                        </select>
+                    </div>
                     <div class="form-group" id="currencyGroup">
                         <label for="currency" class="required">Currency</label>
                         <select id="currency" required tabindex="-1">

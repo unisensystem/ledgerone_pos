@@ -360,7 +360,7 @@ function initializePage(permissions) {
     const form = document.getElementById('invoiceForm');
 
     // Load all data, then initialize dropdowns and add first row
-    Promise.all([loadCustomersLocal(), loadCompanies(), loadBranches(), loadProductsLocal(), loadUOM(), loadUOMGroupUnits(), loadCurrencies(), loadBankAccounts(), loadEmployees(), loadSaleOrders(), loadProjects()]).then(() => {
+    Promise.all([loadCustomersLocal(), loadCompanies(), loadBranches(), loadProductsLocal(), loadUOM(), loadUOMGroupUnits(), loadCurrencies(), loadBankAccounts(), loadEmployees(), loadSaleOrders(), loadProjects(), fetchContainers()]).then(() => {
         console.log('All data loaded. Project dropdown populated.');
         initSearchableDropdown('customerCodeSearch', 'customerCodeOptions', 'customerCode');
         initSearchableDropdown('companySearch', 'companyOptions', 'company');
@@ -1079,13 +1079,17 @@ function initializePage(permissions) {
                 const projectSelect = document.getElementById('project');
                 if (!projectSelect) return;
                 projectSelect.innerHTML = '<option value="">Select Project</option>';
-                data.data.forEach(project => {
+                const projects = data.projects || data.data || [];
+                projects.forEach(project => {
                     const label = `${project.project_code} - ${project.project_name}${project.city_name ? ' - ' + project.city_name : ''}`;
                     const option = document.createElement('option');
                     option.value = project.id;
                     option.textContent = label;
                     projectSelect.appendChild(option);
                 });
+                console.log('Projects loaded:', projects.length);
+            } else {
+                console.error('Failed to load projects:', data.message);
             }
         } catch (error) {
             console.error('Error loading projects:', error);
@@ -1115,6 +1119,28 @@ function initializePage(permissions) {
             }
         } catch (error) {
             console.error('Error loading sale orders:', error);
+        }
+    }
+
+    // Fetch containers from API
+    async function fetchContainers() {
+        try {
+            const response = await fetch('../../../../server/api/sale/sale_tax_invoice/get-containers.php');
+            const data = await response.json();
+
+            if (data.success) {
+                const containerSelect = document.getElementById('container');
+                containerSelect.innerHTML = '<option value="">Select Container</option>';
+
+                data.containers.forEach(container => {
+                    const option = document.createElement('option');
+                    option.value = container.id;
+                    option.textContent = `${container.container_code} - ${container.container_name}`;
+                    containerSelect.appendChild(option);
+                });
+            }
+        } catch (error) {
+            console.error('Error loading containers:', error);
         }
     }
 
@@ -3562,6 +3588,7 @@ function saveInvoice(status = 'Posted') {
         subAccountId: document.getElementById('subAccount').value || null,
         companyId: document.getElementById('company').value || null,
         branchId: document.getElementById('branch').value,
+        containerId: document.getElementById('container')?.value || null,
         currencyId: document.getElementById('currency').value,
         saleOrderId: document.getElementById('saleOrder').value || null,
         previousBalance: document.getElementById('previousBalance')?.value || '0.00',

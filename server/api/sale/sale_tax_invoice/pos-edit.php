@@ -133,7 +133,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
         // Update sale invoice
         $stmt = $pdo->prepare("
             UPDATE sale_invoice SET
-                currency_id = ?, sale_date = ?, customer_id = ?, sub_account_id = ?, company_id = ?, branch_id = ?,
+                currency_id = ?, sale_date = ?, customer_id = ?, sub_account_id = ?, company_id = ?, branch_id = ?, container_id = ?,
                 previous_balance = ?, sale_officer_id = ?, supplier_man_id = ?, sale_order_id = ?, bilty_no = ?, transport_name = ?, project_id = ?, total_bill = ?, total_discount_percent = ?,
                 total_discount_amount = ?, net_amount = ?, withholding_tax_percent = ?, withholding_tax_amount = ?, amount_paid_auto_fill = ?, remarks = ?, status = ?, updated_by = ?
             WHERE id = ? AND tenant_id = ?
@@ -145,25 +145,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
             $input['subAccountId'] ?? null,                      // 4
             $input['companyId'] ?? null,                         // 5
             $input['branchId'],                                  // 6
-            extractBalanceAmount($input['previousBalance'] ?? '0.00'), // 7
-            $input['salesOfficerId'] ?? null,                    // 8
-            $input['supplierManId'] ?? null,                     // 9
-            $input['saleOrderId'] ?? null,                       // 10
-            $input['biltyNo'] ?? null,                           // 11
-            $input['transportName'] ?? null,                     // 12
-            $input['projectId'] ?? null,                         // 13 - project_id
-            $input['totalBill'],                                 // 14
-            $input['totalDiscountPercent'] ?? 0.00,              // 15
-            $input['totalDiscountAmount'] ?? 0.00,               // 16
-            $input['netAmount'],                                 // 17
-            $withholdingTaxPercent,                              // 18
-            $withholdingTaxAmount,                               // 19
-            $input['amountPaidAutoFill'] ?? 'yes',               // 20
-            $input['remarks'] ?? null,                           // 21
-            $input['status'] ?? 'Posted',                        // 22
-            $user_id,                                            // 23
-            $invoice_id,                                         // 24
-            $tenant_id                                           // 25
+            $input['containerId'] ?? null,                       // 7 - container_id (optional)
+            extractBalanceAmount($input['previousBalance'] ?? '0.00'), // 8
+            $input['salesOfficerId'] ?? null,                    // 9
+            $input['supplierManId'] ?? null,                     // 10
+            $input['saleOrderId'] ?? null,                       // 11
+            $input['biltyNo'] ?? null,                           // 12
+            $input['transportName'] ?? null,                     // 13
+            $input['projectId'] ?? null,                         // 14 - project_id
+            $input['totalBill'],                                 // 15
+            $input['totalDiscountPercent'] ?? 0.00,              // 16
+            $input['totalDiscountAmount'] ?? 0.00,               // 17
+            $input['netAmount'],                                 // 18
+            $withholdingTaxPercent,                              // 19
+            $withholdingTaxAmount,                               // 20
+            $input['amountPaidAutoFill'] ?? 'yes',               // 21
+            $input['remarks'] ?? null,                           // 22
+            $input['status'] ?? 'Posted',                        // 23
+            $user_id,                                            // 24
+            $invoice_id,                                         // 25
+            $tenant_id                                           // 26
         ]);
 
         // Delete existing items and related records

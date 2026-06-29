@@ -115,6 +115,14 @@ $currency_symbol = $currency['symbol'];
                         </div>
                     </div>
 
+                    <!-- Container -->
+                    <div class="form-group">
+                        <label class="form-label" for="container">Container</label>
+                        <select id="container" class="form-input">
+                            <option value="">Select Container</option>
+                        </select>
+                    </div>
+
                     <!-- Remarks -->
                     <div class="form-group" style="grid-column: span 3;">
                         <label class="form-label" for="remarks">Remarks</label>

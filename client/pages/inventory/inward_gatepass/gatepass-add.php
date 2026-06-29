@@ -110,6 +110,14 @@ if (!$user_id) {
                         </div>
                         <div class="helper-text">Select receiving branch</div>
                     </div>
+
+                    <div class="form-group">
+                        <label for="container" class="form-label">Container</label>
+                        <select id="container" class="form-input">
+                            <option value="">Select Container</option>
+                        </select>
+                        <div class="helper-text">Optional: Select container if applicable</div>
+                    </div>
                 </div>
             </div>
 

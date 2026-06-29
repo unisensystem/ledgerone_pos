@@ -29,15 +29,14 @@ try {
         throw new Exception('Invalid input data');
     }
     
-    // Validate required fields
     if (empty($input['date']) || empty($input['company_id']) || empty($input['supplier_id']) || empty($input['branch_id']) || empty($input['items'])) {
         throw new Exception('Missing required fields');
     }
     
-    // Start transaction
+    $container_id = $input['container_id'] ?? null;
+    
     $pdo->beginTransaction();
     
-    // Generate gatepass code
     $stmt = $pdo->prepare("SELECT gatepass_code FROM outward_gatepass WHERE tenant_id = ? ORDER BY id DESC LIMIT 1");
     $stmt->execute([$tenant_id]);
     $lastCode = $stmt->fetchColumn();
@@ -50,10 +49,9 @@ try {
     }
     $gatepass_code = 'OGP-' . date('Y') . '-' . str_pad($newNum, 5, '0', STR_PAD_LEFT);
     
-    // Insert outward_gatepass
     $stmt = $pdo->prepare("
-        INSERT INTO outward_gatepass (tenant_id, company_id, gatepass_code, date, supplier_id, branch_id) 
-        VALUES (?, ?, ?, ?, ?, ?)
+        INSERT INTO outward_gatepass (tenant_id, company_id, gatepass_code, date, supplier_id, branch_id, container_id) 
+        VALUES (?, ?, ?, ?, ?, ?, ?)
     ");
     $stmt->execute([
         $tenant_id,
@@ -61,7 +59,8 @@ try {
         $gatepass_code,
         $input['date'],
         $input['supplier_id'],
-        $input['branch_id']
+        $input['branch_id'],
+        $container_id
     ]);
     
     $gatepass_id = $pdo->lastInsertId();

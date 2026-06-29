@@ -25,6 +25,7 @@ $end_date = $_GET['end_date'] ?? null;
 $branch_id = $_GET['branch_id'] ?? null;
 $company_id = !empty($_GET['company_id']) ? $_GET['company_id'] : null;
 $project_id = !empty($_GET['project_id']) ? $_GET['project_id'] : null;
+$container_id = !empty($_GET['container_id']) ? $_GET['container_id'] : null;
 $target_currency_id = $_GET['currency_id'] ?? null;
 
 if (!$start_date || !$end_date) {
@@ -62,6 +63,14 @@ try {
         $project_sql_sale = ' AND si.project_id = ?';
         $project_sql_purchase = ' AND pi.project_id = ?';
     }
+    
+    // Build container condition
+    $container_sql_sale = '';
+    $container_sql_purchase = '';
+    if ($container_id) {
+        $container_sql_sale = ' AND si.container_id = ?';
+        $container_sql_purchase = ' AND pi.container_id = ?';
+    }
 
     // Get Sales Revenue from station_daily_usage (fuel products)
     $sql = "
@@ -98,12 +107,14 @@ try {
         $branch_condition
         " . ($company_id ? " AND si.company_id = ?" : "") . "
         $project_sql_sale
+        $container_sql_sale
         ORDER BY p.name
     ";
     $stmt = $pdo->prepare($sql);
     $params = array_merge([$tenant_id, $start_date, $end_date], $branch_params);
     if ($company_id) $params[] = $company_id;
     if ($project_id) $params[] = $project_id;
+    if ($container_id) $params[] = $container_id;
     $stmt->execute($params);
     $other_sales_raw = $stmt->fetchAll(PDO::FETCH_ASSOC);
     
@@ -143,12 +154,14 @@ try {
         $branch_condition
         " . ($company_id ? " AND si.company_id = ?" : "") . "
         $project_sql_sale
+        $container_sql_sale
         ORDER BY p.name
     ";
     $stmt = $pdo->prepare($sql);
     $params = array_merge([$tenant_id, $start_date, $end_date], $branch_params);
     if ($company_id) $params[] = $company_id;
     if ($project_id) $params[] = $project_id;
+    if ($container_id) $params[] = $container_id;
     $stmt->execute($params);
     $service_revenue_raw = $stmt->fetchAll(PDO::FETCH_ASSOC);
     
@@ -232,12 +245,14 @@ try {
         $branch_condition
         " . ($company_id ? " AND si.company_id = ?" : "") . "
         $project_sql_sale
+        $container_sql_sale
         GROUP BY p.id, p.name
     ";
     $stmt = $pdo->prepare($sql);
     $params = array_merge([$tenant_id, $start_date, $end_date], $branch_params);
     if ($company_id) $params[] = $company_id;
     if ($project_id) $params[] = $project_id;
+    if ($container_id) $params[] = $container_id;
     $stmt->execute($params);
     $other_sold = $stmt->fetchAll(PDO::FETCH_ASSOC);
     
@@ -260,10 +275,12 @@ try {
             AND pi.purchase_date <= ?
             " . ($company_id ? " AND pi.company_id = ?" : "") . "
             $project_sql_purchase
+            $container_sql_purchase
         ");
         $params_cogs = [$item['id'], $tenant_id, $end_date];
         if ($company_id) $params_cogs[] = $company_id;
         if ($project_id) $params_cogs[] = $project_id;
+        if ($container_id) $params_cogs[] = $container_id;
         $stmt->execute($params_cogs);
         $purchase_data = $stmt->fetchAll(PDO::FETCH_ASSOC);
         
@@ -331,6 +348,15 @@ try {
         )";
     }
     
+    if ($container_id) {
+        $expense_filter = " AND (
+            (al.reference_table = 'sale_invoice' AND al.reference_id IN (SELECT id FROM sale_invoice WHERE container_id = ? AND tenant_id = ?))
+            OR (al.reference_table = 'purchase_invoice' AND al.reference_id IN (SELECT id FROM purchase_invoice WHERE container_id = ? AND tenant_id = ?))
+            OR (al.reference_table = 'payment_voucher' AND al.reference_id IN (SELECT id FROM payment_voucher WHERE container_id = ? AND tenant_id = ?))
+            OR (al.reference_table = 'receive_voucher' AND al.reference_id IN (SELECT id FROM receive_voucher WHERE container_id = ? AND tenant_id = ?))
+        )";
+    }
+    
     $stmt = $pdo->prepare("
         SELECT 
             a.name as account,
@@ -351,6 +377,9 @@ try {
     $params_exp = [$tenant_id, $start_date, $end_date];
     if ($company_id) {
         $params_exp = array_merge($params_exp, [$company_id, $company_id, $company_id, $company_id]);
+    }
+    if ($container_id) {
+        $params_exp = [$tenant_id, $start_date, $end_date, $container_id, $tenant_id, $container_id, $tenant_id, $container_id, $tenant_id, $container_id, $tenant_id];
     }
     $stmt->execute($params_exp);
     $expenses_raw = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -439,6 +468,15 @@ try {
             OR (al.reference_table = 'receive_voucher' AND al.reference_id IN (SELECT id FROM receive_voucher WHERE company_id = ?))
         )";
     }
+    
+    if ($container_id) {
+        $income_filter = " AND (
+            (al.reference_table = 'sale_invoice' AND al.reference_id IN (SELECT id FROM sale_invoice WHERE container_id = ? AND tenant_id = ?))
+            OR (al.reference_table = 'purchase_invoice' AND al.reference_id IN (SELECT id FROM purchase_invoice WHERE container_id = ? AND tenant_id = ?))
+            OR (al.reference_table = 'payment_voucher' AND al.reference_id IN (SELECT id FROM payment_voucher WHERE container_id = ? AND tenant_id = ?))
+            OR (al.reference_table = 'receive_voucher' AND al.reference_id IN (SELECT id FROM receive_voucher WHERE container_id = ? AND tenant_id = ?))
+        )";
+    }
     $stmt = $pdo->prepare("
         SELECT 
             a.name as account,
@@ -455,6 +493,9 @@ try {
     $params_inc = [$tenant_id, $start_date, $end_date];
     if ($company_id) {
         $params_inc = array_merge($params_inc, [$company_id, $company_id, $company_id, $company_id]);
+    }
+    if ($container_id) {
+        $params_inc = [$tenant_id, $start_date, $end_date, $container_id, $tenant_id, $container_id, $tenant_id, $container_id, $tenant_id, $container_id, $tenant_id];
     }
     $stmt->execute($params_inc);
     $other_income_raw = $stmt->fetchAll(PDO::FETCH_ASSOC);

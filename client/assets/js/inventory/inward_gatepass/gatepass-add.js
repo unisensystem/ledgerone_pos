@@ -1,54 +1,39 @@
-// Sample data for dropdowns
 let suppliers = [];
 let branches = [];
 let products = [];
 let units = [];
 let companies = [];
+let containers = [];
 let editMode = false;
 let editId = null;
 
-// Initialize dropdowns
 document.addEventListener('DOMContentLoaded', function () {
-    // Check if edit mode
     const urlParams = new URLSearchParams(window.location.search);
     editId = urlParams.get('id');
     editMode = !!editId;
 
-    // Set current date as default
     const today = new Date().toISOString().split('T')[0];
     document.getElementById('date').value = today;
 
-    // Fetch and initialize company dropdown
     fetchCompanies();
-
-    // Fetch and initialize supplier dropdown
     fetchSuppliers();
-
-    // Fetch and initialize branch dropdown
     fetchBranches();
-
-    // Fetch products
     fetchProducts();
-
-    // Fetch units
     fetchUnits();
+    fetchContainers();
 
-    // Load gatepass data if edit mode
     if (editMode) {
-        loadGatepassData(editId);
+        setTimeout(() => loadGatepassData(editId), 500);
     }
 
-    // Setup form submission
     document.getElementById('submit-form').addEventListener('click', submitForm);
 
-    // Setup add row button
     document.getElementById('add-row-btn').addEventListener('click', function () {
         const rowCount = document.querySelectorAll('#items-table-body tr').length;
         addItemRow(rowCount + 1);
     });
 });
 
-// Fetch companies from database
 function fetchCompanies() {
     fetch('../../../../server/api/inventory/inward_gatepass/get-companies.php')
         .then(response => response.json())
@@ -60,16 +45,11 @@ function fetchCompanies() {
                     document.getElementById('company').value = companies[0].company_name;
                     document.getElementById('company').dataset.selectedValue = companies[0].id;
                 }
-            } else {
-                console.error('Failed to fetch companies:', data.message);
             }
         })
-        .catch(error => {
-            console.error('Error fetching companies:', error);
-        });
+        .catch(error => console.error('Error fetching companies:', error));
 }
 
-// Fetch suppliers from database
 function fetchSuppliers() {
     fetch('../../../../server/api/inventory/inward_gatepass/get-suppliers.php')
         .then(response => response.json())
@@ -77,16 +57,11 @@ function fetchSuppliers() {
             if (data.success) {
                 suppliers = data.data;
                 initDropdown('supplier', 'supplier-options', suppliers, 'name');
-            } else {
-                console.error('Failed to fetch suppliers:', data.message);
             }
         })
-        .catch(error => {
-            console.error('Error fetching suppliers:', error);
-        });
+        .catch(error => console.error('Error fetching suppliers:', error));
 }
 
-// Fetch branches from database
 function fetchBranches() {
     fetch('../../../../server/api/inventory/inward_gatepass/get-branches.php')
         .then(response => response.json())
@@ -94,50 +69,57 @@ function fetchBranches() {
             if (data.success) {
                 branches = data.data;
                 initDropdown('branch', 'branch-options', branches, 'name');
-            } else {
-                console.error('Failed to fetch branches:', data.message);
             }
         })
-        .catch(error => {
-            console.error('Error fetching branches:', error);
-        });
+        .catch(error => console.error('Error fetching branches:', error));
 }
 
-// Fetch products from database
 function fetchProducts() {
     fetch('../../../../server/api/inventory/inward_gatepass/get-products.php')
         .then(response => response.json())
         .then(data => {
             if (data.success) {
                 products = data.data;
-                checkAndAddFirstRow();
-            } else {
-                console.error('Failed to fetch products:', data.message);
+                if (!editMode) checkAndAddFirstRow();
             }
         })
-        .catch(error => {
-            console.error('Error fetching products:', error);
-        });
+        .catch(error => console.error('Error fetching products:', error));
 }
 
-// Fetch units from database
 function fetchUnits() {
     fetch('../../../../server/api/inventory/inward_gatepass/get-units.php')
         .then(response => response.json())
         .then(data => {
             if (data.success) {
                 units = data.data;
-                checkAndAddFirstRow();
-            } else {
-                console.error('Failed to fetch units:', data.message);
+                if (!editMode) checkAndAddFirstRow();
             }
         })
-        .catch(error => {
-            console.error('Error fetching units:', error);
-        });
+        .catch(error => console.error('Error fetching units:', error));
 }
 
-// Check if both products and units are loaded, then add first row
+function fetchContainers() {
+    fetch('../../../../server/api/inventory/inward_gatepass/get-containers.php')
+        .then(response => response.json())
+        .then(data => {
+            if (data.success && data.data && data.data.length > 0) {
+                containers = data.data;
+                populateContainerDropdown();
+            }
+        })
+        .catch(error => console.error('Error fetching containers:', error));
+}
+
+function populateContainerDropdown() {
+    const containerSelect = document.getElementById('container');
+    containers.forEach(container => {
+        const option = document.createElement('option');
+        option.value = container.id;
+        option.textContent = container.container_code + ' - ' + container.container_name;
+        containerSelect.appendChild(option);
+    });
+}
+
 function checkAndAddFirstRow() {
     if (products.length > 0 && units.length > 0) {
         const tableBody = document.getElementById('items-table-body');
@@ -147,7 +129,6 @@ function checkAndAddFirstRow() {
     }
 }
 
-// Load gatepass data for editing
 function loadGatepassData(id) {
     fetch(`../../../../server/api/inventory/inward_gatepass/gatepass-get.php?id=${id}`)
         .then(response => response.json())
@@ -155,38 +136,34 @@ function loadGatepassData(id) {
             if (data.success) {
                 const gatepass = data.data;
                 
-                // Set form values
                 document.getElementById('igp-code').value = gatepass.gatepass_code;
                 document.getElementById('date').value = gatepass.date;
                 
-                // Set company
-                setTimeout(() => {
-                    const company = companies.find(c => c.id == gatepass.company_id);
-                    if (company) {
-                        document.getElementById('company').value = company.company_name;
-                        document.getElementById('company').dataset.selectedValue = company.id;
-                    }
-                }, 100);
+                const company = companies.find(c => c.id == gatepass.company_id);
+                if (company) {
+                    document.getElementById('company').value = company.company_name;
+                    document.getElementById('company').dataset.selectedValue = company.id;
+                }
                 
-                // Set supplier
                 const supplier = suppliers.find(s => s.id == gatepass.supplier_id);
                 if (supplier) {
                     document.getElementById('supplier').value = supplier.name;
                     document.getElementById('supplier').dataset.selectedValue = supplier.id;
                 }
                 
-                // Set branch
                 const branch = branches.find(b => b.id == gatepass.branch_id);
                 if (branch) {
                     document.getElementById('branch').value = branch.name;
                     document.getElementById('branch').dataset.selectedValue = branch.id;
                 }
                 
-                // Load items
+                if (gatepass.container_id) {
+                    document.getElementById('container').value = gatepass.container_id;
+                }
+                
                 gatepass.items.forEach((item, index) => {
                     const row = addItemRow(index + 1);
                     
-                    // Set product
                     const product = products.find(p => p.id == item.product_id);
                     if (product) {
                         const productSelect = row.querySelector('.product-select');
@@ -194,15 +171,16 @@ function loadGatepassData(id) {
                         productSelect.dataset.selectedValue = product.id;
                     }
                     
-                    // Set unit
                     const unit = units.find(u => u.id == item.unit_id);
                     if (unit) {
-                        row.querySelector('.unit-select').value = unit.name;
+                        const unitSelect = row.querySelector('.unit-select');
+                        unitSelect.value = unit.name;
                     }
                     
-                    // Set quantity
                     row.querySelector('.quantity-input').value = item.quantity;
                 });
+                
+                document.getElementById('submit-form').innerHTML = '<i class="fas fa-save"></i> Update Gatepass';
             } else {
                 alert('Error loading gatepass: ' + data.message);
             }
@@ -213,7 +191,6 @@ function loadGatepassData(id) {
         });
 }
 
-// Initialize a searchable dropdown
 function initDropdown(inputId, optionsContainerId, items, displayProperty) {
     const input = document.getElementById(inputId);
     const optionsContainer = document.getElementById(optionsContainerId);
@@ -221,10 +198,8 @@ function initDropdown(inputId, optionsContainerId, items, displayProperty) {
     const dropdownMenu = dropdownToggle.nextElementSibling;
     const searchInput = dropdownMenu.querySelector('input[type="text"]');
 
-    // Clear existing options
     optionsContainer.innerHTML = '';
 
-    // Populate dropdown items
     items.forEach(item => {
         const itemElement = document.createElement('div');
         itemElement.className = 'dropdown-item';
@@ -236,7 +211,6 @@ function initDropdown(inputId, optionsContainerId, items, displayProperty) {
             input.value = this.dataset.display;
             input.dataset.selectedValue = this.dataset.value;
 
-            // Mark as selected
             optionsContainer.querySelectorAll('.dropdown-item').forEach(el => {
                 el.classList.remove('selected');
             });
@@ -248,7 +222,6 @@ function initDropdown(inputId, optionsContainerId, items, displayProperty) {
         optionsContainer.appendChild(itemElement);
     });
 
-    // Toggle dropdown
     dropdownToggle.addEventListener('click', function (e) {
         e.stopPropagation();
         dropdownMenu.classList.toggle('show');
@@ -257,14 +230,12 @@ function initDropdown(inputId, optionsContainerId, items, displayProperty) {
             searchInput.value = '';
             searchInput.focus();
 
-            // Reset all items to visible when opening
             optionsContainer.querySelectorAll('.dropdown-item').forEach(item => {
                 item.style.display = 'block';
             });
         }
     });
 
-    // Filter items on search
     searchInput.addEventListener('input', function () {
         const searchTerm = this.value.toLowerCase();
         optionsContainer.querySelectorAll('.dropdown-item').forEach(item => {
@@ -273,7 +244,6 @@ function initDropdown(inputId, optionsContainerId, items, displayProperty) {
         });
     });
 
-    // Close dropdown when clicking outside
     document.addEventListener('click', function (e) {
         if (!dropdownMenu.contains(e.target) && !dropdownToggle.contains(e.target)) {
             dropdownMenu.classList.remove('show');
@@ -281,11 +251,10 @@ function initDropdown(inputId, optionsContainerId, items, displayProperty) {
     });
 }
 
-// Add a new item row to the table
 function addItemRow(rowNumber) {
     const tableBody = document.getElementById('items-table-body');
     const row = document.createElement('tr');
-    row.dataset.rowId = Date.now(); // Unique ID for the row
+    row.dataset.rowId = Date.now();
 
     row.innerHTML = `
                 <td>${rowNumber}</td>
@@ -306,7 +275,6 @@ function addItemRow(rowNumber) {
                                 <input type="text" placeholder="Search products..." class="product-search">
                             </div>
                             <div class="dropdown-items product-options">
-                                <!-- Product options will be populated by JS -->
                             </div>
                         </div>
                     </div>
@@ -333,7 +301,6 @@ function addItemRow(rowNumber) {
 
     tableBody.appendChild(row);
 
-    // Populate unit dropdown
     const unitSelect = row.querySelector('.unit-select');
     units.forEach(unit => {
         const option = document.createElement('option');
@@ -343,7 +310,6 @@ function addItemRow(rowNumber) {
         unitSelect.appendChild(option);
     });
 
-    // Setup product dropdown for this row
     const productDropdown = row.querySelector('.searchable-dropdown');
     const productToggle = row.querySelector('.dropdown-toggle');
     const productSelect = row.querySelector('.product-select');
@@ -351,7 +317,6 @@ function addItemRow(rowNumber) {
     const productSearch = productMenu.querySelector('.product-search');
     const productOptions = productMenu.querySelector('.product-options');
 
-    // Clear and populate product options
     productOptions.innerHTML = '';
     products.forEach(product => {
         const option = document.createElement('div');
@@ -365,13 +330,11 @@ function addItemRow(rowNumber) {
             productSelect.value = this.dataset.display;
             productSelect.dataset.selectedValue = this.dataset.value;
 
-            // Auto-select the unit if product has a default unit
             const unitSelect = row.querySelector('.unit-select');
             if (this.dataset.unit) {
                 unitSelect.value = this.dataset.unit;
             }
 
-            // Mark as selected
             productOptions.querySelectorAll('.dropdown-item').forEach(el => {
                 el.classList.remove('selected');
             });
@@ -383,7 +346,6 @@ function addItemRow(rowNumber) {
         productOptions.appendChild(option);
     });
 
-    // Toggle product dropdown
     productToggle.addEventListener('click', function (e) {
         e.stopPropagation();
         productMenu.classList.toggle('show');
@@ -392,14 +354,12 @@ function addItemRow(rowNumber) {
             productSearch.value = '';
             productSearch.focus();
 
-            // Reset all items to visible when opening
             productOptions.querySelectorAll('.dropdown-item').forEach(item => {
                 item.style.display = 'block';
             });
         }
     });
 
-    // Filter product items on search
     productSearch.addEventListener('input', function () {
         const searchTerm = this.value.toLowerCase();
         productOptions.querySelectorAll('.dropdown-item').forEach(item => {
@@ -408,19 +368,15 @@ function addItemRow(rowNumber) {
         });
     });
 
-    // Setup add row button (plus button)
     row.querySelector('.action-btn.add').addEventListener('click', function () {
         const currentRowNumber = parseInt(row.cells[0].textContent);
         const newRow = addItemRow(currentRowNumber + 1);
 
-        // Insert the new row after the current row
         tableBody.insertBefore(newRow, row.nextSibling);
 
-        // Update all row numbers
         updateRowNumbers();
     });
 
-    // Setup delete row button (minus button)
     row.querySelector('.action-btn.delete').addEventListener('click', function () {
         if (tableBody.children.length > 1) {
             row.remove();
@@ -430,7 +386,6 @@ function addItemRow(rowNumber) {
         }
     });
 
-    // Close dropdown when clicking outside
     document.addEventListener('click', function (e) {
         if (!productMenu.contains(e.target) && !productToggle.contains(e.target)) {
             productMenu.classList.remove('show');
@@ -440,7 +395,6 @@ function addItemRow(rowNumber) {
     return row;
 }
 
-// Update row numbers after addition/deletion
 function updateRowNumbers() {
     const rows = document.querySelectorAll('#items-table-body tr');
     rows.forEach((row, index) => {
@@ -448,9 +402,7 @@ function updateRowNumbers() {
     });
 }
 
-// Form submission handler
 function submitForm() {
-    // Validate required fields
     const requiredFields = [
         { id: 'date', name: 'Date' },
         { id: 'supplier', name: 'Supplier' },
@@ -460,7 +412,6 @@ function submitForm() {
     let isValid = true;
     let errorMessage = '';
 
-    // Check main fields
     requiredFields.forEach(field => {
         const element = document.getElementById(field.id);
         if (!element.value.trim()) {
@@ -472,7 +423,6 @@ function submitForm() {
         }
     });
 
-    // Check company
     const companyElement = document.getElementById('company');
     if (!companyElement.value.trim()) {
         isValid = false;
@@ -482,7 +432,6 @@ function submitForm() {
         companyElement.classList.remove('error');
     }
 
-    // Check items
     const itemRows = document.querySelectorAll('#items-table-body tr');
     if (itemRows.length === 0) {
         isValid = false;
@@ -524,12 +473,12 @@ function submitForm() {
         return;
     }
 
-    // Collect form data
     const formData = {
         date: document.getElementById('date').value,
         company_id: document.getElementById('company').dataset.selectedValue,
         supplier_id: document.getElementById('supplier').dataset.selectedValue,
         branch_id: document.getElementById('branch').dataset.selectedValue,
+        container_id: document.getElementById('container').value || null,
         items: []
     };
 
@@ -544,7 +493,6 @@ function submitForm() {
         });
     });
 
-    // Submit to server
     const apiUrl = editMode 
         ? '../../../../server/api/inventory/inward_gatepass/gatepass-update.php'
         : '../../../../server/api/inventory/inward_gatepass/gatepass-add.php';
@@ -569,7 +517,6 @@ function submitForm() {
             
             alert(message);
             
-            // Redirect to list page
             window.location.href = 'gatepass-list.php';
         } else {
             alert('Error: ' + data.message);

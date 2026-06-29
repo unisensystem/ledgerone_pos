@@ -70,7 +70,7 @@ try {
                 associated_sales_officer_id = ?, 
                 supplier_man_id = ?, 
                 project_id = ?, 
-                is_sales_tax_registered = ?,, 
+                is_sales_tax_registered = ?, 
                 strn = ?, 
                 is_filer = ?, 
                 ntn = ?, 

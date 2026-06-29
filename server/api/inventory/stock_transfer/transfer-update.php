@@ -30,6 +30,7 @@ try {
     $date = $input['date'];
     $from_location_id = $input['from_location_id'];
     $to_location_id = $input['to_location_id'];
+    $container_id = $input['container_id'] ?? null;
     $remarks = $input['remarks'] ?? '';
     $items = $input['items'];
     
@@ -59,10 +60,10 @@ try {
     // Update stock_transfer
     $stmt = $pdo->prepare(
         "UPDATE stock_transfer 
-         SET company_id = ?, date = ?, from_location_id = ?, to_location_id = ?, remarks = ?, total_amount = ?, total_items = ?
+         SET company_id = ?, date = ?, from_location_id = ?, to_location_id = ?, container_id = ?, remarks = ?, total_amount = ?, total_items = ?
          WHERE tenant_id = ? AND id = ?"
     );
-    $stmt->execute([$company_id, $date, $from_location_id, $to_location_id, $remarks, $total_amount, $total_items, $tenant_id, $transfer_id]);
+    $stmt->execute([$company_id, $date, $from_location_id, $to_location_id, $container_id, $remarks, $total_amount, $total_items, $tenant_id, $transfer_id]);
     
     // Insert new items
     $stmt = $pdo->prepare(

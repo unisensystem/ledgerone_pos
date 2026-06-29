@@ -200,6 +200,21 @@ try {
     $stmt->execute([$project_id, $tenant_id, $date_from, $date_to]);
     $trend = $stmt->fetchAll();
 
+    // ── Calculate sale cost using project product rates ─────────────────────
+    $stmt = $pdo->prepare("
+        SELECT SUM(sii.quantity * COALESCE(ppr.rate, 0)) AS total_cost
+        FROM sale_invoice si
+        JOIN sale_invoice_items sii ON sii.sale_invoice_id = si.id
+        LEFT JOIN project_product_rates ppr ON ppr.project_id = ? 
+                                            AND ppr.product_id = sii.product_id
+                                            AND ppr.tenant_id = ?
+        WHERE si.project_id = ? AND si.tenant_id = ?
+          AND si.sale_date BETWEEN ? AND ?
+    ");
+    $stmt->execute([$project_id, $tenant_id, $project_id, $tenant_id, $date_from, $date_to]);
+    $sale_cost_result = $stmt->fetch();
+    $total_sale_cost = floatval($sale_cost_result['total_cost'] ?? 0);
+
     // ── KPI Summary ──────────────────────────────────────────────────────────
     $total_sales      = array_sum(array_column($sale_invoices,    'net_amount'));
     $total_purchase   = array_sum(array_column($purchase_invoices,'net_amount'));
@@ -208,7 +223,7 @@ try {
     $total_received   = array_sum(array_column($receive_vouchers, 'amount'));
     $total_paid       = array_sum(array_column($payment_vouchers, 'amount'));
     $total_expenses   = array_sum(array_column($expenses,         'total_amount'));
-    $net_profit       = ($total_sales - $total_sale_ret) - ($total_purchase - $total_purch_ret) - $total_expenses;
+    $net_profit       = ($total_sales - $total_sale_ret) - $total_sale_cost - $total_expenses;
 
     echo json_encode([
         'success'          => true,
