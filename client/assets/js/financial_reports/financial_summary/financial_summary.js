@@ -1,6 +1,29 @@
 let refreshInterval;
 let currentCurrencySymbol = 'Rs';
 
+const cardRoutes = {
+    'daily-sales':            '../../../pages/sale/pos_invoice/pos-list.php',
+    'total-sales':            '../../../pages/sale/pos_invoice/pos-list.php',
+    'daily-purchase':         '../../../pages/purchase/purchase_invoice/purchase-list.php',
+    'total-purchase':         '../../../pages/purchase/purchase_invoice/purchase-list.php',
+    'daily-sale-return':      '../../../pages/sale/sale_return/return-list.php',
+    'total-sale-return':      '../../../pages/sale/sale_return/return-list.php',
+    'daily-purchase-return':  '../../../pages/purchase/purchase_return/return-list.php',
+    'total-purchase-return':  '../../../pages/purchase/purchase_return/return-list.php',
+    'daily-recovery':         '../../../pages/vouchers/receive_voucher/receive-list.php',
+    'total-recovery':         '../../../pages/vouchers/receive_voucher/receive-list.php',
+    'daily-payment':          '../../../pages/vouchers/payment_voucher/payment-list.php',
+    'total-payment':          '../../../pages/vouchers/payment_voucher/payment-list.php',
+    'daily-expenses':         '../../../pages/vouchers/expense_voucher/expense-list.php',
+    'total-expenses':         '../../../pages/vouchers/expense_voucher/expense-list.php',
+    'daily-cash':             '../../../pages/financial_reports/cash_flow/cash-flow.php',
+    'total-cash':             '../../../pages/financial_reports/cash_flow/cash-flow.php',
+    'daily-bank':             '../../../pages/financial_reports/cash_flow/cash-flow.php',
+    'total-bank':             '../../../pages/financial_reports/cash_flow/cash-flow.php',
+    'daily-cheque':           '../../../pages/financial_reports/cash_flow/cash-flow.php',
+    'total-cheque':           '../../../pages/financial_reports/cash_flow/cash-flow.php',
+};
+
 $(document).ready(function() {
     setDefaultDates();
     loadCurrencies();
@@ -22,6 +45,15 @@ $(document).ready(function() {
         
         const filter = $(this).data('filter');
         applyQuickFilter(filter);
+    });
+
+    // Card click navigation
+    $(document).on('click', '.stat-card', function() {
+        const type = $(this).data('type');
+        const url = cardRoutes[type];
+        if (url) {
+            window.location.href = url;
+        }
     });
 });
 

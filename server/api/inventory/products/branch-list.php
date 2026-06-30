@@ -24,16 +24,25 @@ if (!$user_id || !$tenant_id) {
 
 try {
     $stmt = $pdo->prepare("
-        SELECT id, branch_name, branch_type, parent_branch_id 
-        FROM branches 
-        WHERE tenant_id = ? AND is_active = 1 
-        ORDER BY parent_branch_id IS NULL DESC, parent_branch_id, branch_name
+        SELECT
+            b.id,
+            b.branch_name,
+            b.branch_type,
+            b.parent_branch_id,
+            pb.branch_name AS parent_branch_name
+        FROM user_branches ub
+        JOIN branches b  ON ub.branch_id = b.id
+        LEFT JOIN branches pb ON b.parent_branch_id = pb.id
+        WHERE ub.tenant_id = ?
+          AND ub.user_id   = ?
+          AND b.is_active  = 1
+        ORDER BY pb.branch_name, b.branch_name
     ");
-    $stmt->execute([$tenant_id]);
+    $stmt->execute([$tenant_id, $user_id]);
     $branches = $stmt->fetchAll(PDO::FETCH_ASSOC);
-    
+
     echo json_encode(['success' => true, 'branches' => $branches]);
-    
+
 } catch (PDOException $e) {
     http_response_code(500);
     echo json_encode(['success' => false, 'message' => 'Database error: ' . $e->getMessage()]);

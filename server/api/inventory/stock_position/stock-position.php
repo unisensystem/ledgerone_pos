@@ -538,9 +538,23 @@ try {
             break;
             
         case 'branches':
-            $branches_sql = "SELECT b.id, b.branch_name, b.branch_type, b.parent_branch_id, pb.branch_name as parent_name FROM branches b LEFT JOIN branches pb ON b.parent_branch_id = pb.id WHERE b.tenant_id = ? AND b.is_active = 1 ORDER BY COALESCE(pb.branch_name, b.branch_name), b.parent_branch_id, b.branch_name";
+            $branches_sql = "
+                SELECT
+                    b.id,
+                    b.branch_name,
+                    b.branch_type,
+                    b.parent_branch_id,
+                    pb.branch_name as parent_name
+                FROM user_branches ub
+                JOIN branches b  ON ub.branch_id = b.id
+                LEFT JOIN branches pb ON b.parent_branch_id = pb.id
+                WHERE ub.tenant_id = ?
+                  AND ub.user_id   = ?
+                  AND b.is_active  = 1
+                ORDER BY pb.branch_name, b.branch_name
+            ";
             $branches_stmt = $pdo->prepare($branches_sql);
-            $branches_stmt->execute([$tenant_id]);
+            $branches_stmt->execute([$tenant_id, $user_id]);
             $branches = $branches_stmt->fetchAll(PDO::FETCH_ASSOC);
             
             foreach ($branches as &$branch) {

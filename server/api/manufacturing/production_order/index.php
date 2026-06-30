@@ -38,9 +38,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     }
     
     if ($action === 'branches') {
-        $stmt = $pdo->prepare("SELECT id, branch_name FROM branches WHERE tenant_id = ? AND is_active = 1");
-        $stmt->execute([$tenant_id]);
-        echo json_encode(['success' => true, 'data' => $stmt->fetchAll()]);
+        $stmt = $pdo->prepare("
+            SELECT
+                b.id,
+                b.branch_name,
+                b.branch_type,
+                pb.branch_name AS parent_branch_name
+            FROM user_branches ub
+            JOIN branches b  ON ub.branch_id = b.id
+            LEFT JOIN branches pb ON b.parent_branch_id = pb.id
+            WHERE ub.tenant_id = ?
+              AND ub.user_id   = ?
+              AND b.is_active  = 1
+            ORDER BY pb.branch_name, b.branch_name
+        ");
+        $stmt->execute([$tenant_id, $user_id]);
+        echo json_encode(['success' => true, 'data' => $stmt->fetchAll(PDO::FETCH_ASSOC)]);
         exit;
     }
     

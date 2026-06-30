@@ -23,47 +23,30 @@ if (!$user_id || !$tenant_id) {
 }
 
 try {
-    $query = "SELECT id, branch_code, branch_name, parent_branch_id, branch_type 
-              FROM branches 
-              WHERE tenant_id = :tenant_id AND is_active = 1 AND allows_inventory = 1
-              ORDER BY parent_branch_id, branch_name";
-    
-    $stmt = $pdo->prepare($query);
-    $stmt->execute(['tenant_id' => $tenant_id]);
+    $stmt = $pdo->prepare("
+        SELECT b.id, b.branch_code, b.branch_name, b.branch_type
+        FROM user_branches ub
+        JOIN branches b ON ub.branch_id = b.id
+        WHERE ub.tenant_id = ? AND ub.user_id = ? AND b.is_active = 1
+        ORDER BY b.branch_name ASC
+    ");
+    $stmt->execute([$tenant_id, $user_id]);
     $branches = $stmt->fetchAll();
-    
-    // Build hierarchy
-    $hierarchical = [];
-    foreach ($branches as $branch) {
-        if ($branch['parent_branch_id'] === null) {
-            // Add parent as non-selectable reference
-            $hierarchical[] = [
-                'id' => null,
-                'code' => $branch['branch_code'],
-                'name' => $branch['branch_name'],
-                'display' => $branch['branch_name'],
-                'level' => 0,
-                'selectable' => false
-            ];
-            
-            // Add children
-            foreach ($branches as $child) {
-                if ($child['parent_branch_id'] == $branch['id']) {
-                    $hierarchical[] = [
-                        'id' => $child['id'],
-                        'code' => $child['branch_code'],
-                        'name' => $child['branch_name'],
-                        'display' => '  └─ ' . $child['branch_name'],
-                        'level' => 1,
-                        'selectable' => true
-                    ];
-                }
-            }
-        }
+
+    $result = [];
+    foreach ($branches as $b) {
+        $result[] = [
+            'id'         => $b['id'],
+            'code'       => $b['branch_code'],
+            'name'       => $b['branch_name'],
+            'display'    => $b['branch_name'],
+            'level'      => 1,
+            'selectable' => true
+        ];
     }
-    
-    echo json_encode(['success' => true, 'branches' => $hierarchical]);
-    
+
+    echo json_encode(['success' => true, 'branches' => $result]);
+
 } catch (Exception $e) {
     http_response_code(500);
     echo json_encode(['success' => false, 'message' => 'Server error: ' . $e->getMessage()]);

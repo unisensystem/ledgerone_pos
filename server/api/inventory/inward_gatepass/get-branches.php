@@ -19,12 +19,13 @@ if (!$user_id || !$tenant_id) {
 try {
     $stmt = $pdo->prepare("
         SELECT b.id, b.branch_name, p.branch_name as parent_name 
-        FROM branches b 
+        FROM user_branches ub
+        JOIN branches b  ON ub.branch_id = b.id
         LEFT JOIN branches p ON b.parent_branch_id = p.id 
-        WHERE b.tenant_id = ? AND b.is_active = 1 AND b.parent_branch_id IS NOT NULL 
+        WHERE ub.tenant_id = ? AND ub.user_id = ? AND b.is_active = 1
         ORDER BY p.branch_name, b.branch_name ASC
     ");
-    $stmt->execute([$tenant_id]);
+    $stmt->execute([$tenant_id, $user_id]);
     $branches = [];
     
     while ($row = $stmt->fetch()) {

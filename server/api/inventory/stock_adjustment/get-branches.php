@@ -24,51 +24,29 @@ if (!$user_id || !$tenant_id) {
 
 try {
     $stmt = $pdo->prepare("
-        SELECT id, branch_code, branch_name, parent_branch_id, branch_type
-        FROM branches
-        WHERE tenant_id = ? AND is_active = 1
-        ORDER BY branch_name ASC
+        SELECT b.id, b.branch_code, b.branch_name, b.branch_type
+        FROM user_branches ub
+        JOIN branches b ON ub.branch_id = b.id
+        WHERE ub.tenant_id = ? AND ub.user_id = ? AND b.is_active = 1
+        ORDER BY b.branch_name ASC
     ");
-    $stmt->execute([$tenant_id]);
+    $stmt->execute([$tenant_id, $user_id]);
     $branches = $stmt->fetchAll();
-    
-    function buildHierarchy($branches, $parentId = null, $prefix = '') {
-        $hierarchy = [];
-        foreach ($branches as $branch) {
-            if ($branch['parent_branch_id'] == $parentId) {
-                $isParent = false;
-                foreach ($branches as $b) {
-                    if ($b['parent_branch_id'] == $branch['id']) {
-                        $isParent = true;
-                        break;
-                    }
-                }
-                
-                $hierarchy[] = [
-                    'id' => $branch['id'],
-                    'code' => $branch['branch_code'],
-                    'name' => $prefix . $branch['branch_name'],
-                    'type' => $branch['branch_type'],
-                    'isParent' => $isParent
-                ];
-                $children = buildHierarchy($branches, $branch['id'], $prefix . '└─ ');
-                $hierarchy = array_merge($hierarchy, $children);
-            }
-        }
-        return $hierarchy;
+
+    $result = [];
+    foreach ($branches as $branch) {
+        $result[] = [
+            'id'       => $branch['id'],
+            'code'     => $branch['branch_code'],
+            'name'     => $branch['branch_name'],
+            'type'     => $branch['branch_type'],
+            'isParent' => false
+        ];
     }
-    
-    $hierarchicalBranches = buildHierarchy($branches);
-    
-    echo json_encode([
-        'success' => true,
-        'branches' => $hierarchicalBranches
-    ]);
-    
+
+    echo json_encode(['success' => true, 'branches' => $result]);
+
 } catch (Exception $e) {
     http_response_code(500);
-    echo json_encode([
-        'success' => false,
-        'message' => 'Error fetching branches: ' . $e->getMessage()
-    ]);
+    echo json_encode(['success' => false, 'message' => 'Error fetching branches: ' . $e->getMessage()]);
 }
