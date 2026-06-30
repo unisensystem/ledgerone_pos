@@ -249,53 +249,73 @@ function closeCreateUserModal() {
     document.getElementById('createBranchIds').value = '';
 }
 
-function openEditUserModal(userId) {
+async function openEditUserModal(userId) {
     const user = users.find(u => u.id === userId);
     if (!user) return;
 
+    // Fetch existing branch access for this user
+    let preselectedBranches = [];
+    try {
+        const res = await fetch(`../../../../server/api/system_setup/admin_panel/user-branch.php?user_id=${userId}`);
+        const d = await res.json();
+        if (d.success) preselectedBranches = d.branches.map(b => b.branch_id);
+    } catch (_) {}
+
     const modalBody = document.querySelector('#editUserModal .modal-body');
     modalBody.innerHTML = `
-                <form id="editUserForm">
-                    <div class="form-grid">
-                        <div class="form-group">
-                            <label class="form-label">Full Name</label>
-                            <input type="text" class="form-input" value="${user.name}" required>
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">Email Address</label>
-                            <input type="email" class="form-input" value="${user.email}" required>
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">Employee</label>
-                            <select class="form-select" name="employee_id">
-                                <option value="">Select Employee (Optional)</option>
-                                ${employees.map(emp => `<option value="${emp.id}" ${user.employee_id == emp.id ? 'selected' : ''}>${emp.employee_id} - ${emp.full_name}</option>`).join('')}
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">Role</label>
-                            <select class="form-select" name="role">
-                                <option value="">Select Role</option>
-                                ${roles.map(role => `<option value="${role.id}" ${user.role === role.name ? 'selected' : ''}>${role.name}</option>`).join('')}
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">Status</label>
-                            <select class="form-select">
-                                <option value="active" ${user.status === 'active' ? 'selected' : ''}>Active</option>
-                                <option value="blocked" ${user.status === 'blocked' ? 'selected' : ''}>Blocked</option>
-                            </select>
-                        </div>
+        <form id="editUserForm">
+            <div class="form-grid">
+                <div class="form-group">
+                    <label class="form-label">Full Name</label>
+                    <input type="text" id="editFullName" class="form-input" value="${user.name}" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Email Address</label>
+                    <input type="email" id="editEmail" class="form-input" value="${user.email}" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Employee</label>
+                    <select id="editEmployee" class="form-select" name="employee_id">
+                        <option value="">Select Employee (Optional)</option>
+                        ${employees.map(emp => `<option value="${emp.id}" ${user.employee_id == emp.id ? 'selected' : ''}>${emp.employee_id} - ${emp.full_name}</option>`).join('')}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Role</label>
+                    <select id="editRole" class="form-select" name="role">
+                        <option value="">Select Role</option>
+                        ${roles.map(role => `<option value="${role.id}" ${user.role === role.name ? 'selected' : ''}>${role.name}</option>`).join('')}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Status</label>
+                    <select id="editStatus" class="form-select">
+                        <option value="active" ${user.status === 'active' ? 'selected' : ''}>Active</option>
+                        <option value="blocked" ${user.status === 'blocked' ? 'selected' : ''}>Blocked</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Reset Password</label>
+                    <input type="password" id="editPassword" class="form-input" placeholder="Leave blank to keep current password">
+                </div>
+                <div class="form-group" style="grid-column: 1 / -1;">
+                    <label class="form-label">Branch Access</label>
+                    <div style="position: relative;">
+                        <input type="text" id="editBranchSearch" class="form-input" placeholder="Search branches..." autocomplete="off">
+                        <div id="editBranchDropdown" style="display:none; position:absolute; top:100%; left:0; right:0; background:var(--surface-card); border:1px solid var(--border-default); border-radius:var(--radius); max-height:200px; overflow-y:auto; z-index:1050; box-shadow:0 4px 12px rgba(0,0,0,0.1);"></div>
                     </div>
-                    <div class="form-group">
-                        <label class="form-label">Reset Password</label>
-                        <input type="password" class="form-input" placeholder="Leave blank to keep current password">
-                    </div>
-                </form>
-            `;
+                    <div id="editSelectedBranches" style="display:flex; flex-wrap:wrap; gap:6px; margin-top:8px;"></div>
+                    <input type="hidden" id="editBranchIds" value="">
+                </div>
+            </div>
+        </form>
+    `;
 
     document.getElementById('editUserModal').style.display = 'flex';
     window.currentEditingUserId = userId;
+
+    // Init branch picker with preselected branches
+    initBranchPicker('editBranchSearch', 'editBranchDropdown', 'editSelectedBranches', 'editBranchIds', preselectedBranches);
 }
 
 function closeEditUserModal() {
@@ -638,61 +658,77 @@ function editUser(userId) {
 }
 
 async function saveUser() {
-    if (window.currentEditingUserId) {
-        const form = document.getElementById('editUserForm');
-        const inputs = form.querySelectorAll('input, select');
-        const employeeId = inputs[2].value;
-        const roleId = inputs[3].value;
-        
-        try {
-            // Update user first
-            const response = await fetch('../../../../server/api/system_setup/admin_panel/user-edit.php', {
-                method: 'PUT',
+    if (!window.currentEditingUserId) return;
+
+    const userId     = window.currentEditingUserId;
+    const fullName   = document.getElementById('editFullName').value;
+    const email      = document.getElementById('editEmail').value;
+    const employeeId = document.getElementById('editEmployee').value;
+    const roleId     = document.getElementById('editRole').value;
+    const status     = document.getElementById('editStatus').value;
+    const password   = document.getElementById('editPassword').value;
+
+    let branchIds = [];
+    try {
+        branchIds = JSON.parse(document.getElementById('editBranchIds').value || '[]');
+    } catch (_) { branchIds = []; }
+
+    try {
+        // Step 1 — update user details
+        const response = await fetch('../../../../server/api/system_setup/admin_panel/user-edit.php', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                id: userId,
+                full_name: fullName,
+                email: email,
+                employee_id: employeeId || null,
+                is_active: status === 'active' ? 1 : 0,
+                password: password
+            })
+        });
+        const data = await response.json();
+        if (!data.success) {
+            alert('Error: ' + data.message);
+            return;
+        }
+
+        // Step 2 — assign role (if selected)
+        if (roleId) {
+            const roleResponse = await fetch('../../../../server/api/system_setup/admin_panel/user-role.php', {
+                method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    id: window.currentEditingUserId,
-                    full_name: inputs[0].value,
-                    email: inputs[1].value,
-                    employee_id: employeeId || null,
-                    is_active: inputs[4].value === 'active' ? 1 : 0,
-                    password: inputs[5].value
-                })
+                body: JSON.stringify({ user_id: parseInt(userId), role_id: parseInt(roleId) })
             });
-            
-            const data = await response.json();
-            
-            if (!data.success) {
-                alert('Error: ' + data.message);
+            const roleData = await roleResponse.json();
+            if (!roleData.success) {
+                alert('User updated but role assignment failed: ' + roleData.message + (roleData.debug ? '\n' + roleData.debug : ''));
+                closeEditUserModal();
+                fetchUsers();
                 return;
             }
-            
-            // Assign role if provided
-            if (roleId) {
-                const roleResponse = await fetch('../../../../server/api/system_setup/admin_panel/user-role.php', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        user_id: parseInt(window.currentEditingUserId),
-                        role_id: parseInt(roleId)
-                    })
-                });
-                const roleData = await roleResponse.json();
-                
-                if (!roleData.success) {
-                    alert('User updated but role assignment failed: ' + roleData.message + (roleData.debug ? '\n' + roleData.debug : ''));
-                    closeEditUserModal();
-                    fetchUsers();
-                    return;
-                }
-            }
-            
-            alert('User updated successfully!');
-            closeEditUserModal();
-            location.reload();
-        } catch (error) {
-            console.error('Error:', error);
-            alert('Error updating user');
         }
+
+        // Step 3 — save branch access (replace existing)
+        const branchResponse = await fetch('../../../../server/api/system_setup/admin_panel/user-branch.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ user_id: parseInt(userId), branch_ids: branchIds })
+        });
+        const branchData = await branchResponse.json();
+        if (!branchData.success) {
+            alert('User updated but branch access save failed: ' + branchData.message);
+            closeEditUserModal();
+            fetchUsers();
+            return;
+        }
+
+        alert('User updated successfully!');
+        closeEditUserModal();
+        fetchUsers();
+    } catch (error) {
+        console.error('Error:', error);
+        alert('Error updating user');
     }
 }
 
