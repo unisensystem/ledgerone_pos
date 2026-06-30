@@ -114,7 +114,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     codeOption.className = 'dropdown-option';
                     codeOption.setAttribute('data-value', supplier.id);
                     codeOption.setAttribute('data-balance', supplier.current_balance);
-                    codeOption.textContent = `${supplier.supplier_code} - ${supplier.supplier_name}`;
+                    codeOption.textContent = `${supplier.supplier_code} - ${supplier.supplier_name}${supplier.primary_phone ? ' - ' + supplier.primary_phone : ''}`;
                     codeOptions.appendChild(codeOption);
                 });
             }

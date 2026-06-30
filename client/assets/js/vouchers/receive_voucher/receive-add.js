@@ -597,7 +597,7 @@ function addBulkRow() {
         <td><input type="text" class="bulk-bill" placeholder="Bill no" autocomplete="off"></td>
         <td><input type="text" class="bulk-dsr" placeholder="DSR-B-24-26-20251231-20260112"></td>
         <td><select class="bulk-project"><option value="">Select</option></select></td>
-        <td><select class="bulk-container"><option value="">Select</option></select></td>
+        <td style="display: none;"><select class="bulk-container" style="display: none;"><option value="">Select</option></select></td>
         <td><select class="bulk-currency" required></select></td>
         <td><input type="number" class="bulk-amount" step="0.01" min="0" placeholder="0.00" required></td>
         <td><input type="text" class="bulk-rem-balance" readonly></td>
@@ -888,6 +888,7 @@ document.getElementById('postBulkBtn').addEventListener('click', async function(
         formData.append('voucher_date', row.querySelector('.bulk-date').value);
         formData.append('customer_code', row.querySelector('.bulk-customer').value);
         formData.append('company_id', bulkCompanyId);
+        formData.append('previous_balance', row.querySelector('.bulk-prev-balance').value);
         formData.append('sub_account_id', row.querySelector('.bulk-sub-account').value || null);
         formData.append('bill_no', row.querySelector('.bulk-bill').value || null);
         formData.append('dsr_no', row.querySelector('.bulk-dsr').value || null);
@@ -983,6 +984,7 @@ form.addEventListener('submit', function (e) {
     formData.append('voucher_date', document.getElementById('voucherDate').value);
     formData.append('customer_code', document.getElementById('customerCode').value.split(' - ')[0]);
     formData.append('company_id', document.getElementById('company').value);
+    formData.append('previous_balance', document.getElementById('previousBalance').value);
     formData.append('sub_account_id', document.getElementById('subAccount').value || null);
     formData.append('bill_no', document.getElementById('billNo').value.split(' - ')[0] || null);
     formData.append('dsr_no', document.getElementById('dsrNo').value || null);

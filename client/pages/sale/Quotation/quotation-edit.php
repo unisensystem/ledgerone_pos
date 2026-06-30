@@ -69,6 +69,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_GET['action'])) {
                 contact_person   = ?,
                 salesman_id      = ?,
                 project_id       = ?,
+                subject          = ?,
                 payment_term_id  = ?,
                 terms_conditions = ?,
                 remarks          = ?,
@@ -90,6 +91,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_GET['action'])) {
                 $input['contact_person'] ?: null,
                 !empty($input['salesman_id'])     ? (int)$input['salesman_id']     : null,
                 !empty($input['project_id'])      ? (int)$input['project_id']      : null,
+                $input['subject']          ?: null,
                 !empty($input['payment_term_id']) ? (int)$input['payment_term_id'] : null,
                 $input['terms_conditions'] ?: null,
                 $input['remarks']          ?: null,
@@ -506,13 +508,17 @@ const editData = {
           </div>
         </div>
 
-        <!-- Project row -->
+        <!-- Project + Subject row -->
         <div class="fg fg-4" style="margin-bottom:9px">
           <div class="f">
             <label>Project</label>
             <select id="projectSel">
               <option value="">Select Project</option>
             </select>
+          </div>
+          <div class="f span3">
+            <label>Subject</label>
+            <input type="text" id="subject" placeholder="e.g. Supply of Electrical Equipment"/>
           </div>
         </div>
 
@@ -723,6 +729,7 @@ function populateForm() {
   document.getElementById('partyType').value         = q.party_type     || '';
   document.getElementById('salesmanSel').value       = q.salesman_id    || '';
   document.getElementById('projectSel').value         = q.project_id     || '';
+  document.getElementById('subject').value            = q.subject        || '';
   document.getElementById('paymentTermSel').value    = q.payment_term_id|| '';
   document.getElementById('termsConditions').value   = q.terms_conditions|| '';
   document.getElementById('remarks').value           = q.remarks        || '';
@@ -1133,6 +1140,7 @@ async function updateQuotation() {
     party_type:       document.getElementById('partyType').value,
     salesman_id:      document.getElementById('salesmanSel').value,
     project_id:       document.getElementById('projectSel').value || null,
+    subject:          document.getElementById('subject').value || null,
     payment_term_id:  document.getElementById('paymentTermSel').value,
     terms_conditions: document.getElementById('termsConditions').value,
     remarks:          document.getElementById('remarks').value,

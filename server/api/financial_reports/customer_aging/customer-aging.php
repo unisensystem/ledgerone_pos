@@ -126,6 +126,7 @@ try {
             'customerName' => $invoice['customer_name'],
             'address' => $invoice['address'] ?? 'N/A',
             'invoiceNo' => $invoice['bill_no'],
+            'invoiceDate' => date('Y-m-d', strtotime($invoice['sale_date'])),
             'type' => $invoice['invoice_type'],
             'amount' => $currency_symbol . number_format($outstanding, 2),
             'daysOverdue' => $days,

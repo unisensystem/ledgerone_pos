@@ -16,7 +16,7 @@ if (!$tenant_id) {
 }
 
 try {
-    $stmt = $pdo->prepare("SELECT id, supplier_code, supplier_name, current_balance FROM suppliers WHERE tenant_id = ? AND status = 'ACTIVE' ORDER BY supplier_name");
+    $stmt = $pdo->prepare("SELECT id, supplier_code, supplier_name, primary_phone, current_balance FROM suppliers WHERE tenant_id = ? AND status = 'ACTIVE' ORDER BY supplier_name");
     $stmt->execute([$tenant_id]);
     $suppliers = $stmt->fetchAll(PDO::FETCH_ASSOC);
     

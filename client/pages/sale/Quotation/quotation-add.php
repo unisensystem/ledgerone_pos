@@ -56,11 +56,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_GET['action'])) {
 
             $st = $pdo->prepare("INSERT INTO quotations
                 (tenant_id, quotation_number, quotation_date, valid_till,
-                 customer_id, contact_person, salesman_id, project_id, payment_term_id,
+                 customer_id, contact_person, salesman_id, project_id, subject, payment_term_id,
                  terms_conditions, remarks, footer_note, party_type, status,
                  subtotal, discount_pct, discount_amt, invoice_tax_pct, invoice_tax_amt, grand_total,
                  created_by, updated_by)
-                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,'draft',?,?,?,?,?,?,?,?)");
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,'draft',?,?,?,?,?,?,?,?)");
             $st->execute([
                 $tid,
                 $qno,
@@ -70,6 +70,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_GET['action'])) {
                 $input['contact_person'] ?: null,
                 !empty($input['salesman_id'])     ? (int)$input['salesman_id']     : null,
                 !empty($input['project_id'])      ? (int)$input['project_id']      : null,
+                $input['subject'] ?: null,
                 !empty($input['payment_term_id']) ? (int)$input['payment_term_id'] : null,
                 $input['terms_conditions'] ?: null,
                 $input['remarks'] ?: null,
@@ -462,13 +463,17 @@ tbody td{padding:4px 4px;vertical-align:middle}
           </div>
         </div>
 
-        <!-- Row 3: Project -->
+        <!-- Row 3: Project + Subject -->
         <div class="fg fg-4" style="margin-bottom:9px">
           <div class="f">
             <label>Project</label>
             <select id="projectSel">
               <option value="">Select Project</option>
             </select>
+          </div>
+          <div class="f span3">
+            <label>Subject</label>
+            <input type="text" id="subject" placeholder="e.g. Supply of Electrical Equipment"/>
           </div>
         </div>
 
@@ -1135,6 +1140,7 @@ async function saveQuotation() {
     party_type:       document.getElementById('partyType').value,
     salesman_id:      document.getElementById('salesmanSel').value,
     project_id:       document.getElementById('projectSel').value || null,
+    subject:          document.getElementById('subject').value || null,
     payment_term_id:  document.getElementById('paymentTermSel').value,
     terms_conditions: document.getElementById('termsConditions').value,
     remarks:          document.getElementById('remarks').value,
@@ -1154,8 +1160,7 @@ async function saveQuotation() {
 
   if (d.success) {
     toast(`Quotation ${d.quotation_number} saved successfully!`);
-    document.getElementById('qtnNumber').value = d.quotation_number;
-    document.getElementById('qtnNumberDisplay').textContent = d.quotation_number;
+    setTimeout(() => location.reload(), 1500);
   } else {
     toast(d.message || 'Save failed','err');
   }

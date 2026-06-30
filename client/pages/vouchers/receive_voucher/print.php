@@ -45,6 +45,7 @@ try {
             rv.voucher_number,
             rv.voucher_date,
             rv.amount,
+            rv.previous_balance,
             rv.bill_no,
             rv.description,
             rv.cheque_date,
@@ -324,6 +325,16 @@ try {
                 <div class="info-row">
                     <span class="label">Currency:</span>
                     <?php echo htmlspecialchars($voucher['currency_name']); ?>
+                </div>
+            </div>
+            <div class="info-section">
+                <div class="info-row">
+                    <span class="label">Previous Balance:</span>
+                    <?php echo $voucher['currency_symbol'] . number_format($voucher['previous_balance'], 2); ?>
+                </div>
+                <div class="info-row">
+                    <span class="label">Outstanding Balance:</span>
+                    <?php echo $voucher['currency_symbol'] . number_format($voucher['previous_balance'] - $voucher['amount'], 2); ?>
                 </div>
             </div>
         </div>

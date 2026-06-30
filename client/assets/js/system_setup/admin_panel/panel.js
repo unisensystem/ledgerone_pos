@@ -1,7 +1,21 @@
 let users = [];
 let roles = [];
 let employees = [];
+let allBranches = [];   // all branches for the tenant
 let stats = { total: 0, active: 0, blocked: 0 };
+
+// Fetch branches from API
+async function fetchBranches() {
+    try {
+        const response = await fetch('../../../../server/api/system_setup/admin_panel/get-branches.php');
+        const data = await response.json();
+        if (data.success) {
+            allBranches = data.branches;
+        }
+    } catch (error) {
+        console.error('Error fetching branches:', error);
+    }
+}
 
 // Fetch users from API
 async function fetchUsers() {
@@ -119,14 +133,120 @@ function renderUsersTable() {
     });
 }
 
-// Modal functions
+// ─── Branch Multi-Select Helper ────────────────────────────────────────────
+
+/**
+ * Initialise a searchable multi-select branch picker.
+ * @param {string} searchId   - id of the text input used for searching
+ * @param {string} dropdownId - id of the dropdown list container
+ * @param {string} tagsId     - id of the selected-tags container
+ * @param {string} hiddenId   - id of the hidden input that stores selected IDs
+ * @param {number[]} preselected - array of branch IDs to pre-select
+ */
+function initBranchPicker(searchId, dropdownId, tagsId, hiddenId, preselected = []) {
+    const searchInput  = document.getElementById(searchId);
+    const dropdown     = document.getElementById(dropdownId);
+    const tagsContainer = document.getElementById(tagsId);
+    const hiddenInput  = document.getElementById(hiddenId);
+
+    let selectedIds = [...preselected];
+
+    function getDisplayText(b) {
+        return b.parent_branch_name
+            ? `${b.parent_branch_name} > ${b.branch_code} - ${b.branch_name} (${b.branch_type})`
+            : `${b.branch_code} - ${b.branch_name} (${b.branch_type})`;
+    }
+
+    function renderTags() {
+        tagsContainer.innerHTML = '';
+        selectedIds.forEach(id => {
+            const branch = allBranches.find(b => b.id == id);
+            if (!branch) return;
+            const tag = document.createElement('span');
+            tag.style.cssText = 'display:inline-flex;align-items:center;gap:4px;padding:3px 8px;background:rgba(31,123,255,0.1);color:var(--primary);border-radius:12px;font-size:12px;';
+            tag.innerHTML = `${branch.branch_code} - ${branch.branch_name} <button type="button" data-id="${id}" style="background:none;border:none;color:var(--primary);cursor:pointer;font-size:14px;padding:0;line-height:1;">&times;</button>`;
+            tag.querySelector('button').addEventListener('click', () => {
+                selectedIds = selectedIds.filter(x => x != id);
+                updateHidden();
+                renderTags();
+                renderDropdown(searchInput.value);
+            });
+            tagsContainer.appendChild(tag);
+        });
+        // "All branches" hint
+        if (selectedIds.length === 0) {
+            const hint = document.createElement('span');
+            hint.style.cssText = 'font-size:12px;color:var(--subtext);';
+            hint.textContent = 'No branch selected — user will have no branch access.';
+            tagsContainer.appendChild(hint);
+        }
+    }
+
+    function updateHidden() {
+        hiddenInput.value = JSON.stringify(selectedIds);
+    }
+
+    function renderDropdown(term = '') {
+        dropdown.innerHTML = '';
+        const filtered = allBranches.filter(b => {
+            const text = getDisplayText(b).toLowerCase();
+            return text.includes(term.toLowerCase()) && !selectedIds.includes(b.id);
+        });
+        if (filtered.length === 0) {
+            dropdown.innerHTML = '<div style="padding:8px 12px;color:var(--subtext);font-size:13px;">No branches found</div>';
+        } else {
+            filtered.forEach(b => {
+                const item = document.createElement('div');
+                item.style.cssText = 'padding:8px 12px;cursor:pointer;font-size:13px;';
+                item.textContent = getDisplayText(b);
+                item.addEventListener('mouseenter', () => item.style.background = 'var(--surface-1)');
+                item.addEventListener('mouseleave', () => item.style.background = '');
+                item.addEventListener('mousedown', (e) => {
+                    e.preventDefault();
+                    selectedIds.push(b.id);
+                    updateHidden();
+                    renderTags();
+                    searchInput.value = '';
+                    renderDropdown('');
+                });
+                dropdown.appendChild(item);
+            });
+        }
+    }
+
+    searchInput.addEventListener('focus', () => {
+        renderDropdown(searchInput.value);
+        dropdown.style.display = 'block';
+    });
+    searchInput.addEventListener('input', () => {
+        renderDropdown(searchInput.value);
+        dropdown.style.display = 'block';
+    });
+    searchInput.addEventListener('blur', () => {
+        setTimeout(() => { dropdown.style.display = 'none'; }, 150);
+    });
+
+    // Init
+    updateHidden();
+    renderTags();
+}
+
+// ─── Modal functions ─────────────────────────────────────────────────────────
 function openCreateUserModal() {
     document.getElementById('createUserModal').style.display = 'flex';
+    // Init branch picker fresh (no preselected)
+    document.getElementById('createBranchIds').value = '[]';
+    document.getElementById('createSelectedBranches').innerHTML = '';
+    document.getElementById('createBranchSearch').value = '';
+    document.getElementById('createBranchDropdown').style.display = 'none';
+    initBranchPicker('createBranchSearch', 'createBranchDropdown', 'createSelectedBranches', 'createBranchIds', []);
 }
 
 function closeCreateUserModal() {
     document.getElementById('createUserModal').style.display = 'none';
     document.getElementById('createUserForm').reset();
+    document.getElementById('createSelectedBranches').innerHTML = '';
+    document.getElementById('createBranchIds').value = '';
 }
 
 function openEditUserModal(userId) {
@@ -448,42 +568,66 @@ function closeLoginLocationsModal() {
 
 // User actions
 async function createUser() {
-    const form = document.getElementById('createUserForm');
+    const form     = document.getElementById('createUserForm');
     const formData = new FormData(form);
-    const roleId = formData.get('role');
-    
+    const roleId   = formData.get('role');
+
+    // Parse selected branch IDs
+    let branchIds = [];
     try {
+        branchIds = JSON.parse(document.getElementById('createBranchIds').value || '[]');
+    } catch (_) { branchIds = []; }
+
+    try {
+        // Step 1 — create user
         const response = await fetch('../../../../server/api/system_setup/admin_panel/user-add.php', {
             method: 'POST',
             body: formData
         });
-        
         const data = await response.json();
-        if (data.success) {
-            // Assign role if selected
-            if (roleId && data.user_id) {
-                const roleResponse = await fetch('../../../../server/api/system_setup/admin_panel/user-role.php', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        user_id: data.user_id,
-                        role_id: parseInt(roleId)
-                    })
-                });
-                const roleData = await roleResponse.json();
-                if (!roleData.success) {
-                    alert('User created but role assignment failed: ' + roleData.message);
-                    closeCreateUserModal();
-                    fetchUsers();
-                    return;
-                }
-            }
-            alert('User created successfully!');
-            closeCreateUserModal();
-            fetchUsers();
-        } else {
+
+        if (!data.success) {
             alert('Error: ' + data.message);
+            return;
         }
+
+        const newUserId = data.user_id;
+
+        // Step 2 — assign role (if selected)
+        if (roleId && newUserId) {
+            const roleResponse = await fetch('../../../../server/api/system_setup/admin_panel/user-role.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ user_id: newUserId, role_id: parseInt(roleId) })
+            });
+            const roleData = await roleResponse.json();
+            if (!roleData.success) {
+                alert('User created but role assignment failed: ' + roleData.message);
+                closeCreateUserModal();
+                fetchUsers();
+                return;
+            }
+        }
+
+        // Step 3 — save branch access (if any selected)
+        if (branchIds.length > 0 && newUserId) {
+            const branchResponse = await fetch('../../../../server/api/system_setup/admin_panel/user-branch.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ user_id: newUserId, branch_ids: branchIds })
+            });
+            const branchData = await branchResponse.json();
+            if (!branchData.success) {
+                alert('User created but branch access assignment failed: ' + branchData.message);
+                closeCreateUserModal();
+                fetchUsers();
+                return;
+            }
+        }
+
+        alert('User created successfully!');
+        closeCreateUserModal();
+        fetchUsers();
     } catch (error) {
         alert('Error creating user');
     }
@@ -1020,6 +1164,7 @@ async function deleteRole(roleId) {
 document.addEventListener('DOMContentLoaded', function () {
     fetchUsers();
     fetchRoles();
+    fetchBranches();
 
     // Close modals when clicking outside
     const modals = document.querySelectorAll('.modal-overlay');

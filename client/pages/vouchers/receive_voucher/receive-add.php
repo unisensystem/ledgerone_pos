@@ -67,7 +67,7 @@ if (!$user_id) {
                         </div>
                         <div class="form-group">
                             <label for="previousBalance">Previous Balance</label>
-                            <input type="text" id="previousBalance" readonly>
+                            <input type="text" id="previousBalance" required>
                         </div>
                         <div class="form-group">
                             <label for="remainingBalance">Remaining Balance</label>
@@ -107,7 +107,7 @@ if (!$user_id) {
                                 <!-- Options will be populated by JS -->
                             </select>
                         </div>
-                        <div class="form-group">
+                        <div class="form-group hidden">
                             <label for="container">Container</label>
                             <select id="container">
                                 <option value="">Select Container</option>
@@ -240,9 +240,9 @@ if (!$user_id) {
                     </tbody>
                     <tfoot>
                         <tr style="background: var(--surface-2); font-weight: 600;">
-                            <td colspan="7" style="text-align: right; padding: 12px;">Total:</td>
+                            <td colspan="8" style="text-align: right; padding: 12px;">Total:</td>
                             <td id="bulkTotalAmount" style="padding: 12px;">0.00</td>
-                            <td colspan="6"></td>
+                            <td colspan="8"></td>
                         </tr>
                     </tfoot>
                 </table>

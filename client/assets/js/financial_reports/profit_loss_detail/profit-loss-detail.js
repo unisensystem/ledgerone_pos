@@ -7,11 +7,13 @@ const categoryFilterEl = document.getElementById('categoryFilter');
 const customerFilterEl = document.getElementById('customerFilter');
 const productFilterEl = document.getElementById('productFilter');
 const invoiceFilterEl = document.getElementById('invoiceFilter');
+const supplierFilterEl = document.getElementById('supplierFilter');
 const currencyFilterEl = document.getElementById('currencyFilter');
 const categoryFilterSearchEl = document.getElementById('categoryFilterSearch');
 const customerFilterSearchEl = document.getElementById('customerFilterSearch');
 const productFilterSearchEl = document.getElementById('productFilterSearch');
 const invoiceFilterSearchEl = document.getElementById('invoiceFilterSearch');
+const supplierFilterSearchEl = document.getElementById('supplierFilterSearch');
 const generateReportBtn = document.getElementById('generateReportBtn');
 const resetBtn = document.getElementById('resetBtn');
 const helpBtn = document.getElementById('helpBtn');
@@ -36,10 +38,12 @@ const itemTableBody = document.getElementById('itemTableBody');
 const categoryTableBody = document.getElementById('categoryTableBody');
 const customerTableBody = document.getElementById('customerTableBody');
 const invoiceTableBody = document.getElementById('invoiceTableBody');
+const supplierTableBody = document.getElementById('supplierTableBody');
 const reportPeriodItem = document.getElementById('reportPeriodItem');
 const reportPeriodCategory = document.getElementById('reportPeriodCategory');
 const reportPeriodCustomer = document.getElementById('reportPeriodCustomer');
 const reportPeriodInvoice = document.getElementById('reportPeriodInvoice');
+const reportPeriodSupplier = document.getElementById('reportPeriodSupplier');
 
 // Set default dates
 const today = new Date();
@@ -107,6 +111,7 @@ loadCategories();
 loadCustomers();
 loadProducts();
 loadInvoices();
+loadSuppliers();
 
 async function loadCurrencies() {
     try {
@@ -218,6 +223,27 @@ async function loadProducts() {
     }
 }
 
+async function loadSuppliers() {
+    try {
+        const response = await fetch('../../../../server/api/financial_reports/profit_loss_detail/get-suppliers.php');
+        const result = await response.json();
+
+        if (result.success) {
+            const suppliersData = [{id: '', name: 'All Suppliers'}, ...result.data];
+            initSearchableDropdown(
+                supplierFilterSearchEl,
+                document.getElementById('supplierFilterOptions'),
+                supplierFilterEl,
+                suppliersData,
+                'id',
+                'name'
+            );
+        }
+    } catch (error) {
+        console.error('Error loading suppliers:', error);
+    }
+}
+
 async function loadInvoices() {
     try {
         const response = await fetch('../../../../server/api/financial_reports/profit_loss_detail/get-invoices.php');
@@ -283,7 +309,7 @@ function validateForm() {
 }
 
 // Fetch data from API
-async function fetchReportData(startDate, endDate, branchId, companyId, categoryId, customerId, productId, invoiceId, currencyId) {
+async function fetchReportData(startDate, endDate, branchId, companyId, categoryId, customerId, productId, invoiceId, currencyId, supplierId) {
     let url = `../../../../server/api/financial_reports/profit_loss_detail/get-report.php?start_date=${startDate}&end_date=${endDate}`;
     if (branchId && branchId !== 'all') url += `&branch_id=${branchId}`;
     if (companyId) url += `&company_id=${companyId}`;
@@ -292,6 +318,7 @@ async function fetchReportData(startDate, endDate, branchId, companyId, category
     if (productId) url += `&product_id=${productId}`;
     if (invoiceId) url += `&invoice_id=${invoiceId}`;
     if (currencyId) url += `&currency_id=${currencyId}`;
+    if (supplierId) url += `&supplier_id=${supplierId}`;
     
     const response = await fetch(url);
     const result = await response.json();
@@ -313,15 +340,16 @@ async function generateReport() {
         validationMessage.style.display = 'flex';
 
         const data = await fetchReportData(
-            startDateEl.value, 
-            endDateEl.value, 
-            branchFilterEl.value, 
+            startDateEl.value,
+            endDateEl.value,
+            branchFilterEl.value,
             companyFilterEl.value,
             categoryFilterEl.value,
             customerFilterEl.value,
             productFilterEl.value,
             invoiceFilterEl.value,
-            currencyFilterEl.value
+            currencyFilterEl.value,
+            supplierFilterEl.value
         );
 
         console.log('Report Data:', data);
@@ -359,6 +387,7 @@ async function generateReport() {
         reportPeriodCategory.textContent = periodText;
         reportPeriodCustomer.textContent = periodText;
         reportPeriodInvoice.textContent = periodText;
+        reportPeriodSupplier.textContent = periodText;
 
         // Build item-wise table
         let itemHTML = '';
@@ -531,6 +560,53 @@ async function generateReport() {
 
         invoiceTableBody.innerHTML = invoiceHTML;
 
+        // Build supplier-wise table
+        let supplierHTML = '';
+        let supTotalRevenue = 0;
+        let supTotalCOGS = 0;
+        let supTotalProfit = 0;
+
+        data.supplierwise.forEach(supplier => {
+            const revenue = parseFloat(supplier.revenue);
+            const cogs = parseFloat(supplier.cogs);
+            const profit = revenue - cogs;
+            const margin = revenue > 0 ? ((profit / revenue) * 100).toFixed(2) : '—';
+
+            supTotalRevenue += revenue;
+            supTotalCOGS += cogs;
+            supTotalProfit += profit;
+
+            supplierHTML += `
+                <tr>
+                    <td>${supplier.supplier_code || '—'}</td>
+                    <td>${supplier.supplier_name}</td>
+                    <td class="amount-cell">${supplier.purchase_count}</td>
+                    <td class="amount-cell positive">${formatCurrency(revenue)}</td>
+                    <td class="amount-cell negative">${formatCurrency(cogs)}</td>
+                    <td class="amount-cell ${profit >= 0 ? 'positive' : 'negative'}">${formatCurrency(profit)}</td>
+                    <td class="amount-cell">${margin}${margin !== '—' ? '%' : ''}</td>
+                </tr>
+            `;
+        });
+
+        if (data.supplierwise.length === 0) {
+            supplierHTML = '<tr><td colspan="7" style="text-align:center; color: var(--text-subtext); padding: 30px;">No supplier data found for selected period.</td></tr>';
+        } else {
+            const supTotalMargin = supTotalRevenue > 0 ? ((supTotalProfit / supTotalRevenue) * 100).toFixed(2) : '0.00';
+            supplierHTML += `
+                <tr class="total-row">
+                    <td colspan="2"><strong>TOTAL</strong></td>
+                    <td class="amount-cell"></td>
+                    <td class="amount-cell positive">${formatCurrency(supTotalRevenue)}</td>
+                    <td class="amount-cell negative">${formatCurrency(supTotalCOGS)}</td>
+                    <td class="amount-cell ${supTotalProfit >= 0 ? 'positive' : 'negative'}">${formatCurrency(supTotalProfit)}</td>
+                    <td class="amount-cell">${supTotalMargin}%</td>
+                </tr>
+            `;
+        }
+
+        supplierTableBody.innerHTML = supplierHTML;
+
         // Show results
         summaryCards.style.display = 'grid';
         reportResults.style.display = 'block';
@@ -557,10 +633,12 @@ function resetForm() {
     customerFilterEl.value = '';
     productFilterEl.value = '';
     invoiceFilterEl.value = '';
+    supplierFilterEl.value = '';
     categoryFilterSearchEl.value = '';
     customerFilterSearchEl.value = '';
     productFilterSearchEl.value = '';
     invoiceFilterSearchEl.value = '';
+    supplierFilterSearchEl.value = '';
 
     summaryCards.style.display = 'none';
     reportResults.style.display = 'none';
@@ -595,6 +673,8 @@ function printReport() {
         reportData = window.currentData.customerwise;
     } else if (activeTab === 'invoicewise') {
         reportData = window.currentData.invoicewise;
+    } else if (activeTab === 'supplierwise') {
+        reportData = window.currentData.supplierwise;
     }
     
     const dataJson = encodeURIComponent(JSON.stringify(reportData));

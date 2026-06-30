@@ -47,6 +47,7 @@ try {
     $voucher_date = $_POST['voucher_date'] ?? '';
     $customer_code = $_POST['customer_code'] ?? '';
     $company_id = $_POST['company_id'] ?? null;
+    $previous_balance = (!empty($_POST['previous_balance']) && $_POST['previous_balance'] !== 'null') ? floatval($_POST['previous_balance']) : 0;
     $sub_account_id = (!empty($_POST['sub_account_id']) && $_POST['sub_account_id'] !== 'null') ? intval($_POST['sub_account_id']) : null;
     $bill_no = !empty($_POST['bill_no']) ? $_POST['bill_no'] : null;
     $dsr_no = (!empty($_POST['dsr_no']) && $_POST['dsr_no'] !== 'null') ? $_POST['dsr_no'] : null;
@@ -146,14 +147,14 @@ try {
     $stmt = $pdo->prepare("
         INSERT INTO receive_voucher (
             tenant_id, company_id, voucher_number, voucher_date, customer_id, sub_account_id, bill_no, dsr_no, project_id, container_id,
-            amount, currency_id, payment_method_id, bank_account_id, cheque_date, cheque_no, description, attachment,
+            amount, previous_balance, currency_id, payment_method_id, bank_account_id, cheque_date, cheque_no, description, attachment,
             recovery_officer_id, created_by, updated_by
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ");
     
     $stmt->execute([
         $tenant_id, $company_id, $voucher_number, $voucher_date, $customer['id'], $sub_account_id, $bill_no, $dsr_no, $project_id, $container_id,
-        $amount, $currency_id, $payment_method_id, $bank_account_id, $cheque_date, $cheque_no, $description, $attachment,
+        $amount, $previous_balance, $currency_id, $payment_method_id, $bank_account_id, $cheque_date, $cheque_no, $description, $attachment,
         $recovery_officer_id, $user_id, $user_id
     ]);
     

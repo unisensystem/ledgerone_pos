@@ -221,6 +221,8 @@ $data = $_GET['data'] ?? '';
             echo 'Category-wise Profit & Loss Report';
         } elseif ($report_type === 'customerwise') {
             echo 'Customer-wise Profit & Loss Report';
+        } elseif ($report_type === 'supplierwise') {
+            echo 'Supplier-wise Profit & Loss Report';
         } else {
             echo 'Invoice-wise Profit & Loss Report';
         }
@@ -402,6 +404,62 @@ $data = $_GET['data'] ?? '';
                 html += `
                         <tr class="total-row">
                             <td><strong>TOTAL</strong></td>
+                            <td class="text-right"></td>
+                            <td class="text-right">${formatCurrency(totalRevenue)}</td>
+                            <td class="text-right">${formatCurrency(totalCOGS)}</td>
+                            <td class="text-right ${totalProfit >= 0 ? 'positive' : 'negative'}">${formatCurrency(totalProfit)}</td>
+                            <td class="text-right">${totalMargin}%</td>
+                        </tr>
+                    </tbody>
+                </table>
+                `;
+
+            } else if (reportType === 'supplierwise') {
+                html = `
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Code</th>
+                                <th>Supplier</th>
+                                <th class="text-right">Purchases</th>
+                                <th class="text-right">Revenue</th>
+                                <th class="text-right">COGS</th>
+                                <th class="text-right">Gross Profit</th>
+                                <th class="text-right">Margin %</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                `;
+
+                let totalRevenue = 0, totalCOGS = 0, totalProfit = 0;
+
+                reportData.forEach(supplier => {
+                    const revenue = parseFloat(supplier.revenue);
+                    const cogs = parseFloat(supplier.cogs);
+                    const profit = revenue - cogs;
+                    const margin = revenue > 0 ? ((profit / revenue) * 100).toFixed(2) : '—';
+
+                    totalRevenue += revenue;
+                    totalCOGS += cogs;
+                    totalProfit += profit;
+
+                    html += `
+                        <tr>
+                            <td>${supplier.supplier_code || '—'}</td>
+                            <td>${supplier.supplier_name}</td>
+                            <td class="text-right">${supplier.purchase_count}</td>
+                            <td class="text-right">${formatCurrency(revenue)}</td>
+                            <td class="text-right">${formatCurrency(cogs)}</td>
+                            <td class="text-right ${profit >= 0 ? 'positive' : 'negative'}">${formatCurrency(profit)}</td>
+                            <td class="text-right">${margin}${margin !== '—' ? '%' : ''}</td>
+                        </tr>
+                    `;
+                });
+
+                const totalMargin = totalRevenue > 0 ? ((totalProfit / totalRevenue) * 100).toFixed(2) : '0.00';
+                html += `
+                        <tr class="total-row">
+                            <td colspan="2"><strong>TOTAL</strong></td>
                             <td class="text-right"></td>
                             <td class="text-right">${formatCurrency(totalRevenue)}</td>
                             <td class="text-right">${formatCurrency(totalCOGS)}</td>

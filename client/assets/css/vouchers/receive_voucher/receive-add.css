@@ -234,6 +234,11 @@ textarea {
   white-space: nowrap;
 }
 
+.bulk-table th:nth-child(8),
+.bulk-table td:nth-child(8) {
+  display: none;
+}
+
 .bulk-table td {
   padding: 8px;
   border: 1px solid var(--border-default);

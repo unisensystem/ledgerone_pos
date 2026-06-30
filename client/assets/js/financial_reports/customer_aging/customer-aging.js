@@ -48,7 +48,7 @@ function renderTable() {
     tableBody.innerHTML = '';
 
     if (reportData.length === 0) {
-        tableBody.innerHTML = '<tr><td colspan="9" style="text-align: center; padding: 20px;">No overdue invoices found</td></tr>';
+        tableBody.innerHTML = '<tr><td colspan="10" style="text-align: center; padding: 20px;">No overdue invoices found</td></tr>';
         updatePaginationInfo();
         return;
     }
@@ -72,6 +72,7 @@ function renderTable() {
             <td>${item.customerName}</td>
             <td>${item.address}</td>
             <td><span class="badge badge-primary">${item.invoiceNo}</span></td>
+            <td>${item.invoiceDate}</td>
             <td>${item.type}</td>
             <td><strong>${item.amount}</strong></td>
             <td>${item.daysOverdue} days</td>

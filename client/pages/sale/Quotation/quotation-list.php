@@ -290,6 +290,17 @@ $stUpd->execute([$uid, $qid, $tid]);
 }
 
 require_once '../../../../includes/dashboard.php';
+
+// Load base currency
+$stCur = $pdo->prepare("
+    SELECT c.code
+    FROM tenant_currencies tc
+    JOIN ledgerone_public.currencies c ON c.id = tc.currency_id
+    WHERE tc.tenant_id = ? AND tc.is_base_currency = 1
+    LIMIT 1
+");
+$stCur->execute([$tenant_id]);
+$baseCur = $stCur->fetchColumn() ?: 'PKR';
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -657,6 +668,7 @@ tbody td{padding:10px 13px;color:#2f3b4c;vertical-align:middle}
 <script>
 const API = location.pathname;
 const PAGE_SIZE = 15;
+const BASE_CUR = <?= json_encode($baseCur) ?>;
 
 let currentPage  = 1;
 let totalRecords = 0;
@@ -700,7 +712,7 @@ async function loadStats() {
   document.getElementById('sv-approved').textContent = s.approved || 0;
   document.getElementById('sv-converted').textContent= s.converted|| 0;
   document.getElementById('sv-rejected').textContent = s.rejected || 0;
-  document.getElementById('ss-total').textContent    = 'PKR ' + fmt(s.total_value);
+  document.getElementById('ss-total').textContent    = BASE_CUR + ' ' + fmt(s.total_value);
 }
 
 // ── FILTER BY STATUS (stat card click) ───────────────────
@@ -785,7 +797,7 @@ function renderTable(rows) {
       </td>
       <td class="date-col">${fmtDate(r.quotation_date)}</td>
       <td class="date-col">${fmtDate(r.valid_till)}</td>
-      <td class="amt-col">PKR ${fmt(r.grand_total)}</td>
+      <td class="amt-col">${BASE_CUR} ${fmt(r.grand_total)}</td>
       <td>${badgeMap[r.status] || r.status}</td>
       <td>
         <div class="act-group">
@@ -856,7 +868,7 @@ function openConvertModal(id) {
   document.getElementById('cp_qno').textContent     = row.quotation_number || '–';
   document.getElementById('cp_cust').textContent    = row.customer_name    || '–';
   document.getElementById('cp_date').textContent    = fmtDate(row.quotation_date);
-  document.getElementById('cp_total').textContent   = 'PKR ' + fmt(row.grand_total);
+  document.getElementById('cp_total').textContent   = BASE_CUR + ' ' + fmt(row.grand_total);
   document.getElementById('cp_salesman').textContent= row.salesman_name    || 'N/A';
   openModal('convertModal');
 }

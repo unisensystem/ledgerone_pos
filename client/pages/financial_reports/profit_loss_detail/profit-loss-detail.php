@@ -136,8 +136,18 @@ $currency_symbol = $currency['symbol'];
                         <div class="helper-text">Filter by customer</div>
                     </div>
                 </div>
-                
+
                 <div class="form-row">
+                    <div class="form-group">
+                        <label for="supplierFilter">Supplier</label>
+                        <div class="searchable-dropdown">
+                            <input type="text" class="search-input" placeholder="Search supplier..." id="supplierFilterSearch" autocomplete="off">
+                            <div class="dropdown-options" id="supplierFilterOptions"></div>
+                            <input type="hidden" id="supplierFilter">
+                        </div>
+                        <div class="helper-text">Filter by supplier</div>
+                    </div>
+
                     <div class="form-group">
                         <label for="productFilter">Product</label>
                         <div class="searchable-dropdown">
@@ -147,7 +157,7 @@ $currency_symbol = $currency['symbol'];
                         </div>
                         <div class="helper-text">Filter by product</div>
                     </div>
-                    
+
                     <div class="form-group">
                         <label for="invoiceFilter">Invoice #</label>
                         <div class="searchable-dropdown">
@@ -157,7 +167,9 @@ $currency_symbol = $currency['symbol'];
                         </div>
                         <div class="helper-text">Filter by invoice</div>
                     </div>
-                    
+                </div>
+
+                <div class="form-row">
                     <div class="form-group">
                         <label for="currencyFilter">Currency</label>
                         <select id="currencyFilter">
@@ -215,6 +227,9 @@ $currency_symbol = $currency['symbol'];
                 </button>
                 <button class="tab-btn" data-tab="invoicewise">
                     <i class="fas fa-file-invoice"></i> Invoice-wise P&L
+                </button>
+                <button class="tab-btn" data-tab="supplierwise">
+                    <i class="fas fa-truck"></i> Supplier-wise P&L
                 </button>
             </div>
 
@@ -314,6 +329,32 @@ $currency_symbol = $currency['symbol'];
                             </tr>
                         </thead>
                         <tbody id="invoiceTableBody">
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Supplier-wise Tab -->
+            <div class="tab-content" id="supplierwise">
+                <div class="card-title">
+                    Supplier-wise Profit & Loss
+                    <span style="font-size: 14px; font-weight: normal; color: var(--text-subtext); margin-left: 10px;" id="reportPeriodSupplier"></span>
+                </div>
+
+                <div class="table-container">
+                    <table id="supplierTable">
+                        <thead>
+                            <tr>
+                                <th style="width: 10%;">Code</th>
+                                <th style="width: 28%;">Supplier</th>
+                                <th style="width: 10%;">Purchases</th>
+                                <th style="width: 17%;">Revenue</th>
+                                <th style="width: 17%;">COGS</th>
+                                <th style="width: 11%;">Gross Profit</th>
+                                <th style="width: 7%;">Margin %</th>
+                            </tr>
+                        </thead>
+                        <tbody id="supplierTableBody">
                         </tbody>
                     </table>
                 </div>

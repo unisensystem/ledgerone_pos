@@ -50,6 +50,19 @@ $stC = $pdo->prepare("SELECT * FROM companies WHERE tenant_id = ? AND is_active 
 $stC->execute([$tenant_id]);
 $company = $stC->fetch(PDO::FETCH_ASSOC) ?: [];
 
+// Load base currency
+$stCur = $pdo->prepare("
+    SELECT c.code, c.symbol
+    FROM tenant_currencies tc
+    JOIN ledgerone_public.currencies c ON c.id = tc.currency_id
+    WHERE tc.tenant_id = ? AND tc.is_base_currency = 1
+    LIMIT 1
+");
+$stCur->execute([$tenant_id]);
+$baseCurrency = $stCur->fetch(PDO::FETCH_ASSOC);
+$currencyCode   = $baseCurrency['code']   ?? 'PKR';
+$currencySymbol = $baseCurrency['symbol'] ?? 'Rs';
+
 // Build company location string
 $locationParts = array_filter([
     $company['city']    ?? '',
@@ -58,7 +71,7 @@ $locationParts = array_filter([
 ]);
 $locationStr = implode(', ', $locationParts);
 
-function numberToWords(float $amount): string {
+function numberToWords(float $amount, string $currencyCode = 'PKR'): string {
     $ones  = ['','One','Two','Three','Four','Five','Six','Seven','Eight','Nine',
                'Ten','Eleven','Twelve','Thirteen','Fourteen','Fifteen','Sixteen',
                'Seventeen','Eighteen','Nineteen'];
@@ -78,7 +91,7 @@ function numberToWords(float $amount): string {
     $rupees   = (int)$amount;
     $paisa    = (int)round(($amount - $rupees) * 100);
     $words    = trim(convert($rupees, $ones, $tens));
-    $result   = 'PKR ' . ($words ?: 'Zero') . ' Rupees';
+    $result   = $currencyCode . ' ' . ($words ?: 'Zero') . ' Rupees';
     if ($paisa > 0) {
         $paisaWords = trim(convert($paisa, $ones, $tens));
         $result    .= ' and ' . $paisaWords . ' Paisa';
@@ -104,11 +117,9 @@ $metaItems[] = ['Quotation No.', htmlspecialchars($q['quotation_number']),      
 $metaItems[] = ['Date',          fmtDate($q['quotation_date']),                    'text'];
 if (!empty($q['valid_till']))    $metaItems[] = ['Valid Till',     fmtDate($q['valid_till']),                             'text'];
 $metaItems[]                                  = ['Status', '<span class="status-badge '.$scls.'">'.ucfirst($q['status']).'</span>', 'html'];
-if (!empty($q['customer_name'])) $metaItems[] = ['Customer',      htmlspecialchars($q['customer_name']),                 'text'];
-if (!empty($q['contact_person']))$metaItems[] = ['Contact Person', htmlspecialchars($q['contact_person']),               'text'];
-if (!empty($q['payment_term'])) $metaItems[]  = ['Payment Terms', htmlspecialchars($q['payment_term']),                  'text'];
-if (!empty($q['salesman_name'])) $metaItems[] = ['Salesman',      htmlspecialchars($q['salesman_name']),                 'text'];
-if (!empty($q['party_type']))   $metaItems[]  = ['Party Type',    htmlspecialchars($q['party_type']),                    'text'];
+if (!empty($q['customer_name'])) $metaItems[] = ['TO',            htmlspecialchars($q['customer_name']),                 'text'];
+if (!empty($q['contact_person']))$metaItems[] = ['ATTN', htmlspecialchars($q['contact_person']),               'text'];
+if (!empty($q['subject']))           $metaItems[] = ['Subject', htmlspecialchars($q['subject']),                   'text'];
 if (!empty($q['project_name'])) {
     $projLabel = htmlspecialchars($q['proj_code'] . ' - ' . $q['project_name']);
     if (!empty($q['project_city'])) $projLabel .= htmlspecialchars(' - ' . $q['project_city']);
@@ -276,9 +287,7 @@ body { font-family: "Segoe UI", Arial, sans-serif; font-size: 11.5px; color: #1a
         <th style="width:80px">Size</th>
         <th style="width:50px" class="r">Qty</th>
         <th style="width:60px">Unit</th>
-        <th style="width:72px" class="r">Rate</th>
-        <th style="width:44px" class="r">Tax%</th>
-        <th style="width:72px" class="r">Tax Amt</th>
+        <th style="width:72px" class="r">Unit Price</th>
         <th style="width:82px" class="r">Amount</th>
       </tr>
     </thead>
@@ -300,8 +309,6 @@ body { font-family: "Segoe UI", Arial, sans-serif; font-size: 11.5px; color: #1a
         <td class="r"><?= fmtNum($it['quantity']) ?></td>
         <td><?= htmlspecialchars($it['unit_name'] ?? '—') ?></td>
         <td class="r"><?= fmtNum($it['rate']) ?></td>
-        <td class="r"><?= fmtNum($it['tax_pct']) ?>%</td>
-        <td class="r"><?= fmtNum($it['tax_amt']) ?></td>
         <td class="r" style="font-weight:700"><?= fmtNum($it['line_total']) ?></td>
       </tr>
       <?php endforeach; ?>
@@ -324,7 +331,7 @@ body { font-family: "Segoe UI", Arial, sans-serif; font-size: 11.5px; color: #1a
       <?php endif; ?>
       <?php if ((float)$q['invoice_tax_pct'] > 0 || (float)$q['invoice_tax_amt'] > 0): ?>
       <tr>
-        <td>Tax (<?= fmtNum($q['invoice_tax_pct']) ?>%)</td>
+        <td>VAT (<?= fmtNum($q['invoice_tax_pct']) ?>%)</td>
         <td><?= fmtNum($q['invoice_tax_amt']) ?></td>
       </tr>
       <?php endif; ?>
@@ -338,7 +345,7 @@ body { font-family: "Segoe UI", Arial, sans-serif; font-size: 11.5px; color: #1a
   <!-- ── Amount in Words ── -->
   <div class="words-box">
     <span class="words-lbl">Amount in Words:</span>
-    <span class="words-val"><?= htmlspecialchars(numberToWords((float)$q['grand_total'])) ?></span>
+    <span class="words-val"><?= htmlspecialchars(numberToWords((float)$q['grand_total'], $currencyCode)) ?></span>
   </div>
 
   <!-- ── Terms & Conditions ── -->

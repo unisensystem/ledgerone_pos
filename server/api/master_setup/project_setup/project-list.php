@@ -1,7 +1,7 @@
 <?php
-require_once '../../../../includes/connection.php';
 session_start();
 header('Content-Type: application/json');
+require_once '../../../../includes/connection.php';
 
 $tenant_id = $_SESSION['tenant_id'] ?? null;
 if (!$tenant_id) { http_response_code(401); echo json_encode(['success' => false, 'message' => 'Unauthorized']); exit; }
@@ -27,5 +27,6 @@ try {
 
     echo json_encode(['success' => true, 'data' => $projects]);
 } catch (Exception $e) {
+    http_response_code(500);
     echo json_encode(['success' => false, 'message' => $e->getMessage()]);
 }

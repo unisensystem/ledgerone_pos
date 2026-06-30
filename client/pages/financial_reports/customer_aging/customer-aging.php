@@ -161,6 +161,7 @@ $currency_symbol = $currency['symbol'];
                             <th>Customer Name</th>
                             <th>Address</th>
                             <th>Invoice No</th>
+                            <th>Invoice Date</th>
                             <th>Type</th>
                             <th>Amount</th>
                             <th>Days Overdue</th>

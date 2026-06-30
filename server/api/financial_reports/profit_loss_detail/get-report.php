@@ -572,13 +572,206 @@ try {
         ];
     }
 
+    // ==================== SUPPLIER-WISE PROFIT & LOSS ====================
+
+    // Get all suppliers who have purchase invoices in this tenant
+    // Also include suppliers linked via products.vendor_id
+    $sql = "
+        SELECT DISTINCT
+            s.id as supplier_id,
+            s.supplier_name,
+            s.supplier_code
+        FROM suppliers s
+        WHERE s.tenant_id = ?
+        AND s.is_blacklisted = 0
+        AND (
+            EXISTS (
+                SELECT 1 FROM purchase_invoice pi
+                WHERE pi.supplier_id = s.id
+                AND pi.tenant_id = ?
+                AND pi.purchase_date BETWEEN ? AND ?
+                " . ($branch_id && $branch_id !== 'all' ? " AND (pi.branch_id = ? OR pi.branch_id IN (SELECT id FROM branches WHERE parent_branch_id = ?))" : "") . "
+                " . ($company_id ? " AND pi.company_id = ?" : "") . "
+            )
+            OR
+            EXISTS (
+                SELECT 1 FROM products p
+                WHERE p.vendor_id = s.id
+                AND p.tenant_id = ?
+                AND p.is_active = 1
+            )
+        )
+        ORDER BY s.supplier_name
+    ";
+
+    $params_sup = [$tenant_id, $tenant_id, $start_date, $end_date];
+    if ($branch_id && $branch_id !== 'all') {
+        $params_sup[] = $branch_id;
+        $params_sup[] = $branch_id;
+    }
+    if ($company_id) $params_sup[] = $company_id;
+    $params_sup[] = $tenant_id;
+
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute($params_sup);
+    $all_suppliers = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    // Filter by supplier if specified
+    if (!empty($_GET['supplier_id'])) {
+        $filter_supplier_id = $_GET['supplier_id'];
+        $all_suppliers = array_filter($all_suppliers, fn($s) => $s['supplier_id'] == $filter_supplier_id);
+        $all_suppliers = array_values($all_suppliers);
+    }
+
+    $supplierwise_data = [];
+
+    foreach ($all_suppliers as $supplier) {
+        $sup_id = $supplier['supplier_id'];
+
+        // --- COGS: total purchased from this supplier in date range ---
+        $sql_cogs = "
+            SELECT
+                pii.product_id,
+                SUM(pii.quantity) as total_qty,
+                SUM(pii.net_amount) as total_cost,
+                pi.currency_id
+            FROM purchase_invoice pi
+            JOIN purchase_invoice_items pii ON pi.id = pii.purchase_invoice_id
+            WHERE pi.supplier_id = ?
+            AND pi.tenant_id = ?
+            AND pi.purchase_date BETWEEN ? AND ?
+            " . ($branch_id && $branch_id !== 'all' ? " AND (pi.branch_id = ? OR pi.branch_id IN (SELECT id FROM branches WHERE parent_branch_id = ?))" : "") . "
+            " . ($company_id ? " AND pi.company_id = ?" : "") . "
+            " . (!empty($_GET['product_id']) ? " AND pii.product_id = ?" : "") . "
+            GROUP BY pii.product_id, pi.currency_id
+        ";
+
+        $params_cogs = [$sup_id, $tenant_id, $start_date, $end_date];
+        if ($branch_id && $branch_id !== 'all') {
+            $params_cogs[] = $branch_id;
+            $params_cogs[] = $branch_id;
+        }
+        if ($company_id) $params_cogs[] = $company_id;
+        if (!empty($_GET['product_id'])) $params_cogs[] = $_GET['product_id'];
+
+        $stmt = $pdo->prepare($sql_cogs);
+        $stmt->execute($params_cogs);
+        $cogs_rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        $total_cogs = 0;
+        $purchase_count = 0;
+        $supplier_product_ids = [];
+
+        foreach ($cogs_rows as $row) {
+            $cost = (float)$row['total_cost'];
+            $from_currency = $row['currency_id'] ?? $base_currency_id;
+            if ($from_currency != $target_currency_id) {
+                $cost = $converter->convert($cost, $from_currency, $target_currency_id);
+            }
+            $total_cogs += $cost;
+            $supplier_product_ids[] = $row['product_id'];
+        }
+
+        // Also include products linked via vendor_id on products table
+        $stmt = $pdo->prepare("
+            SELECT id FROM products
+            WHERE vendor_id = ?
+            AND tenant_id = ?
+            AND is_active = 1
+            " . (!empty($_GET['product_id']) ? " AND id = ?" : "") . "
+        ");
+        $params_vp = [$sup_id, $tenant_id];
+        if (!empty($_GET['product_id'])) $params_vp[] = $_GET['product_id'];
+        $stmt->execute($params_vp);
+        $vendor_products = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        foreach ($vendor_products as $vp) {
+            if (!in_array($vp['id'], $supplier_product_ids)) {
+                $supplier_product_ids[] = $vp['id'];
+            }
+        }
+
+        // Count distinct purchase invoices
+        $stmt = $pdo->prepare("
+            SELECT COUNT(DISTINCT pi.id) as cnt
+            FROM purchase_invoice pi
+            WHERE pi.supplier_id = ?
+            AND pi.tenant_id = ?
+            AND pi.purchase_date BETWEEN ? AND ?
+            " . ($branch_id && $branch_id !== 'all' ? " AND (pi.branch_id = ? OR pi.branch_id IN (SELECT id FROM branches WHERE parent_branch_id = ?))" : "") . "
+            " . ($company_id ? " AND pi.company_id = ?" : "") . "
+        ");
+        $params_cnt = [$sup_id, $tenant_id, $start_date, $end_date];
+        if ($branch_id && $branch_id !== 'all') {
+            $params_cnt[] = $branch_id;
+            $params_cnt[] = $branch_id;
+        }
+        if ($company_id) $params_cnt[] = $company_id;
+        $stmt->execute($params_cnt);
+        $purchase_count = (int)$stmt->fetchColumn();
+
+        // --- REVENUE: sales of products that belong to this supplier ---
+        $total_revenue = 0;
+
+        if (!empty($supplier_product_ids)) {
+            $placeholders = implode(',', array_fill(0, count($supplier_product_ids), '?'));
+
+            $sql_rev = "
+                SELECT
+                    SUM(sii.net_amount) as revenue,
+                    si.currency_id
+                FROM sale_invoice si
+                JOIN sale_invoice_items sii ON si.id = sii.sale_invoice_id
+                JOIN branches b ON si.branch_id = b.id
+                WHERE si.tenant_id = ?
+                AND si.sale_date BETWEEN ? AND ?
+                AND sii.product_id IN ($placeholders)
+                $branch_condition
+                " . ($company_id ? " AND si.company_id = ?" : "") . "
+                " . (!empty($_GET['customer_id']) ? " AND si.customer_id = ?" : "") . "
+                GROUP BY si.currency_id
+            ";
+
+            $params_rev = array_merge([$tenant_id, $start_date, $end_date], $supplier_product_ids);
+            $params_rev = array_merge($params_rev, $branch_params);
+            if ($company_id) $params_rev[] = $company_id;
+            if (!empty($_GET['customer_id'])) $params_rev[] = $_GET['customer_id'];
+
+            $stmt = $pdo->prepare($sql_rev);
+            $stmt->execute($params_rev);
+            $rev_rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+            foreach ($rev_rows as $row) {
+                $rev = (float)$row['revenue'];
+                $from_currency = $row['currency_id'] ?? $base_currency_id;
+                if ($from_currency != $target_currency_id) {
+                    $rev = $converter->convert($rev, $from_currency, $target_currency_id);
+                }
+                $total_revenue += $rev;
+            }
+        }
+
+        // Only show suppliers where products have been sold
+        if ($total_revenue == 0) continue;
+
+        $supplierwise_data[] = [
+            'supplier_id'    => $sup_id,
+            'supplier_name'  => $supplier['supplier_name'],
+            'supplier_code'  => $supplier['supplier_code'],
+            'purchase_count' => $purchase_count,
+            'revenue'        => $total_revenue,
+            'cogs'           => $total_cogs,
+            'profit'         => $total_revenue - $total_cogs
+        ];
+    }
+
     echo json_encode([
         'success' => true,
         'data' => [
-            'itemwise' => $itemwise_data,
+            'itemwise'     => $itemwise_data,
             'categorywise' => $categorywise_data,
             'customerwise' => $customerwise_data,
-            'invoicewise' => $invoicewise_data
+            'invoicewise'  => $invoicewise_data,
+            'supplierwise' => $supplierwise_data
         ]
     ]);
 

@@ -254,6 +254,19 @@ if (!$user_id) {
                                 <option value="America/Los_Angeles">America/Los_Angeles</option>
                             </select>
                         </div>
+                        <div class="form-group" style="grid-column: 1 / -1;">
+                            <label class="form-label">Branch Access</label>
+                            <div style="position: relative;">
+                                <input type="text" id="createBranchSearch" class="form-input" placeholder="Search branches..." autocomplete="off">
+                                <div id="createBranchDropdown" style="display:none; position:absolute; top:100%; left:0; right:0; background:var(--surface-card); border:1px solid var(--border-default); border-radius:var(--radius); max-height:200px; overflow-y:auto; z-index:1050; box-shadow:0 4px 12px rgba(0,0,0,0.1);">
+                                    <!-- Populated by JS -->
+                                </div>
+                            </div>
+                            <div id="createSelectedBranches" style="display:flex; flex-wrap:wrap; gap:6px; margin-top:8px;">
+                                <!-- Selected branch tags shown here -->
+                            </div>
+                            <input type="hidden" id="createBranchIds" value="">
+                        </div>
                     </div>
                 </form>
             </div>
