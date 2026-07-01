@@ -234,6 +234,47 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             ]);
         }
 
+        // Accounting Ledger Entries
+        $glStmt = $pdo->prepare("
+            INSERT INTO accounting_ledger
+            (tenant_id, transaction_type, reference_table, reference_id, account_id, date, description, debit, credit, created_at)
+            VALUES (?, 'wastage', 'production_wastage', ?, ?, ?, ?, ?, ?, NOW())
+        ");
+
+        // Raw material wastage: Dr. Wastage/Loss Account (account 116 out = loss from WIP)
+        foreach ($items as $item) {
+            $wastage_qty = floatval($item['wastage_qty'] ?? 0);
+            if ($wastage_qty <= 0) continue;
+
+            // Get unit cost from stock_ledger
+            $costStmt = $pdo->prepare("SELECT unit_cost FROM stock_ledger WHERE tenant_id = ? AND product_id = ? AND unit_id = ? AND qty_in > 0 ORDER BY transaction_date DESC LIMIT 1");
+            $costStmt->execute([$tenant_id, $item['material_id'], $item['uom_id']]);
+            $unitCost = $costStmt->fetchColumn() ?: 0;
+            $totalCost = $wastage_qty * $unitCost;
+
+            if ($totalCost > 0) {
+                // Debit: Wastage/Loss (account 116 - WIP reduced)
+                $glStmt->execute([$tenant_id, $wastage_id, 116, $wastage_date, 'Raw material wastage: ' . $wastage_no, $totalCost, 0]);
+                // Credit: WIP Inventory (account 116)
+                $glStmt->execute([$tenant_id, $wastage_id, 116, $wastage_date, 'Raw material wastage: ' . $wastage_no, 0, $totalCost]);
+            }
+        }
+
+        // Finished good wastage: Dr. Loss, Cr. Finished Goods (account 117)
+        if ($fg_wastage_qty > 0 && $fg_product_id && $fg_uom_id) {
+            $fgCostStmt = $pdo->prepare("SELECT unit_cost FROM stock_ledger WHERE tenant_id = ? AND product_id = ? AND unit_id = ? AND qty_in > 0 ORDER BY transaction_date DESC LIMIT 1");
+            $fgCostStmt->execute([$tenant_id, $fg_product_id, $fg_uom_id]);
+            $fgUnitCost = $fgCostStmt->fetchColumn() ?: 0;
+            $fgTotalCost = $fg_wastage_qty * $fgUnitCost;
+
+            if ($fgTotalCost > 0) {
+                // Debit: Wastage/Loss
+                $glStmt->execute([$tenant_id, $wastage_id, 117, $wastage_date, 'Finished good wastage: ' . $wastage_no, $fgTotalCost, 0]);
+                // Credit: Finished Goods Inventory (account 117)
+                $glStmt->execute([$tenant_id, $wastage_id, 117, $wastage_date, 'Finished good wastage: ' . $wastage_no, 0, $fgTotalCost]);
+            }
+        }
+
         $pdo->commit();
         echo json_encode(['success' => true, 'message' => 'Wastage entry saved successfully', 'wastage_id' => $wastage_id]);
     } catch (Exception $e) {

@@ -137,6 +137,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'DELETE') {
             $stmt = $pdo->prepare("DELETE FROM stock_ledger WHERE reference_table = 'production_completions' AND reference_id = ?");
             $stmt->execute([$id]);
             
+            // Delete accounting ledger entries
+            $stmt = $pdo->prepare("DELETE FROM accounting_ledger WHERE reference_table = 'production_completions' AND reference_id = ? AND tenant_id = ?");
+            $stmt->execute([$id, $tenant_id]);
+            
             // Delete completion materials
             $stmt = $pdo->prepare("DELETE FROM production_completion_materials WHERE production_completion_id = ?");
             $stmt->execute([$id]);
@@ -149,9 +153,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'DELETE') {
             $stmt = $pdo->prepare("DELETE FROM production_completions WHERE id = ?");
             $stmt->execute([$id]);
             
-            // Update production order status back to In Progress
-            $stmt = $pdo->prepare("UPDATE production_orders SET status = 'In Progress', updated_at = NOW() WHERE id = ?");
-            $stmt->execute([$completion['production_order_id']]);
+            // Update production order status back
+            $remainingStmt = $pdo->prepare("SELECT COUNT(*) FROM production_completions WHERE production_order_id = ? AND tenant_id = ?");
+            $remainingStmt->execute([$completion['production_order_id'], $tenant_id]);
+            $remainingCount = $remainingStmt->fetchColumn();
+            
+            $newStatus = $remainingCount > 0 ? 'In Progress' : 'Planned';
+            $stmt = $pdo->prepare("UPDATE production_orders SET status = ?, updated_at = NOW() WHERE id = ?");
+            $stmt->execute([$newStatus, $completion['production_order_id']]);
             
             $pdo->commit();
             echo json_encode(['success' => true, 'message' => 'Completion deleted successfully']);

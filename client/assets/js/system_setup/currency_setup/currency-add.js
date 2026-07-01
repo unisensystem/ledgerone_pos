@@ -115,8 +115,9 @@ currencyForm.addEventListener('submit', async function (e) {
         currencyNameError.textContent = '';
     }
 
-    // Validate base currency checkbox
-    if (!document.getElementById('isBaseCurrency').checked) {
+    // Validate base currency checkbox only if it's not disabled (i.e., first currency case)
+    const baseCurrencyCheckbox = document.getElementById('isBaseCurrency');
+    if (!baseCurrencyCheckbox.disabled && !baseCurrencyCheckbox.checked) {
         baseCurrencyError.textContent = 'You must confirm this is the base currency';
         isValid = false;
     } else {

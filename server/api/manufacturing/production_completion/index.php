@@ -450,6 +450,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             ]);
         }
         
+        // 4. Accounting Ledger Entries
+        $glStmt = $pdo->prepare("
+            INSERT INTO accounting_ledger
+            (tenant_id, transaction_type, reference_table, reference_id, account_id, date, description, debit, credit, created_at)
+            VALUES (?, 'production_completion', 'production_completions', ?, ?, ?, ?, ?, ?, NOW())
+        ");
+        
+        // Debit: Finished Goods Inventory (account 117)
+        $glStmt->execute([$tenant_id, $completion_id, 117, $complete_date, 'Production completed: ' . $completionNo, $totalCost, 0]);
+        
+        // Credit: WIP Inventory (account 116)
+        $glStmt->execute([$tenant_id, $completion_id, 116, $complete_date, 'Production completed: ' . $completionNo, 0, $totalCost]);
+        
         // Check if fully completed
         $stmt = $pdo->prepare("
             SELECT order_qty, 
@@ -508,6 +521,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
         // Delete old stock ledger entries
         $stmt = $pdo->prepare("DELETE FROM stock_ledger WHERE reference_table = 'production_completions' AND reference_id = ?");
         $stmt->execute([$completion_id]);
+        
+        // Delete old accounting ledger entries
+        $stmt = $pdo->prepare("DELETE FROM accounting_ledger WHERE reference_table = 'production_completions' AND reference_id = ? AND tenant_id = ?");
+        $stmt->execute([$completion_id, $tenant_id]);
         
         // Delete old completed products
         $stmt = $pdo->prepare("DELETE FROM completed_products WHERE production_completion_id = ?");
@@ -658,6 +675,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
                 $complete_date
             ]);
         }
+        
+        // Insert new accounting ledger entries
+        $glStmt = $pdo->prepare("
+            INSERT INTO accounting_ledger
+            (tenant_id, transaction_type, reference_table, reference_id, account_id, date, description, debit, credit, created_at)
+            VALUES (?, 'production_completion', 'production_completions', ?, ?, ?, ?, ?, ?, NOW())
+        ");
+        
+        // Get completion_no for description
+        $compNoStmt = $pdo->prepare("SELECT completion_no FROM production_completions WHERE id = ?");
+        $compNoStmt->execute([$completion_id]);
+        $compNo = $compNoStmt->fetchColumn();
+        
+        // Debit: Finished Goods Inventory (account 117)
+        $glStmt->execute([$tenant_id, $completion_id, 117, $complete_date, 'Production completed: ' . $compNo, $totalCost, 0]);
+        
+        // Credit: WIP Inventory (account 116)
+        $glStmt->execute([$tenant_id, $completion_id, 116, $complete_date, 'Production completed: ' . $compNo, 0, $totalCost]);
         
         // Check if production order should be marked as completed
         $stmt = $pdo->prepare("

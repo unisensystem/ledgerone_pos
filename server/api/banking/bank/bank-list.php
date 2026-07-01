@@ -24,14 +24,17 @@ if (!$user_id || !$tenant_id) {
 
 try {
     $stmt = $pdo->prepare("
-        SELECT id, bank_name, account_number, account_title, account_type, is_mfb, 
-               mfb_name, currency, branch_name, branch_city, branch_state, 
-               opening_balance, debit_amount, credit_amount, balance_type, 
-               is_active, created_at, bank_logo_path, iban, swift_code, 
-               contact_person, contact_number, email, branch_code
-        FROM bank_accounts 
-        WHERE tenant_id = ? 
-        ORDER BY created_at DESC
+        SELECT ba.id, ba.bank_name, ba.account_number, ba.account_title, ba.account_type, ba.is_mfb, 
+               ba.mfb_name, ba.currency_id, c.code as currency_code, c.name as currency_name, c.symbol as currency_symbol,
+               ba.branch_name, ba.branch_city, ba.branch_state, 
+               ba.opening_balance, ba.debit_amount, ba.credit_amount, ba.balance_type, 
+               ba.is_active, ba.created_at, ba.bank_logo_path, ba.iban, ba.swift_code, 
+               ba.contact_person, ba.contact_number, ba.email, ba.branch_code
+        FROM bank_accounts ba
+        LEFT JOIN tenant_currencies tc ON ba.currency_id = tc.id
+        LEFT JOIN ledgerone_public.currencies c ON tc.currency_id = c.id
+        WHERE ba.tenant_id = ? 
+        ORDER BY ba.created_at DESC
     ");
     
     $stmt->execute([$tenant_id]);
@@ -60,7 +63,9 @@ try {
         'total_accounts' => count($accounts),
         'active_accounts' => $activeCount,
         'total_balance' => $totalBalance,
-        'mfb_accounts' => $mfbCount
+        'mfb_accounts' => $mfbCount,
+        'base_currency_code' => $accounts[0]['currency_code'] ?? 'PKR',
+        'base_currency_symbol' => $accounts[0]['currency_symbol'] ?? '₨'
     ];
     
     echo json_encode(['success' => true, 'data' => $accounts, 'stats' => $stats]);

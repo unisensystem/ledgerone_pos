@@ -97,10 +97,7 @@ if (!$user_id) {
                         <div class="form-row">
                             <label class="form-label" for="currency">Currency *</label>
                             <select id="currency" class="form-select" required>
-                                <option value="PKR">PKR - Pakistani Rupee</option>
-                                <option value="USD">USD - US Dollar</option>
-                                <option value="EUR">EUR - Euro</option>
-                                <option value="GBP">GBP - British Pound</option>
+                                <option value="">Loading currencies...</option>
                             </select>
                         </div>
 

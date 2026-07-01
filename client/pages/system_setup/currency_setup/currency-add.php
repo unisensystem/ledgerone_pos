@@ -51,8 +51,8 @@ if (!$user_id) {
 
                     <div class="form-group full-width">
                         <div class="checkbox-group">
-                            <input type="checkbox" id="isBaseCurrency" required>
-                            <label for="isBaseCurrency" class="checkbox-label required">Set as Base Currency</label>
+                            <input type="checkbox" id="isBaseCurrency">
+                            <label for="isBaseCurrency" class="checkbox-label">Set as Base Currency</label>
                         </div>
                         <div class="helper-text">This currency will be used as the primary currency for all transactions
                         </div>

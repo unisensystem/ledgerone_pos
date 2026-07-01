@@ -1,3 +1,23 @@
+// Load tenant currencies for edit modal
+async function loadEditCurrencies() {
+    const select = document.getElementById('editCurrency');
+    try {
+        const response = await fetch('../../../../server/api/system_setup/currency_setup/currency-list.php');
+        const result = await response.json();
+        if (result.success && result.data.length > 0) {
+            select.innerHTML = '<option value="">Select currency</option>';
+            result.data.forEach(currency => {
+                const option = document.createElement('option');
+                option.value = currency.id;
+                option.textContent = `${currency.code} - ${currency.name} (${currency.symbol})`;
+                select.appendChild(option);
+            });
+        }
+    } catch (e) {
+        select.innerHTML = '<option value="">Failed to load</option>';
+    }
+}
+
 // Data
 let bankAccounts = [];
 
@@ -29,13 +49,17 @@ const nextPageBtn = document.getElementById('nextPage');
 const paginationInfo = document.getElementById('paginationInfo');
 
 // Helper Functions
-function formatCurrency(amount, currency) {
-    const formatter = new Intl.NumberFormat('en-PK', {
-        style: 'currency',
-        currency: currency,
-        minimumFractionDigits: 2
-    });
-    return formatter.format(amount);
+function formatCurrency(amount, currencyCode, currencySymbol) {
+    try {
+        const formatter = new Intl.NumberFormat('en-PK', {
+            style: 'currency',
+            currency: currencyCode || 'PKR',
+            minimumFractionDigits: 2
+        });
+        return formatter.format(amount);
+    } catch (e) {
+        return (currencySymbol || '') + ' ' + parseFloat(amount).toFixed(2);
+    }
 }
 
 function getTypeBadge(type) {
@@ -126,10 +150,10 @@ function renderTable() {
                         <div style="font-size: 12px; color: var(--light-text-sub);">${account.branch_city}, ${account.branch_state}</div>
                     </td>
                     <td>
-                        <div class="balance ${balanceClass}">${formatCurrency(account.balance, account.currency)}</div>
+                        <div class="balance ${balanceClass}">${formatCurrency(account.balance, account.currency_code, account.currency_symbol)}</div>
                         <div style="font-size: 12px; color: var(--light-text-sub);">${account.balance_type === 'debit' ? 'Debit' : 'Credit'} Balance</div>
                     </td>
-                    <td>${account.currency}</td>
+                    <td>${account.currency_code ? account.currency_code + ' ' + (account.currency_symbol || '') : '-'}</td>
                     <td>${getStatusBadge(account.status)}</td>
                     <td>
                         <div class="action-buttons-cell">
@@ -360,7 +384,7 @@ function showEditModal(id) {
         document.getElementById('editAccountNumber').value = account.account_number;
         document.getElementById('editAccountTitle').value = account.account_title || '';
         document.getElementById('editAccountType').value = account.account_type;
-        document.getElementById('editCurrency').value = account.currency || 'PKR';
+        document.getElementById('editCurrency').value = account.currency_id || '';
         document.getElementById('editBranchName').value = account.branch_name;
         document.getElementById('editBranchCode').value = account.branch_code || '';
         document.getElementById('editBranchCity').value = account.branch_city;
@@ -446,7 +470,7 @@ function addAccount() {
 function renderStats(stats) {
     document.querySelector('.stat-card.total-accounts .stat-value').textContent = stats.total_accounts;
     document.querySelector('.stat-card.active-accounts .stat-value').textContent = stats.active_accounts;
-    document.querySelector('.stat-card.balance .stat-value').textContent = formatCurrency(stats.total_balance, 'PKR');
+    document.querySelector('.stat-card.balance .stat-value').textContent = formatCurrency(stats.total_balance, stats.base_currency_code, stats.base_currency_symbol);
     document.querySelector('.stat-card.mfb-accounts .stat-value').textContent = stats.mfb_accounts;
     
     // Update percentages
@@ -477,6 +501,7 @@ function loadBankAccounts() {
 document.addEventListener('DOMContentLoaded', () => {
     // Load data
     loadBankAccounts();
+    loadEditCurrencies();
 
     // Sorting
     document.querySelectorAll('th.sortable').forEach(th => {

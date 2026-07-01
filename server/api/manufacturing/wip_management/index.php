@@ -789,13 +789,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $pomStmt->execute([$item['issue_qty'], $wipData['production_order_id'], $item['material_id'], $item['uom_id']]);
             }
             
+            // Delete accounting_ledger entries for this WIP
+            $deleteGLStmt = $pdo->prepare("
+                DELETE FROM accounting_ledger
+                WHERE reference_table = 'work_in_progress'
+                AND reference_id = ?
+                AND tenant_id = ?
+            ");
+            $deleteGLStmt->execute([$wip_id, $tenant_id]);
+            
             // Delete all items
             $deleteItemsStmt = $pdo->prepare("DELETE FROM work_in_progress_items WHERE work_in_progress_id = ?");
             $deleteItemsStmt->execute([$wip_id]);
             
             // Delete WIP header
-            $deleteWIPStmt = $pdo->prepare("DELETE FROM work_in_progress WHERE id = ? AND tenant_id = ?");
-            $deleteWIPStmt->execute([$wip_id, $tenant_id]);
+            $deleteWIPHeaderStmt = $pdo->prepare("DELETE FROM work_in_progress WHERE id = ? AND tenant_id = ?");
+            $deleteWIPHeaderStmt->execute([$wip_id, $tenant_id]);
+            
+            // Revert production order status to 'Planned' if no more WIPs exist
+            $remainingStmt = $pdo->prepare("SELECT COUNT(*) FROM work_in_progress WHERE production_order_id = ? AND tenant_id = ?");
+            $remainingStmt->execute([$wipData['production_order_id'], $tenant_id]);
+            if ($remainingStmt->fetchColumn() == 0) {
+                $revertStmt = $pdo->prepare("UPDATE production_orders SET status = 'Planned', updated_at = NOW() WHERE id = ? AND tenant_id = ?");
+                $revertStmt->execute([$wipData['production_order_id'], $tenant_id]);
+            }
             
             $pdo->commit();
             echo json_encode(['success' => true, 'message' => 'WIP deleted successfully']);

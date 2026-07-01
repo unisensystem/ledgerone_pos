@@ -1,3 +1,30 @@
+// Load tenant currencies from API
+async function loadCurrencies() {
+    const select = document.getElementById('currency');
+    try {
+        const response = await fetch('../../../../server/api/system_setup/currency_setup/currency-list.php');
+        const result = await response.json();
+
+        if (result.success && result.data.length > 0) {
+            select.innerHTML = '<option value="">Select currency</option>';
+            result.data.forEach(currency => {
+                const option = document.createElement('option');
+                option.value = currency.id;
+                option.textContent = `${currency.code} - ${currency.name} (${currency.symbol})`;
+                if (currency.is_base_currency == 1) option.selected = true;
+                select.appendChild(option);
+            });
+        } else {
+            select.innerHTML = '<option value="">No currencies found</option>';
+        }
+    } catch (error) {
+        console.error('Failed to load currencies:', error);
+        select.innerHTML = '<option value="">Failed to load currencies</option>';
+    }
+}
+
+loadCurrencies();
+
 // MFB Section Toggle
 const isMfbCheckbox = document.getElementById('isMfb');
 const mfbSection = document.getElementById('mfbSection');

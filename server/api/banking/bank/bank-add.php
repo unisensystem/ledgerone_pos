@@ -27,11 +27,18 @@ try {
     $input = $_POST;
     
     // Validate required fields
-    $required = ['bankName', 'accountNumber', 'accountType', 'branchName', 'branchCity', 'branchState', 'asOfDate'];
+    $required = ['bankName', 'accountNumber', 'accountType', 'currency', 'branchName', 'branchCity', 'branchState', 'asOfDate'];
     foreach ($required as $field) {
         if (empty($input[$field])) {
             throw new Exception("$field is required");
         }
+    }
+
+    // Validate currency_id belongs to this tenant
+    $stmt = $pdo->prepare("SELECT id FROM tenant_currencies WHERE id = ? AND tenant_id = ?");
+    $stmt->execute([$input['currency'], $tenant_id]);
+    if (!$stmt->fetch()) {
+        throw new Exception('Invalid currency selected');
     }
     
     // Handle file upload
@@ -103,7 +110,7 @@ try {
     $stmt = $pdo->prepare("
         INSERT INTO bank_accounts (
             tenant_id, bank_name, is_mfb, mfb_name, account_number, account_type, 
-            currency, branch_name, branch_code, branch_city, branch_state, 
+            currency_id, branch_name, branch_code, branch_city, branch_state, 
             branch_address, account_title, iban, swift_code, contact_person, 
             contact_number, email, notes, balance_type, opening_balance, 
             as_of_date, is_active, account_id, bank_logo_path
@@ -117,7 +124,7 @@ try {
         $input['mfbName'] ?? null,
         $input['accountNumber'],
         $input['accountType'],
-        $input['currency'] ?? 'PKR',
+        intval($input['currency']),
         $input['branchName'],
         $input['branchCode'] ?? null,
         $input['branchCity'],

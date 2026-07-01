@@ -113,6 +113,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'DELETE') {
         $stmt = $pdo->prepare("DELETE FROM stock_ledger WHERE reference_table = 'production_wastage' AND reference_id = ?");
         $stmt->execute([$id]);
 
+        // Delete accounting_ledger entries
+        $stmt = $pdo->prepare("DELETE FROM accounting_ledger WHERE reference_table = 'production_wastage' AND reference_id = ? AND tenant_id = ?");
+        $stmt->execute([$id, $tenant_id]);
+
         $stmt = $pdo->prepare("DELETE FROM production_wastage_items WHERE wastage_id = ?");
         $stmt->execute([$id]);
 
