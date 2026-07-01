@@ -116,7 +116,6 @@ $metaItems = [];
 $metaItems[] = ['Quotation No.', htmlspecialchars($q['quotation_number']),         'text'];
 $metaItems[] = ['Date',          fmtDate($q['quotation_date']),                    'text'];
 if (!empty($q['valid_till']))    $metaItems[] = ['Valid Till',     fmtDate($q['valid_till']),                             'text'];
-$metaItems[]                                  = ['Status', '<span class="status-badge '.$scls.'">'.ucfirst($q['status']).'</span>', 'html'];
 if (!empty($q['customer_name'])) $metaItems[] = ['TO',            htmlspecialchars($q['customer_name']),                 'text'];
 if (!empty($q['contact_person']))$metaItems[] = ['ATTN', htmlspecialchars($q['contact_person']),               'text'];
 if (!empty($q['subject']))           $metaItems[] = ['Subject', htmlspecialchars($q['subject']),                   'text'];
@@ -143,6 +142,8 @@ body { font-family: "Segoe UI", Arial, sans-serif; font-size: 11.5px; color: #1a
 
 /* ── COMPANY HEADER ── */
 .co-header  { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px; padding-bottom: 10px; border-bottom: 2.5px solid #1f7bff; }
+.co-left    { display: flex; align-items: flex-start; gap: 12px; }
+.co-logo    { width: 64px; height: 64px; object-fit: contain; flex-shrink: 0; }
 .co-name    { font-size: 20px; font-weight: 800; color: #0e1a2b; letter-spacing: .3px; }
 .co-slogan  { font-size: 10.5px; color: #1f7bff; font-style: italic; margin-top: 2px; font-weight: 500; }
 .co-sub     { font-size: 10px; color: #6b7280; margin-top: 2px; }
@@ -240,17 +241,22 @@ body { font-family: "Segoe UI", Arial, sans-serif; font-size: 11.5px; color: #1a
 
   <!-- ── Company Header ── -->
   <div class="co-header">
-    <div>
-      <div class="co-name"><?= htmlspecialchars($company['company_name'] ?? 'LedgerOne ERP') ?></div>
-      <?php if (!empty($company['slogan'])): ?>
-      <div class="co-slogan"><?= htmlspecialchars($company['slogan']) ?></div>
+    <div class="co-left">
+      <?php if (!empty($company['logo_url'])): ?>
+      <img class="co-logo" src="../../assets/uploads/company_logo/<?= htmlspecialchars($company['logo_url']) ?>" alt="Logo">
       <?php endif; ?>
-      <?php if (!empty($company['address'])): ?>
-      <div class="co-sub"><?= htmlspecialchars($company['address']) ?></div>
-      <?php endif; ?>
-      <?php if (!empty($locationStr)): ?>
-      <div class="co-sub"><?= htmlspecialchars($locationStr) ?></div>
-      <?php endif; ?>
+      <div>
+        <div class="co-name"><?= htmlspecialchars($company['company_name'] ?? 'LedgerOne ERP') ?></div>
+        <?php if (!empty($company['slogan'])): ?>
+        <div class="co-slogan"><?= htmlspecialchars($company['slogan']) ?></div>
+        <?php endif; ?>
+        <?php if (!empty($company['address'])): ?>
+        <div class="co-sub"><?= htmlspecialchars($company['address']) ?></div>
+        <?php endif; ?>
+        <?php if (!empty($locationStr)): ?>
+        <div class="co-sub"><?= htmlspecialchars($locationStr) ?></div>
+        <?php endif; ?>
+      </div>
     </div>
     <div class="co-contact">
       <?php if (!empty($company['phone'])): ?>Phone: <?= htmlspecialchars($company['phone']) ?><br><?php endif; ?>

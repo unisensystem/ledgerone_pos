@@ -42,6 +42,8 @@ function convertToWebP($sourcePath, $targetPath) {
     return false;
 }
 
+$uploadDir = '../../../../client/assets/uploads/company_logo/';
+
 try {
     if ($_SERVER['REQUEST_METHOD'] === 'GET') {
         // Get company by ID
@@ -78,8 +80,6 @@ try {
         
         // Handle logo upload if provided
         if (isset($_FILES['logo_file']) && $_FILES['logo_file']['error'] === UPLOAD_ERR_OK) {
-            $uploadDir = '../../../../client/assets/uploads/company_logo/';
-            
             if (!is_dir($uploadDir)) {
                 mkdir($uploadDir, 0755, true);
             }
@@ -102,16 +102,23 @@ try {
             $currentLogo = $currentStmt->fetch();
             
             $fileExtension = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
-            $logoFileName = uniqid('logo_') . '.webp';
-            $targetPath = $uploadDir . $logoFileName;
             
-            if ($fileExtension === 'webp' || $fileExtension === 'avif' || $fileExtension === 'pdf') {
+            if (in_array($fileExtension, ['webp', 'avif', 'pdf'])) {
                 $logoFileName = uniqid('logo_') . '.' . $fileExtension;
                 $targetPath = $uploadDir . $logoFileName;
-                move_uploaded_file($file['tmp_name'], $targetPath);
+                if (!move_uploaded_file($file['tmp_name'], $targetPath)) {
+                    throw new Exception('Failed to upload file');
+                }
             } else {
-                if (!convertToWebP($file['tmp_name'], $targetPath)) {
-                    throw new Exception('Failed to process image');
+                $logoFileName = uniqid('logo_') . '.webp';
+                $targetPath = $uploadDir . $logoFileName;
+                if (!function_exists('imagewebp') || !convertToWebP($file['tmp_name'], $targetPath)) {
+                    // Fallback: save original format if WebP conversion not supported
+                    $logoFileName = uniqid('logo_') . '.' . $fileExtension;
+                    $targetPath = $uploadDir . $logoFileName;
+                    if (!move_uploaded_file($file['tmp_name'], $targetPath)) {
+                        throw new Exception('Failed to upload file');
+                    }
                 }
             }
             

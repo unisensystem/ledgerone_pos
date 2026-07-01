@@ -129,11 +129,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 form.reset();
                 logoPreview.innerHTML = '<span style="color: var(--text-subtext); font-size: 12px;">No logo selected</span>';
             } else {
-                errorNotification.textContent = result.message;
+                errorNotification.textContent = result.message || 'An error occurred while saving the company.';
                 showNotification(errorNotification);
             }
         } catch (error) {
-            errorNotification.textContent = 'An error occurred while saving the company.';
+            errorNotification.textContent = 'Network error. Please try again.';
             showNotification(errorNotification);
         } finally {
             // Re-enable submit button

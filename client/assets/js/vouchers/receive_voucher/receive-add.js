@@ -109,11 +109,9 @@ fetch('../../../../server/api/vouchers/receive_voucher/get-containers.php')
 
 // Fetch bills for selected customer
 function fetchBillsForCustomer(customerCode) {
-    console.log('Fetching bills for customer:', customerCode);
     fetch(`../../../../server/api/vouchers/receive_voucher/get-bills.php?customer_code=${customerCode}`)
         .then(response => response.json())
         .then(data => {
-            console.log('Bills response:', data);
             if (data.success) {
                 bills = data.data.map(bill => ({
                     number: bill.bill_no,
@@ -121,12 +119,39 @@ function fetchBillsForCustomer(customerCode) {
                     date: bill.sale_date,
                     currency: bill.currency_symbol || '$'
                 }));
-                console.log('Bills loaded:', bills);
-                // Reinitialize bill dropdown with new data
-                setupSearchableDropdown('billNo', 'billDropdown', bills, 'display', 'number');
+                renderBillDropdown('');
             }
         })
         .catch(error => console.error('Error fetching bills:', error));
+}
+
+function renderBillDropdown(searchTerm) {
+    const dropdown = document.getElementById('billDropdown');
+    dropdown.innerHTML = '';
+    const filtered = bills.filter(b =>
+        b.number.toLowerCase().includes(searchTerm) ||
+        (b.date && b.date.toLowerCase().includes(searchTerm)) ||
+        b.amount.toString().includes(searchTerm)
+    );
+    if (filtered.length === 0) {
+        dropdown.classList.remove('show');
+        return;
+    }
+    filtered.slice(0, 10).forEach(bill => {
+        const option = document.createElement('div');
+        option.className = 'dropdown-item';
+        const date = new Date(bill.date).toLocaleDateString();
+        option.innerHTML = `<strong>${bill.number}</strong> - ${date} - ${bill.currency}${parseFloat(bill.amount).toFixed(2)}`;
+        option.addEventListener('click', function () {
+            document.getElementById('billNo').value = `${bill.number} - ${date} - ${bill.currency}${parseFloat(bill.amount).toFixed(2)}`;
+            document.getElementById('billNo').dataset.selectedBillNo = bill.number;
+            dropdown.classList.remove('show');
+            // previousBalance is NOT changed — only remainingBalance recalculates
+            updateRemainingBalance();
+        });
+        dropdown.appendChild(option);
+    });
+    dropdown.classList.add('show');
 }
 
 // Fetch sub-accounts for selected customer
@@ -364,21 +389,6 @@ function setupSearchableDropdown(inputId, dropdownId, data, displayKey, valueKey
                                 }
                             });
                     }
-                    
-                    // Update balance if this is bill dropdown
-                    if (inputId === 'billNo' && this.dataset.billno) {
-                        const customerCode = document.getElementById('customerCode').value.split(' - ')[0];
-                        if (customerCode) {
-                            fetch(`../../../../server/api/vouchers/receive_voucher/get-customer-balance.php?customer_code=${customerCode}&bill_no=${this.dataset.billno}`)
-                                .then(r => r.json())
-                                .then(data => {
-                                    if (data.success) {
-                                        document.getElementById('previousBalance').value = parseFloat(data.balance).toFixed(2);
-                                        updateRemainingBalance();
-                                    }
-                                });
-                        }
-                    }
                 });
 
                 dropdown.appendChild(option);
@@ -458,8 +468,25 @@ function setupSearchableDropdown(inputId, dropdownId, data, displayKey, valueKey
     });
 }
 
-// Initialize searchable dropdowns after customers are loaded
-setupSearchableDropdown('billNo', 'billDropdown', bills, 'amount', 'number');
+// Initialize bill dropdown input listener (once)
+(function setupBillInput() {
+    const billInput = document.getElementById('billNo');
+    const billDropdown = document.getElementById('billDropdown');
+
+    billInput.addEventListener('input', function () {
+        renderBillDropdown(this.value.toLowerCase());
+    });
+
+    billInput.addEventListener('focus', function () {
+        if (bills.length > 0) renderBillDropdown(this.value.toLowerCase());
+    });
+
+    document.addEventListener('click', function (e) {
+        if (!billInput.contains(e.target) && !billDropdown.contains(e.target)) {
+            billDropdown.classList.remove('show');
+        }
+    });
+})();
 
 // Update remaining balance when amount changes
 document.getElementById('amount').addEventListener('input', updateRemainingBalance);
@@ -986,7 +1013,7 @@ form.addEventListener('submit', function (e) {
     formData.append('company_id', document.getElementById('company').value);
     formData.append('previous_balance', document.getElementById('previousBalance').value);
     formData.append('sub_account_id', document.getElementById('subAccount').value || null);
-    formData.append('bill_no', document.getElementById('billNo').value.split(' - ')[0] || null);
+    formData.append('bill_no', document.getElementById('billNo').dataset.selectedBillNo || document.getElementById('billNo').value.split(' - ')[0] || null);
     formData.append('dsr_no', document.getElementById('dsrNo').value || null);
     formData.append('project_id', document.getElementById('project').value || null);
     formData.append('container_id', document.getElementById('container').value || null);

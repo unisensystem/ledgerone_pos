@@ -67,7 +67,7 @@ if (!$user_id) {
                         </div>
                         <div class="form-group">
                             <label for="previousBalance">Previous Balance</label>
-                            <input type="text" id="previousBalance" required>
+                            <input type="text" id="previousBalance" readonly required>
                         </div>
                         <div class="form-group">
                             <label for="remainingBalance">Remaining Balance</label>
