@@ -24,6 +24,7 @@ let companies = [];
 let projects = [];
 let containers = [];
 let currentCustomerId = null;
+let pendingPdcs = [];
 
 // Fetch customers from API
 fetch('../../../../server/api/vouchers/receive_voucher/get-suppliers.php')
@@ -106,6 +107,51 @@ fetch('../../../../server/api/vouchers/receive_voucher/get-containers.php')
         }
     })
     .catch(error => console.error('Error fetching containers:', error));
+
+// Fetch pending PDCs for selected customer
+function fetchPendingPdcsForCustomer(customerId) {
+    const select = document.getElementById('againstPdc');
+    select.innerHTML = '<option value="">Select Pending PDC...</option>';
+    document.getElementById('pdcRemainingInfo').style.display = 'none';
+    pendingPdcs = [];
+    if (!customerId) return;
+
+    fetch(`../../../../server/api/vouchers/receive_voucher/get-pending-pdcs.php?customer_id=${customerId}`)
+        .then(r => r.json())
+        .then(data => {
+            if (data.success && data.data.length > 0) {
+                pendingPdcs = data.data;
+                data.data.forEach(pdc => {
+                    const opt = document.createElement('option');
+                    opt.value = pdc.id;
+                    const date = new Date(pdc.cheque_date).toLocaleDateString();
+                    const paid = parseFloat(pdc.paid_amount) > 0
+                        ? ` | Paid: ${parseFloat(pdc.paid_amount).toFixed(2)}`
+                        : '';
+                    opt.textContent = `${pdc.cheque_no} — ${pdc.bank_name || 'N/A'} — ${date} — Remaining: ${parseFloat(pdc.remaining).toFixed(2)}${paid}`;
+                    opt.dataset.remaining = pdc.remaining;
+                    opt.dataset.paid = pdc.paid_amount;
+                    select.appendChild(opt);
+                });
+            }
+        })
+        .catch(err => console.error('Error fetching pending PDCs:', err));
+}
+
+// PDC select handler
+document.getElementById('againstPdc').addEventListener('change', function() {
+    const infoEl = document.getElementById('pdcRemainingInfo');
+    const selected = this.options[this.selectedIndex];
+    if (!this.value) { infoEl.style.display = 'none'; return; }
+    const remaining = parseFloat(selected.dataset.remaining) || 0;
+    const paid = parseFloat(selected.dataset.paid) || 0;
+    infoEl.style.display = 'block';
+    if (paid > 0) {
+        infoEl.innerHTML = `<i class="fas fa-info-circle"></i> Already paid: ${paid.toFixed(2)} | Remaining: ${remaining.toFixed(2)}`;
+    } else {
+        infoEl.innerHTML = `<i class="fas fa-info-circle"></i> Full cheque amount remaining: ${remaining.toFixed(2)}`;
+    }
+});
 
 // Fetch bills for selected customer
 function fetchBillsForCustomer(customerCode) {
@@ -378,6 +424,7 @@ function setupSearchableDropdown(inputId, dropdownId, data, displayKey, valueKey
                         currentCustomerId = this.dataset.id;
                         fetchBillsForCustomer(this.dataset.value);
                         fetchSubAccountsForCustomer(this.dataset.id);
+                        fetchPendingPdcsForCustomer(this.dataset.id);
                         
                         // Fetch balance from API
                         fetch(`../../../../server/api/vouchers/receive_voucher/get-customer-balance.php?customer_code=${this.dataset.value}`)
@@ -431,6 +478,7 @@ function setupSearchableDropdown(inputId, dropdownId, data, displayKey, valueKey
                     currentCustomerId = selectedItem.dataset.id;
                     fetchBillsForCustomer(selectedItem.dataset.value);
                     fetchSubAccountsForCustomer(selectedItem.dataset.id);
+                    fetchPendingPdcsForCustomer(selectedItem.dataset.id);
                     
                     // Fetch balance from API
                     fetch(`../../../../server/api/vouchers/receive_voucher/get-customer-balance.php?customer_code=${selectedItem.dataset.value}`)
@@ -629,6 +677,7 @@ function addBulkRow() {
         <td><input type="number" class="bulk-amount" step="0.01" min="0" placeholder="0.00" required></td>
         <td><input type="text" class="bulk-rem-balance" readonly></td>
         <td><select class="bulk-payment" required></select></td>
+        <td><select class="bulk-against-pdc"><option value="">— No PDC —</option></select></td>
         <td><select class="bulk-bank"></select></td>
         <td><input type="date" class="bulk-cheque-date"></td>
         <td><input type="text" class="bulk-cheque-no"></td>
@@ -758,6 +807,23 @@ function setupBulkCustomerDropdown(row) {
                     dropdown.classList.remove('show');
                     // Fetch bills for this customer
                     fetchBillsForCustomer(customer.code);
+                    
+                    // Populate Against PDC dropdown for this row
+                    const pdcSelect = row.querySelector('.bulk-against-pdc');
+                    pdcSelect.innerHTML = '<option value="">— No PDC —</option>';
+                    fetch(`../../../../server/api/vouchers/receive_voucher/get-pending-pdcs.php?customer_id=${customer.id}`)
+                        .then(r => r.json())
+                        .then(data => {
+                            if (data.success && data.data.length > 0) {
+                                data.data.forEach(pdc => {
+                                    const opt = document.createElement('option');
+                                    opt.value = pdc.id;
+                                    const date = new Date(pdc.cheque_date).toLocaleDateString();
+                                    opt.textContent = `${pdc.cheque_no} (${date}) Rem:${parseFloat(pdc.remaining).toFixed(0)}`;
+                                    pdcSelect.appendChild(opt);
+                                });
+                            }
+                        });
                     
                     // Fetch balance from API
                     fetch(`../../../../server/api/vouchers/receive_voucher/get-customer-balance.php?customer_code=${customer.code}`)
@@ -924,6 +990,7 @@ document.getElementById('postBulkBtn').addEventListener('click', async function(
         formData.append('amount', row.querySelector('.bulk-amount').value);
         formData.append('currency_id', row.querySelector('.bulk-currency').value);
         formData.append('payment_method_id', row.querySelector('.bulk-payment').value);
+        formData.append('against_pdc_id', row.querySelector('.bulk-against-pdc').value || null);
         formData.append('bank_account', row.querySelector('.bulk-bank').value || null);
         formData.append('cheque_date', row.querySelector('.bulk-cheque-date').value || null);
         formData.append('cheque_no', row.querySelector('.bulk-cheque-no').value || null);
@@ -1024,6 +1091,7 @@ form.addEventListener('submit', function (e) {
     formData.append('cheque_date', document.getElementById('chequeDate').value || '');
     formData.append('cheque_no', document.getElementById('chequeNo').value || '');
     formData.append('description', document.getElementById('description').value || null);
+    formData.append('against_pdc_id', document.getElementById('againstPdc').value || null);
     
     const recoveryOfficerInput = document.getElementById('recoveryOfficer');
     const recoveryOfficerId = recoveryOfficerInput.dataset.selectedId;
@@ -1079,6 +1147,9 @@ function resetForm() {
     currentFile = null;
     attachmentThumbnail.innerHTML = '<i class="fas fa-file"></i>';
     attachmentPreview.classList.remove('show');
+    document.getElementById('againstPdc').innerHTML = '<option value="">Select Pending PDC...</option>';
+    document.getElementById('pdcRemainingInfo').style.display = 'none';
+    pendingPdcs = [];
 
     // Reset border colors
     const fields = form.querySelectorAll('input, select, textarea');

@@ -22,6 +22,7 @@ if (!$user_id || !$tenant_id) {
 $data = json_decode(file_get_contents('php://input'), true);
 $pdc_id = $data['id'] ?? null;
 $new_status = $data['status'] ?? null;
+$override_bank_account_id = $data['bank_account_id'] ?? null;
 
 if (!$pdc_id || !$new_status) {
     http_response_code(400);
@@ -55,9 +56,22 @@ try {
     
     $debug_info['pdc_data'] = $pdc;
     
-    // Update status
-    $stmt = $pdo->prepare("UPDATE post_dated_cheques SET status = ? WHERE id = ? AND tenant_id = ?");
-    $stmt->execute([$new_status, $pdc_id, $tenant_id]);
+    // Update status (and bank_account_id if overridden)
+    if ($override_bank_account_id) {
+        $stmt = $pdo->prepare("UPDATE post_dated_cheques SET status = ?, bank_account_id = ? WHERE id = ? AND tenant_id = ?");
+        $stmt->execute([$new_status, $override_bank_account_id, $pdc_id, $tenant_id]);
+    } else {
+        $stmt = $pdo->prepare("UPDATE post_dated_cheques SET status = ? WHERE id = ? AND tenant_id = ?");
+        $stmt->execute([$new_status, $pdc_id, $tenant_id]);
+    }
+    
+    // Resolve final bank account_id for ledger entries
+    if ($override_bank_account_id) {
+        $stmt = $pdo->prepare("SELECT account_id FROM bank_accounts WHERE id = ? AND tenant_id = ?");
+        $stmt->execute([$override_bank_account_id, $tenant_id]);
+        $overrideBankRow = $stmt->fetch();
+        $bank_account_id = $overrideBankRow['account_id'] ?? $pdc['bank_account_id'];
+    }
     
     // Insert accounting ledger entries
     $transaction_type = $pdc['transaction_type'];

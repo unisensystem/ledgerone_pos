@@ -47,8 +47,21 @@ try {
     $stmt->execute([$tenant_id, $customer_id]);
     $total_invoices += $stmt->fetch()['total'];
     
-    // Get total payments
-    $stmt = $pdo->prepare("SELECT COALESCE(SUM(amount), 0) as total FROM receive_voucher WHERE tenant_id = ? AND customer_id = ?");
+    // Get total payments (exclude cheques that are still Pending in post_dated_cheques)
+    $stmt = $pdo->prepare("
+        SELECT COALESCE(SUM(rv.amount), 0) as total 
+        FROM receive_voucher rv
+        WHERE rv.tenant_id = ? AND rv.customer_id = ?
+        AND NOT (
+            rv.payment_method_id = 6
+            AND EXISTS (
+                SELECT 1 FROM post_dated_cheques pdc 
+                WHERE pdc.reference_id = rv.id 
+                AND pdc.reference_table = 'receive_voucher'
+                AND pdc.status = 'Pending'
+            )
+        )
+    ");
     $stmt->execute([$tenant_id, $customer_id]);
     $total_payments = $stmt->fetch()['total'];
     

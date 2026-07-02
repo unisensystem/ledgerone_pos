@@ -4,6 +4,7 @@ let currentPage = 1;
 const itemsPerPage = 10;
 let filteredData = [];
 let companies = [];
+let allBankAccounts = [];
 
 // DOM Elements
 const tableBody = document.getElementById('pdcs-table-body');
@@ -22,6 +23,7 @@ const nextPageBtn = document.getElementById('next-page');
 async function initApp() {
     await loadBanks();
     await loadCompanies();
+    await loadBankAccounts();
     await fetchPDCs();
     setupEventListeners();
 }
@@ -43,6 +45,19 @@ async function loadBanks() {
         }
     } catch (error) {
         console.error('Error loading banks:', error);
+    }
+}
+
+// Load all bank accounts for approve modal
+async function loadBankAccounts() {
+    try {
+        const response = await fetch('../../../../server/api/banking/post_dated_cheques/get_bank_accounts.php');
+        const result = await response.json();
+        if (result.success) {
+            allBankAccounts = result.data;
+        }
+    } catch (error) {
+        console.error('Error loading bank accounts:', error);
     }
 }
 
@@ -148,6 +163,18 @@ function renderTable() {
             currency: 'USD'
         }).format(pdc.amount).replace('$', CURRENCY_SYMBOL);
 
+        // Partial paid info
+        const isPartiallyPaid = pdc.paidAmount > 0 && pdc.status === 'Pending';
+        const isFullyPaid = pdc.paidAmount >= pdc.amount && pdc.status === 'Pending';
+        const paidBadge = isFullyPaid
+            ? `<span style="display:inline-block;margin-left:6px;padding:2px 8px;border-radius:12px;font-size:11px;background:#e6f7ef;color:#2fbf71;font-weight:600;">Fully Paid</span>`
+            : isPartiallyPaid
+            ? `<span style="display:inline-block;margin-left:6px;padding:2px 8px;border-radius:12px;font-size:11px;background:#fff5e6;color:#e8b23f;font-weight:600;">Partial ${CURRENCY_SYMBOL}${pdc.paidAmount.toFixed(2)}/${CURRENCY_SYMBOL}${pdc.amount.toFixed(2)}</span>`
+            : '';
+
+        // Approve button — hide if fully paid via cash
+        const canApprove = pdc.status === 'Pending' && !isFullyPaid;
+
         // Determine status class
         let statusClass = '';
         switch (pdc.status) {
@@ -163,17 +190,24 @@ function renderTable() {
                     <td>${pdc.account}</td>
                     <td>${pdc.bankName}</td>
                     <td>${pdc.type}</td>
-                    <td><strong>${formattedAmount}</strong></td>
+                    <td><strong>${formattedAmount}</strong>${paidBadge}</td>
                     <td>${formattedDate}</td>
                     <td><span class="status-badge ${statusClass}">${pdc.status}</span></td>
                     <td>
                         <div class="action-buttons">
-                            ${pdc.status === 'Pending' ? `
+                            ${canApprove ? `
                                 <button class="action-btn action-approve" onclick="updateStatus(${pdc.id}, 'Approved')" title="Approve">
                                     <i class="fas fa-check"></i>
                                 </button>
+                            ` : ''}
+                            ${pdc.status === 'Pending' ? `
                                 <button class="action-btn action-reject" onclick="updateStatus(${pdc.id}, 'Rejected')" title="Reject">
                                     <i class="fas fa-times"></i>
+                                </button>
+                            ` : ''}
+                            ${(pdc.paidAmount > 0) ? `
+                                <button class="action-btn" style="color:#1f7bff;background:rgba(31,123,255,0.1);" onclick="viewPdcPayments(${pdc.id})" title="View Payments">
+                                    <i class="fas fa-eye"></i>
                                 </button>
                             ` : ''}
                             <button class="action-btn action-cancel" onclick="updateStatus(${pdc.id}, 'Cancelled')" title="Cancel">
@@ -268,25 +302,51 @@ async function resetFilters() {
 let pendingStatusUpdate = null;
 
 async function updateStatus(id, newStatus) {
-    pendingStatusUpdate = { id, newStatus };
-    const modal = document.getElementById('confirmation-modal');
-    const message = document.getElementById('modal-message');
-    message.textContent = `Are you sure you want to change the status to "${newStatus}"?`;
-    modal.classList.add('active');
+    if (newStatus === 'Approved') {
+        // Open approve modal with bank selection
+        const pdc = filteredData.find(p => p.id === id);
+        pendingStatusUpdate = { id, newStatus };
+        
+        document.getElementById('approve-cheque-no').textContent = pdc?.chequeNo || '';
+        document.getElementById('approve-amount').textContent = 
+            CURRENCY_SYMBOL + parseFloat(pdc?.amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2 });
+        
+        // Populate bank dropdown
+        const select = document.getElementById('approve-bank-select');
+        select.innerHTML = '';
+        allBankAccounts.forEach(bank => {
+            const opt = document.createElement('option');
+            opt.value = bank.id;
+            opt.textContent = `${bank.bank_name} - ${bank.account_number}`;
+            if (bank.id == pdc?.bankAccountId) opt.selected = true;
+            select.appendChild(opt);
+        });
+        
+        document.getElementById('approve-modal').classList.add('active');
+    } else {
+        pendingStatusUpdate = { id, newStatus };
+        const modal = document.getElementById('confirmation-modal');
+        const message = document.getElementById('modal-message');
+        message.textContent = `Are you sure you want to change the status to "${newStatus}"?`;
+        modal.classList.add('active');
+    }
 }
 
-async function confirmStatusUpdate() {
+async function confirmStatusUpdate(bankAccountId = null) {
     if (!pendingStatusUpdate) return;
     
     const { id, newStatus } = pendingStatusUpdate;
-    const modal = document.getElementById('confirmation-modal');
-    modal.classList.remove('active');
+    document.getElementById('confirmation-modal').classList.remove('active');
+    document.getElementById('approve-modal').classList.remove('active');
     
     try {
+        const body = { id, status: newStatus };
+        if (bankAccountId) body.bank_account_id = parseInt(bankAccountId);
+        
         const response = await fetch('../../../../server/api/banking/post_dated_cheques/update_status.php', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ id, status: newStatus })
+            body: JSON.stringify(body)
         });
         
         const result = await response.json();
@@ -303,6 +363,65 @@ async function confirmStatusUpdate() {
     }
     
     pendingStatusUpdate = null;
+}
+
+// View payments against a PDC
+async function viewPdcPayments(pdcId) {
+    try {
+        const response = await fetch(`../../../../server/api/banking/post_dated_cheques/get-pdc-payments.php?pdc_id=${pdcId}`);
+        const result = await response.json();
+        if (!result.success) { showNotification('Failed to load payments', 'error'); return; }
+
+        const pdc = result.pdc;
+        const payments = result.data;
+        const totalPaid = result.total_paid;
+        const remaining = result.remaining;
+
+        const chequeDate = new Date(pdc.cheque_date).toLocaleDateString();
+        const progressPct = Math.min((totalPaid / pdc.amount) * 100, 100).toFixed(1);
+
+        let rows = payments.length === 0
+            ? `<tr><td colspan="4" style="text-align:center;color:#6b7280;padding:20px;">No cash payments yet</td></tr>`
+            : payments.map(p => `
+                <tr>
+                    <td style="padding:10px;font-size:14px;border-bottom:1px solid #e1e6ee;">${p.voucher_number}</td>
+                    <td style="padding:10px;font-size:14px;border-bottom:1px solid #e1e6ee;">${new Date(p.voucher_date).toLocaleDateString()}</td>
+                    <td style="padding:10px;font-size:14px;border-bottom:1px solid #e1e6ee;">${p.payment_method || 'N/A'}</td>
+                    <td style="padding:10px;font-size:14px;border-bottom:1px solid #e1e6ee;"><strong>${CURRENCY_SYMBOL}${parseFloat(p.amount).toFixed(2)}</strong></td>
+                </tr>`).join('');
+
+        document.getElementById('pdc-payments-body').innerHTML = `
+            <div style="margin-bottom:16px;padding:12px;background:#f7f9fc;border-radius:8px;">
+                <div style="display:flex;justify-content:space-between;margin-bottom:8px;">
+                    <span><strong>Cheque:</strong> ${pdc.cheque_no} &mdash; ${pdc.bank_name || 'N/A'}</span>
+                    <span><strong>Date:</strong> ${chequeDate}</span>
+                </div>
+                <div style="display:flex;justify-content:space-between;margin-bottom:10px;">
+                    <span>Total: <strong>${CURRENCY_SYMBOL}${parseFloat(pdc.amount).toFixed(2)}</strong></span>
+                    <span>Paid: <strong style="color:#2fbf71;">${CURRENCY_SYMBOL}${totalPaid.toFixed(2)}</strong></span>
+                    <span>Remaining: <strong style="color:${remaining > 0 ? '#e8b23f' : '#2fbf71'}">${CURRENCY_SYMBOL}${remaining.toFixed(2)}</strong></span>
+                </div>
+                <div style="background:#e1e6ee;border-radius:20px;height:8px;">
+                    <div style="background:#2fbf71;height:8px;border-radius:20px;width:${progressPct}%;transition:width 0.3s;"></div>
+                </div>
+                <div style="text-align:right;font-size:12px;color:#6b7280;margin-top:4px;">${progressPct}% cleared</div>
+            </div>
+            <div style="overflow-x:auto;">
+            <table style="width:100%;min-width:unset;border-collapse:collapse;">
+                <thead><tr style="background:#f7f9fc;">
+                    <th style="padding:10px;text-align:left;font-size:13px;font-weight:600;color:#6b7280;border-bottom:1px solid #e1e6ee;min-width:unset;">Voucher #</th>
+                    <th style="padding:10px;text-align:left;font-size:13px;font-weight:600;color:#6b7280;border-bottom:1px solid #e1e6ee;min-width:unset;">Date</th>
+                    <th style="padding:10px;text-align:left;font-size:13px;font-weight:600;color:#6b7280;border-bottom:1px solid #e1e6ee;min-width:unset;">Method</th>
+                    <th style="padding:10px;text-align:left;font-size:13px;font-weight:600;color:#6b7280;border-bottom:1px solid #e1e6ee;min-width:unset;">Amount</th>
+                </tr></thead>
+                <tbody>${rows}</tbody>
+            </table>
+            </div>`;
+
+        document.getElementById('pdc-payments-modal').classList.add('active');
+    } catch (err) {
+        showNotification('Error loading payments', 'error');
+    }
 }
 
 // Show notification
@@ -481,6 +600,32 @@ function setupEventListeners() {
         if (e.target.id === 'confirmation-modal') {
             document.getElementById('confirmation-modal').classList.remove('active');
             pendingStatusUpdate = null;
+        }
+    });
+    
+    // Approve modal event listeners
+    document.getElementById('approve-modal-confirm').addEventListener('click', () => {
+        const bankAccountId = document.getElementById('approve-bank-select').value;
+        confirmStatusUpdate(bankAccountId);
+    });
+    document.getElementById('approve-modal-cancel').addEventListener('click', () => {
+        document.getElementById('approve-modal').classList.remove('active');
+        pendingStatusUpdate = null;
+    });
+    document.getElementById('approve-modal').addEventListener('click', (e) => {
+        if (e.target.id === 'approve-modal') {
+            document.getElementById('approve-modal').classList.remove('active');
+            pendingStatusUpdate = null;
+        }
+    });
+
+    // PDC payments modal
+    document.getElementById('pdc-payments-close').addEventListener('click', () => {
+        document.getElementById('pdc-payments-modal').classList.remove('active');
+    });
+    document.getElementById('pdc-payments-modal').addEventListener('click', (e) => {
+        if (e.target.id === 'pdc-payments-modal') {
+            document.getElementById('pdc-payments-modal').classList.remove('active');
         }
     });
 }

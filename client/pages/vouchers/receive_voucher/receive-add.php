@@ -143,6 +143,13 @@ if (!$user_id) {
                                 <!-- Options will be populated by JS -->
                             </select>
                         </div>
+                        <div class="form-group" id="againstPdcGroup">
+                            <label for="againstPdc">Against PDC <span style="font-size:11px;color:var(--subtext);">Optional</span></label>
+                            <select id="againstPdc">
+                                <option value="">— Select Pending PDC —</option>
+                            </select>
+                            <div id="pdcRemainingInfo" style="display:none; margin-top:6px; font-size:12px; color:#e8b23f; font-weight:500;"></div>
+                        </div>
                         <div class="form-group">
                             <label for="recoveryOfficer">Recovery Officer</label>
                             <div class="searchable-dropdown">
@@ -229,6 +236,7 @@ if (!$user_id) {
                             <th>Amount</th>
                             <th>Remaining Balance</th>
                             <th>Payment Method</th>
+                            <th>Against PDC</th>
                             <th>Bank Account</th>
                             <th>Cheque Date</th>
                             <th>Cheque No</th>
@@ -240,7 +248,7 @@ if (!$user_id) {
                     </tbody>
                     <tfoot>
                         <tr style="background: var(--surface-2); font-weight: 600;">
-                            <td colspan="8" style="text-align: right; padding: 12px;">Total:</td>
+                            <td colspan="9" style="text-align: right; padding: 12px;">Total:</td>
                             <td id="bulkTotalAmount" style="padding: 12px;">0.00</td>
                             <td colspan="8"></td>
                         </tr>

@@ -24,18 +24,24 @@ try {
     $params = [$tenant_id];
     
     if ($expense_account_id || $cost_center_id) {
-        // When filtering, return sum of filtered lines only
         $sql = "SELECT 
             ev.id,
             ev.voucher_no,
             ev.date,
             ev.description,
+            ev.company_id,
+            ev.project_id,
+            p.project_name,
             SUM(evl.amount) as total_amount,
             COUNT(evl.id) as total_items,
-            GROUP_CONCAT(DISTINCT a.name SEPARATOR ', ') as expense_accounts
+            GROUP_CONCAT(a.name ORDER BY evl.id SEPARATOR ',') as expense_accounts,
+            GROUP_CONCAT(cc.name ORDER BY evl.id SEPARATOR ',') as cost_centers,
+            GROUP_CONCAT(evl.amount ORDER BY evl.id SEPARATOR ',') as expense_amounts
         FROM expense_voucher ev
+        LEFT JOIN projects p ON ev.project_id = p.id
         INNER JOIN expense_voucher_line evl ON ev.id = evl.voucher_id
         INNER JOIN accounts a ON evl.account_id = a.id
+        LEFT JOIN cost_centers cc ON evl.cost_center_id = cc.id
         WHERE ev.tenant_id = ?";
         
         if ($expense_account_id) {
@@ -48,18 +54,28 @@ try {
             $params[] = $cost_center_id;
         }
         
-        $sql .= " GROUP BY ev.id, ev.voucher_no, ev.date, ev.description ORDER BY ev.id DESC";
+        $sql .= " GROUP BY ev.id ORDER BY ev.id DESC";
     } else {
-        // No filter, return original voucher totals
         $sql = "SELECT 
             ev.id,
             ev.voucher_no,
             ev.date,
             ev.description,
             ev.total_amount,
-            ev.total_items
+            ev.total_items,
+            ev.company_id,
+            ev.project_id,
+            p.project_name,
+            GROUP_CONCAT(a.name ORDER BY evl.id SEPARATOR ',') as expense_accounts,
+            GROUP_CONCAT(cc.name ORDER BY evl.id SEPARATOR ',') as cost_centers,
+            GROUP_CONCAT(evl.amount ORDER BY evl.id SEPARATOR ',') as expense_amounts
         FROM expense_voucher ev
+        LEFT JOIN projects p ON ev.project_id = p.id
+        LEFT JOIN expense_voucher_line evl ON evl.voucher_id = ev.id
+        LEFT JOIN accounts a ON evl.account_id = a.id
+        LEFT JOIN cost_centers cc ON evl.cost_center_id = cc.id
         WHERE ev.tenant_id = ?
+        GROUP BY ev.id
         ORDER BY ev.id DESC";
     }
     

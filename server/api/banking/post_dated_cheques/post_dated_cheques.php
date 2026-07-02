@@ -28,14 +28,17 @@ try {
         pdc.status,
         pdc.transaction_type,
         pdc.company_id,
+        pdc.bank_account_id,
         COALESCE(c.customer_name, s.supplier_name) as account,
         ba.bank_name,
-        co.company_name
+        co.company_name,
+        COALESCE(SUM(rv.amount), 0) as paid_amount
     FROM post_dated_cheques pdc
     LEFT JOIN customers c ON pdc.customer_id = c.id
     LEFT JOIN suppliers s ON pdc.supplier_id = s.id
     LEFT JOIN bank_accounts ba ON pdc.bank_account_id = ba.id
     LEFT JOIN companies co ON pdc.company_id = co.id
+    LEFT JOIN receive_voucher rv ON rv.against_pdc_id = pdc.id AND rv.tenant_id = pdc.tenant_id
     WHERE pdc.tenant_id = ?";
     
     $params = [$tenant_id];
@@ -107,7 +110,7 @@ try {
         $params[] = $_GET['company_id'];
     }
     
-    $query .= " ORDER BY pdc.cheque_date DESC";
+    $query .= " GROUP BY pdc.id, pdc.cheque_no, pdc.amount, pdc.cheque_date, pdc.status, pdc.transaction_type, pdc.company_id, pdc.bank_account_id, c.customer_name, s.supplier_name, ba.bank_name, co.company_name ORDER BY pdc.cheque_date DESC";
     
     $stmt = $pdo->prepare($query);
     $stmt->execute($params);
@@ -122,10 +125,13 @@ try {
             'bankName' => $row['bank_name'] ?? 'N/A',
             'type' => $row['transaction_type'],
             'amount' => (float)$row['amount'],
+            'paidAmount' => (float)$row['paid_amount'],
+            'remaining' => (float)$row['amount'] - (float)$row['paid_amount'],
             'date' => $row['cheque_date'],
             'status' => $row['status'],
             'companyId' => $row['company_id'],
-            'companyName' => $row['company_name'] ?? 'N/A'
+            'companyName' => $row['company_name'] ?? 'N/A',
+            'bankAccountId' => $row['bank_account_id']
         ];
     }
     

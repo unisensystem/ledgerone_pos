@@ -29,11 +29,18 @@ try {
             ev.total_items,
             ev.company_id,
             ev.project_id,
-            p.project_name
+            p.project_name,
+            GROUP_CONCAT(a.name ORDER BY evl.id SEPARATOR ',') AS expense_accounts,
+            GROUP_CONCAT(cc.name ORDER BY evl.id SEPARATOR ',') AS cost_centers,
+            GROUP_CONCAT(evl.amount ORDER BY evl.id SEPARATOR ',') AS expense_amounts
         FROM expense_voucher ev
         LEFT JOIN projects p ON ev.project_id = p.id
+        LEFT JOIN expense_voucher_line evl ON evl.voucher_id = ev.id
+        LEFT JOIN accounts a ON evl.account_id = a.id
+        LEFT JOIN cost_centers cc ON evl.cost_center_id = cc.id
         WHERE ev.tenant_id = ?
         " . ($project_id ? "AND ev.project_id = ?" : "") . "
+        GROUP BY ev.id
         ORDER BY ev.id DESC
     ");
     

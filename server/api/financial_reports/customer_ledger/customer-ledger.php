@@ -135,9 +135,14 @@ try {
                     $prev_invoices += $amount;
                 }
                 
-                $stmt = $pdo->prepare("SELECT amount, currency_id FROM receive_voucher WHERE tenant_id = ? AND customer_id = ? AND voucher_date < ?{$company_filter}");
+                $stmt = $pdo->prepare("SELECT rv.amount, rv.currency_id FROM receive_voucher rv WHERE rv.tenant_id = ? AND rv.customer_id = ? AND rv.voucher_date < ?{$company_filter}
+                    AND rv.id NOT IN (
+                        SELECT pdc.reference_id FROM post_dated_cheques pdc
+                        WHERE pdc.tenant_id = ? AND pdc.reference_table = 'receive_voucher' AND pdc.status = 'Pending'
+                    )");
                 $params_prev = [$tenant_id, $customer['id'], $from_date];
                 if ($company_id) $params_prev[] = $company_id;
+                $params_prev[] = $tenant_id;
                 $stmt->execute($params_prev);
                 $prev_payments_data = $stmt->fetchAll(PDO::FETCH_ASSOC);
                 $prev_payments = 0;
@@ -229,9 +234,14 @@ try {
                 if ($company_id) $return_params[] = $company_id;
             }
             
-            $payment_sql = "SELECT amount, currency_id FROM receive_voucher WHERE tenant_id = ? AND customer_id = ?{$company_filter}";
+            $payment_sql = "SELECT rv.amount, rv.currency_id FROM receive_voucher rv WHERE rv.tenant_id = ? AND rv.customer_id = ?{$company_filter}
+                AND rv.id NOT IN (
+                    SELECT pdc.reference_id FROM post_dated_cheques pdc
+                    WHERE pdc.tenant_id = ? AND pdc.reference_table = 'receive_voucher' AND pdc.status = 'Pending'
+                )";
             $payment_params = [$tenant_id, $customer['id']];
             if ($company_id) $payment_params[] = $company_id;
+            $payment_params[] = $tenant_id;
             
             $payment_voucher_sql = "SELECT amount, currency_id FROM payment_voucher WHERE tenant_id = ? AND customer_id IS NOT NULL AND supplier_id IS NULL AND customer_id = ?{$company_filter}";
             $payment_voucher_params = [$tenant_id, $customer['id']];

@@ -257,6 +257,38 @@ $currency_symbol = $currency['symbol'] ?? '$';
         </div>
     </div>
 
+    <!-- Approve Modal with Bank Selection -->
+    <div id="approve-modal" class="modal">
+        <div class="modal-content">
+            <h3 class="modal-title"><i class="fas fa-check-circle" style="color:#2FBF71;margin-right:8px;"></i>Approve PDC</h3>
+            <p style="margin-bottom:16px;color:var(--subtext,#6b7280);font-size:14px;">Cheque <strong id="approve-cheque-no"></strong> — Amount: <strong id="approve-amount"></strong></p>
+            <div class="form-group" style="margin-bottom:20px;">
+                <label class="form-label" for="approve-bank-select">Deposit to Bank Account</label>
+                <select class="form-select" id="approve-bank-select">
+                    <option value="">Loading...</option>
+                </select>
+                <small style="color:var(--subtext,#6b7280);font-size:12px;margin-top:4px;display:block;">Original bank shown by default. Change if depositing to a different bank.</small>
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-secondary" id="approve-modal-cancel">Cancel</button>
+                <button class="btn btn-primary" id="approve-modal-confirm" style="background:#2FBF71;border-color:#2FBF71;">
+                    <i class="fas fa-check"></i> Approve & Post
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- PDC Payments View Modal -->
+    <div id="pdc-payments-modal" class="modal">
+        <div class="modal-content" style="max-width:560px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+                <h3 class="modal-title" style="margin:0;"><i class="fas fa-eye" style="color:#1f7bff;margin-right:8px;"></i>PDC Payment History</h3>
+                <button id="pdc-payments-close" style="background:none;border:none;font-size:20px;cursor:pointer;color:#6b7280;">&times;</button>
+            </div>
+            <div id="pdc-payments-body"></div>
+        </div>
+    </div>
+
     <script>
         const CURRENCY_SYMBOL = '<?php echo $currency_symbol; ?>';
     </script>

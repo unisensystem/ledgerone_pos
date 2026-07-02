@@ -34,6 +34,9 @@ let currentPage = 1;
 const itemsPerPage = 10;
 let filteredData = [];
 let voucherToDeleteId = null;
+let trendChart = null;
+let accountsChart = null;
+let costCentersChart = null;
 
 // Fetch expense vouchers from API
 async function fetchExpenseVouchers() {
@@ -61,12 +64,12 @@ async function fetchDropdownData() {
             fetch('../../../../server/api/master_setup/project_setup/get-projects-dropdown.php')
         ]);
         
-        const expenseData = await expenseRes.json();
+        const expenseAccountsRes = await expenseRes.json();
         const companyData = await companyRes.json();
         const projectData = await projectRes.json();
         
-        if (expenseData.success) {
-            allExpenseAccounts = expenseData.data;
+        if (expenseAccountsRes.success) {
+            allExpenseAccounts = expenseAccountsRes.data;
             initSearchableDropdown('filterExpenseAccountOptions', allExpenseAccounts, filterExpenseAccount);
         }
         
@@ -81,8 +84,8 @@ async function fetchDropdownData() {
         }
         
         if (projectData.success) {
-            allProjects = projectData.data;
-            projectData.data.forEach(project => {
+            allProjects = projectData.projects;
+            projectData.projects.forEach(project => {
                 const option = document.createElement('option');
                 option.value = project.id;
                 option.textContent = `${project.project_code} - ${project.project_name} - ${project.city_name}`;
@@ -96,8 +99,8 @@ async function fetchDropdownData() {
 
 // Update stats cards
 function updateStats() {
-    const totalVouchers = expenseData.length;
-    const totalAmount = expenseData.reduce((sum, v) => sum + parseFloat(v.total_amount), 0);
+    const totalVouchers = filteredData.length;
+    const totalAmount = filteredData.reduce((sum, v) => sum + parseFloat(v.total_amount), 0);
     
     document.querySelector('.stat-card:nth-child(1) .stat-value').textContent = totalVouchers;
     document.getElementById('totalAmountStat').textContent = CURRENCY_SYMBOL + totalAmount.toFixed(2);
@@ -106,13 +109,12 @@ function updateStats() {
 // Render charts
 function renderCharts() {
     renderExpenseTrendChart();
-    renderTopAccountsChart();
-    renderTopCostCentersChart();
+    renderTopAccountsChart(filteredData);
+    renderTopCostCentersChart(filteredData);
 }
 
 // Expense Trend Chart
 function renderExpenseTrendChart() {
-    // Get last 30 days data
     const last30Days = [];
     const today = new Date();
     for (let i = 29; i >= 0; i--) {
@@ -121,132 +123,113 @@ function renderExpenseTrendChart() {
         last30Days.push(date.toISOString().split('T')[0]);
     }
     
-    // Aggregate expenses by date
     const expensesByDate = {};
     last30Days.forEach(date => expensesByDate[date] = 0);
-    
-    expenseData.forEach(expense => {
+    filteredData.forEach(expense => {
         if (expensesByDate.hasOwnProperty(expense.date)) {
             expensesByDate[expense.date] += parseFloat(expense.total_amount);
         }
     });
     
-    const options = {
-        series: [{
-            name: 'Expenses',
-            data: last30Days.map(date => expensesByDate[date])
-        }],
-        chart: {
-            type: 'area',
-            height: 300,
-            toolbar: { show: false },
-            zoom: { enabled: false }
-        },
+    const seriesData = last30Days.map(date => expensesByDate[date]);
+    const categories = last30Days.map(date => new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }));
+
+    if (trendChart) {
+        trendChart.updateOptions({ xaxis: { categories } });
+        trendChart.updateSeries([{ name: 'Expenses', data: seriesData }]);
+        return;
+    }
+    
+    trendChart = new ApexCharts(document.querySelector('#expenseTrendChart'), {
+        series: [{ name: 'Expenses', data: seriesData }],
+        chart: { type: 'area', height: 300, toolbar: { show: false }, zoom: { enabled: false } },
         dataLabels: { enabled: false },
         stroke: { curve: 'smooth', width: 2 },
         colors: ['#1f7bff'],
-        fill: {
-            type: 'gradient',
-            gradient: {
-                shadeIntensity: 1,
-                opacityFrom: 0.4,
-                opacityTo: 0.1
-            }
-        },
-        xaxis: {
-            categories: last30Days.map(date => new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })),
-            labels: { rotate: -45 }
-        },
-        yaxis: {
-            labels: {
-                formatter: (value) => CURRENCY_SYMBOL + value.toFixed(0)
-            }
-        },
-        tooltip: {
-            y: {
-                formatter: (value) => CURRENCY_SYMBOL + value.toFixed(2)
-            }
-        }
-    };
-    
-    const chart = new ApexCharts(document.querySelector('#expenseTrendChart'), options);
-    chart.render();
+        fill: { type: 'gradient', gradient: { shadeIntensity: 1, opacityFrom: 0.4, opacityTo: 0.1 } },
+        xaxis: { categories, labels: { rotate: -45 } },
+        yaxis: { labels: { formatter: (value) => CURRENCY_SYMBOL + value.toFixed(0) } },
+        tooltip: { y: { formatter: (value) => CURRENCY_SYMBOL + value.toFixed(2) } }
+    });
+    trendChart.render();
 }
 
 // Top Accounts Chart
-async function renderTopAccountsChart() {
-    try {
-        const response = await fetch('../../../../server/api/vouchers/expense_voucher/get-account-expenses.php');
-        const data = await response.json();
-        
-        if (data.success && data.data.length > 0) {
-            const accounts = data.data;
-            
-            const options = {
-                series: accounts.map(acc => parseFloat(acc.total_amount)),
-                chart: {
-                    type: 'donut',
-                    height: 300
-                },
-                labels: accounts.map(acc => acc.account_name),
-                colors: ['#1f7bff', '#2fbf71', '#e8b23f', '#e34f4f', '#6b7280'],
-                legend: {
-                    position: 'bottom'
-                },
-                dataLabels: {
-                    formatter: (val) => val.toFixed(1) + '%'
-                },
-                tooltip: {
-                    y: {
-                        formatter: (value) => CURRENCY_SYMBOL + value.toFixed(2)
-                    }
-                }
-            };
-            
-            const chart = new ApexCharts(document.querySelector('#topAccountsChart'), options);
-            chart.render();
+function renderTopAccountsChart(data) {
+    // Aggregate from filteredData
+    const accountMap = {};
+    data.forEach(expense => {
+        if (expense.expense_accounts) {
+            expense.expense_accounts.split(',').forEach((acc, i) => {
+                const name = acc.trim();
+                const amounts = expense.expense_amounts ? expense.expense_amounts.split(',') : [];
+                const amount = parseFloat(amounts[i]) || (parseFloat(expense.total_amount) / (expense.total_items || 1));
+                accountMap[name] = (accountMap[name] || 0) + amount;
+            });
         }
-    } catch (error) {
-        console.error('Error fetching account expenses:', error);
+    });
+
+    const sorted = Object.entries(accountMap).sort((a, b) => b[1] - a[1]).slice(0, 5);
+    if (!sorted.length) return;
+
+    const labels = sorted.map(e => e[0]);
+    const series = sorted.map(e => e[1]);
+
+    if (accountsChart) {
+        accountsChart.updateOptions({ labels });
+        accountsChart.updateSeries(series);
+        return;
     }
+
+    accountsChart = new ApexCharts(document.querySelector('#topAccountsChart'), {
+        series,
+        chart: { type: 'donut', height: 300 },
+        labels,
+        colors: ['#1f7bff', '#2fbf71', '#e8b23f', '#e34f4f', '#6b7280'],
+        legend: { position: 'bottom' },
+        dataLabels: { formatter: (val) => val.toFixed(1) + '%' },
+        tooltip: { y: { formatter: (value) => CURRENCY_SYMBOL + value.toFixed(2) } }
+    });
+    accountsChart.render();
 }
 
 // Top Cost Centers Chart
-async function renderTopCostCentersChart() {
-    try {
-        const response = await fetch('../../../../server/api/vouchers/expense_voucher/get-cost-center-expenses.php');
-        const data = await response.json();
-        
-        if (data.success && data.data.length > 0) {
-            const costCenters = data.data;
-            
-            const options = {
-                series: costCenters.map(cc => parseFloat(cc.total_amount)),
-                chart: {
-                    type: 'donut',
-                    height: 300
-                },
-                labels: costCenters.map(cc => cc.cost_center_name),
-                colors: ['#1f7bff', '#2fbf71', '#e8b23f', '#e34f4f', '#6b7280'],
-                legend: {
-                    position: 'bottom'
-                },
-                dataLabels: {
-                    formatter: (val) => val.toFixed(1) + '%'
-                },
-                tooltip: {
-                    y: {
-                        formatter: (value) => CURRENCY_SYMBOL + value.toFixed(2)
-                    }
-                }
-            };
-            
-            const chart = new ApexCharts(document.querySelector('#topCostCentersChart'), options);
-            chart.render();
+function renderTopCostCentersChart(data) {
+    const ccMap = {};
+    data.forEach(expense => {
+        if (expense.cost_centers) {
+            expense.cost_centers.split(',').forEach((cc, i) => {
+                const name = cc.trim();
+                if (!name || name === '-') return;
+                const amounts = expense.expense_amounts ? expense.expense_amounts.split(',') : [];
+                const amount = parseFloat(amounts[i]) || (parseFloat(expense.total_amount) / (expense.total_items || 1));
+                ccMap[name] = (ccMap[name] || 0) + amount;
+            });
         }
-    } catch (error) {
-        console.error('Error fetching cost center expenses:', error);
+    });
+
+    const sorted = Object.entries(ccMap).sort((a, b) => b[1] - a[1]).slice(0, 5);
+    if (!sorted.length) return;
+
+    const labels = sorted.map(e => e[0]);
+    const series = sorted.map(e => e[1]);
+
+    if (costCentersChart) {
+        costCentersChart.updateOptions({ labels });
+        costCentersChart.updateSeries(series);
+        return;
     }
+
+    costCentersChart = new ApexCharts(document.querySelector('#topCostCentersChart'), {
+        series,
+        chart: { type: 'donut', height: 300 },
+        labels,
+        colors: ['#1f7bff', '#2fbf71', '#e8b23f', '#e34f4f', '#6b7280'],
+        legend: { position: 'bottom' },
+        dataLabels: { formatter: (val) => val.toFixed(1) + '%' },
+        tooltip: { y: { formatter: (value) => CURRENCY_SYMBOL + value.toFixed(2) } }
+    });
+    costCentersChart.render();
 }
 
 // Initialize the table
@@ -483,6 +466,8 @@ function filterData() {
         applyServerFilters(expenseAccountId, costCenterId);
     } else {
         currentPage = 1;
+        updateStats();
+        renderCharts();
         renderTable();
     }
 }
@@ -501,7 +486,6 @@ async function applyServerFilters(expenseAccountId, costCenterId) {
             expenseData = data.data;
             filteredData = [...expenseData];
             
-            // Re-apply client-side filters
             const searchTerm = globalSearch.value.toLowerCase();
             const fromDate = document.getElementById('fromDate').value;
             const toDate = document.getElementById('toDate').value;
@@ -530,6 +514,7 @@ async function applyServerFilters(expenseAccountId, costCenterId) {
             
             currentPage = 1;
             updateStats();
+            renderCharts();
             renderTable();
         }
     } catch (error) {

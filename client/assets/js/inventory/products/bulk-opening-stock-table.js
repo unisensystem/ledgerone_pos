@@ -110,10 +110,10 @@ function initializeRowControls(row) {
             }
         });
         
-        productSearch.addEventListener('blur', function() {
-            setTimeout(() => {
+        document.addEventListener('click', (e) => {
+            if (productDropdown && !productDropdown.contains(e.target)) {
                 dropdownList.style.display = 'none';
-            }, 150);
+            }
         });
     }
     
@@ -135,7 +135,7 @@ function initializeRowControls(row) {
 
 function initBranchDropdown(container) {
     const searchInput = container.querySelector('.branch-search');
-    const hiddenInput = container.querySelector('input[type="hidden"]');
+    const hiddenInput = container.querySelector('.branch-id');
     const dropdownList = container.querySelector('.dropdown-list');
     
     if (!searchInput || !hiddenInput || !dropdownList) return;
@@ -148,12 +148,13 @@ function initBranchDropdown(container) {
     searchInput.addEventListener('input', () => {
         const query = searchInput.value.toLowerCase();
         renderBranchList(query, dropdownList, searchInput, hiddenInput);
+        dropdownList.style.display = 'block';
     });
     
-    searchInput.addEventListener('blur', () => {
-        setTimeout(() => {
+    document.addEventListener('click', (e) => {
+        if (!container.contains(e.target)) {
             dropdownList.style.display = 'none';
-        }, 200);
+        }
     });
 }
 
@@ -165,57 +166,36 @@ function renderBranchList(query, dropdownList, searchInput, hiddenInput) {
         return;
     }
     
-    const parentBranches = allBranches.filter(b => !b.parent_branch_id);
-    const childBranches = allBranches.filter(b => b.parent_branch_id);
+    const filtered = allBranches.filter(b =>
+        query === '' || b.branch_name.toLowerCase().includes(query)
+    );
     
-    let hasResults = false;
-    
-    parentBranches.forEach(parent => {
-        const parentMatches = parent.branch_name.toLowerCase().includes(query);
-        const children = childBranches.filter(c => 
-            c.parent_branch_id === parent.id && 
-            c.branch_name.toLowerCase().includes(query)
-        );
-        
-        if (parentMatches || children.length > 0 || query === '') {
-            const parentItem = document.createElement('div');
-            parentItem.className = 'dropdown-item dropdown-parent';
-            parentItem.textContent = `${parent.branch_name} (${parent.branch_type})`;
-            parentItem.style.fontWeight = '600';
-            parentItem.style.color = 'var(--subtext)';
-            parentItem.style.cursor = 'not-allowed';
-            dropdownList.appendChild(parentItem);
-            hasResults = true;
-            
-            const relatedChildren = query === '' ? 
-                childBranches.filter(c => c.parent_branch_id === parent.id) : 
-                children;
-            
-            relatedChildren.forEach(child => {
-                const childItem = document.createElement('div');
-                childItem.className = 'dropdown-item dropdown-child';
-                childItem.textContent = `${child.branch_name} (${child.branch_type})`;
-                childItem.style.paddingLeft = '30px';
-                childItem.dataset.id = child.id;
-                
-                childItem.addEventListener('mousedown', (e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    searchInput.value = `${child.branch_name} (${child.branch_type})`;
-                    hiddenInput.value = child.id;
-                    dropdownList.style.display = 'none';
-                    updateSummary();
-                });
-                
-                dropdownList.appendChild(childItem);
-                hasResults = true;
-            });
-        }
-    });
-    
-    if (!hasResults) {
+    if (filtered.length === 0) {
         dropdownList.innerHTML = '<div class="dropdown-item" style="color: var(--subtext); cursor: default;">No branches found</div>';
+        return;
     }
+    
+    filtered.forEach(branch => {
+        const item = document.createElement('div');
+        item.className = 'dropdown-item';
+        item.textContent = branch.parent_branch_name
+            ? `${branch.branch_name} (${branch.branch_type}) — ${branch.parent_branch_name}`
+            : `${branch.branch_name} (${branch.branch_type})`;
+        item.dataset.id = branch.id;
+        
+        item.addEventListener('mousedown', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            searchInput.value = branch.parent_branch_name
+                ? `${branch.branch_name} (${branch.branch_type}) — ${branch.parent_branch_name}`
+                : `${branch.branch_name} (${branch.branch_type})`;
+            hiddenInput.value = branch.id;
+            dropdownList.style.display = 'none';
+            updateSummary();
+        });
+        
+        dropdownList.appendChild(item);
+    });
 }
 
 function clearProductData(row) {
