@@ -410,6 +410,6 @@ if (!$user_id) {
     <?php include 'scheme-modal.php'; ?>
 
     <script src="../../../assets/js/inventory/products/scheme-functions.js"></script>
-    <script src="../../../assets/js/inventory/products/product-add.js"></script>
+    <script src="../../../assets/js/inventory/products/product-add.js?v=<?= filemtime(__DIR__ . '/../../../assets/js/inventory/products/product-add.js') ?>"></script>
 </body>
 </html>

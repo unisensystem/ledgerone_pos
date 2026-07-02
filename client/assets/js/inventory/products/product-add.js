@@ -820,11 +820,7 @@ function addStockEntry() {
     }
     
     stockEntries.appendChild(newEntry);
-    
-    if (window.branchesData) {
-        initBranchDropdown(newEntry.querySelector('.custom-dropdown'));
-    }
-    
+    initBranchDropdown(newEntry.querySelector('.custom-dropdown'));
     calculateTotalStock();
 }
 
@@ -2197,36 +2193,53 @@ function loadParentProductForEdit(parentProductId) {
 }
 
 function loadBranches() {
+    window.branchesData = [];
+    const branchDropdowns = document.querySelectorAll('.custom-dropdown');
+    console.log('[Branch] loadBranches: found', branchDropdowns.length, 'custom-dropdown elements');
+    branchDropdowns.forEach(dropdown => {
+        if (dropdown.querySelector('.branch-search')) {
+            console.log('[Branch] Initializing branch dropdown from loadBranches');
+            initBranchDropdown(dropdown);
+        }
+    });
+
     fetch('../../../../server/api/inventory/products/branch-list.php')
     .then(response => response.json())
     .then(data => {
-        if (data.success && data.branches) {
+        console.log('[Branch] API response:', data);
+        if (data.success && Array.isArray(data.branches)) {
             window.branchesData = data.branches;
-            document.querySelectorAll('.custom-dropdown').forEach(dropdown => {
-                initBranchDropdown(dropdown);
-            });
+            console.log('[Branch] branchesData set:', window.branchesData.length, 'branches');
+        } else {
+            console.warn('[Branch] fetch returned no data:', data);
         }
     })
-    .catch(error => console.error('Error loading branches:', error));
+    .catch(error => console.error('[Branch] fetch error:', error));
 }
 
 function initBranchDropdown(container) {
     const searchInput = container.querySelector('.branch-search');
     const hiddenInput = container.querySelector('input[type="hidden"]');
     const dropdownList = container.querySelector('.dropdown-list');
-    
-    if (!searchInput || !hiddenInput || !dropdownList) return;
-    
+
+    console.log('[Branch] initBranchDropdown - searchInput:', !!searchInput, 'hiddenInput:', !!hiddenInput, 'dropdownList:', !!dropdownList);
+
+    if (!searchInput || !hiddenInput || !dropdownList) {
+        console.warn('[Branch] initBranchDropdown: missing elements, aborting');
+        return;
+    }
+
     searchInput.addEventListener('focus', () => {
+        console.log('[Branch] focus fired, branchesData:', window.branchesData ? window.branchesData.length + ' items' : 'undefined');
         renderBranchList('', dropdownList, searchInput, hiddenInput);
         dropdownList.style.display = 'block';
     });
-    
+
     searchInput.addEventListener('input', () => {
         const query = searchInput.value.toLowerCase();
         renderBranchList(query, dropdownList, searchInput, hiddenInput);
     });
-    
+
     document.addEventListener('click', (e) => {
         if (!container.contains(e.target)) {
             dropdownList.style.display = 'none';
@@ -2236,55 +2249,40 @@ function initBranchDropdown(container) {
 
 function renderBranchList(query, dropdownList, searchInput, hiddenInput) {
     dropdownList.innerHTML = '';
-    
-    const parentBranches = window.branchesData.filter(b => !b.parent_branch_id || b.parent_branch_id === null);
-    const childBranches = window.branchesData.filter(b => b.parent_branch_id && b.parent_branch_id !== null);
-    
-    let hasResults = false;
-    
-    parentBranches.forEach(parent => {
-        const parentMatches = parent.branch_name.toLowerCase().includes(query);
-        const children = childBranches.filter(c => 
-            c.parent_branch_id === parent.id && 
-            c.branch_name.toLowerCase().includes(query)
-        );
-        
-        if (parentMatches || children.length > 0 || query === '') {
-            const parentItem = document.createElement('div');
-            parentItem.className = 'dropdown-item dropdown-parent';
-            parentItem.textContent = `${parent.branch_name} (${parent.branch_type})`;
-            parentItem.style.fontWeight = '600';
-            parentItem.style.color = 'var(--subtext)';
-            parentItem.style.cursor = 'not-allowed';
-            dropdownList.appendChild(parentItem);
-            hasResults = true;
-            
-            const relatedChildren = query === '' ? 
-                childBranches.filter(c => c.parent_branch_id === parent.id) : 
-                children;
-            
-            relatedChildren.forEach(child => {
-                const childItem = document.createElement('div');
-                childItem.className = 'dropdown-item dropdown-child';
-                childItem.textContent = `${child.branch_name} (${child.branch_type})`;
-                childItem.style.paddingLeft = '30px';
-                childItem.dataset.id = child.id;
-                
-                childItem.addEventListener('click', () => {
-                    searchInput.value = `${child.branch_name} (${child.branch_type})`;
-                    hiddenInput.value = child.id;
-                    dropdownList.style.display = 'none';
-                });
-                
-                dropdownList.appendChild(childItem);
-                hasResults = true;
-            });
-        }
-    });
-    
-    if (!hasResults) {
-        dropdownList.innerHTML = '<div class="dropdown-item" style="color: var(--subtext); cursor: default;">No branches found</div>';
+
+    if (!window.branchesData || window.branchesData.length === 0) {
+        console.log('[Branch] renderBranchList: no data available');
+        dropdownList.innerHTML = '<div class="dropdown-item" style="color: var(--subtext); cursor: default;">No branches available</div>';
+        return;
     }
+
+    const filtered = window.branchesData.filter(b =>
+        query === '' || b.branch_name.toLowerCase().includes(query)
+    );
+
+    console.log('[Branch] renderBranchList: filtered', filtered.length, 'branches for query:', JSON.stringify(query));
+
+    if (filtered.length === 0) {
+        dropdownList.innerHTML = '<div class="dropdown-item" style="color: var(--subtext); cursor: default;">No branches found</div>';
+        return;
+    }
+
+    filtered.forEach(branch => {
+        const item = document.createElement('div');
+        item.className = 'dropdown-item';
+        item.textContent = branch.parent_branch_name
+            ? `${branch.branch_name} (${branch.branch_type}) — ${branch.parent_branch_name}`
+            : `${branch.branch_name} (${branch.branch_type})`;
+        item.dataset.id = branch.id;
+
+        item.addEventListener('click', () => {
+            searchInput.value = `${branch.branch_name} (${branch.branch_type})`;
+            hiddenInput.value = branch.id;
+            dropdownList.style.display = 'none';
+        });
+
+        dropdownList.appendChild(item);
+    });
 }
 
 function closeUnitModal() {
