@@ -72,29 +72,45 @@ $locationParts = array_filter([
 $locationStr = implode(', ', $locationParts);
 
 function numberToWords(float $amount, string $currencyCode = 'PKR'): string {
-    $ones  = ['','One','Two','Three','Four','Five','Six','Seven','Eight','Nine',
-               'Ten','Eleven','Twelve','Thirteen','Fourteen','Fifteen','Sixteen',
-               'Seventeen','Eighteen','Nineteen'];
-    $tens  = ['','','Twenty','Thirty','Forty','Fifty','Sixty','Seventy','Eighty','Ninety'];
+    $ones = ['','One','Two','Three','Four','Five','Six','Seven','Eight','Nine',
+              'Ten','Eleven','Twelve','Thirteen','Fourteen','Fifteen','Sixteen',
+              'Seventeen','Eighteen','Nineteen'];
+    $tens = ['','','Twenty','Thirty','Forty','Fifty','Sixty','Seventy','Eighty','Ninety'];
+
+    // [major unit, minor unit]
+    $map = [
+        'USD' => ['Dollars',  'Cents'],    'EUR' => ['Euros',    'Cents'],
+        'GBP' => ['Pounds',   'Pence'],    'PKR' => ['Rupees',   'Paisa'],
+        'INR' => ['Rupees',   'Paisa'],    'AED' => ['Dirhams',  'Fils'],
+        'SAR' => ['Riyals',   'Halalah'],  'OMR' => ['Rials',    'Baisa'],
+        'QAR' => ['Riyals',   'Dirhams'],  'KWD' => ['Dinars',   'Fils'],
+        'BHD' => ['Dinars',   'Fils'],     'JPY' => ['Yen',      'Sen'],
+        'CNY' => ['Yuan',     'Fen'],      'CAD' => ['Dollars',  'Cents'],
+        'AUD' => ['Dollars',  'Cents'],    'CHF' => ['Francs',   'Rappen'],
+        'TRY' => ['Lira',     'Kurus'],    'BDT' => ['Taka',     'Paisa'],
+        'MYR' => ['Ringgit',  'Sen'],      'SGD' => ['Dollars',  'Cents'],
+        'ZAR' => ['Rand',     'Cents'],    'NGN' => ['Naira',    'Kobo'],
+        'EGP' => ['Pounds',   'Piastres'], 'NPR' => ['Rupees',   'Paisa'],
+    ];
+    [$majorUnit, $minorUnit] = $map[strtoupper($currencyCode)] ?? ['Units', 'Subunits'];
 
     function convert(int $n, array $ones, array $tens): string {
-        if ($n === 0)        return '';
-        if ($n < 20)         return $ones[$n] . ' ';
-        if ($n < 100)        return $tens[(int)($n/10)] . ' ' . ($n%10 ? $ones[$n%10].' ' : '');
-        if ($n < 1000)       return $ones[(int)($n/100)] . ' Hundred ' . convert($n%100, $ones, $tens);
-        if ($n < 100000)     return convert((int)($n/1000), $ones, $tens) . 'Thousand ' . convert($n%1000, $ones, $tens);
-        if ($n < 10000000)   return convert((int)($n/100000), $ones, $tens) . 'Lakh ' . convert($n%100000, $ones, $tens);
-        return                      convert((int)($n/10000000), $ones, $tens) . 'Crore ' . convert($n%10000000, $ones, $tens);
+        if ($n === 0)      return '';
+        if ($n < 20)       return $ones[$n] . ' ';
+        if ($n < 100)      return $tens[(int)($n/10)] . ' ' . ($n%10 ? $ones[$n%10].' ' : '');
+        if ($n < 1000)     return $ones[(int)($n/100)] . ' Hundred ' . convert($n%100, $ones, $tens);
+        if ($n < 100000)   return convert((int)($n/1000), $ones, $tens) . 'Thousand ' . convert($n%1000, $ones, $tens);
+        if ($n < 10000000) return convert((int)($n/100000), $ones, $tens) . 'Lakh ' . convert($n%100000, $ones, $tens);
+        return                    convert((int)($n/10000000), $ones, $tens) . 'Crore ' . convert($n%10000000, $ones, $tens);
     }
 
-    $amount   = round($amount, 2);
-    $rupees   = (int)$amount;
-    $paisa    = (int)round(($amount - $rupees) * 100);
-    $words    = trim(convert($rupees, $ones, $tens));
-    $result   = $currencyCode . ' ' . ($words ?: 'Zero') . ' Rupees';
-    if ($paisa > 0) {
-        $paisaWords = trim(convert($paisa, $ones, $tens));
-        $result    .= ' and ' . $paisaWords . ' Paisa';
+    $amount = round($amount, 2);
+    $major  = (int)$amount;
+    $minor  = (int)round(($amount - $major) * 100);
+    $words  = trim(convert($major, $ones, $tens));
+    $result = strtoupper($currencyCode) . ' ' . ($words ?: 'Zero') . ' ' . $majorUnit;
+    if ($minor > 0) {
+        $result .= ' and ' . trim(convert($minor, $ones, $tens)) . ' ' . $minorUnit;
     }
     return $result . ' Only';
 }

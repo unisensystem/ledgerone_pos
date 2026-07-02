@@ -19,7 +19,7 @@ if (!$invoice_id) {
 try {
     // Get invoice data
     $stmt = $pdo->prepare("
-        SELECT 
+        SELECT
             si.*,
             c.customer_name,
             c.customer_code,
@@ -31,12 +31,15 @@ try {
             co.phone as company_phone,
             b.branch_name,
             b.branch_code,
-            u.full_name as created_by_name
+            u.full_name as created_by_name,
+            cur.code as currency_code,
+            cur.symbol as currency_symbol
         FROM sale_invoice si
         LEFT JOIN customers c ON si.customer_id = c.id
         LEFT JOIN companies co ON si.company_id = co.id
         LEFT JOIN branches b ON si.branch_id = b.id
         LEFT JOIN employees u ON si.created_by = u.id
+        LEFT JOIN ledgerone_public.currencies cur ON cur.id = si.currency_id
         WHERE si.id = ? AND si.tenant_id = ?
     ");
     $stmt->execute([$invoice_id, $tenant_id]);
@@ -281,42 +284,51 @@ try {
             <div class="totals-left">
                 <div><strong>Amount in Words:</strong></div>
                 <div style="min-height: 30px; padding: 5px; border: 1px solid #ddd;">
-                    <?php 
-                    function numberToWords($num) {
-                        $ones = array('', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine');
-                        $teens = array('Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen');
-                        $tens = array('', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety');
-                        
-                        if ($num == 0) return 'Zero';
-                        
-                        $words = '';
-                        while ($num > 0) {
-                            if ($num >= 1000000) {
-                                $words .= numberToWords(intval($num / 1000000)) . ' Million ';
-                                $num %= 1000000;
-                            } elseif ($num >= 1000) {
-                                $words .= numberToWords(intval($num / 1000)) . ' Thousand ';
-                                $num %= 1000;
-                            } elseif ($num >= 100) {
-                                $words .= $ones[intval($num / 100)] . ' Hundred ';
-                                $num %= 100;
-                            } elseif ($num >= 20) {
-                                $words .= $tens[intval($num / 10)];
-                                $num %= 10;
-                                if ($num > 0) $words .= ' ' . $ones[$num];
-                                $num = 0;
-                            } else {
-                                if ($num >= 10) {
-                                    $words .= $teens[$num - 10];
-                                } else {
-                                    $words .= $ones[$num];
-                                }
-                                $num = 0;
-                            }
+                    <?php
+                    function numberToWords(float $amount, string $currencyCode = 'PKR'): string {
+                        $ones = ['','One','Two','Three','Four','Five','Six','Seven','Eight','Nine',
+                                  'Ten','Eleven','Twelve','Thirteen','Fourteen','Fifteen','Sixteen',
+                                  'Seventeen','Eighteen','Nineteen'];
+                        $tens = ['','','Twenty','Thirty','Forty','Fifty','Sixty','Seventy','Eighty','Ninety'];
+
+                        $map = [
+                            'USD' => ['Dollars',  'Cents'],    'EUR' => ['Euros',    'Cents'],
+                            'GBP' => ['Pounds',   'Pence'],    'PKR' => ['Rupees',   'Paisa'],
+                            'INR' => ['Rupees',   'Paisa'],    'AED' => ['Dirhams',  'Fils'],
+                            'SAR' => ['Riyals',   'Halalah'],  'OMR' => ['Rials',    'Baisa'],
+                            'QAR' => ['Riyals',   'Dirhams'],  'KWD' => ['Dinars',   'Fils'],
+                            'BHD' => ['Dinars',   'Fils'],     'JPY' => ['Yen',      'Sen'],
+                            'CNY' => ['Yuan',     'Fen'],      'CAD' => ['Dollars',  'Cents'],
+                            'AUD' => ['Dollars',  'Cents'],    'CHF' => ['Francs',   'Rappen'],
+                            'TRY' => ['Lira',     'Kurus'],    'BDT' => ['Taka',     'Paisa'],
+                            'MYR' => ['Ringgit',  'Sen'],      'SGD' => ['Dollars',  'Cents'],
+                            'ZAR' => ['Rand',     'Cents'],    'NGN' => ['Naira',    'Kobo'],
+                            'EGP' => ['Pounds',   'Piastres'], 'NPR' => ['Rupees',   'Paisa'],
+                        ];
+                        [$majorUnit, $minorUnit] = $map[strtoupper($currencyCode)] ?? ['Units', 'Subunits'];
+
+                        function cvt(int $n, array $ones, array $tens): string {
+                            if ($n === 0)      return '';
+                            if ($n < 20)       return $ones[$n] . ' ';
+                            if ($n < 100)      return $tens[(int)($n/10)] . ' ' . ($n%10 ? $ones[$n%10].' ' : '');
+                            if ($n < 1000)     return $ones[(int)($n/100)] . ' Hundred ' . cvt($n%100, $ones, $tens);
+                            if ($n < 100000)   return cvt((int)($n/1000), $ones, $tens) . 'Thousand ' . cvt($n%1000, $ones, $tens);
+                            if ($n < 10000000) return cvt((int)($n/100000), $ones, $tens) . 'Lakh ' . cvt($n%100000, $ones, $tens);
+                            return                    cvt((int)($n/10000000), $ones, $tens) . 'Crore ' . cvt($n%10000000, $ones, $tens);
                         }
-                        return trim($words);
+
+                        $amount = round($amount, 2);
+                        $major  = (int)$amount;
+                        $minor  = (int)round(($amount - $major) * 100);
+                        $words  = trim(cvt($major, $ones, $tens));
+                        $result = strtoupper($currencyCode) . ' ' . ($words ?: 'Zero') . ' ' . $majorUnit;
+                        if ($minor > 0) {
+                            $result .= ' and ' . trim(cvt($minor, $ones, $tens)) . ' ' . $minorUnit;
+                        }
+                        return $result . ' Only';
                     }
-                    echo numberToWords(intval($invoice['net_amount'])) . ' Rupees only';
+                    $currencyCode = $invoice['currency_code'] ?? 'PKR';
+                    echo htmlspecialchars(numberToWords((float)$invoice['net_amount'], $currencyCode));
                     ?>
                 </div>
             </div>

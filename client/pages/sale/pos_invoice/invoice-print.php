@@ -1305,11 +1305,29 @@
                 document.getElementById('totalBalance').textContent = `${currencySymbol} ${Math.abs(totalBalanceValue).toFixed(2)} ${totalBalanceSign}`;
             }
 
-            // Convert net amount to words
-            const netAmountWords = numberToWords(Math.floor(parseFloat(invoice.net_amount)));
-            const cents = Math.round((parseFloat(invoice.net_amount) % 1) * 100);
-            const centsWords = cents > 0 ? ` and ${numberToWords(cents)} Cents` : '';
-            document.getElementById('amountInWords').textContent = `${netAmountWords}${centsWords} Only`;
+            // Convert net amount to words with multi-currency support
+            const currencyUnitMap = {
+                'USD': ['Dollars','Cents'],   'EUR': ['Euros','Cents'],
+                'GBP': ['Pounds','Pence'],    'PKR': ['Rupees','Paisa'],
+                'INR': ['Rupees','Paisa'],    'AED': ['Dirhams','Fils'],
+                'SAR': ['Riyals','Halalah'],  'OMR': ['Rials','Baisa'],
+                'QAR': ['Riyals','Dirhams'],  'KWD': ['Dinars','Fils'],
+                'BHD': ['Dinars','Fils'],     'JPY': ['Yen','Sen'],
+                'CNY': ['Yuan','Fen'],        'CAD': ['Dollars','Cents'],
+                'AUD': ['Dollars','Cents'],   'CHF': ['Francs','Rappen'],
+                'TRY': ['Lira','Kurus'],      'BDT': ['Taka','Paisa'],
+                'MYR': ['Ringgit','Sen'],     'SGD': ['Dollars','Cents'],
+                'ZAR': ['Rand','Cents'],      'NGN': ['Naira','Kobo'],
+                'EGP': ['Pounds','Piastres'], 'NPR': ['Rupees','Paisa'],
+            };
+            const invCurrCode = (invoice.currency_code || 'PKR').toUpperCase();
+            const [majorUnit, minorUnit] = currencyUnitMap[invCurrCode] || ['Units', 'Subunits'];
+            const netMajor = Math.floor(parseFloat(invoice.net_amount));
+            const netMinor = Math.round((parseFloat(invoice.net_amount) % 1) * 100);
+            let amountInWordsStr = `${invCurrCode} ${numberToWords(netMajor)} ${majorUnit}`;
+            if (netMinor > 0) amountInWordsStr += ` and ${numberToWords(netMinor)} ${minorUnit}`;
+            amountInWordsStr += ' Only';
+            document.getElementById('amountInWords').textContent = amountInWordsStr;
 
             // Apply hide settings
             if (localStorage.getItem('hidePrintAmountInWords') === 'true') {
