@@ -174,15 +174,17 @@ function calculateInvoiceLevelTaxes() {
         if (!isTaxInclusive) totalExclusiveTax += taxAmount;
     });
 
-    // Update Net Receivable with exclusive taxes added.
-    // Callers that handle withholding tax will override this immediately after.
+    // Update Net Amount and Net Receivable with exclusive taxes added.
+    const baseNetAmount = window.currentNetAmount
+        ?? parseFloat(document.getElementById('netAmount')?.textContent)
+        ?? 0;
+    const finalAmount = (baseNetAmount + totalExclusiveTax).toFixed(2);
+
+    const netAmountEl = document.getElementById('netAmount');
+    if (netAmountEl) netAmountEl.textContent = finalAmount;
+
     const netReceivableEl = document.getElementById('netReceivable');
-    if (netReceivableEl) {
-        const baseNetAmount = window.currentNetAmount
-            ?? parseFloat(document.getElementById('netAmount')?.textContent)
-            ?? 0;
-        netReceivableEl.textContent = (baseNetAmount + totalExclusiveTax).toFixed(2);
-    }
+    if (netReceivableEl) netReceivableEl.textContent = finalAmount;
 
     return totalExclusiveTax;
 }

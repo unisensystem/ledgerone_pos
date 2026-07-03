@@ -257,12 +257,12 @@ if (!$user_id) {
                         <span class="summary-label" id="shippingFeesLabel">Shipping Fees</span>
                         <input type="number" id="shippingFees" class="table-input" min="0" step="0.01" value="0">
                     </div>
+                    <!-- Dynamic Invoice-Level Taxes will be inserted here -->
+                    <div id="invoiceLevelTaxesContainer"></div>
                     <div class="summary-item">
                         <span class="summary-label" id="netAmountSummaryLabel">Net Amount</span>
                         <span class="summary-value" id="netAmount">0.00</span>
                     </div>
-                    <!-- Dynamic Invoice-Level Taxes will be inserted here -->
-                    <div id="invoiceLevelTaxesContainer"></div>
                     <div class="summary-item">
                         <span class="summary-label" id="netReceivableLabel">Net Receivable</span>
                         <span class="summary-value" id="netReceivable" style="color: var(--primary); font-size: 16px; font-weight: 700;">0.00</span>
