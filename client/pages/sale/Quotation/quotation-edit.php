@@ -75,6 +75,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_GET['action'])) {
                 remarks          = ?,
                 footer_note      = ?,
                 party_type       = ?,
+                currency_id      = ?,
                 subtotal         = ?,
                 discount_pct     = ?,
                 discount_amt     = ?,
@@ -97,6 +98,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_GET['action'])) {
                 $input['remarks']          ?: null,
                 $input['footer_note']      ?: null,
                 $input['party_type']       ?: null,
+                !empty($input['currency_id']) ? (int)$input['currency_id'] : null,
                 $itemsSubtotalWithTax, $discountPct, $discountAmt, $invoiceTaxPct, $invoiceTaxAmt, $grandTotal,
                 $uid,
                 $qid, $tid,
@@ -180,6 +182,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_GET['action'])) {
             $st = $pdo->prepare("DELETE FROM payment_terms WHERE id=? AND tenant_id=?");
             $st->execute([(int)$input['id'], $tid]);
             resp(true, [], 'Term deleted');
+        }
+
+        // ── CURRENCIES ────────────────────────────────────────
+        if ($action === 'currencies') {
+            $st = $pdo->prepare("
+                SELECT tc.currency_id, c.name, c.symbol, c.code
+                FROM tenant_currencies tc
+                JOIN ledgerone_public.currencies c ON tc.currency_id = c.id
+                WHERE tc.tenant_id = ?
+                ORDER BY c.name
+            ");
+            $st->execute([$tid]);
+            resp(true, ['data' => $st->fetchAll(PDO::FETCH_ASSOC)]);
         }
 
         // ── UNITS ─────────────────────────────────────────────
@@ -508,15 +523,21 @@ const editData = {
           </div>
         </div>
 
-        <!-- Project + Subject row -->
+        <!-- Currency, Project + Subject row -->
         <div class="fg fg-4" style="margin-bottom:9px">
+          <div class="f">
+            <label>Currency</label>
+            <select id="currencySel">
+              <option value="">Select Currency</option>
+            </select>
+          </div>
           <div class="f">
             <label>Project</label>
             <select id="projectSel">
               <option value="">Select Project</option>
             </select>
           </div>
-          <div class="f span3">
+          <div class="f span2">
             <label>Subject</label>
             <input type="text" id="subject" placeholder="e.g. Supply of Electrical Equipment"/>
           </div>
@@ -642,19 +663,20 @@ const editData = {
 <!-- ══ JAVASCRIPT ══════════════════════════════════════════ -->
 <script>
 const API = location.pathname;
-let customers = [];
-let products  = [];
-let units     = [];
-let payTerms  = [];
-let salesmen  = [];
-let rowId     = 0;
+let customers  = [];
+let products   = [];
+let units      = [];
+let payTerms   = [];
+let salesmen   = [];
+let currencies = [];
+let rowId      = 0;
 
 // ── INIT ─────────────────────────────────────────────────────
 async function init() {
   showSpinner(true);
   await Promise.all([
     loadCustomers(), loadProducts(),
-    loadUnits(), loadPaymentTerms(), loadSalesmen(), loadProjects()
+    loadUnits(), loadPaymentTerms(), loadSalesmen(), loadProjects(), loadCurrencies()
   ]);
   populateForm();
   showSpinner(false);
@@ -706,6 +728,17 @@ async function loadSalesmen() {
     salesmen.map(e => `<option value="${e.id}">${e.name}</option>`).join('');
 }
 
+async function loadCurrencies() {
+  const d = await api('currencies');
+  if (!d.success) return;
+  currencies = d.data;
+  const sel = document.getElementById('currencySel');
+  sel.innerHTML = '<option value="">Select Currency</option>' +
+    currencies.map(c =>
+      `<option value="${c.currency_id}" data-symbol="${escHtml(c.symbol)}">${c.name} (${c.symbol}) - ${c.code}</option>`
+    ).join('');
+}
+
 async function loadProjects() {
   const r = await fetch('../../../../server/api/master_setup/project_setup/get-projects-dropdown.php');
   const d = await r.json();
@@ -734,8 +767,9 @@ function populateForm() {
   document.getElementById('termsConditions').value   = q.terms_conditions|| '';
   document.getElementById('remarks').value           = q.remarks        || '';
   document.getElementById('footerNote').value        = q.footer_note    || '';
-  document.getElementById('discountPct').value       = q.discount_pct   || 0;
-  document.getElementById('taxPct').value            = q.invoice_tax_pct|| 0;
+  document.getElementById('discountPct').value       = q.discount_pct    || 0;
+  document.getElementById('taxPct').value            = q.invoice_tax_pct || 0;
+  if (q.currency_id) document.getElementById('currencySel').value = q.currency_id;
 
   // Pre-select customer in searchable dropdown
   if (q.customer_id) {
@@ -1145,6 +1179,7 @@ async function updateQuotation() {
     terms_conditions: document.getElementById('termsConditions').value,
     remarks:          document.getElementById('remarks').value,
     footer_note:      document.getElementById('footerNote').value,
+    currency_id:      document.getElementById('currencySel').value || null,
     discount_pct:     parseFloat(document.getElementById('discountPct').value) || 0,
     tax_pct:          parseFloat(document.getElementById('taxPct').value) || 0,
     items,

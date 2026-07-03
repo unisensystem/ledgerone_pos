@@ -58,9 +58,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_GET['action'])) {
                 (tenant_id, quotation_number, quotation_date, valid_till,
                  customer_id, contact_person, salesman_id, project_id, subject, payment_term_id,
                  terms_conditions, remarks, footer_note, party_type, status,
+                 currency_id,
                  subtotal, discount_pct, discount_amt, invoice_tax_pct, invoice_tax_amt, grand_total,
                  created_by, updated_by)
-                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,'draft',?,?,?,?,?,?,?,?)");
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,'draft',?,?,?,?,?,?,?,?,?)");
             $st->execute([
                 $tid,
                 $qno,
@@ -76,6 +77,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_GET['action'])) {
                 $input['remarks'] ?: null,
                 $input['footer_note'] ?: null,
                 $input['party_type']  ?: null,
+                !empty($input['currency_id']) ? (int)$input['currency_id'] : null,
                 $itemsSubtotalWithTax, $discountPct, $discountAmt, $invoiceTaxPct, $invoiceTaxAmt, $grandTotal,
                 $uid, $uid,
             ]);
@@ -158,6 +160,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_GET['action'])) {
         }
 
         // ── 8. LOAD UNITS ─────────────────────────────────────
+        if ($action === 'currencies') {
+            $st = $pdo->prepare("
+                SELECT tc.currency_id, c.name, c.symbol, c.code
+                FROM tenant_currencies tc
+                JOIN ledgerone_public.currencies c ON tc.currency_id = c.id
+                WHERE tc.tenant_id = ?
+                ORDER BY c.name
+            ");
+            $st->execute([$tenant_id]);
+            resp(true, ['data' => $st->fetchAll(PDO::FETCH_ASSOC)]);
+        }
+
         if ($action === 'units') {
             $st = $pdo->prepare("SELECT id, uom_name AS name, uom_name AS symbol
                                   FROM uom WHERE (tenant_id=? OR tenant_id=0) ORDER BY uom_name");
@@ -463,15 +477,21 @@ tbody td{padding:4px 4px;vertical-align:middle}
           </div>
         </div>
 
-        <!-- Row 3: Project + Subject -->
+        <!-- Row 3: Currency, Project + Subject -->
         <div class="fg fg-4" style="margin-bottom:9px">
+          <div class="f">
+            <label>Currency</label>
+            <select id="currencySel">
+              <option value="">Select Currency</option>
+            </select>
+          </div>
           <div class="f">
             <label>Project</label>
             <select id="projectSel">
               <option value="">Select Project</option>
             </select>
           </div>
-          <div class="f span3">
+          <div class="f span2">
             <label>Subject</label>
             <input type="text" id="subject" placeholder="e.g. Supply of Electrical Equipment"/>
           </div>
@@ -644,11 +664,12 @@ TAX: Exclusive of all Tax</textarea>
 <!-- ══ JAVASCRIPT ══════════════════════════════════════════ -->
 <script>
 const API = location.pathname;
-let customers = [];
-let products  = [];
-let units     = [];
-let payTerms  = [];
-let salesmen  = [];
+let customers  = [];
+let products   = [];
+let units      = [];
+let payTerms   = [];
+let salesmen   = [];
+let currencies = [];
 let rowId = 0;
 
 // ── INIT ─────────────────────────────────────────────────────
@@ -661,7 +682,7 @@ async function init() {
   showSpinner(true);
   await Promise.all([
     loadQtnNumber(), loadCustomers(), loadProducts(),
-    loadUnits(), loadPaymentTerms(), loadSalesmen(), loadProjects()
+    loadUnits(), loadPaymentTerms(), loadSalesmen(), loadProjects(), loadCurrencies()
   ]);
   showSpinner(false);
   addRow();
@@ -719,6 +740,17 @@ async function loadSalesmen() {
   const sel = document.getElementById('salesmanSel');
   sel.innerHTML = '<option value="">Select Salesman</option>' +
     salesmen.map(e=>`<option value="${e.id}">${e.name}</option>`).join('');
+}
+
+async function loadCurrencies() {
+  const d = await api('currencies');
+  if (!d.success) return;
+  currencies = d.data;
+  const sel = document.getElementById('currencySel');
+  sel.innerHTML = '<option value="">Select Currency</option>' +
+    currencies.map((c, i) =>
+      `<option value="${c.currency_id}" data-symbol="${escAttr(c.symbol)}" ${i===0?'selected':''}>${c.name} (${c.symbol}) - ${c.code}</option>`
+    ).join('');
 }
 
 async function loadProjects() {
@@ -1145,6 +1177,7 @@ async function saveQuotation() {
     terms_conditions: document.getElementById('termsConditions').value,
     remarks:          document.getElementById('remarks').value,
     footer_note:      document.getElementById('footerNote').value,
+    currency_id:      document.getElementById('currencySel').value || null,
     discount_pct:     parseFloat(document.getElementById('discountPct').value) || 0,
     tax_pct:          parseFloat(document.getElementById('taxPct').value) || 0,
     items,

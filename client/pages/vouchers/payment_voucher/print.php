@@ -22,21 +22,29 @@ require_once '../../../../includes/connection.php';
 
 // Function to convert number to words
 function numberToWords($number) {
-    $ones = array('', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen');
-    $tens = array('', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety');
-    
-    if ($number < 20) {
-        return $ones[$number];
-    } elseif ($number < 100) {
-        return $tens[intval($number / 10)] . ($number % 10 != 0 ? ' ' . $ones[$number % 10] : '');
-    } elseif ($number < 1000) {
-        return $ones[intval($number / 100)] . ' Hundred' . ($number % 100 != 0 ? ' ' . numberToWords($number % 100) : '');
-    } elseif ($number < 1000000) {
-        return numberToWords(intval($number / 1000)) . ' Thousand' . ($number % 1000 != 0 ? ' ' . numberToWords($number % 1000) : '');
-    } elseif ($number < 1000000000) {
-        return numberToWords(intval($number / 1000000)) . ' Million' . ($number % 1000000 != 0 ? ' ' . numberToWords($number % 1000000) : '');
+    $ones = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten',
+             'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
+    $tens = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
+
+    if ($number == 0) return 'Zero';
+    if ($number < 20) return $ones[$number];
+    if ($number < 100) return $tens[intval($number / 10)] . ($number % 10 ? ' ' . $ones[$number % 10] : '');
+    if ($number < 1000) return $ones[intval($number / 100)] . ' Hundred' . ($number % 100 ? ' ' . numberToWords($number % 100) : '');
+    if ($number < 1000000) return numberToWords(intval($number / 1000)) . ' Thousand' . ($number % 1000 ? ' ' . numberToWords($number % 1000) : '');
+    if ($number < 1000000000) return numberToWords(intval($number / 1000000)) . ' Million' . ($number % 1000000 ? ' ' . numberToWords($number % 1000000) : '');
+    return numberToWords(intval($number / 1000000000)) . ' Billion' . ($number % 1000000000 ? ' ' . numberToWords($number % 1000000000) : '');
+}
+
+function amountInWords($amount, $main_unit, $sub_unit) {
+    $amount   = round($amount, 2);
+    $intPart  = intval($amount);
+    $decPart  = round(($amount - $intPart) * 100);
+
+    $words = numberToWords($intPart) . ' ' . ($main_unit ?: 'Only');
+    if ($decPart > 0) {
+        $words .= ' and ' . numberToWords($decPart) . ' ' . ($sub_unit ?: 'Cents');
     }
-    return 'Number too large';
+    return $words . ' Only';
 }
 
 try {
@@ -56,6 +64,8 @@ try {
             a.name as payment_method,
             c.name as currency_name,
             c.symbol as currency_symbol,
+            c.main_unit_name as currency_main_unit,
+            c.sub_unit_name as currency_sub_unit,
             ba.bank_name,
             ba.account_number,
             co.company_name,
@@ -394,7 +404,7 @@ try {
                 Total Amount: <?php echo $voucher['currency_symbol'] . number_format($voucher['amount'], 2); ?>
             </div>
             <div style="margin-top: 10px; font-style: italic;">
-                Amount in Words: <?php echo numberToWords(intval($voucher['amount'])) . ' ' . $voucher['currency_name'] . ' Only'; ?>
+                Amount in Words: <?php echo amountInWords($voucher['amount'], $voucher['currency_main_unit'], $voucher['currency_sub_unit']); ?>
             </div>
         </div>
         

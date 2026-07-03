@@ -50,18 +50,29 @@ $stC = $pdo->prepare("SELECT * FROM companies WHERE tenant_id = ? AND is_active 
 $stC->execute([$tenant_id]);
 $company = $stC->fetch(PDO::FETCH_ASSOC) ?: [];
 
-// Load base currency
+// Load quotation currency (use quotation's currency_id if set, else base currency)
 $stCur = $pdo->prepare("
-    SELECT c.code, c.symbol
-    FROM tenant_currencies tc
-    JOIN ledgerone_public.currencies c ON c.id = tc.currency_id
-    WHERE tc.tenant_id = ? AND tc.is_base_currency = 1
+    SELECT c.code, c.symbol, c.main_unit_name, c.sub_unit_name
+    FROM ledgerone_public.currencies c
+    WHERE c.id = ?
     LIMIT 1
 ");
-$stCur->execute([$tenant_id]);
-$baseCurrency = $stCur->fetch(PDO::FETCH_ASSOC);
-$currencyCode   = $baseCurrency['code']   ?? 'PKR';
-$currencySymbol = $baseCurrency['symbol'] ?? 'Rs';
+// Prefer quotation's own currency_id, fallback to tenant base currency
+$qCurrencyId = !empty($q['currency_id']) ? (int)$q['currency_id'] : null;
+if (!$qCurrencyId) {
+    $stBase = $pdo->prepare("
+        SELECT currency_id FROM tenant_currencies
+        WHERE tenant_id = ? AND is_base_currency = 1 LIMIT 1
+    ");
+    $stBase->execute([$tenant_id]);
+    $qCurrencyId = (int)($stBase->fetchColumn() ?: 0);
+}
+$stCur->execute([$qCurrencyId]);
+$currencyRow    = $stCur->fetch(PDO::FETCH_ASSOC);
+$currencyCode   = $currencyRow['code']           ?? 'PKR';
+$currencySymbol = $currencyRow['symbol']         ?? 'Rs';
+$mainUnit       = $currencyRow['main_unit_name'] ?? 'Rupees';
+$subUnit        = $currencyRow['sub_unit_name']  ?? 'Paisa';
 
 // Build company location string
 $locationParts = array_filter([
@@ -71,28 +82,11 @@ $locationParts = array_filter([
 ]);
 $locationStr = implode(', ', $locationParts);
 
-function numberToWords(float $amount, string $currencyCode = 'PKR'): string {
+function numberToWords(float $amount, string $mainUnit = 'Rupees', string $subUnit = 'Paisa', string $currencyCode = 'PKR'): string {
     $ones = ['','One','Two','Three','Four','Five','Six','Seven','Eight','Nine',
               'Ten','Eleven','Twelve','Thirteen','Fourteen','Fifteen','Sixteen',
               'Seventeen','Eighteen','Nineteen'];
     $tens = ['','','Twenty','Thirty','Forty','Fifty','Sixty','Seventy','Eighty','Ninety'];
-
-    // [major unit, minor unit]
-    $map = [
-        'USD' => ['Dollars',  'Cents'],    'EUR' => ['Euros',    'Cents'],
-        'GBP' => ['Pounds',   'Pence'],    'PKR' => ['Rupees',   'Paisa'],
-        'INR' => ['Rupees',   'Paisa'],    'AED' => ['Dirhams',  'Fils'],
-        'SAR' => ['Riyals',   'Halalah'],  'OMR' => ['Rials',    'Baisa'],
-        'QAR' => ['Riyals',   'Dirhams'],  'KWD' => ['Dinars',   'Fils'],
-        'BHD' => ['Dinars',   'Fils'],     'JPY' => ['Yen',      'Sen'],
-        'CNY' => ['Yuan',     'Fen'],      'CAD' => ['Dollars',  'Cents'],
-        'AUD' => ['Dollars',  'Cents'],    'CHF' => ['Francs',   'Rappen'],
-        'TRY' => ['Lira',     'Kurus'],    'BDT' => ['Taka',     'Paisa'],
-        'MYR' => ['Ringgit',  'Sen'],      'SGD' => ['Dollars',  'Cents'],
-        'ZAR' => ['Rand',     'Cents'],    'NGN' => ['Naira',    'Kobo'],
-        'EGP' => ['Pounds',   'Piastres'], 'NPR' => ['Rupees',   'Paisa'],
-    ];
-    [$majorUnit, $minorUnit] = $map[strtoupper($currencyCode)] ?? ['Units', 'Subunits'];
 
     function convert(int $n, array $ones, array $tens): string {
         if ($n === 0)      return '';
@@ -108,9 +102,9 @@ function numberToWords(float $amount, string $currencyCode = 'PKR'): string {
     $major  = (int)$amount;
     $minor  = (int)round(($amount - $major) * 100);
     $words  = trim(convert($major, $ones, $tens));
-    $result = strtoupper($currencyCode) . ' ' . ($words ?: 'Zero') . ' ' . $majorUnit;
+    $result = strtoupper($currencyCode) . ' ' . ($words ?: 'Zero') . ' ' . $mainUnit;
     if ($minor > 0) {
-        $result .= ' and ' . trim(convert($minor, $ones, $tens)) . ' ' . $minorUnit;
+        $result .= ' and ' . trim(convert($minor, $ones, $tens)) . ' ' . $subUnit;
     }
     return $result . ' Only';
 }
@@ -259,7 +253,7 @@ body { font-family: "Segoe UI", Arial, sans-serif; font-size: 11.5px; color: #1a
   <div class="co-header">
     <div class="co-left">
       <?php if (!empty($company['logo_url'])): ?>
-      <img class="co-logo" src="../../assets/uploads/company_logo/<?= htmlspecialchars($company['logo_url']) ?>" alt="Logo">
+      <img class="co-logo" src="../../../assets/uploads/company_logo/<?= htmlspecialchars($company['logo_url']) ?>" alt="Logo">
       <?php endif; ?>
       <div>
         <div class="co-name"><?= htmlspecialchars($company['company_name'] ?? 'LedgerOne ERP') ?></div>
@@ -367,7 +361,7 @@ body { font-family: "Segoe UI", Arial, sans-serif; font-size: 11.5px; color: #1a
   <!-- ── Amount in Words ── -->
   <div class="words-box">
     <span class="words-lbl">Amount in Words:</span>
-    <span class="words-val"><?= htmlspecialchars(numberToWords((float)$q['grand_total'], $currencyCode)) ?></span>
+    <span class="words-val"><?= htmlspecialchars(numberToWords((float)$q['grand_total'], $mainUnit, $subUnit, $currencyCode)) ?></span>
   </div>
 
   <!-- ── Terms & Conditions ── -->
