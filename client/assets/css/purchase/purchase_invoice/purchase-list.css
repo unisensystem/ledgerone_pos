@@ -201,6 +201,16 @@ select:focus {
   background: #d14343;
 }
 
+.btn-info {
+  background: #0891b2;
+  color: white;
+  border: none;
+}
+
+.btn-info:hover {
+  background: #0e7490;
+}
+
 .table-container {
   overflow-x: auto;
 }

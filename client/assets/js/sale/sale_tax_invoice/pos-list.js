@@ -126,6 +126,15 @@ function initializeListPage(permissions) {
             printBtn.title = 'Print Invoice';
             printBtn.addEventListener('click', () => printInvoice(invoice.id));
 
+            // Custom print button
+            const customPrintBtn = document.createElement('button');
+            customPrintBtn.className = 'btn btn-info btn-sm';
+            customPrintBtn.innerHTML = '<i class="fas fa-file-invoice"></i>';
+            customPrintBtn.title = 'Custom Print (Tax Invoice)';
+            customPrintBtn.addEventListener('click', () => {
+                window.open(`invoice-print2.php?id=${invoice.id}`, '_blank');
+            });
+
             // Delete button
             const deleteBtn = document.createElement('button');
             deleteBtn.className = 'btn btn-danger btn-sm';
@@ -141,6 +150,7 @@ function initializeListPage(permissions) {
 
             actionButtons.appendChild(editBtn);
             actionButtons.appendChild(printBtn);
+            actionButtons.appendChild(customPrintBtn);
             actionButtons.appendChild(deleteBtn);
 
             actionsCell.appendChild(actionButtons);

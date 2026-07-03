@@ -21,7 +21,7 @@ if (!$user_id) {
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>LedgerOne ERP - Sale Tax Invoices</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="stylesheet" href="../../../assets/css/purchase/purchase_invoice/purchase-list.css">
+    <link rel="stylesheet" href="../../../assets/css/purchase/purchase_invoice/purchase-list.css?v=2">
 </head>
 <body class="light-theme">
     <div class="container">
@@ -126,6 +126,6 @@ if (!$user_id) {
         </div>
     </div>
 
-    <script src="../../../assets/js/sale/sale_tax_invoice/pos-list.js"></script>
+    <script src="../../../assets/js/sale/sale_tax_invoice/pos-list.js?v=2"></script>
 </body>
 </html>
