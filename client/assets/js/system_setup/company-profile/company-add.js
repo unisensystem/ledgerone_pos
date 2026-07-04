@@ -96,6 +96,7 @@ document.addEventListener('DOMContentLoaded', function() {
         formData.append('industry_type', document.getElementById('industry_type').value);
         formData.append('email', document.getElementById('email').value);
         formData.append('phone', document.getElementById('phone').value);
+        formData.append('mobile_no', document.getElementById('mobile_no').value);
         formData.append('website', document.getElementById('website').value);
         formData.append('address', document.getElementById('address').value);
         formData.append('country_id', document.getElementById('country_id').value);
@@ -103,6 +104,7 @@ document.addEventListener('DOMContentLoaded', function() {
         formData.append('state', document.getElementById('state').value);
         formData.append('city', document.getElementById('city').value);
         formData.append('zipcode', document.getElementById('zipcode').value);
+        formData.append('po_box_no', document.getElementById('po_box_no').value);
         formData.append('registration_number', document.getElementById('registration_number').value);
         formData.append('tax_identification_number', document.getElementById('tax_identification_number').value);
         formData.append('sales_tax_number', document.getElementById('sales_tax_number').value);

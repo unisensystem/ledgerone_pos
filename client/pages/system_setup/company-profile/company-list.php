@@ -179,6 +179,10 @@ if (!$user_id) {
                         <input type="text" id="edit_phone" name="phone">
                     </div>
                     <div class="form-group">
+                        <label>Mobile No</label>
+                        <input type="text" id="edit_mobile_no" name="mobile_no">
+                    </div>
+                    <div class="form-group">
                         <label>Website</label>
                         <input type="url" id="edit_website" name="website">
                     </div>
@@ -207,6 +211,10 @@ if (!$user_id) {
                     <div class="form-group">
                         <label>Zipcode</label>
                         <input type="text" id="edit_zipcode" name="zipcode">
+                    </div>
+                    <div class="form-group">
+                        <label>P.O. Box No</label>
+                        <input type="text" id="edit_po_box_no" name="po_box_no">
                     </div>
                     <div class="form-group">
                         <label>Registration Number</label>

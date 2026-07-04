@@ -58,6 +58,7 @@ try {
                 brand_id = ?,
                 customer_name = ?, 
                 address = ?, 
+                po_box_no = ?, 
                 primary_phone = ?, 
                 secondary_phone = ?, 
                 identity_card_no = ?, 
@@ -88,6 +89,7 @@ try {
                 WHERE id = ? AND tenant_id = ?";
         
         $stmt = $pdo->prepare($sql);
+        $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
         $stmt->execute([
             !empty($input['companyId']) ? (int)$input['companyId'] : null,
             !empty($input['customerTypeId']) ? (int)$input['customerTypeId'] : null,
@@ -95,6 +97,7 @@ try {
             !empty($input['brandId']) ? (int)$input['brandId'] : null,
             trim($input['customerName']),
             !empty($input['address']) ? trim($input['address']) : null,
+            !empty($input['poBoxNo']) ? trim($input['poBoxNo']) : null,
             !empty($input['primaryPhone']) ? trim($input['primaryPhone']) : null,
             !empty($input['secondaryPhone']) ? trim($input['secondaryPhone']) : null,
             !empty($input['identityCard']) ? trim($input['identityCard']) : null,

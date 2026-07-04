@@ -310,6 +310,34 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
+    // Fetch supplier balance — project-wise if project selected, else total
+    async function fetchSupplierBalance(supplierId) {
+        if (!supplierId) return;
+        try {
+            const projectId = document.getElementById('project')?.value || '';
+            const url = projectId
+                ? `../../../../server/api/purchase/purchase_invoice/get-supplier-balance.php?supplier_id=${supplierId}&project_id=${projectId}`
+                : `../../../../server/api/purchase/purchase_invoice/get-supplier-balance.php?supplier_id=${supplierId}`;
+
+            const response = await fetch(url);
+            const data = await response.json();
+
+            if (data.success) {
+                const balance = parseFloat(data.balance || 0);
+                document.getElementById('previousBalance').value =
+                    `${balance >= 0 ? 'Dr' : 'Cr'} ${Math.abs(balance).toFixed(2)}`;
+            }
+        } catch (error) {
+            console.error('Error fetching supplier balance:', error);
+        }
+    }
+
+    // Re-fetch balance when project changes
+    document.getElementById('project')?.addEventListener('change', function () {
+        const supplierId = document.getElementById('supplierCode')?.value;
+        if (supplierId) fetchSupplierBalance(supplierId);
+    });
+
     // Load sub accounts from API
     async function loadSubAccounts(supplierId) {
         try {
@@ -666,10 +694,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
                 // Update related fields for supplier selection
                 if (hiddenInputId === 'supplierCode') {
-                    const balance = parseFloat(e.target.getAttribute('data-balance'));
-                    document.getElementById('previousBalance').value = `${balance >= 0 ? 'Dr' : 'Cr'} ${Math.abs(balance).toFixed(2)}`;
-                    
-                    // Load sub accounts for selected supplier
+                    fetchSupplierBalance(value);
                     loadSubAccounts(value);
                 }
                 

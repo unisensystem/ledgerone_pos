@@ -131,8 +131,8 @@ try {
         // Build SQL based on whether logo is being updated
         if ($logoFileName) {
             $sql = "UPDATE companies SET 
-                    company_name = ?, legal_name = ?, email = ?, phone = ?, website = ?,
-                    address = ?, country_id = ?, country = ?, state = ?, city = ?, zipcode = ?,
+                    company_name = ?, legal_name = ?, email = ?, phone = ?, mobile_no = ?, website = ?,
+                    address = ?, country_id = ?, country = ?, state = ?, city = ?, zipcode = ?, po_box_no = ?,
                     industry_type = ?, registration_number = ?, tax_identification_number = ?,
                     sales_tax_number = ?, logo_url = ?, language_code = ?, timezone = ?,
                     currency_code = ?, inventory_valuation_method = ?, is_active = ?
@@ -143,6 +143,7 @@ try {
                 $_POST['legal_name'] ?? null,
                 $_POST['email'] ?? null,
                 $_POST['phone'] ?? null,
+                $_POST['mobile_no'] ?? null,
                 $_POST['website'] ?? null,
                 $_POST['address'] ?? null,
                 !empty($_POST['country_id']) ? (int)$_POST['country_id'] : null,
@@ -150,6 +151,7 @@ try {
                 $_POST['state'] ?? null,
                 $_POST['city'] ?? null,
                 $_POST['zipcode'] ?? null,
+                $_POST['po_box_no'] ?? null,
                 $_POST['industry_type'] ?? null,
                 $_POST['registration_number'] ?? null,
                 $_POST['tax_identification_number'] ?? null,
@@ -165,8 +167,8 @@ try {
             ];
         } else {
             $sql = "UPDATE companies SET 
-                    company_name = ?, legal_name = ?, email = ?, phone = ?, website = ?,
-                    address = ?, country_id = ?, country = ?, state = ?, city = ?, zipcode = ?,
+                    company_name = ?, legal_name = ?, email = ?, phone = ?, mobile_no = ?, website = ?,
+                    address = ?, country_id = ?, country = ?, state = ?, city = ?, zipcode = ?, po_box_no = ?,
                     industry_type = ?, registration_number = ?, tax_identification_number = ?,
                     sales_tax_number = ?, language_code = ?, timezone = ?,
                     currency_code = ?, inventory_valuation_method = ?, is_active = ?
@@ -177,6 +179,7 @@ try {
                 $_POST['legal_name'] ?? null,
                 $_POST['email'] ?? null,
                 $_POST['phone'] ?? null,
+                $_POST['mobile_no'] ?? null,
                 $_POST['website'] ?? null,
                 $_POST['address'] ?? null,
                 !empty($_POST['country_id']) ? (int)$_POST['country_id'] : null,
@@ -184,6 +187,7 @@ try {
                 $_POST['state'] ?? null,
                 $_POST['city'] ?? null,
                 $_POST['zipcode'] ?? null,
+                $_POST['po_box_no'] ?? null,
                 $_POST['industry_type'] ?? null,
                 $_POST['registration_number'] ?? null,
                 $_POST['tax_identification_number'] ?? null,

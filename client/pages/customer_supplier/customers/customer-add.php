@@ -162,6 +162,14 @@ if (!$user_id) {
                         </div>
 
                         <div class="form-group col-6">
+                            <label for="poBoxNo">
+                                <i class="fas fa-mailbox"></i>
+                                P.O. Box No
+                            </label>
+                            <input type="text" id="poBoxNo" maxlength="50" placeholder="e.g., P.O. Box 12345">
+                        </div>
+
+                        <div class="form-group col-6">
                             <label for="primaryPhone">
                                 <i class="fas fa-phone"></i>
                                 Primary Phone

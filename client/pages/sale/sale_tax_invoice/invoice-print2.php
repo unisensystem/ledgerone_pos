@@ -22,16 +22,20 @@ try {
             si.*,
             c.customer_name,
             c.customer_code,
-            c.address       AS customer_address,
-            c.primary_phone AS customer_mob,
-            c.email         AS customer_email,
-            c.strn          AS customer_trn,
+            c.address         AS customer_address,
+            c.po_box_no       AS customer_pobox,
+            c.strn            AS customer_trn,
+            c.primary_phone   AS customer_mob,
+            c.secondary_phone AS customer_phone,
+            c.email           AS customer_email,
             co.company_name,
-            co.email        AS company_email,
-            co.phone        AS company_phone,
-            co.zipcode      AS company_pobox,
-            co.address      AS company_address,
-            co.logo_url     AS company_logo,
+            co.email              AS company_email,
+            co.phone              AS company_phone,
+            co.mobile_no          AS company_mob,
+            co.po_box_no          AS company_pobox,
+            co.sales_tax_number   AS company_trn,
+            co.address            AS company_address,
+            co.logo_url           AS company_logo,
             b.branch_name,
             u.full_name     AS created_by_name,
             cur.code        AS currency_code,
@@ -387,18 +391,18 @@ body {
             <td>
                 <div class="party-name"><?php echo htmlspecialchars($invoice['company_name']); ?></div>
                 <div class="party-row"><span class="pl">P.O. Box No</span><span class="pv"><?php echo htmlspecialchars($invoice['company_pobox'] ?? ''); ?></span></div>
-                <div class="party-row"><span class="pl">TRN No</span><span class="pv"></span></div>
-                <div class="party-row"><span class="pl">Mob No</span><span class="pv"></span></div>
+                <div class="party-row"><span class="pl">TRN No</span><span class="pv"><?php echo htmlspecialchars($invoice['company_trn'] ?? ''); ?></span></div>
+                <div class="party-row"><span class="pl">Mob No</span><span class="pv"><?php echo htmlspecialchars($invoice['company_mob'] ?? ''); ?></span></div>
                 <div class="party-row"><span class="pl">Phone No</span><span class="pv"><?php echo htmlspecialchars($invoice['company_phone'] ?? ''); ?></span></div>
                 <div class="party-row"><span class="pl">Email</span><span class="pv"><?php echo htmlspecialchars($invoice['company_email'] ?? ''); ?></span></div>
             </td>
             <!-- TO: Customer -->
             <td>
                 <div class="party-name"><?php echo htmlspecialchars($invoice['customer_name'] ?? ''); ?></div>
-                <div class="party-row"><span class="pl">P.O. Box No</span><span class="pv"></span></div>
+                <div class="party-row"><span class="pl">P.O. Box No</span><span class="pv"><?php echo htmlspecialchars($invoice['customer_pobox'] ?? ''); ?></span></div>
                 <div class="party-row"><span class="pl">TRN No</span><span class="pv"><?php echo htmlspecialchars($invoice['customer_trn'] ?? ''); ?></span></div>
                 <div class="party-row"><span class="pl">Mob No</span><span class="pv"><?php echo htmlspecialchars($invoice['customer_mob'] ?? ''); ?></span></div>
-                <div class="party-row"><span class="pl">Phone No</span><span class="pv"></span></div>
+                <div class="party-row"><span class="pl">Phone No</span><span class="pv"><?php echo htmlspecialchars($invoice['customer_phone'] ?? ''); ?></span></div>
                 <div class="party-row"><span class="pl">Email</span><span class="pv"><?php echo htmlspecialchars($invoice['customer_email'] ?? ''); ?></span></div>
                 <div class="party-row"><span class="pl">PROJECT</span><span class="pv"><?php echo htmlspecialchars($invoice['project_name'] ?? ''); ?></span></div>
             </td>
@@ -486,14 +490,32 @@ body {
                 <td></td>
                 <td colspan="5"><span class="t-words-lbl">In Words: </span><?php echo htmlspecialchars(numberToWords((float)$invoice['net_amount'], $currencyCode)); ?></td>
             </tr>
+            <?php
+                // previous_balance is a plain signed number: positive = Dr, negative = Cr
+                $prev_bal_num  = (float)($invoice['previous_balance'] ?? 0);
+                $remaining_bal = (float)$invoice['net_amount'] - (float)($invoice['amount_paid'] ?? 0);
+                $total_bal     = $prev_bal_num + $remaining_bal;
+                $prev_label    = ($prev_bal_num  >= 0 ? 'Dr ' : 'Cr ') . number_format(abs($prev_bal_num),  2);
+                $total_label   = ($total_bal     >= 0 ? 'Dr ' : 'Cr ') . number_format(abs($total_bal),     2);
+            ?>
+            <tr>
+                <td></td>
+                <td class="t-label" colspan="4">Previous Balance</td>
+                <td class="t-value"><?php echo htmlspecialchars($prev_label); ?></td>
+            </tr>
+            <tr>
+                <td></td>
+                <td class="t-label" colspan="4" style="background:#7E8C6F;color:#fff;">Total Balance</td>
+                <td class="t-value" style="background:#7E8C6F;color:#fff;"><?php echo htmlspecialchars($total_label); ?></td>
+            </tr>
         </tfoot>
     </table>
 
-    <!-- NAME ROW -->
+    <!-- NAME / REMARKS ROW -->
     <table class="name-table">
         <tr>
             <td class="name-lbl">Name:</td>
-            <td class="name-val"><?php echo htmlspecialchars($invoice['created_by_name'] ?? ''); ?></td>
+            <td class="name-val"><?php echo htmlspecialchars($invoice['remarks'] ?? ''); ?></td>
         </tr>
     </table>
 

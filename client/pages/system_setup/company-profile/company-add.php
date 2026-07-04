@@ -86,6 +86,10 @@ if (!$user_id) {
                             <input type="text" id="phone" name="phone" placeholder="+1 (555) 123-4567">
                         </div>
                         <div class="form-group">
+                            <label for="mobile_no">Mobile No</label>
+                            <input type="text" id="mobile_no" name="mobile_no" placeholder="+92 300 1234567">
+                        </div>
+                        <div class="form-group">
                             <label for="website">Website</label>
                             <input type="url" id="website" name="website" placeholder="https://www.company.com">
                         </div>
@@ -121,6 +125,10 @@ if (!$user_id) {
                         <div class="form-group">
                             <label for="zipcode">Zipcode</label>
                             <input type="text" id="zipcode" name="zipcode" placeholder="90210">
+                        </div>
+                        <div class="form-group">
+                            <label for="po_box_no">P.O. Box No</label>
+                            <input type="text" id="po_box_no" name="po_box_no" placeholder="P.O. Box 12345">
                         </div>
                     </div>
                 </div>

@@ -217,6 +217,10 @@ $currency_symbol = $currency['symbol'] ?? '$';
                             <textarea id="editAddress"></textarea>
                         </div>
                         <div class="form-group col-6">
+                            <label>P.O. Box No</label>
+                            <input type="text" id="editPoBoxNo" maxlength="50">
+                        </div>
+                        <div class="form-group col-6">
                             <label>Primary Phone</label>
                             <input type="text" id="editPrimaryPhone" maxlength="15">
                         </div>
@@ -480,6 +484,10 @@ $currency_symbol = $currency['symbol'] ?? '$';
                     <div class="form-group col-12">
                         <label>Address</label>
                         <div class="view-field" id="viewAddress"></div>
+                    </div>
+                    <div class="form-group col-6">
+                        <label>P.O. Box No</label>
+                        <div class="view-field" id="viewPoBoxNo"></div>
                     </div>
                     <div class="form-group col-6">
                         <label>Primary Phone</label>

@@ -13,6 +13,7 @@ document.addEventListener('DOMContentLoaded', function () {
         { id: 'outStation', label: 'Out Station', visible: true },
         { id: 'shopkeeperName', label: 'Shopkeeper Name', visible: false },
         { id: 'address', label: 'Address', visible: false },
+        { id: 'poBoxNo', label: 'P.O. Box No', visible: false },
         { id: 'primaryPhone', label: 'Primary Phone', visible: false },
         { id: 'secondaryPhone', label: 'Secondary Phone', visible: false },
         { id: 'email', label: 'Email Address', visible: false },
@@ -51,15 +52,18 @@ document.addEventListener('DOMContentLoaded', function () {
     
     // Get field visibility settings from localStorage
     function getFieldVisibility() {
+        const defaults = getDefaultVisibility();
         const stored = localStorage.getItem(CUSTOMIZE_FIELDS_KEY);
         if (stored) {
             try {
-                return JSON.parse(stored);
+                const parsed = JSON.parse(stored);
+                // Merge: new fields not in cache get their default value
+                return Object.assign({}, defaults, parsed);
             } catch (e) {
-                return getDefaultVisibility();
+                return defaults;
             }
         }
-        return getDefaultVisibility();
+        return defaults;
     }
     
     // Get default visibility for all fields
@@ -1111,6 +1115,7 @@ document.addEventListener('DOMContentLoaded', function () {
             brandId: document.getElementById('brandName').value || null,
             customerName: customerName.value.trim(),
             address: document.getElementById('address').value.trim(),
+            poBoxNo: document.getElementById('poBoxNo').value.trim(),
             primaryPhone: primaryPhone.value.trim(),
             secondaryPhone: secondaryPhone.value.trim(),
             identityCard: identityCard.value.trim(),

@@ -281,6 +281,7 @@ document.addEventListener('DOMContentLoaded', function () {
         document.getElementById('viewBrandName').textContent = customer.brand_name || '-';
         
         document.getElementById('viewAddress').textContent = customer.address || '';
+        document.getElementById('viewPoBoxNo').textContent = customer.po_box_no || '';
         // Load and display company
         fetch('../../../../server/api/customer_supplier/customers/get-companies.php')
             .then(response => response.json())
@@ -847,6 +848,7 @@ document.addEventListener('DOMContentLoaded', function () {
         }, 100);
         
         document.getElementById('editAddress').value = customer.address || '';
+        document.getElementById('editPoBoxNo').value = customer.po_box_no || '';
         document.getElementById('editPrimaryPhone').value = customer.primary_phone || '';
         document.getElementById('editSecondaryPhone').value = customer.secondary_phone || '';
         document.getElementById('editEmail').value = customer.email || '';
@@ -1255,6 +1257,7 @@ document.addEventListener('DOMContentLoaded', function () {
             brandId: $('#editBrandName').val() || null,
             customerName: document.getElementById('editCustomerName').value.trim(),
             address: document.getElementById('editAddress').value.trim(),
+            poBoxNo: document.getElementById('editPoBoxNo').value.trim(),
             primaryPhone: document.getElementById('editPrimaryPhone').value.trim(),
             secondaryPhone: document.getElementById('editSecondaryPhone').value.trim(),
             email: document.getElementById('editEmail').value.trim(),

@@ -118,11 +118,11 @@ try {
     
     // Insert company
     $sql = "INSERT INTO companies (
-        tenant_id, company_code, company_name, legal_name, email, phone, website,
-        address, country, state, city, zipcode, industry_type, registration_number,
+        tenant_id, company_code, company_name, legal_name, email, phone, mobile_no, website,
+        address, country, state, city, zipcode, po_box_no, industry_type, registration_number,
         tax_identification_number, sales_tax_number, logo_url, language_code,
         timezone, currency_code, inventory_valuation_method, is_active
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
     
     $stmt = $pdo->prepare($sql);
     $result = $stmt->execute([
@@ -132,12 +132,14 @@ try {
         $_POST['legal_name'] ?? null,
         $_POST['email'] ?? null,
         $_POST['phone'] ?? null,
+        $_POST['mobile_no'] ?? null,
         $_POST['website'] ?? null,
         $_POST['address'] ?? null,
         $_POST['country'] ?? null,
         $_POST['state'] ?? null,
         $_POST['city'] ?? null,
         $_POST['zipcode'] ?? null,
+        $_POST['po_box_no'] ?? null,
         $_POST['industry_type'] ?? null,
         $_POST['registration_number'] ?? null,
         $_POST['tax_identification_number'] ?? null,

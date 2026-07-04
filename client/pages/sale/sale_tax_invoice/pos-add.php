@@ -731,7 +731,7 @@ if (!$user_id) {
     <div class="modal" id="printCustomizationModal">
         <div class="modal-content" style="max-width: 1200px; width: 95%; max-height: 90vh; overflow-y: auto;">
             <h3 class="modal-title">Print Customization</h3>
-            <p style="margin-bottom: 20px; color: var(--subtext); font-size: 14px;">Drag columns to reorder � Click labels to edit � Changes apply to printed invoices</p>
+            <p style="margin-bottom: 20px; color: var(--subtext); font-size: 14px;">Drag columns to reorder   Click labels to edit   Changes apply to printed invoices</p>
             
             <div style="display: grid; grid-template-columns: 400px 1fr; gap: 24px; margin-bottom: 24px;">
                 <div>

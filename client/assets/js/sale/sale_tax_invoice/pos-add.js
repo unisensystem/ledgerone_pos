@@ -1166,19 +1166,25 @@ function initializePage(permissions) {
         }
     }
 
-    // Fetch customer balance from ledger
+    // Fetch customer balance — project-wise if project selected, else total
     async function fetchCustomerBalance(customerId) {
+        if (!customerId) return;
         try {
-            const response = await fetch(`../../../../server/api/financial_reports/customer_ledger/customer-ledger.php?customer_id=${customerId}&type=summary`);
+            const projectId = document.getElementById('project')?.value || '';
+            const url = projectId
+                ? `../../../../server/api/sale/sale_tax_invoice/get-customer-balance.php?customer_id=${customerId}&project_id=${projectId}`
+                : `../../../../server/api/sale/sale_tax_invoice/get-customer-balance.php?customer_id=${customerId}`;
+
+            const response = await fetch(url);
             const data = await response.json();
 
-            if (data.success && data.data.length > 0) {
-                const balance = parseFloat(data.data[0].closing_balance || 0);
+            if (data.success) {
+                const balance = parseFloat(data.balance || 0);
                 const balanceText = balance >= 0
                     ? `Dr ${balance.toFixed(2)}`
                     : `Cr ${Math.abs(balance).toFixed(2)}`;
                 showBalanceNotification(balanceText);
-                
+
                 // Store balance in hidden field
                 let prevBalanceEl = document.getElementById('previousBalance');
                 if (!prevBalanceEl) {
@@ -1193,6 +1199,12 @@ function initializePage(permissions) {
             console.error('Error fetching customer balance:', error);
         }
     }
+
+    // Re-fetch balance when project changes
+    document.getElementById('project')?.addEventListener('change', function () {
+        const customerId = document.getElementById('customerCode')?.value;
+        if (customerId) fetchCustomerBalance(customerId);
+    });
 
     // Add event listener to customer dropdown to fetch balance
     document.addEventListener('click', function (e) {

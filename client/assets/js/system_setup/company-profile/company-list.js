@@ -247,6 +247,7 @@ async function editCompany(id) {
             document.getElementById('edit_industry_type').value = company.industry_type || '';
             document.getElementById('edit_email').value = company.email || '';
             document.getElementById('edit_phone').value = company.phone || '';
+            document.getElementById('edit_mobile_no').value = company.mobile_no || '';
             document.getElementById('edit_website').value = company.website || '';
             document.getElementById('edit_address').value = company.address || '';
             document.getElementById('edit_country_id').value = company.country_id || '';
@@ -254,6 +255,7 @@ async function editCompany(id) {
             document.getElementById('edit_state').value = company.state || '';
             document.getElementById('edit_city').value = company.city || '';
             document.getElementById('edit_zipcode').value = company.zipcode || '';
+            document.getElementById('edit_po_box_no').value = company.po_box_no || '';
             document.getElementById('edit_registration_number').value = company.registration_number || '';
             document.getElementById('edit_tax_identification_number').value = company.tax_identification_number || '';
             document.getElementById('edit_sales_tax_number').value = company.sales_tax_number || '';
@@ -327,6 +329,7 @@ document.getElementById('editForm').addEventListener('submit', async function (e
     formData.append('industry_type', document.getElementById('edit_industry_type').value);
     formData.append('email', document.getElementById('edit_email').value);
     formData.append('phone', document.getElementById('edit_phone').value);
+    formData.append('mobile_no', document.getElementById('edit_mobile_no').value);
     formData.append('website', document.getElementById('edit_website').value);
     formData.append('address', document.getElementById('edit_address').value);
     formData.append('country_id', document.getElementById('edit_country_id').value);
@@ -334,6 +337,7 @@ document.getElementById('editForm').addEventListener('submit', async function (e
     formData.append('state', document.getElementById('edit_state').value);
     formData.append('city', document.getElementById('edit_city').value);
     formData.append('zipcode', document.getElementById('edit_zipcode').value);
+    formData.append('po_box_no', document.getElementById('edit_po_box_no').value);
     formData.append('registration_number', document.getElementById('edit_registration_number').value);
     formData.append('tax_identification_number', document.getElementById('edit_tax_identification_number').value);
     formData.append('sales_tax_number', document.getElementById('edit_sales_tax_number').value);
