@@ -67,8 +67,8 @@ try {
     
     // Insert new items
     $stmt = $pdo->prepare(
-        "INSERT INTO stock_transfer_items (tenant_id, transfer_id, product_id, qty, rate, stock_value, engine_no, chassis_no) 
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+        "INSERT INTO stock_transfer_items (tenant_id, transfer_id, product_id, qty, rate, stock_value) 
+         VALUES (?, ?, ?, ?, ?, ?)"
     );
     
     $ledgerStmt = $pdo->prepare(
@@ -85,9 +85,7 @@ try {
             $item['product_id'],
             $item['quantity'],
             $item['rate'],
-            $item['stock_value'],
-            $item['engine_no'] ?? null,
-            $item['chassis_no'] ?? null
+            $item['stock_value']
         ]);
         
         $productStmt->execute([$item['product_id']]);

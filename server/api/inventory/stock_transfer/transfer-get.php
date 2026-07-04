@@ -31,17 +31,8 @@ if (!$transfer_id) {
 }
 
 try {
-    // Get transfer header with branch and company names
-    $query = "SELECT 
-                st.*,
-                c.company_name,
-                fb.branch_name as from_branch,
-                tb.branch_name as to_branch
-              FROM stock_transfer st
-              LEFT JOIN companies c ON st.company_id = c.id
-              LEFT JOIN branches fb ON st.from_location_id = fb.id
-              LEFT JOIN branches tb ON st.to_location_id = tb.id
-              WHERE st.tenant_id = ? AND st.id = ?";
+    // Get transfer header
+    $query = "SELECT * FROM stock_transfer WHERE tenant_id = ? AND id = ?";
     $stmt = $pdo->prepare($query);
     $stmt->execute([$tenant_id, $transfer_id]);
     $transfer = $stmt->fetch();
@@ -52,8 +43,8 @@ try {
         exit;
     }
     
-    // Get transfer items with product details
-    $query = "SELECT sti.*, p.default_unit_id, p.name as product_name
+    // Get transfer items with product default unit
+    $query = "SELECT sti.*, p.default_unit_id 
               FROM stock_transfer_items sti
               LEFT JOIN products p ON sti.product_id = p.id
               WHERE sti.tenant_id = ? AND sti.transfer_id = ?";

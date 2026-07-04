@@ -38,12 +38,11 @@ try {
         throw new Exception('Gatepass not found');
     }
     
-    // Fetch items with engine_no and chassis_no
+    // Fetch items
     $stmt = $pdo->prepare("
-        SELECT ogi.product_id, ogi.unit_id, ogi.quantity, ogi.engine_no, ogi.chassis_no, p.name as product_name
-        FROM outward_gatepass_items ogi
-        LEFT JOIN products p ON ogi.product_id = p.id
-        WHERE ogi.gatepass_id = ? AND ogi.tenant_id = ?
+        SELECT product_id, unit_id, quantity 
+        FROM outward_gatepass_items 
+        WHERE gatepass_id = ? AND tenant_id = ?
     ");
     $stmt->execute([$id, $tenant_id]);
     $items = $stmt->fetchAll();

@@ -572,10 +572,6 @@
         const saved = localStorage.getItem('printColumnCustomization');
         const columnConfig = saved ? JSON.parse(saved) : defaultColumns;
 
-        // Engine No / Chassis No settings
-        const enableEngineNo = localStorage.getItem('enableEngineNo') === 'true';
-        const enableChassisNo = localStorage.getItem('enableChassisNo') === 'true';
-
         // Apply invoice settings to hide/show columns
         const enableCarton = localStorage.getItem('enableCarton') === 'true';
         const enableDozen = localStorage.getItem('enableDozen') === 'true';
@@ -646,24 +642,6 @@
                 th.width = '20%';
                 th.textContent = 'Product';
                 th.dataset.colId = 'product';
-                headerRow.appendChild(th);
-            }
-
-            // Engine No column
-            if (enableEngineNo) {
-                const th = document.createElement('th');
-                th.width = '8%';
-                th.textContent = 'Engine No';
-                th.dataset.colId = 'engine_no';
-                headerRow.appendChild(th);
-            }
-
-            // Chassis No column
-            if (enableChassisNo) {
-                const th = document.createElement('th');
-                th.width = '8%';
-                th.textContent = 'Chassis No';
-                th.dataset.colId = 'chassis_no';
                 headerRow.appendChild(th);
             }
 
@@ -745,10 +723,6 @@
                 th.textContent = 'Totals';
                 totalsRow.appendChild(th);
             }
-
-            // Engine No / Chassis No empty cells in totals
-            if (enableEngineNo) { const th = document.createElement('th'); totalsRow.appendChild(th); }
-            if (enableChassisNo) { const th = document.createElement('th'); totalsRow.appendChild(th); }
 
             // Unit columns - empty cells
             for (let i = 0; i < maxUnitColumns; i++) {
@@ -1063,7 +1037,7 @@
             // Add unit columns to header
             addUnitColumnsToHeader(maxUnitColumns);
             
-            // Build totals row with unit columns (pass engine/chassis flags)
+            // Build totals row with unit columns
             buildTotalsRow(maxUnitColumns);
 
             // Render items
@@ -1096,18 +1070,6 @@
                                 ')</span>';
                         }
                     }
-                }
-
-                // Engine No column
-                if (enableEngineNo) {
-                    const td = row.insertCell();
-                    td.textContent = item.engine_no || '-';
-                }
-
-                // Chassis No column
-                if (enableChassisNo) {
-                    const td = row.insertCell();
-                    td.textContent = item.chassis_no || '-';
                 }
 
                 // Unit columns - show unit name and quantity
@@ -1184,10 +1146,6 @@
                         const td = row.insertCell();
                         td.innerHTML = `<span style="${textColor}">${indent}${item.product_name}</span>`;
                     }
-
-                    // Engine No / Chassis No - empty for child rows
-                    if (enableEngineNo) { const td = row.insertCell(); td.textContent = '-'; }
-                    if (enableChassisNo) { const td = row.insertCell(); td.textContent = '-'; }
 
                     // Unit columns - show unit name and quantity for child
                     for (let i = 0; i < maxUnitColumns; i++) {

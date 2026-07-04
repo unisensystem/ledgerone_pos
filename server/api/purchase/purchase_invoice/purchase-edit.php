@@ -157,8 +157,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
                         'foc_quantity' => $totalFoc,
                         'net_amount' => $totalNet,
                         'size' => $firstItem['size'] ?? '',
-                        'engine_no' => $firstItem['engine_no'] ?? '',
-                        'chassis_no' => $firstItem['chassis_no'] ?? '',
                         'unit_entries' => array_values($uomMap)
                     ];
                 }
@@ -240,11 +238,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
         $item_stmt = $pdo->prepare("
             INSERT INTO purchase_invoice_items (
                 tenant_id, purchase_invoice_id, product_id, uom_id,
-                quantity, engine_no, chassis_no, purchase_price, gross_amount, discount_percent,
+                quantity, purchase_price, gross_amount, discount_percent,
                 discount_amount, trade_offer_percent, trade_offer_amount,
                 tax_percent, tax_amount, foc_quantity, net_amount, size,
                 created_by, updated_by
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ");
         
         foreach ($input['items'] as $item) {
@@ -256,8 +254,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
                     $item['productId'],
                     $unitEntry['uomId'],
                     $unitEntry['quantity'],
-                    $item['engineNo'] ?? null,
-                    $item['chassisNo'] ?? null,
                     $item['purchasePrice'],
                     $isFirstEntry ? $item['grossAmount'] : 0,
                     $item['discountPercent'] ?? 0.00,

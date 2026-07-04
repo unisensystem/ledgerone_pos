@@ -63,10 +63,10 @@ try {
     $stmt = $pdo->prepare("DELETE FROM outward_gatepass_items WHERE gatepass_id = ? AND tenant_id = ?");
     $stmt->execute([$input['id'], $tenant_id]);
     
-    // Insert new items with engine_no and chassis_no
+    // Insert new items
     $stmt = $pdo->prepare("
-        INSERT INTO outward_gatepass_items (tenant_id, gatepass_id, product_id, unit_id, quantity, engine_no, chassis_no) 
-        VALUES (?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO outward_gatepass_items (tenant_id, gatepass_id, product_id, unit_id, quantity) 
+        VALUES (?, ?, ?, ?, ?)
     ");
     
     foreach ($input['items'] as $item) {
@@ -75,9 +75,7 @@ try {
             $input['id'],
             $item['product_id'],
             $item['unit_id'],
-            $item['quantity'],
-            $item['engine_no'] ?? null,
-            $item['chassis_no'] ?? null
+            $item['quantity']
         ]);
     }
     

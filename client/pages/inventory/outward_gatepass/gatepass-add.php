@@ -130,10 +130,8 @@ if (!$user_id) {
                             <tr>
                                 <th width="50">S#</th>
                                 <th>Product</th>
-                                <th width="110">Engine No</th>
-                                <th width="110">Chassis No</th>
-                                <th width="100">Unit</th>
-                                <th width="100">Quantity</th>
+                                <th width="150">Unit</th>
+                                <th width="120">Quantity</th>
                                 <th width="100">Actions</th>
                             </tr>
                         </thead>

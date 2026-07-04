@@ -178,8 +178,6 @@ function loadGatepassData(id) {
                     }
                     
                     row.querySelector('.quantity-input').value = item.quantity;
-                    row.querySelector('.engine-no-input').value = item.engine_no || '';
-                    row.querySelector('.chassis-no-input').value = item.chassis_no || '';
                 });
                 
                 document.getElementById('submit-form').innerHTML = '<i class="fas fa-save"></i> Update Gatepass';
@@ -280,20 +278,6 @@ function addItemRow(rowNumber) {
                             </div>
                         </div>
                     </div>
-                </td>
-                <td>
-                    <input 
-                        type="text" 
-                        class="table-input engine-no-input" 
-                        placeholder="Engine No"
-                    >
-                </td>
-                <td>
-                    <input 
-                        type="text" 
-                        class="table-input chassis-no-input" 
-                        placeholder="Chassis No"
-                    >
                 </td>
                 <td>
                     <select class="table-select unit-select" required>
@@ -505,9 +489,7 @@ function submitForm() {
         formData.items.push({
             product_id: row.querySelector('.product-select').dataset.selectedValue,
             unit_id: selectedOption.dataset.unitId,
-            quantity: row.querySelector('.quantity-input').value,
-            engine_no: row.querySelector('.engine-no-input').value || null,
-            chassis_no: row.querySelector('.chassis-no-input').value || null
+            quantity: row.querySelector('.quantity-input').value
         });
     });
 

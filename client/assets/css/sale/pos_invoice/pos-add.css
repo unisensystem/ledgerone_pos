@@ -151,7 +151,6 @@ select:read-only {
 table {
   width: 100%;
   border-collapse: collapse;
-  white-space: nowrap;
 }
 
 th {
@@ -167,8 +166,6 @@ th {
 td {
   padding: 4px 2px;
   border-bottom: 1px solid var(--border-default);
-  white-space: nowrap;
-  vertical-align: middle;
 }
 
 tbody tr:hover {
@@ -676,15 +673,6 @@ td:has(+ td):not(:has(.unit-input)) {
   font-size: 14px;
   font-weight: 300;
   opacity: 0.5;
-}
-
-/* Engine No and Chassis No cells - always normal */
-td:has(.engine-no-input),
-td:has(.chassis-no-input) {
-  opacity: 1 !important;
-  cursor: default !important;
-  position: static !important;
-  background: none !important;
 }
 
 /* Disabled unit cells (product doesn't have this unit) */

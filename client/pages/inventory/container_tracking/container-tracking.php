@@ -148,11 +148,7 @@ $sym = $cur['symbol'] ?? 'Rs.';
         </div>
         <div class="tbl-wrap">
           <table id="tbl-inbound">
-<<<<<<< Updated upstream
             <thead><tr><th>Gatepass #</th><th>Date</th><th>Supplier</th><th>Branch</th><th>Items</th><th>Quantity</th><th>Status</th></tr></thead>
-=======
-            <thead><tr><th>Gatepass #</th><th>Date</th><th>Supplier</th><th>Branch</th><th>Items</th><th>Quantity</th><th>Engine No</th><th>Chassis No</th><th>Status</th></tr></thead>
->>>>>>> Stashed changes
             <tbody></tbody>
           </table>
         </div>
@@ -168,11 +164,7 @@ $sym = $cur['symbol'] ?? 'Rs.';
         </div>
         <div class="tbl-wrap">
           <table id="tbl-outbound">
-<<<<<<< Updated upstream
             <thead><tr><th>Gatepass #</th><th>Date</th><th>Supplier</th><th>Branch</th><th>Items</th><th>Quantity</th><th>Status</th></tr></thead>
-=======
-            <thead><tr><th>Gatepass #</th><th>Date</th><th>Supplier</th><th>Branch</th><th>Items</th><th>Quantity</th><th>Engine No</th><th>Chassis No</th><th>Status</th></tr></thead>
->>>>>>> Stashed changes
             <tbody></tbody>
           </table>
         </div>
@@ -188,11 +180,7 @@ $sym = $cur['symbol'] ?? 'Rs.';
         </div>
         <div class="tbl-wrap">
           <table id="tbl-transfers">
-<<<<<<< Updated upstream
             <thead><tr><th>Transfer #</th><th>Date</th><th>From Location</th><th>To Location</th><th>Items</th><th>Total Items</th><th>Amount</th></tr></thead>
-=======
-            <thead><tr><th>Transfer #</th><th>Date</th><th>From Location</th><th>To Location</th><th>Items</th><th>Total Items</th><th>Engine No</th><th>Chassis No</th><th>Amount</th></tr></thead>
->>>>>>> Stashed changes
             <tbody></tbody>
           </table>
         </div>
@@ -208,11 +196,7 @@ $sym = $cur['symbol'] ?? 'Rs.';
         </div>
         <div class="tbl-wrap">
           <table id="tbl-sales">
-<<<<<<< Updated upstream
             <thead><tr><th>Bill #</th><th>Date</th><th>Customer</th><th>Items</th><th>Quantity</th><th>Net Amount</th><th>Status</th></tr></thead>
-=======
-            <thead><tr><th>Bill #</th><th>Date</th><th>Customer</th><th>Items</th><th>Quantity</th><th>Engine No</th><th>Chassis No</th><th>Net Amount</th><th>Status</th></tr></thead>
->>>>>>> Stashed changes
             <tbody></tbody>
           </table>
         </div>
@@ -228,11 +212,7 @@ $sym = $cur['symbol'] ?? 'Rs.';
         </div>
         <div class="tbl-wrap">
           <table id="tbl-purchases">
-<<<<<<< Updated upstream
             <thead><tr><th>Bill #</th><th>Date</th><th>Supplier</th><th>Items</th><th>Quantity</th><th>Net Amount</th><th>Status</th></tr></thead>
-=======
-            <thead><tr><th>Bill #</th><th>Date</th><th>Supplier</th><th>Items</th><th>Quantity</th><th>Engine No</th><th>Chassis No</th><th>Net Amount</th><th>Status</th></tr></thead>
->>>>>>> Stashed changes
             <tbody></tbody>
           </table>
         </div>
