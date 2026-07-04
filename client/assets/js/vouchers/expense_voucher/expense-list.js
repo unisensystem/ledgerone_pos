@@ -239,7 +239,7 @@ function renderTable() {
     if (filteredData.length === 0) {
         tableBody.innerHTML = `
                     <tr>
-                        <td colspan="9">
+                        <td colspan="8">
                             <div class="empty-state">
                                 <div class="empty-icon">
                                     <i class="fas fa-file-invoice-dollar"></i>
@@ -278,7 +278,8 @@ function renderTable() {
                     <td>${formattedDate}</td>
                     <td>${expense.description}</td>
                     <td>${expense.project_name || '-'}</td>
-                    <td>${expense.total_items} items</td>
+                    <td>${expense.expense_accounts || '-'}</td>
+                    <td>${expense.cost_centers || '-'}</td>
                     <td class="amount">${formattedAmount}</td>
                     <td>
                         <div class="action-buttons">
@@ -425,7 +426,8 @@ function filterData() {
         if (searchTerm && !(
             expense.voucher_no.toLowerCase().includes(searchTerm) ||
             expense.description.toLowerCase().includes(searchTerm) ||
-            (expense.expense_accounts && expense.expense_accounts.toLowerCase().includes(searchTerm))
+            (expense.expense_accounts && expense.expense_accounts.toLowerCase().includes(searchTerm)) ||
+            (expense.cost_centers && expense.cost_centers.toLowerCase().includes(searchTerm))
         )) {
             return false;
         }
@@ -458,68 +460,23 @@ function filterData() {
             return false;
         }
 
+        // Expense Account filter (client-side by name)
+        if (expenseAccountId && !(expense.expense_account_ids && expense.expense_account_ids.split(',').map(s => s.trim()).includes(String(expenseAccountId)))) {
+            return false;
+        }
+
+        // Cost Center filter (client-side by id)
+        if (costCenterId && !(expense.cost_center_ids && expense.cost_center_ids.split(',').map(s => s.trim()).includes(String(costCenterId)))) {
+            return false;
+        }
+
         return true;
     });
 
-    // Apply server-side filters if expense account or cost center is selected
-    if (expenseAccountId || costCenterId) {
-        applyServerFilters(expenseAccountId, costCenterId);
-    } else {
-        currentPage = 1;
-        updateStats();
-        renderCharts();
-        renderTable();
-    }
-}
-
-// Apply server-side filters
-async function applyServerFilters(expenseAccountId, costCenterId) {
-    try {
-        let url = '../../../../server/api/vouchers/expense_voucher/get-filtered-expenses.php?';
-        if (expenseAccountId) url += `expense_account_id=${expenseAccountId}&`;
-        if (costCenterId) url += `cost_center_id=${costCenterId}`;
-        
-        const response = await fetch(url);
-        const data = await response.json();
-        
-        if (data.success) {
-            expenseData = data.data;
-            filteredData = [...expenseData];
-            
-            const searchTerm = globalSearch.value.toLowerCase();
-            const fromDate = document.getElementById('fromDate').value;
-            const toDate = document.getElementById('toDate').value;
-            const minAmount = parseFloat(document.getElementById('minAmount').value) || 0;
-            const maxAmount = parseFloat(document.getElementById('maxAmount').value) || Infinity;
-            
-            filteredData = filteredData.filter(expense => {
-                if (searchTerm && !(
-                    expense.voucher_no.toLowerCase().includes(searchTerm) ||
-                    expense.description.toLowerCase().includes(searchTerm)
-                )) return false;
-                
-                const expenseDate = new Date(expense.date);
-                if (fromDate && expenseDate < new Date(fromDate)) return false;
-                if (toDate) {
-                    const to = new Date(toDate);
-                    to.setHours(23, 59, 59, 999);
-                    if (expenseDate > to) return false;
-                }
-                
-                const amount = parseFloat(expense.total_amount);
-                if (amount < minAmount || amount > maxAmount) return false;
-                
-                return true;
-            });
-            
-            currentPage = 1;
-            updateStats();
-            renderCharts();
-            renderTable();
-        }
-    } catch (error) {
-        console.error('Error applying filters:', error);
-    }
+    currentPage = 1;
+    updateStats();
+    renderCharts();
+    renderTable();
 }
 
 // View voucher details

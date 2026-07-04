@@ -32,7 +32,9 @@ try {
             p.project_name,
             GROUP_CONCAT(a.name ORDER BY evl.id SEPARATOR ',') AS expense_accounts,
             GROUP_CONCAT(cc.name ORDER BY evl.id SEPARATOR ',') AS cost_centers,
-            GROUP_CONCAT(evl.amount ORDER BY evl.id SEPARATOR ',') AS expense_amounts
+            GROUP_CONCAT(evl.amount ORDER BY evl.id SEPARATOR ',') AS expense_amounts,
+            GROUP_CONCAT(evl.account_id ORDER BY evl.id SEPARATOR ',') AS expense_account_ids,
+            GROUP_CONCAT(IFNULL(evl.cost_center_id, '') ORDER BY evl.id SEPARATOR ',') AS cost_center_ids
         FROM expense_voucher ev
         LEFT JOIN projects p ON ev.project_id = p.id
         LEFT JOIN expense_voucher_line evl ON evl.voucher_id = ev.id

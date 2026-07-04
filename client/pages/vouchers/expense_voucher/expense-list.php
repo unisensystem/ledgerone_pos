@@ -202,6 +202,7 @@ $currency_symbol = $currency['symbol'];
                             <th>Description</th>
                             <th>Project</th>
                             <th>Expense Account</th>
+                            <th>Cost Center</th>
                             <th>Amount</th>
                             <th>Actions</th>
                         </tr>

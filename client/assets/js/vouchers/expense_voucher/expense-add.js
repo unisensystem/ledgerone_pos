@@ -263,9 +263,13 @@ function addExpenseEntry() {
     
     expenseInput.addEventListener('input', async function() {
         const accountId = this.dataset.id;
+        costCenterInput.value = '';
+        delete costCenterInput.dataset.id;
         if (accountId) {
             const costCenters = await fetchCostCenters(accountId);
             initSearchableDropdown(costCenterOptionsId, costCenters, costCenterInput);
+        } else {
+            initSearchableDropdown(costCenterOptionsId, [], costCenterInput);
         }
     });
     
