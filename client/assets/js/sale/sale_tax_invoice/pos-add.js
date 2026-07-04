@@ -2816,10 +2816,9 @@ function initializePage(permissions) {
 
     // Update remaining balance
     function updateRemainingBalance() {
-        const netAmount = parseFloat(document.getElementById('netAmount').textContent) || 0;
+        const netReceivable = parseFloat(document.getElementById('netReceivable').textContent) || 0;
         const amountPaid = parseFloat(document.getElementById('amountPaid').value) || 0;
-        const remainingBalance = netAmount - amountPaid;
-        document.getElementById('remainingBalance').value = remainingBalance.toFixed(2);
+        document.getElementById('remainingBalance').value = (netReceivable - amountPaid).toFixed(2);
     }
 
     // Load invoice-level tax regimes and display columns dynamically
