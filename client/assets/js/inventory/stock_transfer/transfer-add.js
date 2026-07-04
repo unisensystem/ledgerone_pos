@@ -186,6 +186,8 @@ document.addEventListener('DOMContentLoaded', function () {
                         row.querySelector('.product-code').dataset.productId = product.id;
                     }
                     
+                    row.querySelector('.engine-no').value = item.engine_no || '';
+                    row.querySelector('.chassis-no').value = item.chassis_no || '';
                     row.querySelector('.unit').value = item.default_unit_id || '';
                     row.querySelector('.quantity').value = item.qty;
                     row.querySelector('.rate').value = item.rate;
@@ -282,6 +284,22 @@ document.addEventListener('DOMContentLoaded', function () {
                         <!-- Product options will be populated by JS -->
                     </div>
                 </div>
+            </td>
+            <td>
+                <input 
+                    type="text" 
+                    class="table-input engine-no" 
+                    placeholder="Engine No"
+                    data-row="${rowId}"
+                >
+            </td>
+            <td>
+                <input 
+                    type="text" 
+                    class="table-input chassis-no" 
+                    placeholder="Chassis No"
+                    data-row="${rowId}"
+                >
             </td>
             <td>
                 <select class="table-select unit" data-row="${rowId}">
@@ -503,6 +521,8 @@ document.addEventListener('DOMContentLoaded', function () {
             const quantity = row.querySelector('.quantity').value;
             const rate = row.querySelector('.rate').value;
             const stockValue = row.querySelector('.stock-value').value;
+            const engineNo = row.querySelector('.engine-no').value;
+            const chassisNo = row.querySelector('.chassis-no').value;
 
             if (productId) {
                 items.push({
@@ -510,7 +530,9 @@ document.addEventListener('DOMContentLoaded', function () {
                     unit_id: unitId,
                     quantity: quantity,
                     rate: rate,
-                    stock_value: stockValue
+                    stock_value: stockValue,
+                    engine_no: engineNo,
+                    chassis_no: chassisNo
                 });
             }
         });

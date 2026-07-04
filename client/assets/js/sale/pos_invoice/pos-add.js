@@ -155,6 +155,8 @@ function initializePage(permissions) {
 
     // Add real-time listeners to invoice settings checkboxes
     const invoiceSettingCheckboxes = [
+        'enableEngineNo',
+        'enableChassisNo',
         'enableTradeOfferAmount',
         'enableFOC',
         'enableCashDiscountPercent',
@@ -1508,6 +1510,10 @@ function initializePage(permissions) {
                     if (focInput) focInput.value = item.foc_quantity || 0;
                     const netInput = lastRow.querySelector('.net-cell input');
                     if (netInput) netInput.value = item.net_amount;
+                    const engineNoInput = lastRow.querySelector('[data-col="engine-no"]');
+                    if (engineNoInput) engineNoInput.value = item.engine_no || '';
+                    const chassisNoInput = lastRow.querySelector('[data-col="chassis-no"]');
+                    if (chassisNoInput) chassisNoInput.value = item.chassis_no || '';
                     
                     // Set scheme and trigger scheme change
                     const schemeSelect = lastRow.querySelector('.scheme-select');
@@ -1919,662 +1925,12 @@ function initializePage(permissions) {
         }
     }
 
-    // Add a new row to the items table
-    function addRow() {
-        const rowCount = itemsTable.rows.length;
-        const row = itemsTable.insertRow();
-
-        // Serial number
-        const cell0 = row.insertCell(0);
-        cell0.textContent = rowCount + 1;
-
-        // Code (searchable dropdown)
-        const cell1 = row.insertCell(1);
-        const codeContainer = document.createElement('div');
-        codeContainer.className = 'searchable-dropdown';
-        const codeOptionsHtml = productsData.map(product => {
-            const codes = [];
-            if (product.qr_code) codes.push(product.qr_code);
-            if (product.barcode) codes.push(product.barcode);
-            const codeDisplay = (localStorage.getItem('productDisplayMode') || 'code_and_name') === 'code_and_name' && codes.length > 0 ? ` (${codes.join(' - ')})` : '';
-            const photoHtml = product.photo ? `<img src="../../../assets/uploads/products/${product.photo}" alt="${product.name}" style="width: 30px; height: 30px; object-fit: cover; margin-right: 8px; border-radius: 4px;">` : '';
-            const productDisplayText = getProductDisplayText(product);
-            return `<div class="dropdown-option" data-value="${product.id}" data-mrp="${product.mrp}" data-tp="${product.trade_price}" data-unit="${product.default_unit_id}" data-display-text="${productDisplayText}" style="display: flex; align-items: center;">${photoHtml}${productDisplayText}${codeDisplay}</div>`;
-        }).join('');
-        codeContainer.innerHTML = `
-            <input type="text" class="search-input table-input" placeholder="Search product...">
-            <input type="hidden" class="item-code" required>
-        `;
-
-        // Create dropdown options and append to body
-        const dropdownOptions = document.createElement('div');
-        dropdownOptions.className = 'dropdown-options';
-        dropdownOptions.innerHTML = codeOptionsHtml;
-        dropdownOptions.style.position = 'absolute';
-        dropdownOptions.style.display = 'none';
-        dropdownOptions.style.zIndex = '9999';
-        document.body.appendChild(dropdownOptions);
-
-        // Store reference to dropdown
-        codeContainer.querySelector('.search-input').dropdownOptions = dropdownOptions;
-        cell1.appendChild(codeContainer);
-        initTableDropdown(codeContainer);
-
-        // Unit (dropdown)
-        const cell2 = row.insertCell(2);
-        const unitSelect = document.createElement('select');
-        unitSelect.className = 'table-input';
-        const uomOptionsHtml = uomData.map(uom =>
-            `<option value="${uom.id}">${uom.uom_name}</option>`
-        ).join('');
-        unitSelect.innerHTML = `<option value="">Select Unit</option>${uomOptionsHtml}`;
-        unitSelect.required = true;
-        unitSelect.tabIndex = -1;
-
-        // Add UOM change event for price conversion
-        unitSelect.addEventListener('change', function () {
-            handleUOMChange(row, this);
-        });
-
-        cell2.appendChild(unitSelect);
-
-        // Qty (input)
-        const cell3 = row.insertCell(3);
-        const qtyInput = document.createElement('input');
-        qtyInput.type = 'number';
-        qtyInput.className = 'table-input';
-        qtyInput.min = '0';
-        qtyInput.step = '0.01';
-        qtyInput.required = true;
-        qtyInput.value = '0';
-        qtyInput.addEventListener('input', function () {
-            const enableFOC = localStorage.getItem('enableFOC') === 'true';
-            if (enableFOC && row.dataset.rateListQty && row.dataset.rateListFoc) {
-                const qty = parseFloat(this.value) || 0;
-                const rateQty = parseFloat(row.dataset.rateListQty);
-                const rateFoc = parseFloat(row.dataset.rateListFoc);
-                if (rateQty > 0) {
-                    const focQty = Math.floor(qty / rateQty) * rateFoc;
-                    row.cells[15].querySelector('input').value = focQty;
-                }
-            }
-            validateParentQty(row);
-        });
-        cell3.appendChild(qtyInput);
-
-        // Pcs (input)
-        const cell4 = row.insertCell(4);
-        const pcsInput = document.createElement('input');
-        pcsInput.type = 'number';
-        pcsInput.className = 'table-input';
-        pcsInput.min = '0';
-        pcsInput.step = '0.01';
-        pcsInput.value = '0';
-        pcsInput.addEventListener('input', function () {
-            const cartonConv = parseInt(row.dataset.cartonConversion) || 0;
-            const pcs = parseFloat(this.value) || 0;
-            const ctn = parseFloat(row.cells[5].querySelector('input').value) || 0;
-            const dz = parseFloat(row.cells[6].querySelector('input').value) || 0;
-            const totalQty = pcs + (ctn * cartonConv) + (dz * 12);
-            qtyInput.value = totalQty.toFixed(2);
-            qtyInput.dispatchEvent(new Event('input'));
-        });
-        cell4.appendChild(pcsInput);
-
-        // Carton (input)
-        const cell5 = row.insertCell(5);
-        const ctnInput = document.createElement('input');
-        ctnInput.type = 'number';
-        ctnInput.className = 'table-input';
-        ctnInput.min = '0';
-        ctnInput.step = '1';
-        ctnInput.value = '0';
-        ctnInput.addEventListener('input', function () {
-            const cartonConv = parseInt(row.dataset.cartonConversion) || 0;
-            const pcs = parseFloat(row.cells[4].querySelector('input').value) || 0;
-            const ctn = parseFloat(this.value) || 0;
-            const dz = parseFloat(row.cells[6].querySelector('input').value) || 0;
-            const totalQty = pcs + (ctn * cartonConv) + (dz * 12);
-            qtyInput.value = totalQty.toFixed(2);
-            qtyInput.dispatchEvent(new Event('input'));
-        });
-        cell5.appendChild(ctnInput);
-
-        // Dozen (input)
-        const cell6 = row.insertCell(6);
-        const dzInput = document.createElement('input');
-        dzInput.type = 'number';
-        dzInput.className = 'table-input';
-        dzInput.min = '0';
-        dzInput.step = '1';
-        dzInput.value = '0';
-        dzInput.addEventListener('input', function () {
-            const cartonConv = parseInt(row.dataset.cartonConversion) || 0;
-            const pcs = parseFloat(row.cells[4].querySelector('input').value) || 0;
-            const ctn = parseFloat(row.cells[5].querySelector('input').value) || 0;
-            const dz = parseFloat(this.value) || 0;
-            const totalQty = pcs + (ctn * cartonConv) + (dz * 12);
-            qtyInput.value = totalQty.toFixed(2);
-            qtyInput.dispatchEvent(new Event('input'));
-        });
-        cell6.appendChild(dzInput);
-
-        // Sale Price (input)
-        const cell7 = row.insertCell(7);
-        const priceInput = document.createElement('input');
-        priceInput.type = 'number';
-        priceInput.className = 'table-input';
-        priceInput.min = '0';
-        priceInput.step = '0.01';
-        priceInput.required = true;
-        cell7.appendChild(priceInput);
-
-        // Gross Amount (readonly)
-        const cell8 = row.insertCell(8);
-        const grossAmount = document.createElement('input');
-        grossAmount.type = 'text';
-        grossAmount.className = 'table-input';
-        grossAmount.readOnly = true;
-        grossAmount.value = '0.00';
-        grossAmount.tabIndex = -1;
-        cell8.appendChild(grossAmount);
-
-        // Discount % (input)
-        const cell9 = row.insertCell(9);
-        const discountPercent = document.createElement('input');
-        discountPercent.type = 'number';
-        discountPercent.className = 'table-input';
-        discountPercent.min = '0';
-        discountPercent.max = '100';
-        discountPercent.step = '0.01';
-        discountPercent.value = '0';
-        cell9.appendChild(discountPercent);
-
-        // Discount Amount (input)
-        const cell10 = row.insertCell(10);
-        const discountAmount = document.createElement('input');
-        discountAmount.type = 'number';
-        discountAmount.className = 'table-input';
-        discountAmount.min = '0';
-        discountAmount.step = '0.01';
-        discountAmount.value = '0.00';
-        cell10.appendChild(discountAmount);
-
-        // Trade Offer Discount % (input)
-        const cell11 = row.insertCell(11);
-        const tradeOfferDiscount = document.createElement('input');
-        tradeOfferDiscount.type = 'number';
-        tradeOfferDiscount.className = 'table-input';
-        tradeOfferDiscount.min = '0';
-        tradeOfferDiscount.max = '100';
-        tradeOfferDiscount.step = '0.01';
-        tradeOfferDiscount.value = '0';
-        tradeOfferDiscount.addEventListener('input', function() {
-            if (!this.value || this.value == '0') {
-                tradeOfferAmount.value = '0.00';
-            }
-        });
-        cell11.appendChild(tradeOfferDiscount);
-
-        // Trade Offer Amount (input)
-        const cell12 = row.insertCell(12);
-        const tradeOfferAmount = document.createElement('input');
-        tradeOfferAmount.type = 'number';
-        tradeOfferAmount.className = 'table-input';
-        tradeOfferAmount.min = '0';
-        tradeOfferAmount.step = '0.01';
-        tradeOfferAmount.value = '0.00';
-        cell12.appendChild(tradeOfferAmount);
-
-        // Tax % (input)
-        const cell13 = row.insertCell(13);
-        const taxPercent = document.createElement('input');
-        taxPercent.type = 'number';
-        taxPercent.className = 'table-input';
-        taxPercent.min = '0';
-        taxPercent.max = '100';
-        taxPercent.step = '0.01';
-        taxPercent.value = '0';
-        taxPercent.className = 'table-input tax-percent-cell';
-        cell13.appendChild(taxPercent);
-
-        // Tax Amount (input)
-        const cell14 = row.insertCell(14);
-        const taxAmount = document.createElement('input');
-        taxAmount.type = 'number';
-        taxAmount.className = 'table-input';
-        taxAmount.min = '0';
-        taxAmount.step = '0.01';
-        taxAmount.value = '0.00';
-        taxAmount.className = 'table-input tax-amount-cell';
-        cell14.appendChild(taxAmount);
-
-        // FOC Qty (input)
-        const cell15 = row.insertCell(15);
-        const focQty = document.createElement('input');
-        focQty.type = 'number';
-        focQty.className = 'table-input';
-        focQty.min = '0';
-        focQty.step = '0.01';
-        focQty.value = '0';
-        cell15.appendChild(focQty);
-
-        // Apply settings to new row
-        const enableCarton = localStorage.getItem('enableCarton') === 'true';
-        const enableDozen = localStorage.getItem('enableDozen') === 'true';
-        const enableCashDiscountPercent = localStorage.getItem('enableCashDiscountPercent') === 'true';
-        const enableCashDiscountAmount = localStorage.getItem('enableCashDiscountAmount') === 'true';
-        const enableTradeOfferDiscount = localStorage.getItem('enableTradeOfferDiscount') === 'true';
-        const enableTradeOfferAmount = localStorage.getItem('enableTradeOfferAmount') === 'true';
-        const enableFOC = localStorage.getItem('enableFOC') === 'true';
-        const enableTaxation = false;
-
-        cell5.style.display = enableCarton ? '' : 'none';
-        cell6.style.display = enableDozen ? '' : 'none';
-        cell9.style.display = enableCashDiscountPercent ? '' : 'none';
-        cell10.style.display = enableCashDiscountAmount ? '' : 'none';
-        cell11.style.display = enableTradeOfferDiscount ? '' : 'none';
-        cell12.style.display = enableTradeOfferAmount ? '' : 'none';
-        cell13.style.display = enableTaxation ? '' : 'none';
-        cell14.style.display = enableTaxation ? '' : 'none';
-        cell15.style.display = enableFOC ? '' : 'none';
-
-        // Net Amount (readonly)
-        const cell16 = row.insertCell(16);
-        const netAmount = document.createElement('input');
-        netAmount.type = 'text';
-        netAmount.className = 'table-input';
-        netAmount.readOnly = true;
-        netAmount.value = '0.00';
-        netAmount.tabIndex = 0;
-
-        // Add tab navigation logic for Net Amount
-        netAmount.addEventListener('keydown', function (e) {
-            if (e.key === 'Tab' && !e.shiftKey) {
-                const codeInput = row.cells[1].querySelector('.item-code');
-                if (codeInput.value) {
-                    e.preventDefault();
-                    const currentRowIndex = row.rowIndex - 1;
-                    const nextRowIndex = currentRowIndex + 1;
-
-                    if (nextRowIndex < itemsTable.rows.length) {
-                        const nextRow = itemsTable.rows[nextRowIndex];
-                        nextRow.cells[1].querySelector('.search-input').focus();
-                    } else {
-                        addRowDynamic();
-                        setTimeout(() => {
-                            const newRow = itemsTable.rows[itemsTable.rows.length - 1];
-                            newRow.cells[1].querySelector('.search-input').focus();
-                        }, 10);
-                    }
-                } else {
-                    e.preventDefault();
-                    if (itemsTable.rows.length > 1) {
-                        const searchInput = row.cells[1].querySelector('.search-input');
-                        if (searchInput.dropdownOptions) {
-                            searchInput.dropdownOptions.remove();
-                        }
-                        row.remove();
-                        updateSerialNumbers();
-                        updateInvoiceSummary();
-                    }
-                    document.getElementById('totalDiscountPercent').focus();
-                }
-            }
-        });
-
-        cell16.appendChild(netAmount);
-
-        // Actions (delete button)
-        const cell17 = row.insertCell(17);
-        const actionsDiv = document.createElement('div');
-        actionsDiv.style.display = 'flex';
-        actionsDiv.style.gap = '4px';
-
-        const addVariantsBtn = document.createElement('button');
-        addVariantsBtn.type = 'button';
-        addVariantsBtn.className = 'btn btn-secondary btn-sm';
-        addVariantsBtn.innerHTML = '<i class="fas fa-boxes"></i>';
-        addVariantsBtn.title = 'Add Variants';
-        addVariantsBtn.tabIndex = -1;
-        addVariantsBtn.style.display = 'none';
-
-        const deleteBtn = document.createElement('button');
-        deleteBtn.type = 'button';
-        deleteBtn.className = 'btn btn-danger btn-sm';
-        deleteBtn.innerHTML = '<i class="fas fa-trash"></i>';
-        deleteBtn.title = 'Delete row';
-        deleteBtn.tabIndex = -1;
-
-        actionsDiv.appendChild(addVariantsBtn);
-        actionsDiv.appendChild(deleteBtn);
-        cell17.appendChild(actionsDiv);
-
-        // Add event listeners for calculations
-        qtyInput.addEventListener('input', calculateRow);
-        priceInput.addEventListener('input', calculateRow);
-        discountPercent.addEventListener('input', calculateRow);
-        discountAmount.addEventListener('input', calculateRowFromAmount);
-        tradeOfferDiscount.addEventListener('input', calculateRow);
-        tradeOfferAmount.addEventListener('input', calculateRowFromTradeOfferAmount);
-        taxPercent.addEventListener('input', calculateRow);
-        taxAmount.addEventListener('input', calculateRowFromTaxAmount);
-
-        // Enter key navigation for faster workflow
-        qtyInput.addEventListener('keydown', function (e) {
-            if (e.key === 'Enter') {
-                e.preventDefault();
-                priceInput.focus();
-            }
-        });
-
-        priceInput.addEventListener('keydown', function (e) {
-            if (e.key === 'Enter') {
-                e.preventDefault();
-                // Skip to discount if enabled, otherwise go to next row
-                const enableCashDiscountPercent = localStorage.getItem('enableCashDiscountPercent') === 'true';
-                if (enableCashDiscountPercent) {
-                    discountPercent.focus();
-                } else {
-                    netAmount.focus();
-                }
-            }
-        });
-
-        discountPercent.addEventListener('keydown', function (e) {
-            if (e.key === 'Enter') {
-                e.preventDefault();
-                netAmount.focus();
-            }
-        });
-
-        // Add event listener for delete button
-        deleteBtn.addEventListener('click', function () {
-            if (itemsTable.rows.length > 1) {
-                // Check if this is a parent row with children
-                const rowIndex = row.rowIndex - 1;
-                const childRows = [];
-                for (let i = rowIndex + 1; i < itemsTable.rows.length; i++) {
-                    if (itemsTable.rows[i].dataset.parentRowIndex == rowIndex) {
-                        childRows.push(itemsTable.rows[i]);
-                    } else {
-                        break;
-                    }
-                }
-
-                // Delete child rows first
-                childRows.forEach(childRow => childRow.remove());
-
-                // Delete parent row
-                row.remove();
-                updateSerialNumbers();
-                updateInvoiceSummary();
-            } else {
-                alert('Cannot delete the only row. Add another row first.');
-            }
-        });
-
-        // Add event listener for variants button
-        addVariantsBtn.addEventListener('click', function () {
-            openVariantsModal(row);
-        });
-
-        function calculateRow() {
-            // Delegate to global calculateRowAmounts from pos-add-uom.js
-            if (typeof calculateRowAmounts === 'function') {
-                // Calculate total quantity from dynamic unit inputs
-                const unitInputs = row.querySelectorAll('.unit-input');
-                let totalQty = 0;
-                unitInputs.forEach(input => {
-                    const qty = parseFloat(input.value) || 0;
-                    const cf = parseFloat(input.dataset.conversionFactor) || 1;
-                    totalQty += qty * cf;
-                });
-                const price = parseFloat(priceInput.value) || 0;
-                calculateRowAmounts(row, totalQty, price);
-                return;
-            }
-            
-            // Fallback: old static calculation (should not be used with dynamic UOM)
-            const qty = parseFloat(qtyInput.value) || 0;
-            const price = parseFloat(priceInput.value) || 0;
-            const discountPct = parseFloat(discountPercent.value) || 0;
-            const tradeOfferPct = parseFloat(tradeOfferDiscount.value) || 0;
-            const gstPct = parseFloat(gstPercent.value) || 0;
-
-            const gross = qty * price;
-            grossAmount.value = gross.toFixed(2);
-
-            // Calculate discount amount
-            const discountAmt = gross * (discountPct / 100);
-            discountAmount.value = discountAmt.toFixed(2);
-
-            // Calculate trade offer amount from percentage + per unit amount * qty
-            const afterDiscount = gross - discountAmt;
-            const tradeOfferPerUnit = parseFloat(tradeOfferAmount.value) || 0;
-            const tradeOfferAmt = (afterDiscount * (tradeOfferPct / 100)) + (tradeOfferPerUnit * qty);
-            tradeOfferAmount.value = tradeOfferAmt.toFixed(2);
-
-            // Calculate GST amount based on sales_tax_type and customer tax registration
-            const afterTradeOffer = afterDiscount - tradeOfferAmt;
-            let gstAmt = 0;
-
-            const customerId = document.getElementById('customerCode').value;
-            const customer = customersData.find(c => c.id == customerId);
-            const isTaxRegistered = customer && customer.is_sales_tax_registered == 1;
-
-            if (isTaxRegistered) {
-                const salesTaxType = row.dataset.salesTaxType || 'TP';
-
-                if (salesTaxType === 'MRP') {
-                    // MRP Tax (Tax Inclusive): MRP   (Tax% / (100 + Tax%))   Qty
-                    const mrp = parseFloat(row.dataset.productMrp) || 0;
-                    if (mrp > 0 && gstPct > 0) {
-                        gstAmt = mrp * (gstPct / (100 + gstPct)) * qty;
-                    }
-                } else if (salesTaxType === 'EXP') {
-                    // No tax
-                    gstAmt = 0;
-                } else {
-                    // Trade Price (TP) or default: standard calculation
-                    gstAmt = afterTradeOffer * (gstPct / 100);
-                }
-            }
-
-            gstAmount.value = gstAmt.toFixed(2);
-
-            // Calculate net amount
-            const net = afterTradeOffer + gstAmt;
-            netAmount.value = net.toFixed(2);
-
-            // Update invoice summary
-            updateInvoiceSummary();
-        }
-
-        function calculateRowFromAmount() {
-            // Delegate to global calculateRowAmounts from pos-add-uom.js
-            if (typeof calculateRowAmounts === 'function') {
-                // Calculate total quantity from dynamic unit inputs
-                const unitInputs = row.querySelectorAll('.unit-input');
-                let totalQty = 0;
-                unitInputs.forEach(input => {
-                    const qty = parseFloat(input.value) || 0;
-                    const cf = parseFloat(input.dataset.conversionFactor) || 1;
-                    totalQty += qty * cf;
-                });
-                const price = parseFloat(priceInput.value) || 0;
-                calculateRowAmounts(row, totalQty, price);
-                return;
-            }
-            
-            // Fallback
-            const qty = parseFloat(qtyInput.value) || 0;
-            const price = parseFloat(priceInput.value) || 0;
-            const discountAmt = parseFloat(discountAmount.value) || 0;
-
-            const gross = qty * price;
-            grossAmount.value = gross.toFixed(2);
-
-            // Calculate discount percentage from amount
-            const discountPct = gross > 0 ? (discountAmt / gross) * 100 : 0;
-            discountPercent.value = discountPct.toFixed(2);
-
-            // Calculate trade offer from percentage
-            const tradeOfferPct = parseFloat(tradeOfferDiscount.value) || 0;
-            const afterDiscount = gross - discountAmt;
-            const tradeOfferAmt = afterDiscount * (tradeOfferPct / 100);
-            tradeOfferAmount.value = tradeOfferAmt.toFixed(2);
-
-            // Calculate GST based on sales_tax_type and customer tax registration
-            const gstPct = parseFloat(gstPercent.value) || 0;
-            const afterTradeOffer = afterDiscount - tradeOfferAmt;
-            let gstAmt = 0;
-
-            const customerId = document.getElementById('customerCode').value;
-            const customer = customersData.find(c => c.id == customerId);
-            const isTaxRegistered = customer && customer.is_sales_tax_registered == 1;
-
-            if (isTaxRegistered) {
-                const salesTaxType = row.dataset.salesTaxType || 'TP';
-
-                if (salesTaxType === 'MRP') {
-                    const mrp = parseFloat(row.dataset.productMrp) || 0;
-                    if (mrp > 0 && gstPct > 0) {
-                        gstAmt = mrp * (gstPct / (100 + gstPct)) * qty;
-                    }
-                } else if (salesTaxType === 'EXP') {
-                    gstAmt = 0;
-                } else {
-                    gstAmt = afterTradeOffer * (gstPct / 100);
-                }
-            }
-
-            gstAmount.value = gstAmt.toFixed(2);
-
-            // Calculate net amount
-            const net = afterTradeOffer + gstAmt;
-            netAmount.value = net.toFixed(2);
-
-            // Update invoice summary
-            updateInvoiceSummary();
-        }
-
-        function calculateRowFromTradeOfferAmount() {
-            // Delegate to global calculateRowAmounts from pos-add-uom.js
-            if (typeof calculateRowAmounts === 'function') {
-                // Calculate total quantity from dynamic unit inputs
-                const unitInputs = row.querySelectorAll('.unit-input');
-                let totalQty = 0;
-                unitInputs.forEach(input => {
-                    const qty = parseFloat(input.value) || 0;
-                    const cf = parseFloat(input.dataset.conversionFactor) || 1;
-                    totalQty += qty * cf;
-                });
-                const price = parseFloat(priceInput.value) || 0;
-                calculateRowAmounts(row, totalQty, price);
-                return;
-            }
-            
-            // Fallback
-            const qty = parseFloat(qtyInput.value) || 0;
-            const price = parseFloat(priceInput.value) || 0;
-            const discountPct = parseFloat(discountPercent.value) || 0;
-            const tradeOfferAmt = parseFloat(tradeOfferAmount.value) || 0;
-
-            const gross = qty * price;
-            grossAmount.value = gross.toFixed(2);
-
-            // Calculate discount amount
-            const discountAmt = gross * (discountPct / 100);
-            discountAmount.value = discountAmt.toFixed(2);
-
-            // Calculate trade offer percentage from amount
-            const afterDiscount = gross - discountAmt;
-            const tradeOfferPct = afterDiscount > 0 ? (tradeOfferAmt / afterDiscount) * 100 : 0;
-            tradeOfferDiscount.value = tradeOfferPct.toFixed(2);
-
-            // Calculate GST based on sales_tax_type and customer tax registration
-            const gstPct = parseFloat(gstPercent.value) || 0;
-            const afterTradeOffer = afterDiscount - tradeOfferAmt;
-            let gstAmt = 0;
-
-            const customerId = document.getElementById('customerCode').value;
-            const customer = customersData.find(c => c.id == customerId);
-            const isTaxRegistered = customer && customer.is_sales_tax_registered == 1;
-
-            if (isTaxRegistered) {
-                const salesTaxType = row.dataset.salesTaxType || 'TP';
-
-                if (salesTaxType === 'MRP') {
-                    const mrp = parseFloat(row.dataset.productMrp) || 0;
-                    if (mrp > 0 && gstPct > 0) {
-                        gstAmt = mrp * (gstPct / (100 + gstPct)) * qty;
-                    }
-                } else if (salesTaxType === 'EXP') {
-                    gstAmt = 0;
-                } else {
-                    gstAmt = afterTradeOffer * (gstPct / 100);
-                }
-            }
-
-            gstAmount.value = gstAmt.toFixed(2);
-
-            // Calculate net amount
-            const net = afterTradeOffer + gstAmt;
-            netAmount.value = net.toFixed(2);
-
-            // Update invoice summary
-            updateInvoiceSummary();
-        }
-
-        function calculateRowFromTaxAmount() {
-            // Delegate to global calculateRowAmounts from pos-add-uom.js
-            if (typeof calculateRowAmounts === 'function') {
-                // Calculate total quantity from dynamic unit inputs
-                const unitInputs = row.querySelectorAll('.unit-input');
-                let totalQty = 0;
-                unitInputs.forEach(input => {
-                    const qty = parseFloat(input.value) || 0;
-                    const cf = parseFloat(input.dataset.conversionFactor) || 1;
-                    totalQty += qty * cf;
-                });
-                const price = parseFloat(priceInput.value) || 0;
-                calculateRowAmounts(row, totalQty, price);
-                return;
-            }
-            
-            // Fallback
-            const qty = parseFloat(qtyInput.value) || 0;
-            const price = parseFloat(priceInput.value) || 0;
-            const discountPct = parseFloat(discountPercent.value) || 0;
-            const tradeOfferPct = parseFloat(tradeOfferDiscount.value) || 0;
-            const taxAmt = parseFloat(taxAmount.value) || 0;
-
-            const gross = qty * price;
-            grossAmount.value = gross.toFixed(2);
-
-            // Calculate discount amount
-            const discountAmt = gross * (discountPct / 100);
-            discountAmount.value = discountAmt.toFixed(2);
-
-            // Calculate trade offer amount
-            const afterDiscount = gross - discountAmt;
-            const tradeOfferAmt = afterDiscount * (tradeOfferPct / 100);
-            tradeOfferAmount.value = tradeOfferAmt.toFixed(2);
-
-            // Calculate Tax percentage from amount
-            const afterTradeOffer = afterDiscount - tradeOfferAmt;
-            const taxPct = afterTradeOffer > 0 ? (taxAmt / afterTradeOffer) * 100 : 0;
-            taxPercent.value = taxPct.toFixed(2);
-
-            // Calculate net amount
-            const net = afterTradeOffer + taxAmt;
-            netAmount.value = net.toFixed(2);
-
-            // Update invoice summary
-            updateInvoiceSummary();
-        }
+    // Initialize dropdown for table rows
+    function initTableDropdown_UNUSED() {
+        // legacy stub — kept to avoid reference errors if called somewhere
     }
+
+    // [REMOVED: old addRow function replaced by addRowDynamic]
 
     // Initialize dropdown for table rows
     function initTableDropdown(container) {
@@ -3833,6 +3189,8 @@ function saveInvoice(status = 'Posted') {
         const focInput = row.querySelector('.foc-cell input');
         const netInput = row.querySelector('.net-cell input');
         const schemeSelect = row.querySelector('.scheme-select');
+        const engineNoInput = row.querySelector('[data-col="engine-no"]');
+        const chassisNoInput = row.querySelector('[data-col="chassis-no"]');
         
         const salePrice = parseFloat(priceInput.value);
         const grossAmount = parseFloat(grossInput.value);
@@ -3844,6 +3202,8 @@ function saveInvoice(status = 'Posted') {
         const focQty = parseFloat(focInput.value) || 0;
         const netAmount = parseFloat(netInput.value);
         const scheme = schemeSelect ? schemeSelect.value : 'sale_on_tp';
+        const engineNo = engineNoInput ? engineNoInput.value.trim() : '';
+        const chassisNo = chassisNoInput ? chassisNoInput.value.trim() : '';
         
         // Create separate item for each unit with quantity
         unitsWithQty.forEach((unit, index) => {
@@ -3866,7 +3226,9 @@ function saveInvoice(status = 'Posted') {
                 parentRowId: null,
                 stockAffects: parseInt(row.dataset.stockAffects) || 1,
                 invoiceAffects: parseInt(row.dataset.invoiceAffects) || 1,
-                scheme: scheme
+                scheme: scheme,
+                engineNo: isFirstUnit ? engineNo : '',
+                chassisNo: isFirstUnit ? chassisNo : ''
             };
             formData.items.push(item);
         });
@@ -3968,6 +3330,8 @@ function loadInvoiceSettings() {
     if (displayRadio) displayRadio.checked = true;
     
     // Load other settings
+    document.getElementById('enableEngineNo').checked = localStorage.getItem('enableEngineNo') === 'true';
+    document.getElementById('enableChassisNo').checked = localStorage.getItem('enableChassisNo') === 'true';
     document.getElementById('enableTradeOfferAmount').checked = localStorage.getItem('enableTradeOfferAmount') === 'true';
     document.getElementById('enableFOC').checked = localStorage.getItem('enableFOC') === 'true';
     document.getElementById('enableCashDiscountPercent').checked = localStorage.getItem('enableCashDiscountPercent') === 'true';
@@ -4001,6 +3365,8 @@ function saveInvoiceSettings() {
     localStorage.setItem('productDisplayMode', selectedDisplayMode);
     
     // Save other settings
+    localStorage.setItem('enableEngineNo', document.getElementById('enableEngineNo').checked);
+    localStorage.setItem('enableChassisNo', document.getElementById('enableChassisNo').checked);
     localStorage.setItem('enableTradeOfferAmount', document.getElementById('enableTradeOfferAmount').checked);
     localStorage.setItem('enableFOC', document.getElementById('enableFOC').checked);
     localStorage.setItem('enableCashDiscountPercent', document.getElementById('enableCashDiscountPercent').checked);
@@ -4069,6 +3435,8 @@ function refreshProductDisplayInDropdowns() {
 
 // Apply invoice settings to show/hide columns
 function applyInvoiceSettings() {
+    const enableEngineNo = localStorage.getItem('enableEngineNo') === 'true';
+    const enableChassisNo = localStorage.getItem('enableChassisNo') === 'true';
     const enableCashDiscountPercent = localStorage.getItem('enableCashDiscountPercent') === 'true';
     const enableCashDiscountAmount = localStorage.getItem('enableCashDiscountAmount') === 'true';
     const enableTradeOfferAmount = localStorage.getItem('enableTradeOfferAmount') === 'true';
@@ -4079,6 +3447,12 @@ function applyInvoiceSettings() {
     const enableExtraDiscount1 = localStorage.getItem('enableExtraDiscount1') === 'true';
     const enableExtraDiscount2 = localStorage.getItem('enableExtraDiscount2') === 'true';
     const enableShippingFees = localStorage.getItem('enableShippingFees') === 'true';
+
+    // Hide/show table columns by data-col attribute (works with Engine No and Chassis No)
+    const headerCellsEngineNo = document.querySelectorAll('th[data-col="engine-no"]');
+    const headerCellsChassisNo = document.querySelectorAll('th[data-col="chassis-no"]');
+    headerCellsEngineNo.forEach(cell => cell.style.display = enableEngineNo ? '' : 'none');
+    headerCellsChassisNo.forEach(cell => cell.style.display = enableChassisNo ? '' : 'none');
 
     // Hide/show table columns by class name (works with dynamic unit columns)
     const itemsTable = document.getElementById('itemsTable');
@@ -4106,6 +3480,16 @@ function applyInvoiceSettings() {
         
         // Apply visibility to body rows AND disable/enable inputs
         if (tbody) {
+            // Engine No and Chassis No cells in body rows
+            tbody.querySelectorAll('td').forEach(td => {
+                const input = td.querySelector('[data-col="engine-no"]');
+                if (input) td.style.display = enableEngineNo ? '' : 'none';
+            });
+            tbody.querySelectorAll('td').forEach(td => {
+                const input = td.querySelector('[data-col="chassis-no"]');
+                if (input) td.style.display = enableChassisNo ? '' : 'none';
+            });
+
             const discPercentCells = tbody.querySelectorAll('.disc-percent-cell');
             const discAmountCells = tbody.querySelectorAll('.disc-amount-cell');
             const toAmountCells = tbody.querySelectorAll('.to-amount-cell');
@@ -5335,10 +4719,30 @@ async function addRowDynamic() {
     schemeCell.className = 'scheme-cell';
     const schemeDropdown = createSchemeCell(row);
     schemeCell.appendChild(schemeDropdown);
-    
-    // Unit cells will be added dynamically (inserted starting at index 3)
+
+    // Engine No
+    const engineCell = row.insertCell(3);
+    engineCell.style.display = localStorage.getItem('enableEngineNo') === 'true' ? '' : 'none';
+    const engineInput = document.createElement('input');
+    engineInput.type = 'text';
+    engineInput.className = 'table-input engine-no-input';
+    engineInput.placeholder = 'Engine No';
+    engineInput.dataset.col = 'engine-no';
+    engineCell.appendChild(engineInput);
+
+    // Chassis No
+    const chassisCell = row.insertCell(4);
+    chassisCell.style.display = localStorage.getItem('enableChassisNo') === 'true' ? '' : 'none';
+    const chassisInput = document.createElement('input');
+    chassisInput.type = 'text';
+    chassisInput.className = 'table-input chassis-no-input';
+    chassisInput.placeholder = 'Chassis No';
+    chassisInput.dataset.col = 'chassis-no';
+    chassisCell.appendChild(chassisInput);
+
+    // Unit cells will be added dynamically (inserted starting at index 5)
     // Price
-    const priceCell = row.insertCell(3);
+    const priceCell = row.insertCell(5);
     priceCell.className = 'price-cell';
     const priceInput = document.createElement('input');
     priceInput.type = 'number';
@@ -5383,7 +4787,7 @@ async function addRowDynamic() {
     priceCell.appendChild(priceInput);
     
     // Gross Amount
-    const grossCell = row.insertCell(4);
+    const grossCell = row.insertCell(-1);
     grossCell.className = 'gross-cell';
     const grossInput = document.createElement('input');
     grossInput.type = 'text';
@@ -5394,7 +4798,7 @@ async function addRowDynamic() {
     grossCell.appendChild(grossInput);
     
     // Discount %
-    const discPercentCell = row.insertCell(5);
+    const discPercentCell = row.insertCell(-1);
     discPercentCell.className = 'disc-percent-cell';
     const discPercentInput = document.createElement('input');
     discPercentInput.type = 'number';
@@ -5417,7 +4821,7 @@ async function addRowDynamic() {
     discPercentCell.appendChild(discPercentInput);
     
     // Discount Amount
-    const discAmountCell = row.insertCell(6);
+    const discAmountCell = row.insertCell(-1);
     discAmountCell.className = 'disc-amount-cell';
     const discAmountInput = document.createElement('input');
     discAmountInput.type = 'number';
@@ -5428,7 +4832,7 @@ async function addRowDynamic() {
     discAmountCell.appendChild(discAmountInput);
     
     // TO Amount
-    const toAmountCell = row.insertCell(7);
+    const toAmountCell = row.insertCell(-1);
     toAmountCell.className = 'to-amount-cell';
     const toAmountInput = document.createElement('input');
     toAmountInput.type = 'number';
@@ -5439,7 +4843,7 @@ async function addRowDynamic() {
     toAmountCell.appendChild(toAmountInput);
     
     // GST %
-    const taxPercentCell = row.insertCell(8);
+    const taxPercentCell = row.insertCell(-1);
     taxPercentCell.className = 'tax-percent-cell';
     const taxPercentInput = document.createElement('input');
     taxPercentInput.type = 'number';
@@ -5462,7 +4866,7 @@ async function addRowDynamic() {
     taxPercentCell.appendChild(taxPercentInput);
     
     // GST Amount
-    const taxAmountCell = row.insertCell(9);
+    const taxAmountCell = row.insertCell(-1);
     taxAmountCell.className = 'tax-amount-cell';
     const taxAmountInput = document.createElement('input');
     taxAmountInput.type = 'number';
@@ -5473,7 +4877,7 @@ async function addRowDynamic() {
     taxAmountCell.appendChild(taxAmountInput);
     
     // FOC Qty
-    const focCell = row.insertCell(10);
+    const focCell = row.insertCell(-1);
     focCell.className = 'foc-cell';
     const focInput = document.createElement('input');
     focInput.type = 'number';
@@ -5484,7 +4888,7 @@ async function addRowDynamic() {
     focCell.appendChild(focInput);
     
     // Net Amount
-    const netCell = row.insertCell(11);
+    const netCell = row.insertCell(-1);
     netCell.className = 'net-cell';
     const netInput = document.createElement('input');
     netInput.type = 'text';
@@ -5495,7 +4899,7 @@ async function addRowDynamic() {
     netCell.appendChild(netInput);
     
     // Actions
-    const actionsCell = row.insertCell(12);
+    const actionsCell = row.insertCell(-1);
     const deleteBtn = document.createElement('button');
     deleteBtn.type = 'button';
     deleteBtn.className = 'btn btn-danger btn-sm';
@@ -5526,20 +4930,25 @@ async function addRowDynamic() {
 
 // Apply invoice settings to a specific row
 function applyInvoiceSettingsToRow(row) {
+    const enableEngineNo = localStorage.getItem('enableEngineNo') === 'true';
+    const enableChassisNo = localStorage.getItem('enableChassisNo') === 'true';
     const enableCashDiscountPercent = localStorage.getItem('enableCashDiscountPercent') === 'true';
     const enableCashDiscountAmount = localStorage.getItem('enableCashDiscountAmount') === 'true';
     const enableTradeOfferAmount = localStorage.getItem('enableTradeOfferAmount') === 'true';
     const enableFOC = localStorage.getItem('enableFOC') === 'true';
     const enableTaxation = false;
 
-    // Apply visibility to cells in this row
+    const engineCell = row.querySelector('[data-col="engine-no"]')?.closest('td');
+    const chassisCell = row.querySelector('[data-col="chassis-no"]')?.closest('td');
     const discPercentCell = row.querySelector('.disc-percent-cell');
     const discAmountCell = row.querySelector('.disc-amount-cell');
     const toAmountCell = row.querySelector('.to-amount-cell');
     const taxPercentCell = row.querySelector('.tax-percent-cell');
     const taxAmountCell = row.querySelector('.tax-amount-cell');
     const focCell = row.querySelector('.foc-cell');
-    
+
+    if (engineCell) engineCell.style.display = enableEngineNo ? '' : 'none';
+    if (chassisCell) chassisCell.style.display = enableChassisNo ? '' : 'none';
     if (discPercentCell) discPercentCell.style.display = enableCashDiscountPercent ? '' : 'none';
     if (discAmountCell) discAmountCell.style.display = enableCashDiscountAmount ? '' : 'none';
     if (toAmountCell) toAmountCell.style.display = enableTradeOfferAmount ? '' : 'none';

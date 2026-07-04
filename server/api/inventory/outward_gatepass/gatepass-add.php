@@ -65,10 +65,10 @@ try {
     
     $gatepass_id = $pdo->lastInsertId();
     
-    // Insert outward_gatepass_items
+    // Insert outward_gatepass_items with engine_no and chassis_no
     $stmt = $pdo->prepare("
-        INSERT INTO outward_gatepass_items (tenant_id, gatepass_id, product_id, unit_id, quantity) 
-        VALUES (?, ?, ?, ?, ?)
+        INSERT INTO outward_gatepass_items (tenant_id, gatepass_id, product_id, unit_id, quantity, engine_no, chassis_no) 
+        VALUES (?, ?, ?, ?, ?, ?, ?)
     ");
     
     foreach ($input['items'] as $item) {
@@ -77,7 +77,9 @@ try {
             $gatepass_id,
             $item['product_id'],
             $item['unit_id'],
-            $item['quantity']
+            $item['quantity'],
+            $item['engine_no'] ?? null,
+            $item['chassis_no'] ?? null
         ]);
     }
     

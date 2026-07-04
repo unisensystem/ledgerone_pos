@@ -68,7 +68,9 @@ $stmt = $pdo->prepare("
     SELECT 
         p.name as product_name,
         u.uom_name as unit_name,
-        igi.quantity
+        igi.quantity,
+        igi.engine_no,
+        igi.chassis_no
     FROM inward_gatepass_items igi
     LEFT JOIN products p ON igi.product_id = p.id
     LEFT JOIN uom u ON igi.unit_id = u.id
@@ -281,6 +283,8 @@ $items = $stmt->fetchAll();
                 <tr>
                     <th class="text-center" width="50">S#</th>
                     <th>Product Name</th>
+                    <th width="120">Engine No</th>
+                    <th width="120">Chassis No</th>
                     <th class="text-center" width="150">Unit</th>
                     <th class="text-right" width="120">Quantity</th>
                 </tr>
@@ -294,12 +298,14 @@ $items = $stmt->fetchAll();
                 <tr>
                     <td class="text-center"><?php echo $index + 1; ?></td>
                     <td><?php echo htmlspecialchars($item['product_name']); ?></td>
+                    <td><?php echo !empty($item['engine_no']) ? htmlspecialchars($item['engine_no']) : '-'; ?></td>
+                    <td><?php echo !empty($item['chassis_no']) ? htmlspecialchars($item['chassis_no']) : '-'; ?></td>
                     <td class="text-center"><?php echo htmlspecialchars($item['unit_name']); ?></td>
                     <td class="text-right"><?php echo number_format($item['quantity'], 2); ?></td>
                 </tr>
                 <?php endforeach; ?>
                 <tr>
-                    <td colspan="3" class="text-right"><strong>Total Quantity:</strong></td>
+                    <td colspan="5" class="text-right"><strong>Total Quantity:</strong></td>
                     <td class="text-right"><strong><?php echo number_format($total_qty, 2); ?></strong></td>
                 </tr>
             </tbody>

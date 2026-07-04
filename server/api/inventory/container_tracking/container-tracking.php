@@ -116,7 +116,12 @@ try {
     $stmt = $pdo->prepare("
         SELECT ig.id, ig.gatepass_code, ig.date, s.supplier_name, COALESCE(b.branch_name, '—') AS branch_name,
                COUNT(DISTINCT igi.product_id) AS item_count, COALESCE(SUM(igi.quantity), 0) AS total_qty,
+<<<<<<< Updated upstream
                'completed' AS status
+=======
+               'completed' AS status, GROUP_CONCAT(DISTINCT igi.engine_no SEPARATOR ', ') AS engine_nos,
+               GROUP_CONCAT(DISTINCT igi.chassis_no SEPARATOR ', ') AS chassis_nos
+>>>>>>> Stashed changes
         FROM inward_gatepass ig
         LEFT JOIN inward_gatepass_items igi ON igi.gatepass_id = ig.id
         LEFT JOIN suppliers s ON s.id = ig.supplier_id
@@ -132,7 +137,12 @@ try {
     $stmt = $pdo->prepare("
         SELECT og.id, og.gatepass_code, og.date, c.customer_name, COALESCE(b.branch_name, '—') AS branch_name,
                COUNT(DISTINCT ogi.product_id) AS item_count, COALESCE(SUM(ogi.quantity), 0) AS total_qty,
+<<<<<<< Updated upstream
                'completed' AS status
+=======
+               'completed' AS status, GROUP_CONCAT(DISTINCT ogi.engine_no SEPARATOR ', ') AS engine_nos,
+               GROUP_CONCAT(DISTINCT ogi.chassis_no SEPARATOR ', ') AS chassis_nos
+>>>>>>> Stashed changes
         FROM outward_gatepass og
         LEFT JOIN outward_gatepass_items ogi ON ogi.gatepass_id = og.id
         LEFT JOIN customers c ON c.id = og.supplier_id
@@ -150,7 +160,12 @@ try {
                COALESCE(b1.branch_name, '—') AS from_location, 
                COALESCE(b2.branch_name, '—') AS to_location,
                COUNT(DISTINCT sti.product_id) AS item_count, COALESCE(SUM(sti.qty), 0) AS total_items,
+<<<<<<< Updated upstream
                SUM(sti.stock_value) AS total_amount
+=======
+               SUM(sti.stock_value) AS total_amount, GROUP_CONCAT(DISTINCT sti.engine_no SEPARATOR ', ') AS engine_nos,
+               GROUP_CONCAT(DISTINCT sti.chassis_no SEPARATOR ', ') AS chassis_nos
+>>>>>>> Stashed changes
         FROM stock_transfer st
         LEFT JOIN stock_transfer_items sti ON sti.transfer_id = st.id
         LEFT JOIN branches b1 ON b1.id = st.from_location_id
@@ -166,7 +181,12 @@ try {
     $stmt = $pdo->prepare("
         SELECT si.id, si.bill_no, si.sale_date, c.customer_name,
                COUNT(DISTINCT sii.product_id) AS item_count, COALESCE(SUM(sii.quantity), 0) AS total_qty,
+<<<<<<< Updated upstream
                si.net_amount, si.status
+=======
+               si.net_amount, si.status, GROUP_CONCAT(DISTINCT sii.engine_no SEPARATOR ', ') AS engine_nos,
+               GROUP_CONCAT(DISTINCT sii.chassis_no SEPARATOR ', ') AS chassis_nos
+>>>>>>> Stashed changes
         FROM sale_invoice si
         LEFT JOIN sale_invoice_items sii ON sii.sale_invoice_id = si.id
         LEFT JOIN customers c ON c.id = si.customer_id
@@ -181,7 +201,12 @@ try {
     $stmt = $pdo->prepare("
         SELECT pi.id, pi.bill_no, pi.purchase_date, s.supplier_name,
                COUNT(DISTINCT pii.product_id) AS item_count, COALESCE(SUM(pii.quantity), 0) AS total_qty,
+<<<<<<< Updated upstream
                pi.net_amount, pi.status
+=======
+               pi.net_amount, pi.status, GROUP_CONCAT(DISTINCT pii.engine_no SEPARATOR ', ') AS engine_nos,
+               GROUP_CONCAT(DISTINCT pii.chassis_no SEPARATOR ', ') AS chassis_nos
+>>>>>>> Stashed changes
         FROM purchase_invoice pi
         LEFT JOIN purchase_invoice_items pii ON pii.purchase_invoice_id = pi.id
         LEFT JOIN suppliers s ON s.id = pi.supplier_id

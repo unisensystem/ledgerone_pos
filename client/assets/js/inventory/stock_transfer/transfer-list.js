@@ -323,87 +323,124 @@ document.addEventListener('DOMContentLoaded', function () {
         const transfer = transfersData.find(t => t.id === id);
         if (!transfer) return;
 
-        const detailsContainer = document.getElementById('transfer-details');
+        // Fetch transfer details with items
+        fetch(`../../../../server/api/inventory/stock_transfer/transfer-get.php?id=${id}`)
+            .then(response => response.json())
+            .then(data => {
+                if (!data.success) {
+                    alert('Error loading transfer details');
+                    return;
+                }
 
-        // Format date
-        const dateObj = new Date(transfer.date);
-        const formattedDate = dateObj.toLocaleDateString('en-US', {
-            weekday: 'long',
-            year: 'numeric',
-            month: 'long',
-            day: 'numeric'
-        });
+                const detailsContainer = document.getElementById('transfer-details');
+                const transferData = data.transfer;
+                const items = data.transfer.items || [];
 
-        // Format currency
-        const formattedValue = window.currencySymbol + parseFloat(transfer.total_amount).toFixed(2);
+                // Format date
+                const dateObj = new Date(transferData.date);
+                const formattedDate = dateObj.toLocaleDateString('en-US', {
+                    weekday: 'long',
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric'
+                });
 
-        // Status text
-        let statusText = '';
-        switch (transfer.status) {
-            case 'completed':
-                statusText = 'Completed';
-                break;
-            case 'pending':
-                statusText = 'Pending';
-                break;
-            case 'processing':
-                statusText = 'Processing';
-                break;
-            case 'cancelled':
-                statusText = 'Cancelled';
-                break;
-        }
+                // Format currency
+                const formattedValue = window.currencySymbol + parseFloat(transferData.total_amount).toFixed(2);
 
-        detailsContainer.innerHTML = `
-            <div style="margin-bottom: 20px;">
-                <div style="font-size: 13px; color: #6B7280; margin-bottom: 4px;">Transfer Code</div>
-                <div style="font-size: 18px; font-weight: 600; color: #0E1A2B;">${transfer.transfer_code}</div>
-            </div>
-            
-            <div style="margin-bottom: 20px;">
-                <div style="font-size: 13px; color: #6B7280; margin-bottom: 4px;">Date</div>
-                <div style="font-weight: 500;">${formattedDate}</div>
-            </div>
-            
-            <div style="margin-bottom: 20px;">
-                <div style="font-size: 13px; color: #6B7280; margin-bottom: 4px;">Company</div>
-                <div style="font-weight: 500;">${transfer.company_name || '-'}</div>
-            </div>
-            
-            <div style="margin-bottom: 20px;">
-                <div style="font-size: 13px; color: #6B7280; margin-bottom: 4px;">From Branch</div>
-                <div style="font-weight: 500; font-size: 15px;">${transfer.from_branch}</div>
-            </div>
-            
-            <div style="margin-bottom: 20px;">
-                <div style="font-size: 13px; color: #6B7280; margin-bottom: 4px;">To Branch</div>
-                <div style="font-weight: 500; font-size: 15px;">${transfer.to_branch}</div>
-            </div>
-            
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px;">
-                <div>
-                    <div style="font-size: 13px; color: #6B7280; margin-bottom: 4px;">Items Count</div>
-                    <div style="font-weight: 500;">${transfer.total_items} items</div>
-                </div>
-                <div>
-                    <div style="font-size: 13px; color: #6B7280; margin-bottom: 4px;">Total Value</div>
-                    <div style="font-weight: 500;">${formattedValue}</div>
-                </div>
-            </div>
-            
-            <div>
-                <div style="font-size: 13px; color: #6B7280; margin-bottom: 4px;">Remarks</div>
-                <div style="background-color: #F7F9FC; padding: 12px; border-radius: 8px; min-height: 60px;">
-                    ${transfer.remarks || '<span style="color: #9AA1AE; font-style: italic;">No remarks provided</span>'}
-                </div>
-            </div>
-        `;
+                // Build items table
+                let itemsTableHTML = `
+                    <table style="width: 100%; border-collapse: collapse; margin-top: 12px;">
+                        <thead>
+                            <tr style="background-color: #F7F9FC; border-bottom: 1px solid #E1E6EE;">
+                                <th style="padding: 10px; text-align: left; font-size: 12px; font-weight: 600; color: #0E1A2B;">Product</th>
+                                <th style="padding: 10px; text-align: left; font-size: 12px; font-weight: 600; color: #0E1A2B;">Engine No</th>
+                                <th style="padding: 10px; text-align: left; font-size: 12px; font-weight: 600; color: #0E1A2B;">Chassis No</th>
+                                <th style="padding: 10px; text-align: center; font-size: 12px; font-weight: 600; color: #0E1A2B;">Qty</th>
+                                <th style="padding: 10px; text-align: right; font-size: 12px; font-weight: 600; color: #0E1A2B;">Rate</th>
+                                <th style="padding: 10px; text-align: right; font-size: 12px; font-weight: 600; color: #0E1A2B;">Value</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                `;
 
-        // Set transfer code for delete modal
-        document.getElementById('delete-transfer-code').textContent = transfer.transfer_code;
+                items.forEach(item => {
+                    const formattedItemValue = window.currencySymbol + parseFloat(item.stock_value).toFixed(2);
+                    const formattedRate = window.currencySymbol + parseFloat(item.rate).toFixed(2);
+                    itemsTableHTML += `
+                        <tr style="border-bottom: 1px solid #E1E6EE;">
+                            <td style="padding: 10px; font-size: 13px;">${item.product_name || item.product_id}</td>
+                            <td style="padding: 10px; font-size: 13px;">${item.engine_no || '-'}</td>
+                            <td style="padding: 10px; font-size: 13px;">${item.chassis_no || '-'}</td>
+                            <td style="padding: 10px; font-size: 13px; text-align: center;">${item.qty}</td>
+                            <td style="padding: 10px; font-size: 13px; text-align: right;">${formattedRate}</td>
+                            <td style="padding: 10px; font-size: 13px; text-align: right;">${formattedItemValue}</td>
+                        </tr>
+                    `;
+                });
 
-        // Show modal
-        document.getElementById('view-modal').style.display = 'flex';
+                itemsTableHTML += `</tbody></table>`;
+
+                detailsContainer.innerHTML = `
+                    <div style="margin-bottom: 20px;">
+                        <div style="font-size: 13px; color: #6B7280; margin-bottom: 4px;">Transfer Code</div>
+                        <div style="font-size: 18px; font-weight: 600; color: #0E1A2B;">${transferData.transfer_code}</div>
+                    </div>
+                    
+                    <div style="margin-bottom: 20px;">
+                        <div style="font-size: 13px; color: #6B7280; margin-bottom: 4px;">Date</div>
+                        <div style="font-weight: 500;">${formattedDate}</div>
+                    </div>
+                    
+                    <div style="margin-bottom: 20px;">
+                        <div style="font-size: 13px; color: #6B7280; margin-bottom: 4px;">Company</div>
+                        <div style="font-weight: 500;">${transferData.company_name || '-'}</div>
+                    </div>
+                    
+                    <div style="margin-bottom: 20px;">
+                        <div style="font-size: 13px; color: #6B7280; margin-bottom: 4px;">From Branch</div>
+                        <div style="font-weight: 500; font-size: 15px;">${transferData.from_branch}</div>
+                    </div>
+                    
+                    <div style="margin-bottom: 20px;">
+                        <div style="font-size: 13px; color: #6B7280; margin-bottom: 4px;">To Branch</div>
+                        <div style="font-weight: 500; font-size: 15px;">${transferData.to_branch}</div>
+                    </div>
+                    
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px;">
+                        <div>
+                            <div style="font-size: 13px; color: #6B7280; margin-bottom: 4px;">Items Count</div>
+                            <div style="font-weight: 500;">${transferData.total_items} items</div>
+                        </div>
+                        <div>
+                            <div style="font-size: 13px; color: #6B7280; margin-bottom: 4px;">Total Value</div>
+                            <div style="font-weight: 500;">${formattedValue}</div>
+                        </div>
+                    </div>
+                    
+                    <div style="margin-bottom: 20px;">
+                        <div style="font-size: 13px; color: #6B7280; margin-bottom: 12px; font-weight: 600;">Transfer Items</div>
+                        ${itemsTableHTML}
+                    </div>
+                    
+                    <div>
+                        <div style="font-size: 13px; color: #6B7280; margin-bottom: 4px;">Remarks</div>
+                        <div style="background-color: #F7F9FC; padding: 12px; border-radius: 8px; min-height: 60px;">
+                            ${transferData.remarks || '<span style="color: #9AA1AE; font-style: italic;">No remarks provided</span>'}
+                        </div>
+                    </div>
+                `;
+
+                // Set transfer code for delete modal
+                document.getElementById('delete-transfer-code').textContent = transferData.transfer_code;
+
+                // Show modal
+                document.getElementById('view-modal').style.display = 'flex';
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Failed to load transfer details');
+            });
     }
 
     function editTransfer(id) {

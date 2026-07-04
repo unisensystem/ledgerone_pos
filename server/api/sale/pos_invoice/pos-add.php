@@ -146,8 +146,8 @@ try {
             quantity, sale_price, gross_amount, discount_percent,
             discount_amount, trade_offer_percent, trade_offer_amount,
             tax_percent, tax_amount, foc_quantity, net_amount, parent_row_id,
-            piece, carton, dozen, scheme, created_by, updated_by
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            piece, carton, dozen, scheme, engine_no, chassis_no, created_by, updated_by
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ");
 
     $itemRowCounter = 0;
@@ -183,6 +183,8 @@ try {
             $item['carton'] ?? null,
             $item['dozen'] ?? null,
             $item['scheme'] ?? 'sale_on_tp',
+            $item['engineNo'] ?? null,
+            $item['chassisNo'] ?? null,
             $user_id,
             $user_id
         ]);

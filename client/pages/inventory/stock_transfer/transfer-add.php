@@ -142,13 +142,15 @@ $currency_symbol = $currency['symbol'];
                     <table class="items-table">
                         <thead>
                             <tr>
-                                <th width="5%">S#</th>
-                                <th width="25%">Product Code</th>
-                                <th width="15%">Unit</th>
-                                <th width="15%">Quantity</th>
-                                <th width="15%">Rate (<?php echo $currency_symbol; ?>)</th>
-                                <th width="15%">Stock Value</th>
-                                <th width="10%">Actions</th>
+                                <th width="3%">S#</th>
+                                <th width="18%">Product Code</th>
+                                <th width="12%">Engine No</th>
+                                <th width="12%">Chassis No</th>
+                                <th width="10%">Unit</th>
+                                <th width="10%">Quantity</th>
+                                <th width="12%">Rate (<?php echo $currency_symbol; ?>)</th>
+                                <th width="12%">Stock Value</th>
+                                <th width="11%">Actions</th>
                             </tr>
                         </thead>
                         <tbody id="items-table-body">

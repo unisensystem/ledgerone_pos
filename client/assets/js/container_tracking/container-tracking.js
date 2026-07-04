@@ -119,31 +119,51 @@ async function loadDetail(cid) {
 
     fillTable('tbl-inbound', data.inbound_gatepass, r =>
         '<td>' + r.gatepass_code + '</td><td>' + fd(r.date) + '</td><td>' + (r.supplier_name||'—') + '</td><td>' + (r.branch_name||'—') + '</td>' +
+<<<<<<< Updated upstream
         '<td>' + (r.item_count||0) + '</td><td>' + (r.total_qty||0) + '</td><td>' + badge(r.status||'pending') + '</td>'
+=======
+        '<td>' + (r.item_count||0) + '</td><td>' + (r.total_qty||0) + '</td><td><code>' + (r.engine_nos||'—') + '</code></td><td><code>' + (r.chassis_nos||'—') + '</code></td><td>' + badge(r.status||'pending') + '</td>'
+>>>>>>> Stashed changes
     );
     fillFooter('foot-inbound', data.inbound_gatepass, 'total_qty', data.inbound_gatepass.length + ' gatepasses');
 
     fillTable('tbl-outbound', data.outbound_gatepass, r =>
         '<td>' + r.gatepass_code + '</td><td>' + fd(r.date) + '</td><td>' + (r.supplier_name||'—') + '</td><td>' + (r.branch_name||'—') + '</td>' +
+<<<<<<< Updated upstream
         '<td>' + (r.item_count||0) + '</td><td>' + (r.total_qty||0) + '</td><td>' + badge(r.status||'pending') + '</td>'
+=======
+        '<td>' + (r.item_count||0) + '</td><td>' + (r.total_qty||0) + '</td><td><code>' + (r.engine_nos||'—') + '</code></td><td><code>' + (r.chassis_nos||'—') + '</code></td><td>' + badge(r.status||'pending') + '</td>'
+>>>>>>> Stashed changes
     );
     fillFooter('foot-outbound', data.outbound_gatepass, 'total_qty', data.outbound_gatepass.length + ' gatepasses');
 
     fillTable('tbl-transfers', data.stock_transfers, r =>
         '<td>' + r.transfer_code + '</td><td>' + fd(r.date) + '</td><td>' + (r.from_location||'—') + '</td><td>' + (r.to_location||'—') + '</td>' +
+<<<<<<< Updated upstream
         '<td>' + (r.item_count||0) + '</td><td>' + (r.total_items||0) + '</td><td>' + fc(r.total_amount) + '</td>'
+=======
+        '<td>' + (r.item_count||0) + '</td><td>' + (r.total_items||0) + '</td><td><code>' + (r.engine_nos||'—') + '</code></td><td><code>' + (r.chassis_nos||'—') + '</code></td><td>' + fc(r.total_amount) + '</td>'
+>>>>>>> Stashed changes
     );
     fillFooter('foot-transfers', data.stock_transfers, 'total_amount', data.stock_transfers.length + ' transfers');
 
     fillTable('tbl-sales', data.sale_invoices, r =>
         '<td>' + r.bill_no + '</td><td>' + fd(r.sale_date) + '</td><td>' + (r.customer_name||'—') + '</td>' +
+<<<<<<< Updated upstream
         '<td>' + (r.item_count||0) + '</td><td>' + (r.total_qty||0) + '</td><td><strong>' + fc(r.net_amount) + '</strong></td><td>' + badge(r.status) + '</td>'
+=======
+        '<td>' + (r.item_count||0) + '</td><td>' + (r.total_qty||0) + '</td><td><code>' + (r.engine_nos||'—') + '</code></td><td><code>' + (r.chassis_nos||'—') + '</code></td><td><strong>' + fc(r.net_amount) + '</strong></td><td>' + badge(r.status) + '</td>'
+>>>>>>> Stashed changes
     );
     fillFooter('foot-sales', data.sale_invoices, 'net_amount', data.sale_invoices.length + ' invoices');
 
     fillTable('tbl-purchases', data.purchase_invoices, r =>
         '<td>' + r.bill_no + '</td><td>' + fd(r.purchase_date) + '</td><td>' + (r.supplier_name||'—') + '</td>' +
+<<<<<<< Updated upstream
         '<td>' + (r.item_count||0) + '</td><td>' + (r.total_qty||0) + '</td><td><strong>' + fc(r.net_amount) + '</strong></td><td>' + badge(r.status) + '</td>'
+=======
+        '<td>' + (r.item_count||0) + '</td><td>' + (r.total_qty||0) + '</td><td><code>' + (r.engine_nos||'—') + '</code></td><td><code>' + (r.chassis_nos||'—') + '</code></td><td><strong>' + fc(r.net_amount) + '</strong></td><td>' + badge(r.status) + '</td>'
+>>>>>>> Stashed changes
     );
     fillFooter('foot-purchases', data.purchase_invoices, 'net_amount', data.purchase_invoices.length + ' invoices');
 

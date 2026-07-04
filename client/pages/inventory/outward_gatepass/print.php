@@ -63,12 +63,14 @@ if (empty($gatepass['company_name'])) {
     }
 }
 
-// Fetch items
+// Fetch items with engine_no and chassis_no
 $stmt = $pdo->prepare("
     SELECT 
         p.name as product_name,
         u.uom_name as unit_name,
-        igi.quantity
+        igi.quantity,
+        igi.engine_no,
+        igi.chassis_no
     FROM outward_gatepass_items igi
     LEFT JOIN products p ON igi.product_id = p.id
     LEFT JOIN uom u ON igi.unit_id = u.id
@@ -97,7 +99,7 @@ $items = $stmt->fetchAll();
         }
 
         .print-container {
-            max-width: 800px;
+            max-width: 900px;
             margin: 0 auto;
             border: 2px solid #000;
             padding: 30px;
@@ -167,11 +169,11 @@ $items = $stmt->fetchAll();
         .items-table th {
             background-color: #f0f0f0;
             font-weight: bold;
-            font-size: 13px;
+            font-size: 12px;
         }
 
         .items-table td {
-            font-size: 13px;
+            font-size: 12px;
         }
 
         .items-table .text-center {
@@ -279,10 +281,12 @@ $items = $stmt->fetchAll();
         <table class="items-table">
             <thead>
                 <tr>
-                    <th class="text-center" width="50">S#</th>
+                    <th class="text-center" width="35">S#</th>
                     <th>Product Name</th>
-                    <th class="text-center" width="150">Unit</th>
-                    <th class="text-right" width="120">Quantity</th>
+                    <th width="90">Engine No</th>
+                    <th width="90">Chassis No</th>
+                    <th width="80">Unit</th>
+                    <th class="text-right" width="80">Quantity</th>
                 </tr>
             </thead>
             <tbody>
@@ -294,12 +298,14 @@ $items = $stmt->fetchAll();
                 <tr>
                     <td class="text-center"><?php echo $index + 1; ?></td>
                     <td><?php echo htmlspecialchars($item['product_name']); ?></td>
+                    <td><?php echo htmlspecialchars($item['engine_no'] ?? '-'); ?></td>
+                    <td><?php echo htmlspecialchars($item['chassis_no'] ?? '-'); ?></td>
                     <td class="text-center"><?php echo htmlspecialchars($item['unit_name']); ?></td>
                     <td class="text-right"><?php echo number_format($item['quantity'], 2); ?></td>
                 </tr>
                 <?php endforeach; ?>
                 <tr>
-                    <td colspan="3" class="text-right"><strong>Total Quantity:</strong></td>
+                    <td colspan="5" class="text-right"><strong>Total Quantity:</strong></td>
                     <td class="text-right"><strong><?php echo number_format($total_qty, 2); ?></strong></td>
                 </tr>
             </tbody>

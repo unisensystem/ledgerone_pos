@@ -148,15 +148,26 @@ try {
     $stmt = $pdo->prepare("
         INSERT INTO receive_voucher (
             tenant_id, company_id, voucher_number, voucher_date, customer_id, sub_account_id, bill_no, dsr_no, project_id, container_id,
+<<<<<<< Updated upstream
             amount, previous_balance, currency_id, payment_method_id, bank_account_id, cheque_date, cheque_no, description, attachment,
             recovery_officer_id, against_pdc_id, created_by, updated_by
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+=======
+            amount, currency_id, payment_method_id, bank_account_id, cheque_date, cheque_no, description, attachment,
+            recovery_officer_id, created_by, updated_by
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+>>>>>>> Stashed changes
     ");
     
     $stmt->execute([
         $tenant_id, $company_id, $voucher_number, $voucher_date, $customer['id'], $sub_account_id, $bill_no, $dsr_no, $project_id, $container_id,
+<<<<<<< Updated upstream
         $amount, $previous_balance, $currency_id, $payment_method_id, $bank_account_id, $cheque_date, $cheque_no, $description, $attachment,
         $recovery_officer_id, $against_pdc_id, $user_id, $user_id
+=======
+        $amount, $currency_id, $payment_method_id, $bank_account_id, $cheque_date, $cheque_no, $description, $attachment,
+        $recovery_officer_id, $user_id, $user_id
+>>>>>>> Stashed changes
     ]);
     
     $voucher_id = $pdo->lastInsertId();

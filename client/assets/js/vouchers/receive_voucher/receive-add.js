@@ -108,6 +108,7 @@ fetch('../../../../server/api/vouchers/receive_voucher/get-containers.php')
     })
     .catch(error => console.error('Error fetching containers:', error));
 
+<<<<<<< Updated upstream
 // Fetch pending PDCs for selected customer
 function fetchPendingPdcsForCustomer(customerId) {
     const select = document.getElementById('againstPdc');
@@ -153,6 +154,8 @@ document.getElementById('againstPdc').addEventListener('change', function() {
     }
 });
 
+=======
+>>>>>>> Stashed changes
 // Fetch bills for selected customer
 function fetchBillsForCustomer(customerCode) {
     fetch(`../../../../server/api/vouchers/receive_voucher/get-bills.php?customer_code=${customerCode}`)
@@ -672,7 +675,11 @@ function addBulkRow() {
         <td><input type="text" class="bulk-bill" placeholder="Bill no" autocomplete="off"></td>
         <td><input type="text" class="bulk-dsr" placeholder="DSR-B-24-26-20251231-20260112"></td>
         <td><select class="bulk-project"><option value="">Select</option></select></td>
+<<<<<<< Updated upstream
         <td style="display: none;"><select class="bulk-container" style="display: none;"><option value="">Select</option></select></td>
+=======
+        <td><select class="bulk-container"><option value="">Select</option></select></td>
+>>>>>>> Stashed changes
         <td><select class="bulk-currency" required></select></td>
         <td><input type="number" class="bulk-amount" step="0.01" min="0" placeholder="0.00" required></td>
         <td><input type="text" class="bulk-rem-balance" readonly></td>

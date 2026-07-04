@@ -190,7 +190,9 @@
             <thead>
                 <tr>
                     <th width="5%">#</th>
-                    <th width="25%">Product</th>
+                    <th width="20%">Product</th>
+                    <th width="10%">Engine No</th>
+                    <th width="10%">Chassis No</th>
                     <th width="7%" id="printSizeHeader">Size</th>
                     <th width="13%">Quantities</th>
                     <th width="10%" class="text-right">Trade Price</th>
@@ -301,6 +303,8 @@
         applyInvoiceSettings();
         function applyInvoiceSettings() {
             const enableSize = localStorage.getItem('enableSize') === 'true';
+            const enableEngineNo = localStorage.getItem('enableEngineNo') === 'true';
+            const enableChassisNo = localStorage.getItem('enableChassisNo') === 'true';
             const enableInlineCashDiscount = localStorage.getItem('enableInlineCashDiscount') === 'true';
             const enableInlineCashDiscountAmount = localStorage.getItem('enableInlineCashDiscountAmount') === 'true';
             const enableTradeOffer = localStorage.getItem('enableTradeOffer') === 'true';
@@ -311,26 +315,34 @@
             const enableInvoiceCashDiscountAmount = localStorage.getItem('enableInvoiceCashDiscountAmount') === 'true';
             const enableShippingFees = localStorage.getItem('enableShippingFees') === 'true';
             
-            // Hide/show table headers (0=#, 1=Product, 2=Size, 3=Quantities, 4=TradePrice, 5=GrossAmt, 6=Disc%, 7=DiscAmt, 8=TO%, 9=TOAmt, 10=Tax%, 11=TaxAmt, 12=FOC, 13=NetAmt)
+            // Hide/show table headers (0=#, 1=Product, 2=EngineNo, 3=ChassisNo, 4=Size, 5=Quantities, 6=TradePrice, 7=GrossAmt, 8=Disc%, 9=DiscAmt, 10=TO%, 11=TOAmt, 12=Tax%, 13=TaxAmt, 14=FOC, 15=NetAmt)
             const headers = document.querySelectorAll('.items-table thead th');
-            headers[2].style.display = enableSize ? '' : 'none'; // Size
-            headers[6].style.display = enableInlineCashDiscount ? '' : 'none'; // Disc %
-            headers[7].style.display = enableInlineCashDiscountAmount ? '' : 'none'; // Disc Amt
-            headers[8].style.display = enableTradeOffer ? '' : 'none'; // TO %
-            headers[9].style.display = enableTradeOfferAmount ? '' : 'none'; // TO Amt
-            headers[10].style.display = enableTaxation ? '' : 'none'; // GST %
-            headers[11].style.display = enableTaxation ? '' : 'none'; // GST Amt
-            headers[12].style.display = enableFOC ? '' : 'none'; // FOC Qty
+            headers[2].style.display = enableEngineNo ? '' : 'none'; // Engine No
+            headers[3].style.display = enableChassisNo ? '' : 'none'; // Chassis No
+            headers[4].style.display = enableSize ? '' : 'none'; // Size
+            headers[8].style.display = enableInlineCashDiscount ? '' : 'none'; // Disc %
+            headers[9].style.display = enableInlineCashDiscountAmount ? '' : 'none'; // Disc Amt
+            headers[10].style.display = enableTradeOffer ? '' : 'none'; // TO %
+            headers[11].style.display = enableTradeOfferAmount ? '' : 'none'; // TO Amt
+            headers[12].style.display = enableTaxation ? '' : 'none'; // GST %
+            headers[13].style.display = enableTaxation ? '' : 'none'; // GST Amt
+            headers[14].style.display = enableFOC ? '' : 'none'; // FOC Qty
             
-            // Hide/show footer cells
-            const footerCells = document.querySelectorAll('.items-table tfoot th');
-            footerCells[3].style.display = enableInlineCashDiscount ? '' : 'none';
-            footerCells[4].style.display = enableInlineCashDiscountAmount ? '' : 'none';
-            footerCells[5].style.display = enableTradeOffer ? '' : 'none';
-            footerCells[6].style.display = enableTradeOfferAmount ? '' : 'none';
-            footerCells[7].style.display = enableTaxation ? '' : 'none';
-            footerCells[8].style.display = enableTaxation ? '' : 'none';
-            footerCells[9].style.display = enableFOC ? '' : 'none';
+            // Hide/show footer cells by ID
+            const totalUnitPrice = document.getElementById('totalUnitPrice');
+            const totalGrossAmount = document.getElementById('totalGrossAmount');
+            const totalDiscountAmountItems = document.getElementById('totalDiscountAmountItems');
+            const totalTradeOfferAmountItems = document.getElementById('totalTradeOfferAmountItems');
+            const totalGSTAmountItems = document.getElementById('totalGSTAmountItems');
+            const totalFOCQty = document.getElementById('totalFOCQty');
+            const totalNetAmountItems = document.getElementById('totalNetAmountItems');
+            
+            if (totalUnitPrice) totalUnitPrice.parentElement.style.display = enableEngineNo ? '' : 'none';
+            if (totalGrossAmount) totalGrossAmount.parentElement.style.display = enableChassisNo ? '' : 'none';
+            if (totalDiscountAmountItems) totalDiscountAmountItems.parentElement.style.display = enableInlineCashDiscount ? '' : 'none';
+            if (totalTradeOfferAmountItems) totalTradeOfferAmountItems.parentElement.style.display = enableTradeOfferAmount ? '' : 'none';
+            if (totalGSTAmountItems) totalGSTAmountItems.parentElement.style.display = enableTaxation ? '' : 'none';
+            if (totalFOCQty) totalFOCQty.parentElement.style.display = enableFOC ? '' : 'none';
             
             // Hide/show totals section rows
             document.getElementById('discountPercentRow').style.display = enableInvoiceCashDiscount ? '' : 'none';
@@ -443,6 +455,8 @@
                 row.innerHTML = `
                     <td class="text-center">${index + 1}</td>
                     <td>${item.product_name}</td>
+                    <td>${item.engine_no || '-'}</td>
+                    <td>${item.chassis_no || '-'}</td>
                     <td style="display: ${enableSize ? '' : 'none'}">${item.size || '-'}</td>
                     <td>${unitQtyDisplay || '-'}</td>
                     <td class="text-right">${currencySymbol} ${parseFloat(item.purchase_price).toFixed(2)}</td>

@@ -531,6 +531,12 @@ document.addEventListener('DOMContentLoaded', function () {
                     items.forEach((item, idx) => {
                         const row = itemsTable.rows[idx];
 
+                        const engineInput = row.querySelector('.engine-no-cell input');
+                        if (engineInput) engineInput.value = item.engine_no || '';
+
+                        const chassisInput = row.querySelector('.chassis-no-cell input');
+                        if (chassisInput) chassisInput.value = item.chassis_no || '';
+
                         const sizeCellInput = row.querySelector('.size-cell input');
                         if (sizeCellInput) sizeCellInput.value = item.size || '';
 
@@ -1222,8 +1228,26 @@ document.addEventListener('DOMContentLoaded', function () {
         cell1.appendChild(codeContainer);
         initTableDropdownDynamic(codeContainer, row);
 
+        // Engine No
+        const engineCell = row.insertCell(2);
+        engineCell.className = 'engine-no-cell';
+        const engineInput = document.createElement('input');
+        engineInput.type = 'text';
+        engineInput.className = 'table-input';
+        engineInput.placeholder = 'Engine No';
+        engineCell.appendChild(engineInput);
+        
+        // Chassis No
+        const chassisCell = row.insertCell(3);
+        chassisCell.className = 'chassis-no-cell';
+        const chassisInput = document.createElement('input');
+        chassisInput.type = 'text';
+        chassisInput.className = 'table-input';
+        chassisInput.placeholder = 'Chassis No';
+        chassisCell.appendChild(chassisInput);
+
         // Size
-        const sizeCell = row.insertCell(2);
+        const sizeCell = row.insertCell(4);
         sizeCell.className = 'size-cell';
         const sizeInput = document.createElement('input');
         sizeInput.type = 'text';
@@ -1233,7 +1257,7 @@ document.addEventListener('DOMContentLoaded', function () {
         
         // Unit cells will be added dynamically
         // Price
-        const priceCell = row.insertCell(3);
+        const priceCell = row.insertCell(5);
         priceCell.className = 'price-cell';
         const priceInput = document.createElement('input');
         priceInput.type = 'number';
@@ -1254,7 +1278,7 @@ document.addEventListener('DOMContentLoaded', function () {
         priceCell.appendChild(priceInput);
         
         // Gross Amount
-        const grossCell = row.insertCell(4);
+        const grossCell = row.insertCell(6);
         grossCell.className = 'gross-cell';
         const grossInput = document.createElement('input');
         grossInput.type = 'text';
@@ -1265,7 +1289,7 @@ document.addEventListener('DOMContentLoaded', function () {
         grossCell.appendChild(grossInput);
         
         // Discount %
-        const discPercentCell = row.insertCell(5);
+        const discPercentCell = row.insertCell(7);
         discPercentCell.className = 'disc-percent-cell';
         const discPercentInput = document.createElement('input');
         discPercentInput.type = 'number';
@@ -1288,7 +1312,7 @@ document.addEventListener('DOMContentLoaded', function () {
         discPercentCell.appendChild(discPercentInput);
         
         // Discount Amount
-        const discAmountCell = row.insertCell(6);
+        const discAmountCell = row.insertCell(8);
         discAmountCell.className = 'disc-amount-cell';
         const discAmountInput = document.createElement('input');
         discAmountInput.type = 'number';
@@ -1299,7 +1323,7 @@ document.addEventListener('DOMContentLoaded', function () {
         discAmountCell.appendChild(discAmountInput);
         
         // TO %
-        const toPercentCell = row.insertCell(7);
+        const toPercentCell = row.insertCell(9);
         toPercentCell.className = 'to-percent-cell';
         const toPercentInput = document.createElement('input');
         toPercentInput.type = 'number';
@@ -1322,7 +1346,7 @@ document.addEventListener('DOMContentLoaded', function () {
         toPercentCell.appendChild(toPercentInput);
         
         // TO Amount
-        const toAmountCell = row.insertCell(8);
+        const toAmountCell = row.insertCell(10);
         toAmountCell.className = 'to-amount-cell';
         const toAmountInput = document.createElement('input');
         toAmountInput.type = 'number';
@@ -1333,7 +1357,7 @@ document.addEventListener('DOMContentLoaded', function () {
         toAmountCell.appendChild(toAmountInput);
         
         // Tax %
-        const taxPercentCell = row.insertCell(9);
+        const taxPercentCell = row.insertCell(11);
         taxPercentCell.className = 'tax-percent-cell';
         const taxPercentInput = document.createElement('input');
         taxPercentInput.type = 'number';
@@ -1357,7 +1381,7 @@ document.addEventListener('DOMContentLoaded', function () {
         taxPercentCell.appendChild(taxPercentInput);
         
         // Tax Amount
-        const taxAmountCell = row.insertCell(10);
+        const taxAmountCell = row.insertCell(12);
         taxAmountCell.className = 'tax-amount-cell';
         const taxAmountInput = document.createElement('input');
         taxAmountInput.type = 'number';
@@ -1369,7 +1393,7 @@ document.addEventListener('DOMContentLoaded', function () {
         taxAmountCell.appendChild(taxAmountInput);
         
         // FOC Qty
-        const focCell = row.insertCell(11);
+        const focCell = row.insertCell(13);
         focCell.className = 'foc-cell';
         const focInput = document.createElement('input');
         focInput.type = 'number';
@@ -1380,7 +1404,7 @@ document.addEventListener('DOMContentLoaded', function () {
         focCell.appendChild(focInput);
         
         // Net Amount
-        const netCell = row.insertCell(12);
+        const netCell = row.insertCell(14);
         netCell.className = 'net-cell';
         const netInput = document.createElement('input');
         netInput.type = 'text';
@@ -1391,7 +1415,7 @@ document.addEventListener('DOMContentLoaded', function () {
         netCell.appendChild(netInput);
         
         // Actions
-        const actionsCell = row.insertCell(13);
+        const actionsCell = row.insertCell(15);
         const deleteBtn = document.createElement('button');
         deleteBtn.type = 'button';
         deleteBtn.className = 'btn btn-danger btn-sm';
@@ -1417,6 +1441,8 @@ document.addEventListener('DOMContentLoaded', function () {
         // Apply current settings to this new row
         applySettingsToRow(row, {
             enableSize: localStorage.getItem('enableSize') === 'true',
+            enableEngineNo: localStorage.getItem('enableEngineNo') === 'true',
+            enableChassisNo: localStorage.getItem('enableChassisNo') === 'true',
             enableTradeOffer: localStorage.getItem('enableTradeOffer') === 'true',
             enableTradeOfferAmount: localStorage.getItem('enableTradeOfferAmount') === 'true',
             enableFOC: localStorage.getItem('enableFOC') === 'true',
@@ -1964,6 +1990,8 @@ document.addEventListener('DOMContentLoaded', function () {
             if (unitEntries.length > 0) {
                 const item = {
                     productId: row.cells[1].querySelector('.item-code').value,
+                    engineNo: row.querySelector('.engine-no-cell input')?.value || null,
+                    chassisNo: row.querySelector('.chassis-no-cell input')?.value || null,
                     size: row.querySelector('.size-cell input')?.value || '',
                     unitEntries: unitEntries,
                     purchasePrice: parseFloat(row.querySelector('.price-cell input').value),
@@ -2089,6 +2117,8 @@ document.addEventListener('DOMContentLoaded', function () {
     document.getElementById('invoiceSettingsBtn').addEventListener('click', function () {
         // Load settings from localStorage
         document.getElementById('enableSize').checked = localStorage.getItem('enableSize') === 'true';
+        document.getElementById('enableEngineNo').checked = localStorage.getItem('enableEngineNo') === 'true';
+        document.getElementById('enableChassisNo').checked = localStorage.getItem('enableChassisNo') === 'true';
         document.getElementById('enableTradeOffer').checked = localStorage.getItem('enableTradeOffer') === 'true';
         document.getElementById('enableTradeOfferAmount').checked = localStorage.getItem('enableTradeOfferAmount') === 'true';
         document.getElementById('enableFOC').checked = localStorage.getItem('enableFOC') === 'true';
@@ -2108,6 +2138,8 @@ document.addEventListener('DOMContentLoaded', function () {
     document.getElementById('saveSettingsBtn').addEventListener('click', function () {
         // Save settings to localStorage
         localStorage.setItem('enableSize', document.getElementById('enableSize').checked);
+        localStorage.setItem('enableEngineNo', document.getElementById('enableEngineNo').checked);
+        localStorage.setItem('enableChassisNo', document.getElementById('enableChassisNo').checked);
         localStorage.setItem('enableTradeOffer', document.getElementById('enableTradeOffer').checked);
         localStorage.setItem('enableTradeOfferAmount', document.getElementById('enableTradeOfferAmount').checked);
         localStorage.setItem('enableFOC', document.getElementById('enableFOC').checked);
@@ -2142,10 +2174,14 @@ document.addEventListener('DOMContentLoaded', function () {
         const enableShippingFees = localStorage.getItem('enableShippingFees') === 'true';
 
         const enableSize = localStorage.getItem('enableSize') === 'true';
+        const enableEngineNo = localStorage.getItem('enableEngineNo') === 'true';
+        const enableChassisNo = localStorage.getItem('enableChassisNo') === 'true';
 
         // Show/hide thead and tfoot columns via data-col
         const colMap = [
             { col: 'size',          show: enableSize },
+            { col: 'engine-no',     show: enableEngineNo },
+            { col: 'chassis-no',    show: enableChassisNo },
             { col: 'disc-percent',  show: enableInlineCashDiscount },
             { col: 'disc-amount',   show: enableInlineCashDiscountAmount },
             { col: 'to-percent',    show: enableTradeOffer },
@@ -2163,7 +2199,7 @@ document.addEventListener('DOMContentLoaded', function () {
         // Show/hide cells in all existing rows
         const rows = document.getElementById('itemsTable').getElementsByTagName('tbody')[0].rows;
         for (let row of rows) {
-            applySettingsToRow(row, { enableSize, enableTradeOffer, enableTradeOfferAmount, enableFOC, enableTaxation, enableInlineCashDiscount, enableInlineCashDiscountAmount });
+            applySettingsToRow(row, { enableSize, enableEngineNo, enableChassisNo, enableTradeOffer, enableTradeOfferAmount, enableFOC, enableTaxation, enableInlineCashDiscount, enableInlineCashDiscountAmount });
         }
 
         // Hide/show invoice summary fields
@@ -2181,9 +2217,13 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function applySettingsToRow(row, settings) {
-        const { enableSize, enableTradeOffer, enableTradeOfferAmount, enableFOC, enableTaxation, enableInlineCashDiscount, enableInlineCashDiscountAmount } = settings;
+        const { enableSize, enableEngineNo, enableChassisNo, enableTradeOffer, enableTradeOfferAmount, enableFOC, enableTaxation, enableInlineCashDiscount, enableInlineCashDiscountAmount } = settings;
         const sizeCell = row.querySelector('.size-cell');
         if (sizeCell) sizeCell.style.display = enableSize ? '' : 'none';
+        const engineCell = row.querySelector('.engine-no-cell');
+        if (engineCell) engineCell.style.display = enableEngineNo ? '' : 'none';
+        const chassisCell = row.querySelector('.chassis-no-cell');
+        if (chassisCell) chassisCell.style.display = enableChassisNo ? '' : 'none';
         const toPercentCell = row.querySelector('.to-percent-cell');
         const toAmountCell = row.querySelector('.to-amount-cell');
         const focCell = row.querySelector('.foc-cell');
