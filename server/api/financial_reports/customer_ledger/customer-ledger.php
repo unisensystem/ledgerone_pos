@@ -199,7 +199,30 @@ try {
                     $prev_rent += $amount;
                 }
                 
-                $opening_balance = $base_opening + $prev_invoices + $prev_returns_data['refunded'] - $prev_payment_vouchers - $prev_payments - $prev_returns_data['credit'] - $prev_rent;
+                // Transfer voucher soft opening — FROM customer (credit), TO customer (debit)
+                $stmt = $pdo->prepare("SELECT COALESCE(SUM(amount), 0) as total, currency_id FROM transfer_voucher WHERE tenant_id = ? AND from_type = 'customer' AND from_customer_id = ? AND voucher_date < ?{$company_filter} GROUP BY currency_id");
+                $params_prev = [$tenant_id, $customer['id'], $from_date];
+                if ($company_id) $params_prev[] = $company_id;
+                $stmt->execute($params_prev);
+                $prev_tv_from = 0;
+                foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+                    $amt = $row['total'];
+                    if ($row['currency_id'] && $row['currency_id'] != $target_currency_id) $amt = $converter->convert($amt, $row['currency_id'], $target_currency_id);
+                    $prev_tv_from += $amt;
+                }
+
+                $stmt = $pdo->prepare("SELECT COALESCE(SUM(amount), 0) as total, currency_id FROM transfer_voucher WHERE tenant_id = ? AND to_type = 'customer' AND to_customer_id = ? AND voucher_date < ?{$company_filter} GROUP BY currency_id");
+                $params_prev = [$tenant_id, $customer['id'], $from_date];
+                if ($company_id) $params_prev[] = $company_id;
+                $stmt->execute($params_prev);
+                $prev_tv_to = 0;
+                foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+                    $amt = $row['total'];
+                    if ($row['currency_id'] && $row['currency_id'] != $target_currency_id) $amt = $converter->convert($amt, $row['currency_id'], $target_currency_id);
+                    $prev_tv_to += $amt;
+                }
+
+                $opening_balance = $base_opening + $prev_invoices + $prev_returns_data['refunded'] + $prev_tv_to - $prev_payment_vouchers - $prev_payments - $prev_returns_data['credit'] - $prev_rent - $prev_tv_from;
             }
             
             // Get transactions in date range
@@ -326,6 +349,32 @@ try {
                 $total_credit += $amount;
             }
             
+            // Transfer voucher amounts in date range
+            $tv_from_sql = "SELECT amount, currency_id FROM transfer_voucher WHERE tenant_id = ? AND from_type = 'customer' AND from_customer_id = ?{$company_filter}";
+            $tv_from_params = [$tenant_id, $customer['id']];
+            if ($company_id) $tv_from_params[] = $company_id;
+            $tv_to_sql = "SELECT amount, currency_id FROM transfer_voucher WHERE tenant_id = ? AND to_type = 'customer' AND to_customer_id = ?{$company_filter}";
+            $tv_to_params = [$tenant_id, $customer['id']];
+            if ($company_id) $tv_to_params[] = $company_id;
+            if ($from_date && $to_date) {
+                $tv_from_sql .= " AND voucher_date BETWEEN ? AND ?";
+                $tv_from_params[] = $from_date; $tv_from_params[] = $to_date;
+                $tv_to_sql .= " AND voucher_date BETWEEN ? AND ?";
+                $tv_to_params[] = $from_date; $tv_to_params[] = $to_date;
+            }
+            $stmt = $pdo->prepare($tv_from_sql); $stmt->execute($tv_from_params);
+            foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+                $amt = $row['amount'];
+                if ($row['currency_id'] && $row['currency_id'] != $target_currency_id) $amt = $converter->convert($amt, $row['currency_id'], $target_currency_id);
+                $total_credit += $amt;
+            }
+            $stmt = $pdo->prepare($tv_to_sql); $stmt->execute($tv_to_params);
+            foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+                $amt = $row['amount'];
+                if ($row['currency_id'] && $row['currency_id'] != $target_currency_id) $amt = $converter->convert($amt, $row['currency_id'], $target_currency_id);
+                $total_debit += $amt;
+            }
+
             $closing_balance = $opening_balance + $total_debit - $total_credit;
             
             if ($closing_balance != 0 || $total_debit != 0 || $total_credit != 0) {
@@ -664,8 +713,34 @@ try {
         $stmt->execute($params);
         $rent_transactions = $stmt->fetchAll(PDO::FETCH_ASSOC);
         
+        // Get transfer vouchers — FROM this customer (credit), TO this customer (debit)
+        $tv_company_filter = ($company_id ? " AND company_id = ?" : "");
+        $sql = "SELECT voucher_date as date,
+                CONCAT('Transfer Out - ', voucher_number) as description,
+                voucher_number as reference,
+                0 as debit, amount as credit, 'transfer_out' as type, null as sub_account_id, currency_id
+                FROM transfer_voucher
+                WHERE tenant_id = ? AND from_type = 'customer' AND from_customer_id = ?{$tv_company_filter}";
+        $params = [$tenant_id, $customer_id];
+        if ($company_id) $params[] = $company_id;
+        if ($from_date && $to_date) { $sql .= " AND voucher_date BETWEEN ? AND ?"; $params[] = $from_date; $params[] = $to_date; }
+        $stmt = $pdo->prepare($sql); $stmt->execute($params);
+        $tv_out = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        $sql = "SELECT voucher_date as date,
+                CONCAT('Transfer In - ', voucher_number) as description,
+                voucher_number as reference,
+                amount as debit, 0 as credit, 'transfer_in' as type, null as sub_account_id, currency_id
+                FROM transfer_voucher
+                WHERE tenant_id = ? AND to_type = 'customer' AND to_customer_id = ?{$tv_company_filter}";
+        $params = [$tenant_id, $customer_id];
+        if ($company_id) $params[] = $company_id;
+        if ($from_date && $to_date) { $sql .= " AND voucher_date BETWEEN ? AND ?"; $params[] = $from_date; $params[] = $to_date; }
+        $stmt = $pdo->prepare($sql); $stmt->execute($params);
+        $tv_in = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
         // Combine and sort transactions
-        $transactions = array_merge($invoices, $payments, $returns, $pdcs, $rent_cash_transactions);
+        $transactions = array_merge($invoices, $payments, $returns, $pdcs, $rent_cash_transactions, $tv_out, $tv_in);
         
         // Get sub accounts
         $stmt = $pdo->prepare("SELECT id, sub_account_name FROM customer_sub_accounts WHERE tenant_id = ? AND customer_id = ?");

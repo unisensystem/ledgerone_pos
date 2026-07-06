@@ -29,11 +29,12 @@ $searchText = $_GET['searchText'] ?? '';
 $company_id = $_GET['company_id'] ?? null;
 
 try {
-    $company_filter = ($company_id ? " AND (si.company_id = ? OR pi.company_id = ? OR rv.company_id = ? OR pv.company_id = ? OR ev.company_id = ? OR jv.company_id = ?)" : "");
+    $company_filter = ($company_id ? " AND (si.company_id = ? OR pi.company_id = ? OR rv.company_id = ? OR pv.company_id = ? OR ev.company_id = ? OR jv.company_id = ? OR tv.company_id = ?)" : "");
     
     $query = "SELECT 
         al.id,
         al.date,
+        al.account_id,
         a.sub_account_id as account_number,
         a.name as account_name,
         al.description,
@@ -48,10 +49,12 @@ try {
     LEFT JOIN payment_voucher pv ON al.reference_table = 'payment_voucher' AND al.reference_id = pv.id
     LEFT JOIN expense_voucher ev ON al.reference_table = 'expense_voucher' AND al.reference_id = ev.id
     LEFT JOIN journal_voucher jv ON al.reference_table = 'journal_voucher' AND al.reference_id = jv.id
+    LEFT JOIN transfer_voucher tv ON al.reference_table = 'transfer_voucher' AND al.reference_id = tv.id
     WHERE al.tenant_id = ?{$company_filter}";
     
     $params = [$tenant_id];
     if ($company_id) {
+        $params[] = $company_id;
         $params[] = $company_id;
         $params[] = $company_id;
         $params[] = $company_id;
@@ -114,7 +117,8 @@ try {
         $totalDebits += $entry['debit'];
         $totalCredits += $entry['credit'];
         
-        $accountKey = $entry['account_number'];
+        // Use account_id (unique) as key — sub_account_id can collide across different accounts
+        $accountKey = $entry['account_id'];
         if (!isset($accountBalances[$accountKey])) {
             $accountBalances[$accountKey] = 0;
         }
