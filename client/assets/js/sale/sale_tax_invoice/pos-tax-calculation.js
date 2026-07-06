@@ -167,11 +167,6 @@ async function loadTaxRatesForCustomer(customerId) {
         }
     }
 
-    // Load invoice-level tax regimes for this customer
-    if (typeof loadInvoiceLevelTaxRegimes === 'function') {
-        const companyId = document.getElementById('company')?.value;
-        await loadInvoiceLevelTaxRegimes(customerId, companyId);
-    }
 }
 
 /**

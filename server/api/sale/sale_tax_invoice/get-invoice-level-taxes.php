@@ -81,7 +81,8 @@ try {
                 0
             ) as rate_percentage
         FROM tax_regimes tr
-        WHERE tr.application_level = 'invoice'
+        WHERE tr.tenant_id = ?
+            AND tr.application_level = 'invoice'
             AND tr.is_active = 1
             AND (tr.effective_from IS NULL OR tr.effective_from <= NOW())
             AND (tr.effective_to IS NULL OR tr.effective_to >= NOW())
@@ -96,8 +97,8 @@ try {
     
     $stmt = $pdo->prepare($baseQuery);
     
-    // params: party_type, is_filer (filter), party_type, is_filer (ORDER BY priority)
-    $params = [$party_type, $is_filer, $party_type, $is_filer];
+    // params: party_type, is_filer (filter), party_type, is_filer (ORDER BY priority), tenant_id
+    $params = [$party_type, $is_filer, $party_type, $is_filer, $tenant_id];
     if ($company_country_id) {
         $params[] = $company_country_id;
     }

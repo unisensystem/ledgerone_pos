@@ -1214,14 +1214,7 @@ function initializePage(permissions) {
                 console.log('Customer selected:', customerId);
                 fetchCustomerBalance(customerId);
                 loadSubAccounts(customerId);
-                
-                // Load invoice-level tax regimes for the selected customer
-                if (typeof loadInvoiceLevelTaxRegimes === 'function') {
-                    console.log('Calling loadInvoiceLevelTaxRegimes for customer:', customerId);
-                    const companyId = document.getElementById('company')?.value;
-                    loadInvoiceLevelTaxRegimes(customerId, companyId);
-                }
-                
+
                 // Recalculate tax for all products with the new customer
                 if (typeof loadTaxRatesForCustomer === 'function') {
                     loadTaxRatesForCustomer(customerId);
@@ -1708,12 +1701,6 @@ function initializePage(permissions) {
                     // Load sub accounts for selected customer
                     loadSubAccounts(value);
 
-                    // Load invoice-level tax regimes for customer
-                    if (typeof loadInvoiceLevelTaxRegimes === 'function') {
-                        const companyId = document.getElementById('company')?.value;
-                        loadInvoiceLevelTaxRegimes(value, companyId);
-                    }
-
                     // Auto-populate sales officer if associated
                     const salesOfficerId = e.target.getAttribute('data-sales-officer');
                     if (salesOfficerId) {
@@ -1752,7 +1739,7 @@ function initializePage(permissions) {
                     const creditLimit = parseFloat(e.target.getAttribute('data-credit-limit')) || 0;
                     hiddenInput.setAttribute('data-credit-limit', creditLimit);
 
-                    // Load invoice-level tax regimes for customer
+                    // Load invoice-level tax regimes for selected customer
                     if (typeof loadInvoiceLevelTaxRegimes === 'function') {
                         const companyId = document.getElementById('company')?.value;
                         loadInvoiceLevelTaxRegimes(value, companyId);
