@@ -19,9 +19,7 @@ try {
     $stmt->execute([$tenant_id, $cid]);
     $invoices = $stmt->fetch()['total'];
 
-    $stmt = $pdo->prepare("SELECT COALESCE(SUM(debit), 0) as total FROM opening_balance_invoices WHERE tenant_id = ? AND customer_id = ?");
-    $stmt->execute([$tenant_id, $cid]);
-    $invoices += $stmt->fetch()['total'];
+    // opening_balance_invoices already included in opening_debit_amount — do NOT add again
 
     $stmt = $pdo->prepare("SELECT COALESCE(SUM(rv.amount), 0) as total FROM receive_voucher rv WHERE rv.tenant_id = ? AND rv.customer_id = ? AND NOT (rv.payment_method_id = 6 AND EXISTS (SELECT 1 FROM post_dated_cheques pdc WHERE pdc.reference_id = rv.id AND pdc.reference_table = 'receive_voucher' AND pdc.status = 'Pending'))");
     $stmt->execute([$tenant_id, $cid]);

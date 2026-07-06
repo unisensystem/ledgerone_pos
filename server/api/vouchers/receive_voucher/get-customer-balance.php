@@ -37,15 +37,10 @@ try {
     $customer_id = $customer['id'];
     $opening_balance = $customer['opening_debit_amount'] - $customer['opening_credit_amount'];
 
-    // Get total invoices
+    // Get total invoices (sale invoices only, NOT opening_balance_invoices — already in opening_debit_amount)
     $stmt = $pdo->prepare("SELECT COALESCE(SUM(net_amount), 0) as total FROM sale_invoice WHERE tenant_id = ? AND customer_id = ?");
     $stmt->execute([$tenant_id, $customer_id]);
     $total_invoices = $stmt->fetch()['total'];
-
-    // Get opening balance invoices
-    $stmt = $pdo->prepare("SELECT COALESCE(SUM(debit), 0) as total FROM opening_balance_invoices WHERE tenant_id = ? AND customer_id = ?");
-    $stmt->execute([$tenant_id, $customer_id]);
-    $total_invoices += $stmt->fetch()['total'];
     
     // Get total payments (exclude cheques that are still Pending in post_dated_cheques)
     $stmt = $pdo->prepare("
@@ -69,8 +64,17 @@ try {
     $stmt = $pdo->prepare("SELECT COALESCE(SUM(net_amount - amount_refunded), 0) as total FROM sale_return WHERE tenant_id = ? AND customer_id = ? AND status = 'Posted'");
     $stmt->execute([$tenant_id, $customer_id]);
     $total_returns = $stmt->fetch()['total'];
-    
-    $balance = $opening_balance + $total_invoices - $total_payments - $total_returns;
+
+    // Transfer voucher: FROM customer (tv_out) = balance reduces (-), TO customer (tv_in) = balance increases (+)
+    $stmt = $pdo->prepare("SELECT COALESCE(SUM(amount), 0) as total FROM transfer_voucher WHERE tenant_id = ? AND from_customer_id = ?");
+    $stmt->execute([$tenant_id, $customer_id]);
+    $tv_out = $stmt->fetch()['total'];
+
+    $stmt = $pdo->prepare("SELECT COALESCE(SUM(amount), 0) as total FROM transfer_voucher WHERE tenant_id = ? AND to_customer_id = ?");
+    $stmt->execute([$tenant_id, $customer_id]);
+    $tv_in = $stmt->fetch()['total'];
+
+    $balance = $opening_balance + $total_invoices - $total_payments - $total_returns - $tv_out + $tv_in;
     
     echo json_encode(['success' => true, 'balance' => $balance]);
 } catch (Exception $e) {
