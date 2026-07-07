@@ -33,7 +33,7 @@ try {
     $stmt = $pdo->prepare("
         SELECT
             tv.id, tv.voucher_number, tv.voucher_date, tv.amount, tv.description,
-            tv.cheque_no, tv.cheque_date,
+            tv.cheque_no, tv.cheque_date, tv.slip_no, tv.attachment,
             tv.from_type, tv.to_type,
             fc.customer_name  AS from_customer_name,  fc.customer_code  AS from_customer_code,
             fs.supplier_name  AS from_supplier_name,  fs.supplier_code  AS from_supplier_code,
@@ -168,10 +168,41 @@ try {
         <?php if (!empty($v['cheque_date']) && $v['cheque_date'] !== '0000-00-00'): ?>
         <tr><th>Cheque Date</th><td><?php echo date('d-M-Y', strtotime($v['cheque_date'])); ?></td></tr>
         <?php endif; ?>
+        <?php if (!empty($v['slip_no'])): ?>
+        <tr><th>Slip No</th><td><?php echo htmlspecialchars($v['slip_no']); ?></td></tr>
+        <?php endif; ?>
         <?php if (!empty($v['description'])): ?>
         <tr><th>Description</th><td><?php echo htmlspecialchars($v['description']); ?></td></tr>
         <?php endif; ?>
     </table>
+
+    <?php if (!empty($v['attachment'])): ?>
+    <div style="margin:16px 0;">
+        <strong>Attachment:</strong><br>
+        <?php
+            $attachPath = '../../../assets/uploads/transfer_voucher/' . $v['attachment'];
+            $ext = strtolower(pathinfo($v['attachment'], PATHINFO_EXTENSION));
+        ?>
+        <?php if ($ext === 'pdf'): ?>
+            <div style="margin-top:8px;">
+                <a href="<?php echo $attachPath; ?>" target="_blank"
+                   style="display:inline-flex; align-items:center; gap:6px; background:#1f7bff; color:#fff; padding:8px 16px; border-radius:4px; text-decoration:none; font-size:12px; font-weight:bold;">
+                    &#128196; View PDF Attachment
+                </a>
+            </div>
+            <div style="margin-top:10px; border:1px solid #ddd; border-radius:4px; overflow:hidden; max-width:600px; height:300px;">
+                <iframe src="<?php echo $attachPath; ?>" style="width:100%; height:100%; border:none;"></iframe>
+            </div>
+        <?php else: ?>
+            <div style="margin-top:8px;">
+                <img src="<?php echo $attachPath; ?>" alt="Slip Attachment"
+                     style="max-width:400px; max-height:300px; border:1px solid #ddd; border-radius:4px; display:block; cursor:pointer;"
+                     onclick="this.style.maxWidth=this.style.maxWidth==='100%'?'400px':'100%'" title="Click to toggle size">
+                <div style="font-size:10px; color:#888; margin-top:4px;">Click image to enlarge</div>
+            </div>
+        <?php endif; ?>
+    </div>
+    <?php endif; ?>
 
     <div class="amount-section">
         <div class="total-amount">

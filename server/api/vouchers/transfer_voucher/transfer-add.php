@@ -42,7 +42,36 @@ try {
     $bank_account_id   = !empty($_POST['bank_account_id']) ? intval($_POST['bank_account_id']) : null;
     $cheque_no         = !empty($_POST['cheque_no'])        ? $_POST['cheque_no']        : null;
     $cheque_date       = !empty($_POST['cheque_date'])      ? $_POST['cheque_date']      : null;
+    $slip_no           = !empty($_POST['slip_no'])          ? $_POST['slip_no']          : null;
     $description       = !empty($_POST['description'])      ? $_POST['description']      : null;
+
+    // Handle file upload
+    $attachment = null;
+    if (isset($_FILES['attachment']) && $_FILES['attachment']['error'] === UPLOAD_ERR_OK) {
+        $file = $_FILES['attachment'];
+        $allowedTypes = ['png', 'jpg', 'jpeg', 'gif', 'pdf', 'webp', 'avif'];
+        if ($file['size'] > 5 * 1024 * 1024) {
+            echo json_encode(['success' => false, 'error' => 'File size exceeds 5MB limit']); exit();
+        }
+        $fileExt = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+        if (!in_array($fileExt, $allowedTypes)) {
+            echo json_encode(['success' => false, 'error' => 'Invalid file type']); exit();
+        }
+        $uploadDir = '../../../../client/assets/uploads/transfer_voucher/';
+        if (!is_dir($uploadDir)) mkdir($uploadDir, 0755, true);
+        $fileName = uniqid() . '_' . time();
+        if ($fileExt === 'pdf') {
+            $finalFileName = $fileName . '.pdf';
+            move_uploaded_file($file['tmp_name'], $uploadDir . $finalFileName);
+        } else {
+            $finalFileName = $fileName . '.webp';
+            $imgFns = ['jpg'=>'imagecreatefromjpeg','jpeg'=>'imagecreatefromjpeg','png'=>'imagecreatefrompng','gif'=>'imagecreatefromgif','webp'=>'imagecreatefromwebp','avif'=>'imagecreatefromavif'];
+            $image = ($imgFns[$fileExt] ?? null) ? $imgFns[$fileExt]($file['tmp_name']) : null;
+            if ($image) { imagewebp($image, $uploadDir . $finalFileName, 80); imagedestroy($image); }
+            else { echo json_encode(['success' => false, 'error' => 'Failed to process image']); exit(); }
+        }
+        $attachment = $finalFileName;
+    }
 
     $from_type           = $_POST['from_type']           ?? 'customer';
     $from_party_code     = trim($_POST['from_party_code'] ?? '');
@@ -137,14 +166,14 @@ try {
             from_type, from_customer_id, from_supplier_id, from_sub_account_id,
             to_type,   to_customer_id,   to_supplier_id,   to_sub_account_id,
             amount, currency_id, payment_method_id, bank_account_id,
-            cheque_no, cheque_date, description,
+            cheque_no, cheque_date, slip_no, attachment, description,
             created_by, updated_by
         ) VALUES (
             ?, ?, ?, ?,
             ?, ?, ?, ?,
             ?, ?, ?, ?,
             ?, ?, ?, ?,
-            ?, ?, ?,
+            ?, ?, ?, ?, ?,
             ?, ?
         )
     ");
@@ -153,7 +182,7 @@ try {
         $from_type, $from_customer_id, $from_supplier_id, $from_sub_account_id,
         $to_type,   $to_customer_id,   $to_supplier_id,   $to_sub_account_id,
         $amount, $currency_id, $payment_method_id, $bank_account_id,
-        $cheque_no, $cheque_date, $description,
+        $cheque_no, $cheque_date, $slip_no, $attachment, $description,
         $user_id, $user_id
     ]);
     $voucher_id = $pdo->lastInsertId();

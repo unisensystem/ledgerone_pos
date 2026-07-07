@@ -84,40 +84,58 @@ document.getElementById('currency').addEventListener('change', function () {
     document.getElementById('currencySymbol').textContent = sym;
 });
 
-// ─── Payment method show/hide bank/cheque fields ──────────────────────────────
+// ─── Payment method show/hide bank/cheque/slip fields ────────────────────────
 document.getElementById('paymentMethod').addEventListener('change', function () {
     const id = parseInt(this.value);
-    const bankGrp    = document.getElementById('bankAccountGroup');
+    const bankGrp     = document.getElementById('bankAccountGroup');
     const chequeNoGrp = document.getElementById('chequeNoGroup');
     const chequeDtGrp = document.getElementById('chequeDateGroup');
-    const bankFld    = document.getElementById('bankAccount');
+    const slipNoGrp   = document.getElementById('slipNoGroup');
+    const attachGrp   = document.getElementById('attachmentGroup');
+    const bankFld     = document.getElementById('bankAccount');
     const chequeNoFld = document.getElementById('chequeNo');
     const chequeDtFld = document.getElementById('chequeDate');
+    const slipNoFld   = document.getElementById('slipNo');
+    const attachFld   = document.getElementById('slipAttachment');
 
-    bankGrp.classList.add('hidden');
-    chequeNoGrp.classList.add('hidden');
-    chequeDtGrp.classList.add('hidden');
-    bankFld.removeAttribute('required');
-    chequeNoFld.removeAttribute('required');
-    chequeDtFld.removeAttribute('required');
-
-    if (id === 7) {
-        bankFld.value = '';
-        chequeNoFld.value = '';
-        chequeDtFld.value = '';
-    }
-
-    if (id && id !== 7) {
-        bankGrp.classList.remove('hidden');
-        bankFld.setAttribute('required', 'required');
-    }
+    // Hide all conditional fields
+    [bankGrp, chequeNoGrp, chequeDtGrp, slipNoGrp, attachGrp].forEach(g => g.classList.add('hidden'));
+    [bankFld, chequeNoFld, chequeDtFld, slipNoFld, attachFld].forEach(f => f.removeAttribute('required'));
+    bankFld.value = ''; chequeNoFld.value = ''; chequeDtFld.value = '';
+    slipNoFld.value = ''; attachFld.value = '';
+    document.getElementById('attachmentPreview').style.display = 'none';
 
     if (id === 6) {
+        // PDC/Cheque — bank account + cheque no + cheque date
+        bankGrp.classList.remove('hidden');
         chequeNoGrp.classList.remove('hidden');
         chequeDtGrp.classList.remove('hidden');
+        bankFld.setAttribute('required', 'required');
         chequeNoFld.setAttribute('required', 'required');
         chequeDtFld.setAttribute('required', 'required');
+    } else if (id !== 7 && id) {
+        // Bank Transfer — slip no + attachment only
+        slipNoGrp.classList.remove('hidden');
+        attachGrp.classList.remove('hidden');
     }
+    // id === 7 = Cash — nothing extra
+});
+
+// Attachment preview
+document.getElementById('slipAttachment').addEventListener('change', function () {
+    const preview  = document.getElementById('attachmentPreview');
+    const nameSpan = document.getElementById('attachmentName');
+    if (this.files && this.files[0]) {
+        nameSpan.textContent = this.files[0].name;
+        preview.style.display = 'flex';
+    } else {
+        preview.style.display = 'none';
+    }
+});
+
+document.getElementById('removeAttachment').addEventListener('click', function () {
+    document.getElementById('slipAttachment').value = '';
+    document.getElementById('attachmentPreview').style.display = 'none';
 });
 
 // ─── Party Type Toggle Buttons ────────────────────────────────────────────────
@@ -354,6 +372,9 @@ form.addEventListener('submit', function (e) {
     fd.append('bank_account_id',    document.getElementById('bankAccount').value || '');
     fd.append('cheque_no',          document.getElementById('chequeNo').value || '');
     fd.append('cheque_date',        document.getElementById('chequeDate').value || '');
+    fd.append('slip_no',            document.getElementById('slipNo').value || '');
+    const slipFile = document.getElementById('slipAttachment').files[0];
+    if (slipFile) fd.append('attachment', slipFile);
     fd.append('description',        document.getElementById('description').value || '');
     fd.append('from_type',          fromType);
     fd.append('from_party_code',    fromPartyCode || document.getElementById('fromParty').value.trim());
@@ -408,10 +429,13 @@ function resetForm() {
     document.getElementById('toPreviousBalance').value = '';
     document.getElementById('toRemainingBalance').value = '';
 
-    // Hide bank/cheque fields
-    ['bankAccountGroup','chequeNoGroup','chequeDateGroup'].forEach(id => {
+    // Hide bank/cheque/slip fields
+    ['bankAccountGroup','chequeNoGroup','chequeDateGroup','slipNoGroup','attachmentGroup'].forEach(id => {
         document.getElementById(id).classList.add('hidden');
     });
+    document.getElementById('slipNo').value = '';
+    document.getElementById('slipAttachment').value = '';
+    document.getElementById('attachmentPreview').style.display = 'none';
 
     form.querySelectorAll('input, select, textarea').forEach(f => f.style.borderColor = '');
 

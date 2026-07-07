@@ -150,19 +150,28 @@ if (!$user_id) { header('Location: ../../auth/login.html'); exit(); }
                                 <option value="">Select Method</option>
                             </select>
                         </div>
-                        <div class="form-group" id="editBankAccountGroup">
+                        <div class="form-group" id="editBankAccountGroup" style="display:none;">
                             <label>Bank Account</label>
                             <select id="editBankAccount">
                                 <option value="">Select Bank Account</option>
                             </select>
                         </div>
-                        <div class="form-group" id="editChequeNoGroup">
+                        <div class="form-group" id="editChequeNoGroup" style="display:none;">
                             <label>Cheque No</label>
                             <input type="text" id="editChequeNo">
                         </div>
-                        <div class="form-group" id="editChequeDateGroup">
+                        <div class="form-group" id="editChequeDateGroup" style="display:none;">
                             <label>Cheque Date</label>
                             <input type="date" id="editChequeDate">
+                        </div>
+                        <div class="form-group" id="editSlipNoGroup" style="display:none;">
+                            <label>Slip No</label>
+                            <input type="text" id="editSlipNo" placeholder="Enter slip number">
+                        </div>
+                        <div class="form-group" id="editAttachmentGroup" style="display:none;">
+                            <label>Attachment</label>
+                            <input type="file" id="editSlipAttachment" accept="image/*,.pdf">
+                            <div id="editCurrentAttachment" style="margin-top:6px; font-size:12px; color:var(--subtext);"></div>
                         </div>
                         <div class="form-group">
                             <label>From Party (readonly)</label>

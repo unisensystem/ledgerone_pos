@@ -233,14 +233,23 @@ function openEditModal(id) {
             document.getElementById('editToParty').value        = v.to_display   || '';
             document.getElementById('editChequeNo').value       = v.cheque_no    || '';
             document.getElementById('editChequeDate').value     = v.cheque_date  || '';
+            document.getElementById('editSlipNo').value         = v.slip_no      || '';
+            document.getElementById('editSlipAttachment').value = '';
 
-            // Set selects
+            // Show existing attachment info
+            const curAttEl = document.getElementById('editCurrentAttachment');
+            if (v.attachment) {
+                curAttEl.innerHTML = `Current: <a href="../../../../client/assets/uploads/transfer_voucher/${v.attachment}" target="_blank">${v.attachment}</a> <small>(upload new to replace)</small>`;
+            } else {
+                curAttEl.innerHTML = '';
+            }
+
             setSelectValue('editCompany',       v.company_id);
             setSelectValue('editCurrency',      v.currency_id);
             setSelectValue('editPaymentMethod', v.payment_method_id);
             setSelectValue('editBankAccount',   v.bank_account_id);
 
-            toggleEditBankCheque(parseInt(v.payment_method_id));
+            toggleEditPaymentFields(parseInt(v.payment_method_id));
             document.getElementById('editModal').classList.add('show');
         });
 }
@@ -251,16 +260,30 @@ function setSelectValue(id, val) {
 }
 
 document.getElementById('editPaymentMethod').addEventListener('change', function () {
-    toggleEditBankCheque(parseInt(this.value));
+    toggleEditPaymentFields(parseInt(this.value));
 });
 
-function toggleEditBankCheque(id) {
-    const bankGrp   = document.getElementById('editBankAccountGroup');
-    const chequeNo  = document.getElementById('editChequeNoGroup');
-    const chequeDt  = document.getElementById('editChequeDateGroup');
-    bankGrp.style.display  = (id && id !== 7) ? 'flex' : 'none';
-    chequeNo.style.display = (id === 6) ? 'flex' : 'none';
-    chequeDt.style.display = (id === 6) ? 'flex' : 'none';
+function toggleEditPaymentFields(id) {
+    const bankGrp    = document.getElementById('editBankAccountGroup');
+    const chequeNo   = document.getElementById('editChequeNoGroup');
+    const chequeDt   = document.getElementById('editChequeDateGroup');
+    const slipNoGrp  = document.getElementById('editSlipNoGroup');
+    const attachGrp  = document.getElementById('editAttachmentGroup');
+
+    // Hide all first
+    [bankGrp, chequeNo, chequeDt, slipNoGrp, attachGrp].forEach(g => g.style.display = 'none');
+
+    if (id === 6) {
+        // PDC/Cheque
+        bankGrp.style.display  = 'flex';
+        chequeNo.style.display = 'flex';
+        chequeDt.style.display = 'flex';
+    } else if (id && id !== 7) {
+        // Bank Transfer
+        slipNoGrp.style.display = 'flex';
+        attachGrp.style.display = 'flex';
+    }
+    // id=7 Cash — nothing extra
 }
 
 document.getElementById('editModalClose').addEventListener('click', closeEditModal);
@@ -273,25 +296,32 @@ function closeEditModal() {
 
 document.getElementById('saveEditBtn').addEventListener('click', () => {
     const id = document.getElementById('editVoucherId').value;
-    const payload = {
-        voucher_date:      document.getElementById('editVoucherDate').value,
-        company_id:        document.getElementById('editCompany').value,
-        currency_id:       document.getElementById('editCurrency').value,
-        amount:            document.getElementById('editAmount').value,
-        payment_method_id: document.getElementById('editPaymentMethod').value,
-        bank_account_id:   document.getElementById('editBankAccount').value || null,
-        cheque_no:         document.getElementById('editChequeNo').value    || null,
-        cheque_date:       document.getElementById('editChequeDate').value  || null,
-        description:       document.getElementById('editDescription').value || null,
-    };
+    const btn = document.getElementById('saveEditBtn');
+    btn.disabled = true;
+    btn.textContent = 'Saving...';
 
-    document.getElementById('saveEditBtn').disabled = true;
-    document.getElementById('saveEditBtn').textContent = 'Saving...';
+    const fd = new FormData();
+    fd.append('voucher_date',      document.getElementById('editVoucherDate').value);
+    fd.append('company_id',        document.getElementById('editCompany').value);
+    fd.append('currency_id',       document.getElementById('editCurrency').value);
+    fd.append('amount',            document.getElementById('editAmount').value);
+    fd.append('payment_method_id', document.getElementById('editPaymentMethod').value);
+    fd.append('bank_account_id',   document.getElementById('editBankAccount').value || '');
+    fd.append('cheque_no',         document.getElementById('editChequeNo').value    || '');
+    fd.append('cheque_date',       document.getElementById('editChequeDate').value  || '');
+    fd.append('slip_no',           document.getElementById('editSlipNo').value      || '');
+    fd.append('description',       document.getElementById('editDescription').value || '');
+
+    const curAttEl = document.getElementById('editCurrentAttachment');
+    const keepAtt  = curAttEl.querySelector('a')?.textContent || '';
+    fd.append('keep_attachment', keepAtt);
+
+    const file = document.getElementById('editSlipAttachment').files[0];
+    if (file) fd.append('attachment', file);
 
     fetch(`../../../../server/api/vouchers/transfer_voucher/transfer-edit.php?id=${id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
+        method: 'POST',
+        body: fd
     })
     .then(r => r.json())
     .then(data => {
@@ -304,8 +334,8 @@ document.getElementById('saveEditBtn').addEventListener('click', () => {
     })
     .catch(() => alert('Network error'))
     .finally(() => {
-        document.getElementById('saveEditBtn').disabled = false;
-        document.getElementById('saveEditBtn').textContent = 'Save Changes';
+        btn.disabled = false;
+        btn.textContent = 'Save Changes';
     });
 });
 

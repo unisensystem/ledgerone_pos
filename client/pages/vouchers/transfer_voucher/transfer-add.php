@@ -87,7 +87,19 @@ if (!$user_id) {
                             <label for="chequeDate">Cheque Date</label>
                             <input type="date" id="chequeDate">
                         </div>
-                    </div>
+                        <div class="form-group hidden" id="slipNoGroup">
+                            <label for="slipNo">Slip No</label>
+                            <input type="text" id="slipNo" placeholder="Enter slip number">
+                        </div>
+                        <div class="form-group hidden" id="attachmentGroup">
+                            <label for="slipAttachment">Attachment</label>
+                            <input type="file" id="slipAttachment" accept=".png,.jpg,.jpeg,.gif,.pdf,.webp,.avif">
+                            <div id="attachmentPreview" style="display:none; margin-top:6px; font-size:12px; color:var(--subtext); display:flex; align-items:center; gap:8px;">
+                                <i class="fas fa-file"></i>
+                                <span id="attachmentName"></span>
+                                <button type="button" id="removeAttachment" style="background:none;border:none;color:var(--error);cursor:pointer;"><i class="fas fa-times"></i></button>
+                            </div>
+                        </div>                    </div>
                 </div>
 
                 <!-- FROM Party -->
