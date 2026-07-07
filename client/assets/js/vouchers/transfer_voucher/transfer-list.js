@@ -108,7 +108,7 @@ function renderTable(vouchers) {
             <td>${fromName}</td>
             <td>${toName}</td>
             <td class="amount">${amount}</td>
-            <td>${v.payment_method || 'N/A'}</td>
+            <td>${v.slip_no || '-'}</td>
             <td>
                 <div class="actions">
                     <button class="action-btn edit" title="Edit" onclick="openEditModal(${v.id})"><i class="fas fa-edit"></i></button>

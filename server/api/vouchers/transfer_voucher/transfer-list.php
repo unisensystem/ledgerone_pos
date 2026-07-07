@@ -52,7 +52,7 @@ try {
     // Data
     $stmt = $pdo->prepare("
         SELECT
-            tv.id, tv.voucher_number, tv.voucher_date, tv.amount,
+            tv.id, tv.voucher_number, tv.voucher_date, tv.amount, tv.slip_no,
             tv.from_type, tv.to_type,
             fc.customer_name AS from_customer_name, fc.customer_code AS from_customer_code,
             fs.supplier_name AS from_supplier_name, fs.supplier_code AS from_supplier_code,

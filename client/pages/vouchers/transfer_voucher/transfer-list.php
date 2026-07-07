@@ -96,7 +96,7 @@ if (!$user_id) { header('Location: ../../auth/login.html'); exit(); }
                         <th>From</th>
                         <th>To</th>
                         <th>Amount</th>
-                        <th>Payment Method</th>
+                        <th>Slip No</th>
                         <th>Actions</th>
                     </tr>
                 </thead>
