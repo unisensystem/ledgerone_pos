@@ -107,7 +107,7 @@ try {
     $stmt = $pdo->prepare("
         UPDATE bank_accounts SET 
             bank_name = ?, account_number = ?, account_title = ?, account_type = ?, 
-            currency = ?, branch_name = ?, branch_code = ?, branch_city = ?, 
+            currency_id = ?, branch_name = ?, branch_code = ?, branch_city = ?, 
             branch_state = ?, iban = ?, swift_code = ?, contact_person = ?, 
             contact_number = ?, email = ?, balance_type = ?, opening_balance = ?, 
             is_active = ?, bank_logo_path = ?

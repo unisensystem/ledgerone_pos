@@ -51,7 +51,7 @@ function renderInvoiceLevelTaxColumns() {
         percentItem.className = 'summary-item';
         percentItem.innerHTML = `
             <span class="summary-label">${regime.regime_name} %</span>
-            <span class="summary-value" id="invoiceTax_${regime.id}_percent">${ratePercent.toFixed(2)}</span>
+            <span class="summary-value" id="invoiceTax_${regime.id}_percent">${ratePercent.toFixed(3)}</span>
         `;
         container.appendChild(percentItem);
 
@@ -91,7 +91,7 @@ function calculateInvoiceLevelTaxes() {
 
         const amountEl = document.getElementById(`invoiceTax_${regime.id}_amount`);
         if (amountEl) {
-            amountEl.textContent = taxAmount.toFixed(2);
+            amountEl.textContent = taxAmount.toFixed(3);
         }
 
         totalInvoiceTax += taxAmount;
@@ -100,7 +100,7 @@ function calculateInvoiceLevelTaxes() {
     const netReceivableEl = document.getElementById('netReceivable');
     if (netReceivableEl) {
         const netReceivable = netAmount + totalInvoiceTax;
-        netReceivableEl.textContent = netReceivable.toFixed(2);
+        netReceivableEl.textContent = netReceivable.toFixed(3);
     }
 
     return totalInvoiceTax;
@@ -118,7 +118,7 @@ function clearInvoiceLevelTaxes() {
     const netAmount = parseFloat(netAmountEl?.textContent) || 0;
     
     const netReceivableEl = document.getElementById('netReceivable');
-    if (netReceivableEl) netReceivableEl.textContent = netAmount.toFixed(2);
+    if (netReceivableEl) netReceivableEl.textContent = netAmount.toFixed(3);
 }
 
 // Export functions

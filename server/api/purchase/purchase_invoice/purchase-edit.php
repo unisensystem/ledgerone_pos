@@ -197,7 +197,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
                 previous_balance = ?, total_bill = ?, total_discount_percent = ?,
                 total_discount_amount = ?, total_tax_percent = ?, total_tax_amount = ?,
                 shipping_fees = ?, shipping_fees_type = ?, net_amount = ?, supplier_invoice_no = ?, 
-                supplier_invoice_date = ?, purchase_order_id = ?, bilty_no = ?, transport_name = ?, remarks = ?, sub_account_id = ?, project_id = ?, updated_by = ?
+                supplier_invoice_date = ?, purchase_order_id = ?, bilty_no = ?, transport_name = ?, remarks = ?, sub_account_id = ?, project_id = ?, assoc_company_id = ?, updated_by = ?
             WHERE id = ? AND tenant_id = ?
         ");
         $stmt->execute([
@@ -224,6 +224,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
             $input['remarks'] ?? null,
             $input['subAccountId'] ?? null,
             $input['projectId'] ?? null,
+            $input['assocCompanyId'] ?? null,
             $user_id,
             $invoice_id,
             $tenant_id

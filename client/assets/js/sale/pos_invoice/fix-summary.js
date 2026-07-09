@@ -108,13 +108,13 @@ function updateInvoiceSummaryFixed() {
     const totalFocQtyEl = document.getElementById('totalFocQty');
     const totalNetAmountItemsEl = document.getElementById('totalNetAmountItems');
     
-    if (totalBillEl) totalBillEl.textContent = totalBill.toFixed(2);
-    if (totalGrossAmountEl) totalGrossAmountEl.textContent = totalGrossAmount.toFixed(2);
-    if (totalDiscountAmountItemsEl) totalDiscountAmountItemsEl.textContent = totalDiscountAmountItems.toFixed(2);
-    if (totalTradeOfferAmountEl) totalTradeOfferAmountEl.textContent = totalTradeOfferAmount.toFixed(2);
-    if (totalTaxAmountEl) totalTaxAmountEl.textContent = totalTaxAmount.toFixed(2);
-    if (totalFocQtyEl) totalFocQtyEl.textContent = totalFocQty.toFixed(2);
-    if (totalNetAmountItemsEl) totalNetAmountItemsEl.textContent = totalNetAmountItems.toFixed(2);
+    if (totalBillEl) totalBillEl.textContent = totalBill.toFixed(3);
+    if (totalGrossAmountEl) totalGrossAmountEl.textContent = totalGrossAmount.toFixed(3);
+    if (totalDiscountAmountItemsEl) totalDiscountAmountItemsEl.textContent = totalDiscountAmountItems.toFixed(3);
+    if (totalTradeOfferAmountEl) totalTradeOfferAmountEl.textContent = totalTradeOfferAmount.toFixed(3);
+    if (totalTaxAmountEl) totalTaxAmountEl.textContent = totalTaxAmount.toFixed(3);
+    if (totalFocQtyEl) totalFocQtyEl.textContent = totalFocQty.toFixed(3);
+    if (totalNetAmountItemsEl) totalNetAmountItemsEl.textContent = totalNetAmountItems.toFixed(3);
     
     // Calculate invoice-level discount
     const discountPercentEl = document.getElementById('totalDiscountPercent');
@@ -129,8 +129,8 @@ function updateInvoiceSummaryFixed() {
     const totalDiscountAmountEl = document.getElementById('totalDiscountAmount');
     const netAmountEl = document.getElementById('netAmount');
     
-    if (totalDiscountAmountEl) totalDiscountAmountEl.value = invoiceDiscountAmount.toFixed(2);
-    if (netAmountEl) netAmountEl.textContent = netAmount.toFixed(2);
+    if (totalDiscountAmountEl) totalDiscountAmountEl.value = invoiceDiscountAmount.toFixed(3);
+    if (netAmountEl) netAmountEl.textContent = netAmount.toFixed(3);
     
     console.log('DOM netAmount element now contains:', netAmountEl?.textContent);
     
@@ -153,7 +153,7 @@ function updateInvoiceSummaryFixed() {
     
     const remainingBalanceEl = document.getElementById('remainingBalance');
     if (remainingBalanceEl) {
-        remainingBalanceEl.value = remainingBalance.toFixed(2);
+        remainingBalanceEl.value = remainingBalance.toFixed(3);
     }
 }
 

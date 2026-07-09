@@ -42,7 +42,9 @@ $currency_symbol = $currency['symbol'] ?? '$';
         .edit-salesman-chip .chip-remove:hover { opacity:1; }
         .edit-salesman-dropdown-item { padding:8px 12px; cursor:pointer; font-size:14px; }
         .edit-salesman-dropdown-item:hover { background:var(--surface-2,#f3f4f6); }
-        .edit-salesman-dropdown-item.disabled { opacity:.4; pointer-events:none; }
+        .edit-assoc-company-chip { display:inline-flex; align-items:center; gap:4px; background:var(--success,#2fbf71); color:#fff; border-radius:999px; padding:2px 10px; font-size:13px; }
+        .edit-assoc-company-chip .chip-remove { cursor:pointer; font-size:16px; line-height:1; opacity:.8; }
+        .edit-assoc-company-chip .chip-remove:hover { opacity:1; }
     </style>
 </head>
 
@@ -176,6 +178,15 @@ $currency_symbol = $currency['symbol'] ?? '$';
                                 <option value="">Select Company</option>
                             </select>
                         </div>
+                        <div class="form-group col-4" style="position:relative;">
+                            <label>Associated Companies</label>
+                            <div id="editAssocCompanyChipsContainer" style="border:1px solid var(--border-default,#ccc);border-radius:8px;padding:6px 8px;background:var(--input-bg,#fff);cursor:text;min-height:48px;">
+                                <div id="editAssocCompanyChipsList" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:4px;"></div>
+                                <input type="text" id="editAssocCompanySearch" placeholder="Search company..." autocomplete="off" style="border:none;outline:none;background:transparent;width:100%;font-size:14px;padding:2px 4px;height:auto;">
+                            </div>
+                            <div id="editAssocCompanyDropdown" style="display:none;position:fixed;z-index:99999;background:var(--surface-1,#fff);border:1px solid var(--border-default,#ccc);border-radius:8px;max-height:200px;overflow-y:auto;box-shadow:0 4px 12px rgba(0,0,0,.15);"></div>
+                            <input type="hidden" id="editAssocCompanyIds" value="">
+                        </div>
                         <div class="form-group col-4">
                             <label>Supplier Code</label>
                             <input type="text" id="editSupplierCode" readonly>
@@ -190,11 +201,11 @@ $currency_symbol = $currency['symbol'] ?? '$';
                             <input type="hidden" id="editSalesmanIds" value="">
                         </div>
                         <div class="form-group col-4">
-                            <label class="required">Supplier Name</label>
+                            <label class="required">Brand Name - Company</label>
                             <input type="text" id="editSupplierName" required>
                         </div>
                         <div class="form-group col-4">
-                            <label>Brand Name</label>
+                            <label>Supplier Name</label>
                             <input type="text" id="editBrandName">
                         </div>
                         <div class="form-group col-12">
@@ -331,7 +342,11 @@ $currency_symbol = $currency['symbol'] ?? '$';
                         <div class="view-field" id="viewSalesman"></div>
                     </div>
                     <div class="form-group col-4">
-                        <label>Brand Name</label>
+                        <label>Associated Companies</label>
+                        <div class="view-field" id="viewAssocCompanies"></div>
+                    </div>
+                    <div class="form-group col-4">
+                        <label>Brand Name - Company</label>
                         <div class="view-field" id="viewSupplierName"></div>
                     </div>
                     <div class="form-group col-4">

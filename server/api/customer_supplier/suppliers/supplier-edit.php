@@ -127,7 +127,6 @@ try {
             foreach ($input['subAccounts'] as $subAccount) {
                 if (!empty(trim($subAccount['name']))) {
                     if (!empty($subAccount['id'])) {
-                        // Update existing sub account
                         $updateSql = "UPDATE supplier_sub_accounts SET sub_account_name = ?, debit = ?, credit = ? WHERE id = ? AND tenant_id = ? AND supplier_id = ?";
                         $stmt = $pdo->prepare($updateSql);
                         $stmt->execute([
@@ -140,7 +139,6 @@ try {
                         ]);
                         $submittedIds[] = (int)$subAccount['id'];
                     } else {
-                        // Insert new sub account
                         $insertSql = "INSERT INTO supplier_sub_accounts (tenant_id, supplier_id, sub_account_name, debit, credit) VALUES (?, ?, ?, ?, ?)";
                         $stmt = $pdo->prepare($insertSql);
                         $stmt->execute([
@@ -155,12 +153,24 @@ try {
                 }
             }
             
-            // Delete sub accounts that were not submitted (explicitly removed by user)
             if (!empty($submittedIds)) {
                 $placeholders = implode(',', array_fill(0, count($submittedIds), '?'));
                 $deleteSql = "DELETE FROM supplier_sub_accounts WHERE tenant_id = ? AND supplier_id = ? AND id NOT IN ($placeholders)";
                 $stmt = $pdo->prepare($deleteSql);
                 $stmt->execute(array_merge([$tenant_id, $supplier_id], $submittedIds));
+            }
+        }
+
+        // Update associated companies
+        $stmt = $pdo->prepare("DELETE FROM supplier_associated_companies WHERE tenant_id = ? AND supplier_id = ?");
+        $stmt->execute([$tenant_id, $supplier_id]);
+        if (!empty($input['associatedCompanyIds'])) {
+            $assocIds = array_filter(array_map('intval', explode(',', $input['associatedCompanyIds'])));
+            if (!empty($assocIds)) {
+                $assocStmt = $pdo->prepare("INSERT IGNORE INTO supplier_associated_companies (tenant_id, supplier_id, company_id) VALUES (?, ?, ?)");
+                foreach ($assocIds as $cid) {
+                    $assocStmt->execute([$tenant_id, $supplier_id, $cid]);
+                }
             }
         }
 

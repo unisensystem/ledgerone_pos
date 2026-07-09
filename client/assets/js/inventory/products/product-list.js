@@ -118,6 +118,9 @@ document.addEventListener('DOMContentLoaded', function () {
     
     // Load categories for filter
     loadCategoriesFilter();
+    
+    // Load vendors for filter
+    loadVendorsFilter();
 
     // Pagination buttons
     document.getElementById('prevPage').addEventListener('click', function () {
@@ -222,6 +225,7 @@ function renderProductTable(productsToRender) {
                     <td>${typeBadge}</td>
                     <td>${product.uomDisplay || '<span style="color: #999;">Not Set</span>'}</td>
                     <td>${product.category}</td>
+                    <td>${product.vendor || '<span style="color: #999;">Not Set</span>'}</td>
                     <td>${product.price > 0 ? `${product.currencySymbol}${product.price.toFixed(2)}` : 'Free'}</td>
                     <td>${statusBadge}</td>
                     <td>
@@ -474,6 +478,7 @@ function resetFilters() {
     document.getElementById('category').value = '';
     document.getElementById('type').value = '';
     document.getElementById('status').value = '';
+    document.getElementById('vendor').value = '';
     document.getElementById('uomFilter').value = '';
     document.querySelector('input[name="priceType"][value="tp"]').checked = true;
     collapsedParents.clear();
@@ -565,6 +570,7 @@ function loadProducts(page = 1) {
         category: document.getElementById('category').value,
         type: document.getElementById('type').value,
         status: document.getElementById('status').value,
+        vendor: document.getElementById('vendor').value,
         uom_filter: document.getElementById('uomFilter').value,
         page: page
     });
@@ -588,6 +594,7 @@ function loadProducts(page = 1) {
                     type: product.product_type,
                     uomDisplay: uomDisplay,
                     category: product.category_name || 'Uncategorized',
+                    vendor: product.supplier_name || '',
                     subcategory: product.subcategory_name || '',
                     currentStock: product.current_stock,
                     price: parseFloat(priceType === 'tp' ? product.trade_price : product.mrp),
@@ -635,6 +642,23 @@ function loadCategoriesFilter() {
         }
     })
     .catch(error => console.error('Error loading categories:', error));
+}
+
+function loadVendorsFilter() {
+    fetch('../../../../server/api/inventory/products/supplier-list.php')
+    .then(response => response.json())
+    .then(data => {
+        if (data.success && data.suppliers) {
+            const select = document.getElementById('vendor');
+            data.suppliers.forEach(supplier => {
+                const option = document.createElement('option');
+                option.value = supplier.id;
+                option.textContent = supplier.supplier_name;
+                select.appendChild(option);
+            });
+        }
+    })
+    .catch(error => console.error('Error loading vendors:', error));
 }
 
 function updatePagination() {

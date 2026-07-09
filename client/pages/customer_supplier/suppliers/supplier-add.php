@@ -25,53 +25,19 @@ if (!$user_id) {
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="../../../assets/css/customer_supplier/suppliers/supplier-add.css">
 </head>
-<style>
-    .salesman-chip {
-        display: inline-flex;
-        align-items: center;
-        gap: 5px;
-        background: var(--primary, #4f46e5);
-        color: white;
-        padding: 3px 10px 3px 10px;
-        border-radius: 20px;
-        font-size: 13px;
-        white-space: nowrap;
-    }
-
-    .salesman-chip .chip-remove {
-        cursor: pointer;
-        font-size: 12px;
-        margin-left: 2px;
-        opacity: 0.8;
-    }
-
-    .salesman-chip .chip-remove:hover {
-        opacity: 1;
-    }
-
-    .salesman-dropdown-item {
-        padding: 9px 14px;
-        cursor: pointer;
-        font-size: 14px;
-    }
-
-    .salesman-dropdown-item:hover {
-        background: var(--surface-2, #f3f4f6);
-    }
-
-    .salesman-dropdown-item.disabled {
-        opacity: 0.4;
-        cursor: default;
-    }
-</style>
-
 <body class="light-mode">
     <div class="container">
         <div class="card">
-            <h2 class="card-title">
-                <i class="fas fa-user-plus"></i>
-                Supplier Entry
-            </h2>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 28px; padding-bottom: 16px; border-bottom: 1px solid var(--border-default);">
+                <h2 class="card-title" style="margin-bottom: 0; padding-bottom: 0; border-bottom: none;">
+                    <i class="fas fa-user-plus"></i>
+                    Supplier Entry
+                </h2>
+                <button type="button" id="customizeFieldsBtn" class="btn btn-secondary btn-sm" style="padding: 0 16px; height: 40px;">
+                    <i class="fas fa-sliders-h"></i>
+                    Customize Fields
+                </button>
+            </div>
             <form id="supplierForm">
                 <div class="form-grid">
                     <!-- Basic Information Section -->
@@ -93,6 +59,52 @@ if (!$user_id) {
                                 <i class="fas fa-exclamation-circle"></i>
                                 <span>Company is required</span>
                             </div>
+                        </div>
+
+                        <div class="form-group col-4" style="position: relative;">
+                            <label for="assocCompanySearch">
+                                <i class="fas fa-building"></i>
+                                Associated Companies
+                            </label>
+                            <div id="assocCompanyChipsContainer" style="
+                                border: 1px solid var(--input-border, #ccc);
+                                border-radius: 8px;
+                                padding: 6px 8px;
+                                background: var(--input-bg, #fff);
+                                cursor: text;
+                                min-height: 48px;
+                            ">
+                                <div id="assocCompanyChipsList" style="
+                                    display: flex;
+                                    flex-wrap: wrap;
+                                    gap: 6px;
+                                    margin-bottom: 4px;
+                                "></div>
+                                <input type="text" id="assocCompanySearch" placeholder="Search company..." autocomplete="off" style="
+                                    border: none;
+                                    outline: none;
+                                    background: transparent;
+                                    width: 100%;
+                                    font-size: 14px;
+                                    padding: 2px 4px;
+                                    height: auto;
+                                ">
+                            </div>
+                            <div id="assocCompanyDropdown" style="
+                                display: none;
+                                position: absolute;
+                                top: 100%;
+                                left: 0;
+                                right: 0;
+                                z-index: 9999;
+                                background: var(--surface-1, #fff);
+                                border: 1px solid var(--border-default, #ccc);
+                                border-radius: 8px;
+                                max-height: 200px;
+                                overflow-y: auto;
+                                box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+                            "></div>
+                            <input type="hidden" id="assocCompanyIds" name="assocCompanyIds" value="">
                         </div>
 
                         <div class="form-group col-4">
@@ -152,9 +164,9 @@ if (!$user_id) {
                         <div class="form-group col-12">
                             <label for="supplierName" class="required">
                                 <i class="fas fa-user"></i>
-                                Brand Name
+                                Brand Name - Company
                             </label>
-                            <input type="text" id="supplierName" required placeholder="Enter Brand Name ">
+                            <input type="text" id="supplierName" required placeholder="Enter Brand Name - Company">
                             <div class="error-text" id="supplierNameError">
                                 <i class="fas fa-exclamation-circle"></i>
                                 <span>Brand Name is required</span>
@@ -368,6 +380,34 @@ if (!$user_id) {
         <button class="notification-close" id="notificationClose">
             <i class="fas fa-times"></i>
         </button>
+    </div>
+
+    <!-- Customize Fields Modal -->
+    <div class="modal" id="customizeFieldsModal">
+        <div class="modal-content" style="max-width: 500px; max-height: 80vh; overflow-y: auto;">
+            <div class="modal-header">
+                <h3><i class="fas fa-sliders-h"></i> Customize Fields</h3>
+                <button class="modal-close" id="customizeFieldsModalClose">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body" style="padding: 24px;">
+                <div style="margin-bottom: 16px; display: flex; gap: 8px;">
+                    <button type="button" class="btn btn-secondary btn-sm" id="customizeFieldsSelectAllBtn" style="flex: 1;">
+                        <i class="fas fa-check-square"></i> Select All
+                    </button>
+                    <button type="button" class="btn btn-secondary btn-sm" id="customizeFieldsDeselectAllBtn" style="flex: 1;">
+                        <i class="fas fa-square"></i> Deselect All
+                    </button>
+                </div>
+                <div id="customizeFieldsList" style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                </div>
+            </div>
+            <div class="modal-footer" style="gap: 12px;">
+                <button type="button" class="btn btn-secondary" id="customizeFieldsResetBtn">Reset to Default</button>
+                <button type="button" class="btn btn-primary" id="customizeFieldsSaveBtn">Save Preferences</button>
+            </div>
+        </div>
     </div>
 
     <script src="../../../assets/js/customer_supplier/suppliers/supplier-add.js?v=<?php echo time(); ?>"></script>

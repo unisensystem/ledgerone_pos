@@ -662,7 +662,7 @@ async function loadDraftInvoices() {
                     <td style="padding: 8px; border-bottom: 1px solid var(--border-default);">${draft.bill_no}</td>
                     <td style="padding: 8px; border-bottom: 1px solid var(--border-default);">${new Date(draft.sale_date).toLocaleDateString()}</td>
                     <td style="padding: 8px; border-bottom: 1px solid var(--border-default);">${draft.customer_name}</td>
-                    <td style="padding: 8px; border-bottom: 1px solid var(--border-default); text-align: right;">${draft.currency_symbol}${parseFloat(draft.net_amount).toFixed(2)}</td>
+                    <td style="padding: 8px; border-bottom: 1px solid var(--border-default); text-align: right;">${draft.currency_symbol}${parseFloat(draft.net_amount).toFixed(3)}</td>
                     <td style="padding: 8px; border-bottom: 1px solid var(--border-default); text-align: center;">
                         <button class="btn btn-primary btn-sm" onclick="loadDraft(${draft.id})" style="padding: 4px 8px; margin-right: 4px;">
                             <i class="fas fa-edit"></i> Load
@@ -868,8 +868,8 @@ async function fetchCustomerBalance(customerId) {
         if (data.success && data.data.length > 0) {
             const balance = parseFloat(data.data[0].closing_balance || 0);
             currentInvoice.previousBalance = balance >= 0 
-                ? `Dr ${balance.toFixed(2)}` 
-                : `Cr ${Math.abs(balance).toFixed(2)}`;
+                ? `Dr ${balance.toFixed(3)}` 
+                : `Cr ${Math.abs(balance).toFixed(3)}`;
         } else {
             currentInvoice.previousBalance = 'Dr 0.00';
         }
@@ -1242,7 +1242,7 @@ function showChildProductModal(parent, children) {
             <input type="checkbox" class="child-check" data-id="${child.id}" data-name="${child.name}" data-stock="${child.stock_affects}" data-invoice="${child.invoice_affects}">
             <span>${child.name}</span>
             <input type="number" class="child-qty" min="0" value="0" style="padding: 4px; border: 1px solid var(--border-default); border-radius: 4px;" placeholder="Qty">
-            <input type="number" class="child-price" min="0" value="${childPrice.toFixed(2)}" step="0.01" style="padding: 4px; border: 1px solid var(--border-default); border-radius: 4px;" placeholder="Price">
+            <input type="number" class="child-price" min="0" value="${childPrice.toFixed(3)}" step="0.01" style="padding: 4px; border: 1px solid var(--border-default); border-radius: 4px;" placeholder="Price">
         `;
         childList.appendChild(div);
     });
@@ -1364,9 +1364,10 @@ function renderItems() {
             <div>${item.product}${item.children ? '<br><small style="color: var(--subtext);">(' + item.children.map(c => c.name + ': ' + c.qty + ' @ ' + formatCurrency(c.price)).join(' | ') + ')</small>' : ''}</div>
             <div>${item.unit}</div>
             <input type="number" value="${item.qty}" min="1" class="text-right item-qty-input" data-item-id="${item.id}" data-product-id="${item.productId}" onchange="updateItemQty(${item.id}, this.value)">
-            <input type="number" value="${item.price.toFixed(2)}" step="0.01" class="text-right" onchange="updateItemPrice(${item.id}, this.value)">
+            <input type="number" value="${item.price.toFixed(3)}" step="0.01" class="text-right" onchange="updateItemPrice(${item.id}, this.value)">
             <div class="readonly">${formatCurrency(item.gross)}</div>
-            <input type="number" value="${item.discountPercent}" step="0.1" class="text-right" onchange="updateItemDiscount(${item.id}, this.value)">
+            <input type="number" value="${item.discountPercent}" step="0.1" class="text-right" data-role="disc-pct" data-item-id="${item.id}" onchange="updateItemDiscountPct(${item.id}, this.value)">
+            <input type="number" value="${item.discountAmount.toFixed(3)}" step="0.01" class="text-right" data-role="disc-amt" data-item-id="${item.id}" onchange="updateItemDiscountAmt(${item.id}, this.value)">
             <input type="number" value="${item.gstPercent}" step="0.1" class="text-right" onchange="updateItemGst(${item.id}, this.value)">
             <div class="readonly">${formatCurrency(item.net)}</div>
             <div class="text-center">
@@ -1407,6 +1408,30 @@ window.updateItemDiscount = function(itemId, newPercent) {
     if (item) {
         item.discountPercent = parseFloat(newPercent) || 0;
         recalculateItem(item);
+        renderItems();
+        updateSummary();
+    }
+};
+
+window.updateItemDiscountPct = function(itemId, newPercent) {
+    const item = currentInvoice.items.find(i => i.id === itemId);
+    if (item) {
+        item.discountPercent = parseFloat(newPercent) || 0;
+        item.discountAmount = item.gross * (item.discountPercent / 100);
+        item.gstAmount = (item.gross - item.discountAmount) * (item.gstPercent / 100);
+        item.net = item.gross - item.discountAmount + item.gstAmount;
+        renderItems();
+        updateSummary();
+    }
+};
+
+window.updateItemDiscountAmt = function(itemId, newAmt) {
+    const item = currentInvoice.items.find(i => i.id === itemId);
+    if (item) {
+        item.discountAmount = parseFloat(newAmt) || 0;
+        item.discountPercent = item.gross > 0 ? (item.discountAmount / item.gross) * 100 : 0;
+        item.gstAmount = (item.gross - item.discountAmount) * (item.gstPercent / 100);
+        item.net = item.gross - item.discountAmount + item.gstAmount;
         renderItems();
         updateSummary();
     }
@@ -1548,8 +1573,9 @@ function updateSummary() {
     
     // Update totals footer
     const totalQty = currentInvoice.items.reduce((sum, item) => sum + item.qty, 0);
-    document.getElementById('totalQty').textContent = totalQty.toFixed(2);
+    document.getElementById('totalQty').textContent = totalQty.toFixed(3);
     document.getElementById('totalGross').textContent = formatCurrency(totalBill);
+    document.getElementById('totalDiscAmt').textContent = formatCurrency(totalDiscount);
     document.getElementById('totalNet').textContent = formatCurrency(currentInvoice.items.reduce((sum, item) => sum + item.net, 0));
     
     document.getElementById('totalBill').textContent = formatCurrency(totalBill);
@@ -1569,7 +1595,7 @@ function updateReturnedAndBalance() {
     const amountReturned = difference > 0 ? difference : 0;
     const balance = difference < 0 ? Math.abs(difference) : 0;
     
-    document.getElementById('amountReturned').value = amountReturned.toFixed(2);
+    document.getElementById('amountReturned').value = amountReturned.toFixed(3);
     document.getElementById('summaryReturned').textContent = formatCurrency(amountReturned);
     document.getElementById('balanceAmount').textContent = formatCurrency(balance);
     
@@ -1599,7 +1625,7 @@ function updateInvoiceDiscount() {
     
     if (document.activeElement === percentInput) {
         const percent = parseFloat(percentInput.value) || 0;
-        amountInput.value = (totalNet * percent / 100).toFixed(2);
+        amountInput.value = (totalNet * percent / 100).toFixed(3);
     } else if (document.activeElement === amountInput) {
         const amount = parseFloat(amountInput.value) || 0;
         percentInput.value = totalNet > 0 ? ((amount / totalNet) * 100).toFixed(1) : 0;
@@ -1618,7 +1644,7 @@ function quickPay() {
     const invoiceDiscountAmount = parseFloat(document.getElementById('invoiceDiscountAmount').value) || 0;
     const finalAmount = netAmount - invoiceDiscountAmount;
     
-    document.getElementById('amountReceived').value = finalAmount.toFixed(2);
+    document.getElementById('amountReceived').value = finalAmount.toFixed(3);
     document.getElementById('amountReturned').value = 0;
     updateSummary();
     showNotification(`Quick Pay: ${formatCurrency(finalAmount)}`);
@@ -1766,7 +1792,7 @@ function formatCurrency(amount) {
     const currency = currenciesData.find(c => c.code === currencyCode);
     const symbol = currency ? currency.symbol : '$';
     
-    return `${symbol}${Math.abs(amount).toFixed(2)}`;
+    return `${symbol}${Math.abs(amount).toFixed(3)}`;
 }
 
 function showNotification(message) {

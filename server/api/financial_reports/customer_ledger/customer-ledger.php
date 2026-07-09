@@ -222,7 +222,7 @@ try {
                     $prev_tv_to += $amt;
                 }
 
-                $opening_balance = $base_opening + $prev_invoices + $prev_returns_data['refunded'] + $prev_tv_to - $prev_payment_vouchers - $prev_payments - $prev_returns_data['credit'] - $prev_rent - $prev_tv_from;
+                $opening_balance = $base_opening + $prev_invoices + $prev_returns_data['refunded'] + $prev_tv_to + $prev_payment_vouchers - $prev_payments - $prev_returns_data['credit'] - $prev_rent - $prev_tv_from;
             }
             
             // Get transactions in date range
@@ -495,7 +495,26 @@ try {
             $stmt->execute([$tenant_id, $customer_id, $from_date]);
             $prev_returns_main = $stmt->fetch();
             
-            $main_account_opening = $main_account_opening + $prev_invoices_main + $prev_returns_main['refunded'] - $prev_payment_vouchers_main - $prev_payments_main - $prev_returns_main['credit'];
+            // Transfer vouchers for main account (no sub_account_id)
+            $stmt = $pdo->prepare("SELECT COALESCE(SUM(amount), 0) as total, currency_id FROM transfer_voucher WHERE tenant_id = ? AND from_type = 'customer' AND from_customer_id = ? AND voucher_date < ? AND (from_sub_account_id IS NULL OR from_sub_account_id = 0) GROUP BY currency_id");
+            $stmt->execute([$tenant_id, $customer_id, $from_date]);
+            $prev_tv_from_main = 0;
+            foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+                $amt = $row['total'];
+                if ($row['currency_id'] && $row['currency_id'] != $target_currency_id) $amt = $converter->convert($amt, $row['currency_id'], $target_currency_id);
+                $prev_tv_from_main += $amt;
+            }
+
+            $stmt = $pdo->prepare("SELECT COALESCE(SUM(amount), 0) as total, currency_id FROM transfer_voucher WHERE tenant_id = ? AND to_type = 'customer' AND to_customer_id = ? AND voucher_date < ? AND (to_sub_account_id IS NULL OR to_sub_account_id = 0) GROUP BY currency_id");
+            $stmt->execute([$tenant_id, $customer_id, $from_date]);
+            $prev_tv_to_main = 0;
+            foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+                $amt = $row['total'];
+                if ($row['currency_id'] && $row['currency_id'] != $target_currency_id) $amt = $converter->convert($amt, $row['currency_id'], $target_currency_id);
+                $prev_tv_to_main += $amt;
+            }
+
+            $main_account_opening = $main_account_opening + $prev_invoices_main + $prev_returns_main['refunded'] + $prev_tv_to_main + $prev_payment_vouchers_main - $prev_payments_main - $prev_returns_main['credit'] - $prev_tv_from_main;
             
             // Sub account transactions
             foreach ($sub_opening_map as $sub_id => $sub_balance) {
@@ -775,8 +794,23 @@ try {
             $ob_stmt->execute([$tenant_id, $customer_id]);
             $ob_invoices = $ob_stmt->fetchAll(PDO::FETCH_ASSOC);
 
-            if (!empty($ob_invoices)) {
-                // Show individual OB invoice rows
+            if ($from_date) {
+                // When date filter is set, show single Soft Opening Balance row
+                if ($main_account_opening != 0) {
+                    $result[] = [
+                        'date' => $from_date,
+                        'description' => 'Soft Opening Balance',
+                        'reference' => 'OB-MAIN',
+                        'debit' => 0,
+                        'credit' => 0,
+                        'running_balance' => $main_account_opening,
+                        'type' => 'opening_balance',
+                        'sub_account_id' => null
+                    ];
+                }
+                $running_balance = $main_account_opening;
+            } elseif (!empty($ob_invoices)) {
+                // No date filter: show individual OB invoice rows
                 $ob_running = 0;
                 foreach ($ob_invoices as $obi) {
                     $ob_amount = floatval($obi['debit']);
@@ -796,8 +830,8 @@ try {
             } elseif ($main_account_opening != 0) {
                 // Fallback: single OB row
                 $result[] = [
-                    'date' => $from_date ?: 'Opening Balance',
-                    'description' => $from_date ? 'Soft Opening Balance' : 'Opening Balance',
+                    'date' => 'Opening Balance',
+                    'description' => 'Opening Balance',
                     'reference' => 'OB-MAIN',
                     'debit' => 0,
                     'credit' => 0,

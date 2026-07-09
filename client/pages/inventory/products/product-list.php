@@ -69,6 +69,13 @@ if (!$user_id) {
                     </svg>
                     Bulk Opening Stock
                 </button>
+                <button class="btn btn-secondary" id="bulkRateUpdateBtn" onclick="location.href='bulk-rate-update.php'" title="Update rates for multiple products">
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M2 8h12M8 2v12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                        <circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="1.5"/>
+                    </svg>
+                    Bulk Rate Update
+                </button>
                 <button class="btn btn-primary" id="addProductBtn">
                     <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
                         <path d="M8 3.33333V12.6667" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
@@ -129,6 +136,12 @@ if (!$user_id) {
                         <option value="inactive">Inactive</option>
                     </select>
                 </div>
+                <div class="filter-group">
+                    <label for="vendor">Vendor</label>
+                    <select id="vendor">
+                        <option value="">All Vendors</option>
+                    </select>
+                </div>
                 <div class="filter-actions">
                     <button class="btn btn-secondary" id="applyFilters">Apply Filters</button>
                     <button class="btn btn-ghost" id="resetFilters">Reset</button>
@@ -148,6 +161,7 @@ if (!$user_id) {
                             <th>Type</th>
                             <th>UOM</th>
                             <th>Category</th>
+                            <th>Vendor</th>
                             <th>Price</th>
                             <th>Status</th>
                             <th>Actions</th>

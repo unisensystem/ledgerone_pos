@@ -110,18 +110,18 @@ function applyTaxToRow(row, taxRate, formula, basePrice, applicationLevel = 'ite
         }
     } else {
         if (taxPercentInput) {
-            taxPercentInput.value = parseFloat(taxRate).toFixed(2);
+            taxPercentInput.value = parseFloat(taxRate).toFixed(3);
             taxPercentInput.readOnly = false;
             taxPercentInput.disabled = false;
             taxPercentInput.style.backgroundColor = '';
             taxPercentInput.style.cursor = 'auto';
             taxPercentInput.style.opacity = '1';
             taxPercentInput.title = isTaxInclusive
-                ? `${parseFloat(taxRate).toFixed(2)}% (Tax Inclusive — extracted from price)`
-                : `${parseFloat(taxRate).toFixed(2)}% (Tax Exclusive — added to price)`;
+                ? `${parseFloat(taxRate).toFixed(3)}% (Tax Inclusive — extracted from price)`
+                : `${parseFloat(taxRate).toFixed(3)}% (Tax Exclusive — added to price)`;
         }
         if (taxAmountInput) {
-            taxAmountInput.value = parseFloat(taxAmount).toFixed(2);
+            taxAmountInput.value = parseFloat(taxAmount).toFixed(3);
         }
     }
 
@@ -205,15 +205,15 @@ async function loadTaxForNewProduct(row, customerId, productId) {
                 taxPercentInput.style.opacity = '0.7';
                 taxPercentInput.title = 'Tax applied at invoice level, not at item level';
             } else {
-                taxPercentInput.value = parseFloat(taxResult.tax_rate).toFixed(2);
+                taxPercentInput.value = parseFloat(taxResult.tax_rate).toFixed(3);
                 taxPercentInput.readOnly = false;
                 taxPercentInput.disabled = false;
                 taxPercentInput.style.backgroundColor = '';
                 taxPercentInput.style.cursor = 'auto';
                 taxPercentInput.style.opacity = '1';
                 taxPercentInput.title = isTaxInclusive
-                    ? `${parseFloat(taxResult.tax_rate).toFixed(2)}% (Tax Inclusive — extracted from price)`
-                    : `${parseFloat(taxResult.tax_rate).toFixed(2)}% (Tax Exclusive — added to price)`;
+                    ? `${parseFloat(taxResult.tax_rate).toFixed(3)}% (Tax Inclusive — extracted from price)`
+                    : `${parseFloat(taxResult.tax_rate).toFixed(3)}% (Tax Exclusive — added to price)`;
             }
         }
         

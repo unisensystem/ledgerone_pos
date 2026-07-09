@@ -153,8 +153,11 @@ async function loadCurrency() {
         const response = await fetch('../../../../server/api/vouchers/cash_opening/get-currency.php');
         const data = await response.json();
         
-        if (data.success && data.currency) {
-            currencyInput.value = data.currency;
+        if (data.success) {
+            currencyInput.value = `${data.code} - ${data.name} (${data.symbol})`;
+            currencyInput.dataset.currencyId = data.currency_id;
+            currencyInput.dataset.symbol = data.symbol;
+            currencyInput.dataset.code = data.code;
         }
     } catch (error) {
         console.error('Failed to load currency');
@@ -261,14 +264,14 @@ async function saveRecord() {
                 company_id: document.getElementById('company').value,
                 as_of_date: asOfDateInput.value,
                 opening_amount: openingCashInput.value,
-                currency: currencyInput.value
+                currency: currencyInput.dataset.currencyId
             })
         });
 
         const data = await response.json();
 
         if (data.success) {
-            showStatusMessage(`Opening cash of $${parseFloat(openingCashInput.value).toFixed(2)} saved successfully.`, 'success');
+            showStatusMessage(`Opening cash saved successfully.`, 'success');
             resetForm();
             await loadRecords();
             checkFormLock();
@@ -303,12 +306,14 @@ async function loadRecords() {
 
             cashRecords.forEach(record => {
                 const row = document.createElement('tr');
+                const currencySymbol = record.currency_symbol || '$';
+                const currencyCode = record.currency || '-';
                 row.innerHTML = `
                     <td>${record.branch_name || '-'}</td>
                     <td>${record.company_name || '-'}</td>
                     <td>${formatDate(record.as_of_date)}</td>
-                    <td><strong>$${parseFloat(record.opening_amount).toFixed(2)}</strong></td>
-                    <td>${record.currency}</td>
+                    <td><strong>${currencySymbol}${parseFloat(record.opening_amount).toFixed(2)}</strong></td>
+                    <td>${currencyCode}</td>
                     <td>${record.entered_by}</td>
                     <td>${formatDateTime(record.updated_at)}</td>
                     <td>
@@ -409,7 +414,7 @@ function openEditModal(recordId) {
     document.getElementById('editCompany').value = record.company_name || '-';
     document.getElementById('editAsOfDate').value = record.as_of_date;
     document.getElementById('editOpeningCash').value = record.opening_amount;
-    document.getElementById('editCurrency').value = record.currency;
+    document.getElementById('editCurrency').value = `${record.currency} - ${record.currency_symbol}`;
     document.getElementById('editOpeningCashError').style.display = 'none';
     
     editModal.style.display = 'block';

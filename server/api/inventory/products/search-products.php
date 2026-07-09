@@ -25,34 +25,33 @@ if (!$user_id || !$tenant_id) {
 try {
     $query = $_GET['q'] ?? '';
     
-    if (empty($query)) {
-        echo json_encode(['success' => true, 'products' => []]);
-        exit;
-    }
-
-    // Search products by name, code, or barcode
     $searchTerm = '%' . $query . '%';
-    
-    $stmt = $pdo->prepare("
-        SELECT 
-            p.id,
-            p.code,
-            p.name,
-            p.default_unit_id,
-            p.product_type,
-            p.uom_type,
-            p.uom_group_id,
-            u.uom_name as unit_name
-        FROM products p
-        LEFT JOIN uom u ON p.default_unit_id = u.id
-        WHERE p.tenant_id = ? 
-            AND (p.name LIKE ? OR p.code LIKE ? OR p.barcode LIKE ?)
-            AND p.is_active = 1
-        ORDER BY p.code, p.name
-        LIMIT 20
-    ");
-    
-    $stmt->execute([$tenant_id, $searchTerm, $searchTerm, $searchTerm]);
+
+    if (empty($query)) {
+        $stmt = $pdo->prepare("
+            SELECT p.id, p.code, p.name, p.default_unit_id, p.product_type, p.uom_type, p.uom_group_id,
+                   u.uom_name as unit_name
+            FROM products p
+            LEFT JOIN uom u ON p.default_unit_id = u.id
+            WHERE p.tenant_id = ? AND p.is_active = 1
+            ORDER BY p.name
+            LIMIT 50
+        ");
+        $stmt->execute([$tenant_id]);
+    } else {
+        $stmt = $pdo->prepare("
+            SELECT p.id, p.code, p.name, p.default_unit_id, p.product_type, p.uom_type, p.uom_group_id,
+                   u.uom_name as unit_name
+            FROM products p
+            LEFT JOIN uom u ON p.default_unit_id = u.id
+            WHERE p.tenant_id = ?
+                AND (p.name LIKE ? OR p.code LIKE ? OR p.barcode LIKE ?)
+                AND p.is_active = 1
+            ORDER BY p.name
+            LIMIT 50
+        ");
+        $stmt->execute([$tenant_id, $searchTerm, $searchTerm, $searchTerm]);
+    }
     $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
     
     echo json_encode(['success' => true, 'products' => $products]);

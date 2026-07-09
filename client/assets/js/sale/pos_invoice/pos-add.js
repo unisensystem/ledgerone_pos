@@ -1,4 +1,4 @@
-﻿// Global variables for products and UOM data
+// Global variables for products and UOM data
 let uomData = [];
 let branchesData = [];
 let companiesData = [];
@@ -1246,8 +1246,8 @@ function initializePage(permissions) {
             if (data.success && data.data.length > 0) {
                 const balance = parseFloat(data.data[0].closing_balance || 0);
                 const balanceText = balance >= 0
-                    ? `Dr ${balance.toFixed(2)}`
-                    : `Cr ${Math.abs(balance).toFixed(2)}`;
+                    ? `Dr ${balance.toFixed(3)}`
+                    : `Cr ${Math.abs(balance).toFixed(3)}`;
                 showBalanceNotification(balanceText);
                 
                 // Store balance in hidden field
@@ -1585,7 +1585,7 @@ function initializePage(permissions) {
                 // Apply invoice settings after loading data
                 applyInvoiceSettings();
 
-                // Re-populate extra discount values AFTER applyInvoiceSettings —
+                // Re-populate extra discount values AFTER applyInvoiceSettings �
                 // it resets disabled inputs to '0' when the feature is off in localStorage.
                 document.getElementById('extraDiscount1Percent').value = invoice.extra_discount_1_percent || 0;
                 document.getElementById('extraDiscount1Amount').value  = invoice.extra_discount_1_amount  || 0;
@@ -1626,7 +1626,7 @@ function initializePage(permissions) {
                 document.getElementById('branch').value = order.branch_id;
                 document.getElementById('currency').value = order.currency_id;
                 const prevBalanceEl = document.getElementById('previousBalance');
-                if (prevBalanceEl) prevBalanceEl.value = `${order.current_balance >= 0 ? 'Dr' : 'Cr'} ${Math.abs(order.current_balance).toFixed(2)}`;
+                if (prevBalanceEl) prevBalanceEl.value = `${order.current_balance >= 0 ? 'Dr' : 'Cr'} ${Math.abs(order.current_balance).toFixed(3)}`;
                 const salesOfficerEl = document.getElementById('salesOfficer');
                 if (salesOfficerEl) salesOfficerEl.value = order.sale_officer_id || '';
                 const supplierManEl = document.getElementById('supplierMan');
@@ -1800,7 +1800,7 @@ function initializePage(permissions) {
                 // Update related fields for customer selection
                 if (hiddenInputId === 'customerCode') {
                     const balance = parseFloat(e.target.getAttribute('data-balance'));
-                    showBalanceNotification(`${balance >= 0 ? 'Dr' : 'Cr'} ${Math.abs(balance).toFixed(2)}`);
+                    showBalanceNotification(`${balance >= 0 ? 'Dr' : 'Cr'} ${Math.abs(balance).toFixed(3)}`);
 
                     // Update customer address
                     const address = e.target.getAttribute('data-address');
@@ -1833,7 +1833,7 @@ function initializePage(permissions) {
                     const withholdingTax = parseFloat(e.target.getAttribute('data-withholding-tax')) || 0;
                     const withholdingTaxInput = document.getElementById('withholdingTaxPercent');
                     if (withholdingTaxInput) {
-                        withholdingTaxInput.value = withholdingTax.toFixed(2);
+                        withholdingTaxInput.value = withholdingTax.toFixed(3);
                     }
 
                     // Auto-populate invoice-wise discount from customer
@@ -1984,7 +1984,7 @@ function initializePage(permissions) {
         qtyInput.type = 'number';
         qtyInput.className = 'table-input';
         qtyInput.min = '0';
-        qtyInput.step = '0.01';
+        qtyInput.step = '0.001';
         qtyInput.required = true;
         qtyInput.value = '0';
         qtyInput.addEventListener('input', function () {
@@ -2008,7 +2008,7 @@ function initializePage(permissions) {
         pcsInput.type = 'number';
         pcsInput.className = 'table-input';
         pcsInput.min = '0';
-        pcsInput.step = '0.01';
+        pcsInput.step = '0.001';
         pcsInput.value = '0';
         pcsInput.addEventListener('input', function () {
             const cartonConv = parseInt(row.dataset.cartonConversion) || 0;
@@ -2016,7 +2016,7 @@ function initializePage(permissions) {
             const ctn = parseFloat(row.cells[5].querySelector('input').value) || 0;
             const dz = parseFloat(row.cells[6].querySelector('input').value) || 0;
             const totalQty = pcs + (ctn * cartonConv) + (dz * 12);
-            qtyInput.value = totalQty.toFixed(2);
+            qtyInput.value = totalQty.toFixed(3);
             qtyInput.dispatchEvent(new Event('input'));
         });
         cell4.appendChild(pcsInput);
@@ -2035,7 +2035,7 @@ function initializePage(permissions) {
             const ctn = parseFloat(this.value) || 0;
             const dz = parseFloat(row.cells[6].querySelector('input').value) || 0;
             const totalQty = pcs + (ctn * cartonConv) + (dz * 12);
-            qtyInput.value = totalQty.toFixed(2);
+            qtyInput.value = totalQty.toFixed(3);
             qtyInput.dispatchEvent(new Event('input'));
         });
         cell5.appendChild(ctnInput);
@@ -2054,7 +2054,7 @@ function initializePage(permissions) {
             const ctn = parseFloat(row.cells[5].querySelector('input').value) || 0;
             const dz = parseFloat(this.value) || 0;
             const totalQty = pcs + (ctn * cartonConv) + (dz * 12);
-            qtyInput.value = totalQty.toFixed(2);
+            qtyInput.value = totalQty.toFixed(3);
             qtyInput.dispatchEvent(new Event('input'));
         });
         cell6.appendChild(dzInput);
@@ -2065,7 +2065,7 @@ function initializePage(permissions) {
         priceInput.type = 'number';
         priceInput.className = 'table-input';
         priceInput.min = '0';
-        priceInput.step = '0.01';
+        priceInput.step = '0.001';
         priceInput.required = true;
         cell7.appendChild(priceInput);
 
@@ -2086,7 +2086,7 @@ function initializePage(permissions) {
         discountPercent.className = 'table-input';
         discountPercent.min = '0';
         discountPercent.max = '100';
-        discountPercent.step = '0.01';
+        discountPercent.step = '0.001';
         discountPercent.value = '0';
         cell9.appendChild(discountPercent);
 
@@ -2096,7 +2096,7 @@ function initializePage(permissions) {
         discountAmount.type = 'number';
         discountAmount.className = 'table-input';
         discountAmount.min = '0';
-        discountAmount.step = '0.01';
+        discountAmount.step = '0.001';
         discountAmount.value = '0.00';
         cell10.appendChild(discountAmount);
 
@@ -2107,7 +2107,7 @@ function initializePage(permissions) {
         tradeOfferDiscount.className = 'table-input';
         tradeOfferDiscount.min = '0';
         tradeOfferDiscount.max = '100';
-        tradeOfferDiscount.step = '0.01';
+        tradeOfferDiscount.step = '0.001';
         tradeOfferDiscount.value = '0';
         tradeOfferDiscount.addEventListener('input', function() {
             if (!this.value || this.value == '0') {
@@ -2122,7 +2122,7 @@ function initializePage(permissions) {
         tradeOfferAmount.type = 'number';
         tradeOfferAmount.className = 'table-input';
         tradeOfferAmount.min = '0';
-        tradeOfferAmount.step = '0.01';
+        tradeOfferAmount.step = '0.001';
         tradeOfferAmount.value = '0.00';
         cell12.appendChild(tradeOfferAmount);
 
@@ -2133,7 +2133,7 @@ function initializePage(permissions) {
         taxPercent.className = 'table-input';
         taxPercent.min = '0';
         taxPercent.max = '100';
-        taxPercent.step = '0.01';
+        taxPercent.step = '0.001';
         taxPercent.value = '0';
         taxPercent.className = 'table-input tax-percent-cell';
         cell13.appendChild(taxPercent);
@@ -2144,7 +2144,7 @@ function initializePage(permissions) {
         taxAmount.type = 'number';
         taxAmount.className = 'table-input';
         taxAmount.min = '0';
-        taxAmount.step = '0.01';
+        taxAmount.step = '0.001';
         taxAmount.value = '0.00';
         taxAmount.className = 'table-input tax-amount-cell';
         cell14.appendChild(taxAmount);
@@ -2155,7 +2155,7 @@ function initializePage(permissions) {
         focQty.type = 'number';
         focQty.className = 'table-input';
         focQty.min = '0';
-        focQty.step = '0.01';
+        focQty.step = '0.001';
         focQty.value = '0';
         cell15.appendChild(focQty);
 
@@ -2343,17 +2343,17 @@ function initializePage(permissions) {
             const gstPct = parseFloat(gstPercent.value) || 0;
 
             const gross = qty * price;
-            grossAmount.value = gross.toFixed(2);
+            grossAmount.value = gross.toFixed(3);
 
             // Calculate discount amount
             const discountAmt = gross * (discountPct / 100);
-            discountAmount.value = discountAmt.toFixed(2);
+            discountAmount.value = discountAmt.toFixed(3);
 
             // Calculate trade offer amount from percentage + per unit amount * qty
             const afterDiscount = gross - discountAmt;
             const tradeOfferPerUnit = parseFloat(tradeOfferAmount.value) || 0;
             const tradeOfferAmt = (afterDiscount * (tradeOfferPct / 100)) + (tradeOfferPerUnit * qty);
-            tradeOfferAmount.value = tradeOfferAmt.toFixed(2);
+            tradeOfferAmount.value = tradeOfferAmt.toFixed(3);
 
             // Calculate GST amount based on sales_tax_type and customer tax registration
             const afterTradeOffer = afterDiscount - tradeOfferAmt;
@@ -2381,11 +2381,11 @@ function initializePage(permissions) {
                 }
             }
 
-            gstAmount.value = gstAmt.toFixed(2);
+            gstAmount.value = gstAmt.toFixed(3);
 
             // Calculate net amount
             const net = afterTradeOffer + gstAmt;
-            netAmount.value = net.toFixed(2);
+            netAmount.value = net.toFixed(3);
 
             // Update invoice summary
             updateInvoiceSummary();
@@ -2413,17 +2413,17 @@ function initializePage(permissions) {
             const discountAmt = parseFloat(discountAmount.value) || 0;
 
             const gross = qty * price;
-            grossAmount.value = gross.toFixed(2);
+            grossAmount.value = gross.toFixed(3);
 
             // Calculate discount percentage from amount
             const discountPct = gross > 0 ? (discountAmt / gross) * 100 : 0;
-            discountPercent.value = discountPct.toFixed(2);
+            discountPercent.value = discountPct.toFixed(3);
 
             // Calculate trade offer from percentage
             const tradeOfferPct = parseFloat(tradeOfferDiscount.value) || 0;
             const afterDiscount = gross - discountAmt;
             const tradeOfferAmt = afterDiscount * (tradeOfferPct / 100);
-            tradeOfferAmount.value = tradeOfferAmt.toFixed(2);
+            tradeOfferAmount.value = tradeOfferAmt.toFixed(3);
 
             // Calculate GST based on sales_tax_type and customer tax registration
             const gstPct = parseFloat(gstPercent.value) || 0;
@@ -2449,11 +2449,11 @@ function initializePage(permissions) {
                 }
             }
 
-            gstAmount.value = gstAmt.toFixed(2);
+            gstAmount.value = gstAmt.toFixed(3);
 
             // Calculate net amount
             const net = afterTradeOffer + gstAmt;
-            netAmount.value = net.toFixed(2);
+            netAmount.value = net.toFixed(3);
 
             // Update invoice summary
             updateInvoiceSummary();
@@ -2482,16 +2482,16 @@ function initializePage(permissions) {
             const tradeOfferAmt = parseFloat(tradeOfferAmount.value) || 0;
 
             const gross = qty * price;
-            grossAmount.value = gross.toFixed(2);
+            grossAmount.value = gross.toFixed(3);
 
             // Calculate discount amount
             const discountAmt = gross * (discountPct / 100);
-            discountAmount.value = discountAmt.toFixed(2);
+            discountAmount.value = discountAmt.toFixed(3);
 
             // Calculate trade offer percentage from amount
             const afterDiscount = gross - discountAmt;
             const tradeOfferPct = afterDiscount > 0 ? (tradeOfferAmt / afterDiscount) * 100 : 0;
-            tradeOfferDiscount.value = tradeOfferPct.toFixed(2);
+            tradeOfferDiscount.value = tradeOfferPct.toFixed(3);
 
             // Calculate GST based on sales_tax_type and customer tax registration
             const gstPct = parseFloat(gstPercent.value) || 0;
@@ -2517,11 +2517,11 @@ function initializePage(permissions) {
                 }
             }
 
-            gstAmount.value = gstAmt.toFixed(2);
+            gstAmount.value = gstAmt.toFixed(3);
 
             // Calculate net amount
             const net = afterTradeOffer + gstAmt;
-            netAmount.value = net.toFixed(2);
+            netAmount.value = net.toFixed(3);
 
             // Update invoice summary
             updateInvoiceSummary();
@@ -2551,25 +2551,25 @@ function initializePage(permissions) {
             const taxAmt = parseFloat(taxAmount.value) || 0;
 
             const gross = qty * price;
-            grossAmount.value = gross.toFixed(2);
+            grossAmount.value = gross.toFixed(3);
 
             // Calculate discount amount
             const discountAmt = gross * (discountPct / 100);
-            discountAmount.value = discountAmt.toFixed(2);
+            discountAmount.value = discountAmt.toFixed(3);
 
             // Calculate trade offer amount
             const afterDiscount = gross - discountAmt;
             const tradeOfferAmt = afterDiscount * (tradeOfferPct / 100);
-            tradeOfferAmount.value = tradeOfferAmt.toFixed(2);
+            tradeOfferAmount.value = tradeOfferAmt.toFixed(3);
 
             // Calculate Tax percentage from amount
             const afterTradeOffer = afterDiscount - tradeOfferAmt;
             const taxPct = afterTradeOffer > 0 ? (taxAmt / afterTradeOffer) * 100 : 0;
-            taxPercent.value = taxPct.toFixed(2);
+            taxPercent.value = taxPct.toFixed(3);
 
             // Calculate net amount
             const net = afterTradeOffer + taxAmt;
-            netAmount.value = net.toFixed(2);
+            netAmount.value = net.toFixed(3);
 
             // Update invoice summary
             updateInvoiceSummary();
@@ -2852,54 +2852,54 @@ function initializePage(permissions) {
             }
 
             // Batch DOM updates
-            document.getElementById('totalSalePrice').textContent = totalSalePrice.toFixed(2);
-            document.getElementById('totalGrossAmount').textContent = totalGrossAmount.toFixed(2);
-            document.getElementById('totalDiscountAmountItems').textContent = totalDiscountAmountItems.toFixed(2);
-            document.getElementById('totalTradeOfferAmount').textContent = totalTradeOfferAmount.toFixed(2);
-            document.getElementById('totalTaxAmount').textContent = totalTaxAmount.toFixed(2);
-            document.getElementById('totalFocQty').textContent = totalFocQty.toFixed(2);
-            document.getElementById('totalNetAmountItems').textContent = totalNetAmountItems.toFixed(2);
-            document.getElementById('totalBill').textContent = totalNetAmountItems.toFixed(2);
+            document.getElementById('totalSalePrice').textContent = totalSalePrice.toFixed(3);
+            document.getElementById('totalGrossAmount').textContent = totalGrossAmount.toFixed(3);
+            document.getElementById('totalDiscountAmountItems').textContent = totalDiscountAmountItems.toFixed(3);
+            document.getElementById('totalTradeOfferAmount').textContent = totalTradeOfferAmount.toFixed(3);
+            document.getElementById('totalTaxAmount').textContent = totalTaxAmount.toFixed(3);
+            document.getElementById('totalFocQty').textContent = totalFocQty.toFixed(3);
+            document.getElementById('totalNetAmountItems').textContent = totalNetAmountItems.toFixed(3);
+            document.getElementById('totalBill').textContent = totalNetAmountItems.toFixed(3);
 
             let invoiceDiscountAmount = parseFloat(document.getElementById('totalDiscountAmount').value) || 0;
             const invoiceDiscountPercent = parseFloat(document.getElementById('totalDiscountPercent').value) || 0;
 
             if (invoiceDiscountPercent > 0) {
                 invoiceDiscountAmount = totalNetAmountItems * (invoiceDiscountPercent / 100);
-                document.getElementById('totalDiscountAmount').value = invoiceDiscountAmount.toFixed(2);
+                document.getElementById('totalDiscountAmount').value = invoiceDiscountAmount.toFixed(3);
             } else if (invoiceDiscountAmount > 0) {
                 // If discount amount is manually entered, recalculate percentage
                 const discountPct = totalNetAmountItems > 0 ? (invoiceDiscountAmount / totalNetAmountItems) * 100 : 0;
-                document.getElementById('totalDiscountPercent').value = discountPct.toFixed(2);
+                document.getElementById('totalDiscountPercent').value = discountPct.toFixed(3);
             }
 
             const afterMainDiscount = totalNetAmountItems - invoiceDiscountAmount;
 
-            // Extra Discount 1 — base: amount after main invoice discount
+            // Extra Discount 1 � base: amount after main invoice discount
             let extraDiscount1Amount = parseFloat(document.getElementById('extraDiscount1Amount')?.value) || 0;
             const extraDiscount1Percent = parseFloat(document.getElementById('extraDiscount1Percent')?.value) || 0;
             if (extraDiscount1Percent > 0) {
                 extraDiscount1Amount = afterMainDiscount * (extraDiscount1Percent / 100);
                 const el = document.getElementById('extraDiscount1Amount');
-                if (el) el.value = extraDiscount1Amount.toFixed(2);
+                if (el) el.value = extraDiscount1Amount.toFixed(3);
             } else if (extraDiscount1Amount > 0) {
                 const pct = afterMainDiscount > 0 ? (extraDiscount1Amount / afterMainDiscount) * 100 : 0;
                 const el = document.getElementById('extraDiscount1Percent');
-                if (el) el.value = pct.toFixed(2);
+                if (el) el.value = pct.toFixed(3);
             }
             const afterExtraDiscount1 = afterMainDiscount - extraDiscount1Amount;
 
-            // Extra Discount 2 — base: amount after extra discount 1
+            // Extra Discount 2 � base: amount after extra discount 1
             let extraDiscount2Amount = parseFloat(document.getElementById('extraDiscount2Amount')?.value) || 0;
             const extraDiscount2Percent = parseFloat(document.getElementById('extraDiscount2Percent')?.value) || 0;
             if (extraDiscount2Percent > 0) {
                 extraDiscount2Amount = afterExtraDiscount1 * (extraDiscount2Percent / 100);
                 const el = document.getElementById('extraDiscount2Amount');
-                if (el) el.value = extraDiscount2Amount.toFixed(2);
+                if (el) el.value = extraDiscount2Amount.toFixed(3);
             } else if (extraDiscount2Amount > 0) {
                 const pct = afterExtraDiscount1 > 0 ? (extraDiscount2Amount / afterExtraDiscount1) * 100 : 0;
                 const el = document.getElementById('extraDiscount2Percent');
-                if (el) el.value = pct.toFixed(2);
+                if (el) el.value = pct.toFixed(3);
             }
             const afterExtraDiscount2 = afterExtraDiscount1 - extraDiscount2Amount;
 
@@ -2919,7 +2919,7 @@ function initializePage(permissions) {
 
             // Update DOM element
             const netAmountEl = document.getElementById('netAmount');
-            if (netAmountEl) netAmountEl.textContent = netAmount.toFixed(2);
+            if (netAmountEl) netAmountEl.textContent = netAmount.toFixed(3);
 
             console.log('DOM netAmount element now contains:', netAmountEl?.textContent);
 
@@ -2937,7 +2937,7 @@ function initializePage(permissions) {
             const isCashInvoice = document.getElementById('invoiceType')?.value === 'Cash';
             if (amountPaidInput && (isCashInvoice || (autoFillYes && autoFillYes.checked))) {
                 const netReceivableAmount = parseFloat(document.getElementById('netReceivable')?.textContent) || netAmount;
-                amountPaidInput.value = netReceivableAmount.toFixed(2);
+                amountPaidInput.value = netReceivableAmount.toFixed(3);
             }
 
             updateRemainingBalance();
@@ -2955,7 +2955,7 @@ function initializePage(permissions) {
         const total = previousBalance + netReceivable;
 
         if (total >= creditLimit) {
-            alert(`Warning: Total amount (${total.toFixed(2)}) exceeds or equals customer credit limit (${creditLimit.toFixed(2)})`);
+            alert(`Warning: Total amount (${total.toFixed(3)}) exceeds or equals customer credit limit (${creditLimit.toFixed(3)})`);
         }
     }
 
@@ -2964,7 +2964,7 @@ function initializePage(permissions) {
         const netAmount = parseFloat(document.getElementById('netAmount').textContent) || 0;
         const amountPaid = parseFloat(document.getElementById('amountPaid').value) || 0;
         const remainingBalance = netAmount - amountPaid;
-        document.getElementById('remainingBalance').value = remainingBalance.toFixed(2);
+        document.getElementById('remainingBalance').value = remainingBalance.toFixed(3);
     }
 
     // Load invoice-level tax regimes and display columns dynamically
@@ -3090,7 +3090,7 @@ function initializePage(permissions) {
         totalTaxAmountSummary.addEventListener('input', updateInvoiceSummaryFromTaxAmount);
     }
 
-    // Extra Discount 1 — percent drives amount; amount drives percent
+    // Extra Discount 1 � percent drives amount; amount drives percent
     const extraDiscount1PercentEl = document.getElementById('extraDiscount1Percent');
     if (extraDiscount1PercentEl) {
         extraDiscount1PercentEl.addEventListener('input', function () {
@@ -3110,7 +3110,7 @@ function initializePage(permissions) {
         });
     }
 
-    // Extra Discount 2 — percent drives amount; amount drives percent
+    // Extra Discount 2 � percent drives amount; amount drives percent
     const extraDiscount2PercentEl = document.getElementById('extraDiscount2Percent');
     if (extraDiscount2PercentEl) {
         extraDiscount2PercentEl.addEventListener('input', function () {
@@ -3154,7 +3154,7 @@ function initializePage(permissions) {
                 const netAmount = parseFloat(document.getElementById('netAmount').textContent) || 0;
                 const amountPaidEl = document.getElementById('amountPaid');
                 if (amountPaidEl) {
-                    amountPaidEl.value = netAmount.toFixed(2);
+                    amountPaidEl.value = netAmount.toFixed(3);
                     updateRemainingBalance();
                 }
             }
@@ -3172,7 +3172,7 @@ function initializePage(permissions) {
     if (copyNetAmountBtn) {
         copyNetAmountBtn.addEventListener('click', function() {
             const netAmount = parseFloat(document.getElementById('netAmount').textContent) || 0;
-            document.getElementById('amountPaid').value = netAmount.toFixed(2);
+            document.getElementById('amountPaid').value = netAmount.toFixed(3);
             updateRemainingBalance();
         });
     }
@@ -3183,7 +3183,7 @@ function initializePage(permissions) {
         radio.addEventListener('change', function() {
             if (this.value === 'yes') {
                 const netAmount = parseFloat(document.getElementById('netAmount').textContent) || 0;
-                document.getElementById('amountPaid').value = netAmount.toFixed(2);
+                document.getElementById('amountPaid').value = netAmount.toFixed(3);
                 updateRemainingBalance();
             }
         });
@@ -4337,7 +4337,7 @@ function updateInvoiceSummaryFromTaxAmount() {
         }
     }
 
-    document.getElementById('totalBill').textContent = totalBill.toFixed(2);
+    document.getElementById('totalBill').textContent = totalBill.toFixed(3);
 
     const discountAmount = parseFloat(document.getElementById('totalDiscountAmount').value) || 0;
     const afterDiscount = totalBill - discountAmount;
@@ -4346,9 +4346,9 @@ function updateInvoiceSummaryFromTaxAmount() {
     const shippingFees = parseFloat(document.getElementById('shippingFees').value) || 0;
     const netAmount = afterDiscount + gstAmount + shippingFees;
 
-    document.getElementById('totalGstPercent').value = gstPercent.toFixed(2);
-    document.getElementById('netAmount').textContent = netAmount.toFixed(2);
-    document.getElementById('amountPaid').value = netAmount.toFixed(2);
+    document.getElementById('totalGstPercent').value = gstPercent.toFixed(3);
+    document.getElementById('netAmount').textContent = netAmount.toFixed(3);
+    document.getElementById('amountPaid').value = netAmount.toFixed(3);
 
     updateRemainingBalance();
 }
@@ -4460,7 +4460,7 @@ async function loadPriceHistory(productId) {
         if (data.success && data.history && data.history.length > 0) {
             const content = data.history.map((item, index) => {
                 const date = new Date(item.sale_date).toLocaleDateString();
-                return `<div>${index + 1}. ${date} - ${item.currency_symbol}${parseFloat(item.sale_price).toFixed(2)} (Qty: ${item.quantity})</div>`;
+                return `<div>${index + 1}. ${date} - ${item.currency_symbol}${parseFloat(item.sale_price).toFixed(3)} (Qty: ${item.quantity})</div>`;
             }).join('');
 
             document.getElementById('priceHistoryContent').innerHTML = content;
@@ -4493,7 +4493,7 @@ async function loadProductStock(productId) {
         if (data.success) {
             const stock = parseFloat(data.stock);
             const unitName = data.unit_name || '';
-            const stockDisplay = unitName ? `${stock.toFixed(2)} ${unitName}` : `${stock.toFixed(2)} units`;
+            const stockDisplay = unitName ? `${stock.toFixed(3)} ${unitName}` : `${stock.toFixed(3)} units`;
             const stockColor = stock > 0 ? 'var(--success)' : 'var(--error)';
             
             document.getElementById('stockContent').innerHTML = `
@@ -4544,13 +4544,13 @@ function validateStockForRow(row) {
     // Update required qty display
     const requiredDisplay = document.getElementById('requiredQtyDisplay');
     if (requiredDisplay) {
-        const requiredQtyText = unitName ? `Required: ${totalQty.toFixed(2)} ${unitName}` : `Required: ${totalQty.toFixed(2)} units`;
+        const requiredQtyText = unitName ? `Required: ${totalQty.toFixed(3)} ${unitName}` : `Required: ${totalQty.toFixed(3)} units`;
         requiredDisplay.innerHTML = requiredQtyText;
         
         if (totalQty > availableStock) {
             requiredDisplay.style.color = 'var(--error)';
             requiredDisplay.style.fontWeight = '600';
-            requiredDisplay.innerHTML += ` <span style="color: var(--error);">⚠️ Exceeds available stock!</span>`;
+            requiredDisplay.innerHTML += ` <span style="color: var(--error);">?? Exceeds available stock!</span>`;
             
             // Highlight the row
             row.style.backgroundColor = 'rgba(227, 79, 79, 0.1)';
@@ -4816,7 +4816,7 @@ function showVariantsModal(parentRow, children) {
         <div style="display: flex; align-items: center; gap: 12px; padding: 8px; border-bottom: 1px solid var(--border-default);">
             <input type="checkbox" class="variant-checkbox" data-id="${child.id}" data-name="${child.name}" data-code="${child.code}" data-unit="${child.default_unit_id}" data-stock-affects="${child.stock_affects}" data-invoice-affects="${child.invoice_affects}" style="width: auto;" ${isChecked}>
             <span style="flex: 1; cursor: pointer;" class="variant-label" data-id="${child.id}">${child.code} - ${child.name}</span>
-            <input type="number" class="variant-qty table-input" data-id="${child.id}" min="0" step="0.01" value="${savedQty}" placeholder="Qty" style="width: 80px;" ${isDisabled}>
+            <input type="number" class="variant-qty table-input" data-id="${child.id}" min="0" step="0.001" value="${savedQty}" placeholder="Qty" style="width: 80px;" ${isDisabled}>
         </div>
     `;
     }).join('');
@@ -4913,7 +4913,7 @@ function addChildRows(parentRow, children) {
     // Sum child quantities and update parent
     const totalChildQty = children.reduce((sum, child) => sum + child.qty, 0);
     const parentQtyInput = parentRow.cells[3].querySelector('input');
-    parentQtyInput.value = totalChildQty.toFixed(2);
+    parentQtyInput.value = totalChildQty.toFixed(3);
     parentQtyInput.dispatchEvent(new Event('input'));
 
     // Store children in parent row dataset instead of creating visible rows
@@ -4956,7 +4956,7 @@ function updateParentQtyFromChildren(parentRow) {
     }
 
     const parentQtyInput = parentRow.cells[3].querySelector('input');
-    parentQtyInput.value = totalChildQty.toFixed(2);
+    parentQtyInput.value = totalChildQty.toFixed(3);
     parentQtyInput.dispatchEvent(new Event('input'));
 }
 
@@ -5344,7 +5344,7 @@ async function addRowDynamic() {
     priceInput.type = 'number';
     priceInput.className = 'table-input';
     priceInput.min = '0';
-    priceInput.step = '0.01';
+    priceInput.step = '0.001';
     priceInput.required = true;
     priceInput.addEventListener('input', function() {
         const unitInputs = row.querySelectorAll('.unit-input');
@@ -5401,7 +5401,7 @@ async function addRowDynamic() {
     discPercentInput.className = 'table-input';
     discPercentInput.min = '0';
     discPercentInput.max = '100';
-    discPercentInput.step = '0.01';
+    discPercentInput.step = '0.001';
     discPercentInput.value = '0';
     discPercentInput.addEventListener('input', function() {
         const unitInputs = row.querySelectorAll('.unit-input');
@@ -5423,7 +5423,7 @@ async function addRowDynamic() {
     discAmountInput.type = 'number';
     discAmountInput.className = 'table-input';
     discAmountInput.min = '0';
-    discAmountInput.step = '0.01';
+    discAmountInput.step = '0.001';
     discAmountInput.value = '0.00';
     discAmountCell.appendChild(discAmountInput);
     
@@ -5434,7 +5434,7 @@ async function addRowDynamic() {
     toAmountInput.type = 'number';
     toAmountInput.className = 'table-input';
     toAmountInput.min = '0';
-    toAmountInput.step = '0.01';
+    toAmountInput.step = '0.001';
     toAmountInput.value = '0.00';
     toAmountCell.appendChild(toAmountInput);
     
@@ -5446,7 +5446,7 @@ async function addRowDynamic() {
     taxPercentInput.className = 'table-input';
     taxPercentInput.min = '0';
     taxPercentInput.max = '100';
-    taxPercentInput.step = '0.01';
+    taxPercentInput.step = '0.001';
     taxPercentInput.value = '0';
     taxPercentInput.addEventListener('input', function() {
         const unitInputs = row.querySelectorAll('.unit-input');
@@ -5468,7 +5468,7 @@ async function addRowDynamic() {
     taxAmountInput.type = 'number';
     taxAmountInput.className = 'table-input';
     taxAmountInput.min = '0';
-    taxAmountInput.step = '0.01';
+    taxAmountInput.step = '0.001';
     taxAmountInput.value = '0.00';
     taxAmountCell.appendChild(taxAmountInput);
     
@@ -5479,7 +5479,7 @@ async function addRowDynamic() {
     focInput.type = 'number';
     focInput.className = 'table-input';
     focInput.min = '0';
-    focInput.step = '0.01';
+    focInput.step = '0.001';
     focInput.value = '0';
     focCell.appendChild(focInput);
     
@@ -5607,7 +5607,7 @@ function initTableDropdownDynamic(container, row) {
                 if (!isNextField) {
                     visibleOptions[0].click();
                 } else {
-                    // Enter is nextField — close dropdown and let the global handler navigate
+                    // Enter is nextField � close dropdown and let the global handler navigate
                     optionsContainer.style.display = 'none';
                 }
             }
@@ -5685,7 +5685,7 @@ function initTableDropdownDynamic(container, row) {
                         taxAmountInput.value = '0.00';
                     } else {
                         // Item-level tax: show the tax rate
-                        taxPercentInput.value = parseFloat(taxCalc.tax_rate).toFixed(2);
+                        taxPercentInput.value = parseFloat(taxCalc.tax_rate).toFixed(3);
                         taxPercentInput.readOnly = false;
                         taxPercentInput.disabled = false;
                         taxPercentInput.style.backgroundColor = '';

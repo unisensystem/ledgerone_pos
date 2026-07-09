@@ -1,3 +1,75 @@
+// ===== CUSTOMIZE FIELDS FUNCTIONALITY =====
+const CUSTOMIZE_FIELDS_KEY = 'expenseVoucherCustomizeFields';
+
+const allFields = [
+    { id: 'project', label: 'Project', visible: false },
+    { id: 'container', label: 'Container', visible: false }
+];
+
+function getFieldVisibility() {
+    const defaults = getDefaultVisibility();
+    const stored = localStorage.getItem(CUSTOMIZE_FIELDS_KEY);
+    if (stored) {
+        try {
+            const parsed = JSON.parse(stored);
+            return Object.assign({}, defaults, parsed);
+        } catch (e) {
+            return defaults;
+        }
+    }
+    return defaults;
+}
+
+function getDefaultVisibility() {
+    const defaults = {};
+    allFields.forEach(field => {
+        defaults[field.id] = field.visible;
+    });
+    return defaults;
+}
+
+function saveFieldVisibility(visibility) {
+    localStorage.setItem(CUSTOMIZE_FIELDS_KEY, JSON.stringify(visibility));
+}
+
+function toggleFieldVisibility(fieldId, isVisible) {
+    const element = document.getElementById(fieldId);
+    if (element) {
+        const formGroup = element.closest('.form-group');
+        if (formGroup) {
+            formGroup.style.display = isVisible ? '' : 'none';
+        }
+    }
+}
+
+function applyFieldVisibility() {
+    const visibility = getFieldVisibility();
+    allFields.forEach(field => {
+        if (visibility.hasOwnProperty(field.id)) {
+            toggleFieldVisibility(field.id, visibility[field.id]);
+        }
+    });
+}
+
+function populateCustomizeFieldsList() {
+    const visibility = getFieldVisibility();
+    const customizeFieldsList = document.getElementById('customizeFieldsList');
+    customizeFieldsList.innerHTML = '';
+    
+    allFields.forEach(field => {
+        const isVisible = visibility[field.id] !== undefined ? visibility[field.id] : field.visible;
+        const checkbox = document.createElement('div');
+        checkbox.className = 'customize-field-item';
+        checkbox.innerHTML = `
+            <label class="customize-field-label">
+                <input type="checkbox" class="customize-field-checkbox" data-field-id="${field.id}" ${isVisible ? 'checked' : ''}>
+                <span>${field.label}</span>
+            </label>
+        `;
+        customizeFieldsList.appendChild(checkbox);
+    });
+}
+
 // Sample data for dropdowns
 let expenseAccounts = [];
 let paymentMethods = [];
@@ -87,6 +159,70 @@ dateInput.value = today;
 
 // Initialize with one empty expense entry
 let entryCounter = 1;
+
+// Initialize customize fields
+document.addEventListener('DOMContentLoaded', function() {
+    applyFieldVisibility();
+    
+    const customizeFieldsBtn = document.getElementById('customizeFieldsBtn');
+    const customizeFieldsModal = document.getElementById('customizeFieldsModal');
+    const customizeFieldsModalClose = document.getElementById('customizeFieldsModalClose');
+    const customizeFieldsSaveBtn = document.getElementById('customizeFieldsSaveBtn');
+    const customizeFieldsResetBtn = document.getElementById('customizeFieldsResetBtn');
+    const customizeFieldsSelectAllBtn = document.getElementById('customizeFieldsSelectAllBtn');
+    const customizeFieldsDeselectAllBtn = document.getElementById('customizeFieldsDeselectAllBtn');
+    
+    customizeFieldsBtn.addEventListener('click', function() {
+        populateCustomizeFieldsList();
+        customizeFieldsModal.classList.add('active');
+    });
+    
+    function closeCustomizeFieldsModal() {
+        customizeFieldsModal.classList.remove('active');
+    }
+    
+    customizeFieldsModalClose.addEventListener('click', closeCustomizeFieldsModal);
+    customizeFieldsModal.addEventListener('click', function(e) {
+        if (e.target === customizeFieldsModal) closeCustomizeFieldsModal();
+    });
+    
+    customizeFieldsSaveBtn.addEventListener('click', function() {
+        const checkboxes = document.querySelectorAll('.customize-field-checkbox');
+        const visibility = {};
+        
+        checkboxes.forEach(checkbox => {
+            const fieldId = checkbox.dataset.fieldId;
+            visibility[fieldId] = checkbox.checked;
+        });
+        
+        saveFieldVisibility(visibility);
+        applyFieldVisibility();
+        closeCustomizeFieldsModal();
+    });
+    
+    customizeFieldsResetBtn.addEventListener('click', function() {
+        if (confirm('Are you sure you want to reset to default field visibility?')) {
+            const defaults = getDefaultVisibility();
+            saveFieldVisibility(defaults);
+            applyFieldVisibility();
+            populateCustomizeFieldsList();
+        }
+    });
+    
+    customizeFieldsSelectAllBtn.addEventListener('click', function() {
+        const checkboxes = document.querySelectorAll('.customize-field-checkbox');
+        checkboxes.forEach(checkbox => {
+            checkbox.checked = true;
+        });
+    });
+    
+    customizeFieldsDeselectAllBtn.addEventListener('click', function() {
+        const checkboxes = document.querySelectorAll('.customize-field-checkbox');
+        checkboxes.forEach(checkbox => {
+            checkbox.checked = false;
+        });
+    });
+});
 
 // Fetch dropdown data and initialize
 fetchDropdownData().then(() => {

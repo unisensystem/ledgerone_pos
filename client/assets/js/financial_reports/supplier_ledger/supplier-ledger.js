@@ -31,6 +31,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const subAccount = document.getElementById('sub-account');
     const companyFilter = document.getElementById('company-filter');
     const currencyFilter = document.getElementById('currency-filter');
+    const symbolOverride = document.getElementById('symbol-override');
 
     let currentPage = 1;
     let totalPages = 1;
@@ -276,6 +277,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     currencyFilter.innerHTML += `<option value="${currency.id}" ${isBase ? 'selected' : ''}>${currency.name} (${currency.symbol})${isBase ? ' - Base' : ''}</option>`;
                     if (isBase) {
                         currentCurrencySymbol = currency.symbol;
+                        symbolOverride.value = currency.symbol;
                     }
                 });
             }
@@ -290,10 +292,17 @@ document.addEventListener('DOMContentLoaded', function () {
         const symbolMatch = selectedOption.text.match(/\((.+?)\)/);
         if (symbolMatch) {
             currentCurrencySymbol = symbolMatch[1];
+            symbolOverride.value = symbolMatch[1];
         }
         if (summaryLedgerBtn.classList.contains('active') || (detailedLedgerBtn.classList.contains('active') && supplierCode.value)) {
             await loadLedgerData();
         }
+    });
+
+    // Symbol override — only changes display symbol, no conversion
+    symbolOverride.addEventListener('change', function() {
+        currentCurrencySymbol = this.value;
+        if (allData.length > 0) renderPage();
     });
 
     // Load suppliers

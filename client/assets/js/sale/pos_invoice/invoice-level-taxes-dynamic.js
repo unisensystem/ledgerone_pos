@@ -58,7 +58,7 @@ function renderInvoiceLevelTaxColumns() {
         percentItem.dataset.taxRegimeId = regime.id;
         percentItem.innerHTML = `
             <span class="summary-label">${regime.regime_name} %</span>
-            <span class="summary-value" id="invoiceTax_${regime.id}_percent">${ratePercent.toFixed(2)}</span>
+            <span class="summary-value" id="invoiceTax_${regime.id}_percent">${ratePercent.toFixed(3)}</span>
         `;
         container.appendChild(percentItem);
 
@@ -167,8 +167,8 @@ function calculateInvoiceLevelTaxes() {
         const percentEl = document.getElementById(`invoiceTax_${regime.id}_percent`);
         const amountEl  = document.getElementById(`invoiceTax_${regime.id}_amount`);
 
-        if (percentEl) percentEl.textContent = ratePercent.toFixed(2);
-        if (amountEl)  amountEl.textContent  = taxAmount.toFixed(2);
+        if (percentEl) percentEl.textContent = ratePercent.toFixed(3);
+        if (amountEl)  amountEl.textContent  = taxAmount.toFixed(3);
 
         totalInvoiceTax += taxAmount;
         if (!isTaxInclusive) totalExclusiveTax += taxAmount;
@@ -181,7 +181,7 @@ function calculateInvoiceLevelTaxes() {
             || parseFloat(document.getElementById('netAmount')?.textContent)
             || 0;
         const netReceivable = baseNetAmount + totalExclusiveTax;
-        netReceivableEl.textContent = netReceivable.toFixed(2);
+        netReceivableEl.textContent = netReceivable.toFixed(3);
         console.log('Net Receivable updated:', netReceivable);
     }
 

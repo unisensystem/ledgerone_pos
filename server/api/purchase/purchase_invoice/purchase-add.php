@@ -63,8 +63,8 @@ try {
             previous_balance, total_bill, total_discount_percent, 
             total_discount_amount, total_tax_percent, total_tax_amount, 
             shipping_fees, shipping_fees_type, net_amount, supplier_invoice_no, supplier_invoice_date, 
-            purchase_order_id, bilty_no, transport_name, remarks, sub_account_id, project_id, created_by, updated_by
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            purchase_order_id, bilty_no, transport_name, remarks, sub_account_id, project_id, assoc_company_id, created_by, updated_by
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ");
     
     $stmt->execute([
@@ -93,6 +93,7 @@ try {
         $input['remarks'] ?? null,
         $input['subAccountId'] ?? null,
         $input['projectId'] ?? null,
+        $input['assocCompanyId'] ?? null,
         $user_id,
         $user_id
     ]);

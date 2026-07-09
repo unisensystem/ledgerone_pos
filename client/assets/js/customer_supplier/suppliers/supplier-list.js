@@ -192,6 +192,19 @@ document.addEventListener('DOMContentLoaded', function () {
         } else {
             document.getElementById('viewSalesman').textContent = '-';
         }
+
+        // Load associated companies
+        fetch(`../../../../server/api/customer_supplier/suppliers/get-assoc-companies.php?supplier_id=${supplier.id}`)
+            .then(r => r.json())
+            .then(data => {
+                const el = document.getElementById('viewAssocCompanies');
+                if (data.success && data.companies && data.companies.length) {
+                    el.textContent = data.companies.map(c => c.company_name).join(', ');
+                } else {
+                    el.textContent = '-';
+                }
+            })
+            .catch(() => { document.getElementById('viewAssocCompanies').textContent = '-'; });
     }
 
     function closeViewModal() {
@@ -221,12 +234,20 @@ document.addEventListener('DOMContentLoaded', function () {
     // Salesman chip state — lives here so listeners are attached only once
     let editEmployees        = [];
     let editSelectedSalesmen = [];
+    let editAllCompanies     = [];
+    let editSelectedAssocCompanies = [];
 
     const editSalesmanSearch        = document.getElementById('editSalesmanSearch');
     const editSalesmanChipsList     = document.getElementById('editSalesmanChipsList');
     const editSalesmanDropdown      = document.getElementById('editSalesmanDropdown');
     const editSalesmanIdsInput      = document.getElementById('editSalesmanIds');
     const editSalesmanChipsContainer = document.getElementById('editSalesmanChipsContainer');
+
+    const editAssocCompanySearch        = document.getElementById('editAssocCompanySearch');
+    const editAssocCompanyChipsList     = document.getElementById('editAssocCompanyChipsList');
+    const editAssocCompanyDropdown      = document.getElementById('editAssocCompanyDropdown');
+    const editAssocCompanyIdsInput      = document.getElementById('editAssocCompanyIds');
+    const editAssocCompanyChipsContainer = document.getElementById('editAssocCompanyChipsContainer');
 
     function renderEditSalesmanChips() {
         editSalesmanChipsList.innerHTML = editSelectedSalesmen.map(s => `
@@ -259,8 +280,84 @@ document.addEventListener('DOMContentLoaded', function () {
         editSalesmanDropdown.style.display = 'none';
     }
 
+    function renderEditAssocCompanyChips() {
+        editAssocCompanyChipsList.innerHTML = editSelectedAssocCompanies.map(s =>
+            `<div class="edit-assoc-company-chip"><span>${s.name}</span><span class="chip-remove" data-id="${s.id}">×</span></div>`
+        ).join('');
+        editAssocCompanyChipsList.querySelectorAll('.chip-remove').forEach(btn => {
+            btn.addEventListener('click', function() {
+                editSelectedAssocCompanies = editSelectedAssocCompanies.filter(s => s.id != this.dataset.id);
+                renderEditAssocCompanyChips();
+                editAssocCompanyIdsInput.value = editSelectedAssocCompanies.map(s => s.id).join(',');
+            });
+        });
+        editAssocCompanyIdsInput.value = editSelectedAssocCompanies.map(s => s.id).join(',');
+    }
+
+    function addEditAssocCompanyChip(id, name) {
+        if (editSelectedAssocCompanies.find(s => s.id == id)) return;
+        editSelectedAssocCompanies.push({ id, name });
+        renderEditAssocCompanyChips();
+    }
+
+    function resetEditAssocCompanyChips() {
+        editSelectedAssocCompanies = [];
+        editAssocCompanyChipsList.innerHTML = '';
+        editAssocCompanyIdsInput.value = '';
+        editAssocCompanySearch.value = '';
+        editAssocCompanyDropdown.style.display = 'none';
+    }
+
     // Escape modal's overflow-y:auto by anchoring the dropdown to body with position:fixed
     document.body.appendChild(editSalesmanDropdown);
+    document.body.appendChild(editAssocCompanyDropdown);
+
+    // Assoc company search
+    editAssocCompanySearch.addEventListener('focus', function() {
+        const list = editAllCompanies.filter(c => !editSelectedAssocCompanies.find(s => s.id == c.id));
+        if (list.length > 0) {
+            const rect = editAssocCompanyChipsContainer.getBoundingClientRect();
+            editAssocCompanyDropdown.style.top   = (rect.bottom + 2) + 'px';
+            editAssocCompanyDropdown.style.left  = rect.left + 'px';
+            editAssocCompanyDropdown.style.width = rect.width + 'px';
+            editAssocCompanyDropdown.innerHTML = list.map(c =>
+                `<div class="edit-salesman-dropdown-item" data-id="${c.id}" data-name="${c.company_name}">${c.company_name}</div>`
+            ).join('');
+            editAssocCompanyDropdown.style.display = 'block';
+        }
+    });
+
+    editAssocCompanySearch.addEventListener('input', function() {
+        const term = this.value.toLowerCase();
+        const list = term
+            ? editAllCompanies.filter(c => c.company_name.toLowerCase().includes(term) && !editSelectedAssocCompanies.find(s => s.id == c.id))
+            : editAllCompanies.filter(c => !editSelectedAssocCompanies.find(s => s.id == c.id));
+        if (list.length > 0) {
+            const rect = editAssocCompanyChipsContainer.getBoundingClientRect();
+            editAssocCompanyDropdown.style.top   = (rect.bottom + 2) + 'px';
+            editAssocCompanyDropdown.style.left  = rect.left + 'px';
+            editAssocCompanyDropdown.style.width = rect.width + 'px';
+            editAssocCompanyDropdown.innerHTML = list.map(c =>
+                `<div class="edit-salesman-dropdown-item" data-id="${c.id}" data-name="${c.company_name}">${c.company_name}</div>`
+            ).join('');
+            editAssocCompanyDropdown.style.display = 'block';
+        } else {
+            editAssocCompanyDropdown.style.display = 'none';
+        }
+    });
+
+    editAssocCompanyDropdown.addEventListener('click', function(e) {
+        const item = e.target.closest('.edit-salesman-dropdown-item');
+        if (item) {
+            addEditAssocCompanyChip(item.dataset.id, item.dataset.name);
+            editAssocCompanySearch.value = '';
+            editAssocCompanyDropdown.style.display = 'none';
+        }
+    });
+
+    editAssocCompanyChipsContainer.addEventListener('click', function() {
+        editAssocCompanySearch.focus();
+    });
 
     // Attached once — always references the current editEmployees / editSelectedSalesmen
     editSalesmanSearch.addEventListener('input', function () {
@@ -305,6 +402,11 @@ document.addEventListener('DOMContentLoaded', function () {
             !editSalesmanDropdown.contains(e.target)) {
             editSalesmanDropdown.style.display = 'none';
         }
+        if (editModal.classList.contains('show') &&
+            !editAssocCompanyChipsContainer.contains(e.target) &&
+            !editAssocCompanyDropdown.contains(e.target)) {
+            editAssocCompanyDropdown.style.display = 'none';
+        }
     });
 
     function closeEditModal() {
@@ -312,6 +414,7 @@ document.addEventListener('DOMContentLoaded', function () {
         editSupplierForm.reset();
         document.getElementById('editProject').value = '';
         resetEditSalesmanChips();
+        resetEditAssocCompanyChips();
     }
 
     editModalClose.addEventListener('click', closeEditModal);
@@ -339,6 +442,7 @@ document.addEventListener('DOMContentLoaded', function () {
             id:             currentEditingId,
             companyId:      document.getElementById('editCompany').value,
             salesmanId:     editSalesmanIdsInput.value || null,
+            associatedCompanyIds: editAssocCompanyIdsInput.value || null,
             projectId:      document.getElementById('editProject').value || null,
             supplierName:   document.getElementById('editSupplierName').value.trim(),
             brandName:      document.getElementById('editBrandName').value.trim(),
@@ -419,6 +523,7 @@ document.addEventListener('DOMContentLoaded', function () {
     function openEditModal(id) {
         currentEditingId = id;
         resetEditSalesmanChips();
+        resetEditAssocCompanyChips();
 
         fetch(`../../../../server/api/customer_supplier/suppliers/supplier-edit.php?id=${id}`)
             .then(r => r.json())
@@ -455,6 +560,7 @@ document.addEventListener('DOMContentLoaded', function () {
             .then(r => r.json())
             .then(data => {
                 if (data.success) {
+                    editAllCompanies = data.companies;
                     const sel = document.getElementById('editCompany');
                     sel.innerHTML = '<option value="">Select Company</option>';
                     data.companies.forEach(c => {
@@ -462,6 +568,14 @@ document.addEventListener('DOMContentLoaded', function () {
                         if (c.id == supplier.company_id) opt.selected = true;
                         sel.appendChild(opt);
                     });
+                    // Load associated companies after editAllCompanies is set
+                    fetch(`../../../../server/api/customer_supplier/suppliers/get-assoc-companies.php?supplier_id=${supplier.id}`)
+                        .then(r => r.json())
+                        .then(assocData => {
+                            if (assocData.success && assocData.companies) {
+                                assocData.companies.forEach(c => addEditAssocCompanyChip(c.company_id, c.company_name));
+                            }
+                        });
                 }
             });
 

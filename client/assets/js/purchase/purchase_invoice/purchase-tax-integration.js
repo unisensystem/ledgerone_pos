@@ -43,7 +43,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 
                 const taxPercentInput = row.querySelector('.tax-percent-cell input');
                 if (taxPercentInput) {
-                    taxPercentInput.value = parseFloat(taxResult.tax_rate).toFixed(2);
+                    taxPercentInput.value = parseFloat(taxResult.tax_rate).toFixed(3);
                     taxPercentInput.readOnly = false;
                     taxPercentInput.disabled = false;
                     console.log('Tax % set to:', taxPercentInput.value);

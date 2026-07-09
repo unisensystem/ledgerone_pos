@@ -606,7 +606,7 @@ $user_employee_id = $user['employee_id'] ?? null;
             background: var(--surface-1);
             border-bottom: 1px solid var(--border-default);
             display: grid;
-            grid-template-columns: 30px 120px 60px 60px 70px 70px 70px 70px 80px 40px;
+            grid-template-columns: 30px 120px 60px 60px 70px 70px 60px 65px 70px 80px 40px;
             gap: 4px;
             align-items: center;
         }
@@ -622,7 +622,7 @@ $user_employee_id = $user['employee_id'] ?? null;
             padding: 6px 12px;
             border-bottom: 1px solid var(--border-default);
             display: grid;
-            grid-template-columns: 30px 120px 60px 60px 70px 70px 70px 70px 80px 40px;
+            grid-template-columns: 30px 120px 60px 60px 70px 70px 60px 65px 70px 80px 40px;
             gap: 4px;
             align-items: center;
             transition: background 0.2s;
@@ -811,7 +811,7 @@ $user_employee_id = $user['employee_id'] ?? null;
 
             .items-header,
             .item-row {
-                grid-template-columns: 30px 100px 50px 50px 60px 60px 60px 60px 70px 40px;
+                grid-template-columns: 30px 100px 50px 50px 60px 60px 55px 60px 60px 70px 40px;
             }
 
             .action-buttons {
@@ -839,7 +839,7 @@ $user_employee_id = $user['employee_id'] ?? null;
 
             .items-header,
             .item-row {
-                grid-template-columns: 30px 80px 45px 45px 55px 55px 55px 55px 65px 35px;
+                grid-template-columns: 30px 80px 45px 45px 55px 55px 50px 55px 55px 65px 35px;
                 font-size: 11px;
             }
 
@@ -1062,6 +1062,7 @@ $user_employee_id = $user['employee_id'] ?? null;
                     <div class="col-header text-right">PRICE</div>
                     <div class="col-header text-right">GROSS</div>
                     <div class="col-header text-right">DISC%</div>
+                    <div class="col-header text-right">DISC AMT</div>
                     <div class="col-header text-right">GST%</div>
                     <div class="col-header text-right">NET</div>
                     <div class="col-header text-center">ACT</div>
@@ -1069,7 +1070,7 @@ $user_employee_id = $user['employee_id'] ?? null;
                 <div class="items-body" id="itemsBody">
                     <!-- Items will be added here -->
                 </div>
-                <div class="items-footer" style="padding: 8px 12px; background: var(--surface-2); border-top: 2px solid var(--border-strong); display: grid; grid-template-columns: 30px 120px 60px 60px 70px 70px 70px 70px 80px 40px; gap: 4px; align-items: center; font-weight: 600;">
+                <div class="items-footer" style="padding: 8px 12px; background: var(--surface-2); border-top: 2px solid var(--border-strong); display: grid; grid-template-columns: 30px 120px 60px 60px 70px 70px 60px 65px 70px 80px 40px; gap: 4px; align-items: center; font-weight: 600;">
                     <div></div>
                     <div>TOTALS</div>
                     <div></div>
@@ -1077,6 +1078,7 @@ $user_employee_id = $user['employee_id'] ?? null;
                     <div></div>
                     <div class="text-right" id="totalGross">0.00</div>
                     <div></div>
+                    <div class="text-right" id="totalDiscAmt">0.00</div>
                     <div></div>
                     <div class="text-right" id="totalNet">0.00</div>
                     <div></div>

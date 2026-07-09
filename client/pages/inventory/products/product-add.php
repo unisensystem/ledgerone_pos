@@ -266,22 +266,22 @@ if (!$user_id) {
                 <div class="form-row">
                     <div class="form-group optional-field" id="purchasePriceGroup" data-field="purchasePrice">
                         <label>Purchase Price / Selected Unit</label>
-                        <input type="number" id="purchasePrice" name="purchasePrice" step="0.01" min="0">
+                        <input type="number" id="purchasePrice" name="purchasePrice" step="0.001" min="0">
                     </div>
                     
                     <div class="form-group">
                         <label>Trade Price (TP) / Selected Unit</label>
-                        <input type="number" id="tradePrice" name="tradePrice" step="0.01" min="0">
+                        <input type="number" id="tradePrice" name="tradePrice" step="0.001" min="0">
                     </div>
                     
                     <div class="form-group optional-field" data-field="wholesalePrice">
                         <label>Wholesale Price / Selected Unit</label>
-                        <input type="number" id="wholesalePrice" name="wholesalePrice" step="0.01" min="0">
+                        <input type="number" id="wholesalePrice" name="wholesalePrice" step="0.001" min="0">
                     </div>
                     
                     <div class="form-group">
                         <label>Maximum Retail Price (MRP) / Selected Unit</label>
-                        <input type="number" id="mrp" name="mrp" step="0.01" min="0">
+                        <input type="number" id="mrp" name="mrp" step="0.001" min="0">
                     </div>
                     
                     <div class="form-group optional-field" data-field="defaultDiscount">

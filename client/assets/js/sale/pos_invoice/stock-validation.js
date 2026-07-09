@@ -26,7 +26,7 @@ function validateStockBeforeSave() {
         const productName = row.cells[1]?.querySelector('.search-input')?.value || 'Unknown Product';
         
         if (totalQty > 0 && availableStock > 0 && totalQty > availableStock) {
-            alert(`❌ Stock Validation Error!\n\nProduct: ${productName}\nRequired: ${totalQty.toFixed(2)} units\nAvailable: ${availableStock.toFixed(2)} units\n\nPlease reduce the quantity or check stock availability.`);
+            alert(`❌ Stock Validation Error!\n\nProduct: ${productName}\nRequired: ${totalQty.toFixed(3)} units\nAvailable: ${availableStock.toFixed(3)} units\n\nPlease reduce the quantity or check stock availability.`);
             return false;
         }
     }

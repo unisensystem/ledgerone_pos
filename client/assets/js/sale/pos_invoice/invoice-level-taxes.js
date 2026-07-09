@@ -80,8 +80,8 @@ function calculateInvoiceLevelTaxes() {
         const percentEl = document.getElementById(`invoiceTax_${regime.id}_percent`);
         const amountEl = document.getElementById(`invoiceTax_${regime.id}_amount`);
 
-        if (percentEl) percentEl.textContent = ratePercent.toFixed(2);
-        if (amountEl) amountEl.textContent = taxAmount.toFixed(2);
+        if (percentEl) percentEl.textContent = ratePercent.toFixed(3);
+        if (amountEl) amountEl.textContent = taxAmount.toFixed(3);
 
         totalInvoiceTax += taxAmount;
     });
@@ -90,7 +90,7 @@ function calculateInvoiceLevelTaxes() {
     const netReceivableEl = document.getElementById('netReceivable');
     if (netReceivableEl) {
         const netReceivable = netAmount - totalInvoiceTax;
-        netReceivableEl.textContent = netReceivable.toFixed(2);
+        netReceivableEl.textContent = netReceivable.toFixed(3);
     }
 
     return totalInvoiceTax;

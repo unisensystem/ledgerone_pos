@@ -48,27 +48,27 @@ function calculateRowAmounts(row, qty, price) {
     }
     
     const gross = qty * price;
-    grossCell.querySelector('input').value = gross.toFixed(2);
+    grossCell.querySelector('input').value = gross.toFixed(3);
     
     const discPercent = parseFloat(discPercentCell.querySelector('input').value) || 0;
     const discAmount = gross * (discPercent / 100);
-    discAmountCell.querySelector('input').value = discAmount.toFixed(2);
+    discAmountCell.querySelector('input').value = discAmount.toFixed(3);
     
     const afterDiscount = gross - discAmount;
     
     const toPercent = parseFloat(toPercentCell.querySelector('input').value) || 0;
     const toAmount = afterDiscount * (toPercent / 100);
-    toAmountCell.querySelector('input').value = toAmount.toFixed(2);
+    toAmountCell.querySelector('input').value = toAmount.toFixed(3);
     
     const afterTO = afterDiscount - toAmount;
     
     // Calculate tax
     const taxPercent = parseFloat(taxPercentCell.querySelector('input').value) || 0;
     const taxAmount = afterTO * (taxPercent / 100);
-    taxAmountCell.querySelector('input').value = taxAmount.toFixed(2);
+    taxAmountCell.querySelector('input').value = taxAmount.toFixed(3);
     
     const net = afterTO + taxAmount;
-    netCell.querySelector('input').value = net.toFixed(2);
+    netCell.querySelector('input').value = net.toFixed(3);
     
     updateInvoiceSummaryDynamic();
 }

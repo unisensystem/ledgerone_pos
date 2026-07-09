@@ -87,7 +87,7 @@ function updateFooterTotals() {
     for (let i = maxUnitColumns - 1; i >= 0; i--) {
         const th = document.createElement('th');
         th.className = 'unit-total';
-        th.textContent = unitTotals[i].toFixed(2);
+        th.textContent = unitTotals[i].toFixed(3);
         insertTotalAfter.insertAdjacentElement('afterend', th);
     }
     
@@ -113,25 +113,25 @@ function updateFooterTotals() {
     }
     
     const totalPurchasePriceEl = document.getElementById('totalPurchasePrice');
-    if (totalPurchasePriceEl) totalPurchasePriceEl.textContent = totalPrice.toFixed(2);
+    if (totalPurchasePriceEl) totalPurchasePriceEl.textContent = totalPrice.toFixed(3);
     
     const totalGrossAmountEl = document.getElementById('totalGrossAmount');
-    if (totalGrossAmountEl) totalGrossAmountEl.textContent = totalGross.toFixed(2);
+    if (totalGrossAmountEl) totalGrossAmountEl.textContent = totalGross.toFixed(3);
     
     const totalDiscountAmountItemsEl = document.getElementById('totalDiscountAmountItems');
-    if (totalDiscountAmountItemsEl) totalDiscountAmountItemsEl.textContent = totalDisc.toFixed(2);
+    if (totalDiscountAmountItemsEl) totalDiscountAmountItemsEl.textContent = totalDisc.toFixed(3);
     
     const totalTradeOfferAmountItemsEl = document.getElementById('totalTradeOfferAmountItems');
-    if (totalTradeOfferAmountItemsEl) totalTradeOfferAmountItemsEl.textContent = totalTO.toFixed(2);
+    if (totalTradeOfferAmountItemsEl) totalTradeOfferAmountItemsEl.textContent = totalTO.toFixed(3);
     
     const totalGSTAmountItemsEl = document.getElementById('totalTaxAmountItems');
-    if (totalGSTAmountItemsEl) totalGSTAmountItemsEl.textContent = totalGST.toFixed(2);
+    if (totalGSTAmountItemsEl) totalGSTAmountItemsEl.textContent = totalGST.toFixed(3);
     
     const totalFOCQtyEl = document.getElementById('totalFOCQty');
-    if (totalFOCQtyEl) totalFOCQtyEl.textContent = totalFOC.toFixed(2);
+    if (totalFOCQtyEl) totalFOCQtyEl.textContent = totalFOC.toFixed(3);
     
     const totalNetAmountItemsEl = document.getElementById('totalNetAmountItems');
-    if (totalNetAmountItemsEl) totalNetAmountItemsEl.textContent = totalNet.toFixed(2);
+    if (totalNetAmountItemsEl) totalNetAmountItemsEl.textContent = totalNet.toFixed(3);
 }
 
 // Recalculate max columns when products change
@@ -239,7 +239,7 @@ function updateRowUnitCells(row) {
             input.type = 'number';
             input.className = 'table-input unit-input';
             input.min = '0';
-            input.step = '0.01';
+            input.step = '0.001';
             // Restore existing value if available, otherwise set to 0
             input.value = existingValues[unit.id] || '0';
             input.placeholder = '0';
@@ -307,26 +307,26 @@ function calculateRowAmounts(row, qty, price) {
     }
     
     const gross = qty * price;
-    grossCell.querySelector('input').value = gross.toFixed(2);
+    grossCell.querySelector('input').value = gross.toFixed(3);
     
     const discPercent = parseFloat(discPercentCell.querySelector('input').value) || 0;
     const discAmount = gross * (discPercent / 100);
-    discAmountCell.querySelector('input').value = discAmount.toFixed(2);
+    discAmountCell.querySelector('input').value = discAmount.toFixed(3);
     
     const afterDiscount = gross - discAmount;
     
     const toPercent = parseFloat(toPercentCell.querySelector('input').value) || 0;
     const toAmount = afterDiscount * (toPercent / 100);
-    toAmountCell.querySelector('input').value = toAmount.toFixed(2);
+    toAmountCell.querySelector('input').value = toAmount.toFixed(3);
     
     const afterTO = afterDiscount - toAmount;
     
     const taxPercent = parseFloat(taxPercentCell.querySelector('input').value) || 0;
     const taxAmount = afterTO * (taxPercent / 100);
-    taxAmountCell.querySelector('input').value = taxAmount.toFixed(2);
+    taxAmountCell.querySelector('input').value = taxAmount.toFixed(3);
     
     const net = afterTO + taxAmount;
-    netCell.querySelector('input').value = net.toFixed(2);
+    netCell.querySelector('input').value = net.toFixed(3);
     
     updateInvoiceSummaryDynamic();
 }
@@ -344,7 +344,7 @@ function updateInvoiceSummaryDynamic() {
     }
     
     const totalBillElement = document.getElementById('totalBill');
-    if (totalBillElement) totalBillElement.textContent = totalBill.toFixed(2);
+    if (totalBillElement) totalBillElement.textContent = totalBill.toFixed(3);
     
     const discountPercentElement = document.getElementById('totalDiscountPercent');
     const discountPercent = discountPercentElement ? parseFloat(discountPercentElement.value) || 0 : 0;
@@ -357,10 +357,10 @@ function updateInvoiceSummaryDynamic() {
     const netAmount = shippingFeesType === 'subtract' ? afterDiscount - shippingFees : afterDiscount + shippingFees;
     
     const discountAmountElement = document.getElementById('totalDiscountAmount');
-    if (discountAmountElement) discountAmountElement.value = discountAmount.toFixed(2);
+    if (discountAmountElement) discountAmountElement.value = discountAmount.toFixed(3);
     
     const netAmountElement = document.getElementById('netAmount');
-    if (netAmountElement) netAmountElement.textContent = netAmount.toFixed(2);
+    if (netAmountElement) netAmountElement.textContent = netAmount.toFixed(3);
     
     updateFooterTotals();
     

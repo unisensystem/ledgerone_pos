@@ -185,13 +185,6 @@
                             <input type="text" class="account-input" data-row="${serialNumber}" placeholder="Search account...">
                             <i class="fas fa-chevron-down"></i>
                         </div>
-                        <div class="dropdown-options" id="dropdown-${serialNumber}">
-                            ${accountOptions.map(account => 
-                                `<div class="dropdown-option" data-value="${account.id}" data-name="${account.name}">
-                                    ${account.name}
-                                </div>`
-                            ).join('')}
-                        </div>
                     </div>
                     <input type="hidden" class="account-id" id="accountId-${serialNumber}">
                 </td>
@@ -212,6 +205,16 @@
             `;
             
             tableBody.appendChild(row);
+
+            // Create dropdown and append to body to avoid table overflow clipping
+            const dropdownEl = document.createElement('div');
+            dropdownEl.className = 'dropdown-options';
+            dropdownEl.id = `dropdown-${serialNumber}`;
+            dropdownEl.innerHTML = accountOptions.map(account =>
+                `<div class="dropdown-option" data-value="${account.id}" data-name="${account.name}">${account.name}</div>`
+            ).join('');
+            document.body.appendChild(dropdownEl);
+
             attachDropdownListeners(serialNumber);
             serialNumber++;
         }
@@ -219,8 +222,10 @@
         // Remove an entry row
         function removeEntryRow(rowNum) {
             const row = document.getElementById(`entryRow-${rowNum}`);
+            const dropdown = document.getElementById(`dropdown-${rowNum}`);
             if (row) {
                 row.remove();
+                if (dropdown) dropdown.remove();
                 
                 // Recalculate serial numbers
                 const rows = document.querySelectorAll('#journalTableBody tr');
@@ -233,6 +238,14 @@
             }
         }
 
+        // Position dropdown using fixed coordinates
+        function positionDropdown(input, dropdown) {
+            const rect = input.getBoundingClientRect();
+            dropdown.style.top = rect.bottom + 'px';
+            dropdown.style.left = rect.left + 'px';
+            dropdown.style.width = rect.width + 'px';
+        }
+
         // Attach event listeners to dropdown
         function attachDropdownListeners(rowNum) {
             const input = document.querySelector(`.account-input[data-row="${rowNum}"]`);
@@ -240,6 +253,7 @@
             const accountIdInput = document.getElementById(`accountId-${rowNum}`);
             
             input.addEventListener('focus', function() {
+                positionDropdown(input, dropdown);
                 dropdown.classList.add('show');
             });
             
@@ -249,24 +263,18 @@
                 
                 options.forEach(option => {
                     const text = option.textContent.toLowerCase();
-                    if (text.includes(searchTerm)) {
-                        option.style.display = 'block';
-                    } else {
-                        option.style.display = 'none';
-                    }
+                    option.style.display = text.includes(searchTerm) ? 'block' : 'none';
                 });
                 
+                positionDropdown(input, dropdown);
                 dropdown.classList.add('show');
             });
             
             // Handle option selection
             dropdown.querySelectorAll('.dropdown-option').forEach(option => {
                 option.addEventListener('click', function() {
-                    const accountId = this.getAttribute('data-value');
-                    const accountName = this.getAttribute('data-name');
-                    
-                    input.value = accountName;
-                    accountIdInput.value = accountId;
+                    input.value = this.getAttribute('data-name');
+                    accountIdInput.value = this.getAttribute('data-value');
                     dropdown.classList.remove('show');
                 });
             });
@@ -277,6 +285,13 @@
                     dropdown.classList.remove('show');
                 }
             });
+
+            // Reposition on scroll
+            window.addEventListener('scroll', function() {
+                if (dropdown.classList.contains('show')) {
+                    positionDropdown(input, dropdown);
+                }
+            }, true);
         }
 
         // Update totals and validation
@@ -478,6 +493,7 @@
                     
                     // Clear all entries and add one fresh row
                     const tableBody = document.getElementById('journalTableBody');
+                    document.querySelectorAll('body > .dropdown-options').forEach(d => d.remove());
                     tableBody.innerHTML = '';
                     serialNumber = 1;
                     addEntryRow();
@@ -521,6 +537,7 @@
                 
                 // Clear all entries and add one fresh row
                 const tableBody = document.getElementById('journalTableBody');
+                document.querySelectorAll('body > .dropdown-options').forEach(d => d.remove());
                 tableBody.innerHTML = '';
                 serialNumber = 1;
                 addEntryRow();

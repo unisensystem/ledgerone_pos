@@ -24,7 +24,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
 
 try {
     $stmt = $pdo->prepare("
-        SELECT c.name 
+        SELECT tc.currency_id, c.code, c.name, c.symbol
         FROM tenant_currencies tc 
         JOIN ledgerone_public.currencies c ON tc.currency_id = c.id 
         WHERE tc.tenant_id = ? AND tc.is_base_currency = 1
@@ -33,9 +33,9 @@ try {
     $row = $stmt->fetch();
     
     if ($row) {
-        echo json_encode(['success' => true, 'currency' => $row['name']]);
+        echo json_encode(['success' => true, 'currency_id' => $row['currency_id'], 'code' => $row['code'], 'name' => $row['name'], 'symbol' => $row['symbol']]);
     } else {
-        echo json_encode(['success' => false, 'currency' => 'USD']);
+        echo json_encode(['success' => false, 'currency_id' => 2, 'code' => 'PKR', 'name' => 'Pakistani Rupee', 'symbol' => '₨']);
     }
 } catch (Exception $e) {
     http_response_code(500);

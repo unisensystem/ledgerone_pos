@@ -20,7 +20,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const form = document.getElementById('invoiceForm');
 
     // Load all data, then initialize dropdowns and add first row
-    Promise.all([loadSuppliers(), loadBranches(), loadProducts(), loadUOM(), loadCurrencies(), loadCompanies(), loadPurchaseOrders(), loadProjects(), fetchContainers()]).then(() => {
+    Promise.all([loadSuppliers(), loadBranches(), loadProducts(), loadUOM(), loadCurrencies(), loadCompanies(), loadAssocCompanies(), loadPurchaseOrders(), loadProjects(), fetchContainers()]).then(() => {
         initSearchableDropdown('supplierCodeSearch', 'supplierCodeOptions', 'supplierCode');
         initSearchableDropdown('branchSearch', 'branchOptions', 'branch');
         initSearchableDropdown('purchaseOrderSearch', 'purchaseOrderOptions', 'purchaseOrder');
@@ -35,6 +35,44 @@ document.addEventListener('DOMContentLoaded', function () {
             // Add first row after data is loaded
             addRowDynamic();
         }
+    });
+
+    // When associated company changes, filter suppliers
+    document.getElementById('associatedCompany').addEventListener('change', function() {
+        const assocCompanyId = this.value;
+        const codeOptions = document.getElementById('supplierCodeOptions');
+        // Reset supplier
+        document.getElementById('supplierCodeSearch').value = '';
+        document.getElementById('supplierCode').value = '';
+        document.getElementById('previousBalance').value = '0.00';
+        document.getElementById('subAccountOptions').innerHTML = '';
+        document.getElementById('subAccountSearch').value = '';
+        document.getElementById('subAccount').value = '';
+
+        if (!assocCompanyId) {
+            // Show all suppliers
+            loadSuppliers();
+            return;
+        }
+
+        fetch(`../../../../server/api/purchase/purchase_invoice/get-suppliers-by-assoc-company.php?assoc_company_id=${assocCompanyId}`)
+            .then(r => r.json())
+            .then(data => {
+                codeOptions.innerHTML = '';
+                if (data.success && data.suppliers.length) {
+                    data.suppliers.forEach(supplier => {
+                        const opt = document.createElement('div');
+                        opt.className = 'dropdown-option';
+                        opt.setAttribute('data-value', supplier.id);
+                        opt.setAttribute('data-balance', supplier.current_balance);
+                        opt.textContent = `${supplier.supplier_code} - ${supplier.supplier_name}${supplier.primary_phone ? ' - ' + supplier.primary_phone : ''}`;
+                        codeOptions.appendChild(opt);
+                    });
+                } else {
+                    codeOptions.innerHTML = '<div style="padding:10px;color:var(--subtext)">No suppliers found for this company</div>';
+                }
+            })
+            .catch(err => console.error('suppliers by assoc company error:', err));
     });
 
     // Add row button event
@@ -212,6 +250,23 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
+    // Load all associated companies for the dropdown
+    async function loadAssocCompanies() {
+        try {
+            const response = await fetch('../../../../server/api/purchase/purchase_invoice/get-assoc-companies-by-company.php');
+            const data = await response.json();
+            if (data.success) {
+                const assocSelect = document.getElementById('associatedCompany');
+                assocSelect.innerHTML = '<option value="">Select Associated Company</option>';
+                data.companies.forEach(c => {
+                    assocSelect.appendChild(new Option(c.company_name, c.company_id));
+                });
+            }
+        } catch (err) {
+            console.error('loadAssocCompanies error:', err);
+        }
+    }
+
     // Load companies from API
     async function loadCompanies() {
         try {
@@ -325,7 +380,7 @@ document.addEventListener('DOMContentLoaded', function () {
             if (data.success) {
                 const balance = parseFloat(data.balance || 0);
                 document.getElementById('previousBalance').value =
-                    `${balance >= 0 ? 'Dr' : 'Cr'} ${Math.abs(balance).toFixed(2)}`;
+                    `${balance >= 0 ? 'Dr' : 'Cr'} ${Math.abs(balance).toFixed(3)}`;
             }
         } catch (error) {
             console.error('Error fetching supplier balance:', error);
@@ -497,6 +552,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 document.getElementById('biltyNo').value = invoice.bilty_no || '';
                 document.getElementById('transportName').value = invoice.transport_name || '';
                 document.getElementById('company').value = invoice.company_id || '';
+                document.getElementById('associatedCompany').value = invoice.assoc_company_id || '';
                 document.getElementById('supplierCodeSearch').value = `${invoice.supplier_code || ''} - ${invoice.supplier_name || ''}`;
                 document.getElementById('supplierCode').value = invoice.supplier_id || '';
                 const branchText = invoice.parent_branch_name
@@ -846,7 +902,7 @@ document.addEventListener('DOMContentLoaded', function () {
         priceInput.type = 'number';
         priceInput.className = 'table-input';
         priceInput.min = '0';
-        priceInput.step = '0.01';
+        priceInput.step = '0.001';
         priceInput.required = true;
         cell7.appendChild(priceInput);
 
@@ -877,7 +933,7 @@ document.addEventListener('DOMContentLoaded', function () {
         discountAmount.type = 'number';
         discountAmount.className = 'table-input';
         discountAmount.min = '0';
-        discountAmount.step = '0.01';
+        discountAmount.step = '0.001';
         discountAmount.value = '0.00';
         cell10.appendChild(discountAmount);
 
@@ -898,7 +954,7 @@ document.addEventListener('DOMContentLoaded', function () {
         tradeOfferAmount.type = 'number';
         tradeOfferAmount.className = 'table-input';
         tradeOfferAmount.min = '0';
-        tradeOfferAmount.step = '0.01';
+        tradeOfferAmount.step = '0.001';
         tradeOfferAmount.value = '0.00';
         cell12.appendChild(tradeOfferAmount);
 
@@ -919,7 +975,7 @@ document.addEventListener('DOMContentLoaded', function () {
         gstAmount.type = 'number';
         gstAmount.className = 'table-input';
         gstAmount.min = '0';
-        gstAmount.step = '0.01';
+        gstAmount.step = '0.001';
         gstAmount.value = '0.00';
         cell14.appendChild(gstAmount);
 
@@ -1067,7 +1123,7 @@ document.addEventListener('DOMContentLoaded', function () {
             const cartonConversion = parseFloat(row.dataset.cartonConversion) || 0;
 
             const calculatedQty = pcs + (ctn * cartonConversion) + (dz * 12);
-            qtyInput.value = calculatedQty.toFixed(2);
+            qtyInput.value = calculatedQty.toFixed(3);
             calculateRow();
         }
 
@@ -1080,29 +1136,29 @@ document.addEventListener('DOMContentLoaded', function () {
 
             // Calculate gross amount
             const gross = qty * price;
-            grossAmount.value = gross.toFixed(2);
+            grossAmount.value = gross.toFixed(3);
 
             // Calculate discount amount
             const discountAmt = gross * (discountPct / 100);
-            discountAmount.value = discountAmt.toFixed(2);
+            discountAmount.value = discountAmt.toFixed(3);
 
             // Calculate after discount
             const afterDiscount = gross - discountAmt;
 
             // Calculate trade offer amount
             const tradeOfferAmt = afterDiscount * (tradeOfferPct / 100);
-            tradeOfferAmount.value = tradeOfferAmt.toFixed(2);
+            tradeOfferAmount.value = tradeOfferAmt.toFixed(3);
 
             // Calculate after trade offer
             const afterTradeOffer = afterDiscount - tradeOfferAmt;
 
             // Calculate GST amount
             const gstAmt = afterTradeOffer * (gstPct / 100);
-            gstAmount.value = gstAmt.toFixed(2);
+            gstAmount.value = gstAmt.toFixed(3);
 
             // Calculate net amount
             const net = afterTradeOffer + gstAmt;
-            netAmount.value = net.toFixed(2);
+            netAmount.value = net.toFixed(3);
 
             // Update invoice summary
             updateInvoiceSummary();
@@ -1117,29 +1173,29 @@ document.addEventListener('DOMContentLoaded', function () {
 
             // Calculate gross amount
             const gross = qty * price;
-            grossAmount.value = gross.toFixed(2);
+            grossAmount.value = gross.toFixed(3);
 
             // Calculate discount percentage from amount
             const discountPct = gross > 0 ? (discountAmt / gross) * 100 : 0;
-            discountPercent.value = discountPct.toFixed(2);
+            discountPercent.value = discountPct.toFixed(3);
 
             // Calculate after discount
             const afterDiscount = gross - discountAmt;
 
             // Calculate trade offer amount
             const tradeOfferAmt = afterDiscount * (tradeOfferPct / 100);
-            tradeOfferAmount.value = tradeOfferAmt.toFixed(2);
+            tradeOfferAmount.value = tradeOfferAmt.toFixed(3);
 
             // Calculate after trade offer
             const afterTradeOffer = afterDiscount - tradeOfferAmt;
 
             // Calculate GST amount
             const gstAmt = afterTradeOffer * (gstPct / 100);
-            gstAmount.value = gstAmt.toFixed(2);
+            gstAmount.value = gstAmt.toFixed(3);
 
             // Calculate net amount
             const net = afterTradeOffer + gstAmt;
-            netAmount.value = net.toFixed(2);
+            netAmount.value = net.toFixed(3);
 
             // Update invoice summary
             updateInvoiceSummary();
@@ -1154,25 +1210,25 @@ document.addEventListener('DOMContentLoaded', function () {
 
             // Calculate gross amount
             const gross = qty * price;
-            grossAmount.value = gross.toFixed(2);
+            grossAmount.value = gross.toFixed(3);
 
             // Calculate after discount
             const afterDiscount = gross - discountAmt;
 
             // Calculate trade offer percentage from amount
             const tradeOfferPct = afterDiscount > 0 ? (tradeOfferAmt / afterDiscount) * 100 : 0;
-            tradeOfferPercent.value = tradeOfferPct.toFixed(2);
+            tradeOfferPercent.value = tradeOfferPct.toFixed(3);
 
             // Calculate after trade offer
             const afterTradeOffer = afterDiscount - tradeOfferAmt;
 
             // Calculate GST amount
             const gstAmt = afterTradeOffer * (gstPct / 100);
-            gstAmount.value = gstAmt.toFixed(2);
+            gstAmount.value = gstAmt.toFixed(3);
 
             // Calculate net amount
             const net = afterTradeOffer + gstAmt;
-            netAmount.value = net.toFixed(2);
+            netAmount.value = net.toFixed(3);
 
             // Update invoice summary
             updateInvoiceSummary();
@@ -1187,7 +1243,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
             // Calculate gross amount
             const gross = qty * price;
-            grossAmount.value = gross.toFixed(2);
+            grossAmount.value = gross.toFixed(3);
 
             // Calculate after discount
             const afterDiscount = gross - discountAmt;
@@ -1197,11 +1253,11 @@ document.addEventListener('DOMContentLoaded', function () {
 
             // Calculate GST percentage from amount
             const gstPct = afterTradeOffer > 0 ? (gstAmt / afterTradeOffer) * 100 : 0;
-            gstPercent.value = gstPct.toFixed(2);
+            gstPercent.value = gstPct.toFixed(3);
 
             // Calculate net amount
             const net = afterTradeOffer + gstAmt;
-            netAmount.value = net.toFixed(2);
+            netAmount.value = net.toFixed(3);
 
             // Update invoice summary
             updateInvoiceSummary();
@@ -1264,7 +1320,7 @@ document.addEventListener('DOMContentLoaded', function () {
         priceInput.type = 'number';
         priceInput.className = 'table-input';
         priceInput.min = '0';
-        priceInput.step = '0.01';
+        priceInput.step = '0.001';
         priceInput.required = true;
         priceInput.addEventListener('input', function() {
             const unitInputs = row.querySelectorAll('.unit-input');
@@ -1319,7 +1375,7 @@ document.addEventListener('DOMContentLoaded', function () {
         discAmountInput.type = 'number';
         discAmountInput.className = 'table-input';
         discAmountInput.min = '0';
-        discAmountInput.step = '0.01';
+        discAmountInput.step = '0.001';
         discAmountInput.value = '0.00';
         discAmountCell.appendChild(discAmountInput);
         
@@ -1353,7 +1409,7 @@ document.addEventListener('DOMContentLoaded', function () {
         toAmountInput.type = 'number';
         toAmountInput.className = 'table-input';
         toAmountInput.min = '0';
-        toAmountInput.step = '0.01';
+        toAmountInput.step = '0.001';
         toAmountInput.value = '0.00';
         toAmountCell.appendChild(toAmountInput);
         
@@ -1388,7 +1444,7 @@ document.addEventListener('DOMContentLoaded', function () {
         taxAmountInput.type = 'number';
         taxAmountInput.className = 'table-input';
         taxAmountInput.min = '0';
-        taxAmountInput.step = '0.01';
+        taxAmountInput.step = '0.001';
         taxAmountInput.value = '0.00';
         taxAmountInput.setAttribute('data-tax-amount', '');
         taxAmountCell.appendChild(taxAmountInput);
@@ -1751,15 +1807,15 @@ document.addEventListener('DOMContentLoaded', function () {
         }
 
         // Update totals row
-        document.getElementById('totalPurchasePrice').textContent = totalPurchasePrice.toFixed(2);
-        document.getElementById('totalGrossAmount').textContent = totalGrossAmount.toFixed(2);
-        document.getElementById('totalDiscountAmountItems').textContent = totalDiscountAmountItems.toFixed(2);
-        document.getElementById('totalTradeOfferAmountItems').textContent = totalTradeOfferAmountItems.toFixed(2);
-        document.getElementById('totalTaxAmountItems').textContent = totalGSTAmountItems.toFixed(2);
-        document.getElementById('totalFOCQty').textContent = totalFOCQty.toFixed(2);
-        document.getElementById('totalNetAmountItems').textContent = totalNetAmountItems.toFixed(2);
+        document.getElementById('totalPurchasePrice').textContent = totalPurchasePrice.toFixed(3);
+        document.getElementById('totalGrossAmount').textContent = totalGrossAmount.toFixed(3);
+        document.getElementById('totalDiscountAmountItems').textContent = totalDiscountAmountItems.toFixed(3);
+        document.getElementById('totalTradeOfferAmountItems').textContent = totalTradeOfferAmountItems.toFixed(3);
+        document.getElementById('totalTaxAmountItems').textContent = totalGSTAmountItems.toFixed(3);
+        document.getElementById('totalFOCQty').textContent = totalFOCQty.toFixed(3);
+        document.getElementById('totalNetAmountItems').textContent = totalNetAmountItems.toFixed(3);
 
-        document.getElementById('totalBill').textContent = totalBill.toFixed(2);
+        document.getElementById('totalBill').textContent = totalBill.toFixed(3);
 
         const discountAmount = parseFloat(document.getElementById('totalDiscountAmount').value) || 0;
         const afterDiscount = totalBill - discountAmount;
@@ -1770,8 +1826,8 @@ document.addEventListener('DOMContentLoaded', function () {
         const netAmount = afterDiscount + gstAmount + shippingFees;
 
         const gstAmountEl = document.getElementById('totalGSTAmount');
-        if (gstAmountEl) gstAmountEl.value = gstAmount.toFixed(2);
-        document.getElementById('netAmount').textContent = netAmount.toFixed(2);
+        if (gstAmountEl) gstAmountEl.value = gstAmount.toFixed(3);
+        document.getElementById('netAmount').textContent = netAmount.toFixed(3);
     }
 
     // Update invoice summary with invoice-level taxes
@@ -1789,7 +1845,7 @@ document.addEventListener('DOMContentLoaded', function () {
     document.getElementById('totalDiscountPercent').addEventListener('input', function() {
         const totalBill = parseFloat(document.getElementById('totalBill').textContent) || 0;
         const pct = parseFloat(this.value) || 0;
-        document.getElementById('totalDiscountAmount').value = (totalBill * pct / 100).toFixed(2);
+        document.getElementById('totalDiscountAmount').value = (totalBill * pct / 100).toFixed(3);
         updateInvoiceSummaryDynamic();
     });
 
@@ -1834,7 +1890,7 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         }
 
-        document.getElementById('totalBill').textContent = totalBill.toFixed(2);
+        document.getElementById('totalBill').textContent = totalBill.toFixed(3);
 
         const discountAmount = parseFloat(document.getElementById('totalDiscountAmount').value) || 0;
         const discountPercent = totalBill > 0 ? (discountAmount / totalBill) * 100 : 0;
@@ -1845,10 +1901,10 @@ document.addEventListener('DOMContentLoaded', function () {
         const shippingFees = parseFloat(document.getElementById('shippingFees')?.value) || 0;
         const netAmount = afterDiscount + gstAmount + shippingFees;
 
-        document.getElementById('totalDiscountPercent').value = discountPercent.toFixed(2);
+        document.getElementById('totalDiscountPercent').value = discountPercent.toFixed(3);
         const gstAmountEl = document.getElementById('totalGSTAmount');
-        if (gstAmountEl) gstAmountEl.value = gstAmount.toFixed(2);
-        document.getElementById('netAmount').textContent = netAmount.toFixed(2);
+        if (gstAmountEl) gstAmountEl.value = gstAmount.toFixed(3);
+        document.getElementById('netAmount').textContent = netAmount.toFixed(3);
     }
 
     function updateInvoiceSummaryFromGSTAmount() {
@@ -1862,7 +1918,7 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         }
 
-        document.getElementById('totalBill').textContent = totalBill.toFixed(2);
+        document.getElementById('totalBill').textContent = totalBill.toFixed(3);
 
         const discountPercent = parseFloat(document.getElementById('totalDiscountPercent').value) || 0;
         const discountAmount = totalBill * (discountPercent / 100);
@@ -1873,10 +1929,10 @@ document.addEventListener('DOMContentLoaded', function () {
         const shippingFees = parseFloat(document.getElementById('shippingFees')?.value) || 0;
         const netAmount = afterDiscount + gstAmount + shippingFees;
 
-        document.getElementById('totalDiscountAmount').value = discountAmount.toFixed(2);
+        document.getElementById('totalDiscountAmount').value = discountAmount.toFixed(3);
         const gstPercentEl = document.getElementById('totalGSTPercent');
-        if (gstPercentEl) gstPercentEl.value = gstPercent.toFixed(2);
-        document.getElementById('netAmount').textContent = netAmount.toFixed(2);
+        if (gstPercentEl) gstPercentEl.value = gstPercent.toFixed(3);
+        document.getElementById('netAmount').textContent = netAmount.toFixed(3);
     }
 
     // Validate form before submission
@@ -1953,6 +2009,7 @@ document.addEventListener('DOMContentLoaded', function () {
             subAccountId: document.getElementById('subAccount')?.value || null,
             currencyId: document.getElementById('currency')?.value,
             projectId: document.getElementById('project')?.value || null,
+            assocCompanyId: document.getElementById('associatedCompany')?.value || null,
             previousBalance: parseFloat(document.getElementById('previousBalance')?.value) || 0,
             totalBill: parseFloat(document.getElementById('totalBill')?.textContent),
             totalDiscountPercent: parseFloat(document.getElementById('totalDiscountPercent')?.value) || 0,
@@ -2087,6 +2144,9 @@ document.addEventListener('DOMContentLoaded', function () {
         document.getElementById('container').value = '';
         document.getElementById('previousBalance').value = '0.00';
         document.getElementById('project').value = '';
+        const assocReset = document.getElementById('associatedCompany');
+        if (assocReset) assocReset.innerHTML = '<option value="">Select Associated Company</option>';
+        loadAssocCompanies();
 
         // Reset currency to base currency
         loadCurrencies();
@@ -2123,6 +2183,18 @@ document.addEventListener('DOMContentLoaded', function () {
         document.getElementById('enableInvoiceCashDiscount').checked = localStorage.getItem('enableInvoiceCashDiscount') === 'true';
         document.getElementById('enableInvoiceCashDiscountAmount').checked = localStorage.getItem('enableInvoiceCashDiscountAmount') === 'true';
         document.getElementById('enableShippingFees').checked = localStorage.getItem('enableShippingFees') === 'true';
+        // Invoice Details fields
+        document.getElementById('showSupplierInvoiceNo').checked = localStorage.getItem('showSupplierInvoiceNo') !== 'false';
+        document.getElementById('showSupplierInvoiceDate').checked = localStorage.getItem('showSupplierInvoiceDate') !== 'false';
+        document.getElementById('showAssociatedCompany').checked = localStorage.getItem('showAssociatedCompany') !== 'false';
+        document.getElementById('showPurchaseOrder').checked = localStorage.getItem('showPurchaseOrder') !== 'false';
+        document.getElementById('showBiltyNo').checked = localStorage.getItem('showBiltyNo') !== 'false';
+        document.getElementById('showTransportName').checked = localStorage.getItem('showTransportName') !== 'false';
+        document.getElementById('showPreviousBalance').checked = localStorage.getItem('showPreviousBalance') !== 'false';
+        document.getElementById('showSubAccount').checked = localStorage.getItem('showSubAccount') !== 'false';
+        document.getElementById('showContainer').checked = localStorage.getItem('showContainer') !== 'false';
+        document.getElementById('showProject').checked = localStorage.getItem('showProject') !== 'false';
+        document.getElementById('showRemarks').checked = localStorage.getItem('showRemarks') !== 'false';
         document.getElementById('settingsModal').style.display = 'flex';
     });
 
@@ -2142,6 +2214,18 @@ document.addEventListener('DOMContentLoaded', function () {
         localStorage.setItem('enableInvoiceCashDiscount', document.getElementById('enableInvoiceCashDiscount').checked);
         localStorage.setItem('enableInvoiceCashDiscountAmount', document.getElementById('enableInvoiceCashDiscountAmount').checked);
         localStorage.setItem('enableShippingFees', document.getElementById('enableShippingFees').checked);
+        // Invoice Details fields
+        localStorage.setItem('showSupplierInvoiceNo', document.getElementById('showSupplierInvoiceNo').checked);
+        localStorage.setItem('showSupplierInvoiceDate', document.getElementById('showSupplierInvoiceDate').checked);
+        localStorage.setItem('showAssociatedCompany', document.getElementById('showAssociatedCompany').checked);
+        localStorage.setItem('showPurchaseOrder', document.getElementById('showPurchaseOrder').checked);
+        localStorage.setItem('showBiltyNo', document.getElementById('showBiltyNo').checked);
+        localStorage.setItem('showTransportName', document.getElementById('showTransportName').checked);
+        localStorage.setItem('showPreviousBalance', document.getElementById('showPreviousBalance').checked);
+        localStorage.setItem('showSubAccount', document.getElementById('showSubAccount').checked);
+        localStorage.setItem('showContainer', document.getElementById('showContainer').checked);
+        localStorage.setItem('showProject', document.getElementById('showProject').checked);
+        localStorage.setItem('showRemarks', document.getElementById('showRemarks').checked);
         document.getElementById('settingsModal').style.display = 'none';
 
         // Apply settings immediately
@@ -2165,8 +2249,30 @@ document.addEventListener('DOMContentLoaded', function () {
         const enableInvoiceCashDiscount = localStorage.getItem('enableInvoiceCashDiscount') === 'true';
         const enableInvoiceCashDiscountAmount = localStorage.getItem('enableInvoiceCashDiscountAmount') === 'true';
         const enableShippingFees = localStorage.getItem('enableShippingFees') === 'true';
-
         const enableSize = localStorage.getItem('enableSize') === 'true';
+
+        // Invoice Details fields (default true if never set)
+        const invoiceDetailFields = [
+            { key: 'showSupplierInvoiceNo',   id: 'supplierInvoiceNo' },
+            { key: 'showSupplierInvoiceDate', id: 'supplierInvoiceDate' },
+            { key: 'showAssociatedCompany',   id: 'associatedCompany' },
+            { key: 'showPurchaseOrder',       id: 'purchaseOrderSearch' },
+            { key: 'showBiltyNo',             id: 'biltyNo' },
+            { key: 'showTransportName',       id: 'transportName' },
+            { key: 'showPreviousBalance',     id: 'previousBalance' },
+            { key: 'showSubAccount',          id: 'subAccountSearch' },
+            { key: 'showContainer',           id: 'container' },
+            { key: 'showProject',             id: 'project' },
+            { key: 'showRemarks',             id: 'remarks' },
+        ];
+        invoiceDetailFields.forEach(({ key, id }) => {
+            const show = localStorage.getItem(key) !== 'false';
+            const el = document.getElementById(id);
+            if (el) {
+                const fg = el.closest('.form-group');
+                if (fg) fg.style.display = show ? '' : 'none';
+            }
+        });
 
         // Show/hide thead and tfoot columns via data-col
         const colMap = [
@@ -2401,7 +2507,7 @@ function showVariantsModal(parentRow, children) {
 function addChildProducts(parentRow, children) {
     const totalChildQty = children.reduce((sum, child) => sum + child.qty, 0);
     const parentQtyInput = parentRow.cells[3].querySelector('input');
-    parentQtyInput.value = totalChildQty.toFixed(2);
+    parentQtyInput.value = totalChildQty.toFixed(3);
     parentQtyInput.dispatchEvent(new Event('input'));
 
     const childProducts = children.map(child => ({

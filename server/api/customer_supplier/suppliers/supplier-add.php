@@ -143,6 +143,18 @@ try {
         }
     }
     
+    // Insert associated companies
+    if (!empty($input['associatedCompanyIds'])) {
+        $assocIds = array_filter(array_map('intval', explode(',', $input['associatedCompanyIds'])));
+        if (!empty($assocIds)) {
+            $assocSql = "INSERT INTO supplier_associated_companies (tenant_id, supplier_id, company_id) VALUES (?, ?, ?)";
+            $assocStmt = $pdo->prepare($assocSql);
+            foreach ($assocIds as $cid) {
+                $assocStmt->execute([$tenant_id, $new_id, $cid]);
+            }
+        }
+    }
+    
     echo json_encode([
         'success' => true,
         'message' => 'Supplier created successfully',

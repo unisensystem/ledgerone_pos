@@ -56,9 +56,14 @@ if (!$user_id) {
                         <label for="company" class="required">Company</label>
                         <select id="company" required>
                             <option value="">Select Company</option>
-                            <!-- Options loaded dynamically -->
                         </select>
                         <div class="error-message" id="companyError">Please select a company</div>
+                    </div>
+                    <div class="form-group">
+                        <label for="associatedCompany">Associated Company</label>
+                        <select id="associatedCompany">
+                            <option value="">Select Associated Company</option>
+                        </select>
                     </div>
                     <div class="form-group">
                         <label for="purchaseOrder">Purchase Order #</label>
@@ -217,16 +222,16 @@ if (!$user_id) {
                     </div>
                     <div class="summary-item">
                         <span class="summary-label">Discount %</span>
-                        <input type="number" id="totalDiscountPercent" class="table-input" min="0" max="100" step="0.01" value="0">
+                        <input type="number" id="totalDiscountPercent" class="table-input" min="0" max="100" step="0.001" value="0">
                     </div>
                     <div class="summary-item">
                         <span class="summary-label" id="totalDiscountAmountLabel">Discount Amount</span>
-                        <input type="number" id="totalDiscountAmount" class="table-input" min="0" step="0.01" value="0">
+                        <input type="number" id="totalDiscountAmount" class="table-input" min="0" step="0.001" value="0">
                     </div>
                     <div class="summary-item">
                         <span class="summary-label" id="shippingFeesLabel">Shipping Fees</span>
                         <div style="display: flex; flex-direction: column; gap: 8px; width: 100%;">
-                            <input type="number" id="shippingFees" class="table-input" min="0" step="0.01" value="0" placeholder="Enter shipping fees">
+                            <input type="number" id="shippingFees" class="table-input" min="0" step="0.001" value="0" placeholder="Enter shipping fees">
                             <div style="display: flex; gap: 12px; align-items: center;">
                                 <label style="display: flex; align-items: center; gap: 4px; cursor: pointer; margin: 0;">
                                     <input type="radio" name="shippingFeesType" id="shippingFeesAdd" value="add" checked style="width: auto; height: auto; margin: 0;">
@@ -246,7 +251,7 @@ if (!$user_id) {
                     <!-- Dynamic Invoice-Level Taxes will be inserted here -->
                     <div id="invoiceLevelTaxesContainer"></div>
                     <div class="summary-item">
-                        <span class="summary-label" id="netReceivableLabel">Net Receivable</span>
+                        <span class="summary-label" id="netReceivableLabel">Net Payable</span>
                         <span class="summary-value" id="netReceivable" style="color: var(--primary); font-size: 16px; font-weight: 700;">0.00</span>
                     </div>
                 </div>
@@ -283,56 +288,46 @@ if (!$user_id) {
     <div class="modal" id="settingsModal">
         <div class="modal-content">
             <h3 class="modal-title">Invoice Settings</h3>
-            <div class="form-group">
-                <label>
-                    <input type="checkbox" id="enableSize"> Enable Size Column
-                </label>
+
+            <div class="settings-section">
+                <div class="settings-section-title">Invoice Details Fields</div>
+                <div class="settings-grid">
+                    <div class="settings-item"><input type="checkbox" id="showSupplierInvoiceNo"><label for="showSupplierInvoiceNo">Supplier Invoice No</label></div>
+                    <div class="settings-item"><input type="checkbox" id="showSupplierInvoiceDate"><label for="showSupplierInvoiceDate">Supplier Invoice Date</label></div>
+                    <div class="settings-item"><input type="checkbox" id="showAssociatedCompany"><label for="showAssociatedCompany">Associated Company</label></div>
+                    <div class="settings-item"><input type="checkbox" id="showPurchaseOrder"><label for="showPurchaseOrder">Purchase Order #</label></div>
+                    <div class="settings-item"><input type="checkbox" id="showBiltyNo"><label for="showBiltyNo">Bilty No</label></div>
+                    <div class="settings-item"><input type="checkbox" id="showTransportName"><label for="showTransportName">Transport Name</label></div>
+                    <div class="settings-item"><input type="checkbox" id="showPreviousBalance"><label for="showPreviousBalance">Supplier's Previous Balance</label></div>
+                    <div class="settings-item"><input type="checkbox" id="showSubAccount"><label for="showSubAccount">Sub Account</label></div>
+                    <div class="settings-item"><input type="checkbox" id="showContainer"><label for="showContainer">Container</label></div>
+                    <div class="settings-item"><input type="checkbox" id="showProject"><label for="showProject">Project</label></div>
+                    <div class="settings-item"><input type="checkbox" id="showRemarks"><label for="showRemarks">Remarks</label></div>
+                </div>
             </div>
-            <div class="form-group">
-                <label>
-                    <input type="checkbox" id="enableTradeOffer"> Enable Inline Trade Offer Discount %
-                </label>
+
+            <div class="settings-section">
+                <div class="settings-section-title">Items Table Columns</div>
+                <div class="settings-grid">
+                    <div class="settings-item"><input type="checkbox" id="enableSize"><label for="enableSize">Enable Size Column</label></div>
+                    <div class="settings-item"><input type="checkbox" id="enableTradeOffer"><label for="enableTradeOffer">Inline Trade Offer Discount %</label></div>
+                    <div class="settings-item"><input type="checkbox" id="enableTradeOfferAmount"><label for="enableTradeOfferAmount">Inline Trade Offer Amount</label></div>
+                    <div class="settings-item"><input type="checkbox" id="enableFOC"><label for="enableFOC">Free Of Cost (FOC) Quantity</label></div>
+                    <div class="settings-item"><input type="checkbox" id="enableTaxation"><label for="enableTaxation">Tax % and Tax Amount</label></div>
+                    <div class="settings-item"><input type="checkbox" id="enableInlineCashDiscount"><label for="enableInlineCashDiscount">Inline Cash Discount %</label></div>
+                    <div class="settings-item"><input type="checkbox" id="enableInlineCashDiscountAmount"><label for="enableInlineCashDiscountAmount">Inline Cash Discount Amount</label></div>
+                </div>
             </div>
-            <div class="form-group">
-                <label>
-                    <input type="checkbox" id="enableTradeOfferAmount"> Enable Inline Trade Offer Amount
-                </label>
+
+            <div class="settings-section">
+                <div class="settings-section-title">Invoice Summary</div>
+                <div class="settings-grid">
+                    <div class="settings-item"><input type="checkbox" id="enableInvoiceCashDiscount"><label for="enableInvoiceCashDiscount">Invoice-wise Cash Discount %</label></div>
+                    <div class="settings-item"><input type="checkbox" id="enableInvoiceCashDiscountAmount"><label for="enableInvoiceCashDiscountAmount">Invoice-wise Cash Discount Amount</label></div>
+                    <div class="settings-item"><input type="checkbox" id="enableShippingFees"><label for="enableShippingFees">Shipping Fees</label></div>
+                </div>
             </div>
-            <div class="form-group">
-                <label>
-                    <input type="checkbox" id="enableFOC"> Enable Free Of Cost (FOC) Quantity
-                </label>
-            </div>
-            <div class="form-group">
-                <label>
-                    <input type="checkbox" id="enableTaxation"> Enable Tax % and Tax Amt
-                </label>
-            </div>
-            <div class="form-group">
-                <label>
-                    <input type="checkbox" id="enableInlineCashDiscount"> Enable Inline Cash Discount %
-                </label>
-            </div>
-            <div class="form-group">
-                <label>
-                    <input type="checkbox" id="enableInlineCashDiscountAmount"> Enable Inline Cash Discount Amount
-                </label>
-            </div>
-            <div class="form-group">
-                <label>
-                    <input type="checkbox" id="enableInvoiceCashDiscount"> Enable Invoice-wise Cash Discount %
-                </label>
-            </div>
-            <div class="form-group">
-                <label>
-                    <input type="checkbox" id="enableInvoiceCashDiscountAmount"> Enable Invoice-wise Cash Discount Amount
-                </label>
-            </div>
-            <div class="form-group">
-                <label>
-                    <input type="checkbox" id="enableShippingFees"> Enable Shipping Fees
-                </label>
-            </div>
+
             <div class="modal-actions">
                 <button class="btn btn-secondary" id="closeSettingsBtn">Close</button>
                 <button class="btn btn-primary" id="saveSettingsBtn">Save Settings</button>

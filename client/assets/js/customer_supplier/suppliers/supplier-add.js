@@ -1,4 +1,155 @@
 document.addEventListener('DOMContentLoaded', function () {
+    // ===== CUSTOMIZE FIELDS =====
+    const CUSTOMIZE_FIELDS_KEY = 'supplierFormCustomizeFields';
+
+    const allFields = [
+        { id: 'company',          label: 'Company',                visible: true },
+        { id: 'assocCompanySearch', label: 'Associated Companies', visible: true },
+        { id: 'supplierCode',     label: 'Supplier Code',          visible: true },
+        { id: 'salesmanSearch',   label: 'Salesman',               visible: true },
+        { id: 'supplierName',     label: 'Brand Name - Company',   visible: true },
+        { id: 'brandName',        label: 'Supplier Name',          visible: true },
+        { id: 'address',          label: 'Address',                visible: true },
+        { id: 'primaryPhone',     label: 'Primary Phone',          visible: true },
+        { id: 'secondaryPhone',   label: 'Secondary Phone',        visible: false },
+        { id: 'email',            label: 'Email Address',          visible: false },
+        { id: 'identityCard',     label: 'Identity Card No',       visible: false },
+        { id: 'project',          label: 'Project',                visible: false },
+        { id: 'openingDebit',     label: 'Opening Debit Amount',   visible: true },
+        { id: 'openingCredit',    label: 'Opening Credit Amount',  visible: true },
+        { id: 'aitPercent',       label: 'AIT %',                  visible: false },
+        { id: 'subAccountsTable', label: '📋 Sub Accounts',        visible: true },
+        { id: 'blacklist',        label: 'Blacklist Supplier',     visible: true },
+    ];
+
+    function getDefaultVisibility() {
+        const d = {};
+        allFields.forEach(f => { d[f.id] = f.visible; });
+        return d;
+    }
+
+    function getFieldVisibility() {
+        const stored = localStorage.getItem(CUSTOMIZE_FIELDS_KEY);
+        if (stored) {
+            try { return Object.assign({}, getDefaultVisibility(), JSON.parse(stored)); }
+            catch (e) {}
+        }
+        return getDefaultVisibility();
+    }
+
+    function saveFieldVisibility(v) {
+        localStorage.setItem(CUSTOMIZE_FIELDS_KEY, JSON.stringify(v));
+    }
+
+    function getFieldFormGroup(fieldId) {
+        const el = document.getElementById(fieldId);
+        if (!el) return null;
+        if (fieldId === 'subAccountsTable') {
+            return el.closest('.form-section') || el.closest('.form-group');
+        }
+        // chips containers: find the form-group wrapper
+        if (fieldId === 'assocCompanySearch' || fieldId === 'salesmanSearch') {
+            return el.closest('.form-group');
+        }
+        const fg = el.closest('.form-group');
+        if (fg) return fg;
+        const cg = el.closest('.checkbox-group');
+        return cg ? cg.closest('.form-group') : null;
+    }
+
+    function refreshSectionHeadings() {
+        document.querySelectorAll('.form-section').forEach(section => {
+            const groups = section.querySelectorAll('.form-group');
+            let hasVisible = false;
+            groups.forEach(fg => {
+                if (fg.querySelector('input, select, textarea') && fg.style.display !== 'none') {
+                    hasVisible = true;
+                }
+            });
+            const heading = section.querySelector('.section-title');
+            if (heading) heading.style.display = hasVisible ? '' : 'none';
+        });
+    }
+
+    function applyFieldVisibility() {
+        const vis = getFieldVisibility();
+        allFields.forEach(f => {
+            const fg = getFieldFormGroup(f.id);
+            if (fg) fg.style.display = vis[f.id] ? '' : 'none';
+        });
+        refreshSectionHeadings();
+    }
+
+    // Modal elements
+    const customizeFieldsBtn        = document.getElementById('customizeFieldsBtn');
+    const customizeFieldsModal      = document.getElementById('customizeFieldsModal');
+    const customizeFieldsModalClose = document.getElementById('customizeFieldsModalClose');
+    const customizeFieldsList       = document.getElementById('customizeFieldsList');
+    const customizeFieldsSaveBtn    = document.getElementById('customizeFieldsSaveBtn');
+    const customizeFieldsResetBtn   = document.getElementById('customizeFieldsResetBtn');
+    const customizeFieldsSelectAll  = document.getElementById('customizeFieldsSelectAllBtn');
+    const customizeFieldsDeselectAll= document.getElementById('customizeFieldsDeselectAllBtn');
+
+    function populateCustomizeFieldsList() {
+        const vis = getFieldVisibility();
+        customizeFieldsList.innerHTML = '';
+        allFields.forEach(f => {
+            const item = document.createElement('div');
+            item.className = 'customize-field-item';
+            item.innerHTML = `<label class="customize-field-label">
+                <input type="checkbox" class="customize-field-checkbox" data-field-id="${f.id}" ${vis[f.id] ? 'checked' : ''}>
+                <span>${f.label}</span>
+            </label>`;
+            customizeFieldsList.appendChild(item);
+        });
+    }
+
+    function closeCustomizeFieldsModal() {
+        customizeFieldsModal.classList.remove('show');
+    }
+
+    customizeFieldsBtn.addEventListener('click', function () {
+        populateCustomizeFieldsList();
+        customizeFieldsModal.classList.add('show');
+    });
+
+    customizeFieldsModalClose.addEventListener('click', closeCustomizeFieldsModal);
+    customizeFieldsModal.addEventListener('click', function (e) {
+        if (e.target === customizeFieldsModal) closeCustomizeFieldsModal();
+    });
+
+    customizeFieldsSaveBtn.addEventListener('click', function () {
+        const vis = {};
+        customizeFieldsList.querySelectorAll('.customize-field-checkbox').forEach(cb => {
+            vis[cb.dataset.fieldId] = cb.checked;
+        });
+        saveFieldVisibility(vis);
+        applyFieldVisibility();
+        closeCustomizeFieldsModal();
+        showNotification('Success', 'Field preferences saved successfully!', 'success');
+    });
+
+    customizeFieldsResetBtn.addEventListener('click', function () {
+        if (confirm('Reset to default field visibility?')) {
+            saveFieldVisibility(getDefaultVisibility());
+            applyFieldVisibility();
+            populateCustomizeFieldsList();
+            showNotification('Success', 'Field visibility reset to default', 'success');
+        }
+    });
+
+    customizeFieldsSelectAll.addEventListener('click', function () {
+        customizeFieldsList.querySelectorAll('.customize-field-checkbox').forEach(cb => cb.checked = true);
+    });
+
+    customizeFieldsDeselectAll.addEventListener('click', function () {
+        customizeFieldsList.querySelectorAll('.customize-field-checkbox').forEach(cb => cb.checked = false);
+    });
+
+    // Apply on page load
+    applyFieldVisibility();
+    // ===== END CUSTOMIZE FIELDS =====
+
     const form = document.getElementById('supplierForm');
     const submitBtn = document.getElementById('submitBtn');
     const resetBtn = document.getElementById('resetBtn');
@@ -15,8 +166,17 @@ document.addEventListener('DOMContentLoaded', function () {
     const salesmanIdsInput = document.getElementById('salesmanIds');
     const salesmanChipsContainer = document.getElementById('salesmanChipsContainer');
 
+    // Associated Companies multi-select elements
+    const assocCompanySearch = document.getElementById('assocCompanySearch');
+    const assocCompanyChipsList = document.getElementById('assocCompanyChipsList');
+    const assocCompanyDropdown = document.getElementById('assocCompanyDropdown');
+    const assocCompanyIdsInput = document.getElementById('assocCompanyIds');
+    const assocCompanyChipsContainer = document.getElementById('assocCompanyChipsContainer');
+
     let employees = [];
     let selectedSalesmen = [];
+    let allCompanies = [];
+    let selectedAssocCompanies = [];
     let isSubmitting = false;
 
     // Load companies and employees
@@ -29,12 +189,14 @@ document.addEventListener('DOMContentLoaded', function () {
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
+                    allCompanies = data.companies;
                     data.companies.forEach(company => {
                         const option = new Option(company.company_name, company.id);
                         companySelect.appendChild(option);
                     });
                 }
-            });
+            })
+            .catch(err => console.error('loadCompanies error:', err));
     }
 
     function loadEmployees() {
@@ -51,14 +213,15 @@ document.addEventListener('DOMContentLoaded', function () {
         fetch('../../../../server/api/master_setup/project_setup/get-projects-dropdown.php')
             .then(response => response.json())
             .then(data => {
-                if (data.success) {
+                if (data.success && Array.isArray(data.data)) {
                     const sel = document.getElementById('project');
                     data.data.forEach(p => {
                         const label = `${p.project_code} - ${p.project_name}${p.city_name ? ' - ' + p.city_name : ''}`;
                         sel.appendChild(new Option(label, p.id));
                     });
                 }
-            });
+            })
+            .catch(err => console.error('loadProjects error:', err));
     }
 
     // Salesman search functionality
@@ -141,12 +304,82 @@ document.addEventListener('DOMContentLoaded', function () {
         if (!salesmanChipsContainer.contains(e.target) && !salesmanDropdown.contains(e.target)) {
             salesmanDropdown.style.display = 'none';
         }
+        if (!assocCompanyChipsContainer.contains(e.target) && !assocCompanyDropdown.contains(e.target)) {
+            assocCompanyDropdown.style.display = 'none';
+        }
     });
 
     // Focus search input when clicking container
     salesmanChipsContainer.addEventListener('click', function() {
         salesmanSearch.focus();
     });
+
+    // Associated Companies chip logic
+    assocCompanyChipsContainer.addEventListener('click', function() {
+        assocCompanySearch.focus();
+    });
+
+    assocCompanySearch.addEventListener('focus', function() {
+        const term = this.value.toLowerCase();
+        const list = term
+            ? allCompanies.filter(c => c.company_name.toLowerCase().includes(term) && !selectedAssocCompanies.find(s => s.id == c.id))
+            : allCompanies.filter(c => !selectedAssocCompanies.find(s => s.id == c.id));
+        if (list.length > 0) {
+            assocCompanyDropdown.innerHTML = list.map(c =>
+                `<div class="salesman-dropdown-item" data-id="${c.id}" data-name="${c.company_name}">${c.company_name}</div>`
+            ).join('');
+            assocCompanyDropdown.style.display = 'block';
+        }
+    });
+
+    assocCompanySearch.addEventListener('input', function() {
+        const term = this.value.toLowerCase();
+        if (!term) { assocCompanyDropdown.style.display = 'none'; return; }
+        const filtered = allCompanies.filter(c =>
+            c.company_name.toLowerCase().includes(term) &&
+            !selectedAssocCompanies.find(s => s.id == c.id)
+        );
+        if (filtered.length > 0) {
+            assocCompanyDropdown.innerHTML = filtered.map(c =>
+                `<div class="salesman-dropdown-item" data-id="${c.id}" data-name="${c.company_name}">${c.company_name}</div>`
+            ).join('');
+            assocCompanyDropdown.style.display = 'block';
+        } else {
+            assocCompanyDropdown.style.display = 'none';
+        }
+    });
+
+    assocCompanyDropdown.addEventListener('click', function(e) {
+        const item = e.target.closest('.salesman-dropdown-item');
+        if (item) {
+            addAssocCompanyChip(item.dataset.id, item.dataset.name);
+            assocCompanySearch.value = '';
+            assocCompanyDropdown.style.display = 'none';
+        }
+    });
+
+    function addAssocCompanyChip(id, name) {
+        if (selectedAssocCompanies.find(s => s.id == id)) return;
+        selectedAssocCompanies.push({ id, name });
+        renderAssocCompanyChips();
+    }
+
+    function renderAssocCompanyChips() {
+        assocCompanyChipsList.innerHTML = selectedAssocCompanies.map(s =>
+            `<div class="assoc-company-chip">
+                <span>${s.name}</span>
+                <span class="chip-remove" data-id="${s.id}">×</span>
+            </div>`
+        ).join('');
+        assocCompanyChipsList.querySelectorAll('.chip-remove').forEach(btn => {
+            btn.addEventListener('click', function() {
+                selectedAssocCompanies = selectedAssocCompanies.filter(s => s.id != this.dataset.id);
+                renderAssocCompanyChips();
+                assocCompanyIdsInput.value = selectedAssocCompanies.map(s => s.id).join(',');
+            });
+        });
+        assocCompanyIdsInput.value = selectedAssocCompanies.map(s => s.id).join(',');
+    }
 
     // Sub-accounts table management
     const subAccountsBody = document.getElementById('subAccountsBody');
@@ -259,6 +492,7 @@ document.addEventListener('DOMContentLoaded', function () {
             projectId: document.getElementById('project').value || null,
             companyId: companySelect.value,
             salesmanId: salesmanIdsInput.value || null,
+            associatedCompanyIds: assocCompanyIdsInput.value || null,
             supplierName: document.getElementById('supplierName').value.trim(),
             brandName: document.getElementById('brandName').value.trim(),
             address: document.getElementById('address').value.trim(),
@@ -289,6 +523,8 @@ document.addEventListener('DOMContentLoaded', function () {
                     selectedSalesmen = [];
                     updateSalesmanChips();
                     updateSalesmanIdsInput();
+                    selectedAssocCompanies = [];
+                    renderAssocCompanyChips();
                 }, 2000);
             } else {
                 throw new Error(data.message);
@@ -311,6 +547,8 @@ document.addEventListener('DOMContentLoaded', function () {
             selectedSalesmen = [];
             updateSalesmanChips();
             updateSalesmanIdsInput();
+            selectedAssocCompanies = [];
+            renderAssocCompanyChips();
         }
     });
 });

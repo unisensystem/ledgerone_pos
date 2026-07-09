@@ -70,30 +70,32 @@ if (!$user_id) {
         <div class="card">
             <div class="card-title">Journal Entries</div>
             
-            <div class="table-container">
-                <table id="journalTable">
-                    <thead>
-                        <tr>
-                            <th width="5%">S#</th>
-                            <th width="30%">Account</th>
-                            <th width="15%">Debit</th>
-                            <th width="15%">Credit</th>
-                            <th width="25%">Line Description</th>
-                            <th width="10%">Action</th>
-                        </tr>
-                    </thead>
-                    <tbody id="journalTableBody">
-                        <!-- Journal entries will be added here dynamically -->
-                    </tbody>
-                    <tfoot>
-                        <tr class="total-row">
-                            <td colspan="2">Total</td>
-                            <td id="totalDebit">0.00</td>
-                            <td id="totalCredit">0.00</td>
-                            <td colspan="2" id="balanceStatus">Balanced</td>
-                        </tr>
-                    </tfoot>
-                </table>
+            <div style="position: relative; z-index: 10;">
+                <div class="table-container">
+                    <table id="journalTable">
+                        <thead>
+                            <tr>
+                                <th width="5%">S#</th>
+                                <th width="30%">Account</th>
+                                <th width="15%">Debit</th>
+                                <th width="15%">Credit</th>
+                                <th width="25%">Line Description</th>
+                                <th width="10%">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="journalTableBody">
+                            <!-- Journal entries will be added here dynamically -->
+                        </tbody>
+                        <tfoot>
+                            <tr class="total-row">
+                                <td colspan="2">Total</td>
+                                <td id="totalDebit">0.00</td>
+                                <td id="totalCredit">0.00</td>
+                                <td colspan="2" id="balanceStatus">Balanced</td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
             </div>
             
             <div style="margin-top: 20px; display: flex; justify-content: center;">

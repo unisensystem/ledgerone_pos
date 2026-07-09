@@ -23,10 +23,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $branch_id = $data['branch_id'] ?? null;
     $as_of_date = $data['as_of_date'] ?? null;
     $opening_amount = $data['opening_amount'] ?? null;
-    $currency = isset($data['currency']) ? substr($data['currency'], 0, 3) : 'USD';
+    $currency_id = $data['currency'] ?? null;
     $company_id = $data['company_id'] ?? null;
     
-    if (!$branch_id || !$as_of_date || !$opening_amount) {
+    if (!$branch_id || !$as_of_date || !$opening_amount || !$currency_id) {
         http_response_code(400);
         echo json_encode(['error' => 'Missing required fields']);
         exit();
@@ -45,12 +45,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             exit();
         }
         
-        // Insert cash opening record
+        // Insert cash opening record with currency_id
         $stmt = $pdo->prepare("
-            INSERT INTO cash_opening (tenant_id, company_id, branch_id, as_of_date, opening_amount, currency, entered_by, is_locked) 
+            INSERT INTO cash_opening (tenant_id, company_id, branch_id, as_of_date, opening_amount, currency_id, entered_by, is_locked) 
             VALUES (?, ?, ?, ?, ?, ?, ?, 1)
         ");
-        $stmt->execute([$tenant_id, $company_id, $branch_id, $as_of_date, $opening_amount, $currency, $username]);
+        $stmt->execute([$tenant_id, $company_id, $branch_id, $as_of_date, $opening_amount, $currency_id, $username]);
         $cash_opening_id = $pdo->lastInsertId();
         
         // Create accounting entries: Debit Cash, Credit Opening Balance Equity
@@ -97,10 +97,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 } elseif ($_SERVER['REQUEST_METHOD'] === 'GET') {
     try {
         $stmt = $pdo->prepare("
-            SELECT co.id, co.as_of_date, co.opening_amount, co.currency, co.entered_by, co.updated_at, b.branch_name, c.company_name 
+            SELECT 
+                co.id, 
+                co.as_of_date, 
+                co.opening_amount, 
+                co.currency_id, 
+                co.entered_by, 
+                co.updated_at, 
+                b.branch_name, 
+                c.company_name,
+                cur.code as currency,
+                cur.symbol as currency_symbol
             FROM cash_opening co 
             LEFT JOIN branches b ON co.branch_id = b.id AND co.tenant_id = b.tenant_id
-            LEFT JOIN companies c ON co.company_id = c.id
+            LEFT JOIN companies c ON co.company_id = c.id AND co.tenant_id = c.tenant_id
+            LEFT JOIN ledgerone_public.currencies cur ON co.currency_id = cur.id
             WHERE co.tenant_id = ? 
             ORDER BY co.as_of_date DESC
         ");

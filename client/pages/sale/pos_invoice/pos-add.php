@@ -286,31 +286,31 @@ if (!$user_id) {
                     </div>
                     <div class="summary-item">
                         <span class="summary-label">Discount %</span>
-                        <input type="number" id="totalDiscountPercent" class="table-input" min="0" max="100" step="0.01" value="0">
+                        <input type="number" id="totalDiscountPercent" class="table-input" min="0" max="100" step="0.001" value="0">
                     </div>
                     <div class="summary-item">
                         <span class="summary-label" id="totalDiscountAmountLabel">Discount Amount</span>
-                        <input type="number" id="totalDiscountAmount" class="table-input" min="0" step="0.01" value="0">
+                        <input type="number" id="totalDiscountAmount" class="table-input" min="0" step="0.001" value="0">
                     </div>
                     <div class="summary-item">
                         <span class="summary-label">Extra Discount 1 %</span>
-                        <input type="number" id="extraDiscount1Percent" class="table-input" min="0" max="100" step="0.01" value="0">
+                        <input type="number" id="extraDiscount1Percent" class="table-input" min="0" max="100" step="0.001" value="0">
                     </div>
                     <div class="summary-item">
                         <span class="summary-label">Extra Discount 1 Amt</span>
-                        <input type="number" id="extraDiscount1Amount" class="table-input" min="0" step="0.01" value="0">
+                        <input type="number" id="extraDiscount1Amount" class="table-input" min="0" step="0.001" value="0">
                     </div>
                     <div class="summary-item">
                         <span class="summary-label">Extra Discount 2 %</span>
-                        <input type="number" id="extraDiscount2Percent" class="table-input" min="0" max="100" step="0.01" value="0">
+                        <input type="number" id="extraDiscount2Percent" class="table-input" min="0" max="100" step="0.001" value="0">
                     </div>
                     <div class="summary-item">
                         <span class="summary-label">Extra Discount 2 Amt</span>
-                        <input type="number" id="extraDiscount2Amount" class="table-input" min="0" step="0.01" value="0">
+                        <input type="number" id="extraDiscount2Amount" class="table-input" min="0" step="0.001" value="0">
                     </div>
                     <div class="summary-item">
                         <span class="summary-label" id="shippingFeesLabel">Shipping Fees</span>
-                        <input type="number" id="shippingFees" class="table-input" min="0" step="0.01" value="0">
+                        <input type="number" id="shippingFees" class="table-input" min="0" step="0.001" value="0">
                     </div>
                     <div class="summary-item">
                         <span class="summary-label" id="netAmountSummaryLabel">Net Amount</span>
@@ -340,7 +340,7 @@ if (!$user_id) {
                     <div class="summary-item">
                         <span class="summary-label" id="amountPaidLabel">Amount Paid</span>
                         <div style="display: flex; gap: 4px; align-items: center;">
-                            <input type="number" id="amountPaid" class="table-input" min="0" step="0.01" value="0" style="flex: 1;">
+                            <input type="number" id="amountPaid" class="table-input" min="0" step="0.001" value="0" style="flex: 1;">
                             <button type="button" class="btn btn-secondary" id="copyNetAmountBtn" title="Copy Net Amount" style="height: 40px; padding: 0 12px;">
                                 <i class="fas fa-copy"></i>
                             </button>

@@ -299,13 +299,13 @@ async function calculateLessSchemeAmounts(row, product) {
     }
     
     if (toAmountInput) {
-        toAmountInput.value = totalTOAmount.toFixed(2);
+        toAmountInput.value = totalTOAmount.toFixed(3);
     }
     
     // Recalculate row amounts with updated FOC and T.O
     // Mark row to skip percentage-based T.O calculation
     row.dataset.useSchemeTO = 'true';
-    row.dataset.schemeToAmount = totalTOAmount.toFixed(2);
+    row.dataset.schemeToAmount = totalTOAmount.toFixed(3);
     
     let totalQty = 0;
     unitInputs.forEach(input => {
@@ -387,7 +387,7 @@ async function calculateLessSpecialSchemeAmounts(row, product) {
     // Update T.O Amount field
     const toAmountInput = row.querySelector('.to-amount-cell input');
     if (toAmountInput) {
-        toAmountInput.value = totalTOAmount.toFixed(2);
+        toAmountInput.value = totalTOAmount.toFixed(3);
     }
     
     // Keep FOC at 0
@@ -398,7 +398,7 @@ async function calculateLessSpecialSchemeAmounts(row, product) {
     
     // Mark row to use scheme T.O calculation
     row.dataset.useSchemeTO = 'true';
-    row.dataset.schemeToAmount = totalTOAmount.toFixed(2);
+    row.dataset.schemeToAmount = totalTOAmount.toFixed(3);
     
     // Recalculate row amounts with updated T.O
     calculateRowAmountsWithScheme(row, totalQty, salePrice);
@@ -429,7 +429,7 @@ function calculateRowAmountsWithScheme(row, totalQty, price) {
     const gross = Number(totalQty) * Number(price);
     const grossInput = row.querySelector('.gross-cell input');
     if (grossInput) {
-        grossInput.value = gross.toFixed(2);
+        grossInput.value = gross.toFixed(3);
     }
     
     // Discount amount (percentage-based) - only if enabled
@@ -440,7 +440,7 @@ function calculateRowAmountsWithScheme(row, totalQty, price) {
     }
     const discAmountInput = row.querySelector('.disc-amount-cell input');
     if (discAmountInput) {
-        discAmountInput.value = discountAmt.toFixed(2);
+        discAmountInput.value = discountAmt.toFixed(3);
     }
     
     // After discount
@@ -467,14 +467,14 @@ function calculateRowAmountsWithScheme(row, totalQty, price) {
     }
     const gstAmountInput = row.querySelector('.tax-amount-cell input');
     if (gstAmountInput) {
-        gstAmountInput.value = gstAmt.toFixed(2);
+        gstAmountInput.value = gstAmt.toFixed(3);
     }
     
     // Net amount
     const net = afterTradeOffer + gstAmt;
     const netInput = row.querySelector('.net-cell input');
     if (netInput) {
-        netInput.value = net.toFixed(2);
+        netInput.value = net.toFixed(3);
     }
     
     // Update summary
@@ -588,7 +588,7 @@ async function calculateGivenSchemeAmounts(row, product) {
     // Update FOC Qty field
     const focInput = row.querySelector('.foc-cell input');
     if (focInput) {
-        focInput.value = totalFOCQty.toFixed(2);
+        focInput.value = totalFOCQty.toFixed(3);
     }
     
     // Keep T.O Amount at 0
