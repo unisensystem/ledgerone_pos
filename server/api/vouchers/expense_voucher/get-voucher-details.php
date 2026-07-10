@@ -36,9 +36,14 @@ try {
             ev.total_items, 
             ev.company_id,
             ev.project_id,
-            c.company_name
+            ev.container_id,
+            ev.vendor_id,
+            ev.type,
+            c.company_name,
+            s.supplier_name as vendor_name
         FROM expense_voucher ev
         LEFT JOIN companies c ON ev.company_id = c.id
+        LEFT JOIN suppliers s ON ev.vendor_id = s.id
         WHERE ev.id = ? AND ev.tenant_id = ?
     ");
     $stmt->execute([$voucher_id, $tenant_id]);

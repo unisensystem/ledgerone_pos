@@ -272,6 +272,14 @@ $currency_symbol = $currency['symbol'];
                         <strong>Company:</strong>
                         <p id="viewCompany"></p>
                     </div>
+                    <div>
+                        <strong>Vendor:</strong>
+                        <p id="viewVendor"></p>
+                    </div>
+                    <div>
+                        <strong>Type:</strong>
+                        <p id="viewType"></p>
+                    </div>
                     <div style="grid-column: 1 / -1;">
                         <strong>Description:</strong>
                         <p id="viewDescription"></p>

@@ -39,6 +39,9 @@ $stmt = $pdo->prepare("
         ev.description, 
         ev.total_amount, 
         ev.total_items,
+        ev.vendor_id,
+        ev.type,
+        s.supplier_name as vendor_name,
         c.company_name,
         c.legal_name,
         c.address,
@@ -50,6 +53,7 @@ $stmt = $pdo->prepare("
         c.email
     FROM expense_voucher ev
     LEFT JOIN companies c ON ev.company_id = c.id
+    LEFT JOIN suppliers s ON ev.vendor_id = s.id
     WHERE ev.id = ? AND ev.tenant_id = ?
 ");
 $stmt->execute([$voucher_id, $tenant_id]);
@@ -286,6 +290,18 @@ $lines = $stmt->fetchAll(PDO::FETCH_ASSOC);
             <div class="info-item">
                 <label>Date</label>
                 <div class="value"><?php echo date('F d, Y', strtotime($voucher['date'])); ?></div>
+            </div>
+            <?php if (!empty($voucher['vendor_name'])): ?>
+            <div class="info-item">
+                <label>Vendor</label>
+                <div class="value"><?php echo htmlspecialchars($voucher['vendor_name']); ?></div>
+            </div>
+            <?php endif; ?>
+            <div class="info-item">
+                <label>Type</label>
+                <div class="value" style="font-weight:bold; color: <?php echo ($voucher['type'] === 'DR') ? '#e34f4f' : '#2fbf71'; ?>">
+                    <?php echo ($voucher['type'] === 'DR') ? '- DR' : '+ CR'; ?>
+                </div>
             </div>
             <div class="info-item description">
                 <label>Description</label>

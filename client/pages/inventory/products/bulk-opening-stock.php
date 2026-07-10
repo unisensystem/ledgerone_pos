@@ -171,6 +171,12 @@ if (!$tenant_id || !$pdo) {
             background-color: #f5f5f5;
         }
         
+        .dropdown-item.selected {
+            background-color: #e3f2fd;
+            color: #1976d2;
+            font-weight: 600;
+        }
+        
         .dropdown-item.disabled {
             color: #ccc;
             cursor: not-allowed;

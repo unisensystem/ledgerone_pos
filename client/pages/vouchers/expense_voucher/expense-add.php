@@ -138,6 +138,26 @@ $currency_symbol = $currency['symbol'] ?? '$';
                     </select>
                 </div>
 
+                <div class="form-group" id="vendorGroup">
+                    <label for="vendor">Vendor</label>
+                    <select id="vendor">
+                        <option value="">Select Vendor</option>
+                    </select>
+                </div>
+
+                <div class="form-group" id="typeGroup">
+                    <label>Type</label>
+                    <div style="display: flex; gap: 8px;">
+                        <button type="button" id="typeCR" class="btn type-btn active" data-type="CR" style="flex:1;">
+                            + CR
+                        </button>
+                        <button type="button" id="typeDR" class="btn type-btn" data-type="DR" style="flex:1;">
+                            - DR
+                        </button>
+                    </div>
+                    <input type="hidden" id="voucherType" value="CR">
+                </div>
+
                 <div class="form-group full-width">
                     <label for="description">Description</label>
                     <textarea id="description" placeholder="Enter a brief description of this expense entry"></textarea>

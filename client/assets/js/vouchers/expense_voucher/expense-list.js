@@ -495,6 +495,11 @@ function viewVoucher(id) {
                     day: 'numeric'
                 });
                 document.getElementById('viewCompany').textContent = voucher.company_name || '-';
+                document.getElementById('viewVendor').textContent = voucher.vendor_name || '-';
+                const typeEl = document.getElementById('viewType');
+                typeEl.textContent = voucher.type || 'CR';
+                typeEl.style.fontWeight = '600';
+                typeEl.style.color = (voucher.type === 'DR') ? '#e34f4f' : '#2fbf71';
                 document.getElementById('viewDescription').textContent = voucher.description;
                 document.getElementById('viewTotalAmount').textContent = CURRENCY_SYMBOL + parseFloat(voucher.total_amount).toFixed(2);
                 

@@ -91,6 +91,8 @@ function initializeRowControls(row) {
     const dropdownList = productDropdown ? productDropdown.querySelector('.dropdown-list') : null;
     
     if (productSearch && dropdownList) {
+        let selectedIndex = -1;
+
         productSearch.addEventListener('focus', function() {
             if (this.value.trim().length >= 2) {
                 dropdownList.style.display = 'block';
@@ -99,6 +101,7 @@ function initializeRowControls(row) {
         
         productSearch.addEventListener('input', function(e) {
             const searchText = this.value.trim();
+            selectedIndex = -1;
             if (searchText.length >= 2) {
                 searchProducts(searchText, dropdownList, row);
             } else {
@@ -109,10 +112,34 @@ function initializeRowControls(row) {
                 }
             }
         });
+
+        productSearch.addEventListener('keydown', function(e) {
+            const items = dropdownList.querySelectorAll('.dropdown-item:not([style*="cursor: default"])');
+            if (!items.length) return;
+
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                selectedIndex = Math.min(selectedIndex + 1, items.length - 1);
+                updateDropdownSelection(items, selectedIndex);
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                selectedIndex = Math.max(selectedIndex - 1, 0);
+                updateDropdownSelection(items, selectedIndex);
+            } else if (e.key === 'Enter') {
+                e.preventDefault();
+                if (selectedIndex >= 0 && items[selectedIndex]) {
+                    items[selectedIndex].dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+                }
+            } else if (e.key === 'Escape') {
+                dropdownList.style.display = 'none';
+                selectedIndex = -1;
+            }
+        });
         
         document.addEventListener('click', (e) => {
             if (productDropdown && !productDropdown.contains(e.target)) {
                 dropdownList.style.display = 'none';
+                selectedIndex = -1;
             }
         });
     }
@@ -139,21 +166,47 @@ function initBranchDropdown(container) {
     const dropdownList = container.querySelector('.dropdown-list');
     
     if (!searchInput || !hiddenInput || !dropdownList) return;
+
+    let selectedIndex = -1;
     
     searchInput.addEventListener('focus', () => {
-        renderBranchList('', dropdownList, searchInput, hiddenInput);
+        renderBranchList(searchInput.value.toLowerCase(), dropdownList, searchInput, hiddenInput);
         dropdownList.style.display = 'block';
     });
     
     searchInput.addEventListener('input', () => {
-        const query = searchInput.value.toLowerCase();
-        renderBranchList(query, dropdownList, searchInput, hiddenInput);
+        selectedIndex = -1;
+        renderBranchList(searchInput.value.toLowerCase(), dropdownList, searchInput, hiddenInput);
         dropdownList.style.display = 'block';
+    });
+
+    searchInput.addEventListener('keydown', function(e) {
+        const items = dropdownList.querySelectorAll('.dropdown-item:not([style*="cursor: default"])');
+        if (!items.length) return;
+
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            selectedIndex = Math.min(selectedIndex + 1, items.length - 1);
+            updateDropdownSelection(items, selectedIndex);
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            selectedIndex = Math.max(selectedIndex - 1, 0);
+            updateDropdownSelection(items, selectedIndex);
+        } else if (e.key === 'Enter') {
+            e.preventDefault();
+            if (selectedIndex >= 0 && items[selectedIndex]) {
+                items[selectedIndex].dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+            }
+        } else if (e.key === 'Escape') {
+            dropdownList.style.display = 'none';
+            selectedIndex = -1;
+        }
     });
     
     document.addEventListener('click', (e) => {
         if (!container.contains(e.target)) {
             dropdownList.style.display = 'none';
+            selectedIndex = -1;
         }
     });
 }
@@ -205,6 +258,13 @@ function clearProductData(row) {
     row.querySelector('.default-unit-id').value = '';
     row.querySelector('.product-search').value = '';
     row.querySelector('.qty-columns').innerHTML = '';
+}
+
+function updateDropdownSelection(items, index) {
+    items.forEach((item, i) => {
+        item.classList.toggle('selected', i === index);
+        if (i === index) item.scrollIntoView({ block: 'nearest' });
+    });
 }
 
 function searchProducts(searchText, dropdownList, row) {

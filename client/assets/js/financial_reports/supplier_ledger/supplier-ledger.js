@@ -469,158 +469,93 @@ document.addEventListener('DOMContentLoaded', function () {
         pagination.style.display = 'none';
         const tbody = detailedLedgerTable.querySelector('tbody');
         tbody.innerHTML = '';
-        
-        // Opening balance row
+
         const openingLabel = fromDate.value ? 'Soft Opening Balance' : 'Opening Balance';
         tbody.innerHTML += `
-            <tr>
-                <td>${fromDate.value || 'Opening Balance'}</td>
-                <td>${openingLabel}</td>
-                <td>OB001</td>
+            <tr style="background:#f0f9ff;">
+                <td>${fromDate.value || '-'}</td>
+                <td><em>${openingLabel}</em></td>
+                <td>-</td>
                 <td></td>
                 <td></td>
                 <td class="${openingBalance >= 0 ? 'balance-positive' : 'balance-negative'}">${currentCurrencySymbol}${Math.abs(openingBalance).toFixed(2)} ${openingBalance >= 0 ? 'Dr' : 'Cr'}</td>
             </tr>
         `;
-        
+
         let totalDebit = 0, totalCredit = 0;
-        
-        // Render all transactions grouped by sub_account_id
         const renderedSubAccounts = new Set();
-        
-        // First render transactions without sub account
-        if (groupedData[null] || groupedData[''] || groupedData[undefined]) {
-            const transactions = groupedData[null] || groupedData[''] || groupedData[undefined];
-            transactions.forEach(row => {
-                const debit = parseFloat(row.debit) || 0;
-                const credit = parseFloat(row.credit) || 0;
-                const balance = parseFloat(row.running_balance) || 0;
-                const isPDC = row.pdc_status !== undefined;
-                const isNonApprovedPDC = isPDC && row.pdc_status !== 'Approved';
-                
-                if (!isNonApprovedPDC) {
-                    totalDebit += debit;
-                }
-                totalCredit += credit;
-                
-                tbody.innerHTML += `
-                    <tr ${isNonApprovedPDC ? 'style="color: #e8b23f; font-style: italic;"' : ''}>
-                        <td>${row.date}</td>
-                        <td>
-                            ${row.description}
-                            ${row.invoice_id || row.return_id ? `<button class="btn-expand" data-type="${row.invoice_id ? 'invoice' : 'return'}" data-id="${row.invoice_id || row.return_id}" style="margin-left: 8px; padding: 2px 8px; font-size: 11px; background: var(--primary); color: white; border: none; border-radius: 4px; cursor: pointer;">Expand</button>` : ''}
-                        </td>
-                        <td>${row.reference}</td>
-                        <td>${debit > 0 ? currentCurrencySymbol + debit.toFixed(2) : ''}</td>
-                        <td>${credit > 0 ? currentCurrencySymbol + credit.toFixed(2) : ''}</td>
-                        <td class="${balance >= 0 ? 'balance-positive' : 'balance-negative'}">${currentCurrencySymbol}${Math.abs(balance).toFixed(2)} ${balance >= 0 ? 'Dr' : 'Cr'}</td>
-                    </tr>
-                `;
-            });
-        }
-        
-        // Render known sub accounts and their transactions
-        subAccounts.forEach(subAccount => {
-            renderedSubAccounts.add(subAccount.id.toString());
-            const subAccountOpening = (parseFloat(subAccount.debit) || 0) - (parseFloat(subAccount.credit) || 0);
-            const subAccountTransactions = groupedData[subAccount.id];
-            
+
+        function renderRow(row) {
+            const debit = parseFloat(row.debit) || 0;
+            const credit = parseFloat(row.credit) || 0;
+            const balance = parseFloat(row.running_balance) || 0;
+            const isPDC = row.pdc_status !== undefined;
+            const isNonApprovedPDC = isPDC && row.pdc_status !== 'Approved';
+            const isExpense = row.description && row.description.startsWith('Expense Voucher');
+
+            if (!isNonApprovedPDC) totalDebit += debit;
+            totalCredit += credit;
+
+            let rowStyle = '';
+            if (isNonApprovedPDC) rowStyle = 'color:#e8b23f; font-style:italic;';
+            else if (isExpense) rowStyle = 'background:#fff3e0;';
+
+            const typeTag = isExpense
+                ? `<span style="display:inline-block;margin-left:6px;padding:1px 7px;font-size:11px;border-radius:10px;font-weight:600;background:${debit > 0 ? '#fde8e8' : '#e8f5e9'};color:${debit > 0 ? '#c0392b' : '#27ae60'};">${debit > 0 ? 'DR' : 'CR'}</span>`
+                : '';
+
             tbody.innerHTML += `
-                <tr style="background: #e3f2fd; font-weight: 600;">
-                    <td colspan="6"><strong>Sub Account: ${subAccount.sub_account_name}</strong></td>
+                <tr style="${rowStyle}">
+                    <td>${row.date}</td>
+                    <td>
+                        ${row.description}${typeTag}
+                        ${row.invoice_id || row.return_id ? `<button class="btn-expand" data-type="${row.invoice_id ? 'invoice' : 'return'}" data-id="${row.invoice_id || row.return_id}" style="margin-left:8px;padding:2px 8px;font-size:11px;background:var(--primary);color:white;border:none;border-radius:4px;cursor:pointer;">Expand</button>` : ''}
+                    </td>
+                    <td>${row.reference}</td>
+                    <td>${debit > 0 ? currentCurrencySymbol + debit.toFixed(2) : ''}</td>
+                    <td>${credit > 0 ? currentCurrencySymbol + credit.toFixed(2) : ''}</td>
+                    <td class="${balance >= 0 ? 'balance-positive' : 'balance-negative'}">${currentCurrencySymbol}${Math.abs(balance).toFixed(2)} ${balance >= 0 ? 'Dr' : 'Cr'}</td>
                 </tr>
             `;
-            
-            if (subAccountOpening !== 0) {
+        }
+
+        // Transactions without sub account
+        const noSubTxns = groupedData[null] || groupedData[''] || groupedData[undefined] || [];
+        noSubTxns.forEach(renderRow);
+
+        // Known sub accounts
+        subAccounts.forEach(sa => {
+            renderedSubAccounts.add(sa.id.toString());
+            const saOpening = (parseFloat(sa.debit) || 0) - (parseFloat(sa.credit) || 0);
+            const saTxns = groupedData[sa.id] || [];
+
+            tbody.innerHTML += `<tr style="background:#e3f2fd;font-weight:600;"><td colspan="6"><strong>Sub Account: ${sa.sub_account_name}</strong></td></tr>`;
+
+            if (saOpening !== 0) {
                 tbody.innerHTML += `
-                    <tr>
-                        <td>${fromDate.value || 'Opening Balance'}</td>
-                        <td>${openingLabel}</td>
-                        <td>OB-SUB</td>
-                        <td></td>
-                        <td></td>
-                        <td class="${subAccountOpening >= 0 ? 'balance-positive' : 'balance-negative'}">${currentCurrencySymbol}${Math.abs(subAccountOpening).toFixed(2)} ${subAccountOpening >= 0 ? 'Dr' : 'Cr'}</td>
-                    </tr>
-                `;
+                    <tr style="background:#f0f9ff;">
+                        <td>${fromDate.value || '-'}</td>
+                        <td><em>${openingLabel}</em></td>
+                        <td>-</td><td></td><td></td>
+                        <td class="${saOpening >= 0 ? 'balance-positive' : 'balance-negative'}">${currentCurrencySymbol}${Math.abs(saOpening).toFixed(2)} ${saOpening >= 0 ? 'Dr' : 'Cr'}</td>
+                    </tr>`;
             }
-            
-            if (subAccountTransactions && subAccountTransactions.length > 0) {
-                
-                subAccountTransactions.forEach(row => {
-                    const debit = parseFloat(row.debit) || 0;
-                    const credit = parseFloat(row.credit) || 0;
-                    const balance = parseFloat(row.running_balance) || 0;
-                    const isPDC = row.pdc_status !== undefined;
-                    const isNonApprovedPDC = isPDC && row.pdc_status !== 'Approved';
-                    
-                    if (!isNonApprovedPDC) {
-                        totalDebit += debit;
-                    }
-                    totalCredit += credit;
-                    
-                    tbody.innerHTML += `
-                        <tr ${isNonApprovedPDC ? 'style="color: #e8b23f; font-style: italic;"' : ''}>
-                            <td>${row.date}</td>
-                            <td>
-                                ${row.description}
-                                ${row.invoice_id || row.return_id ? `<button class="btn-expand" data-type="${row.invoice_id ? 'invoice' : 'return'}" data-id="${row.invoice_id || row.return_id}" style="margin-left: 8px; padding: 2px 8px; font-size: 11px; background: var(--primary); color: white; border: none; border-radius: 4px; cursor: pointer;">Expand</button>` : ''}
-                            </td>
-                            <td>${row.reference}</td>
-                            <td>${debit > 0 ? currentCurrencySymbol + debit.toFixed(2) : ''}</td>
-                            <td>${credit > 0 ? currentCurrencySymbol + credit.toFixed(2) : ''}</td>
-                            <td class="${balance >= 0 ? 'balance-positive' : 'balance-negative'}">${currentCurrencySymbol}${Math.abs(balance).toFixed(2)} ${balance >= 0 ? 'Dr' : 'Cr'}</td>
-                        </tr>
-                    `;
-                });
+            saTxns.forEach(renderRow);
+        });
+
+        // Remaining sub accounts not in sub_accounts array
+        Object.keys(groupedData).forEach(key => {
+            if (key && key !== 'null' && key !== '' && key !== 'undefined' && !renderedSubAccounts.has(key)) {
+                tbody.innerHTML += `<tr style="background:#e3f2fd;font-weight:600;"><td colspan="6"><strong>Sub Account ID: ${key}</strong></td></tr>`;
+                groupedData[key].forEach(renderRow);
             }
         });
-        
-        // Render any remaining sub accounts that exist in transactions but not in sub_accounts array
-        Object.keys(groupedData).forEach(subAccountKey => {
-            if (subAccountKey && subAccountKey !== 'null' && subAccountKey !== '' && subAccountKey !== 'undefined' && !renderedSubAccounts.has(subAccountKey)) {
-                const subAccountTransactions = groupedData[subAccountKey];
-                
-                tbody.innerHTML += `
-                    <tr style="background: #e3f2fd; font-weight: 600;">
-                        <td colspan="6"><strong>Sub Account ID: ${subAccountKey}</strong></td>
-                    </tr>
-                `;
-                
-                subAccountTransactions.forEach(row => {
-                    const debit = parseFloat(row.debit) || 0;
-                    const credit = parseFloat(row.credit) || 0;
-                    const balance = parseFloat(row.running_balance) || 0;
-                    const isPDC = row.pdc_status !== undefined;
-                    const isNonApprovedPDC = isPDC && row.pdc_status !== 'Approved';
-                    
-                    if (!isNonApprovedPDC) {
-                        totalDebit += debit;
-                    }
-                    totalCredit += credit;
-                    
-                    tbody.innerHTML += `
-                        <tr ${isNonApprovedPDC ? 'style="color: #e8b23f; font-style: italic;"' : ''}>
-                            <td>${row.date}</td>
-                            <td>
-                                ${row.description}
-                                ${row.invoice_id || row.return_id ? `<button class="btn-expand" data-type="${row.invoice_id ? 'invoice' : 'return'}" data-id="${row.invoice_id || row.return_id}" style="margin-left: 8px; padding: 2px 8px; font-size: 11px; background: var(--primary); color: white; border: none; border-radius: 4px; cursor: pointer;">Expand</button>` : ''}
-                            </td>
-                            <td>${row.reference}</td>
-                            <td>${debit > 0 ? currentCurrencySymbol + debit.toFixed(2) : ''}</td>
-                            <td>${credit > 0 ? currentCurrencySymbol + credit.toFixed(2) : ''}</td>
-                            <td class="${balance >= 0 ? 'balance-positive' : 'balance-negative'}">${currentCurrencySymbol}${Math.abs(balance).toFixed(2)} ${balance >= 0 ? 'Dr' : 'Cr'}</td>
-                        </tr>
-                    `;
-                });
-            }
-        });
-        
+
         const finalBalance = openingBalance - totalCredit + totalDebit;
         tbody.innerHTML += `
             <tr class="totals-row">
                 <td><strong>Totals</strong></td>
-                <td></td>
-                <td></td>
+                <td></td><td></td>
                 <td><strong>${currentCurrencySymbol}${totalDebit.toFixed(2)}</strong></td>
                 <td><strong>${currentCurrencySymbol}${totalCredit.toFixed(2)}</strong></td>
                 <td><strong class="${finalBalance >= 0 ? 'balance-positive' : 'balance-negative'}">${currentCurrencySymbol}${Math.abs(finalBalance).toFixed(2)} ${finalBalance >= 0 ? 'Dr' : 'Cr'}</strong></td>

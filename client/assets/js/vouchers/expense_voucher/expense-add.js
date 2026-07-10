@@ -3,7 +3,9 @@ const CUSTOMIZE_FIELDS_KEY = 'expenseVoucherCustomizeFields';
 
 const allFields = [
     { id: 'project', label: 'Project', visible: false },
-    { id: 'container', label: 'Container', visible: false }
+    { id: 'container', label: 'Container', visible: false },
+    { id: 'vendor', label: 'Vendor', visible: true },
+    { id: 'type', label: 'Type (CR/DR)', visible: true }
 ];
 
 function getFieldVisibility() {
@@ -33,12 +35,12 @@ function saveFieldVisibility(visibility) {
 }
 
 function toggleFieldVisibility(fieldId, isVisible) {
-    const element = document.getElementById(fieldId);
+    const groupMap = { vendor: 'vendorGroup', type: 'typeGroup' };
+    const targetId = groupMap[fieldId] || fieldId;
+    const element = document.getElementById(targetId);
     if (element) {
-        const formGroup = element.closest('.form-group');
-        if (formGroup) {
-            formGroup.style.display = isVisible ? '' : 'none';
-        }
+        const formGroup = element.closest('.form-group') || element;
+        formGroup.style.display = isVisible ? '' : 'none';
     }
 }
 
@@ -77,17 +79,19 @@ let bankAccounts = [];
 let companies = [];
 let projects = [];
 let containers = [];
+let vendors = [];
 
 // Fetch data from API
 async function fetchDropdownData() {
     try {
-        const [expenseRes, paymentRes, bankRes, companyRes, projectRes, containerRes] = await Promise.all([
+        const [expenseRes, paymentRes, bankRes, companyRes, projectRes, containerRes, vendorRes] = await Promise.all([
             fetch('../../../../server/api/vouchers/expense_voucher/get-expense-accounts.php'),
             fetch('../../../../server/api/vouchers/expense_voucher/get-payment-methods.php'),
             fetch('../../../../server/api/vouchers/expense_voucher/get-bank-accounts.php'),
             fetch('../../../../server/api/vouchers/expense_voucher/get-companies.php'),
             fetch('../../../../server/api/master_setup/project_setup/get-projects-dropdown.php'),
-            fetch('../../../../server/api/vouchers/expense_voucher/get-containers.php')
+            fetch('../../../../server/api/vouchers/expense_voucher/get-containers.php'),
+            fetch('../../../../server/api/vouchers/expense_voucher/get-vendors.php')
         ]);
         
         const expenseData = await expenseRes.json();
@@ -96,6 +100,7 @@ async function fetchDropdownData() {
         const companyData = await companyRes.json();
         const projectData = await projectRes.json();
         const containerData = await containerRes.json();
+        const vendorData = await vendorRes.json();
         
         if (expenseData.success) {
             expenseAccounts = expenseData.data;
@@ -137,6 +142,16 @@ async function fetchDropdownData() {
                 option.value = c.id;
                 option.textContent = `${c.container_code} - ${c.container_name}`;
                 containerSelect.appendChild(option);
+            });
+        }
+        if (vendorData.success) {
+            vendors = vendorData.data;
+            const vendorSelect = document.getElementById('vendor');
+            vendorData.data.forEach(v => {
+                const option = document.createElement('option');
+                option.value = v.id;
+                option.textContent = v.supplier_name;
+                vendorSelect.appendChild(option);
             });
         }
     } catch (error) {
@@ -259,6 +274,12 @@ async function loadVoucherForEdit(voucherId) {
                 if (voucher.container_id) {
                     document.getElementById('container').value = voucher.container_id;
                 }
+                if (voucher.vendor_id) {
+                    document.getElementById('vendor').value = voucher.vendor_id;
+                }
+                if (voucher.type) {
+                    setVoucherType(voucher.type);
+                }
             }, 100);
             
             // Populate expense lines
@@ -310,6 +331,17 @@ async function loadVoucherForEdit(voucherId) {
     }
 }
 
+// Type CR/DR toggle
+function setVoucherType(type) {
+    document.getElementById('voucherType').value = type;
+    document.querySelectorAll('.type-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.type === type);
+    });
+}
+
+document.getElementById('typeCR').addEventListener('click', () => setVoucherType('CR'));
+document.getElementById('typeDR').addEventListener('click', () => setVoucherType('DR'));
+
 // Fetch next voucher number
 async function fetchNextVoucherNumber() {
     try {
@@ -346,14 +378,12 @@ function addExpenseEntry() {
                 <td>
                     <div class="searchable-dropdown">
                         <input type="text" class="expense-account" placeholder="Search expense account..." required>
-                        <div class="dropdown-options" id="expenseOptions-${entryCounter}"></div>
                     </div>
                     <div class="error-text">Expense account is required</div>
                 </td>
                 <td>
                     <div class="searchable-dropdown">
                         <input type="text" class="cost-center" placeholder="Search cost center...">
-                        <div class="dropdown-options" id="costCenterOptions-${entryCounter}"></div>
                     </div>
                 </td>
                 <td>
@@ -443,8 +473,12 @@ function addExpenseEntry() {
 function removeEntry(id) {
     const entry = document.getElementById(`entry-${id}`);
     if (entry) {
+        // Remove body-appended dropdowns for this row
+        const expDd = document.getElementById(`expenseOptions-${id}`);
+        const ccDd = document.getElementById(`costCenterOptions-${id}`);
+        if (expDd) expDd.remove();
+        if (ccDd) ccDd.remove();
         entry.remove();
-        // Update serial numbers
         updateSerialNumbers();
     }
 }
@@ -472,10 +506,27 @@ async function fetchCostCenters(accountId) {
 
 // Initialize searchable dropdown
 function initSearchableDropdown(optionsId, data, inputElement) {
-    const dropdownOptions = document.getElementById(optionsId);
+    // Remove old dropdown from DOM if exists
+    let dropdownOptions = document.getElementById(optionsId);
+    if (dropdownOptions) dropdownOptions.remove();
+
+    // Create new dropdown appended to body (avoids table overflow clipping)
+    dropdownOptions = document.createElement('div');
+    dropdownOptions.id = optionsId;
+    dropdownOptions.className = 'dropdown-options';
+    document.body.appendChild(dropdownOptions);
+
     const inputField = inputElement;
 
-    // Populate dropdown options
+    function positionDropdown() {
+        const rect = inputField.getBoundingClientRect();
+        dropdownOptions.style.position = 'fixed';
+        dropdownOptions.style.top = rect.bottom + 'px';
+        dropdownOptions.style.left = rect.left + 'px';
+        dropdownOptions.style.width = rect.width + 'px';
+        dropdownOptions.style.zIndex = '99999';
+    }
+
     function populateOptions(filter = '') {
         dropdownOptions.innerHTML = '';
         const filteredData = data.filter(item =>
@@ -487,29 +538,37 @@ function initSearchableDropdown(optionsId, data, inputElement) {
             option.className = 'dropdown-option';
             option.textContent = item.name;
             option.dataset.id = item.id;
-            option.addEventListener('click', () => {
+            option.addEventListener('mousedown', (e) => {
+                e.preventDefault();
                 inputField.value = item.name;
                 inputField.dataset.id = item.id;
                 dropdownOptions.classList.remove('active');
-                // Trigger input event to update dependent dropdowns
                 inputField.dispatchEvent(new Event('input'));
             });
             dropdownOptions.appendChild(option);
         });
     }
 
-    // Show dropdown on input focus
     inputField.addEventListener('focus', () => {
-        populateOptions();
+        populateOptions(inputField.value);
+        positionDropdown();
         dropdownOptions.classList.add('active');
     });
 
-    // Filter options on input
     inputField.addEventListener('input', (e) => {
         populateOptions(e.target.value);
+        positionDropdown();
+        dropdownOptions.classList.add('active');
     });
 
-    // Close dropdown when clicking outside
+    inputField.addEventListener('blur', () => {
+        setTimeout(() => dropdownOptions.classList.remove('active'), 150);
+    });
+
+    window.addEventListener('scroll', () => {
+        if (dropdownOptions.classList.contains('active')) positionDropdown();
+    }, true);
+
     document.addEventListener('click', (e) => {
         if (!dropdownOptions.contains(e.target) && e.target !== inputField) {
             dropdownOptions.classList.remove('active');
@@ -598,6 +657,8 @@ async function validateAndPost() {
                     company_id: document.getElementById('company').value,
                     project_id: document.getElementById('project').value || null,
                     container_id: document.getElementById('container').value || null,
+                    vendor_id: document.getElementById('vendor').value || null,
+                    type: document.getElementById('voucherType').value,
                     voucher_number: document.getElementById('voucher').value,
                     description: document.getElementById('description').value,
                     entries: expenseData
