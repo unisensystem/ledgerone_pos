@@ -369,12 +369,15 @@
 
     <div class="invoice-container">
         <div class="invoice-header">
-            <div class="company-info">
+            <div class="company-info" style="display:flex; align-items:center; gap:15px;">
+                <div id="companyLogoWrapper"></div>
+                <div>
                 <h1 id="companyName">Loading...</h1>
                 <p id="companyAddress">Loading...</p>
                 <p id="companyCityState">Loading...</p>
                 <p id="companyPhone">Loading...</p>
                 <p id="companyEmail">Loading...</p>
+                </div>
             </div>
             <div class="invoice-details">
                 <h2>SALE INVOICE</h2>
@@ -387,6 +390,7 @@
             <div class="customer-info">
                 <h3>Customer Information</h3>
                 <p><strong>Name:</strong> <span id="customerName">Loading...</span></p>
+                <p><strong>Area:</strong> <span id="customerArea">-</span></p>
                 <p><strong>Address:</strong> <span id="customerAddress">Loading...</span></p>
                 <p><strong>Phone:</strong> <span id="customerPhone">-</span></p>
                 <p><strong>Email:</strong> <span id="customerEmail">-</span></p>
@@ -395,12 +399,18 @@
                 <h3>Invoice Information</h3>
                 <p><strong>Branch:</strong> <span id="branchName">Loading...</span></p>
                 <p><strong>Currency:</strong> <span id="currency">Loading...</span></p>
+                <p id="invoiceTypeRow"><strong>Invoice Type:</strong> <span id="invoiceTypeVal">-</span></p>
+                <p id="dueDateRow" style="display:none;"><strong>Due Date:</strong> <span id="dueDateVal">-</span></p>
                 <p><strong>Sales Officer:</strong> <span id="salesOfficer">-</span></p>
                 <p><strong>Supplier Man:</strong> <span id="supplierMan">-</span></p>
                 <p><strong>Bilty No:</strong> <span id="biltyNo">-</span></p>
                 <p><strong>Transport:</strong> <span id="transportName">-</span></p>
                 <p><strong>Remarks:</strong> <span id="remarks">-</span></p>
             </div>
+        </div>
+
+        <div id="brandRow" style="display:none; margin-bottom: 12px; padding: 6px 12px; background: #f5f5f5; border-left: 3px solid #333; border-radius: 3px; font-size: 12px;">
+            <strong>Brand:</strong> <span id="brandName" style="color: #555;"></span>
         </div>
 
         <table class="items-table">
@@ -890,17 +900,14 @@
         }
 
         function populateCompanyData(company) {
-            // Set company logo only if exists
             if (company.logo_url) {
                 const logoImg = document.createElement('img');
                 logoImg.src = `../../../assets/uploads/company_logo/${company.logo_url}`;
                 logoImg.alt = 'Company Logo';
-                logoImg.style.maxWidth = '120px';
+                logoImg.style.maxWidth = '100px';
                 logoImg.style.maxHeight = '80px';
-                logoImg.style.marginBottom = '10px';
-                logoImg.style.display = 'block';
-                const companyInfo = document.querySelector('.company-info');
-                companyInfo.insertBefore(logoImg, companyInfo.firstChild);
+                logoImg.className = 'company-logo';
+                document.getElementById('companyLogoWrapper').appendChild(logoImg);
             }
 
             document.getElementById('companyName').textContent = company.company_name || company.legal_name || 'Company Name';
@@ -915,6 +922,7 @@
             document.getElementById('invoiceNo').textContent = invoice.bill_no;
             document.getElementById('invoiceDate').textContent = new Date(invoice.sale_date).toLocaleDateString();
             document.getElementById('customerName').textContent = `${invoice.customer_code} - ${invoice.customer_name}`;
+            document.getElementById('customerArea').textContent = invoice.area_name || '-';
 
             // Customer address
             let addressText = '';
@@ -949,6 +957,13 @@
                 `${invoice.branch_name} (${invoice.branch_type}) - Parent: ${invoice.parent_branch_name}` :
                 `${invoice.branch_name} (${invoice.branch_type})`;
 
+            // Invoice Type & Due Date
+            document.getElementById('invoiceTypeVal').textContent = invoice.invoice_type || '-';
+            if (invoice.invoice_type === 'Credit' && invoice.due_date) {
+                document.getElementById('dueDateVal').textContent = new Date(invoice.due_date).toLocaleDateString();
+                document.getElementById('dueDateRow').style.display = '';
+            }
+
             const branchEl = document.getElementById('branchName').closest('p');
             const currencyEl = document.getElementById('currency').closest('p');
 
@@ -962,6 +977,12 @@
                 currencyEl.style.display = 'none';
             } else {
                 document.getElementById('currency').textContent = invoice.currency_name;
+            }
+
+            // Brand
+            if (invoice.brand_name) {
+                document.getElementById('brandName').textContent = invoice.brand_name;
+                document.getElementById('brandRow').style.display = 'block';
             }
 
             const salesOfficerEl = document.getElementById('salesOfficer').closest('p');
@@ -1342,6 +1363,13 @@
             if (localStorage.getItem('hidePrintGeneratedOn') === 'true') {
                 document.getElementById('generatedOnSection').style.display = 'none';
             }
+
+            // Hide empty rows in Customer & Invoice info
+            document.querySelectorAll('.customer-info p, .invoice-info p').forEach(p => {
+                if (p.style.display === 'none') return;
+                const span = p.querySelector('span');
+                if (span && (!span.textContent.trim() || span.textContent.trim() === '-')) p.style.display = 'none';
+            });
 
             // Generate QR Code if enabled
             setTimeout(() => {

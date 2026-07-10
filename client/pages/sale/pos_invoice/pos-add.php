@@ -89,13 +89,13 @@ if (!$user_id) {
                     </div>
                     
                     <!-- 5. Due Date -->
-                    <div class="form-group" id="dueDateGroup">
+                    <div class="form-group" id="dueDateGroup" style="display:none;">
                         <label for="dueDate">Due Date</label>
                         <input type="date" id="dueDate" tabindex="-1">
                     </div>
                     
                     <!-- 6. Brand -->
-                    <div class="form-group" id="brandGroup">
+                    <div class="form-group" id="brandGroup" style="display:none;">
                         <label for="brand">Brand</label>
                         <select id="brand" tabindex="-1">
                             <option value="">Select Brand</option>
@@ -387,15 +387,34 @@ if (!$user_id) {
 
     <!-- Success Modal -->
     <div class="modal" id="successModal">
-        <div class="modal-content">
-            <h3 class="modal-title">Invoice Saved Successfully!</h3>
-            <p>What would you like to do next?</p>
-            <div class="modal-actions">
-                <button class="btn btn-secondary" id="printLaterBtn">
-                    Print Later
+        <div class="success-modal-content">
+            <!-- Countdown Ring -->
+            <div class="success-countdown-wrap">
+                <svg class="success-ring" viewBox="0 0 44 44">
+                    <circle class="success-ring-bg" cx="22" cy="22" r="19"/>
+                    <circle class="success-ring-fill" id="countdownRing" cx="22" cy="22" r="19"/>
+                </svg>
+                <span class="success-countdown-num" id="countdownNum">5</span>
+            </div>
+
+            <!-- Icon + Title -->
+            <div class="success-icon"><i class="fas fa-check"></i></div>
+            <h3 class="success-title">Invoice Saved!</h3>
+            <p class="success-sub">New invoice starts automatically in <strong id="countdownText">5</strong>s</p>
+
+            <!-- Actions -->
+            <div class="success-actions">
+                <button class="success-btn success-btn-ghost" id="printLaterBtn">
+                    <i class="fas fa-clock"></i> Print Later
+                    <kbd>Esc</kbd>
                 </button>
-                <button class="btn btn-primary" id="printInvoiceBtn">
-                    <i class="fas fa-print"></i> Print Invoice
+                <button class="success-btn success-btn-new" id="newInvoiceBtn">
+                    <i class="fas fa-plus"></i> New Invoice
+                    <kbd>Enter</kbd>
+                </button>
+                <button class="success-btn success-btn-print" id="printInvoiceBtn">
+                    <i class="fas fa-print"></i> Print
+                    <kbd>P</kbd>
                 </button>
             </div>
         </div>
@@ -1041,6 +1060,19 @@ if (!$user_id) {
         </div>
     </div>
 
+    <script>
+    (function() {
+        function toggleCreditFields() {
+            const isCredit = document.getElementById('invoiceType').value === 'Credit';
+            document.getElementById('dueDateGroup').style.display = isCredit ? '' : 'none';
+            document.getElementById('brandGroup').style.display = isCredit ? '' : 'none';
+        }
+        document.addEventListener('DOMContentLoaded', function() {
+            toggleCreditFields();
+            document.getElementById('invoiceType').addEventListener('change', toggleCreditFields);
+        });
+    })();
+    </script>
     <script src="../../../assets/js/sale/pos_invoice/pos-add-uom.js?v=<?php echo time(); ?>&debug=1"></script>
     <script src="../../../assets/js/sale/pos_invoice/brand-autofill.js?v=<?php echo time(); ?>"></script>
     <script src="../../../assets/js/sale/pos_invoice/pos-add-scheme.js?v=<?php echo time(); ?>"></script>

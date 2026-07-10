@@ -2082,6 +2082,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     // Store invoice ID for print functionality
                     window.lastInvoiceId = data.invoice_id;
                     document.getElementById('successModal').style.display = 'flex';
+                    window.purchaseStartCountdown(isEditMode);
                 } else {
                     alert('Error: ' + data.message);
                 }
@@ -2156,18 +2157,72 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     // Modal button events
+    const COUNTDOWN_SEC = 5;
+    const CIRCUMFERENCE = 119.4;
+    window._purchaseCountdownTimer = null;
+
+    window.purchaseStartCountdown = function(editMode) {
+        let remaining = COUNTDOWN_SEC;
+        const ring = document.getElementById('countdownRing');
+        const numEl = document.getElementById('countdownNum');
+        const textEl = document.getElementById('countdownText');
+        if (ring) ring.style.strokeDashoffset = '0';
+        if (numEl) numEl.textContent = remaining;
+        if (textEl) textEl.textContent = remaining;
+        clearInterval(window._purchaseCountdownTimer);
+        window._purchaseCountdownTimer = setInterval(function() {
+            remaining--;
+            const offset = CIRCUMFERENCE * (1 - remaining / COUNTDOWN_SEC);
+            if (ring) ring.style.strokeDashoffset = offset;
+            if (numEl) numEl.textContent = remaining;
+            if (textEl) textEl.textContent = remaining;
+            if (remaining <= 0) {
+                clearInterval(window._purchaseCountdownTimer);
+                editMode ? window.location.href = 'purchase-list.php' : window.location.reload();
+            }
+        }, 1000);
+    };
+
+    window.purchaseStopCountdown = function() {
+        clearInterval(window._purchaseCountdownTimer);
+    };
+
     document.getElementById('printLaterBtn').addEventListener('click', function () {
+        window.purchaseStopCountdown();
         document.getElementById('successModal').style.display = 'none';
-        performReset();
+        window.location.href = 'purchase-list.php';
     });
 
+    const newInvoiceBtn = document.getElementById('newInvoiceBtn');
+    if (newInvoiceBtn) {
+        newInvoiceBtn.addEventListener('click', function() {
+            window.purchaseStopCountdown();
+            isEditMode ? window.location.href = 'purchase-add.php' : window.location.reload();
+        });
+    }
+
     document.getElementById('printInvoiceBtn').addEventListener('click', function () {
+        window.purchaseStopCountdown();
         document.getElementById('successModal').style.display = 'none';
         const invoiceId = isEditMode ? editId : window.lastInvoiceId;
-        if (invoiceId) {
-            window.open(`invoice-print.php?id=${invoiceId}`, '_blank');
+        if (invoiceId) window.open(`invoice-print.php?id=${invoiceId}`, '_blank');
+        isEditMode ? window.location.href = 'purchase-list.php' : performReset();
+    });
+
+    document.addEventListener('keydown', function(e) {
+        const modal = document.getElementById('successModal');
+        if (!modal || modal.style.display !== 'flex') return;
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            window.purchaseStopCountdown();
+            isEditMode ? window.location.href = 'purchase-add.php' : window.location.reload();
+        } else if (e.key === 'Escape') {
+            e.preventDefault();
+            document.getElementById('printLaterBtn')?.click();
+        } else if (e.key === 'p' || e.key === 'P') {
+            e.preventDefault();
+            document.getElementById('printInvoiceBtn')?.click();
         }
-        performReset();
     });
 
     // Invoice Settings Modal
