@@ -3306,14 +3306,87 @@ function initializePage(permissions) {
     
     if (printLaterBtn) {
         printLaterBtn.addEventListener('click', function () {
+            window.stopSuccessCountdown();
             const modal = document.getElementById('successModal');
             if (modal) modal.style.display = 'none';
-            performReset();
+            window.location.href = 'pos-list.php';
         });
     }
 
+    const newInvoiceBtn = document.getElementById('newInvoiceBtn');
+    if (newInvoiceBtn) {
+        newInvoiceBtn.addEventListener('click', function () {
+            window.stopSuccessCountdown();
+            if (isEditMode) {
+                window.location.href = 'pos-add.php';
+            } else {
+                window.location.reload();
+            }
+        });
+    }
+
+    // Countdown timer for success modal
+    window._successCountdownTimer = null;
+    const COUNTDOWN_SEC = 5;
+    const CIRCUMFERENCE = 119.4;
+
+    window.startSuccessCountdown = function (editMode) {
+        let remaining = COUNTDOWN_SEC;
+        const ring = document.getElementById('countdownRing');
+        const numEl = document.getElementById('countdownNum');
+        const textEl = document.getElementById('countdownText');
+
+        if (ring) ring.style.strokeDashoffset = '0';
+        if (numEl) numEl.textContent = remaining;
+        if (textEl) textEl.textContent = remaining;
+
+        clearInterval(window._successCountdownTimer);
+        window._successCountdownTimer = setInterval(function () {
+            remaining--;
+            const offset = CIRCUMFERENCE * (1 - remaining / COUNTDOWN_SEC);
+            if (ring) ring.style.strokeDashoffset = offset;
+            if (numEl) numEl.textContent = remaining;
+            if (textEl) textEl.textContent = remaining;
+            if (remaining <= 0) {
+                clearInterval(window._successCountdownTimer);
+                if (editMode) {
+                    window.location.href = 'pos-list.php';
+                } else {
+                    window.location.reload();
+                }
+            }
+        }, 1000);
+    };
+
+    window.stopSuccessCountdown = function () {
+        clearInterval(window._successCountdownTimer);
+    };
+
+    // Enter key on success modal triggers New Invoice
+    document.addEventListener('keydown', function (e) {
+        const modal = document.getElementById('successModal');
+        if (!modal || modal.style.display !== 'flex') return;
+
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            window.stopSuccessCountdown();
+            if (isEditMode) {
+                window.location.href = 'pos-add.php';
+            } else {
+                window.location.reload();
+            }
+        } else if (e.key === 'Escape') {
+            e.preventDefault();
+            document.getElementById('printLaterBtn')?.click();
+        } else if (e.key === 'p' || e.key === 'P') {
+            e.preventDefault();
+            document.getElementById('printInvoiceBtn')?.click();
+        }
+    });
+
     if (printInvoiceBtn) {
         printInvoiceBtn.addEventListener('click', function () {
+            window.stopSuccessCountdown();
             const modal = document.getElementById('successModal');
             if (modal) modal.style.display = 'none';
             const invoiceId = isEditMode ? editId : window.lastInvoiceId;
@@ -3921,6 +3994,7 @@ function saveInvoice(status = 'Posted') {
                 } else {
                     window.lastInvoiceId = data.invoice_id;
                     document.getElementById('successModal').style.display = 'flex';
+                    startSuccessCountdown(isEditMode);
                 }
             } else {
                 alert('Error: ' + data.message);

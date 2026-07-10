@@ -36,6 +36,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
                 c.address as customer_address,
                 c.primary_phone as customer_phone,
                 c.email as customer_email,
+                a.area_name,
                 csa.sub_account_name,
                 co.company_name,
                 b.branch_name,
@@ -59,6 +60,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
                 END as payment_method
             FROM sale_invoice si
             LEFT JOIN customers c ON si.customer_id = c.id
+            LEFT JOIN areas a ON c.area_id = a.id
             LEFT JOIN customer_sub_accounts csa ON si.sub_account_id = csa.id
             LEFT JOIN companies co ON si.company_id = co.id
             LEFT JOIN branches b ON si.branch_id = b.id
@@ -423,8 +425,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
             $rvStmt = $pdo->prepare("
                 INSERT INTO receive_voucher (
                     tenant_id, currency_id, voucher_number, voucher_date, customer_id,
-                    bill_no, amount, payment_method_id, bank_account_id, created_by, updated_by
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    bill_no, amount, payment_method_id, bank_account_id, project_id, created_by, updated_by
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ");
             $rvStmt->execute([
                 $tenant_id,
@@ -436,6 +438,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
                 $input['amountPaid'],
                 $paymentMethodId,
                 $input['bankAccountId'] ?? null,
+                (!empty($input['projectId']) && intval($input['projectId']) > 0) ? intval($input['projectId']) : null,
                 $user_id,
                 $user_id
             ]);
