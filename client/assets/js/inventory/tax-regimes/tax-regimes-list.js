@@ -12,6 +12,7 @@ const TAX_BASE_OPTIONS = {
         { value: 'total_bill',           label: 'Total Bill' },
         { value: 'value_excl_sales_tax', label: 'Value Excluding Sales Tax (Total Bill - Discount Amt)' },
         { value: 'net_amount',           label: 'Net Amount' },
+        { value: 'remaining_balance',    label: 'Remaining Balance' },
     ]
 };
 

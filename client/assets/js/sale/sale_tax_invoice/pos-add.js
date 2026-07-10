@@ -2815,6 +2815,12 @@ function initializePage(permissions) {
 
     // Update remaining balance
     function updateRemainingBalance() {
+        // When a remaining_balance tax regime is active, amountPaid affects the tax base,
+        // so we re-run the full tax calculation to keep taxes and net receivable in sync.
+        const hasRemainingBalanceTax = window.invoiceLevelTaxRegimes?.some(r => r.tax_base === 'remaining_balance');
+        if (hasRemainingBalanceTax && typeof calculateInvoiceLevelTaxes === 'function') {
+            calculateInvoiceLevelTaxes();
+        }
         const netReceivable = parseFloat(document.getElementById('netReceivable').textContent) || 0;
         const amountPaid = parseFloat(document.getElementById('amountPaid').value) || 0;
         document.getElementById('remainingBalance').value = (netReceivable - amountPaid).toFixed(2);

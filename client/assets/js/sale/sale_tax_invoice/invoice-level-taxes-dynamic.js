@@ -80,6 +80,7 @@ function renderInvoiceLevelTaxColumns() {
  *   total_bill           → sum of all row net amounts before any invoice discount
  *   value_excl_sales_tax → total_bill minus invoice discount (does NOT include shipping)
  *   net_amount (default) → value_excl_sales_tax plus shipping fees
+ *   remaining_balance    → interim net receivable minus amount paid (set during phase 2)
  */
 function resolveInvoiceBase(regime) {
     switch (regime.tax_base) {
@@ -87,6 +88,8 @@ function resolveInvoiceBase(regime) {
             return window.currentTotalBill ?? 0;
         case 'value_excl_sales_tax':
             return window.currentValueExclSalesTax ?? 0;
+        case 'remaining_balance':
+            return window.currentRemainingBalance ?? 0;
         case 'net_amount':
         default:
             return window.currentNetAmount
@@ -111,6 +114,7 @@ function applyInvoiceFormula(formulaTemplate, base, ratePercent, isTaxInclusive)
         .replace(/{total_bill}/g,           window.currentTotalBill          || 0)
         .replace(/{value_excl_sales_tax}/g,  window.currentValueExclSalesTax  || 0)
         .replace(/{net_amount}/g,            window.currentNetAmount          || 0)
+        .replace(/{remaining_balance}/g,     window.currentRemainingBalance   || 0)
         .replace(/{trade_price}/g,           base)
         .replace(/{mrp}/g,                   base)
         .replace(/{import_value}/g,          base)
@@ -128,6 +132,10 @@ function applyInvoiceFormula(formulaTemplate, base, ratePercent, isTaxInclusive)
 
 /**
  * Calculate invoice-level taxes using each regime's tax_base and formula_template.
+ *
+ * Two-phase approach for remaining_balance:
+ *   Phase 1 — all regimes except remaining_balance → establishes interim net receivable
+ *   Phase 2 — remaining_balance regimes → tax base = interim_netReceivable - amountPaid
  */
 function calculateInvoiceLevelTaxes() {
     console.log('calculateInvoiceLevelTaxes called. Regimes:', window.invoiceLevelTaxRegimes);
@@ -145,39 +153,75 @@ function calculateInvoiceLevelTaxes() {
     // Track the base amount used per regime so it can be saved correctly
     window.invoiceTaxBaseAmounts = {};
 
-    let totalInvoiceTax = 0;
-    let totalExclusiveTax = 0;
-
-    window.invoiceLevelTaxRegimes.forEach(regime => {
-        const ratePercent   = parseFloat(regime.rate_percentage) || 0;
-        const isTaxInclusive = regime.is_tax_inclusive == 1;
-        const base          = resolveInvoiceBase(regime);
-
-        window.invoiceTaxBaseAmounts[regime.id] = base;
-
-        const taxAmount = applyInvoiceFormula(
-            regime.formula_template || '',
-            base,
-            ratePercent,
-            isTaxInclusive
-        );
-
-        console.log(`${regime.regime_name} [tax_base=${regime.tax_base}] base=${base} rate=${ratePercent}% → tax=${taxAmount}`);
-
-        const percentEl = document.getElementById(`invoiceTax_${regime.id}_percent`);
-        const amountEl  = document.getElementById(`invoiceTax_${regime.id}_amount`);
-
-        if (percentEl) percentEl.textContent = ratePercent.toFixed(2);
-        if (amountEl)  amountEl.textContent  = taxAmount.toFixed(2);
-
-        totalInvoiceTax += taxAmount;
-        if (!isTaxInclusive) totalExclusiveTax += taxAmount;
-    });
-
-    // Update Net Amount and Net Receivable with exclusive taxes added.
     const baseNetAmount = window.currentNetAmount
         ?? parseFloat(document.getElementById('netAmount')?.textContent)
         ?? 0;
+
+    // ── Phase 1: all regimes except remaining_balance ──────────────────────
+    let phase1ExclusiveTax = 0;
+
+    window.invoiceLevelTaxRegimes
+        .filter(r => r.tax_base !== 'remaining_balance')
+        .forEach(regime => {
+            const ratePercent    = parseFloat(regime.rate_percentage) || 0;
+            const isTaxInclusive = regime.is_tax_inclusive == 1;
+            const base           = resolveInvoiceBase(regime);
+
+            window.invoiceTaxBaseAmounts[regime.id] = base;
+
+            const taxAmount = applyInvoiceFormula(
+                regime.formula_template || '',
+                base,
+                ratePercent,
+                isTaxInclusive
+            );
+
+            console.log(`[Phase 1] ${regime.regime_name} [tax_base=${regime.tax_base}] base=${base} rate=${ratePercent}% → tax=${taxAmount}`);
+
+            const percentEl = document.getElementById(`invoiceTax_${regime.id}_percent`);
+            const amountEl  = document.getElementById(`invoiceTax_${regime.id}_amount`);
+            if (percentEl) percentEl.textContent = ratePercent.toFixed(2);
+            if (amountEl)  amountEl.textContent  = taxAmount.toFixed(2);
+
+            if (!isTaxInclusive) phase1ExclusiveTax += taxAmount;
+        });
+
+    // Derive remaining balance from interim net receivable so phase 2 can use it
+    const interimNetReceivable = baseNetAmount + phase1ExclusiveTax;
+    const amountPaid = parseFloat(document.getElementById('amountPaid')?.value) || 0;
+    window.currentRemainingBalance = Math.max(0, interimNetReceivable - amountPaid);
+
+    // ── Phase 2: remaining_balance regimes ────────────────────────────────
+    let phase2ExclusiveTax = 0;
+
+    window.invoiceLevelTaxRegimes
+        .filter(r => r.tax_base === 'remaining_balance')
+        .forEach(regime => {
+            const ratePercent    = parseFloat(regime.rate_percentage) || 0;
+            const isTaxInclusive = regime.is_tax_inclusive == 1;
+            const base           = window.currentRemainingBalance;
+
+            window.invoiceTaxBaseAmounts[regime.id] = base;
+
+            const taxAmount = applyInvoiceFormula(
+                regime.formula_template || '',
+                base,
+                ratePercent,
+                isTaxInclusive
+            );
+
+            console.log(`[Phase 2] ${regime.regime_name} [tax_base=remaining_balance] base=${base} rate=${ratePercent}% → tax=${taxAmount}`);
+
+            const percentEl = document.getElementById(`invoiceTax_${regime.id}_percent`);
+            const amountEl  = document.getElementById(`invoiceTax_${regime.id}_amount`);
+            if (percentEl) percentEl.textContent = ratePercent.toFixed(2);
+            if (amountEl)  amountEl.textContent  = taxAmount.toFixed(2);
+
+            if (!isTaxInclusive) phase2ExclusiveTax += taxAmount;
+        });
+
+    // Update Net Amount and Net Receivable with all exclusive taxes added
+    const totalExclusiveTax = phase1ExclusiveTax + phase2ExclusiveTax;
     const finalAmount = (baseNetAmount + totalExclusiveTax).toFixed(2);
 
     const netAmountEl = document.getElementById('netAmount');

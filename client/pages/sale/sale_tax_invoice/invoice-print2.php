@@ -111,7 +111,7 @@ function numberToWords(float $amount, string $currencyCode = 'AED'): string {
 
 $currencyCode   = $invoice['currency_code']            ?? 'AED';
 $taxableAmount  = (float)($invoice['total_bill']       ?? 0)
-                - (float)($invoice['total_discount_amount'] ?? 0);
+                - (float)($invoice['amount_paid']      ?? 0);
 $vatAmount      = (float)($invoice['net_amount']       ?? 0)
                 - $taxableAmount
                 - (float)($invoice['shipping_fees']    ?? 0);
@@ -461,6 +461,11 @@ body {
                 <td></td>
                 <td class="t-label" colspan="4">AMOUNT</td>
                 <td class="t-value"><?php echo number_format((float)$invoice['total_bill'], 2); ?></td>
+            </tr>
+            <tr>
+                <td></td>
+                <td class="t-label" colspan="4">AMOUNT RECEIVED</td>
+                <td class="t-value"><?php echo number_format((float)($invoice['amount_paid'] ?? 0), 2); ?></td>
             </tr>
             <tr>
                 <td></td>
