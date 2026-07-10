@@ -130,6 +130,13 @@ if (!$user_id) {
 
                 <div class="form-row">
                     <div class="form-group">
+                        <label class="required">Application Level</label>
+                        <select id="applicationLevel" name="application_level" required>
+                            <option value="item">Item</option>
+                            <option value="invoice">Invoice</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
                         <label class="required">Tax Base</label>
                         <select id="taxBase" name="tax_base" required>
                             <option value="">Select Tax Base</option>
@@ -168,13 +175,6 @@ if (!$user_id) {
                             <option value="importer">Importer</option>
                             <option value="distributor">Distributor</option>
                             <option value="retailer">Retailer</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label class="required">Application Level</label>
-                        <select id="applicationLevel" name="application_level" required>
-                            <option value="item">Item</option>
-                            <option value="invoice">Invoice</option>
                         </select>
                     </div>
                 </div>
@@ -243,6 +243,6 @@ if (!$user_id) {
         </div>
     </div>
 
-    <script src="../../../assets/js/inventory/tax-regimes/tax-regimes-list.js"></script>
+    <script src="../../../assets/js/inventory/tax-regimes/tax-regimes-list.js?v=<?php echo time(); ?>"></script>
 </body>
 </html>

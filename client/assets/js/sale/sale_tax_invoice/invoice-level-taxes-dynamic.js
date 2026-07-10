@@ -100,21 +100,34 @@ function resolveInvoiceBase(regime) {
 
 /**
  * Evaluate a formula_template string with invoice variables substituted.
- * Supported tokens: {total_bill}, {value_excl_sales_tax}, {net_amount}, {rate}
+ * Supported tokens: {total_bill}, {value_excl_sales_tax}, {net_amount}, {remaining_balance}, {rate}
  * Falls back to simple base × rate / 100 when template is absent.
+ *
+ * @param {string}  formulaTemplate
+ * @param {number}  base            - resolved base amount (also substituted for item-level tokens)
+ * @param {number}  ratePercent
+ * @param {boolean} isTaxInclusive
+ * @param {number|null} overrideBase - when set, ALL invoice-total tokens resolve to this value
+ *                                     (used by phase-2 so remaining_balance tax_base wins over
+ *                                      whatever token the formula happens to reference)
  */
-function applyInvoiceFormula(formulaTemplate, base, ratePercent, isTaxInclusive) {
+function applyInvoiceFormula(formulaTemplate, base, ratePercent, isTaxInclusive, overrideBase = null) {
     if (!formulaTemplate || formulaTemplate.trim() === '' || formulaTemplate === '0') {
         return isTaxInclusive
             ? (ratePercent > 0 ? base * ratePercent / (100 + ratePercent) : 0)
             : base * (ratePercent / 100);
     }
 
+    const totalBillVal   = overrideBase !== null ? overrideBase : (window.currentTotalBill         || 0);
+    const valueExclVal   = overrideBase !== null ? overrideBase : (window.currentValueExclSalesTax || 0);
+    const netAmountVal   = overrideBase !== null ? overrideBase : (window.currentNetAmount         || 0);
+    const remainingVal   = overrideBase !== null ? overrideBase : (window.currentRemainingBalance  || 0);
+
     let expr = formulaTemplate
-        .replace(/{total_bill}/g,           window.currentTotalBill          || 0)
-        .replace(/{value_excl_sales_tax}/g,  window.currentValueExclSalesTax  || 0)
-        .replace(/{net_amount}/g,            window.currentNetAmount          || 0)
-        .replace(/{remaining_balance}/g,     window.currentRemainingBalance   || 0)
+        .replace(/{total_bill}/g,           totalBillVal)
+        .replace(/{value_excl_sales_tax}/g,  valueExclVal)
+        .replace(/{net_amount}/g,            netAmountVal)
+        .replace(/{remaining_balance}/g,     remainingVal)
         .replace(/{trade_price}/g,           base)
         .replace(/{mrp}/g,                   base)
         .replace(/{import_value}/g,          base)
@@ -186,8 +199,11 @@ function calculateInvoiceLevelTaxes() {
             if (!isTaxInclusive) phase1ExclusiveTax += taxAmount;
         });
 
-    // Derive remaining balance from interim net receivable so phase 2 can use it
+    // Derive remaining balance from interim net receivable so phase 2 can use it.
+    // Store interimNetReceivable so updateRemainingBalance() can display the correct
+    // pre-remaining-balance-tax outstanding amount instead of the post-tax final amount.
     const interimNetReceivable = baseNetAmount + phase1ExclusiveTax;
+    window.invoiceLevelInterimNetReceivable = interimNetReceivable;
     const amountPaid = parseFloat(document.getElementById('amountPaid')?.value) || 0;
     window.currentRemainingBalance = Math.max(0, interimNetReceivable - amountPaid);
 
@@ -207,7 +223,8 @@ function calculateInvoiceLevelTaxes() {
                 regime.formula_template || '',
                 base,
                 ratePercent,
-                isTaxInclusive
+                isTaxInclusive,
+                base  // overrideBase: all invoice-total tokens resolve to remaining_balance
             );
 
             console.log(`[Phase 2] ${regime.regime_name} [tax_base=remaining_balance] base=${base} rate=${ratePercent}% → tax=${taxAmount}`);

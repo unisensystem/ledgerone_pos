@@ -2815,14 +2815,24 @@ function initializePage(permissions) {
 
     // Update remaining balance
     function updateRemainingBalance() {
-        // When a remaining_balance tax regime is active, amountPaid affects the tax base,
-        // so we re-run the full tax calculation to keep taxes and net receivable in sync.
         const hasRemainingBalanceTax = window.invoiceLevelTaxRegimes?.some(r => r.tax_base === 'remaining_balance');
-        if (hasRemainingBalanceTax && typeof calculateInvoiceLevelTaxes === 'function') {
-            calculateInvoiceLevelTaxes();
-        }
-        const netReceivable = parseFloat(document.getElementById('netReceivable').textContent) || 0;
         const amountPaid = parseFloat(document.getElementById('amountPaid').value) || 0;
+
+        if (hasRemainingBalanceTax && typeof calculateInvoiceLevelTaxes === 'function') {
+            // Re-run taxes so phase-2 uses the updated amountPaid as its base input.
+            calculateInvoiceLevelTaxes();
+            // The remaining balance field must show the pre-remaining-balance-tax outstanding
+            // amount (interimNetReceivable − amountPaid), not the post-tax final receivable.
+            // Using the post-tax value would silently inflate the displayed balance by the tax
+            // itself, making the field inconsistent with what the user sees as "owed before tax".
+            const interim = window.invoiceLevelInterimNetReceivable
+                ?? parseFloat(document.getElementById('netReceivable').textContent)
+                ?? 0;
+            document.getElementById('remainingBalance').value = Math.max(0, interim - amountPaid).toFixed(2);
+            return;
+        }
+
+        const netReceivable = parseFloat(document.getElementById('netReceivable').textContent) || 0;
         document.getElementById('remainingBalance').value = (netReceivable - amountPaid).toFixed(2);
     }
 

@@ -37,10 +37,11 @@ try {
             co.address            AS company_address,
             co.logo_url           AS company_logo,
             b.branch_name,
-            u.full_name     AS created_by_name,
-            cur.code        AS currency_code,
-            cur.symbol      AS currency_symbol,
-            pr.project_name
+            u.full_name           AS created_by_name,
+            cur.code              AS currency_code,
+            cur.symbol            AS currency_symbol,
+            pr.project_name,
+            COALESCE(rv.amount, 0) AS amount_paid
         FROM sale_invoice si
         LEFT JOIN customers  c   ON si.customer_id = c.id
         LEFT JOIN companies  co  ON si.company_id  = co.id
@@ -48,6 +49,7 @@ try {
         LEFT JOIN employees  u   ON si.created_by  = u.id
         LEFT JOIN ledgerone_public.currencies cur ON cur.id = si.currency_id
         LEFT JOIN projects pr ON pr.id = si.project_id
+        LEFT JOIN receive_voucher rv ON rv.bill_no = si.bill_no AND rv.tenant_id = si.tenant_id
         WHERE si.id = ? AND si.tenant_id = ?
     ");
     $stmt->execute([$invoice_id, $tenant_id]);
@@ -64,6 +66,15 @@ try {
     ");
     $itemStmt->execute([$invoice_id, $tenant_id]);
     $items = $itemStmt->fetchAll(PDO::FETCH_ASSOC);
+
+    $taxStmt = $pdo->prepare("
+        SELECT tax_name, rate_percentage, tax_amount
+        FROM sale_invoice_taxes
+        WHERE sale_invoice_id = ? AND tenant_id = ?
+        ORDER BY id
+    ");
+    $taxStmt->execute([$invoice_id, $tenant_id]);
+    $invoiceTaxes = $taxStmt->fetchAll(PDO::FETCH_ASSOC);
 
 } catch (Exception $e) {
     die('Error: ' . $e->getMessage());
@@ -109,14 +120,9 @@ function numberToWords(float $amount, string $currencyCode = 'AED'): string {
     return strtolower($result).' only';
 }
 
-$currencyCode   = $invoice['currency_code']            ?? 'AED';
-$taxableAmount  = (float)($invoice['total_bill']       ?? 0)
-                - (float)($invoice['amount_paid']      ?? 0);
-$vatAmount      = (float)($invoice['net_amount']       ?? 0)
-                - $taxableAmount
-                - (float)($invoice['shipping_fees']    ?? 0);
-$vatRate        = ($taxableAmount > 0 && $vatAmount > 0)
-                ? round(($vatAmount / $taxableAmount) * 100, 2) : 0;
+$currencyCode  = $invoice['currency_code'] ?? 'AED';
+$taxableAmount = (float)($invoice['total_bill']  ?? 0)
+               - (float)($invoice['amount_paid'] ?? 0);
 ?>
 <!DOCTYPE html>
 <html>
@@ -472,13 +478,20 @@ body {
                 <td class="t-label" colspan="4">TAXABLE AMOUNT</td>
                 <td class="t-value"><?php echo number_format($taxableAmount, 2); ?></td>
             </tr>
-            <?php if ($vatAmount > 0): ?>
+            <?php foreach ($invoiceTaxes as $tax): ?>
+            <?php if ((float)$tax['tax_amount'] > 0): ?>
             <tr>
                 <td></td>
-                <td class="t-label" colspan="4">VAT <?php echo $vatRate > 0 ? $vatRate.'%' : ''; ?></td>
-                <td class="t-value"><?php echo number_format($vatAmount, 2); ?></td>
+                <td class="t-label" colspan="4">
+                    <?php echo htmlspecialchars($tax['tax_name']); ?>
+                    <?php if ((float)$tax['rate_percentage'] > 0): ?>
+                        <?php echo (float)$tax['rate_percentage']; ?>%
+                    <?php endif; ?>
+                </td>
+                <td class="t-value"><?php echo number_format((float)$tax['tax_amount'], 2); ?></td>
             </tr>
             <?php endif; ?>
+            <?php endforeach; ?>
             <?php if ((float)($invoice['shipping_fees'] ?? 0) > 0): ?>
             <tr>
                 <td></td>
