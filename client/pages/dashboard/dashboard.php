@@ -896,6 +896,36 @@ $hasDateFilter = $dateFrom && $dateTo;
                 </div>
             </div>
 
+             <!-- Keyboard Shortcuts -->
+            <div class="quick-actions">
+                <h2 class="section-title">Keyboard Shortcuts</h2>
+                <div class="ledger-search-box" style="flex-direction: column; align-items: stretch;">
+                    <div style="display:flex; gap:1rem; flex-wrap:wrap; align-items:center; width:100%;">
+                        <select id="shortcutPageSelect" class="ledger-input" style="flex:1; min-width:220px;">
+                            <option value="">Select Page...</option>
+                            <option value="sale-invoice" data-label="Sale Invoice">Sale Invoice</option>
+                            <option value="purchase-invoice" data-label="Purchase Invoice">Purchase Invoice</option>
+                            <option value="receive-voucher" data-label="Receive Voucher (RV)">Receive Voucher (RV)</option>
+                            <option value="payment-voucher" data-label="Payment Voucher (PV)">Payment Voucher (PV)</option>
+                            <option value="expense-voucher" data-label="Expense Voucher (EV)">Expense Voucher (EV)</option>
+                            <option value="customer-ledger" data-label="Customer Ledger">Customer Ledger</option>
+                            <option value="supplier-ledger" data-label="Supplier Ledger">Supplier Ledger</option>
+                            <option value="pos-invoice" data-label="POS Invoice">POS Invoice</option>
+                            <option value="new-product" data-label="Product List">Product List</option>
+                            <option value="new-customer" data-label="New Customer">New Customer</option>
+                            <option value="new-supplier" data-label="New Supplier">New Supplier</option>
+                        </select>
+                        <input type="text" id="shortcutKeyInput" class="ledger-input"
+                            style="flex:0 0 220px; text-align:center; cursor:pointer; background:#f8fafc;"
+                            placeholder="Click here, then press keys" readonly>
+                        <button class="btn btn-primary" onclick="saveShortcut()">Save Shortcut</button>
+                    </div>
+                    <div id="shortcutsList" style="display:flex; flex-wrap:wrap; gap:0.6rem; margin-top:1rem;">
+                        <!-- filled by JS -->
+                    </div>
+                </div>
+            </div>
+
             <!-- Quick Actions Section -->
             <div class="quick-actions">
                 <h2 class="section-title">Quick Actions</h2>
@@ -2100,12 +2130,98 @@ $hasDateFilter = $dateFrom && $dateTo;
                 }
             });
 
-            document.getElementById('bankStatementModal')?.addEventListener('click', function(e) {
+           document.getElementById('bankStatementModal')?.addEventListener('click', function(e) {
                 if (e.target === this) {
                     closeBankStatementModal();
                 }
             });
+
+            // ---------- Keyboard Shortcuts (management UI) ----------
+            let capturedCombo = '';
+
+            const shortcutKeyInput = document.getElementById('shortcutKeyInput');
+            shortcutKeyInput?.addEventListener('keydown', function (e) {
+                e.preventDefault();
+                if (['Control', 'Alt', 'Shift', 'Meta'].includes(e.key)) return;
+
+                const parts = [];
+                if (e.ctrlKey) parts.push('Ctrl');
+                if (e.altKey) parts.push('Alt');
+                if (e.shiftKey) parts.push('Shift');
+                parts.push(e.key.length === 1 ? e.key.toUpperCase() : e.key);
+
+                capturedCombo = parts.join('+');
+                shortcutKeyInput.value = capturedCombo;
+            });
+
+            async function saveShortcut() {
+                const select = document.getElementById('shortcutPageSelect');
+                const pageKey = select.value;
+                const pageLabel = select.options[select.selectedIndex]?.dataset.label || '';
+
+                if (!pageKey) { alert('Pehle koi page select karein'); return; }
+                if (!capturedCombo) { alert('Key box par click karke shortcut key press karein'); return; }
+
+                try {
+                    const res = await fetch('../../../server/api/shortcuts/shortcuts.php?action=save', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ key_combo: capturedCombo, page_key: pageKey, page_label: pageLabel })
+                    });
+                    const data = await res.json();
+                    if (data.success) {
+                        capturedCombo = '';
+                        shortcutKeyInput.value = '';
+                        select.value = '';
+                        loadShortcutsUI();
+                    } else {
+                        alert(data.message || 'Save failed');
+                    }
+                } catch (err) {
+                    console.error(err);
+                    alert('Error saving shortcut');
+                }
+            }
+
+            async function deleteShortcut(id) {
+                try {
+                    await fetch('../../../server/api/shortcuts/shortcuts.php?action=delete', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ id })
+                    });
+                    loadShortcutsUI();
+                } catch (err) {
+                    console.error(err);
+                }
+            }
+
+            async function loadShortcutsUI() {
+                const list = document.getElementById('shortcutsList');
+                if (!list) return;
+                try {
+                    const res = await fetch('../../../server/api/shortcuts/shortcuts.php?action=list');
+                    const data = await res.json();
+                    if (data.success && data.data.length) {
+                        list.innerHTML = data.data.map(s => `
+                            <span style="display:flex; align-items:center; gap:0.5rem; background:white; border:1.5px solid #d6dbe4; border-radius:0.5rem; padding:0.4rem 0.75rem; font-size:13px;">
+                                <strong style="color:var(--primary);">${s.key_combo}</strong> → ${s.page_label}
+                                <i class="fas fa-times" style="cursor:pointer; color:#94a3b8;" onclick="deleteShortcut(${s.id})"></i>
+                            </span>
+                        `).join('');
+                    } else {
+                        list.innerHTML = '<span style="color:#94a3b8; font-size:13px;">Set a shortcut.</span>';
+                    }
+                } catch (err) {
+                    console.error(err);
+                }
+            }
+
+            loadShortcutsUI();
         </script>
+    
+
+
         <script src="../../assets/js/dashboard/dashboard-main.js"></script>
     <?php endif; ?>
 

@@ -35,6 +35,9 @@ try {
             co.po_box_no          AS company_pobox,
             co.sales_tax_number   AS company_trn,
             co.address            AS company_address,
+            co.city               AS company_city,
+            co.state              AS company_state,
+            co.country            AS company_country,
             co.logo_url           AS company_logo,
             b.branch_name,
             u.full_name           AS created_by_name,
@@ -351,14 +354,126 @@ body {
 .sig-party { font-weight: bold; font-size: 11px; margin-bottom: 28px; }
 .sig-line  { border-top: 1px solid #555; padding-top: 3px; font-size: 10px; color: #333; display: inline-block; min-width: 130px; }
 
+/* ── HEADER ── */
+.inv-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    padding: 4px 0 10px;
+    border-bottom: 1px solid #ddd;
+    margin-bottom: 8px;
+}
+.inv-header-left {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+}
+.inv-header-left img {
+    max-height: 60px;
+    max-width: 120px;
+    object-fit: contain;
+    flex-shrink: 0;
+}
+.inv-company-info h2 {
+    margin: 0 0 3px;
+    font-size: 15px;
+    font-weight: 800;
+    color: #111;
+    letter-spacing: 0.3px;
+}
+.inv-company-info p {
+    margin: 1px 0;
+    font-size: 10px;
+    color: #444;
+}
+.inv-header-right {
+    text-align: right;
+    font-size: 10px;
+    color: #444;
+    line-height: 1.6;
+}
+
+/* ── WATERMARK ── */
+.page {
+    position: relative;
+}
+.page::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 55%;
+    height: 55%;
+    background-image: var(--wm-logo);
+    background-repeat: no-repeat;
+    background-size: contain;
+    background-position: center;
+    opacity: 0.07;
+    pointer-events: none;
+    z-index: 0;
+}
+/* keep all content above the watermark layer */
+.page > * { position: relative; z-index: 1; }
+
 @media print {
     body  { background: #fff; }
     .page { margin:0; border:none; padding: 4mm 6mm; width:100%; }
 }
 </style>
 </head>
+<?php
+$logoFile = !empty($invoice['company_logo']) ? $invoice['company_logo'] : '';
+$logoUrl  = $logoFile ? '../../../assets/uploads/company_logo/' . htmlspecialchars($logoFile) : '';
+$logoAbsUrl = $logoFile ? '/ledgerone_erp/client/assets/uploads/company_logo/' . htmlspecialchars($logoFile) : '';
+?>
 <body>
+<?php if ($logoAbsUrl): ?>
+<style>
+    .page { --wm-logo: url('<?php echo $logoAbsUrl; ?>'); }
+</style>
+<?php endif; ?>
 <div class="page">
+
+    <!-- HEADER -->
+    <div class="inv-header">
+        <!-- LEFT: logo + company name & address -->
+        <div class="inv-header-left">
+            <?php if ($logoUrl): ?>
+            <img src="<?php echo $logoUrl; ?>" alt="<?php echo htmlspecialchars($invoice['company_name']); ?>">
+            <?php endif; ?>
+            <div class="inv-company-info">
+                <h2><?php echo htmlspecialchars($invoice['company_name']); ?></h2>
+                <?php if (!empty($invoice['company_address'])): ?>
+                <p><?php echo htmlspecialchars($invoice['company_address']); ?></p>
+                <?php endif; ?>
+                <?php
+                $cityLine = implode(', ', array_filter([
+                    $invoice['company_city']    ?? '',
+                    $invoice['company_state']   ?? '',
+                    $invoice['company_country'] ?? '',
+                ]));
+                if ($cityLine): ?>
+                <p><?php echo htmlspecialchars($cityLine); ?></p>
+                <?php endif; ?>
+                <?php if (!empty($invoice['company_pobox'])): ?>
+                <p>P.O. Box: <?php echo htmlspecialchars($invoice['company_pobox']); ?></p>
+                <?php endif; ?>
+            </div>
+        </div>
+        <!-- RIGHT: email & phone -->
+        <div class="inv-header-right">
+            <?php if (!empty($invoice['company_email'])): ?>
+            <div><?php echo htmlspecialchars($invoice['company_email']); ?></div>
+            <?php endif; ?>
+            <?php if (!empty($invoice['company_phone'])): ?>
+            <div><?php echo htmlspecialchars($invoice['company_phone']); ?></div>
+            <?php endif; ?>
+            <?php if (!empty($invoice['company_mob']) && $invoice['company_mob'] !== $invoice['company_phone']): ?>
+            <div><?php echo htmlspecialchars($invoice['company_mob']); ?></div>
+            <?php endif; ?>
+        </div>
+    </div>
 
     <!-- INVOICE NO / DATE -->
     <table class="meta-table">
@@ -507,24 +622,6 @@ body {
             <tr class="t-words">
                 <td></td>
                 <td colspan="5"><span class="t-words-lbl">In Words: </span><?php echo htmlspecialchars(numberToWords((float)$invoice['net_amount'], $currencyCode)); ?></td>
-            </tr>
-            <?php
-                // previous_balance is a plain signed number: positive = Dr, negative = Cr
-                $prev_bal_num  = (float)($invoice['previous_balance'] ?? 0);
-                $remaining_bal = (float)$invoice['net_amount'] - (float)($invoice['amount_paid'] ?? 0);
-                $total_bal     = $prev_bal_num + $remaining_bal;
-                $prev_label    = ($prev_bal_num  >= 0 ? 'Dr ' : 'Cr ') . number_format(abs($prev_bal_num),  2);
-                $total_label   = ($total_bal     >= 0 ? 'Dr ' : 'Cr ') . number_format(abs($total_bal),     2);
-            ?>
-            <tr>
-                <td></td>
-                <td class="t-label" colspan="4">Previous Balance</td>
-                <td class="t-value"><?php echo htmlspecialchars($prev_label); ?></td>
-            </tr>
-            <tr>
-                <td></td>
-                <td class="t-label" colspan="4" style="background:#7E8C6F;color:#fff;">Total Balance</td>
-                <td class="t-value" style="background:#7E8C6F;color:#fff;"><?php echo htmlspecialchars($total_label); ?></td>
             </tr>
         </tfoot>
     </table>
