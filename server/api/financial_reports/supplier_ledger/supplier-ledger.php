@@ -316,8 +316,22 @@ try {
                 else $total_credit += floatval($ev['total_amount']);
             }
 
+            // Journal voucher adjustments for this supplier
+            $adj_stmt = $pdo->prepare(
+                "SELECT COALESCE(SUM(al.debit),0) as adj_debit, COALESCE(SUM(al.credit),0) as adj_credit
+                 FROM accounting_ledger al
+                 JOIN journal_voucher jv ON al.reference_id = jv.id AND al.reference_table = 'journal_voucher'
+                 WHERE al.tenant_id = ? AND al.account_id = 14
+                   AND al.transaction_type = 'Journal Voucher'
+                   AND jv.party_type = 'supplier' AND jv.party_id = ?"
+            );
+            $adj_stmt->execute([$tenant_id, $supplier['id']]);
+            $adj_row = $adj_stmt->fetch(PDO::FETCH_ASSOC);
+            // Supplier is credit-normal: credit increases payable (negative closing), debit decreases it
+            $adj_net = floatval($adj_row['adj_debit']) - floatval($adj_row['adj_credit']);
+
             $total_debit = $total_debit + $total_pdc;
-            $closing_balance = $opening_balance - $total_credit + $total_debit + $total_returns;
+            $closing_balance = $opening_balance - $total_credit + $total_debit + $total_returns + $adj_net;
             
             $data[] = [
                 'supplier_name' => $supplier['supplier_name'],
@@ -598,8 +612,41 @@ try {
         $stmt = $pdo->prepare($ev_sql); $stmt->execute($ev_params);
         $expense_vouchers = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
+        // Get journal voucher adjustments for this supplier
+        $adj_sql = "SELECT jv.voucher_date as date,
+                CONCAT('Adjustment - ', jv.voucher_number) as description,
+                jv.voucher_number as reference,
+                al.debit, al.credit, 'adjustment' as type, null as sub_account_id, null as currency_id, null as invoice_id, null as return_id,
+                jv.description as adj_note,
+                (
+                    SELECT a.name FROM journal_voucher_line jvl2
+                    JOIN accounts a ON a.id = jvl2.account_id
+                    WHERE jvl2.voucher_id = jv.id AND jvl2.account_id != 14
+                    LIMIT 1
+                ) as contra_account_name
+                FROM accounting_ledger al
+                JOIN journal_voucher jv ON al.reference_id = jv.id AND al.reference_table = 'journal_voucher'
+                WHERE al.tenant_id = ? AND al.account_id = 14
+                  AND al.transaction_type = 'Journal Voucher'
+                  AND jv.party_type = 'supplier' AND jv.party_id = ?";
+        $adj_params = [$tenant_id, $supplier_id];
+        if ($from_date && $to_date) {
+            $adj_sql .= " AND jv.voucher_date BETWEEN ? AND ?";
+            $adj_params[] = $from_date;
+            $adj_params[] = $to_date;
+        } elseif ($from_date) {
+            $adj_sql .= " AND jv.voucher_date >= ?";
+            $adj_params[] = $from_date;
+        } elseif ($to_date) {
+            $adj_sql .= " AND jv.voucher_date <= ?";
+            $adj_params[] = $to_date;
+        }
+        $stmt = $pdo->prepare($adj_sql);
+        $stmt->execute($adj_params);
+        $adjustments = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
         // Combine and sort transactions
-        $transactions = array_merge($invoices, $payments, $pdcs, $returns, $tv_out, $tv_in, $expense_vouchers);
+        $transactions = array_merge($invoices, $payments, $pdcs, $returns, $tv_out, $tv_in, $expense_vouchers, $adjustments);
         
         // Convert currencies for all transactions
         foreach ($transactions as &$transaction) {

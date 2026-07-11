@@ -529,6 +529,8 @@ document.addEventListener('DOMContentLoaded', function () {
                         <td>
                             ${hasItems ? `<button class="expand-btn" data-row-id="${rowIndex}"><i class="fas fa-chevron-right"></i></button>` : ''}
                             ${row.description}
+                            ${row.type === 'adjustment' && row.contra_account_name ? `<br><small style="color:var(--text-muted);font-size:11px;"><i class="fas fa-exchange-alt" style="margin-right:4px;"></i>${row.contra_account_name}</small>` : ''}
+                            ${row.type === 'adjustment' && row.adj_note ? `<br><small style="color:var(--text-muted);font-size:11px;font-style:italic;">${row.adj_note}</small>` : ''}
                         </td>
                         <td>${row.reference}</td>
                         <td>${debit > 0 ? currentCurrencySymbol + debit.toFixed(2) : ''}</td>

@@ -510,6 +510,8 @@ document.addEventListener('DOMContentLoaded', function () {
                     <td>
                         ${row.description}${typeTag}
                         ${row.invoice_id || row.return_id ? `<button class="btn-expand" data-type="${row.invoice_id ? 'invoice' : 'return'}" data-id="${row.invoice_id || row.return_id}" style="margin-left:8px;padding:2px 8px;font-size:11px;background:var(--primary);color:white;border:none;border-radius:4px;cursor:pointer;">Expand</button>` : ''}
+                        ${row.type === 'adjustment' && row.contra_account_name ? `<br><small style="color:var(--text-muted);font-size:11px;"><i class="fas fa-exchange-alt" style="margin-right:4px;"></i>${row.contra_account_name}</small>` : ''}
+                        ${row.type === 'adjustment' && row.adj_note ? `<br><small style="color:var(--text-muted);font-size:11px;font-style:italic;">${row.adj_note}</small>` : ''}
                     </td>
                     <td>${row.reference}</td>
                     <td>${debit > 0 ? currentCurrencySymbol + debit.toFixed(2) : ''}</td>

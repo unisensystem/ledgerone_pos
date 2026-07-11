@@ -375,9 +375,22 @@ try {
                 $total_debit += $amt;
             }
 
-            $closing_balance = $opening_balance + $total_debit - $total_credit;
+            // Journal voucher adjustments for this customer
+            $adj_stmt = $pdo->prepare(
+                "SELECT COALESCE(SUM(al.debit),0) as adj_debit, COALESCE(SUM(al.credit),0) as adj_credit
+                 FROM accounting_ledger al
+                 JOIN journal_voucher jv ON al.reference_id = jv.id AND al.reference_table = 'journal_voucher'
+                 WHERE al.tenant_id = ? AND al.account_id = 2
+                   AND al.transaction_type = 'Journal Voucher'
+                   AND jv.party_type = 'customer' AND jv.party_id = ?"
+            );
+            $adj_stmt->execute([$tenant_id, $customer['id']]);
+            $adj_row = $adj_stmt->fetch(PDO::FETCH_ASSOC);
+            $adj_net = floatval($adj_row['adj_debit']) - floatval($adj_row['adj_credit']);
+
+            $closing_balance = $opening_balance + $total_debit - $total_credit + $adj_net;
             
-            if ($closing_balance != 0 || $total_debit != 0 || $total_credit != 0) {
+            if ($closing_balance != 0 || $total_debit != 0 || $total_credit != 0 || $adj_net != 0) {
                 $data[] = [
                     'customer_name' => $customer['customer_name'],
                     'opening_balance' => $opening_balance,
@@ -758,8 +771,35 @@ try {
         $stmt = $pdo->prepare($sql); $stmt->execute($params);
         $tv_in = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
+        // Get journal voucher adjustments for this customer
+        $adj_sql = "SELECT jv.voucher_date as date,
+                CONCAT('Adjustment - ', jv.voucher_number) as description,
+                jv.voucher_number as reference,
+                al.debit, al.credit, 'adjustment' as type, null as sub_account_id, null as currency_id,
+                jv.description as adj_note,
+                (
+                    SELECT a.name FROM journal_voucher_line jvl2
+                    JOIN accounts a ON a.id = jvl2.account_id
+                    WHERE jvl2.voucher_id = jv.id AND jvl2.account_id != 2
+                    LIMIT 1
+                ) as contra_account_name
+                FROM accounting_ledger al
+                JOIN journal_voucher jv ON al.reference_id = jv.id AND al.reference_table = 'journal_voucher'
+                WHERE al.tenant_id = ? AND al.account_id = 2
+                  AND al.transaction_type = 'Journal Voucher'
+                  AND jv.party_type = 'customer' AND jv.party_id = ?";
+        $adj_params = [$tenant_id, $customer_id];
+        if ($from_date && $to_date) {
+            $adj_sql .= " AND jv.voucher_date BETWEEN ? AND ?";
+            $adj_params[] = $from_date;
+            $adj_params[] = $to_date;
+        }
+        $stmt = $pdo->prepare($adj_sql);
+        $stmt->execute($adj_params);
+        $adjustments = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
         // Combine and sort transactions
-        $transactions = array_merge($invoices, $payments, $returns, $pdcs, $rent_cash_transactions, $tv_out, $tv_in);
+        $transactions = array_merge($invoices, $payments, $returns, $pdcs, $rent_cash_transactions, $tv_out, $tv_in, $adjustments);
         
         // Get sub accounts
         $stmt = $pdo->prepare("SELECT id, sub_account_name FROM customer_sub_accounts WHERE tenant_id = ? AND customer_id = ?");
