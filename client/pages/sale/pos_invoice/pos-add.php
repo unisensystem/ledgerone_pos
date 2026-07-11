@@ -1000,62 +1000,192 @@ if (!$user_id) {
 
     <!-- Field Settings Modal -->
     <div class="modal" id="fieldSettingsModal">
-        <div class="modal-content" style="max-height: 90vh; overflow-y: auto;">
-            <h3 class="modal-title">Field Settings</h3>
-            <p>Select which fields to hide:</p>
-            <div style="margin: 20px 0;">
-                <label style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px; cursor: pointer;">
-                    <input type="checkbox" id="hideBillNoStandard" style="width: auto;">
-                    <span>Hide Bill No</span>
-                </label>
-                <label style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px; cursor: pointer;">
-                    <input type="checkbox" id="hideSaleDateStandard" style="width: auto;">
-                    <span>Hide Sale Date</span>
-                </label>
-                <label style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px; cursor: pointer;">
-                    <input type="checkbox" id="hidePreviousBalanceStandard" style="width: auto;">
-                    <span>Hide Customer's Previous Balance</span>
-                </label>
-                <label style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px; cursor: pointer;">
-                    <input type="checkbox" id="hideSubAccountStandard" style="width: auto;">
-                    <span>Hide Sub Account</span>
-                </label>
-                <label style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px; cursor: pointer;">
-                    <input type="checkbox" id="hideCustomerAddressStandard" style="width: auto;">
-                    <span>Hide Customer Address</span>
-                </label>
-                <label style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px; cursor: pointer;">
-                    <input type="checkbox" id="hideSaleOrderStandard" style="width: auto;">
-                    <span>Hide Sale Order#</span>
-                </label>
-                <label style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px; cursor: pointer;">
-                    <input type="checkbox" id="hideBranchStandard" style="width: auto;">
-                    <span>Hide Branch</span>
-                </label>
-                <label style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px; cursor: pointer;">
-                    <input type="checkbox" id="hideCurrencyStandard" style="width: auto;">
-                    <span>Hide Currency</span>
-                </label>
-                <label style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px; cursor: pointer;">
-                    <input type="checkbox" id="hideSalesOfficerStandard" style="width: auto;">
-                    <span>Hide Sales Officer</span>
-                </label>
-                <label style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px; cursor: pointer;">
-                    <input type="checkbox" id="hideBiltyNoStandard" style="width: auto;">
-                    <span>Hide Bilty No</span>
-                </label>
-                <label style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px; cursor: pointer;">
-                    <input type="checkbox" id="hideTransportNameStandard" style="width: auto;">
-                    <span>Hide Transport Name</span>
-                </label>
-                <label style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px; cursor: pointer;">
-                    <input type="checkbox" id="hideRemarksStandard" style="width: auto;">
-                    <span>Hide Remarks</span>
-                </label>
+        <div class="modal-content" style="max-width: 700px; max-height: 90vh; overflow-y: auto;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding-bottom: 14px; border-bottom: 2px solid var(--border-default);">
+                <div>
+                    <h3 class="modal-title" style="margin: 0;"><i class="fas fa-eye-slash" style="color: var(--primary); margin-right: 8px;"></i>Field Settings</h3>
+                    <p style="margin: 4px 0 0; font-size: 12px; color: var(--subtext);">Toggle visibility of Invoice Details fields</p>
+                </div>
+                <button type="button" class="btn btn-secondary btn-sm" id="closeFieldSettingsBtnX" style="padding: 6px 12px;">
+                    <i class="fas fa-times"></i>
+                </button>
             </div>
-            <div class="modal-actions">
-                <button class="btn btn-secondary" id="closeFieldSettingsBtn">Close</button>
-                <button class="btn btn-primary" id="saveFieldSettingsBtn">Save Settings</button>
+
+            <!-- Required Fields Notice -->
+            <div style="padding: 10px 14px; background: var(--surface-2); border-radius: var(--radius); border-left: 3px solid var(--warning); margin-bottom: 18px; font-size: 12px; color: var(--body);">
+                <i class="fas fa-info-circle" style="color: var(--warning); margin-right: 6px;"></i>
+                Fields marked <strong>Required</strong> cannot be hidden.
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+
+                <!-- Sale Date -->
+                <div style="display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; background: var(--surface-2); border-radius: var(--radius); border: 1px solid var(--border-default);">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <i class="fas fa-calendar" style="color: var(--subtext); width: 14px;"></i>
+                        <span style="font-size: 13px; font-weight: 500;">Sale Date</span>
+                    </div>
+                    <span style="font-size: 11px; color: var(--subtext); background: var(--surface-1); padding: 2px 8px; border-radius: 10px;">Required</span>
+                </div>
+
+                <!-- Company -->
+                <div style="display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; background: var(--surface-2); border-radius: var(--radius); border: 1px solid var(--border-default);">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <i class="fas fa-building" style="color: var(--subtext); width: 14px;"></i>
+                        <span style="font-size: 13px; font-weight: 500;">Company</span>
+                    </div>
+                    <span style="font-size: 11px; color: var(--subtext); background: var(--surface-1); padding: 2px 8px; border-radius: 10px;">Required</span>
+                </div>
+
+                <!-- Branch -->
+                <div style="display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; background: var(--surface-2); border-radius: var(--radius); border: 1px solid var(--border-default);">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <i class="fas fa-code-branch" style="color: var(--subtext); width: 14px;"></i>
+                        <span style="font-size: 13px; font-weight: 500;">Branch</span>
+                    </div>
+                    <span style="font-size: 11px; color: var(--subtext); background: var(--surface-1); padding: 2px 8px; border-radius: 10px;">Required</span>
+                </div>
+
+                <!-- Customer Code -->
+                <div style="display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; background: var(--surface-2); border-radius: var(--radius); border: 1px solid var(--border-default);">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <i class="fas fa-user" style="color: var(--subtext); width: 14px;"></i>
+                        <span style="font-size: 13px; font-weight: 500;">Customer Code</span>
+                    </div>
+                    <span style="font-size: 11px; color: var(--subtext); background: var(--surface-1); padding: 2px 8px; border-radius: 10px;">Required</span>
+                </div>
+
+                <!-- Invoice Type -->
+                <label style="display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; background: var(--surface-1); border-radius: var(--radius); border: 1px solid var(--border-default); cursor: pointer; transition: background 0.15s;" onmouseover="this.style.background='var(--surface-2)'" onmouseout="this.style.background='var(--surface-1)'">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <i class="fas fa-file-invoice" style="color: var(--primary); width: 14px;"></i>
+                        <span style="font-size: 13px; font-weight: 500;">Invoice Type</span>
+                    </div>
+                    <input type="checkbox" id="hideInvoiceTypeStandard" style="width: auto; cursor: pointer;">
+                </label>
+
+                <!-- Due Date -->
+                <label style="display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; background: var(--surface-1); border-radius: var(--radius); border: 1px solid var(--border-default); cursor: pointer; transition: background 0.15s;" onmouseover="this.style.background='var(--surface-2)'" onmouseout="this.style.background='var(--surface-1)'">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <i class="fas fa-calendar-check" style="color: var(--primary); width: 14px;"></i>
+                        <span style="font-size: 13px; font-weight: 500;">Due Date</span>
+                    </div>
+                    <input type="checkbox" id="hideDueDateStandard" style="width: auto; cursor: pointer;">
+                </label>
+
+                <!-- Brand -->
+                <label style="display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; background: var(--surface-1); border-radius: var(--radius); border: 1px solid var(--border-default); cursor: pointer; transition: background 0.15s;" onmouseover="this.style.background='var(--surface-2)'" onmouseout="this.style.background='var(--surface-1)'">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <i class="fas fa-tag" style="color: var(--primary); width: 14px;"></i>
+                        <span style="font-size: 13px; font-weight: 500;">Brand</span>
+                    </div>
+                    <input type="checkbox" id="hideBrandStandard" style="width: auto; cursor: pointer;">
+                </label>
+
+                <!-- Sales Officer -->
+                <label style="display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; background: var(--surface-1); border-radius: var(--radius); border: 1px solid var(--border-default); cursor: pointer; transition: background 0.15s;" onmouseover="this.style.background='var(--surface-2)'" onmouseout="this.style.background='var(--surface-1)'">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <i class="fas fa-user-tie" style="color: var(--primary); width: 14px;"></i>
+                        <span style="font-size: 13px; font-weight: 500;">Sales Officer</span>
+                    </div>
+                    <input type="checkbox" id="hideSalesOfficerStandard" style="width: auto; cursor: pointer;">
+                </label>
+
+                <!-- Supplier Man -->
+                <label style="display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; background: var(--surface-1); border-radius: var(--radius); border: 1px solid var(--border-default); cursor: pointer; transition: background 0.15s;" onmouseover="this.style.background='var(--surface-2)'" onmouseout="this.style.background='var(--surface-1)'">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <i class="fas fa-truck" style="color: var(--primary); width: 14px;"></i>
+                        <span style="font-size: 13px; font-weight: 500;">Supplier Man</span>
+                    </div>
+                    <input type="checkbox" id="hideSupplierManStandard" style="width: auto; cursor: pointer;">
+                </label>
+
+                <!-- Area / City -->
+                <label style="display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; background: var(--surface-1); border-radius: var(--radius); border: 1px solid var(--border-default); cursor: pointer; transition: background 0.15s;" onmouseover="this.style.background='var(--surface-2)'" onmouseout="this.style.background='var(--surface-1)'">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <i class="fas fa-map-marker-alt" style="color: var(--primary); width: 14px;"></i>
+                        <span style="font-size: 13px; font-weight: 500;">Area / City</span>
+                    </div>
+                    <input type="checkbox" id="hideAreaCityStandard" style="width: auto; cursor: pointer;">
+                </label>
+
+                <!-- Sub Account -->
+                <label style="display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; background: var(--surface-1); border-radius: var(--radius); border: 1px solid var(--border-default); cursor: pointer; transition: background 0.15s;" onmouseover="this.style.background='var(--surface-2)'" onmouseout="this.style.background='var(--surface-1)'">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <i class="fas fa-sitemap" style="color: var(--primary); width: 14px;"></i>
+                        <span style="font-size: 13px; font-weight: 500;">Sub Account</span>
+                    </div>
+                    <input type="checkbox" id="hideSubAccountStandard" style="width: auto; cursor: pointer;">
+                </label>
+
+                <!-- Sale Order# -->
+                <label style="display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; background: var(--surface-1); border-radius: var(--radius); border: 1px solid var(--border-default); cursor: pointer; transition: background 0.15s;" onmouseover="this.style.background='var(--surface-2)'" onmouseout="this.style.background='var(--surface-1)'">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <i class="fas fa-receipt" style="color: var(--primary); width: 14px;"></i>
+                        <span style="font-size: 13px; font-weight: 500;">Sale Order#</span>
+                    </div>
+                    <input type="checkbox" id="hideSaleOrderStandard" style="width: auto; cursor: pointer;">
+                </label>
+
+                <!-- Currency -->
+                <label style="display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; background: var(--surface-1); border-radius: var(--radius); border: 1px solid var(--border-default); cursor: pointer; transition: background 0.15s;" onmouseover="this.style.background='var(--surface-2)'" onmouseout="this.style.background='var(--surface-1)'">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <i class="fas fa-coins" style="color: var(--primary); width: 14px;"></i>
+                        <span style="font-size: 13px; font-weight: 500;">Currency</span>
+                    </div>
+                    <input type="checkbox" id="hideCurrencyStandard" style="width: auto; cursor: pointer;">
+                </label>
+
+                <!-- Transport Name -->
+                <label style="display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; background: var(--surface-1); border-radius: var(--radius); border: 1px solid var(--border-default); cursor: pointer; transition: background 0.15s;" onmouseover="this.style.background='var(--surface-2)'" onmouseout="this.style.background='var(--surface-1)'">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <i class="fas fa-bus" style="color: var(--primary); width: 14px;"></i>
+                        <span style="font-size: 13px; font-weight: 500;">Transport Name</span>
+                    </div>
+                    <input type="checkbox" id="hideTransportNameStandard" style="width: auto; cursor: pointer;">
+                </label>
+
+                <!-- Bilty No -->
+                <label style="display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; background: var(--surface-1); border-radius: var(--radius); border: 1px solid var(--border-default); cursor: pointer; transition: background 0.15s;" onmouseover="this.style.background='var(--surface-2)'" onmouseout="this.style.background='var(--surface-1)'">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <i class="fas fa-hashtag" style="color: var(--primary); width: 14px;"></i>
+                        <span style="font-size: 13px; font-weight: 500;">Bilty No</span>
+                    </div>
+                    <input type="checkbox" id="hideBiltyNoStandard" style="width: auto; cursor: pointer;">
+                </label>
+
+                <!-- Project -->
+                <label style="display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; background: var(--surface-1); border-radius: var(--radius); border: 1px solid var(--border-default); cursor: pointer; transition: background 0.15s;" onmouseover="this.style.background='var(--surface-2)'" onmouseout="this.style.background='var(--surface-1)'">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <i class="fas fa-project-diagram" style="color: var(--primary); width: 14px;"></i>
+                        <span style="font-size: 13px; font-weight: 500;">Project</span>
+                    </div>
+                    <input type="checkbox" id="hideProjectStandard" style="width: auto; cursor: pointer;">
+                </label>
+
+                <!-- Container -->
+                <label style="display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; background: var(--surface-1); border-radius: var(--radius); border: 1px solid var(--border-default); cursor: pointer; transition: background 0.15s;" onmouseover="this.style.background='var(--surface-2)'" onmouseout="this.style.background='var(--surface-1)'">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <i class="fas fa-box" style="color: var(--primary); width: 14px;"></i>
+                        <span style="font-size: 13px; font-weight: 500;">Container</span>
+                    </div>
+                    <input type="checkbox" id="hideContainerStandard" style="width: auto; cursor: pointer;">
+                </label>
+
+                <!-- Remarks -->
+                <label style="display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; background: var(--surface-1); border-radius: var(--radius); border: 1px solid var(--border-default); cursor: pointer; transition: background 0.15s;" onmouseover="this.style.background='var(--surface-2)'" onmouseout="this.style.background='var(--surface-1)'">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <i class="fas fa-comment" style="color: var(--primary); width: 14px;"></i>
+                        <span style="font-size: 13px; font-weight: 500;">Remarks</span>
+                    </div>
+                    <input type="checkbox" id="hideRemarksStandard" style="width: auto; cursor: pointer;">
+                </label>
+
+            </div>
+
+            <div class="modal-actions" style="margin-top: 20px; padding-top: 14px; border-top: 1px solid var(--border-default);">
+                <button class="btn btn-secondary" id="closeFieldSettingsBtn">Cancel</button>
+                <button class="btn btn-primary" id="saveFieldSettingsBtn"><i class="fas fa-save"></i> Save Settings</button>
             </div>
         </div>
     </div>
@@ -1064,13 +1194,15 @@ if (!$user_id) {
     (function() {
         function toggleCreditFields() {
             const isCredit = document.getElementById('invoiceType').value === 'Credit';
-            document.getElementById('dueDateGroup').style.display = isCredit ? '' : 'none';
-            document.getElementById('brandGroup').style.display = isCredit ? '' : 'none';
+            // Only show due date if invoice type is Credit AND due date is not hidden by field settings
+            const dueDateHidden = localStorage.getItem('hideDueDateStandard') === 'true';
+            document.getElementById('dueDateGroup').style.display = (isCredit && !dueDateHidden) ? '' : 'none';
         }
         document.addEventListener('DOMContentLoaded', function() {
             toggleCreditFields();
             document.getElementById('invoiceType').addEventListener('change', toggleCreditFields);
         });
+        window._toggleCreditFields = toggleCreditFields;
     })();
     </script>
     <script src="../../../assets/js/sale/pos_invoice/pos-add-uom.js?v=<?php echo time(); ?>&debug=1"></script>

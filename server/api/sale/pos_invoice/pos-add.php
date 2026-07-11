@@ -374,18 +374,20 @@ try {
         // Insert receive voucher
         $rvStmt = $pdo->prepare("
             INSERT INTO receive_voucher (
-                tenant_id, currency_id, voucher_number, voucher_date, customer_id,
-                bill_no, amount, payment_method_id, bank_account_id, project_id, created_by, updated_by
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                tenant_id, company_id, currency_id, voucher_number, voucher_date, customer_id,
+                bill_no, amount, previous_balance, payment_method_id, bank_account_id, project_id, created_by, updated_by
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ");
         $rvStmt->execute([
             $tenant_id,
+            $input['companyId'] ?? null,
             $input['currencyId'],
             $voucherNumber,
             $input['saleDate'],
             $input['customerId'],
             $billNo,
             $input['amountPaid'],
+            extractBalanceAmount($input['previousBalance'] ?? '0.00'),
             $paymentMethodId,
             $input['bankAccountId'] ?? null,
             (!empty($input['projectId']) && intval($input['projectId']) > 0) ? intval($input['projectId']) : null,

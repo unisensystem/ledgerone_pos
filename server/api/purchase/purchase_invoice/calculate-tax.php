@@ -55,9 +55,10 @@ try {
             application_level
         FROM tax_regimes 
         WHERE id = ? 
+            AND tenant_id = ?
             AND is_active = 1
     ");
-    $regimeStmt->execute([$product['tax_regime_id']]);
+    $regimeStmt->execute([$product['tax_regime_id'], $tenant_id]);
     $regime = $regimeStmt->fetch(PDO::FETCH_ASSOC);
     
     if (!$regime) {
@@ -75,11 +76,12 @@ try {
         SELECT rate_percentage 
         FROM tax_rates 
         WHERE tax_regime_id = ?
+            AND tenant_id = ?
             AND transaction_type = 'purchase'
             AND is_active = 1
         LIMIT 1
     ");
-    $rateStmt->execute([$regime['id']]);
+    $rateStmt->execute([$regime['id'], $tenant_id]);
     $taxRate = $rateStmt->fetch(PDO::FETCH_ASSOC);
     
     if (!$taxRate) {

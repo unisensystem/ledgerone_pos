@@ -37,6 +37,7 @@ try {
                 (SELECT tr_rate.rate_percentage 
                  FROM tax_rates tr_rate 
                  WHERE tr_rate.tax_regime_id = tr.id
+                   AND tr_rate.tenant_id = ?
                    AND tr_rate.transaction_type = 'purchase'
                    AND tr_rate.is_active = 1
                    AND (tr_rate.effective_from IS NULL OR tr_rate.effective_from <= NOW())
@@ -46,6 +47,7 @@ try {
             ) as rate_percentage
         FROM tax_regimes tr
         WHERE tr.application_level = 'invoice'
+            AND tr.tenant_id = ?
             AND tr.is_active = 1
             AND (tr.effective_from IS NULL OR tr.effective_from <= NOW())
             AND (tr.effective_to IS NULL OR tr.effective_to >= NOW())
@@ -60,7 +62,7 @@ try {
     
     $stmt = $pdo->prepare($baseQuery);
     
-    $params = [];
+    $params = [$tenant_id, $tenant_id];
     if ($company_country_id) {
         $params[] = $company_country_id;
     }

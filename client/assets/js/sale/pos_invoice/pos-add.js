@@ -4019,6 +4019,95 @@ function saveInvoice(status = 'Posted') {
 
 
 
+// Field Settings: load, save, apply
+function loadFieldSettings() {
+    const fields = [
+        'hideInvoiceTypeStandard', 'hideDueDateStandard', 'hideBrandStandard',
+        'hideSalesOfficerStandard', 'hideSupplierManStandard', 'hideAreaCityStandard',
+        'hideSubAccountStandard', 'hideSaleOrderStandard', 'hideCurrencyStandard',
+        'hideTransportNameStandard', 'hideBiltyNoStandard', 'hideProjectStandard',
+        'hideContainerStandard', 'hideRemarksStandard'
+    ];
+    fields.forEach(id => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        const saved = localStorage.getItem(id);
+        el.checked = saved !== null ? saved === 'true' : _fieldHiddenByDefault.has(id);
+    });
+}
+
+function saveFieldSettings() {
+    const fields = [
+        'hideInvoiceTypeStandard', 'hideDueDateStandard', 'hideBrandStandard',
+        'hideSalesOfficerStandard', 'hideSupplierManStandard', 'hideAreaCityStandard',
+        'hideSubAccountStandard', 'hideSaleOrderStandard', 'hideCurrencyStandard',
+        'hideTransportNameStandard', 'hideBiltyNoStandard', 'hideProjectStandard',
+        'hideContainerStandard', 'hideRemarksStandard'
+    ];
+    fields.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) localStorage.setItem(id, el.checked);
+    });
+}
+
+// Fields hidden by default (when no localStorage value saved yet)
+const _fieldHiddenByDefault = new Set([
+    'hideInvoiceTypeStandard', 'hideDueDateStandard', 'hideBrandStandard',
+    'hideSupplierManStandard', 'hideAreaCityStandard',
+    'hideProjectStandard', 'hideContainerStandard'
+]);
+
+function applyFieldVisibility() {
+    const map = [
+        { key: 'hideInvoiceTypeStandard', groupId: 'invoiceTypeGroup' },
+        { key: 'hideDueDateStandard',     groupId: 'dueDateGroup' },
+        { key: 'hideBrandStandard',       groupId: 'brandGroup' },
+        { key: 'hideSalesOfficerStandard',groupId: 'salesOfficerGroup' },
+        { key: 'hideSupplierManStandard', groupId: 'supplierManGroup' },
+        { key: 'hideAreaCityStandard',    groupId: 'areaCityGroup' },
+        { key: 'hideSubAccountStandard',  groupId: 'subAccountGroup' },
+        { key: 'hideSaleOrderStandard',   groupId: 'saleOrderGroup' },
+        { key: 'hideCurrencyStandard',    groupId: 'currencyGroup' },
+        { key: 'hideTransportNameStandard', groupId: 'transportNameGroup' },
+        { key: 'hideBiltyNoStandard',     groupId: 'biltyNoGroup' },
+        { key: 'hideProjectStandard',     groupId: 'projectGroup' },
+        { key: 'hideContainerStandard',   groupId: 'containerGroup' },
+        { key: 'hideRemarksStandard',     groupId: null, selector: '#remarks' }
+    ];
+
+    map.forEach(({ key, groupId, selector }) => {
+        const saved = localStorage.getItem(key);
+        const hidden = saved !== null ? saved === 'true' : _fieldHiddenByDefault.has(key);
+        if (groupId) {
+            const el = document.getElementById(groupId);
+            if (el) el.style.display = hidden ? 'none' : '';
+        } else if (selector) {
+            const el = document.querySelector(selector)?.closest('.summary-item') ||
+                       document.querySelector(selector)?.closest('.form-group');
+            if (el) el.style.display = hidden ? 'none' : '';
+        }
+    });
+
+    // Due date: also respect invoice type (only show if Credit AND not hidden)
+    if (typeof window._toggleCreditFields === 'function') {
+        window._toggleCreditFields();
+    }
+}
+
+// Apply on page load
+document.addEventListener('DOMContentLoaded', function() {
+    applyFieldVisibility();
+});
+
+// Close X button for field settings modal
+document.addEventListener('DOMContentLoaded', function() {
+    const closeX = document.getElementById('closeFieldSettingsBtnX');
+    if (closeX) closeX.addEventListener('click', function() {
+        document.getElementById('fieldSettingsModal').style.display = 'none';
+    });
+});
+
+
 // Load invoice settings from localStorage
 function loadInvoiceSettings() {
     // Load scheme preference
@@ -4649,102 +4738,6 @@ document.getElementById('salesOfficer').addEventListener('change', function () {
 
 
 
-document.getElementById('closeFieldSettingsBtn').addEventListener('click', function () {
-    document.getElementById('fieldSettingsModal').style.display = 'none';
-});
-
-document.getElementById('saveFieldSettingsBtn').addEventListener('click', function () {
-    saveFieldSettings();
-    document.getElementById('fieldSettingsModal').style.display = 'none';
-    applyFieldVisibility();
-});
-
-document.getElementById('fieldSettingsModal').addEventListener('click', function (e) {
-    if (e.target === this) {
-        this.style.display = 'none';
-    }
-});
-
-function loadFieldSettings() {
-    const fields = ['hideBillNoStandard', 'hideSaleDateStandard', 'hidePreviousBalanceStandard', 'hideSubAccountStandard', 'hideCustomerAddressStandard', 'hideSaleOrderStandard', 'hideBranchStandard', 'hideCurrencyStandard', 'hideSalesOfficerStandard', 'hideBiltyNoStandard', 'hideTransportNameStandard', 'hideRemarksStandard'];
-    fields.forEach(id => {
-        const el = document.getElementById(id);
-        if (el) el.checked = localStorage.getItem(id) === 'true';
-    });
-}
-
-function saveFieldSettings() {
-    const fields = [
-        'hideBillNoStandard', 'hideBillNoPos', 'hideSaleDateStandard', 'hideSaleDatePos',
-        'hidePreviousBalanceStandard', 'hidePreviousBalancePos', 'hideSubAccountStandard', 'hideSubAccountPos',
-        'hideCustomerAddressStandard', 'hideCustomerAddressPos', 'hideSaleOrderStandard', 'hideSaleOrderPos',
-        'hideBranchStandard', 'hideBranchPos', 'hideCurrencyStandard', 'hideCurrencyPos',
-        'hideSalesOfficerStandard', 'hideSalesOfficerPos', 'hideBiltyNoStandard', 'hideBiltyNoPos',
-        'hideTransportNameStandard', 'hideTransportNamePos', 'hideRemarksStandard', 'hideRemarksPos'
-    ];
-    
-    fields.forEach(id => {
-        const el = document.getElementById(id);
-        if (el) localStorage.setItem(id, el.checked);
-    });
-    
-    alert('Field settings saved successfully!');
-}
-
-function applyFieldVisibility() {
-    const modeRadio = document.querySelector('input[name="invoiceMode"]:checked');
-    const mode = modeRadio ? modeRadio.value : 'standard';
-    const suffix = mode === 'standard' ? 'Standard' : 'Pos';
-
-    const fieldGroups = [
-        'billNoGroup', 'saleDateGroup', 'previousBalanceGroup', 'subAccountGroup',
-        'customerAddressGroup', 'saleOrderGroup', 'branchGroup', 'currencyGroup',
-        'salesOfficerGroup', 'biltyNoGroup', 'transportNameGroup', 'remarksGroup'
-    ];
-
-    fieldGroups.forEach(groupId => {
-        const group = document.getElementById(groupId);
-        if (group) {
-            const hideKey = groupId.replace('Group', '') + suffix;
-            const hideKey2 = hideKey.charAt(0).toLowerCase() + hideKey.slice(1);
-            const shouldHide = localStorage.getItem(`hide${hideKey2.charAt(0).toUpperCase() + hideKey2.slice(1)}`) === 'true';
-            group.style.display = shouldHide ? 'none' : '';
-        }
-    });
-}
-
-// Mode change listeners
-const standardMode = document.getElementById('standardMode');
-if (standardMode) {
-    standardMode.addEventListener('change', function () {
-        if (this.checked) {
-            localStorage.setItem('invoiceMode', 'standard');
-            applyFieldVisibility();
-        }
-    });
-}
-
-const posMode = document.getElementById('posMode');
-if (posMode) {
-    posMode.addEventListener('change', function () {
-        if (this.checked) {
-            localStorage.setItem('invoiceMode', 'pos');
-            applyFieldVisibility();
-        }
-    });
-}
-
-// Load saved mode on page load
-const savedMode = localStorage.getItem('invoiceMode') || 'standard';
-const posModeRadio = document.getElementById('posMode');
-const standardModeRadio = document.getElementById('standardMode');
-
-if (savedMode === 'pos' && posModeRadio) {
-    posModeRadio.checked = true;
-} else if (standardModeRadio) {
-    standardModeRadio.checked = true;
-}
-applyFieldVisibility();
 
 
 // Debounce utility for performance

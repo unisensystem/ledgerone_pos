@@ -56,6 +56,8 @@ try {
     $amount = $_POST['amount'] ?? 0;
     $currency_id = $_POST['currency_id'] ?? '';
     $payment_method_id = $_POST['payment_method_id'] ?? '';
+    // Map Cash account (id=7 in dropdown) to id=1 for storage
+    if ($payment_method_id == 7) $payment_method_id = 1;
     $bank_account_id = (!empty($_POST['bank_account']) && $_POST['bank_account'] !== 'null') ? intval($_POST['bank_account']) : null;
     $cheque_date = (!empty($_POST['cheque_date']) && $_POST['cheque_date'] !== 'null') ? $_POST['cheque_date'] : null;
     $cheque_no = (!empty($_POST['cheque_no']) && $_POST['cheque_no'] !== 'null') ? $_POST['cheque_no'] : null;
@@ -178,8 +180,8 @@ try {
     
     // Determine debit account ID
     if ($payment_method_id == 6) {
-        $debit_account_id = 78; // Post Dated Cheques Receivable
-    } elseif ($payment_method_id == 7) {
+        $debit_account_id = 78;
+    } elseif ($payment_method_id == 1) {
         $debit_account_id = 1;
     } else {
         $stmt = $pdo->prepare("SELECT account_id FROM bank_accounts WHERE id = ? AND tenant_id = ?");

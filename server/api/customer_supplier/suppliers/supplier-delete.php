@@ -43,6 +43,10 @@ try {
     $stmt = $pdo->prepare("DELETE FROM accounting_ledger WHERE tenant_id = ? AND transaction_type = 'supplier_opening' AND reference_table = 'suppliers' AND reference_id = ?");
     $stmt->execute([$tenant_id, $supplier_id]);
 
+    // Delete associated companies
+    $stmt = $pdo->prepare("DELETE FROM supplier_associated_companies WHERE tenant_id = ? AND supplier_id = ?");
+    $stmt->execute([$tenant_id, $supplier_id]);
+
     // Delete sub accounts
     $stmt = $pdo->prepare("DELETE FROM supplier_sub_accounts WHERE tenant_id = ? AND supplier_id = ?");
     $stmt->execute([$tenant_id, $supplier_id]);

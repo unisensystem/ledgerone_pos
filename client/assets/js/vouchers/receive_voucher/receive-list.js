@@ -36,6 +36,15 @@ fetch('../../../../server/api/vouchers/receive_voucher/get-bank-accounts.php')
         }
     });
 
+// Fetch currencies
+fetch('../../../../server/api/vouchers/receive_voucher/get-currencies.php')
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            currencies = data.data;
+        }
+    });
+
 // Fetch companies
 fetch('../../../../server/api/vouchers/receive_voucher/get-companies.php')
     .then(response => response.json())
@@ -362,102 +371,113 @@ function editVoucher(id) {
 }
 
 function loadEditVoucher(id) {
-    // Fetch voucher details from API
-    fetch(`../../../../server/api/vouchers/receive_voucher/receive-get.php?id=${id}`)
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                const voucher = data.data;
-                
-                // Populate basic fields
-                document.getElementById('editVoucherNumber').value = voucher.voucher_number;
-                document.getElementById('editVoucherDate').value = voucher.voucher_date;
-                document.getElementById('editCustomer').value = `${voucher.customer_code} - ${voucher.customer_name}`;
-                document.getElementById('editBillNo').value = voucher.bill_no || '';
-                document.getElementById('editAmount').value = voucher.amount;
-                document.getElementById('editDescription').value = voucher.description || '';
-                document.getElementById('editChequeDate').value = voucher.cheque_date || '';
-                document.getElementById('editChequeNo').value = voucher.cheque_no || '';
-                
-                // Populate companies
-                const companySelect = document.getElementById('editCompany');
-                companySelect.innerHTML = '<option value="">Select Company</option>';
-                companies.forEach(company => {
-                    const option = document.createElement('option');
-                    option.value = company.id;
-                    option.textContent = company.company_name;
-                    if (company.id == voucher.company_id) option.selected = true;
-                    companySelect.appendChild(option);
-                });
-                
-                // Populate currencies
-                const currencySelect = document.getElementById('editCurrency');
-                currencySelect.innerHTML = '<option value="">Select Currency</option>';
-                currencies.forEach(currency => {
-                    const option = document.createElement('option');
-                    option.value = currency.currency_id;
-                    option.textContent = `${currency.name} (${currency.symbol})`;
-                    if (currency.currency_id == voucher.currency_id) option.selected = true;
-                    currencySelect.appendChild(option);
-                });
-                
-                // Populate payment methods
-                const paymentMethodSelect = document.getElementById('editPaymentMethod');
-                paymentMethodSelect.innerHTML = '<option value="">Select Payment Method</option>';
-                paymentMethods.forEach(method => {
-                    const option = document.createElement('option');
-                    option.value = method.id;
-                    option.textContent = method.name;
-                    if (method.id == voucher.payment_method_id) option.selected = true;
-                    paymentMethodSelect.appendChild(option);
-                });
-                
-                // Populate bank accounts
-                const bankAccountSelect = document.getElementById('editBankAccount');
-                bankAccountSelect.innerHTML = '<option value="">Select Bank Account</option>';
-                bankAccounts.forEach(account => {
-                    const option = document.createElement('option');
-                    option.value = account.id;
-                    option.textContent = `${account.bank_name} - ${account.account_number}`;
-                    if (account.id == voucher.bank_account_id) option.selected = true;
-                    bankAccountSelect.appendChild(option);
-                });
-                
-                // Populate projects
-                const projectSelect = document.getElementById('editProject');
-                projectSelect.innerHTML = '<option value="">Select Project</option>';
-                if (projects && projects.length > 0) {
-                    projects.forEach(project => {
-                        const option = document.createElement('option');
-                        option.value = project.id;
-                        const cityName = project.city_name || 'N/A';
-                        option.textContent = `${project.project_code} - ${project.project_name} - ${cityName}`;
-                        if (project.id == voucher.project_id) {
-                            option.selected = true;
-                        }
-                        projectSelect.appendChild(option);
-                    });
-                }
-                
-                // Handle visibility based on payment method
-                handleEditPaymentMethodChange(voucher.payment_method_id);
-                
-                // Add change listener
-                paymentMethodSelect.onchange = function() {
-                    handleEditPaymentMethodChange(this.value);
-                };
-                
-                // Store voucher ID for saving
-                document.getElementById('editModal').dataset.voucherId = id;
-                document.getElementById('editModal').classList.add('show');
-            } else {
-                alert('Error loading voucher: ' + (data.error || 'Unknown error'));
-            }
-        })
-        .catch(error => {
-            console.error('Fetch error:', error);
-            alert('Network error occurred');
+    // Fetch voucher details + all dropdowns in parallel (ensures data is always fresh)
+    Promise.all([
+        fetch(`../../../../server/api/vouchers/receive_voucher/receive-get.php?id=${id}`).then(r => r.json()),
+        fetch('../../../../server/api/vouchers/receive_voucher/get-companies.php').then(r => r.json()),
+        fetch('../../../../server/api/vouchers/receive_voucher/get-currencies.php').then(r => r.json()),
+        fetch('../../../../server/api/vouchers/receive_voucher/get-payment-methods.php').then(r => r.json()),
+        fetch('../../../../server/api/vouchers/receive_voucher/get-bank-accounts.php').then(r => r.json()),
+        fetch('../../../../server/api/master_setup/project_setup/get-projects-dropdown.php').then(r => r.json())
+    ]).then(([voucherRes, companiesRes, currenciesRes, methodsRes, banksRes, projectsRes]) => {
+        if (!voucherRes.success) {
+            alert('Error loading voucher: ' + (voucherRes.error || 'Unknown error'));
+            return;
+        }
+
+        // Update global arrays
+        if (companiesRes.success) companies = companiesRes.data;
+        if (currenciesRes.success) currencies = currenciesRes.data;
+        if (methodsRes.success) paymentMethods = methodsRes.data;
+        if (banksRes.success) bankAccounts = banksRes.data;
+        // projects API returns data.projects (not data.data)
+        if (projectsRes.success) projects = projectsRes.projects || [];
+
+        const voucher = voucherRes.data;
+
+        // Populate basic fields
+        document.getElementById('editVoucherNumber').value = voucher.voucher_number;
+        document.getElementById('editVoucherDate').value = voucher.voucher_date;
+        document.getElementById('editCustomer').value = `${voucher.customer_code} - ${voucher.customer_name}`;
+        document.getElementById('editBillNo').value = voucher.bill_no || '';
+        document.getElementById('editAmount').value = voucher.amount;
+        document.getElementById('editDescription').value = voucher.description || '';
+        document.getElementById('editChequeDate').value = voucher.cheque_date || '';
+        document.getElementById('editChequeNo').value = voucher.cheque_no || '';
+
+        // Populate companies — auto-select by company_id
+        const companySelect = document.getElementById('editCompany');
+        companySelect.innerHTML = '<option value="">Select Company</option>';
+        companies.forEach(company => {
+            const option = document.createElement('option');
+            option.value = company.id;
+            option.textContent = company.company_name;
+            if (String(company.id) === String(voucher.company_id)) option.selected = true;
+            companySelect.appendChild(option);
         });
+
+        // Populate currencies — auto-select by currency_id
+        const currencySelect = document.getElementById('editCurrency');
+        currencySelect.innerHTML = '<option value="">Select Currency</option>';
+        currencies.forEach(currency => {
+            const option = document.createElement('option');
+            option.value = currency.currency_id;
+            option.textContent = `${currency.name} (${currency.symbol})`;
+            if (String(currency.currency_id) === String(voucher.currency_id)) option.selected = true;
+            currencySelect.appendChild(option);
+        });
+
+        // Populate payment methods — auto-select by payment_method_id
+        const paymentMethodSelect = document.getElementById('editPaymentMethod');
+        paymentMethodSelect.innerHTML = '<option value="">Select Payment Method</option>';
+        paymentMethods.forEach(method => {
+            const option = document.createElement('option');
+            option.value = method.id;
+            option.textContent = method.name;
+            // DB stores Cash as id=1, but dropdown has Cash as id=7
+            const dbId = String(voucher.payment_method_id);
+            const matchId = (dbId === '1') ? '7' : dbId;
+            if (String(method.id) === matchId) option.selected = true;
+            paymentMethodSelect.appendChild(option);
+        });
+
+        // Populate bank accounts — auto-select by bank_account_id
+        const bankAccountSelect = document.getElementById('editBankAccount');
+        bankAccountSelect.innerHTML = '<option value="">Select Bank Account</option>';
+        bankAccounts.forEach(account => {
+            const option = document.createElement('option');
+            option.value = account.id;
+            option.textContent = `${account.bank_name} - ${account.account_number}`;
+            if (String(account.id) === String(voucher.bank_account_id)) option.selected = true;
+            bankAccountSelect.appendChild(option);
+        });
+
+        // Populate projects — auto-select by project_id
+        const projectSelect = document.getElementById('editProject');
+        projectSelect.innerHTML = '<option value="">Select Project</option>';
+        projects.forEach(project => {
+            const option = document.createElement('option');
+            option.value = project.id;
+            option.textContent = `${project.project_code} - ${project.project_name} - ${project.city_name || 'N/A'}`;
+            if (String(project.id) === String(voucher.project_id)) option.selected = true;
+            projectSelect.appendChild(option);
+        });
+
+        // Handle visibility based on payment method
+        handleEditPaymentMethodChange(voucher.payment_method_id);
+
+        // Add change listener
+        paymentMethodSelect.onchange = function() {
+            handleEditPaymentMethodChange(this.value);
+        };
+
+        // Store voucher ID for saving
+        document.getElementById('editModal').dataset.voucherId = id;
+        document.getElementById('editModal').classList.add('show');
+    }).catch(error => {
+        console.error('Fetch error:', error);
+        alert('Network error occurred');
+    });
 }
 
 function handleEditPaymentMethodChange(methodId) {
@@ -468,7 +488,7 @@ function handleEditPaymentMethodChange(methodId) {
     const chequeInput = document.getElementById('editChequeDate');
     const chequeNoInput = document.getElementById('editChequeNo');
     
-    if (methodId == 7) {
+    if (methodId == 7 || methodId == 1) {
         bankGroup.style.display = 'none';
         chequeGroup.style.display = 'none';
         chequeNoGroup.style.display = 'none';

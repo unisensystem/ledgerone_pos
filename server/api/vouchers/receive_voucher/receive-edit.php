@@ -33,6 +33,10 @@ if (!$voucher_id) {
 try {
     $input = json_decode(file_get_contents('php://input'), true);
     
+    $payment_method_id = $input['payment_method_id'] ?? null;
+    // Map Cash account (id=7 in dropdown) to id=1 for storage
+    if ($payment_method_id == 7) $payment_method_id = 1;
+    
     $stmt = $pdo->prepare("
         UPDATE receive_voucher 
         SET 
@@ -57,7 +61,7 @@ try {
         $input['bill_no'] ?? null,
         $input['amount'] ?? 0,
         $input['currency_id'] ?? null,
-        $input['payment_method_id'] ?? null,
+        $payment_method_id,
         $input['bank_account_id'] ?? null,
         $input['cheque_date'] ?? null,
         $input['cheque_no'] ?? null,
