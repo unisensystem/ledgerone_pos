@@ -5,7 +5,8 @@ const allFields = [
     { id: 'project', label: 'Project', visible: false },
     { id: 'container', label: 'Container', visible: false },
     { id: 'vendor', label: 'Vendor', visible: true },
-    { id: 'type', label: 'Type (CR/DR)', visible: true }
+    { id: 'type', label: 'Type (CR/DR)', visible: true },
+    { id: 'cashFlow', label: 'Effect on Cash Flow', visible: true }
 ];
 
 function getFieldVisibility() {
@@ -35,7 +36,7 @@ function saveFieldVisibility(visibility) {
 }
 
 function toggleFieldVisibility(fieldId, isVisible) {
-    const groupMap = { vendor: 'vendorGroup', type: 'typeGroup' };
+    const groupMap = { vendor: 'vendorGroup', type: 'typeGroup', cashFlow: 'cashFlowGroup' };
     const targetId = groupMap[fieldId] || fieldId;
     const element = document.getElementById(targetId);
     if (element) {
@@ -280,6 +281,9 @@ async function loadVoucherForEdit(voucherId) {
                 if (voucher.type) {
                     setVoucherType(voucher.type);
                 }
+                const cashFlow = voucher.is_cash_flow !== undefined ? parseInt(voucher.is_cash_flow) : 1;
+                isCashFlowCheckbox.checked = cashFlow === 1;
+                cashFlowLabel.textContent = cashFlow === 1 ? 'Yes' : 'No';
             }, 100);
             
             // Populate expense lines
@@ -341,6 +345,13 @@ function setVoucherType(type) {
 
 document.getElementById('typeCR').addEventListener('click', () => setVoucherType('CR'));
 document.getElementById('typeDR').addEventListener('click', () => setVoucherType('DR'));
+
+// Cash flow toggle label
+const isCashFlowCheckbox = document.getElementById('isCashFlow');
+const cashFlowLabel = document.getElementById('cashFlowLabel');
+isCashFlowCheckbox.addEventListener('change', function() {
+    cashFlowLabel.textContent = this.checked ? 'Yes' : 'No';
+});
 
 // Fetch next voucher number
 async function fetchNextVoucherNumber() {
@@ -659,6 +670,7 @@ async function validateAndPost() {
                     container_id: document.getElementById('container').value || null,
                     vendor_id: document.getElementById('vendor').value || null,
                     type: document.getElementById('voucherType').value,
+                    is_cash_flow: document.getElementById('isCashFlow').checked ? 1 : 0,
                     voucher_number: document.getElementById('voucher').value,
                     description: document.getElementById('description').value,
                     entries: expenseData

@@ -453,6 +453,14 @@ select:focus {
   color: var(--warning);
 }
 
+.action-btn.cash-flow.cf-yes {
+  color: var(--success);
+}
+
+.action-btn.cash-flow.cf-no {
+  color: var(--subtext);
+}
+
 /* Amount */
 .amount {
   font-weight: 600;

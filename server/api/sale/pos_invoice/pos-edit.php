@@ -449,9 +449,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
             if ($input['paymentMethod'] === 'cash') {
                 $cashAccountId = 1;
             } else {
-                $bankStmt = $pdo->prepare("SELECT account_id FROM bank_accounts WHERE id = ?");
-                $bankStmt->execute([$input['bankAccountId']]);
-                $cashAccountId = $bankStmt->fetchColumn();
+                $cashAccountId = 1; // default fallback
+                if (!empty($input['bankAccountId'])) {
+                    $bankStmt = $pdo->prepare("SELECT account_id FROM bank_accounts WHERE id = ?");
+                    $bankStmt->execute([$input['bankAccountId']]);
+                    $fetchedAccountId = $bankStmt->fetchColumn();
+                    if ($fetchedAccountId !== false && $fetchedAccountId !== '' && $fetchedAccountId !== null) {
+                        $cashAccountId = intval($fetchedAccountId);
+                    }
+                }
             }
 
             // Debit Cash/Bank Account

@@ -239,7 +239,7 @@ function renderTable() {
     if (filteredData.length === 0) {
         tableBody.innerHTML = `
                     <tr>
-                        <td colspan="8">
+                        <td colspan="9">
                             <div class="empty-state">
                                 <div class="empty-icon">
                                     <i class="fas fa-file-invoice-dollar"></i>
@@ -273,6 +273,11 @@ function renderTable() {
         // Format amount
         const formattedAmount = CURRENCY_SYMBOL + parseFloat(expense.total_amount).toFixed(2);
 
+        const cfVal = parseInt(expense.is_cash_flow);
+        const cashFlowBadge = cfVal === 1
+            ? `<span class="status-badge status-approved"><i class="fas fa-check-circle"></i> Yes</span>`
+            : `<span class="status-badge status-rejected"><i class="fas fa-times-circle"></i> No</span>`;
+
         row.innerHTML = `
                     <td><strong>${expense.voucher_no}</strong></td>
                     <td>${formattedDate}</td>
@@ -281,6 +286,7 @@ function renderTable() {
                     <td>${expense.expense_accounts || '-'}</td>
                     <td>${expense.cost_centers || '-'}</td>
                     <td class="amount">${formattedAmount}</td>
+                    <td>${cashFlowBadge}</td>
                     <td>
                         <div class="action-buttons">
                             <button class="action-btn view" title="View Details" onclick="viewVoucher(${expense.id})">
@@ -288,6 +294,9 @@ function renderTable() {
                             </button>
                             <button class="action-btn edit" title="Edit" onclick="editVoucher(${expense.id})">
                                 <i class="fas fa-edit"></i>
+                            </button>
+                            <button class="action-btn cash-flow ${cfVal === 1 ? 'cf-yes' : 'cf-no'}" title="Toggle Cash Flow (${cfVal === 1 ? 'Yes' : 'No'})" onclick="toggleCashFlow(${expense.id}, ${cfVal}, this)">
+                                <i class="fas fa-water"></i>
                             </button>
                             <button class="action-btn print" title="Print" onclick="printVoucher(${expense.id})">
                                 <i class="fas fa-print"></i>
@@ -500,6 +509,10 @@ function viewVoucher(id) {
                 typeEl.textContent = voucher.type || 'CR';
                 typeEl.style.fontWeight = '600';
                 typeEl.style.color = (voucher.type === 'DR') ? '#e34f4f' : '#2fbf71';
+                const cfEl = document.getElementById('viewCashFlow');
+                cfEl.textContent = parseInt(voucher.is_cash_flow) === 1 ? 'Yes' : 'No';
+                cfEl.style.fontWeight = '600';
+                cfEl.style.color = parseInt(voucher.is_cash_flow) === 1 ? '#2fbf71' : '#e34f4f';
                 document.getElementById('viewDescription').textContent = voucher.description;
                 document.getElementById('viewTotalAmount').textContent = CURRENCY_SYMBOL + parseFloat(voucher.total_amount).toFixed(2);
                 
@@ -537,6 +550,41 @@ document.getElementById('viewVoucherModal').addEventListener('click', (e) => {
         document.getElementById('viewVoucherModal').classList.remove('active');
     }
 });
+
+// Toggle cash flow
+async function toggleCashFlow(id, currentVal, btn) {
+    const newVal = currentVal === 1 ? 0 : 1;
+    try {
+        const response = await fetch('../../../../server/api/vouchers/expense_voucher/toggle-cash-flow.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id, is_cash_flow: newVal })
+        });
+        const data = await response.json();
+        if (data.success) {
+            // Update in-memory data
+            const record = expenseData.find(e => e.id == id);
+            if (record) record.is_cash_flow = newVal;
+            const fRecord = filteredData.find(e => e.id == id);
+            if (fRecord) fRecord.is_cash_flow = newVal;
+            // Update button
+            btn.classList.toggle('cf-yes', newVal === 1);
+            btn.classList.toggle('cf-no', newVal === 0);
+            btn.title = `Toggle Cash Flow (${newVal === 1 ? 'Yes' : 'No'})`;
+            btn.setAttribute('onclick', `toggleCashFlow(${id}, ${newVal}, this)`);
+            // Update badge in same row
+            const row = btn.closest('tr');
+            const badgeCell = row.cells[7];
+            badgeCell.innerHTML = newVal === 1
+                ? `<span class="status-badge status-approved"><i class="fas fa-check-circle"></i> Yes</span>`
+                : `<span class="status-badge status-rejected"><i class="fas fa-times-circle"></i> No</span>`;
+        } else {
+            alert('Error: ' + data.error);
+        }
+    } catch (error) {
+        console.error('Error toggling cash flow:', error);
+    }
+}
 
 // Edit voucher
 function editVoucher(id) {

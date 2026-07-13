@@ -158,6 +158,17 @@ $currency_symbol = $currency['symbol'] ?? '$';
                     <input type="hidden" id="voucherType" value="CR">
                 </div>
 
+                <div class="form-group" id="cashFlowGroup">
+                    <label>Effect on Cash Flow</label>
+                    <div class="checkbox-toggle-wrap">
+                        <label class="checkbox-toggle">
+                            <input type="checkbox" id="isCashFlow" checked>
+                            <span class="checkbox-toggle-slider"></span>
+                        </label>
+                        <span class="checkbox-toggle-label" id="cashFlowLabel">Yes</span>
+                    </div>
+                </div>
+
                 <div class="form-group full-width">
                     <label for="description">Description</label>
                     <textarea id="description" placeholder="Enter a brief description of this expense entry"></textarea>

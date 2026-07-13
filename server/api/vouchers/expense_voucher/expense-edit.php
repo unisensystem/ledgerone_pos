@@ -37,6 +37,7 @@ $project_id = $input['project_id'] ?? null;
 $container_id = $input['container_id'] ?? null;
 $vendor_id = $input['vendor_id'] ?? null;
 $type = $input['type'] ?? 'CR';
+$is_cash_flow = isset($input['is_cash_flow']) ? intval($input['is_cash_flow']) : 1;
 $entries = $input['entries'] ?? [];
 
 if (!$date || empty($entries)) {
@@ -63,8 +64,8 @@ try {
     $total_items = count($entries);
     
     // Update expense_voucher
-    $stmt = $pdo->prepare("UPDATE expense_voucher SET date = ?, company_id = ?, description = ?, total_amount = ?, total_items = ?, project_id = ?, container_id = ?, vendor_id = ?, type = ? WHERE id = ? AND tenant_id = ?");
-    $stmt->execute([$date, $input['company_id'], $description, $total_amount, $total_items, $project_id, $container_id, $vendor_id, $type, $voucher_id, $tenant_id]);
+    $stmt = $pdo->prepare("UPDATE expense_voucher SET date = ?, company_id = ?, description = ?, total_amount = ?, total_items = ?, project_id = ?, container_id = ?, vendor_id = ?, type = ?, is_cash_flow = ? WHERE id = ? AND tenant_id = ?");
+    $stmt->execute([$date, $input['company_id'], $description, $total_amount, $total_items, $project_id, $container_id, $vendor_id, $type, $is_cash_flow, $voucher_id, $tenant_id]);
     
     // Insert new lines and ledger entries
     foreach ($entries as $entry) {

@@ -39,6 +39,7 @@ try {
             ev.container_id,
             ev.vendor_id,
             ev.type,
+            ev.is_cash_flow,
             c.company_name,
             s.supplier_name as vendor_name
         FROM expense_voucher ev

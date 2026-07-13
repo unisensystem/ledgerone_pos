@@ -30,6 +30,7 @@ $project_id = $input['project_id'] ?? null;
 $container_id = $input['container_id'] ?? null;
 $vendor_id = $input['vendor_id'] ?? null;
 $type = $input['type'] ?? 'CR';
+$is_cash_flow = isset($input['is_cash_flow']) ? intval($input['is_cash_flow']) : 1;
 $entries = $input['entries'] ?? [];
 
 if (!$date || !$voucher_number || empty($entries)) {
@@ -47,10 +48,10 @@ try {
     
     // Insert into expense_voucher
     $stmt = $pdo->prepare("
-        INSERT INTO expense_voucher (tenant_id, company_id, voucher_no, date, description, total_amount, total_items, project_id, container_id, vendor_id, type)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO expense_voucher (tenant_id, company_id, voucher_no, date, description, total_amount, total_items, project_id, container_id, vendor_id, type, is_cash_flow)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ");
-    $stmt->execute([$tenant_id, $input['company_id'], $voucher_number, $date, $description, $total_amount, $total_items, $project_id, $container_id, $vendor_id, $type]);
+    $stmt->execute([$tenant_id, $input['company_id'], $voucher_number, $date, $description, $total_amount, $total_items, $project_id, $container_id, $vendor_id, $type, $is_cash_flow]);
     $voucher_id = $pdo->lastInsertId();
     
     foreach ($entries as $entry) {

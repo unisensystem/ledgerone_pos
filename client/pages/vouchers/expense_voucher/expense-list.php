@@ -204,6 +204,7 @@ $currency_symbol = $currency['symbol'];
                             <th>Expense Account</th>
                             <th>Cost Center</th>
                             <th>Amount</th>
+                            <th>Cash Flow</th>
                             <th>Actions</th>
                         </tr>
                     </thead>
@@ -279,6 +280,10 @@ $currency_symbol = $currency['symbol'];
                     <div>
                         <strong>Type:</strong>
                         <p id="viewType"></p>
+                    </div>
+                    <div>
+                        <strong>Effect on Cash Flow:</strong>
+                        <p id="viewCashFlow"></p>
                     </div>
                     <div style="grid-column: 1 / -1;">
                         <strong>Description:</strong>

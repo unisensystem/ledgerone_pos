@@ -29,6 +29,7 @@ try {
             ev.total_items,
             ev.company_id,
             ev.project_id,
+            ev.is_cash_flow,
             p.project_name,
             GROUP_CONCAT(a.name ORDER BY evl.id SEPARATOR ',') AS expense_accounts,
             GROUP_CONCAT(cc.name ORDER BY evl.id SEPARATOR ',') AS cost_centers,

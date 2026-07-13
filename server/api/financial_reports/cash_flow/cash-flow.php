@@ -401,6 +401,7 @@ try {
         LEFT JOIN bank_accounts ba ON evl.bank_account_id = ba.id
         WHERE evl.tenant_id = ? 
         AND evl.cheque_date IS NULL
+        AND ev.is_cash_flow = 1
         " . ($company_id ? " AND ev.company_id = ?" : "") . "
         {$date_conditions[6]}
         
@@ -731,7 +732,7 @@ try {
                 FROM expense_voucher_line evl
                 JOIN expense_voucher ev ON evl.voucher_id = ev.id
                 LEFT JOIN bank_accounts ba ON evl.bank_account_id = ba.id
-                WHERE evl.tenant_id = ? AND evl.cheque_date IS NULL AND ev.date < ?
+                WHERE evl.tenant_id = ? AND evl.cheque_date IS NULL AND ev.is_cash_flow = 1 AND ev.date < ?
                 " . ($company_id ? " AND ev.company_id = ?" : "") . "
                 $bank_filter
                 
