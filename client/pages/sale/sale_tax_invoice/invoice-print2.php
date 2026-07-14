@@ -617,11 +617,11 @@ $logoAbsUrl = $logoFile ? '/ledgerone_erp/client/assets/uploads/company_logo/' .
             <tr class="t-total">
                 <td></td>
                 <td class="t-label" colspan="4">Total Amount</td>
-                <td class="t-value"><?php echo number_format((float)$invoice['net_amount'], 2); ?></td>
+                <td class="t-value"><?php echo number_format((float)$invoice['net_amount'] - (float)($invoice['amount_paid'] ?? 0), 2); ?></td>
             </tr>
             <tr class="t-words">
                 <td></td>
-                <td colspan="5"><span class="t-words-lbl">In Words: </span><?php echo htmlspecialchars(numberToWords((float)$invoice['net_amount'], $currencyCode)); ?></td>
+                <td colspan="5"><span class="t-words-lbl">In Words: </span><?php echo htmlspecialchars(numberToWords((float)$invoice['net_amount'] - (float)($invoice['amount_paid'] ?? 0), $currencyCode)); ?></td>
             </tr>
         </tfoot>
     </table>

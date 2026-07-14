@@ -42,6 +42,15 @@ const defaultShortcuts = {
 
 let shortcuts = { ...defaultShortcuts };
 
+// Function to get customer display text based on display mode setting
+function getCustomerDisplayText(customer) {
+    const displayMode = localStorage.getItem('customerDisplayMode') || 'code_name_address';
+    if (displayMode === 'code_only') return customer.customer_code;
+    if (displayMode === 'name_only') return customer.customer_name;
+    if (displayMode === 'code_and_name') return `${customer.customer_code} | ${customer.customer_name}`;
+    return `${customer.customer_code} | ${customer.customer_name} | ${customer.address || 'N/A'}`;
+}
+
 // Function to get product display text based on display mode setting
 function getProductDisplayText(product) {
     const displayMode = localStorage.getItem('productDisplayMode') || 'code_and_name';
@@ -939,11 +948,25 @@ function initializePage(permissions) {
 
         searchInput.addEventListener('click', function (e) {
             e.stopPropagation();
+            searchInput.select();
             openDropdown();
         });
 
         searchInput.addEventListener('focus', function () {
+            searchInput._prevValue = searchInput.value;
+            searchInput.value = '';
             openDropdown();
+        });
+
+        searchInput.addEventListener('blur', function () {
+            setTimeout(() => {
+                if (optionsContainer.style.display === 'none' && !hiddenInput._justSelected) {
+                    if (searchInput._prevValue !== undefined) {
+                        searchInput.value = searchInput._prevValue;
+                    }
+                }
+                hiddenInput._justSelected = false;
+            }, 200);
         });
 
         searchInput.addEventListener('input', function () {
@@ -961,6 +984,7 @@ function initializePage(permissions) {
 
             searchInput.value = value === '' ? '' : opt.textContent;
             hiddenInput.value = value;
+            hiddenInput._justSelected = true;
             optionsContainer.style.display = 'none';
 
             filterCustomersByAreaCity(filterType, cityId, areaId);
@@ -982,7 +1006,7 @@ function initializePage(permissions) {
         option.setAttribute('data-supplier-man', customer.supplier_man_id || '');
         option.setAttribute('data-credit-limit', customer.credit_limit || 0);
         option.setAttribute('data-withholding-tax', customer.advance_income_tax_percentage || 0);
-        option.textContent = `${customer.customer_code} | ${customer.customer_name} | ${customer.address || 'N/A'}`;
+        option.textContent = getCustomerDisplayText(customer);
         return option;
     }
 
@@ -1003,6 +1027,7 @@ function initializePage(permissions) {
         filtered.forEach(customer => fragment.appendChild(buildCustomerOption(customer)));
         customerCodeOptions.appendChild(fragment);
     }
+    window.filterCustomersByAreaCity = filterCustomersByAreaCity;
 
     // Load companies from API
     async function loadCompanies() {
@@ -1361,7 +1386,12 @@ function initializePage(permissions) {
 
                 // Populate form fields
                 document.getElementById('saleDate').value = invoice.sale_date;
-                document.getElementById('customerCodeSearch').value = invoice.customer_name;
+                document.getElementById('customerCodeSearch').value = (() => {
+                    const mode = localStorage.getItem('customerDisplayMode') || 'code_and_name';
+                    if (mode === 'code_only') return invoice.customer_code || invoice.customer_name;
+                    if (mode === 'name_only') return invoice.customer_name;
+                    return `${invoice.customer_code || ''} | ${invoice.customer_name}`.replace(/^\s*\|\s*/, '');
+                })();
                 document.getElementById('customerCode').value = invoice.customer_id;
                 document.getElementById('branchSearch').value = invoice.branch_name;
                 document.getElementById('branch').value = invoice.branch_id;
@@ -1620,7 +1650,12 @@ function initializePage(permissions) {
 
                 // Populate invoice details
                 document.getElementById('saleDate').value = order.sale_date;
-                document.getElementById('customerCodeSearch').value = `${order.customer_code} - ${order.customer_name}`;
+                document.getElementById('customerCodeSearch').value = (() => {
+                    const mode = localStorage.getItem('customerDisplayMode') || 'code_and_name';
+                    if (mode === 'code_only') return order.customer_code;
+                    if (mode === 'name_only') return order.customer_name;
+                    return `${order.customer_code} - ${order.customer_name}`;
+                })();
                 document.getElementById('customerCode').value = order.customer_id;
                 document.getElementById('branchSearch').value = branchesData.find(b => b.id == order.branch_id)?.branch_name || '';
                 document.getElementById('branch').value = order.branch_id;
@@ -1742,14 +1777,29 @@ function initializePage(permissions) {
         // Show options when clicking on search input
         searchInput.addEventListener('click', function (e) {
             e.stopPropagation();
+            searchInput.select();
             optionsContainer.style.display = 'block';
             filterOptions();
         });
 
         // Show options when input receives focus (tab navigation)
         searchInput.addEventListener('focus', function (e) {
+            searchInput._prevValue = searchInput.value;
+            searchInput.value = '';
             optionsContainer.style.display = 'block';
             filterOptions();
+        });
+
+        // Restore previous value on blur if nothing new selected
+        searchInput.addEventListener('blur', function () {
+            setTimeout(() => {
+                if (optionsContainer.style.display === 'none' && !hiddenInput._justSelected) {
+                    if (!hiddenInput.value && searchInput._prevValue) {
+                        searchInput.value = searchInput._prevValue;
+                    }
+                }
+                hiddenInput._justSelected = false;
+            }, 200);
         });
 
         // Handle keyboard navigation
@@ -1779,6 +1829,9 @@ function initializePage(permissions) {
             visibleOptions.forEach((option, index) => {
                 option.style.backgroundColor = index === selectedIndex ? '#1a6cdc' : ''; option.style.color = index === selectedIndex ? 'white' : '';
             });
+            if (selectedIndex >= 0 && visibleOptions[selectedIndex]) {
+                visibleOptions[selectedIndex].scrollIntoView({ block: 'nearest' });
+            }
         }
 
         // Filter options based on search input
@@ -1796,6 +1849,8 @@ function initializePage(permissions) {
                 // Set the search input to display the selected option
                 searchInput.value = displayText;
                 hiddenInput.value = value;
+                hiddenInput._justSelected = true;
+                optionsContainer.style.display = 'none';
 
                 // Update related fields for customer selection
                 if (hiddenInputId === 'customerCode') {
@@ -2595,11 +2650,14 @@ function initializePage(permissions) {
             optionsContainer.style.width = rect.width + 'px';
             optionsContainer.style.display = 'block';
 
+            searchInput.select();
             filterOptions();
         });
 
         // Show options when input receives focus (tab navigation)
         searchInput.addEventListener('focus', function (e) {
+            searchInput._prevValue = searchInput.value;
+            searchInput.value = '';
             // Position dropdown relative to input
             const rect = searchInput.getBoundingClientRect();
             optionsContainer.style.top = (rect.bottom + window.scrollY) + 'px';
@@ -2608,6 +2666,18 @@ function initializePage(permissions) {
             optionsContainer.style.display = 'block';
 
             filterOptions();
+        });
+
+        // Restore previous value on blur if nothing new selected
+        searchInput.addEventListener('blur', function () {
+            setTimeout(() => {
+                if (optionsContainer.style.display === 'none' && !hiddenInput._justSelected) {
+                    if (!hiddenInput.value && searchInput._prevValue) {
+                        searchInput.value = searchInput._prevValue;
+                    }
+                }
+                hiddenInput._justSelected = false;
+            }, 200);
         });
 
         // Auto-search on typing for speed
@@ -2653,6 +2723,9 @@ function initializePage(permissions) {
             visibleOptions.forEach((option, index) => {
                 option.style.backgroundColor = index === selectedIndex ? '#1a6cdc' : ''; option.style.color = index === selectedIndex ? 'white' : '';
             });
+            if (selectedIndex >= 0 && visibleOptions[selectedIndex]) {
+                visibleOptions[selectedIndex].scrollIntoView({ block: 'nearest' });
+            }
         }
 
         // Filter options based on search input
@@ -4129,6 +4202,11 @@ function loadInvoiceSettings() {
     const productDisplayMode = localStorage.getItem('productDisplayMode') || 'code_and_name';
     const displayRadio = document.querySelector(`input[name="productDisplayMode"][value="${productDisplayMode}"]`);
     if (displayRadio) displayRadio.checked = true;
+
+    // Load customer display preference
+    const customerDisplayMode = localStorage.getItem('customerDisplayMode') || 'code_name_address';
+    const customerDisplayRadio = document.querySelector(`input[name="customerDisplayMode"][value="${customerDisplayMode}"]`);
+    if (customerDisplayRadio) customerDisplayRadio.checked = true;
     
     // Load other settings
     document.getElementById('enableTradeOfferAmount').checked = localStorage.getItem('enableTradeOfferAmount') === 'true';
@@ -4162,6 +4240,11 @@ function saveInvoiceSettings() {
     const selectedDisplayMode = document.querySelector('input[name="productDisplayMode"]:checked')?.value || 'code_and_name';
     const previousDisplayMode = localStorage.getItem('productDisplayMode');
     localStorage.setItem('productDisplayMode', selectedDisplayMode);
+
+    // Save customer display preference
+    const selectedCustomerDisplayMode = document.querySelector('input[name="customerDisplayMode"]:checked')?.value || 'code_and_name';
+    const previousCustomerDisplayMode = localStorage.getItem('customerDisplayMode');
+    localStorage.setItem('customerDisplayMode', selectedCustomerDisplayMode);
     
     // Save other settings
     localStorage.setItem('enableTradeOfferAmount', document.getElementById('enableTradeOfferAmount').checked);
@@ -4180,6 +4263,10 @@ function saveInvoiceSettings() {
     // Refresh product dropdowns if display mode changed
     if (previousDisplayMode !== selectedDisplayMode) {
         refreshProductDisplayInDropdowns();
+    }
+    // Refresh customer dropdown if display mode changed
+    if (previousCustomerDisplayMode !== selectedCustomerDisplayMode) {
+        refreshCustomerDisplayInDropdown();
     }
 }
 
@@ -4227,6 +4314,26 @@ function refreshProductDisplayInDropdowns() {
             
             dropdownOptions.innerHTML = newOptionsHtml;
         }
+    }
+}
+
+// Refresh customer display format in dropdown
+function refreshCustomerDisplayInDropdown() {
+    const codeOptions = document.getElementById('customerCodeOptions');
+    if (!codeOptions) return;
+
+    Array.from(codeOptions.getElementsByClassName('dropdown-option')).forEach(option => {
+        const customerId = option.getAttribute('data-value');
+        const customer = customersData.find(c => c.id == customerId);
+        if (customer) option.textContent = getCustomerDisplayText(customer);
+    });
+
+    // Update search input if a customer is already selected
+    const hiddenInput = document.getElementById('customerCode');
+    const searchInput = document.getElementById('customerCodeSearch');
+    if (hiddenInput?.value && searchInput) {
+        const customer = customersData.find(c => c.id == hiddenInput.value);
+        if (customer) searchInput.value = getCustomerDisplayText(customer);
     }
 }
 
@@ -5210,7 +5317,7 @@ async function loadCustomers() {
                 codeOption.setAttribute('data-supplier-man', customer.supplier_man_id || '');
                 codeOption.setAttribute('data-credit-limit', customer.credit_limit || 0);
                 codeOption.setAttribute('data-withholding-tax', customer.advance_income_tax_percentage || 0);
-                codeOption.textContent = `${customer.customer_code} | ${customer.customer_name} | ${customer.address || 'N/A'}`;
+                codeOption.textContent = getCustomerDisplayText(customer);
                 
                 if (customer.id == 613) {
                     console.log('Customer 613 loaded:', customer);
@@ -5685,6 +5792,9 @@ function initTableDropdownDynamic(container, row) {
         visibleOptions.forEach((option, index) => {
             option.style.backgroundColor = index === selectedIndex ? 'var(--surface-1)' : '';
         });
+        if (selectedIndex >= 0 && visibleOptions[selectedIndex]) {
+            visibleOptions[selectedIndex].scrollIntoView({ block: 'nearest' });
+        }
     }
     
     searchInput.addEventListener('input', function() {
@@ -5917,14 +6027,14 @@ async function quickAddCustomer() {
                 newOpt.setAttribute('data-supplier-man', c.supplier_man_id || '');
                 newOpt.setAttribute('data-credit-limit', c.credit_limit || 0);
                 newOpt.setAttribute('data-withholding-tax', c.advance_income_tax_percentage || 0);
-                newOpt.textContent = `${c.customer_code} | ${c.customer_name} | ${c.address || 'N/A'}`;
+                newOpt.textContent = getCustomerDisplayText(c);
                 codeOptions.appendChild(newOpt);
             }
 
             // Auto-select the newly created customer
             const searchInput = document.getElementById('customerCodeSearch');
             const hiddenInput = document.getElementById('customerCode');
-            if (searchInput) searchInput.value = `${c.customer_code} | ${c.customer_name} | ${c.address || 'N/A'}`;
+            if (searchInput) searchInput.value = getCustomerDisplayText(c);
             if (hiddenInput) hiddenInput.value = c.id;
 
             alert(`Customer "${c.customer_name}" added successfully!\nCode: ${c.customer_code}`);

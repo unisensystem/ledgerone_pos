@@ -8,7 +8,7 @@ class DefaultFieldsAutofill {
     constructor() {
         this.storageKey = 'invoiceDefaultFields';
         this.settingsKey = 'invoiceDefaultFieldsSettings';
-        this.fieldsToTrack = ['invoiceType', 'branch', 'areaCity', 'brand', 'salesOfficer', 'supplierMan'];
+        this.fieldsToTrack = ['company', 'invoiceType', 'branch', 'areaCity', 'brand', 'salesOfficer', 'supplierMan'];
         this.initializeListeners();
         this.setupPageVisibilityListener();
     }
@@ -86,7 +86,7 @@ class DefaultFieldsAutofill {
      * Setup special listeners for searchable dropdowns
      */
     setupSearchableDropdownListeners() {
-        ['branch', 'areaCity'].forEach(fieldId => {
+        ['company', 'branch', 'areaCity'].forEach(fieldId => {
             const hiddenField = document.getElementById(fieldId);
             const searchInput = document.getElementById(`${fieldId}Search`);
             const optionsContainer = document.getElementById(`${fieldId}Options`);
@@ -119,10 +119,9 @@ class DefaultFieldsAutofill {
         // For searchable dropdowns, also get the display text
         let valueToSave = field.value;
         
-        if (fieldId === 'branch' || fieldId === 'areaCity') {
+        if (fieldId === 'company' || fieldId === 'branch' || fieldId === 'areaCity') {
             const searchInput = document.getElementById(`${fieldId}Search`);
             if (searchInput && searchInput.value) {
-                // For searchable dropdowns, we store the hidden field value
                 valueToSave = field.value;
             }
         }
@@ -254,8 +253,8 @@ class DefaultFieldsAutofill {
             return;
         }
 
-        // For searchable dropdowns (branch, areaCity)
-        if (fieldId === 'branch' || fieldId === 'areaCity') {
+        // For searchable dropdowns (company, branch, areaCity)
+        if (fieldId === 'company' || fieldId === 'branch' || fieldId === 'areaCity') {
             this.setSearchableDropdownValue(fieldId, value);
         } else {
             // For regular select fields
@@ -292,10 +291,12 @@ class DefaultFieldsAutofill {
 
             // Find matching option text
             let matchedText = value;
+            let matchedOption = null;
             options.forEach(option => {
                 const optionValue = option.getAttribute('data-value');
                 if (optionValue === value) {
                     matchedText = option.textContent.trim();
+                    matchedOption = option;
                 }
             });
 
@@ -304,6 +305,14 @@ class DefaultFieldsAutofill {
 
             // Trigger change event
             field.dispatchEvent(new Event('change', { bubbles: true }));
+
+            // If areaCity, trigger customer filter using option's data attributes
+            if (fieldId === 'areaCity' && matchedOption && typeof window.filterCustomersByAreaCity === 'function') {
+                const filterType = matchedOption.getAttribute('data-filter-type');
+                const cityId     = matchedOption.getAttribute('data-city-id');
+                const areaId     = matchedOption.getAttribute('data-area-id');
+                window.filterCustomersByAreaCity(filterType, cityId, areaId);
+            }
 
             console.log(`✓ Set searchable dropdown ${fieldId} to: ${value} (${matchedText})`);
         };

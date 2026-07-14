@@ -133,6 +133,7 @@ function updateSummaryDisplay() {
     let html = '';
 
     const fieldLabels = {
+        company: 'Company',
         invoiceType: 'Invoice Type',
         branch: 'Branch',
         areaCity: 'Area / City',
