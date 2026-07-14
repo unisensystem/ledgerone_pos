@@ -21,7 +21,10 @@ if (!$user_id || !$tenant_id) {
 
 try {
     $company_id = !empty($_GET['company_id']) ? $_GET['company_id'] : null;
-    
+    $date_range = $_GET['date_range'] ?? 'all';
+    $date_from  = $_GET['date_from'] ?? null;
+    $date_to    = $_GET['date_to'] ?? null;
+
     // Get currency symbol
     $stmt = $pdo->prepare("
         SELECT c.symbol 
@@ -33,12 +36,31 @@ try {
     $currency = $stmt->fetch();
     $currency_symbol = $currency['symbol'] ?? '$';
 
-    // Calculate aging for each invoice
-    $stmt = $pdo->prepare("
+    // Build date condition
+    $dateCondition = '';
+    $dateParams = [];
+
+    if ($date_from && $date_to) {
+        $dateCondition = ' AND {date_col} BETWEEN ? AND ?';
+        $dateParams = [$date_from, $date_to];
+    } elseif ($date_range === '30days') {
+        $dateCondition = ' AND {date_col} >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)';
+    } elseif ($date_range === '90days') {
+        $dateCondition = ' AND {date_col} >= DATE_SUB(CURDATE(), INTERVAL 90 DAY)';
+    }
+
+    $companyCondition = $company_id ? ' AND {company_col} = ?' : '';
+
+    $siDateCond = str_replace('{date_col}', 'si.sale_date', $dateCondition);
+    $obiDateCond = str_replace('{date_col}', 'obi.invoice_date', $dateCondition);
+    $siCompCond = str_replace('{company_col}', 'si.company_id', $companyCondition);
+    $obiCompCond = str_replace('{company_col}', 'c.company_id', $companyCondition);
+
+    $sql = "
         SELECT 
             si.id,
             si.bill_no,
-            si.sale_date,
+            si.sale_date as invoice_date,
             si.net_amount,
             c.customer_code,
             c.customer_name,
@@ -50,16 +72,17 @@ try {
         JOIN customers c ON si.customer_id = c.id
         LEFT JOIN receive_voucher rv ON rv.bill_no = si.bill_no AND rv.tenant_id = ?
         WHERE si.tenant_id = ? AND si.status = 'Posted'
-        " . ($company_id ? " AND si.company_id = ?" : "") . "
+        {$siDateCond}
+        {$siCompCond}
         GROUP BY si.id
-        HAVING (si.net_amount - paid_amount) > 0 AND DATEDIFF(CURDATE(), si.sale_date) >= 15
-        
+        HAVING (si.net_amount - paid_amount) > 0
+
         UNION ALL
-        
+
         SELECT 
             obi.id,
             obi.invoice_number as bill_no,
-            obi.invoice_date as sale_date,
+            obi.invoice_date,
             obi.debit as net_amount,
             c.customer_code,
             c.customer_name,
@@ -71,80 +94,93 @@ try {
         JOIN customers c ON obi.customer_id = c.id
         LEFT JOIN receive_voucher rv ON rv.bill_no = obi.invoice_number AND rv.tenant_id = ?
         WHERE obi.tenant_id = ?
-        " . ($company_id ? " AND c.company_id = ?" : "") . "
+        {$obiDateCond}
+        {$obiCompCond}
         GROUP BY obi.id
-        HAVING (obi.debit - paid_amount) > 0 AND DATEDIFF(CURDATE(), obi.invoice_date) >= 15
-        
+        HAVING (obi.debit - paid_amount) > 0
+
         ORDER BY days_overdue DESC
-    ");
+    ";
+
     $params = [$tenant_id, $tenant_id];
+    $params = array_merge($params, $dateParams);
     if ($company_id) $params[] = $company_id;
     $params[] = $tenant_id;
     $params[] = $tenant_id;
+    $params = array_merge($params, $dateParams);
     if ($company_id) $params[] = $company_id;
+
+    $stmt = $pdo->prepare($sql);
     $stmt->execute($params);
     $invoices = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
     $reportData = [];
     $summary = [
-        'total_overdue' => 0,
-        'bucket_15' => 0,
-        'bucket_25' => 0,
-        'bucket_45' => 0,
-        'count_15' => 0,
-        'count_25' => 0,
-        'count_45' => 0
+        'total_outstanding' => 0,
+        'bucket_current' => 0, 'count_current' => 0,
+        'bucket_1_15'    => 0, 'count_1_15'    => 0,
+        'bucket_16_30'   => 0, 'count_16_30'   => 0,
+        'bucket_31_45'   => 0, 'count_31_45'   => 0,
+        'bucket_45'      => 0, 'count_45'       => 0,
     ];
 
     foreach ($invoices as $index => $invoice) {
         $outstanding = $invoice['net_amount'] - $invoice['paid_amount'];
         $days = (int)$invoice['days_overdue'];
-        
-        // Determine bucket
-        $bucket = '<15';
-        if ($days >= 45) {
+
+        if ($days <= 0) {
+            $bucket = 'current';
+            $summary['bucket_current'] += $outstanding;
+            $summary['count_current']++;
+        } elseif ($days <= 15) {
+            $bucket = '1-15';
+            $summary['bucket_1_15'] += $outstanding;
+            $summary['count_1_15']++;
+        } elseif ($days <= 30) {
+            $bucket = '16-30';
+            $summary['bucket_16_30'] += $outstanding;
+            $summary['count_16_30']++;
+        } elseif ($days <= 45) {
+            $bucket = '31-45';
+            $summary['bucket_31_45'] += $outstanding;
+            $summary['count_31_45']++;
+        } else {
             $bucket = '45+';
             $summary['bucket_45'] += $outstanding;
             $summary['count_45']++;
-        } elseif ($days >= 35) {
-            $bucket = '35+';
-        } elseif ($days >= 25) {
-            $bucket = '25+';
-            $summary['bucket_25'] += $outstanding;
-            $summary['count_25']++;
-        } elseif ($days >= 15) {
-            $bucket = '15+';
-            $summary['bucket_15'] += $outstanding;
-            $summary['count_15']++;
         }
 
-        $summary['total_overdue'] += $outstanding;
+        $summary['total_outstanding'] += $outstanding;
 
         $reportData[] = [
-            'id' => $index + 1,
+            'id'           => $index + 1,
             'customerCode' => $invoice['customer_code'],
             'customerName' => $invoice['customer_name'],
-            'address' => $invoice['address'] ?? 'N/A',
-            'invoiceNo' => $invoice['bill_no'],
-            'invoiceDate' => date('Y-m-d', strtotime($invoice['sale_date'])),
-            'type' => $invoice['invoice_type'],
-            'amount' => $currency_symbol . number_format($outstanding, 2),
-            'daysOverdue' => $days,
-            'bucket' => $bucket
+            'address'      => $invoice['address'] ?? 'N/A',
+            'invoiceNo'    => $invoice['bill_no'],
+            'invoiceDate'  => $invoice['invoice_date'],
+            'type'         => $invoice['invoice_type'],
+            'amount'       => $currency_symbol . number_format($outstanding, 2),
+            'daysOverdue'  => $days,
+            'bucket'       => $bucket
         ];
     }
 
     echo json_encode([
         'success' => true,
-        'data' => $reportData,
+        'data'    => $reportData,
         'summary' => [
-            'total_overdue' => $currency_symbol . number_format($summary['total_overdue'], 2),
-            'bucket_15' => $currency_symbol . number_format($summary['bucket_15'], 2),
-            'bucket_25' => $currency_symbol . number_format($summary['bucket_25'], 2),
-            'bucket_45' => $currency_symbol . number_format($summary['bucket_45'], 2),
-            'count_15' => $summary['count_15'],
-            'count_25' => $summary['count_25'],
-            'count_45' => $summary['count_45']
+            'total_outstanding' => $currency_symbol . number_format($summary['total_outstanding'], 2),
+            'bucket_current'    => $currency_symbol . number_format($summary['bucket_current'], 2),
+            'bucket_1_15'       => $currency_symbol . number_format($summary['bucket_1_15'], 2),
+            'bucket_16_30'      => $currency_symbol . number_format($summary['bucket_16_30'], 2),
+            'bucket_31_45'      => $currency_symbol . number_format($summary['bucket_31_45'], 2),
+            'bucket_45'         => $currency_symbol . number_format($summary['bucket_45'], 2),
+            'count_current'     => $summary['count_current'],
+            'count_1_15'        => $summary['count_1_15'],
+            'count_16_30'       => $summary['count_16_30'],
+            'count_31_45'       => $summary['count_31_45'],
+            'count_45'          => $summary['count_45'],
         ],
         'currency_symbol' => $currency_symbol
     ]);

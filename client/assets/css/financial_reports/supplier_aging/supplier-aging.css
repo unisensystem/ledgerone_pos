@@ -200,7 +200,13 @@ h3 {
 
 @media (min-width: 768px) {
   .buckets-summary {
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (min-width: 1200px) {
+  .buckets-summary {
+    grid-template-columns: repeat(6, 1fr);
   }
 }
 
@@ -294,6 +300,11 @@ tbody tr:last-child td {
 .badge-primary {
   background-color: #e8f1ff;
   color: var(--primary);
+}
+
+.badge-success {
+  background-color: #e6f9f0;
+  color: var(--success);
 }
 
 .badge-warning {

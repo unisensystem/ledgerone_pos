@@ -294,6 +294,18 @@ if (!$user_id) {
                             </label>
                             <input type="number" id="aitPercent" step="0.01" min="0" max="100" placeholder="0.00">
                         </div>
+
+                        <div class="form-group col-6">
+                            <label for="partyType">
+                                <i class="fas fa-building"></i>
+                                Party Type
+                            </label>
+                            <select id="partyType">
+                                <option value="">Select Party Type</option>
+                                <option value="registered_company">Registered Company</option>
+                                <option value="unregistered">Unregistered</option>
+                            </select>
+                        </div>
                     </div>
 
                     <!-- Sub Accounts Section -->

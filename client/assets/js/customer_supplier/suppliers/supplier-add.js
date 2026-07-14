@@ -18,6 +18,7 @@ document.addEventListener('DOMContentLoaded', function () {
         { id: 'openingDebit',     label: 'Opening Debit Amount',   visible: true },
         { id: 'openingCredit',    label: 'Opening Credit Amount',  visible: true },
         { id: 'aitPercent',       label: 'AIT %',                  visible: false },
+        { id: 'partyType',        label: 'Party Type',             visible: true },
         { id: 'subAccountsTable', label: '📋 Sub Accounts',        visible: true },
         { id: 'blacklist',        label: 'Blacklist Supplier',     visible: true },
     ];
@@ -503,6 +504,7 @@ document.addEventListener('DOMContentLoaded', function () {
             openingDebit: document.getElementById('openingDebit').value || 0,
             openingCredit: document.getElementById('openingCredit').value || 0,
             aitPercent: document.getElementById('aitPercent').value || 0,
+            partyType: document.getElementById('partyType').value || null,
             blacklist: document.getElementById('blacklist').checked,
             subAccounts: subAccounts
         };

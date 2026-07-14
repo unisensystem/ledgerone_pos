@@ -64,7 +64,7 @@ $currency_symbol = $currency['symbol'];
                             </a>
                         </div>
                     </div>
-                    <button class="btn btn-primary">
+                    <button class="btn btn-primary" id="applyFiltersBtn">
                         <i class="fas fa-filter"></i> Apply Filters
                     </button>
                 </div>
@@ -80,36 +80,37 @@ $currency_symbol = $currency['symbol'];
                 
                 <div class="form-group">
                     <label class="form-label">Date Range</label>
-                    <select class="form-select">
+                    <select class="form-select" id="dateRangeFilter">
                         <option value="all">All Time</option>
                         <option value="30days" selected>Last 30 Days</option>
                         <option value="90days">Last 90 Days</option>
                         <option value="custom">Custom Range</option>
                     </select>
                 </div>
-                
-                <div class="form-group">
-                    <label class="form-label">Supplier Type</label>
-                    <select class="form-select">
-                        <option value="all">All Suppliers</option>
-                        <option value="regular">Regular</option>
-                        <option value="vip">VIP</option>
-                        <option value="new">New</option>
-                    </select>
+
+                <div class="form-group" id="customDateGroup" style="display:none;">
+                    <label class="form-label">From</label>
+                    <input type="date" class="form-select" id="dateFrom">
+                </div>
+
+                <div class="form-group" id="customDateGroupTo" style="display:none;">
+                    <label class="form-label">To</label>
+                    <input type="date" class="form-select" id="dateTo">
                 </div>
                 
                 <div class="form-group">
                     <label class="form-label">Overdue Bucket</label>
-                    <select class="form-select">
+                    <select class="form-select" id="bucketFilter">
                         <option value="all">All Buckets</option>
-                        <option value="15+">15+ Days</option>
-                        <option value="25+">25+ Days</option>
-                        <option value="35+">35+ Days</option>
+                        <option value="current">Current (Today)</option>
+                        <option value="1-15">1 - 15 Days</option>
+                        <option value="16-30">16 - 30 Days</option>
+                        <option value="31-45">31 - 45 Days</option>
                         <option value="45+">45+ Days</option>
                     </select>
                 </div>
                 
-                <button class="btn btn-ghost">
+                <button class="btn btn-ghost" id="resetFiltersBtn">
                     <i class="fas fa-redo"></i> Reset Filters
                 </button>
             </div>
@@ -118,28 +119,35 @@ $currency_symbol = $currency['symbol'];
         <!-- Buckets Summary -->
         <h2>Overdue Summary</h2>
         <div class="buckets-summary">
-            <div class="bucket-card">
-                <div class="bucket-value">$42,850</div>
-                <div class="bucket-label">Total Overdue</div>
+            <div class="bucket-card" data-bucket="all">
+                <div class="bucket-value">$0.00</div>
+                <div class="bucket-label">Total Outstanding</div>
                 <div class="mt-2" style="font-size: 12px; color: var(--subtext);">Across all suppliers</div>
             </div>
-            
-            <div class="bucket-card">
-                <div class="bucket-value">$18,240</div>
-                <div class="bucket-label">15+ Days Overdue</div>
-                <div class="mt-2" style="font-size: 12px; color: var(--subtext);">12 invoices</div>
+            <div class="bucket-card" data-bucket="current">
+                <div class="bucket-value">$0.00</div>
+                <div class="bucket-label">Current (Today)</div>
+                <div class="mt-2" style="font-size: 12px; color: var(--subtext);">0 invoices</div>
             </div>
-            
-            <div class="bucket-card warning">
-                <div class="bucket-value">$14,750</div>
-                <div class="bucket-label">25+ Days Overdue</div>
-                <div class="mt-2" style="font-size: 12px; color: var(--subtext);">8 invoices</div>
+            <div class="bucket-card" data-bucket="1-15">
+                <div class="bucket-value">$0.00</div>
+                <div class="bucket-label">1 - 15 Days</div>
+                <div class="mt-2" style="font-size: 12px; color: var(--subtext);">0 invoices</div>
             </div>
-            
-            <div class="bucket-card error">
-                <div class="bucket-value">$9,860</div>
-                <div class="bucket-label">45+ Days Overdue</div>
-                <div class="mt-2" style="font-size: 12px; color: var(--subtext);">5 invoices</div>
+            <div class="bucket-card warning" data-bucket="16-30">
+                <div class="bucket-value">$0.00</div>
+                <div class="bucket-label">16 - 30 Days</div>
+                <div class="mt-2" style="font-size: 12px; color: var(--subtext);">0 invoices</div>
+            </div>
+            <div class="bucket-card warning" data-bucket="31-45">
+                <div class="bucket-value">$0.00</div>
+                <div class="bucket-label">31 - 45 Days</div>
+                <div class="mt-2" style="font-size: 12px; color: var(--subtext);">0 invoices</div>
+            </div>
+            <div class="bucket-card error" data-bucket="45+">
+                <div class="bucket-value">$0.00</div>
+                <div class="bucket-label">45+ Days</div>
+                <div class="mt-2" style="font-size: 12px; color: var(--subtext);">0 invoices</div>
             </div>
         </div>
         
@@ -161,6 +169,7 @@ $currency_symbol = $currency['symbol'];
                             <th>Supplier Name</th>
                             <th>Address</th>
                             <th>Invoice No</th>
+                            <th>Invoice Date</th>
                             <th>Type</th>
                             <th>Amount</th>
                             <th>Days Overdue</th>

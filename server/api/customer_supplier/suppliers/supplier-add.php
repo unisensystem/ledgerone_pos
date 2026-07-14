@@ -65,6 +65,7 @@ try {
         'opening_debit_amount' => floatval($input['openingDebit'] ?? 0),
         'opening_credit_amount' => floatval($input['openingCredit'] ?? 0),
         'ait_percent' => floatval($input['aitPercent'] ?? 0),
+        'party_type' => !empty($input['partyType']) ? trim($input['partyType']) : null,
         'is_blacklisted' => isset($input['blacklist']) && $input['blacklist'] === true ? 1 : 0,
         'created_by' => $user_id,
         'updated_by' => $user_id
@@ -77,7 +78,7 @@ try {
     $data['id'] = $new_id;
     
     // Insert supplier
-    $sql = "INSERT INTO suppliers (id, tenant_id, company_id, salesman_id, project_id, supplier_code, supplier_name, brand_name, address, primary_phone, secondary_phone, identity_card_no, email, opening_debit_amount, opening_credit_amount, ait_percent, is_blacklisted, created_by, updated_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+    $sql = "INSERT INTO suppliers (id, tenant_id, company_id, salesman_id, project_id, supplier_code, supplier_name, brand_name, address, primary_phone, secondary_phone, identity_card_no, email, opening_debit_amount, opening_credit_amount, ait_percent, party_type, is_blacklisted, created_by, updated_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
     
     $stmt = $pdo->prepare($sql);
     $stmt->execute([
@@ -97,6 +98,7 @@ try {
         $data['opening_debit_amount'],
         $data['opening_credit_amount'],
         $data['ait_percent'],
+        $data['party_type'],
         $data['is_blacklisted'],
         $data['created_by'],
         $data['updated_by']
