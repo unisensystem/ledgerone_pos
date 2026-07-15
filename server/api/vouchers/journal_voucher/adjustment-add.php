@@ -27,56 +27,60 @@ if (!$data) {
 }
 
 // ── Inputs ────────────────────────────────────────────────────────────────────
+$adj_mode          = $data['adj_mode']          ?? 'single'; // 'single' | 'cross'
 $voucher_date      = $data['voucher_date']      ?? '';
 $voucher_number    = $data['voucher_number']    ?? '';
 $company_id        = $data['company_id']        ?? null;
-$party_type        = $data['party_type']        ?? 'customer'; // 'customer' | 'supplier'
+$description       = trim($data['description']  ?? '');
+$amount            = floatval($data['amount']   ?? 0);
+
+// Party 1
+$party_type        = $data['party_type']        ?? 'customer';
 $party_id          = intval($data['party_id']   ?? 0);
 $party_code        = trim($data['party_code']   ?? '');
-$sub_account_id    = !empty($data['sub_account_id']) ? intval($data['sub_account_id']) : null;
-$adj_type          = $data['adj_type']          ?? 'debit';   // 'debit' | 'credit'
-$contra_account_id = intval($data['contra_account_id'] ?? 0);
-$amount            = floatval($data['amount']   ?? 0);
-$description       = trim($data['description']  ?? '');
+$sub_account_id    = !empty($data['sub_account_id'])  ? intval($data['sub_account_id'])  : null;
+
+// Party 2 (cross mode)
+$party_type2       = $data['party_type2']       ?? 'customer';
+$party_id2         = !empty($data['party_id2'])  ? intval($data['party_id2'])  : null;
+$party_code2       = trim($data['party_code2']  ?? '');
+$sub_account_id2   = !empty($data['sub_account_id2']) ? intval($data['sub_account_id2']) : null;
+
+// Single mode
+$adj_type          = $data['adj_type']          ?? 'debit';
+$contra_account_id = !empty($data['contra_account_id']) ? intval($data['contra_account_id']) : null;
 
 // ── Validate ──────────────────────────────────────────────────────────────────
-if (!$voucher_date || !$company_id || !$party_id || !$contra_account_id || $amount <= 0 || !$description) {
+if (!$voucher_date || !$company_id || !$party_id || $amount <= 0 || !$description) {
     http_response_code(400);
     echo json_encode(['error' => 'Missing required fields']);
     exit();
 }
 
-// ── Party account ID ──────────────────────────────────────────────────────────
-// Customer  → Trade Debtors  = account_id 2
-// Supplier  → Trade Creditors = account_id 14
-$party_account_id = ($party_type === 'customer') ? 2 : 14;
-
-// ── Determine debit/credit sides ──────────────────────────────────────────────
-//
-// Customer adj_type = 'debit'  → DR party account (2),  CR contra
-// Customer adj_type = 'credit' → CR party account (2),  DR contra
-//
-// Supplier adj_type = 'debit'  → DR party account (14), CR contra  (reduces payable)
-// Supplier adj_type = 'credit' → CR party account (14), DR contra  (increases payable)
-//
-// Both cases: same logic — adj_type tells which side the PARTY account goes on.
-
-if ($adj_type === 'debit') {
-    $party_debit  = $amount;
-    $party_credit = 0.00;
-    $contra_debit  = 0.00;
-    $contra_credit = $amount;
+if ($adj_mode === 'cross') {
+    if (!$party_id2) {
+        http_response_code(400);
+        echo json_encode(['error' => 'Party 2 required for cross-party adjustment']);
+        exit();
+    }
 } else {
-    $party_debit  = 0.00;
-    $party_credit = $amount;
-    $contra_debit  = $amount;
-    $contra_credit = 0.00;
+    if (!$contra_account_id) {
+        http_response_code(400);
+        echo json_encode(['error' => 'Contra account required for single-party adjustment']);
+        exit();
+    }
 }
+
+// ── Account IDs ───────────────────────────────────────────────────────────────
+// Customer → Trade Debtors  = account_id 2
+// Supplier → Trade Creditors = account_id 14
+$acct1 = ($party_type  === 'customer') ? 2 : 14;
+$acct2 = ($party_type2 === 'customer') ? 2 : 14;
 
 try {
     $pdo->beginTransaction();
 
-    // ── Generate voucher number if not provided ───────────────────────────────
+    // ── Generate voucher number ───────────────────────────────────────────────
     if (!$voucher_number || $voucher_number === 'Auto-generated') {
         $year = date('Y');
         $stmt = $pdo->prepare(
@@ -94,38 +98,68 @@ try {
         $voucher_number = "ADJ-{$year}-" . str_pad($next, 3, '0', STR_PAD_LEFT);
     }
 
-    // ── Insert into journal_voucher ───────────────────────────────────────────
+    // ── Insert journal_voucher ────────────────────────────────────────────────
     $stmt = $pdo->prepare(
         "INSERT INTO journal_voucher
-            (tenant_id, company_id, voucher_number, voucher_date, description, total_debit, total_credit, created_by, status, party_type, party_id)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'posted', ?, ?)"
+            (tenant_id, company_id, voucher_number, voucher_date, description, total_debit, total_credit, created_by, status, party_type, party_id, adj_mode)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'posted', ?, ?, ?)"
     );
     $stmt->execute([
         $tenant_id, $company_id, $voucher_number, $voucher_date,
-        $description, $amount, $amount, $user_id, $party_type, $party_id
+        $description, $amount, $amount, $user_id, $party_type, $party_id, $adj_mode
     ]);
     $voucher_id = $pdo->lastInsertId();
 
-    // ── Insert journal_voucher_line rows ──────────────────────────────────────
     $stmtLine = $pdo->prepare(
         "INSERT INTO journal_voucher_line (tenant_id, voucher_id, account_id, debit, credit)
          VALUES (?, ?, ?, ?, ?)"
     );
-    // Party line
-    $stmtLine->execute([$tenant_id, $voucher_id, $party_account_id, $party_debit, $party_credit]);
-    // Contra line
-    $stmtLine->execute([$tenant_id, $voucher_id, $contra_account_id, $contra_debit, $contra_credit]);
-
-    // ── Insert into accounting_ledger ─────────────────────────────────────────
     $stmtLedger = $pdo->prepare(
         "INSERT INTO accounting_ledger
             (tenant_id, transaction_type, reference_table, reference_id, account_id, date, description, debit, credit)
          VALUES (?, 'Journal Voucher', 'journal_voucher', ?, ?, ?, ?, ?, ?)"
     );
-    // Party ledger entry
-    $stmtLedger->execute([$tenant_id, $voucher_id, $party_account_id, $voucher_date, $description, $party_debit, $party_credit]);
-    // Contra ledger entry
-    $stmtLedger->execute([$tenant_id, $voucher_id, $contra_account_id, $voucher_date, $description, $contra_debit, $contra_credit]);
+
+    if ($adj_mode === 'cross') {
+        // adj_type tells which side Party1 goes:
+        // 'debit'  => Party1 DR, Party2 CR
+        // 'credit' => Party1 CR, Party2 DR
+        if ($adj_type === 'debit') {
+            $p1_debit = $amount; $p1_credit = 0.00;
+            $p2_debit = 0.00;   $p2_credit = $amount;
+        } else {
+            $p1_debit = 0.00;   $p1_credit = $amount;
+            $p2_debit = $amount; $p2_credit = 0.00;
+        }
+
+        // journal_voucher_line
+        $stmtLine->execute([$tenant_id, $voucher_id, $acct1, $p1_debit, $p1_credit]);
+        $stmtLine->execute([$tenant_id, $voucher_id, $acct2, $p2_debit, $p2_credit]);
+
+        // accounting_ledger
+        $stmtLedger->execute([$tenant_id, $voucher_id, $acct1, $voucher_date, $description, $p1_debit, $p1_credit]);
+        $stmtLedger->execute([$tenant_id, $voucher_id, $acct2, $voucher_date, $description, $p2_debit, $p2_credit]);
+
+        // Store party2 info
+        $pdo->prepare("UPDATE journal_voucher SET party_type2 = ?, party_id2 = ? WHERE id = ?")
+            ->execute([$party_type2, $party_id2, $voucher_id]);
+
+    } else {
+        // ── Single-party ─────────────────────────────────────────────────────
+        if ($adj_type === 'debit') {
+            $party_debit = $amount; $party_credit = 0.00;
+            $contra_debit = 0.00;  $contra_credit = $amount;
+        } else {
+            $party_debit = 0.00;   $party_credit = $amount;
+            $contra_debit = $amount; $contra_credit = 0.00;
+        }
+
+        $stmtLine->execute([$tenant_id, $voucher_id, $acct1,           $party_debit,  $party_credit]);
+        $stmtLine->execute([$tenant_id, $voucher_id, $contra_account_id, $contra_debit, $contra_credit]);
+
+        $stmtLedger->execute([$tenant_id, $voucher_id, $acct1,           $voucher_date, $description, $party_debit,  $party_credit]);
+        $stmtLedger->execute([$tenant_id, $voucher_id, $contra_account_id, $voucher_date, $description, $contra_debit, $contra_credit]);
+    }
 
     $pdo->commit();
 
@@ -139,8 +173,5 @@ try {
 } catch (Exception $e) {
     $pdo->rollBack();
     http_response_code(500);
-    echo json_encode([
-        'error'   => 'Database error',
-        'message' => $e->getMessage()
-    ]);
+    echo json_encode(['error' => 'Database error', 'message' => $e->getMessage()]);
 }

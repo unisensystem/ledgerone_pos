@@ -65,6 +65,7 @@ try {
                 opening_debit_amount = ?, 
                 opening_credit_amount = ?, 
                 ait_percent = ?, 
+                party_type = ?,
                 is_blacklisted = ?, 
                 updated_by = ?, 
                 updated_at = CURRENT_TIMESTAMP 
@@ -85,6 +86,7 @@ try {
             floatval($input['openingDebit'] ?? 0),
             floatval($input['openingCredit'] ?? 0),
             floatval($input['aitPercent'] ?? 0),
+            !empty($input['partyType']) ? trim($input['partyType']) : null,
             isset($input['blacklist']) && $input['blacklist'] === true ? 1 : 0,
             $user_id,
             $supplier_id,

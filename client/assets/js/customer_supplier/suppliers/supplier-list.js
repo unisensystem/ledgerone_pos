@@ -160,6 +160,10 @@ document.addEventListener('DOMContentLoaded', function () {
         document.getElementById('viewOpeningDebit').textContent = `${currencySymbol}${parseFloat(supplier.opening_debit_amount || 0).toFixed(2)}`;
         document.getElementById('viewOpeningCredit').textContent = `${currencySymbol}${parseFloat(supplier.opening_credit_amount || 0).toFixed(2)}`;
         document.getElementById('viewAitPercent').textContent = `${parseFloat(supplier.ait_percent || 0).toFixed(2)}%`;
+
+        // Party Type
+        const partyTypeMap = { registered_company: 'Registered Company', unregistered: 'Unregistered' };
+        document.getElementById('viewPartyType').textContent = partyTypeMap[supplier.party_type] || '-';
         document.getElementById('viewCurrentBalance').textContent = `${currencySymbol}${parseFloat(supplier.current_balance || 0).toFixed(2)}`;
 
         // Project
@@ -454,6 +458,7 @@ document.addEventListener('DOMContentLoaded', function () {
             openingDebit:   document.getElementById('editOpeningDebit').value  || 0,
             openingCredit:  document.getElementById('editOpeningCredit').value || 0,
             aitPercent:     document.getElementById('editAitPercent').value    || 0,
+            partyType:      document.getElementById('editPartyType').value      || null,
             blacklist:      document.getElementById('editBlacklist').checked,
             subAccounts
         };
@@ -550,6 +555,7 @@ document.addEventListener('DOMContentLoaded', function () {
         document.getElementById('editOpeningDebit').value  = supplier.opening_debit_amount  || 0;
         document.getElementById('editOpeningCredit').value = supplier.opening_credit_amount || 0;
         document.getElementById('editAitPercent').value    = supplier.ait_percent   || 0;
+        document.getElementById('editPartyType').value     = supplier.party_type    || '';
         document.getElementById('editBlacklist').checked   = supplier.is_blacklisted == 1;
 
         // Project

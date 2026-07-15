@@ -316,18 +316,35 @@ try {
                 else $total_credit += floatval($ev['total_amount']);
             }
 
-            // Journal voucher adjustments for this supplier
+            // Journal voucher adjustments for this supplier (single + cross-party)
             $adj_stmt = $pdo->prepare(
-                "SELECT COALESCE(SUM(al.debit),0) as adj_debit, COALESCE(SUM(al.credit),0) as adj_credit
-                 FROM accounting_ledger al
-                 JOIN journal_voucher jv ON al.reference_id = jv.id AND al.reference_table = 'journal_voucher'
-                 WHERE al.tenant_id = ? AND al.account_id = 14
-                   AND al.transaction_type = 'Journal Voucher'
-                   AND jv.party_type = 'supplier' AND jv.party_id = ?"
+                "SELECT
+                    COALESCE(SUM(CASE WHEN jv.adj_mode='single' OR (jv.adj_mode='cross' AND jv.party_type='supplier' AND jv.party_id=?
+                        AND jvl.id=(SELECT MIN(id) FROM journal_voucher_line WHERE voucher_id=jv.id AND account_id=14))
+                        OR (jv.adj_mode='cross' AND jv.party_type2='supplier' AND jv.party_id2=?
+                        AND jvl.id=(SELECT MAX(id) FROM journal_voucher_line WHERE voucher_id=jv.id AND account_id=14))
+                        THEN jvl.debit ELSE 0 END), 0) as adj_debit,
+                    COALESCE(SUM(CASE WHEN jv.adj_mode='single' OR (jv.adj_mode='cross' AND jv.party_type='supplier' AND jv.party_id=?
+                        AND jvl.id=(SELECT MIN(id) FROM journal_voucher_line WHERE voucher_id=jv.id AND account_id=14))
+                        OR (jv.adj_mode='cross' AND jv.party_type2='supplier' AND jv.party_id2=?
+                        AND jvl.id=(SELECT MAX(id) FROM journal_voucher_line WHERE voucher_id=jv.id AND account_id=14))
+                        THEN jvl.credit ELSE 0 END), 0) as adj_credit
+                 FROM journal_voucher jv
+                 JOIN journal_voucher_line jvl ON jvl.voucher_id = jv.id AND jvl.account_id = 14
+                 WHERE jv.tenant_id = ? AND jv.status = 'posted'
+                   AND (
+                       (jv.adj_mode = 'single' AND jv.party_type = 'supplier' AND jv.party_id = ?)
+                       OR (jv.adj_mode = 'cross' AND jv.party_type = 'supplier' AND jv.party_id = ?)
+                       OR (jv.adj_mode = 'cross' AND jv.party_type2 = 'supplier' AND jv.party_id2 = ?)
+                   )"
             );
-            $adj_stmt->execute([$tenant_id, $supplier['id']]);
+            $adj_stmt->execute([
+                $supplier['id'], $supplier['id'],
+                $supplier['id'], $supplier['id'],
+                $tenant_id,
+                $supplier['id'], $supplier['id'], $supplier['id']
+            ]);
             $adj_row = $adj_stmt->fetch(PDO::FETCH_ASSOC);
-            // Supplier is credit-normal: credit increases payable (negative closing), debit decreases it
             $adj_net = floatval($adj_row['adj_debit']) - floatval($adj_row['adj_credit']);
 
             $total_debit = $total_debit + $total_pdc;
@@ -612,24 +629,44 @@ try {
         $stmt = $pdo->prepare($ev_sql); $stmt->execute($ev_params);
         $expense_vouchers = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-        // Get journal voucher adjustments for this supplier
+        // Get journal voucher adjustments for this supplier (single + cross-party)
         $adj_sql = "SELECT jv.voucher_date as date,
                 CONCAT('Adjustment - ', jv.voucher_number) as description,
                 jv.voucher_number as reference,
-                al.debit, al.credit, 'adjustment' as type, null as sub_account_id, null as currency_id, null as invoice_id, null as return_id,
+                jvl.debit, jvl.credit,
+                'adjustment' as type, null as sub_account_id, null as currency_id, null as invoice_id, null as return_id,
                 jv.description as adj_note,
-                (
-                    SELECT a.name FROM journal_voucher_line jvl2
-                    JOIN accounts a ON a.id = jvl2.account_id
-                    WHERE jvl2.voucher_id = jv.id AND jvl2.account_id != 14
-                    LIMIT 1
-                ) as contra_account_name
-                FROM accounting_ledger al
-                JOIN journal_voucher jv ON al.reference_id = jv.id AND al.reference_table = 'journal_voucher'
-                WHERE al.tenant_id = ? AND al.account_id = 14
-                  AND al.transaction_type = 'Journal Voucher'
-                  AND jv.party_type = 'supplier' AND jv.party_id = ?";
-        $adj_params = [$tenant_id, $supplier_id];
+                CASE
+                    WHEN jv.adj_mode = 'cross' AND jv.party_type = 'supplier' AND jv.party_id = ? THEN
+                        CONCAT(UPPER(jv.party_type2), ': ', COALESCE(
+                            (SELECT customer_name FROM customers WHERE id = jv.party_id2 LIMIT 1),
+                            (SELECT supplier_name FROM suppliers WHERE id = jv.party_id2 LIMIT 1)
+                        ))
+                    WHEN jv.adj_mode = 'cross' AND jv.party_type2 = 'supplier' AND jv.party_id2 = ? THEN
+                        CONCAT(UPPER(jv.party_type), ': ', COALESCE(
+                            (SELECT customer_name FROM customers WHERE id = jv.party_id LIMIT 1),
+                            (SELECT supplier_name FROM suppliers WHERE id = jv.party_id LIMIT 1)
+                        ))
+                    ELSE (
+                        SELECT a.name FROM journal_voucher_line jvl2
+                        JOIN accounts a ON a.id = jvl2.account_id
+                        WHERE jvl2.voucher_id = jv.id AND jvl2.account_id != 14
+                        LIMIT 1
+                    )
+                END as contra_account_name
+                FROM journal_voucher jv
+                JOIN journal_voucher_line jvl ON jvl.voucher_id = jv.id AND jvl.account_id = 14
+                WHERE jv.tenant_id = ? AND jv.status = 'posted'
+                  AND (
+                      (jv.adj_mode = 'single' AND jv.party_type = 'supplier' AND jv.party_id = ?)
+                      OR
+                      (jv.adj_mode = 'cross' AND jv.party_type = 'supplier' AND jv.party_id = ?
+                       AND jvl.id = (SELECT MIN(id) FROM journal_voucher_line WHERE voucher_id = jv.id AND account_id = 14))
+                      OR
+                      (jv.adj_mode = 'cross' AND jv.party_type2 = 'supplier' AND jv.party_id2 = ?
+                       AND jvl.id = (SELECT MAX(id) FROM journal_voucher_line WHERE voucher_id = jv.id AND account_id = 14))
+                  )";
+        $adj_params = [$supplier_id, $supplier_id, $tenant_id, $supplier_id, $supplier_id, $supplier_id];
         if ($from_date && $to_date) {
             $adj_sql .= " AND jv.voucher_date BETWEEN ? AND ?";
             $adj_params[] = $from_date;

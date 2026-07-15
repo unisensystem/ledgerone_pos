@@ -49,10 +49,27 @@ if (!$user_id) { header('Location: ../../auth/login.html'); exit(); }
             </div>
         </div>
 
+        <!-- Adjustment Mode Toggle -->
         <div class="card">
-            <div class="card-title">Party Selection</div>
+            <div class="card-title">Adjustment Mode</div>
+            <div class="mode-toggle">
+                <button class="mode-btn active" id="btnSingleMode" data-mode="single">
+                    <i class="fas fa-user-edit"></i> Single Party Adjustment
+                </button>
+                <button class="mode-btn" id="btnCrossMode" data-mode="cross">
+                    <i class="fas fa-exchange-alt"></i> Cross Party Adjustment
+                </button>
+            </div>
+            <div class="mode-hint" id="modeHint">
+                <i class="fas fa-info-circle"></i>
+                <span id="modeHintText">Single party: adjust one customer or supplier balance against a contra account</span>
+            </div>
+        </div>
 
-            <!-- Party Type Toggle -->
+        <!-- Party 1 (always shown) -->
+        <div class="card">
+            <div class="card-title" id="party1CardTitle">Party Selection</div>
+
             <div class="party-toggle">
                 <button class="party-btn active" data-type="customer" id="btnCustomer">
                     <i class="fas fa-user"></i> Customer
@@ -85,20 +102,92 @@ if (!$user_id) { header('Location: ../../auth/login.html'); exit(); }
                         <span id="balanceLabel" class="balance-label"></span>
                     </div>
                 </div>
+                <!-- Single mode: new balance shown inside party1 card -->
+                <div class="form-group" id="newBalSingleGroup">
+                    <label>New Balance (After Adjustment)</label>
+                    <div class="balance-display">
+                        <span id="newBalSingleAmount">—</span>
+                        <span id="newBalSingleLabel" class="balance-label"></span>
+                    </div>
+                </div>
+                <!-- Cross mode: entry side badge + new balance shown inside party1 card -->
+                <div class="form-group" id="party1EntryGroup" style="display:none;">
+                    <label>Entry Side</label>
+                    <div class="entry-side-badge" id="party1EntryBadge"></div>
+                </div>
+                <div class="form-group" id="party1NewBalGroup" style="display:none;">
+                    <label>New Balance (After Adjustment)</label>
+                    <div class="balance-display" id="newBalanceDisplay">
+                        <span id="newBalanceAmount">—</span>
+                        <span id="newBalanceLabel" class="balance-label"></span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Party 2 (cross-party mode only) -->
+        <div class="card" id="party2Card" style="display:none;">
+            <div class="card-title">Party 2 Selection</div>
+
+            <div class="party-toggle">
+                <button class="party-btn active" data-type="customer" id="btnCustomer2">
+                    <i class="fas fa-user"></i> Customer
+                </button>
+                <button class="party-btn" data-type="supplier" id="btnSupplier2">
+                    <i class="fas fa-truck"></i> Supplier
+                </button>
+            </div>
+
+            <div class="form-grid" style="margin-top:20px;">
+                <div class="form-group">
+                    <label id="partyLabel2">Customer <span class="req">*</span></label>
+                    <div class="searchable-dropdown">
+                        <input type="text" id="partySearch2" placeholder="Search customer..." autocomplete="off">
+                        <div class="dropdown-list" id="partyDropdown2"></div>
+                    </div>
+                    <input type="hidden" id="partyId2">
+                    <input type="hidden" id="partyCode2">
+                </div>
+                <div class="form-group" id="subAccountGroup2" style="display:none;">
+                    <label>Sub Account</label>
+                    <select id="subAccount2">
+                        <option value="">All / Main Account</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Current Balance</label>
+                    <div class="balance-display" id="balanceDisplay2">
+                        <span id="balanceAmount2">—</span>
+                        <span id="balanceLabel2" class="balance-label"></span>
+                    </div>
+                </div>
+                <!-- Entry side badge + new balance inside party2 card -->
+                <div class="form-group" id="party2EntryGroup" style="display:none;">
+                    <label>Entry Side</label>
+                    <div class="entry-side-badge" id="party2EntryBadge"></div>
+                </div>
+                <div class="form-group" id="party2NewBalGroup" style="display:none;">
+                    <label>New Balance (After Adjustment)</label>
+                    <div class="balance-display" id="newBalanceDisplay2">
+                        <span id="newBalanceAmount2">—</span>
+                        <span id="newBalanceLabel2" class="balance-label"></span>
+                    </div>
+                </div>
             </div>
         </div>
 
         <div class="card">
             <div class="card-title">Adjustment Details</div>
             <div class="form-grid">
-                <div class="form-group">
-                    <label>Adjustment Type <span class="req">*</span></label>
+                <!-- Adj type: shown in both modes -->
+                <div class="form-group" id="adjTypeGroup">
+                    <label id="adjTypeLabel">Adjustment Type <span class="req">*</span></label>
                     <div class="adj-toggle">
                         <button class="adj-btn active debit-btn" data-type="debit" id="btnDebit">
-                            <i class="fas fa-arrow-up"></i> Debit (Increase Balance)
+                            <i class="fas fa-arrow-up"></i> Debit (Increase)
                         </button>
                         <button class="adj-btn credit-btn" data-type="credit" id="btnCredit">
-                            <i class="fas fa-arrow-down"></i> Credit (Decrease Balance)
+                            <i class="fas fa-arrow-down"></i> Credit (Decrease)
                         </button>
                     </div>
                     <div class="adj-hint" id="adjHint">
@@ -106,7 +195,8 @@ if (!$user_id) { header('Location: ../../auth/login.html'); exit(); }
                         <span id="adjHintText">Debit: Customer owes you more (balance increases)</span>
                     </div>
                 </div>
-                <div class="form-group">
+                <!-- Single mode: contra account -->
+                <div class="form-group" id="contraGroup">
                     <label>Contra Account <span class="req">*</span></label>
                     <div class="searchable-dropdown">
                         <input type="text" id="contraSearch" placeholder="Search account..." autocomplete="off">
@@ -118,16 +208,9 @@ if (!$user_id) { header('Location: ../../auth/login.html'); exit(); }
                     <label>Amount <span class="req">*</span></label>
                     <input type="number" id="amount" min="0.01" step="0.01" placeholder="0.00">
                 </div>
-                <div class="form-group">
-                    <label>New Balance (After Adjustment)</label>
-                    <div class="balance-display" id="newBalanceDisplay">
-                        <span id="newBalanceAmount">—</span>
-                        <span id="newBalanceLabel" class="balance-label"></span>
-                    </div>
-                </div>
                 <div class="form-group full-width">
                     <label>Description / Reason <span class="req">*</span></label>
-                    <textarea id="description" placeholder="Reason for this adjustment (e.g. Correction of wrong entry dated 01-Jan-2024)..."></textarea>
+                    <textarea id="description" placeholder="Reason for this adjustment..."></textarea>
                 </div>
             </div>
         </div>
