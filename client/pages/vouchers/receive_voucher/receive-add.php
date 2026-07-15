@@ -27,12 +27,18 @@ if (!$user_id) {
     <div class="container">
         <div class="header">
             <h1 class="page-title">Receive Voucher</h1>
+            <div style="display: flex; align-items: center; gap: 16px;">
+            <button type="button" id="customizeFieldsBtn" class="btn btn-secondary" style="height: 40px; padding: 0 16px;">
+                <i class="fas fa-sliders-h"></i>
+                Customize Fields
+            </button>
             <div class="mode-toggle">
                 <label class="toggle-label">
                     <input type="checkbox" id="bulkModeToggle">
                     <span class="toggle-slider"></span>
                     <span class="toggle-text">Bulk Mode</span>
                 </label>
+            </div>
             </div>
         </div>
 
@@ -254,6 +260,35 @@ if (!$user_id) {
                         </tr>
                     </tfoot>
                 </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Customize Fields Modal -->
+    <div class="modal" id="customizeFieldsModal">
+        <div class="modal-content" style="max-width: 480px; max-height: 80vh; overflow-y: auto;">
+            <div class="modal-header">
+                <div class="modal-title"><i class="fas fa-sliders-h"></i> Customize Fields</div>
+                <button class="modal-close" id="customizeFieldsModalClose">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body" style="text-align: left; padding: 24px;">
+                <div style="margin-bottom: 16px; display: flex; gap: 8px;">
+                    <button type="button" class="btn btn-secondary" id="customizeSelectAllBtn" style="flex: 1; height: 36px; font-size: 13px;">
+                        <i class="fas fa-check-square"></i> Select All
+                    </button>
+                    <button type="button" class="btn btn-secondary" id="customizeDeselectAllBtn" style="flex: 1; height: 36px; font-size: 13px;">
+                        <i class="fas fa-square"></i> Deselect All
+                    </button>
+                </div>
+                <div id="customizeFieldsList" style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                    <!-- Populated by JS -->
+                </div>
+            </div>
+            <div style="padding: 16px 24px; border-top: 1px solid var(--border-default); display: flex; justify-content: flex-end; gap: 12px;">
+                <button type="button" class="btn btn-secondary" id="customizeResetBtn">Reset to Default</button>
+                <button type="button" class="btn btn-primary" id="customizeSaveBtn">Save Preferences</button>
             </div>
         </div>
     </div>

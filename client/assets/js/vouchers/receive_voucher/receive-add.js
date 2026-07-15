@@ -1,3 +1,175 @@
+// ===== CUSTOMIZE FIELDS =====
+const CUSTOMIZE_KEY = 'receiveVoucherCustomizeFields';
+
+// bulkCol: column index (0-based) in the bulk table. null = single-mode only field.
+const allCustomizeFields = [
+    { id: 'voucherDate',      label: 'Voucher Date',      visible: true,  bulkCol: 0  },
+    { id: 'voucherNumber',    label: 'Voucher #',         visible: true,  bulkCol: null },
+    { id: 'company',          label: 'Company',           visible: true,  bulkCol: null },
+    { id: 'customerCode',     label: 'Customer Code',     visible: true,  bulkCol: 1  },
+    { id: 'previousBalance',  label: 'Previous Balance',  visible: true,  bulkCol: 2  },
+    { id: 'remainingBalance', label: 'Remaining Balance', visible: true,  bulkCol: 10 },
+    { id: 'subAccount',       label: 'Sub Account',       visible: true,  bulkCol: 3  },
+    { id: 'billNo',           label: 'Bill No',           visible: true,  bulkCol: 4  },
+    { id: 'dsrNo',            label: 'DSR#',              visible: true,  bulkCol: 5  },
+    { id: 'currency',         label: 'Currency',          visible: true,  bulkCol: 8  },
+    { id: 'project',          label: 'Project',           visible: true,  bulkCol: 6  },
+    { id: 'container',        label: 'Container',         visible: false, bulkCol: 7  },
+    { id: 'amount',           label: 'Amount',            visible: true,  bulkCol: 9  },
+    { id: 'paymentMethod',    label: 'Payment Method',    visible: true,  bulkCol: 11 },
+    { id: 'againstPdc',       label: 'Against PDC',       visible: true,  bulkCol: 12 },
+    { id: 'bankAccount',      label: 'Bank Account',      visible: true,  bulkCol: 13 },
+    { id: 'chequeDate',       label: 'Cheque Date',       visible: true,  bulkCol: 14 },
+    { id: 'chequeNo',         label: 'Cheque No',         visible: true,  bulkCol: 15 },
+    { id: 'recoveryOfficer',  label: 'Recovery Officer',  visible: true,  bulkCol: null },
+    { id: 'attachment',       label: 'Attachment',        visible: true,  bulkCol: null },
+    { id: 'description',      label: 'Description',       visible: true,  bulkCol: 16 },
+];
+
+// Fields whose single-mode visibility is controlled by payment method logic — skip form-group toggling
+const PAYMENT_CONTROLLED = ['bankAccount', 'chequeDate', 'chequeNo'];
+
+function getCustomizeDefaults() {
+    const d = {};
+    allCustomizeFields.forEach(f => { d[f.id] = f.visible; });
+    return d;
+}
+
+function getCustomizeVisibility() {
+    const defaults = getCustomizeDefaults();
+    try {
+        const stored = localStorage.getItem(CUSTOMIZE_KEY);
+        return stored ? Object.assign({}, defaults, JSON.parse(stored)) : defaults;
+    } catch (e) { return defaults; }
+}
+
+function saveCustomizeVisibility(v) {
+    localStorage.setItem(CUSTOMIZE_KEY, JSON.stringify(v));
+}
+
+function getFieldFormGroup(fieldId) {
+    const el = document.getElementById(fieldId);
+    if (!el) return null;
+    return el.closest('.form-group');
+}
+
+// Show/hide a bulk table column (th + all td at that index)
+function setBulkColumnVisible(colIndex, isVisible) {
+    const display = isVisible ? '' : 'none';
+    const table = document.getElementById('bulkTable');
+    if (!table) return;
+    // header
+    const th = table.querySelectorAll('thead tr th')[colIndex];
+    if (th) th.style.display = display;
+    // all body rows
+    table.querySelectorAll('tbody tr').forEach(row => {
+        const td = row.querySelectorAll('td')[colIndex];
+        if (td) td.style.display = display;
+    });
+    // footer
+    const footTds = table.querySelectorAll('tfoot tr td');
+    // footer uses colspan — no per-cell hiding needed
+}
+
+function applyCustomizeVisibility() {
+    const v = getCustomizeVisibility();
+    allCustomizeFields.forEach(f => {
+        const isVisible = v[f.id];
+
+        // --- Single mode form-group ---
+        if (!PAYMENT_CONTROLLED.includes(f.id)) {
+            const fg = getFieldFormGroup(f.id);
+            if (fg) {
+                if (isVisible) {
+                    fg.classList.remove('hidden');
+                    fg.style.display = '';
+                } else {
+                    fg.classList.add('hidden');
+                    fg.style.display = 'none';
+                }
+            }
+        }
+
+        // --- Bulk table column ---
+        if (f.bulkCol !== null) {
+            setBulkColumnVisible(f.bulkCol, isVisible);
+        }
+    });
+}
+
+// Called inside addBulkRow() after appending the new row
+function applyBulkColumnVisibilityToRow(row) {
+    const v = getCustomizeVisibility();
+    allCustomizeFields.forEach(f => {
+        if (f.bulkCol === null) return;
+        const td = row.querySelectorAll('td')[f.bulkCol];
+        if (td) td.style.display = v[f.id] ? '' : 'none';
+    });
+}
+
+function populateCustomizeList() {
+    const v = getCustomizeVisibility();
+    const list = document.getElementById('customizeFieldsList');
+    list.innerHTML = '';
+    allCustomizeFields.forEach(f => {
+        const item = document.createElement('div');
+        item.className = 'customize-field-item';
+        item.innerHTML = `
+            <label class="customize-field-label">
+                <input type="checkbox" class="customize-field-checkbox" data-field-id="${f.id}" ${v[f.id] ? 'checked' : ''}>
+                <span>${f.label}</span>
+            </label>`;
+        list.appendChild(item);
+    });
+}
+
+// Apply on load
+applyCustomizeVisibility();
+
+// Button open
+document.getElementById('customizeFieldsBtn').addEventListener('click', function () {
+    populateCustomizeList();
+    document.getElementById('customizeFieldsModal').classList.add('show');
+});
+
+// Close
+function closeCustomizeModal() {
+    document.getElementById('customizeFieldsModal').classList.remove('show');
+}
+document.getElementById('customizeFieldsModalClose').addEventListener('click', closeCustomizeModal);
+document.getElementById('customizeFieldsModal').addEventListener('click', function (e) {
+    if (e.target === this) closeCustomizeModal();
+});
+
+// Select All / Deselect All
+document.getElementById('customizeSelectAllBtn').addEventListener('click', function () {
+    document.querySelectorAll('.customize-field-checkbox').forEach(cb => cb.checked = true);
+});
+document.getElementById('customizeDeselectAllBtn').addEventListener('click', function () {
+    document.querySelectorAll('.customize-field-checkbox').forEach(cb => cb.checked = false);
+});
+
+// Save
+document.getElementById('customizeSaveBtn').addEventListener('click', function () {
+    const v = {};
+    document.querySelectorAll('.customize-field-checkbox').forEach(cb => {
+        v[cb.dataset.fieldId] = cb.checked;
+    });
+    saveCustomizeVisibility(v);
+    applyCustomizeVisibility();
+    closeCustomizeModal();
+});
+
+// Reset to default
+document.getElementById('customizeResetBtn').addEventListener('click', function () {
+    if (confirm('Reset field visibility to default?')) {
+        saveCustomizeVisibility(getCustomizeDefaults());
+        applyCustomizeVisibility();
+        populateCustomizeList();
+    }
+});
+// ===== END CUSTOMIZE FIELDS =====
+
 // Check permissions
 fetch('../../../../server/api/vouchers/receive_voucher/check-permissions.php')
     .then(r => r.json())
@@ -672,7 +844,7 @@ function addBulkRow() {
         <td><input type="text" class="bulk-bill" placeholder="Bill no" autocomplete="off"></td>
         <td><input type="text" class="bulk-dsr" placeholder="DSR-B-24-26-20251231-20260112"></td>
         <td><select class="bulk-project"><option value="">Select</option></select></td>
-        <td style="display: none;"><select class="bulk-container" style="display: none;"><option value="">Select</option></select></td>
+        <td><select class="bulk-container"><option value="">Select</option></select></td>
         <td><select class="bulk-currency" required></select></td>
         <td><input type="number" class="bulk-amount" step="0.01" min="0" placeholder="0.00" required></td>
         <td><input type="text" class="bulk-rem-balance" readonly></td>
@@ -688,6 +860,7 @@ function addBulkRow() {
     tbody.appendChild(row);
     populateRowSelects(row);
     setupBulkCustomerDropdown(row);
+    applyBulkColumnVisibilityToRow(row);
     
     // Add tab key handler for description field
     row.querySelector('.bulk-description').addEventListener('keydown', function(e) {
