@@ -1126,11 +1126,8 @@
 
                     const td = row.insertCell();
                     td.className = 'text-right';
+                    td.dataset.colId = colData.id;
                     td.textContent = colData.value;
-                    
-                    if (!colData.visible) {
-                        td.style.display = 'none';
-                    }
                 });
 
                 // Calculate totals (only count first unit to avoid duplication)
@@ -1190,6 +1187,7 @@
 
                         const td = row.insertCell();
                         td.className = 'text-right';
+                        td.dataset.colId = colId;
                         td.textContent = '-';
 
                         // Apply visibility
@@ -1371,6 +1369,9 @@
                 if (span && (!span.textContent.trim() || span.textContent.trim() === '-')) p.style.display = 'none';
             });
 
+            // Auto-hide table columns that have no meaningful data
+            hideEmptyTableColumns();
+
             // Generate QR Code if enabled
             setTimeout(() => {
                 const enablePrintQRCode = localStorage.getItem('enablePrintQRCode') === 'true';
@@ -1414,6 +1415,38 @@
                 }, 1000);
             }
         });
+
+        // Auto-hide table columns with no meaningful data
+        function hideEmptyTableColumns() {
+            const headerRow = document.getElementById('itemsTableHeader');
+            const tbody = document.getElementById('itemsTableBody');
+            const footerRow = document.querySelector('.items-table tfoot tr');
+            if (!headerRow || !tbody) return;
+
+            Array.from(headerRow.cells).forEach(th => {
+                if (th.style.display === 'none') return;
+                const colId = th.dataset.colId;
+                if (!colId || colId === 'serial' || colId === 'product' || colId.startsWith('unit_')) return;
+
+                const bodyCells = Array.from(tbody.querySelectorAll(`td[data-col-id="${colId}"]`));
+                if (bodyCells.length === 0) return;
+
+                const allEmpty = bodyCells.every(td => {
+                    const text = td.textContent.trim();
+                    return !text || text === '-' || text === '0' || text === '0.00' ||
+                        text === '0.00%' || /^[^\d]*\s*0\.00$/.test(text);
+                });
+
+                if (allEmpty) {
+                    th.style.display = 'none';
+                    bodyCells.forEach(td => td.style.display = 'none');
+                    if (footerRow) {
+                        const footerCell = footerRow.querySelector(`th[data-col-id="${colId}"]`);
+                        if (footerCell) footerCell.style.display = 'none';
+                    }
+                }
+            });
+        }
 
         // Function to convert number to words
         function numberToWords(num) {

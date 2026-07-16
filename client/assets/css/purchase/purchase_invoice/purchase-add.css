@@ -76,28 +76,28 @@ body {
   background: var(--surface-0);
   border-radius: var(--card-radius);
   box-shadow: var(--shadow);
-  padding: 24px;
-  margin-bottom: 24px;
+  padding: 16px;
+  margin-bottom: 16px;
   overflow: visible;
 }
 
 .card-title {
-  font-size: 18px;
+  font-size: 16px;
   font-weight: 600;
   color: var(--heading);
-  margin-bottom: 20px;
-  padding-bottom: 12px;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
   border-bottom: 1px solid var(--border-default);
 }
 
 .form-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 20px;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
 }
 
 .form-group {
-  margin-bottom: 16px;
+  margin-bottom: 0;
 }
 
 .form-group.full-width {
@@ -106,10 +106,10 @@ body {
 
 label {
   display: block;
-  font-size: 13px;
+  font-size: 11px;
   font-weight: 500;
   color: var(--body);
-  margin-bottom: 6px;
+  margin-bottom: 4px;
 }
 
 .required::after {
@@ -122,13 +122,13 @@ input,
 select,
 textarea {
   width: 100%;
-  height: 40px;
-  padding: 0 14px;
+  height: 32px;
+  padding: 0 10px;
   border: 1.5px solid var(--border-default);
   border-radius: var(--radius);
   background: var(--surface-0);
   color: var(--body);
-  font-size: 14px;
+  font-size: 13px;
   transition: border 0.2s, box-shadow 0.2s;
 }
 
@@ -141,8 +141,8 @@ textarea:focus {
 }
 
 textarea {
-  height: 80px;
-  padding: 12px 14px;
+  height: 60px;
+  padding: 8px 10px;
   resize: vertical;
 }
 
@@ -217,17 +217,17 @@ tbody tr:hover {
 }
 
 .btn {
-  height: 40px;
-  padding: 0 20px;
+  height: 32px;
+  padding: 0 16px;
   border-radius: var(--radius);
   font-weight: 500;
-  font-size: 14px;
+  font-size: 13px;
   cursor: pointer;
   transition: all 0.2s;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: 6px;
 }
 
 .btn-primary {
@@ -270,16 +270,15 @@ tbody tr:hover {
 }
 
 .btn-sm {
-  height: 32px;
-  padding: 0 12px;
-  font-size: 13px;
-  min-width: 32px;
+  height: 26px;
+  padding: 0 10px;
+  font-size: 11px;
 }
 
 .summary-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 20px;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
 }
 
 #invoiceLevelTaxesContainer {
@@ -289,19 +288,68 @@ tbody tr:hover {
 .summary-item {
   display: flex;
   flex-direction: column;
-  align-items: flex-end;
+  gap: 6px;
+  padding: 12px;
+  background: var(--surface-0);
+  border: 1.5px solid var(--border-default);
+  border-radius: var(--radius);
+  transition: all 0.2s ease;
+}
+
+.summary-item:hover {
+  border-color: var(--primary);
+  box-shadow: 0 2px 8px rgba(31, 123, 255, 0.1);
+}
+
+.summary-item.full-width {
+  grid-column: 1 / -1;
 }
 
 .summary-label {
-  font-size: 13px;
+  font-size: 10px;
+  font-weight: 600;
   color: var(--subtext);
-  margin-bottom: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
 }
 
 .summary-value {
   font-size: 18px;
-  font-weight: 600;
-  color: var(--heading);
+  font-weight: 700;
+  color: var(--primary);
+  letter-spacing: -0.3px;
+}
+
+.summary-item input.table-input,
+.summary-item select.table-input {
+  height: 40px;
+  padding: 8px 12px;
+  font-size: 13px;
+  border: 1.5px solid var(--border-default);
+  border-radius: 6px;
+  background: var(--surface-0);
+  color: var(--body);
+  transition: all 0.2s ease;
+}
+
+.summary-item input.table-input:focus,
+.summary-item select.table-input:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(31, 123, 255, 0.1);
+  outline: none;
+}
+
+.summary-item input[readonly] {
+  background: var(--surface-2);
+  color: var(--subtext);
+  cursor: not-allowed;
+}
+
+.summary-item textarea {
+  height: 60px;
+  padding: 8px 12px;
+  font-size: 13px;
+  resize: vertical;
 }
 
 .modal {
@@ -480,7 +528,10 @@ tbody tr:hover {
 
 @media (max-width: 1024px) {
   .form-grid {
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(3, 1fr);
+  }
+  .summary-grid {
+    grid-template-columns: repeat(3, 1fr);
   }
 }
 
@@ -490,7 +541,7 @@ tbody tr:hover {
   }
 
   .summary-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, 1fr);
   }
 }
 

@@ -3,6 +3,7 @@ document.addEventListener('DOMContentLoaded', function () {
     let currentPage = 1;
     let totalPages = 1;
     const invoicesTable = document.getElementById('invoicesTable').getElementsByTagName('tbody')[0];
+    let duplicateInvoiceId = null;
 
     // Load companies for filter
     async function loadCompanies() {
@@ -24,13 +25,14 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
-    // Load suppliers for filter
+    // Load suppliers for filter + duplicate modal
     async function loadSuppliers() {
         try {
             const response = await fetch('../../../../server/api/purchase/purchase_invoice/get-suppliers.php');
             const data = await response.json();
             
             if (data.success) {
+                // Filter dropdown
                 const supplierFilterOptions = document.getElementById('supplierFilterOptions');
                 if (supplierFilterOptions) {
                     supplierFilterOptions.innerHTML = '<div class="dropdown-option" data-value="">All Suppliers</div>';
@@ -43,9 +45,75 @@ document.addEventListener('DOMContentLoaded', function () {
                     });
                     initSearchableDropdown('supplierFilterSearch', 'supplierFilterOptions', 'supplierFilter');
                 }
+
+                // Duplicate modal supplier dropdown
+                const dupOptions = document.getElementById('dupSupplierOptions');
+                if (dupOptions) {
+                    dupOptions.innerHTML = '';
+                    data.suppliers.forEach(supplier => {
+                        const opt = document.createElement('div');
+                        opt.className = 'dropdown-option';
+                        opt.setAttribute('data-value', supplier.id);
+                        opt.textContent = `${supplier.supplier_code} - ${supplier.supplier_name}`;
+                        dupOptions.appendChild(opt);
+                    });
+                    initDupSupplierDropdown();
+                }
             }
         } catch (error) {
             console.error('Error loading suppliers:', error);
+        }
+    }
+
+    async function fetchDupSupplierBalance(supplierId) {
+        const el = document.getElementById('dupSupplierBalance');
+        if (!supplierId || !el) return;
+        el.textContent = 'Loading...';
+        el.style.display = 'block';
+        try {
+            const res = await fetch(`../../../../server/api/financial_reports/supplier_ledger/supplier-ledger.php?supplier_id=${supplierId}&type=summary`);
+            const data = await res.json();
+            if (data.success && data.data && data.data.length > 0) {
+                const balance = parseFloat(data.data[0].closing_balance || 0);
+                const label = balance >= 0 ? 'Dr' : 'Cr';
+                el.textContent = `Balance: ${label} ${Math.abs(balance).toFixed(3)}`;
+            } else {
+                el.textContent = '';
+                el.style.display = 'none';
+            }
+        } catch (e) {
+            el.textContent = '';
+            el.style.display = 'none';
+        }
+    }
+
+    function initDupSupplierDropdown() {
+        const searchInput = document.getElementById('dupSupplierSearch');
+        const optionsContainer = document.getElementById('dupSupplierOptions');
+        const hiddenInput = document.getElementById('dupSupplierId');
+
+        searchInput.addEventListener('click', function(e) {
+            e.stopPropagation();
+            optionsContainer.style.display = 'block';
+            filterDupOptions();
+        });
+        searchInput.addEventListener('input', filterDupOptions);
+
+        optionsContainer.addEventListener('click', function(e) {
+            if (e.target.classList.contains('dropdown-option')) {
+                const supplierId = e.target.getAttribute('data-value');
+                hiddenInput.value = supplierId;
+                searchInput.value = e.target.textContent;
+                optionsContainer.style.display = 'none';
+                fetchDupSupplierBalance(supplierId);
+            }
+        });
+
+        function filterDupOptions() {
+            const term = searchInput.value.toLowerCase();
+            Array.from(optionsContainer.getElementsByClassName('dropdown-option')).forEach(opt => {
+                opt.style.display = opt.textContent.toLowerCase().includes(term) ? 'block' : 'none';
+            });
         }
     }
 
@@ -60,7 +128,9 @@ document.addEventListener('DOMContentLoaded', function () {
                     id: invoice.id,
                     invoiceNo: invoice.bill_no,
                     date: invoice.purchase_date,
+                    supplierInvoiceNo: invoice.supplier_invoice_no || '',
                     supplier: invoice.supplier_name,
+                    supplierId: invoice.supplier_id,
                     companyId: invoice.company_id,
                     items: invoice.item_count,
                     totalAmount: parseFloat(invoice.net_amount),
@@ -136,10 +206,11 @@ document.addEventListener('DOMContentLoaded', function () {
             row.insertCell(0).textContent = invoice.invoiceNo;
             row.insertCell(1).textContent = formattedDate;
             row.insertCell(2).textContent = invoice.supplier || 'N/A';
-            row.insertCell(3).textContent = invoice.items;
-            row.insertCell(4).textContent = formattedAmount;
+            row.insertCell(3).textContent = invoice.supplierInvoiceNo || '-';
+            row.insertCell(4).textContent = invoice.items;
+            row.insertCell(5).textContent = formattedAmount;
 
-            const actionsCell = row.insertCell(5);
+            const actionsCell = row.insertCell(6);
             const actionButtons = document.createElement('div');
             actionButtons.className = 'action-buttons';
 
@@ -149,6 +220,13 @@ document.addEventListener('DOMContentLoaded', function () {
             editBtn.innerHTML = '<i class="fas fa-edit"></i>';
             editBtn.title = 'Edit Invoice';
             editBtn.addEventListener('click', () => editInvoice(invoice.id));
+
+            // Duplicate button
+            const dupBtn = document.createElement('button');
+            dupBtn.className = 'btn btn-secondary btn-sm';
+            dupBtn.innerHTML = '<i class="fas fa-copy"></i>';
+            dupBtn.title = 'Duplicate Invoice';
+            dupBtn.addEventListener('click', () => openDuplicateModal(invoice.id, invoice.invoiceNo, invoice.supplierId));
 
             // Print button
             const printBtn = document.createElement('button');
@@ -165,6 +243,7 @@ document.addEventListener('DOMContentLoaded', function () {
             deleteBtn.addEventListener('click', () => deleteInvoice(invoice.id));
 
             actionButtons.appendChild(editBtn);
+            actionButtons.appendChild(dupBtn);
             actionButtons.appendChild(printBtn);
             actionButtons.appendChild(deleteBtn);
 
@@ -184,6 +263,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const supplierFilter = document.getElementById('supplierFilter');
     const statusFilter = document.getElementById('statusFilter');
     const searchInput = document.getElementById('searchInput');
+    const supplierInvoiceNoFilter = document.getElementById('supplierInvoiceNoFilter');
 
     function applyFilters() {
         let filteredInvoices = [...invoices];
@@ -217,6 +297,14 @@ document.addEventListener('DOMContentLoaded', function () {
 
 
 
+        // Supplier Invoice No filter
+        if (supplierInvoiceNoFilter.value) {
+            const term = supplierInvoiceNoFilter.value.toLowerCase();
+            filteredInvoices = filteredInvoices.filter(invoice =>
+                invoice.supplierInvoiceNo.toLowerCase().includes(term)
+            );
+        }
+
         // Search filter
         if (searchInput.value) {
             const searchTerm = searchInput.value.toLowerCase();
@@ -236,6 +324,7 @@ document.addEventListener('DOMContentLoaded', function () {
     supplierFilter.addEventListener('change', applyFilters);
     statusFilter.addEventListener('change', applyFilters);
     searchInput.addEventListener('input', applyFilters);
+    supplierInvoiceNoFilter.addEventListener('input', applyFilters);
 
     // Update pagination
     function updatePagination(pagination) {
@@ -339,6 +428,95 @@ document.addEventListener('DOMContentLoaded', function () {
         if (e.target === this) {
             this.style.display = 'none';
             deleteInvoiceId = null;
+        }
+    });
+
+    // Duplicate invoice
+    function openDuplicateModal(id, currentBillNo, originalSupplierId) {
+        duplicateInvoiceId = id;
+        document.getElementById('duplicateSourceBillNo').textContent = currentBillNo;
+        document.getElementById('duplicateNewBillNoDisplay').textContent = 'Generating...';
+        document.getElementById('duplicateError').textContent = '';
+        document.getElementById('duplicateDate').value = new Date().toISOString().split('T')[0];
+        document.getElementById('dupSupplierSearch').value = '';
+        document.getElementById('dupSupplierId').value = '';
+        document.getElementById('confirmDuplicateBtn').dataset.originalSupplierId = originalSupplierId || '';
+        const dupBalEl = document.getElementById('dupSupplierBalance');
+        if (dupBalEl) { dupBalEl.textContent = ''; dupBalEl.style.display = 'none'; }
+        document.getElementById('duplicateModal').style.display = 'flex';
+
+        // Fetch original supplier balance on modal open
+        if (originalSupplierId) fetchDupSupplierBalance(originalSupplierId);
+
+        fetch('../../../../server/api/purchase/purchase_invoice/purchase-next-bill-no.php')
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    document.getElementById('duplicateNewBillNoDisplay').textContent = data.bill_no;
+                    document.getElementById('confirmDuplicateBtn').dataset.billNo = data.bill_no;
+                }
+            })
+            .catch(() => {
+                document.getElementById('duplicateNewBillNoDisplay').textContent = 'Error';
+            });
+    }
+
+    document.getElementById('cancelDuplicateBtn').addEventListener('click', function() {
+        document.getElementById('duplicateModal').style.display = 'none';
+        duplicateInvoiceId = null;
+    });
+
+    document.getElementById('confirmDuplicateBtn').addEventListener('click', async function() {
+        const previewBillNo = document.getElementById('duplicateNewBillNoDisplay').textContent;
+        const errorEl = document.getElementById('duplicateError');
+        if (!previewBillNo || previewBillNo === 'Generating...') {
+            errorEl.textContent = 'Please wait, generating invoice number...';
+            return;
+        }
+        this.disabled = true;
+        this.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Duplicating...';
+        try {
+            const newSupplierId = document.getElementById('dupSupplierId').value || null;
+            const originalSupplierId = this.dataset.originalSupplierId || null;
+            const balanceSupplierId = newSupplierId || originalSupplierId;
+            let previousBalance = 0;
+            if (balanceSupplierId) {
+                const balRes = await fetch(`../../../../server/api/financial_reports/supplier_ledger/supplier-ledger.php?supplier_id=${balanceSupplierId}&type=summary`);
+                const balData = await balRes.json();
+                if (balData.success && balData.data && balData.data.length > 0) {
+                    previousBalance = parseFloat(balData.data[0].closing_balance || 0);
+                }
+            }
+            const payload = {
+                invoice_id: duplicateInvoiceId,
+                purchase_date: document.getElementById('duplicateDate').value || null,
+                supplier_id: newSupplierId,
+                previous_balance: previousBalance
+            };
+            const response = await fetch('../../../../server/api/purchase/purchase_invoice/purchase-duplicate.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            const data = await response.json();
+            if (data.success) {
+                document.getElementById('duplicateModal').style.display = 'none';
+                duplicateInvoiceId = null;
+                loadInvoices(currentPage);
+            } else {
+                errorEl.textContent = data.message;
+            }
+        } catch (err) {
+            errorEl.textContent = 'Error: ' + err.message;
+        }
+        this.disabled = false;
+        this.innerHTML = '<i class="fas fa-copy"></i> Confirm Duplicate';
+    });
+
+    document.getElementById('duplicateModal').addEventListener('click', function(e) {
+        if (e.target === this) {
+            this.style.display = 'none';
+            duplicateInvoiceId = null;
         }
     });
 

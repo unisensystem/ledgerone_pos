@@ -45,25 +45,59 @@ function renderInvoiceLevelTaxColumns() {
 
     window.invoiceLevelTaxRegimes.forEach(regime => {
         const ratePercent = parseFloat(regime.rate_percentage) || 0;
-        
-        // Tax % Column
+
+        // Tax % Column (editable)
         const percentItem = document.createElement('div');
         percentItem.className = 'summary-item';
-        percentItem.innerHTML = `
-            <span class="summary-label">${regime.regime_name} %</span>
-            <span class="summary-value" id="invoiceTax_${regime.id}_percent">${ratePercent.toFixed(3)}</span>
-        `;
+        const percentInput = document.createElement('input');
+        percentInput.type = 'number';
+        percentInput.className = 'table-input';
+        percentInput.min = '0';
+        percentInput.step = '0.001';
+        percentInput.value = ratePercent.toFixed(3);
+        percentInput.id = `invoiceTax_${regime.id}_percent`;
+        percentInput.addEventListener('input', function() {
+            const netAmount = parseFloat(document.getElementById('netAmount')?.textContent) || 0;
+            const pct = parseFloat(this.value) || 0;
+            const amountEl = document.getElementById(`invoiceTax_${regime.id}_amount`);
+            if (amountEl) amountEl.value = (netAmount * pct / 100).toFixed(3);
+            recalcNetReceivable();
+        });
+        percentItem.innerHTML = `<span class="summary-label">${regime.regime_name} %</span>`;
+        percentItem.appendChild(percentInput);
         container.appendChild(percentItem);
 
-        // Tax Amount Column
+        // Tax Amount Column (editable)
         const amountItem = document.createElement('div');
         amountItem.className = 'summary-item';
-        amountItem.innerHTML = `
-            <span class="summary-label">${regime.regime_name} Amt</span>
-            <span class="summary-value" id="invoiceTax_${regime.id}_amount">0.00</span>
-        `;
+        const amountInput = document.createElement('input');
+        amountInput.type = 'number';
+        amountInput.className = 'table-input';
+        amountInput.min = '0';
+        amountInput.step = '0.001';
+        amountInput.value = '0.00';
+        amountInput.id = `invoiceTax_${regime.id}_amount`;
+        amountInput.addEventListener('input', function() {
+            const netAmount = parseFloat(document.getElementById('netAmount')?.textContent) || 0;
+            const amt = parseFloat(this.value) || 0;
+            const percentEl = document.getElementById(`invoiceTax_${regime.id}_percent`);
+            if (percentEl) percentEl.value = netAmount > 0 ? (amt / netAmount * 100).toFixed(3) : '0.000';
+            recalcNetReceivable();
+        });
+        amountItem.innerHTML = `<span class="summary-label">${regime.regime_name} Amt</span>`;
+        amountItem.appendChild(amountInput);
         container.appendChild(amountItem);
     });
+
+    function recalcNetReceivable() {
+        const netAmount = parseFloat(document.getElementById('netAmount')?.textContent) || 0;
+        let totalTax = 0;
+        window.invoiceLevelTaxRegimes.forEach(r => {
+            totalTax += parseFloat(document.getElementById(`invoiceTax_${r.id}_amount`)?.value) || 0;
+        });
+        const netReceivableEl = document.getElementById('netReceivable');
+        if (netReceivableEl) netReceivableEl.textContent = (netAmount + totalTax).toFixed(3);
+    }
     
     // Trigger calculation after rendering
     setTimeout(() => calculateInvoiceLevelTaxes(), 10);
@@ -91,7 +125,7 @@ function calculateInvoiceLevelTaxes() {
 
         const amountEl = document.getElementById(`invoiceTax_${regime.id}_amount`);
         if (amountEl) {
-            amountEl.textContent = taxAmount.toFixed(3);
+            amountEl.value = taxAmount.toFixed(3);
         }
 
         totalInvoiceTax += taxAmount;

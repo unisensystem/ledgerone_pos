@@ -365,20 +365,15 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
-    // Fetch supplier balance — project-wise if project selected, else total
+    // Fetch supplier balance from supplier ledger API
     async function fetchSupplierBalance(supplierId) {
         if (!supplierId) return;
         try {
-            const projectId = document.getElementById('project')?.value || '';
-            const url = projectId
-                ? `../../../../server/api/purchase/purchase_invoice/get-supplier-balance.php?supplier_id=${supplierId}&project_id=${projectId}`
-                : `../../../../server/api/purchase/purchase_invoice/get-supplier-balance.php?supplier_id=${supplierId}`;
-
-            const response = await fetch(url);
+            const response = await fetch(`../../../../server/api/financial_reports/supplier_ledger/supplier-ledger.php?supplier_id=${supplierId}&type=summary`);
             const data = await response.json();
 
-            if (data.success) {
-                const balance = parseFloat(data.balance || 0);
+            if (data.success && data.data && data.data.length > 0) {
+                const balance = parseFloat(data.data[0].closing_balance || 0);
                 document.getElementById('previousBalance').value =
                     `${balance >= 0 ? 'Dr' : 'Cr'} ${Math.abs(balance).toFixed(3)}`;
             }
@@ -386,12 +381,6 @@ document.addEventListener('DOMContentLoaded', function () {
             console.error('Error fetching supplier balance:', error);
         }
     }
-
-    // Re-fetch balance when project changes
-    document.getElementById('project')?.addEventListener('change', function () {
-        const supplierId = document.getElementById('supplierCode')?.value;
-        if (supplierId) fetchSupplierBalance(supplierId);
-    });
 
     // Load sub accounts from API
     async function loadSubAccounts(supplierId) {
@@ -2010,7 +1999,7 @@ document.addEventListener('DOMContentLoaded', function () {
             currencyId: document.getElementById('currency')?.value,
             projectId: document.getElementById('project')?.value || null,
             assocCompanyId: document.getElementById('associatedCompany')?.value || null,
-            previousBalance: parseFloat(document.getElementById('previousBalance')?.value) || 0,
+            previousBalance: document.getElementById('previousBalance')?.value || '0.00',
             totalBill: parseFloat(document.getElementById('totalBill')?.textContent),
             totalDiscountPercent: parseFloat(document.getElementById('totalDiscountPercent')?.value) || 0,
             totalDiscountAmount: parseFloat(document.getElementById('totalDiscountAmount')?.value),

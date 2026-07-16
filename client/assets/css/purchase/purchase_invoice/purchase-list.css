@@ -490,3 +490,136 @@ tbody tr:hover {
   gap: 12px;
   margin-top: 20px;
 }
+
+/* Duplicate Modal */
+.duplicate-modal-content {
+  width: 460px;
+}
+
+.duplicate-modal-header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 20px;
+}
+
+.duplicate-modal-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  background: rgba(31, 123, 255, 0.1);
+  color: var(--primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+.duplicate-modal-sub {
+  font-size: 13px;
+  color: var(--subtext);
+  margin: 0;
+}
+
+.duplicate-info-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--surface-1);
+  border: 1px solid var(--border-default);
+  border-radius: 10px;
+  padding: 16px;
+  margin-bottom: 12px;
+}
+
+.duplicate-info-box {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.duplicate-info-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--subtext);
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+}
+
+.duplicate-info-value {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--heading);
+}
+
+.duplicate-info-box--new .duplicate-info-value {
+  color: var(--primary);
+}
+
+.duplicate-arrow {
+  color: var(--subtext);
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+.duplicate-readonly-note {
+  font-size: 12px;
+  color: var(--subtext);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+}
+
+.duplicate-readonly-note i {
+  color: var(--primary);
+  font-size: 12px;
+}
+
+.duplicate-fields {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  margin-top: 16px;
+  margin-bottom: 4px;
+}
+
+.duplicate-field-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.duplicate-field-group label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--body);
+  margin: 0;
+}
+
+.dup-optional {
+  font-size: 11px;
+  color: var(--subtext);
+  font-weight: 400;
+}
+
+.duplicate-field-group input[type="date"],
+.duplicate-field-group .search-input {
+  height: 38px;
+  padding: 0 12px;
+  border: 1.5px solid var(--border-default);
+  border-radius: var(--radius);
+  background: var(--surface-0);
+  color: var(--body);
+  font-size: 14px;
+  width: 100%;
+}
+
+.duplicate-field-group input[type="date"]:focus,
+.duplicate-field-group .search-input:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px rgba(31, 123, 255, 0.1);
+}

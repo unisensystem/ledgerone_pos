@@ -220,7 +220,9 @@ try {
 function extractBalanceAmount($balanceString) {
     if (empty($balanceString)) return 0.00;
     
-    // Remove 'Dr' or 'Cr' and extract numeric value
-    $amount = preg_replace('/^(Dr|Cr)\s*/', '', $balanceString);
-    return floatval($amount);
+    // Dr = positive (we owe supplier), Cr = negative (supplier owes us)
+    $isCr = stripos($balanceString, 'Cr') !== false;
+    $amount = preg_replace('/^(Dr|Cr)\s*/i', '', trim($balanceString));
+    $amount = floatval($amount);
+    return $isCr ? -$amount : $amount;
 }

@@ -147,11 +147,6 @@ if (!$user_id) {
                             <!-- Options loaded dynamically -->
                         </select>
                     </div>
-                    <div class="form-group full-width">
-                        <label for="remarks">Remarks</label>
-                        <textarea id="remarks" placeholder="Enter any additional remarks" tabindex="-1"></textarea>
-                    </div>
-
                 </div>
             </div>
 
@@ -253,6 +248,10 @@ if (!$user_id) {
                     <div class="summary-item">
                         <span class="summary-label" id="netReceivableLabel">Net Payable</span>
                         <span class="summary-value" id="netReceivable" style="color: var(--primary); font-size: 16px; font-weight: 700;">0.00</span>
+                    </div>
+                    <div class="summary-item full-width">
+                        <span class="summary-label">Remarks</span>
+                        <textarea id="remarks" placeholder="Enter any additional remarks" tabindex="-1" style="width: 100%; min-height: 60px;"></textarea>
                     </div>
                 </div>
             </div>
