@@ -983,26 +983,47 @@ async function formatDatabase() {
     }
 }
 
-function createBackup() {
+async function createBackup() {
     const backupName = document.getElementById('backupName').value;
     const location = document.querySelector('#backupModal select').value;
-    
+
     if (!backupName) {
         alert('Please enter a backup name');
         return;
     }
-    
+
     if (location === 'external') {
-        // Create download link
-        const link = document.createElement('a');
-        link.href = `../../../../server/api/backup/generate_backup.php?name=${encodeURIComponent(backupName)}`;
-        link.download = `${backupName}.sql`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        
-        alert('Backup download started. Check your Downloads folder.');
-        closeBackupModal();
+        try {
+            const response = await fetch(`../../../../server/api/backup/generate_backup.php?name=${encodeURIComponent(backupName)}`);
+
+            if (!response.ok) {
+                const err = await response.json().catch(() => null);
+                alert('Backup failed: ' + (err?.message || response.statusText));
+                return;
+            }
+
+            const contentType = response.headers.get('Content-Type') || '';
+            if (contentType.includes('application/json')) {
+                const err = await response.json();
+                alert('Backup failed: ' + (err?.message || 'Unknown error'));
+                return;
+            }
+
+            const blob = await response.blob();
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `${backupName}.sql`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+
+            alert('Backup download started. Check your Downloads folder.');
+            closeBackupModal();
+        } catch (error) {
+            alert('Backup failed: ' + error.message);
+        }
     } else {
         alert(`Backup "${backupName}" created successfully in cloud storage!`);
         closeBackupModal();

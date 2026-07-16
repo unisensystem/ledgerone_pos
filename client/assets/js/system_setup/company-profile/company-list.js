@@ -260,7 +260,7 @@ async function editCompany(id) {
             document.getElementById('edit_tax_identification_number').value = company.tax_identification_number || '';
             document.getElementById('edit_sales_tax_number').value = company.sales_tax_number || '';
             document.getElementById('edit_language_code').value = company.language_code || 'en';
-            document.getElementById('edit_timezone').value = company.timezone || 'UTC';
+            document.getElementById('edit_timezone').value = company.timezone || 'Asia/Karachi';
             document.getElementById('edit_inventory_valuation_method').value = company.inventory_valuation_method || 'FIFO';
             document.getElementById('edit_is_active').value = company.is_active;
 

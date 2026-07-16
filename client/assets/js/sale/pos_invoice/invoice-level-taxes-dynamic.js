@@ -7,37 +7,8 @@ window.invoiceLevelTaxRegimes = [];
  * @param {number} companyId - Company ID (optional, for country filtering)
  */
 async function loadInvoiceLevelTaxRegimes(customerId, companyId = null) {
-    console.log('loadInvoiceLevelTaxRegimes called with customerId:', customerId, 'companyId:', companyId);
-    
-    if (!customerId) {
-        console.log('No customerId provided, clearing taxes');
-        clearInvoiceLevelTaxes();
-        return;
-    }
-
-    try {
-        let url = `../../../../server/api/sale/pos_invoice/get-invoice-level-taxes.php?customer_id=${customerId}`;
-        if (companyId) {
-            url += `&company_id=${companyId}`;
-        }
-        
-        const response = await fetch(url);
-        const data = await response.json();
-        
-        console.log('Invoice-level taxes API response:', data);
-
-        if (data.success && data.data && data.data.length > 0) {
-            window.invoiceLevelTaxRegimes = data.data;
-            console.log('Invoice-level tax regimes loaded:', window.invoiceLevelTaxRegimes);
-            renderInvoiceLevelTaxColumns();
-        } else {
-            console.log('No invoice-level tax regimes found for customer');
-            clearInvoiceLevelTaxes();
-        }
-    } catch (error) {
-        console.error('Error loading invoice-level taxes:', error);
-        clearInvoiceLevelTaxes();
-    }
+    // Invoice-level taxes disabled — clear container and return
+    clearInvoiceLevelTaxes();
 }
 
 /**
@@ -127,65 +98,18 @@ function applyInvoiceFormula(formulaTemplate, base, ratePercent, isTaxInclusive)
 }
 
 /**
- * Calculate invoice-level taxes using each regime's tax_base and formula_template.
+ * Calculate invoice-level taxes — DISABLED.
+ * Net Receivable is set directly equal to Net Amount.
  */
 function calculateInvoiceLevelTaxes() {
-    console.log('calculateInvoiceLevelTaxes called. Regimes:', window.invoiceLevelTaxRegimes);
-
-    if (!window.invoiceLevelTaxRegimes || window.invoiceLevelTaxRegimes.length === 0) {
-        console.log('No invoice-level tax regimes found');
-        return 0;
-    }
-
-    const container = document.getElementById('invoiceLevelTaxesContainer');
-    if (container && container.children.length === 0) {
-        renderInvoiceLevelTaxColumns();
-    }
-
-    // Track the base amount used per regime so it can be saved correctly
-    window.invoiceTaxBaseAmounts = {};
-
-    let totalInvoiceTax = 0;
-    let totalExclusiveTax = 0;
-
-    window.invoiceLevelTaxRegimes.forEach(regime => {
-        const ratePercent   = parseFloat(regime.rate_percentage) || 0;
-        const isTaxInclusive = regime.is_tax_inclusive == 1;
-        const base          = resolveInvoiceBase(regime);
-
-        window.invoiceTaxBaseAmounts[regime.id] = base;
-
-        const taxAmount = applyInvoiceFormula(
-            regime.formula_template || '',
-            base,
-            ratePercent,
-            isTaxInclusive
-        );
-
-        console.log(`${regime.regime_name} [tax_base=${regime.tax_base}] base=${base} rate=${ratePercent}% → tax=${taxAmount}`);
-
-        const percentEl = document.getElementById(`invoiceTax_${regime.id}_percent`);
-        const amountEl  = document.getElementById(`invoiceTax_${regime.id}_amount`);
-
-        if (percentEl) percentEl.textContent = ratePercent.toFixed(3);
-        if (amountEl)  amountEl.textContent  = taxAmount.toFixed(3);
-
-        totalInvoiceTax += taxAmount;
-        if (!isTaxInclusive) totalExclusiveTax += taxAmount;
-    });
-
-    // Net receivable = net_amount + all exclusive taxes (inclusive taxes are already inside net_amount)
     const netReceivableEl = document.getElementById('netReceivable');
     if (netReceivableEl) {
         const baseNetAmount = window.currentNetAmount
             || parseFloat(document.getElementById('netAmount')?.textContent)
             || 0;
-        const netReceivable = baseNetAmount + totalExclusiveTax;
-        netReceivableEl.textContent = netReceivable.toFixed(3);
-        console.log('Net Receivable updated:', netReceivable);
+        netReceivableEl.textContent = baseNetAmount.toFixed(3);
     }
-
-    return totalInvoiceTax;
+    return 0;
 }
 
 /**
@@ -195,9 +119,6 @@ function clearInvoiceLevelTaxes() {
     window.invoiceLevelTaxRegimes = [];
     const container = document.getElementById('invoiceLevelTaxesContainer');
     if (container) container.innerHTML = '';
-
-    const netReceivableEl = document.getElementById('netReceivable');
-    if (netReceivableEl) netReceivableEl.textContent = '0.00';
 }
 
 // Export functions

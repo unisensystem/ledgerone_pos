@@ -239,9 +239,19 @@ if (!$user_id) {
                     <div class="form-group">
                         <label>Timezone</label>
                         <select id="edit_timezone" name="timezone">
+                            <option value="Asia/Karachi" selected>Pakistan Standard Time (PKT)</option>
                             <option value="UTC">UTC</option>
                             <option value="GMT">GMT</option>
                             <option value="EST">Eastern Standard Time</option>
+                            <option value="America/New_York">Eastern Time (US)</option>
+                            <option value="America/Chicago">Central Time (US)</option>
+                            <option value="America/Los_Angeles">Pacific Time (US)</option>
+                            <option value="Europe/London">London</option>
+                            <option value="Europe/Paris">Paris / Berlin</option>
+                            <option value="Asia/Dubai">Dubai (GST)</option>
+                            <option value="Asia/Kolkata">India (IST)</option>
+                            <option value="Asia/Dhaka">Bangladesh (BST)</option>
+                            <option value="Asia/Riyadh">Saudi Arabia (AST)</option>
                         </select>
                     </div>
                     <div class="form-group">

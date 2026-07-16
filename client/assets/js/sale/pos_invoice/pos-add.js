@@ -3040,93 +3040,11 @@ function initializePage(permissions) {
         document.getElementById('remainingBalance').value = remainingBalance.toFixed(3);
     }
 
-    // Load invoice-level tax regimes and display columns dynamically
+    // Invoice-level taxes disabled — no-op
     async function loadInvoiceLevelTaxRegimes(customerId, companyId = null) {
-        try {
-            let url = `../../../../server/api/sale/pos_invoice/get-invoice-level-taxes.php?customer_id=${customerId}`;
-            if (companyId) {
-                url += `&company_id=${companyId}`;
-            }
-            const response = await fetch(url);
-            const data = await response.json();
-
-            console.log('Tax Regimes Response:', data);
-
-            if (!data.success) {
-                console.warn('Failed to load invoice-level taxes:', data.message);
-                window.invoiceLevelTaxRegimes = [];
-                return;
-            }
-
-            // Store tax regimes in window for use in calculations
-            window.invoiceLevelTaxRegimes = data.data || [];
-            console.log('Stored Tax Regimes:', window.invoiceLevelTaxRegimes);
-
-            // Clear previous dynamic tax columns
-            const container = document.getElementById('invoiceLevelTaxesContainer');
-            if (!container) {
-                console.error('invoiceLevelTaxesContainer not found!');
-                return;
-            }
-            container.innerHTML = '';
-
-            // Create columns for each invoice-level tax regime
-            if (window.invoiceLevelTaxRegimes.length > 0) {
-                window.invoiceLevelTaxRegimes.forEach(regime => {
-                    console.log('Creating elements for regime:', regime);
-                    
-                    // Tax % column
-                    const taxPercentItem = document.createElement('div');
-                    taxPercentItem.className = 'summary-item invoice-tax-item';
-                    taxPercentItem.dataset.taxRegimeId = regime.id;
-                    taxPercentItem.dataset.taxType = 'percent';
-                    taxPercentItem.innerHTML = `
-                        <span class="summary-label">${regime.regime_name} %</span>
-                        <span class="summary-value" id="invoiceTax_${regime.id}_percent">0.00</span>
-                    `;
-                    container.appendChild(taxPercentItem);
-
-                    // Tax Amount column
-                    const taxAmountItem = document.createElement('div');
-                    taxAmountItem.className = 'summary-item invoice-tax-item';
-                    taxAmountItem.dataset.taxRegimeId = regime.id;
-                    taxAmountItem.dataset.taxType = 'amount';
-                    taxAmountItem.innerHTML = `
-                        <span class="summary-label">${regime.regime_name} Amount</span>
-                        <span class="summary-value" id="invoiceTax_${regime.id}_amount">0.00</span>
-                    `;
-                    container.appendChild(taxAmountItem);
-                    
-                    // Verify element creation
-                    const amountEl = document.getElementById(`invoiceTax_${regime.id}_amount`);
-                    console.log(`Element invoiceTax_${regime.id}_amount exists:`, !!amountEl);
-                });
-                
-                // Recalculate if there are items in the invoice
-                // Defer using setTimeout(0) to ensure any pending calculations complete first
-                const itemsTableElement = document.getElementById('itemsTable');
-                if (itemsTableElement) {
-                    const tbody = itemsTableElement.getElementsByTagName('tbody')[0];
-                    if (tbody && tbody.rows && tbody.rows.length > 0) {
-                        console.log('Invoice has items. Calling updateInvoiceSummary to recalculate with new tax regimes');
-                        // Defer to next macrotask to allow current calculations to complete
-                        // Call updateInvoiceSummary which will calculate netAmount and then update tax display
-                        setTimeout(() => {
-                            console.log('Deferred call: Calling updateInvoiceSummary() to recalculate with tax regimes');
-                            updateInvoiceSummary();
-                        }, 0);
-                    } else {
-                        console.log('No items in invoice yet. Tax regimes are ready.');
-                    }
-                } else {
-                    console.log('Items table not found');
-                }
-            }
-
-        } catch (error) {
-            console.error('Error loading invoice-level taxes:', error);
-            window.invoiceLevelTaxRegimes = [];
-        }
+        window.invoiceLevelTaxRegimes = [];
+        const container = document.getElementById('invoiceLevelTaxesContainer');
+        if (container) container.innerHTML = '';
     }
 
     // Add event listener for total discount percent
