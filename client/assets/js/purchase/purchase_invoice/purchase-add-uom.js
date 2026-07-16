@@ -346,28 +346,27 @@ function updateInvoiceSummaryDynamic() {
     const totalBillElement = document.getElementById('totalBill');
     if (totalBillElement) totalBillElement.textContent = totalBill.toFixed(3);
     
-    const discountPercentElement = document.getElementById('totalDiscountPercent');
-    const discountPercent = discountPercentElement ? parseFloat(discountPercentElement.value) || 0 : 0;
-    const discountAmount = totalBill * (discountPercent / 100);
+    const discountAmount = parseFloat(document.getElementById('totalDiscountAmount')?.value) || 0;
     const afterDiscount = totalBill - discountAmount;
-    
-    const shippingFeesElement = document.getElementById('shippingFees');
-    const shippingFees = shippingFeesElement ? parseFloat(shippingFeesElement.value) || 0 : 0;
+
+    const gstPercent = parseFloat(document.getElementById('totalGSTPercent')?.value) || 0;
+    const gstAmount = afterDiscount * (gstPercent / 100);
+    const shippingFees = parseFloat(document.getElementById('shippingFees')?.value) || 0;
     const shippingFeesType = document.querySelector('input[name="shippingFeesType"]:checked')?.value || 'add';
-    const netAmount = shippingFeesType === 'subtract' ? afterDiscount - shippingFees : afterDiscount + shippingFees;
-    
-    const discountAmountElement = document.getElementById('totalDiscountAmount');
-    if (discountAmountElement) discountAmountElement.value = discountAmount.toFixed(3);
+    const shippingAdjusted = shippingFeesType === 'subtract' ? -shippingFees : shippingFees;
+    const baseNet = afterDiscount + gstAmount + shippingAdjusted;
+
+    const gstAmountEl = document.getElementById('totalGSTAmount');
+    if (gstAmountEl) gstAmountEl.value = gstAmount.toFixed(3);
     
     const netAmountElement = document.getElementById('netAmount');
-    if (netAmountElement) netAmountElement.textContent = netAmount.toFixed(3);
+    const summaryGrid = netAmountElement?.closest('.summary-grid');
+    if (summaryGrid) summaryGrid.dataset.baseNet = baseNet.toFixed(3);
+    if (netAmountElement) netAmountElement.textContent = baseNet.toFixed(3);
     
     updateFooterTotals();
     
-    // Trigger invoice-level tax calculation
-    if (window.calculateInvoiceLevelTaxes) {
-        setTimeout(() => window.calculateInvoiceLevelTaxes(), 5);
-    }
+    if (window.calculateInvoiceLevelTaxes) window.calculateInvoiceLevelTaxes();
 }
 
 // Helper function to attach price change listener (called from purchase-add.js)

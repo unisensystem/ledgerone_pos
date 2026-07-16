@@ -239,15 +239,11 @@ if (!$user_id) {
                             </div>
                         </div>
                     </div>
-                    <div class="summary-item">
-                        <span class="summary-label" id="netAmountSummaryLabel">Net Amount</span>
-                        <span class="summary-value" id="netAmount">0.00</span>
-                    </div>
                     <!-- Dynamic Invoice-Level Taxes will be inserted here -->
                     <div id="invoiceLevelTaxesContainer"></div>
                     <div class="summary-item">
-                        <span class="summary-label" id="netReceivableLabel">Net Payable</span>
-                        <span class="summary-value" id="netReceivable" style="color: var(--primary); font-size: 16px; font-weight: 700;">0.00</span>
+                        <span class="summary-label" id="netAmountSummaryLabel">Net Amount</span>
+                        <span class="summary-value" id="netAmount" style="color: var(--primary); font-size: 16px; font-weight: 700;">0.00</span>
                     </div>
                     <div class="summary-item full-width">
                         <span class="summary-label">Remarks</span>

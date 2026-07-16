@@ -1,5 +1,6 @@
 <?php
 require_once '../../../../includes/connection.php';
+require_once 'purchase-invoice-tax-helper.php';
 
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
@@ -165,10 +166,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
             $items = array_values($groupedItems);
         }
         
+        $taxes = getPurchaseInvoiceTaxes($pdo, $invoice_id, $tenant_id);
+
         echo json_encode([
             'success' => true,
             'invoice' => $invoice,
-            'items' => $items ?? []
+            'items'   => $items ?? [],
+            'invoice_taxes' => $taxes
         ]);
         
     } catch (Exception $e) {
@@ -333,7 +337,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
         
         // 5. Credit - Trade Creditors
         $ledger_stmt->execute([$tenant_id, $invoice_id, 14, $input['purchaseDate'], 'Purchase Invoice - ' . $billNo, 0, $input['netAmount']]);
-        
+
+        // 6. Save invoice-level taxes
+        if (!empty($input['invoiceTaxes']) && is_array($input['invoiceTaxes'])) {
+            savePurchaseInvoiceTaxes($pdo, $tenant_id, $invoice_id, $input['invoiceTaxes'], $user_id);
+            foreach ($input['invoiceTaxes'] as $tax) {
+                $taxAmt = floatval($tax['taxAmount'] ?? 0);
+                if ($taxAmt > 0) {
+                    $ledger_stmt->execute([$tenant_id, $invoice_id, 107, $input['purchaseDate'], 'Purchase Invoice Tax - ' . $billNo, $taxAmt, 0]);
+                }
+            }
+        }
+
         $pdo->commit();
         
         echo json_encode(['success' => true, 'message' => 'Purchase invoice updated successfully']);

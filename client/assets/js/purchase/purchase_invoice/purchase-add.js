@@ -657,7 +657,23 @@ document.addEventListener('DOMContentLoaded', function () {
                 const totalTaxAmountEl = document.getElementById('totalTaxAmount');
                 if (totalTaxAmountEl) totalTaxAmountEl.value = invoice.total_tax_amount || 0;
                 document.getElementById('shippingFees').value = invoice.shipping_fees || 0;
-                updateInvoiceSummaryDynamic();
+                updateInvoiceSummary();
+
+                // Load invoice-level tax regimes then restore saved taxes
+                if (invoice.supplier_id) {
+                    const supplierId = invoice.supplier_id;
+                    const companyId  = invoice.company_id || '';
+                    const savedTaxes = data.invoice_taxes || [];
+
+                    if (window.loadInvoiceLevelTaxRegimes) {
+                        // Override the global array after load so restoreInvoiceTaxes can use saved values
+                        window.loadInvoiceLevelTaxRegimes(supplierId, companyId).then(() => {
+                            if (savedTaxes.length > 0 && window.restoreInvoiceTaxes) {
+                                window.restoreInvoiceTaxes(savedTaxes);
+                            }
+                        });
+                    }
+                }
 
                 document.querySelector('.page-title').textContent = `Edit Purchase Order - ${invoice.bill_no || ''}`;
 
@@ -1812,22 +1828,23 @@ document.addEventListener('DOMContentLoaded', function () {
         const gstPercent = parseFloat(document.getElementById('totalGSTPercent')?.value) || 0;
         const gstAmount = afterDiscount * (gstPercent / 100);
         const shippingFees = parseFloat(document.getElementById('shippingFees')?.value) || 0;
-        const netAmount = afterDiscount + gstAmount + shippingFees;
+        const shippingType = document.querySelector('input[name="shippingFeesType"]:checked')?.value || 'add';
+        const shippingAdjusted = shippingType === 'subtract' ? -shippingFees : shippingFees;
+        const baseNet = afterDiscount + gstAmount + shippingAdjusted;
 
         const gstAmountEl = document.getElementById('totalGSTAmount');
         if (gstAmountEl) gstAmountEl.value = gstAmount.toFixed(3);
-        document.getElementById('netAmount').textContent = netAmount.toFixed(3);
+
+        const netAmountEl = document.getElementById('netAmount');
+        const summaryGrid = netAmountEl?.closest('.summary-grid');
+        if (summaryGrid) summaryGrid.dataset.baseNet = baseNet.toFixed(3);
+        netAmountEl.textContent = baseNet.toFixed(3);
     }
 
     // Update invoice summary with invoice-level taxes
     function updateInvoiceSummaryDynamic() {
         updateInvoiceSummary();
-        // Trigger invoice-level tax calculation after a brief delay to ensure DOM is updated
-        setTimeout(() => {
-            if (window.calculateInvoiceLevelTaxes) {
-                window.calculateInvoiceLevelTaxes();
-            }
-        }, 5);
+        if (window.calculateInvoiceLevelTaxes) window.calculateInvoiceLevelTaxes();
     }
 
     // When invoice-level discount % changes, derive the amount then refresh
@@ -1854,7 +1871,8 @@ document.addEventListener('DOMContentLoaded', function () {
     document.getElementById('supplierCode').addEventListener('change', function() {
         const supplierId = this.value;
         const companyId = document.getElementById('company').value;
-        if (supplierId && window.loadInvoiceLevelTaxRegimes) {
+        // Skip auto-load in edit mode — handled manually in loadInvoiceData
+        if (supplierId && window.loadInvoiceLevelTaxRegimes && !isEditMode) {
             window.loadInvoiceLevelTaxRegimes(supplierId, companyId);
         }
     });
@@ -1888,12 +1906,18 @@ document.addEventListener('DOMContentLoaded', function () {
         const gstPercent = parseFloat(document.getElementById('totalGSTPercent')?.value) || 0;
         const gstAmount = afterDiscount * (gstPercent / 100);
         const shippingFees = parseFloat(document.getElementById('shippingFees')?.value) || 0;
-        const netAmount = afterDiscount + gstAmount + shippingFees;
+        const shippingType = document.querySelector('input[name="shippingFeesType"]:checked')?.value || 'add';
+        const shippingAdjusted = shippingType === 'subtract' ? -shippingFees : shippingFees;
+        const baseNet = afterDiscount + gstAmount + shippingAdjusted;
 
         document.getElementById('totalDiscountPercent').value = discountPercent.toFixed(3);
         const gstAmountEl = document.getElementById('totalGSTAmount');
         if (gstAmountEl) gstAmountEl.value = gstAmount.toFixed(3);
-        document.getElementById('netAmount').textContent = netAmount.toFixed(3);
+
+        const netAmountEl = document.getElementById('netAmount');
+        const summaryGrid = netAmountEl?.closest('.summary-grid');
+        if (summaryGrid) summaryGrid.dataset.baseNet = baseNet.toFixed(3);
+        netAmountEl.textContent = baseNet.toFixed(3);
     }
 
     function updateInvoiceSummaryFromGSTAmount() {
@@ -1916,12 +1940,18 @@ document.addEventListener('DOMContentLoaded', function () {
         const gstAmount = parseFloat(document.getElementById('totalGSTAmount')?.value) || 0;
         const gstPercent = afterDiscount > 0 ? (gstAmount / afterDiscount) * 100 : 0;
         const shippingFees = parseFloat(document.getElementById('shippingFees')?.value) || 0;
-        const netAmount = afterDiscount + gstAmount + shippingFees;
+        const shippingType = document.querySelector('input[name="shippingFeesType"]:checked')?.value || 'add';
+        const shippingAdjusted = shippingType === 'subtract' ? -shippingFees : shippingFees;
+        const baseNet = afterDiscount + gstAmount + shippingAdjusted;
 
         document.getElementById('totalDiscountAmount').value = discountAmount.toFixed(3);
         const gstPercentEl = document.getElementById('totalGSTPercent');
         if (gstPercentEl) gstPercentEl.value = gstPercent.toFixed(3);
-        document.getElementById('netAmount').textContent = netAmount.toFixed(3);
+
+        const netAmountEl = document.getElementById('netAmount');
+        const summaryGrid = netAmountEl?.closest('.summary-grid');
+        if (summaryGrid) summaryGrid.dataset.baseNet = baseNet.toFixed(3);
+        netAmountEl.textContent = baseNet.toFixed(3);
     }
 
     // Validate form before submission
@@ -2007,6 +2037,7 @@ document.addEventListener('DOMContentLoaded', function () {
             totalTaxAmount: parseFloat(document.getElementById('totalTaxAmount')?.value) || 0,
             shippingFees: parseFloat(document.getElementById('shippingFees')?.value) || 0,
             netAmount: parseFloat(document.getElementById('netAmount')?.textContent),
+            invoiceTaxes: window.getInvoiceTaxData ? window.getInvoiceTaxData() : [],
             remarks: document.getElementById('remarks')?.value,
             items: []
         };

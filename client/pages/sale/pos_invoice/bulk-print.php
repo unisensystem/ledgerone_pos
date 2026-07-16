@@ -25,6 +25,9 @@
             font-size: 14px;
         }
         .no-print button:hover { background: #0056b3; }
+        .size-btn { background: #6c757d !important; }
+        .size-btn:hover { background: #545b62 !important; }
+        .size-btn.active { background: #28a745 !important; }
         .no-print span { color: #555; font-size: 14px; }
 
         .invoice-frame-wrapper {
@@ -52,6 +55,10 @@
 
 <div class="no-print">
     <button onclick="printAll()">🖨️ Print All</button>
+    <button class="size-btn" onclick="setPaperSize('A3')" id="btnA3">A3</button>
+    <button class="size-btn" onclick="setPaperSize('A4')" id="btnA4">A4</button>
+    <button class="size-btn" onclick="setPaperSize('A5')" id="btnA5">A5</button>
+    <button class="size-btn" onclick="setPaperSize('A6')" id="btnA6">A6</button>
     <span id="statusMsg">Loading invoices...</span>
 </div>
 
@@ -104,6 +111,22 @@
     function printAll() {
         window.print();
     }
+
+    function setPaperSize(size) {
+        localStorage.setItem('invoicePaperSize', size);
+        document.querySelectorAll('.size-btn').forEach(btn => btn.classList.remove('active'));
+        document.getElementById('btn' + size).classList.add('active');
+        // Propagate to all loaded iframes
+        document.querySelectorAll('iframe').forEach(iframe => {
+            try {
+                iframe.contentWindow.setPaperSize(size);
+            } catch(e) {}
+        });
+    }
+
+    // Apply saved size on load
+    const savedSize = localStorage.getItem('invoicePaperSize') || 'A4';
+    document.addEventListener('DOMContentLoaded', () => setPaperSize(savedSize));
 </script>
 </body>
 </html>

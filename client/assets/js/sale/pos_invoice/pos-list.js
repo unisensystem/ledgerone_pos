@@ -28,12 +28,220 @@ function initializeListPage(permissions) {
     const invoicesTable = document.getElementById('invoicesTable').getElementsByTagName('tbody')[0];
     let selectedIds = new Set();
 
+    // ── Multi-select system (same as daily-sale-report) ──────────────────────
+    const multiSelects = {
+        companies:     { triggerId: 'company-trigger',       optionsId: 'company-options',       labelId: 'company-label',       allLabel: 'All Companies',     searchPlaceholder: 'Search companies...',     selected: {} },
+        customers:     { triggerId: 'customer-trigger',      optionsId: 'customer-options',      labelId: 'customer-label',      allLabel: 'All Customers',     searchPlaceholder: 'Search customers...',     selected: {} },
+        salesOfficers: { triggerId: 'sales-officer-trigger', optionsId: 'sales-officer-options', labelId: 'sales-officer-label', allLabel: 'All Sales Officers',searchPlaceholder: 'Search officers...',      selected: {} },
+        supplierMen:   { triggerId: 'supplier-man-trigger',  optionsId: 'supplier-man-options',  labelId: 'supplier-man-label',  allLabel: 'All Supplier Men',  searchPlaceholder: 'Search supplier men...',  selected: {} },
+        invoiceTypes:  { triggerId: 'invoice-type-trigger',  optionsId: 'invoice-type-options',  labelId: 'invoice-type-label',  allLabel: 'All Types',         searchPlaceholder: 'Search types...',         selected: {} },
+        vendors:       { triggerId: 'vendor-trigger',        optionsId: 'vendor-options',        labelId: 'vendor-label',        allLabel: 'All Vendors',       searchPlaceholder: 'Search vendors...',       selected: {} },
+        cities:        { triggerId: 'city-filter-trigger',   optionsId: 'city-filter-options',   labelId: 'city-filter-label',   allLabel: 'All Cities',        searchPlaceholder: 'Search cities...',        selected: {} },
+        cityZones:     { triggerId: 'city-zone-filter-trigger', optionsId: 'city-zone-filter-options', labelId: 'city-zone-filter-label', allLabel: 'All City Zones', searchPlaceholder: 'Search city zones...',  selected: {} },
+        areas:         { triggerId: 'area-filter-trigger',   optionsId: 'area-filter-options',   labelId: 'area-filter-label',   allLabel: 'All Areas',         searchPlaceholder: 'Search areas...',         selected: {} },
+    };
+
+    function closeAllMultiSelects(exceptOptions) {
+        document.querySelectorAll('.multi-select-options.open').forEach(p => { if (p !== exceptOptions) p.classList.remove('open'); });
+        document.querySelectorAll('.multi-select-trigger.open').forEach(t => { if (!exceptOptions || t.nextElementSibling !== exceptOptions) t.classList.remove('open'); });
+    }
+
+    function initMultiSelect(key) {
+        const config = multiSelects[key];
+        const trigger = document.getElementById(config.triggerId);
+        const optionsEl = document.getElementById(config.optionsId);
+        if (!trigger || !optionsEl || optionsEl.dataset.ready === 'true') return;
+        optionsEl.dataset.ready = 'true';
+
+        const searchWrap = document.createElement('div');
+        searchWrap.className = 'so-search-wrap';
+        const searchInput = document.createElement('input');
+        searchInput.type = 'text';
+        searchInput.className = 'so-search-input';
+        searchInput.placeholder = config.searchPlaceholder;
+        searchInput.autocomplete = 'off';
+        searchWrap.appendChild(searchInput);
+        optionsEl.appendChild(searchWrap);
+
+        searchInput.addEventListener('input', e => {
+            e.stopPropagation();
+            const f = e.target.value.toLowerCase();
+            optionsEl.querySelectorAll('.multi-select-option').forEach(o => {
+                o.style.display = f && !o.textContent.toLowerCase().includes(f) ? 'none' : '';
+            });
+        });
+        searchInput.addEventListener('click', e => e.stopPropagation());
+
+        trigger.addEventListener('click', e => {
+            e.stopPropagation();
+            const wasOpen = optionsEl.classList.contains('open');
+            closeAllMultiSelects(optionsEl);
+            trigger.classList.toggle('open', !wasOpen);
+            optionsEl.classList.toggle('open', !wasOpen);
+            if (!wasOpen) setTimeout(() => searchInput.focus(), 10);
+        });
+        optionsEl.addEventListener('click', e => e.stopPropagation());
+    }
+
+    function renderMultiSelectOptions(key, options) {
+        const config = multiSelects[key];
+        const optionsEl = document.getElementById(config.optionsId);
+        if (!optionsEl) return;
+        optionsEl.querySelectorAll('.multi-select-option, .multi-select-empty').forEach(el => el.remove());
+        if (options.length === 0) {
+            const empty = document.createElement('div');
+            empty.className = 'multi-select-empty';
+            empty.textContent = 'No options found';
+            optionsEl.appendChild(empty);
+            return;
+        }
+        options.forEach(opt => {
+            const value = String(opt.value);
+            const label = document.createElement('label');
+            label.className = 'multi-select-option';
+            const cb = document.createElement('input');
+            cb.type = 'checkbox';
+            cb.value = value;
+            cb.checked = !!config.selected[value];
+            cb.addEventListener('change', function () {
+                if (this.checked) config.selected[value] = opt.label;
+                else delete config.selected[value];
+                updateMultiSelectLabel(key);
+                if (typeof config.onChange === 'function') config.onChange();
+            });
+            label.appendChild(cb);
+            label.appendChild(document.createTextNode(opt.label));
+            optionsEl.appendChild(label);
+        });
+        updateMultiSelectLabel(key);
+    }
+
+    function updateMultiSelectLabel(key) {
+        const config = multiSelects[key];
+        const label = document.getElementById(config.labelId);
+        if (!label) return;
+        const names = Object.values(config.selected);
+        label.textContent = names.length === 0 ? config.allLabel : names.join(', ');
+    }
+
+    function getSelectedIds(key) {
+        return Object.keys(multiSelects[key].selected);
+    }
+
+    function resetMultiSelect(key) {
+        multiSelects[key].selected = {};
+        const optionsEl = document.getElementById(multiSelects[key].optionsId);
+        if (optionsEl) {
+            optionsEl.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = false);
+            optionsEl.querySelectorAll('.multi-select-option').forEach(o => o.style.display = '');
+            const si = optionsEl.querySelector('.so-search-input');
+            if (si) si.value = '';
+        }
+        updateMultiSelectLabel(key);
+    }
+
+    // Init all multi-selects
+    Object.keys(multiSelects).forEach(key => initMultiSelect(key));
+    document.addEventListener('click', () => closeAllMultiSelects());
+
+    // City -> cascade cityZone & area
+    multiSelects.cities.onChange = () => {
+        loadCityZones(getSelectedIds('cities'));
+        loadAreas([], getSelectedIds('cities'));
+    };
+    multiSelects.cityZones.onChange = () => {
+        loadAreas(getSelectedIds('cityZones'), getSelectedIds('cities'));
+    };
+
+    // Populate invoice types statically
+    renderMultiSelectOptions('invoiceTypes', [
+        { value: 'Cash', label: 'Cash' },
+        { value: 'Credit', label: 'Credit' },
+        { value: 'OutStation', label: 'Out Station' }
+    ]);
+    // ─────────────────────────────────────────────────────────────────────────
+
+    // ── Customize Filters ─────────────────────────────────────────────────
+    const FILTER_STORAGE_KEY = 'pos_list_hidden_filters';
+    const ALL_FILTER_KEYS = [
+        { key: 'dateFrom',     label: 'Date From' },
+        { key: 'dateTo',       label: 'Date To' },
+        { key: 'company',      label: 'Company' },
+        { key: 'customer',     label: 'Customer' },
+        { key: 'salesOfficer', label: 'Sales Officer' },
+        { key: 'supplierMan',  label: 'Supplier Man' },
+        { key: 'invoiceType',  label: 'Invoice Type' },
+        { key: 'vendor',       label: 'Vendor' },
+        { key: 'city',         label: 'City' },
+        { key: 'cityZone',     label: 'City Zone' },
+        { key: 'area',         label: 'Area' },
+        { key: 'project',      label: 'Project' },
+    ];
+
+    function getHiddenFilters() {
+        try { return JSON.parse(localStorage.getItem(FILTER_STORAGE_KEY)) || []; }
+        catch { return []; }
+    }
+
+    function applyFilterVisibility() {
+        const hidden = getHiddenFilters();
+        document.querySelectorAll('.form-row [data-filter-key]').forEach(el => {
+            el.style.display = hidden.includes(el.dataset.filterKey) ? 'none' : '';
+        });
+    }
+
+    function openCustomizeModal() {
+        const hidden = getHiddenFilters();
+        const list = document.getElementById('filterToggleList');
+        list.innerHTML = '';
+        ALL_FILTER_KEYS.forEach(({ key, label }) => {
+            const isVisible = !hidden.includes(key);
+            const item = document.createElement('label');
+            item.style.cssText = 'display:flex; align-items:center; gap:8px; padding:8px 12px; border:1.5px solid var(--border-default); border-radius:var(--radius); cursor:pointer; font-size:13px; user-select:none;';
+            item.innerHTML = `<input type="checkbox" data-fkey="${key}" ${isVisible ? 'checked' : ''} style="width:auto; cursor:pointer;"> ${label}`;
+            list.appendChild(item);
+        });
+        document.getElementById('customizeFiltersModal').style.display = 'flex';
+    }
+
+    document.getElementById('customizeFiltersBtn').addEventListener('click', openCustomizeModal);
+
+    document.getElementById('filterCustomizeSelectAll').addEventListener('click', () => {
+        document.querySelectorAll('#filterToggleList input[type="checkbox"]').forEach(cb => cb.checked = true);
+    });
+
+    document.getElementById('saveCustomizeFiltersBtn').addEventListener('click', () => {
+        const hidden = [];
+        document.querySelectorAll('#filterToggleList input[type="checkbox"]').forEach(cb => {
+            if (!cb.checked) hidden.push(cb.dataset.fkey);
+        });
+        localStorage.setItem(FILTER_STORAGE_KEY, JSON.stringify(hidden));
+        applyFilterVisibility();
+        document.getElementById('customizeFiltersModal').style.display = 'none';
+    });
+
+    document.getElementById('closeCustomizeFiltersBtn').addEventListener('click', () => {
+        document.getElementById('customizeFiltersModal').style.display = 'none';
+    });
+
+    document.getElementById('customizeFiltersModal').addEventListener('click', function(e) {
+        if (e.target === this) this.style.display = 'none';
+    });
+
+    // Apply on page load
+    applyFilterVisibility();
+    // ─────────────────────────────────────────────────────────────────────────
+
     function updateSelectionUI() {
         const count = selectedIds.size;
         const printSelectedBtn = document.getElementById('printSelectedBtn');
+        const deleteSelectedBtn = document.getElementById('deleteSelectedBtn');
         const selectedCount = document.getElementById('selectedCount');
+        const selectedDeleteCount = document.getElementById('selectedDeleteCount');
         printSelectedBtn.style.display = count > 0 ? 'inline-flex' : 'none';
+        deleteSelectedBtn.style.display = count > 0 && permissions.includes('Delete') ? 'inline-flex' : 'none';
         selectedCount.textContent = count;
+        selectedDeleteCount.textContent = count;
         const allCheckboxes = invoicesTable.querySelectorAll('.row-checkbox');
         const selectAll = document.getElementById('selectAllCheckbox');
         if (allCheckboxes.length > 0) {
@@ -66,40 +274,51 @@ function initializeListPage(permissions) {
         const savedChoice = localStorage.getItem('pos_print_preference');
         const printType = savedChoice || 'full';
         if (printType === 'thermal') {
-            // thermal has no bulk page, open each separately
             [...selectedIds].forEach(id => window.open(`thermal-print.php?id=${id}`, '_blank'));
         } else {
             window.open(`bulk-print.php?ids=${ids}`, '_blank');
         }
     });
+
+    document.getElementById('deleteSelectedBtn').addEventListener('click', function () {
+        if (selectedIds.size === 0) return;
+        deleteInvoiceId = null; // bulk mode
+        document.querySelector('#deleteModal p').textContent =
+            `Are you sure you want to delete ${selectedIds.size} selected invoice(s)? This action cannot be undone.`;
+        document.getElementById('deleteModal').style.display = 'flex';
+    });
     
     // Filter elements
-    const dateFrom = document.getElementById('dateFrom');
-    const dateTo = document.getElementById('dateTo');
-    const companyFilter = document.getElementById('companyFilter');
-    const customerFilter = document.getElementById('customerFilter');
-    const saleOfficerFilter = document.getElementById('saleOfficerFilter');
-    const supplierManFilter = document.getElementById('supplierManFilter');
     const searchInput = document.getElementById('searchInput');
+
+    function appendArrayParams(params, name, values) {
+        values.forEach(v => params.append(name + '[]', v));
+    }
 
     // Load invoices from API
     async function loadInvoices(page = 1) {
         try {
-            // Build query parameters
-            const params = new URLSearchParams({
-                page: page,
-                limit: 10
-            });
-            
-            // Add filters if present
-            if (dateFrom.value) params.append('dateFrom', dateFrom.value);
-            if (dateTo.value) params.append('dateTo', dateTo.value);
-            if (companyFilter.value) params.append('company', companyFilter.value);
-            if (customerFilter.value) params.append('customer', customerFilter.value);
-            if (saleOfficerFilter.value) params.append('saleOfficer', saleOfficerFilter.value);
-            if (supplierManFilter.value) params.append('supplierMan', supplierManFilter.value);
-            if (searchInput.value) params.append('search', searchInput.value);
-            
+            const params = new URLSearchParams({ page, limit: 10 });
+
+            const dateFrom = document.getElementById('dateFrom');
+            const dateTo   = document.getElementById('dateTo');
+            if (dateFrom.value) params.set('date_from', dateFrom.value);
+            if (dateTo.value)   params.set('date_to',   dateTo.value);
+            if (searchInput.value.trim()) params.set('search', searchInput.value.trim());
+
+            const projectVal = document.getElementById('projectFilter')?.value;
+            if (projectVal) params.set('project_id', projectVal);
+
+            appendArrayParams(params, 'invoice_types',     getSelectedIds('invoiceTypes'));
+            appendArrayParams(params, 'sales_officer_ids', getSelectedIds('salesOfficers'));
+            appendArrayParams(params, 'supplier_man_ids',  getSelectedIds('supplierMen'));
+            appendArrayParams(params, 'vendor_ids',        getSelectedIds('vendors'));
+            appendArrayParams(params, 'company_ids',       getSelectedIds('companies'));
+            appendArrayParams(params, 'customer_ids',      getSelectedIds('customers'));
+            appendArrayParams(params, 'city_ids',          getSelectedIds('cities'));
+            appendArrayParams(params, 'city_zone_ids',     getSelectedIds('cityZones'));
+            appendArrayParams(params, 'area_ids',          getSelectedIds('areas'));
+
             const response = await fetch(`../../../../server/api/sale/pos_invoice/pos-list.php?${params.toString()}`);
             const data = await response.json();
             
@@ -222,161 +441,114 @@ function initializeListPage(permissions) {
     loadInvoices();
     loadCustomers();
     loadCompanies();
-    loadSalesOfficers();
-    loadSupplierMen();
-    
-    // Load customers for filter
+    loadFilters();
+    loadCities();
+    loadCityZones();
+    loadAreas();
+    loadProjects();
+
     async function loadCustomers() {
         try {
             const response = await fetch('../../../../server/api/sale/pos_invoice/get-customers.php');
             const data = await response.json();
             if (data.success) {
-                const customerFilterOptions = document.getElementById('customerFilterOptions');
-                customerFilterOptions.innerHTML = '<div class="dropdown-option" data-value="" data-name="">All Customers</div>';
-                data.customers.forEach(customer => {
-                    const option = document.createElement('div');
-                    option.className = 'dropdown-option';
-                    option.setAttribute('data-value', customer.customer_name);
-                    option.setAttribute('data-name', customer.customer_name);
-                    option.textContent = `${customer.customer_code} - ${customer.customer_name}`;
-                    customerFilterOptions.appendChild(option);
-                });
-                initSearchableDropdown('customerFilterSearch', 'customerFilterOptions', 'customerFilter');
+                renderMultiSelectOptions('customers', data.customers.map(c => ({
+                    value: c.id, label: `${c.customer_code} - ${c.customer_name}`
+                })));
             }
-        } catch (error) {
-            console.error('Error loading customers:', error);
-        }
+        } catch (e) { console.error(e); }
     }
-    
-    // Load companies for filter
+
     async function loadCompanies() {
         try {
             const response = await fetch('../../../../server/api/sale/pos_invoice/get-companies.php');
             const data = await response.json();
             if (data.success) {
-                const companyFilterOptions = document.getElementById('companyFilterOptions');
-                companyFilterOptions.innerHTML = '<div class="dropdown-option" data-value="" data-name="">All Companies</div>';
-                data.companies.forEach(company => {
-                    const option = document.createElement('div');
-                    option.className = 'dropdown-option';
-                    option.setAttribute('data-value', company.company_name);
-                    option.setAttribute('data-name', company.company_name);
-                    option.textContent = company.company_name;
-                    companyFilterOptions.appendChild(option);
-                });
-                initSearchableDropdown('companyFilterSearch', 'companyFilterOptions', 'companyFilter');
+                renderMultiSelectOptions('companies', data.companies.map(c => ({
+                    value: c.id, label: c.company_name
+                })));
             }
-        } catch (error) {
-            console.error('Error loading companies:', error);
-        }
-    }
-    
-    // Load sales officers for filter
-    async function loadSalesOfficers() {
-        try {
-            const response = await fetch('../../../../server/api/sale/pos_invoice/get-employees.php');
-            const data = await response.json();
-            if (data.success) {
-                const saleOfficerFilterOptions = document.getElementById('saleOfficerFilterOptions');
-                saleOfficerFilterOptions.innerHTML = '<div class="dropdown-option" data-value="" data-name="">All Sales Officers</div>';
-                data.employees.forEach(employee => {
-                    const option = document.createElement('div');
-                    option.className = 'dropdown-option';
-                    option.setAttribute('data-value', employee.id);
-                    option.setAttribute('data-name', employee.full_name);
-                    option.textContent = employee.full_name;
-                    saleOfficerFilterOptions.appendChild(option);
-                });
-                initSearchableDropdown('saleOfficerFilterSearch', 'saleOfficerFilterOptions', 'saleOfficerFilter');
-            }
-        } catch (error) {
-            console.error('Error loading sales officers:', error);
-        }
-    }
-    
-    // Load supplier men for filter
-    async function loadSupplierMen() {
-        try {
-            const response = await fetch('../../../../server/api/sale/pos_invoice/get-employees.php');
-            const data = await response.json();
-            if (data.success) {
-                const supplierManFilterOptions = document.getElementById('supplierManFilterOptions');
-                supplierManFilterOptions.innerHTML = '<div class="dropdown-option" data-value="" data-name="">All Supplier Men</div>';
-                data.employees.forEach(employee => {
-                    const option = document.createElement('div');
-                    option.className = 'dropdown-option';
-                    option.setAttribute('data-value', employee.id);
-                    option.setAttribute('data-name', employee.full_name);
-                    option.textContent = employee.full_name;
-                    supplierManFilterOptions.appendChild(option);
-                });
-                initSearchableDropdown('supplierManFilterSearch', 'supplierManFilterOptions', 'supplierManFilter');
-            }
-        } catch (error) {
-            console.error('Error loading supplier men:', error);
-        }
-    }
-    
-    // Initialize searchable dropdown
-    function initSearchableDropdown(searchInputId, optionsContainerId, hiddenInputId) {
-        const searchInput = document.getElementById(searchInputId);
-        const optionsContainer = document.getElementById(optionsContainerId);
-        const hiddenInput = document.getElementById(hiddenInputId);
-        
-        searchInput.addEventListener('click', function(e) {
-            e.stopPropagation();
-            optionsContainer.style.display = 'block';
-            filterOptions();
-        });
-        
-        searchInput.addEventListener('input', function() {
-            filterOptions();
-        });
-        
-        optionsContainer.addEventListener('click', function(e) {
-            if (e.target.classList.contains('dropdown-option')) {
-                const value = e.target.getAttribute('data-value');
-                const name = e.target.getAttribute('data-name');
-                let defaultText = 'All Items';
-                if (hiddenInputId === 'customerFilter') defaultText = 'All Customers';
-                else if (hiddenInputId === 'companyFilter') defaultText = 'All Companies';
-                else if (hiddenInputId === 'saleOfficerFilter') defaultText = 'All Sales Officers';
-                else if (hiddenInputId === 'supplierManFilter') defaultText = 'All Supplier Men';
-                searchInput.value = name || defaultText;
-                hiddenInput.value = value;
-                optionsContainer.style.display = 'none';
-                applyFilters();
-            }
-        });
-        
-        document.addEventListener('click', function() {
-            optionsContainer.style.display = 'none';
-        });
-        
-        function filterOptions() {
-            const searchTerm = searchInput.value.toLowerCase();
-            const options = optionsContainer.getElementsByClassName('dropdown-option');
-            
-            for (let i = 0; i < options.length; i++) {
-                const option = options[i];
-                const text = option.textContent.toLowerCase();
-                option.style.display = text.includes(searchTerm) ? 'block' : 'none';
-            }
-        }
+        } catch (e) { console.error(e); }
     }
 
-    function applyFilters() {
-        loadInvoices(1); // Reset to page 1 when filters change
+    async function loadFilters() {
+        try {
+            const response = await fetch('../../../../server/api/sale/daily_sale_report/get-filters.php');
+            const data = await response.json();
+            if (data.success) {
+                renderMultiSelectOptions('salesOfficers', data.salesOfficers.map(e => ({ value: e.id, label: e.full_name })));
+                renderMultiSelectOptions('supplierMen',   data.supplierMen.map(e   => ({ value: e.id, label: e.full_name })));
+                renderMultiSelectOptions('vendors',       data.vendors.map(v       => ({ value: v.id, label: v.supplier_name })));
+            }
+        } catch (e) { console.error(e); }
+    }
+
+    async function loadCities() {
+        try {
+            const response = await fetch('../../../../server/api/sale/daily_sale_report/get-cities.php');
+            const data = await response.json();
+            if (data.success) {
+                renderMultiSelectOptions('cities', data.cities.map(c => ({ value: c.id, label: c.city_name })));
+            }
+        } catch (e) { console.error(e); }
+    }
+
+    async function loadCityZones(cityIds = []) {
+        try {
+            const params = new URLSearchParams();
+            cityIds.forEach(id => params.append('city_ids[]', id));
+            const response = await fetch('../../../../server/api/sale/daily_sale_report/get-city-zones.php' + (params.toString() ? '?' + params : ''));
+            const data = await response.json();
+            if (data.success) {
+                renderMultiSelectOptions('cityZones', data.city_zones.map(z => ({ value: z.id, label: z.city_zone_name })));
+            }
+        } catch (e) { console.error(e); }
+    }
+
+    async function loadAreas(cityZoneIds = [], cityIds = []) {
+        try {
+            const params = new URLSearchParams();
+            cityZoneIds.forEach(id => params.append('city_zone_ids[]', id));
+            cityIds.forEach(id => params.append('city_ids[]', id));
+            const response = await fetch('../../../../server/api/sale/daily_sale_report/get-areas.php' + (params.toString() ? '?' + params : ''));
+            const data = await response.json();
+            if (data.success) {
+                renderMultiSelectOptions('areas', data.areas.map(a => ({ value: a.id, label: a.area_name })));
+            }
+        } catch (e) { console.error(e); }
+    }
+
+    async function loadProjects() {
+        try {
+            const response = await fetch('../../../../server/api/master_setup/project_setup/get-projects-dropdown.php');
+            const data = await response.json();
+            if (data.projects) {
+                const select = document.getElementById('projectFilter');
+                if (!select) return;
+                select.innerHTML = '<option value="">All Projects</option>';
+                data.projects.forEach(p => {
+                    const opt = document.createElement('option');
+                    opt.value = p.id;
+                    opt.textContent = p.project_code + ' - ' + p.project_name + (p.city_name ? ' - ' + p.city_name : '');
+                    select.appendChild(opt);
+                });
+            }
+        } catch (e) { console.error(e); }
+    }
+
+    let debounceTimer = null;
+    function applyFilters(delay = 0) {
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(() => loadInvoices(1), delay);
     }
 
     // Add event listeners for filters
-    dateFrom.addEventListener('change', applyFilters);
-    dateTo.addEventListener('change', applyFilters);
-    companyFilter.addEventListener('change', applyFilters);
-    customerFilter.addEventListener('change', applyFilters);
-    saleOfficerFilter.addEventListener('change', applyFilters);
-    supplierManFilter.addEventListener('change', applyFilters);
-    searchInput.addEventListener('input', applyFilters);
+    document.getElementById('dateFrom').addEventListener('change', () => applyFilters());
+    document.getElementById('dateTo').addEventListener('change', () => applyFilters());
+    searchInput.addEventListener('keydown', e => { if (e.key === 'Enter') applyFilters(); });
+    document.getElementById('searchBtn').addEventListener('click', () => applyFilters());
+    document.getElementById('applyFiltersBtn').addEventListener('click', () => applyFilters());
+    document.getElementById('projectFilter')?.addEventListener('change', () => applyFilters());
 
     // Update pagination
     function updatePagination(pagination) {
@@ -471,20 +643,15 @@ function initializeListPage(permissions) {
 
     // Reset filters button
     document.getElementById('resetFiltersBtn').addEventListener('click', function () {
-        dateFrom.value = '';
-        dateTo.value = '';
+        document.getElementById('dateFrom').value = '';
+        document.getElementById('dateTo').value = '';
         searchInput.value = '';
-
-        [['companyFilter', 'companyFilterSearch', 'All Companies'],
-         ['customerFilter', 'customerFilterSearch', 'All Customers'],
-         ['saleOfficerFilter', 'saleOfficerFilterSearch', 'All Sales Officers'],
-         ['supplierManFilter', 'supplierManFilterSearch', 'All Supplier Men']
-        ].forEach(([hiddenId, searchId, placeholder]) => {
-            document.getElementById(hiddenId).value = '';
-            document.getElementById(searchId).value = '';
-            document.getElementById(searchId).placeholder = placeholder;
-        });
-
+        const proj = document.getElementById('projectFilter');
+        if (proj) proj.value = '';
+        Object.keys(multiSelects).forEach(key => resetMultiSelect(key));
+        closeAllMultiSelects();
+        loadCityZones([]);
+        loadAreas([], []);
         loadInvoices(1);
     });
 
@@ -579,17 +746,19 @@ function initializeListPage(permissions) {
     // Modal event listeners
     document.getElementById('cancelDeleteBtn').addEventListener('click', function() {
         document.getElementById('deleteModal').style.display = 'none';
+        document.querySelector('#deleteModal p').textContent =
+            'Are you sure you want to delete this sale invoice? This action cannot be undone.';
         deleteInvoiceId = null;
     });
     
     document.getElementById('confirmDeleteBtn').addEventListener('click', async function() {
         if (deleteInvoiceId) {
+            // Single delete
             try {
                 const response = await fetch(`../../../../server/api/sale/pos_invoice/pos-delete.php?id=${deleteInvoiceId}`, {
                     method: 'DELETE'
                 });
                 const data = await response.json();
-                
                 if (data.success) {
                     document.getElementById('deleteModal').style.display = 'none';
                     loadInvoices(currentPage);
@@ -600,6 +769,21 @@ function initializeListPage(permissions) {
                 alert('Error deleting invoice: ' + error.message);
             }
             deleteInvoiceId = null;
+        } else if (selectedIds.size > 0) {
+            // Bulk delete
+            try {
+                const ids = [...selectedIds];
+                await Promise.all(ids.map(id =>
+                    fetch(`../../../../server/api/sale/pos_invoice/pos-delete.php?id=${id}`, { method: 'DELETE' })
+                ));
+                document.getElementById('deleteModal').style.display = 'none';
+                document.querySelector('#deleteModal p').textContent =
+                    'Are you sure you want to delete this sale invoice? This action cannot be undone.';
+                clearSelections();
+                loadInvoices(currentPage);
+            } catch (error) {
+                alert('Error deleting invoices: ' + error.message);
+            }
         }
     });
     

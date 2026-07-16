@@ -212,6 +212,154 @@
             }
         }
 
+        /* A6 Optimization */
+        body.a6-mode {
+            font-size: 7px;
+            line-height: 1.1;
+        }
+
+        .a6-mode .invoice-container {
+            max-width: 380px;
+            padding: 6px;
+            margin: 5px auto;
+            box-shadow: none;
+        }
+
+        .a6-mode .invoice-header {
+            flex-direction: column;
+            align-items: flex-start;
+            margin-bottom: 6px;
+            padding-bottom: 5px;
+            gap: 4px;
+        }
+
+        .a6-mode .invoice-details {
+            text-align: left;
+            width: 100%;
+        }
+
+        .a6-mode .company-info {
+            gap: 6px !important;
+        }
+
+        .a6-mode .company-info h1 {
+            font-size: 10px;
+            margin-bottom: 1px;
+        }
+
+        .a6-mode .company-info p {
+            font-size: 6px;
+            margin-bottom: 1px;
+        }
+
+        .a6-mode .company-logo {
+            max-width: 35px !important;
+            max-height: 25px !important;
+        }
+
+        .a6-mode .invoice-details h2 {
+            font-size: 9px;
+            margin-bottom: 2px;
+        }
+
+        .a6-mode .invoice-details p {
+            font-size: 6px;
+        }
+
+        .a6-mode .invoice-meta {
+            grid-template-columns: 1fr 1fr;
+            gap: 4px;
+            margin-bottom: 6px;
+        }
+
+        .a6-mode .supplier-info,
+        .a6-mode .invoice-info,
+        .a6-mode .customer-info {
+            padding: 3px;
+        }
+
+        .a6-mode .supplier-info h3,
+        .a6-mode .invoice-info h3,
+        .a6-mode .customer-info h3 {
+            font-size: 7px;
+            margin-bottom: 2px;
+            padding-bottom: 1px;
+        }
+
+        .a6-mode .supplier-info p,
+        .a6-mode .invoice-info p,
+        .a6-mode .customer-info p {
+            font-size: 6px;
+            line-height: 1.2;
+        }
+
+        .a6-mode .items-table {
+            margin-bottom: 5px;
+        }
+
+        .a6-mode .items-table th,
+        .a6-mode .items-table td {
+            padding: 1px 2px;
+            font-size: 6px;
+        }
+
+        .a6-mode .totals-section {
+            margin-top: 5px;
+        }
+
+        .a6-mode .totals-table {
+            width: 200px;
+        }
+
+        .a6-mode .totals-table td {
+            padding: 1px 3px;
+            font-size: 6px;
+        }
+
+        .a6-mode .totals-horizontal-2 .totals-item,
+        .a6-mode .totals-horizontal-3 .totals-item {
+            padding: 2px 4px;
+            font-size: 6px;
+        }
+
+        .a6-mode div[style*="margin-top: 20px"] { margin-top: 5px !important; }
+        .a6-mode div[style*="margin-top: 30px"] { margin-top: 6px !important; }
+        .a6-mode div[style*="padding: 15px"] { padding: 3px !important; }
+        .a6-mode div[style*="padding: 12px"] { padding: 2px !important; }
+        .a6-mode div[style*="font-size: 11px"] { font-size: 6px !important; }
+        .a6-mode div[style*="font-size: 10px"] { font-size: 6px !important; }
+        .a6-mode div[style*="font-size: 13px"] { font-size: 6px !important; }
+        .a6-mode div[style*="margin-bottom: 50px"] { margin-bottom: 6px !important; }
+        .a6-mode div[style*="border-bottom: 1px solid"] { margin-bottom: 1px !important; }
+        .a6-mode div[style*="gap: 50px"] { gap: 8px !important; }
+        .a6-mode span[style*="font-size: 10px"] { font-size: 5px !important; }
+
+        .a6-mode #qrCode {
+            transform: scale(0.4);
+            transform-origin: top right;
+        }
+
+        .a6-mode #signaturesSection {
+            display: grid !important;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px !important;
+            margin-top: 6px !important;
+        }
+
+        .a6-mode #signaturesSection p {
+            font-size: 6px;
+            margin-bottom: 20px !important;
+        }
+
+        .a6-mode #signaturesSection div[style*="border-bottom"] {
+            width: 80px !important;
+            margin-bottom: 3px !important;
+        }
+
+        .a6-mode #signaturesSection p[style*="font-size: 11px"] {
+            font-size: 6px !important;
+        }
+
         /* A5 Optimization */
         body.a5-mode {
             font-size: 8px;
@@ -365,6 +513,7 @@
         <button class="print-btn" onclick="setPaperSize('A3')" id="btnA3">A3</button>
         <button class="print-btn" onclick="setPaperSize('A4')" id="btnA4">A4</button>
         <button class="print-btn" onclick="setPaperSize('A5')" id="btnA5">A5</button>
+        <button class="print-btn" onclick="setPaperSize('A6')" id="btnA6">A6</button>
     </div>
 
     <div class="invoice-container">
@@ -544,12 +693,9 @@
             localStorage.setItem('invoicePaperSize', size);
             document.documentElement.style.setProperty('--page-size', size);
             
-            // Add/remove A5 class
-            if (size === 'A5') {
-                document.body.classList.add('a5-mode');
-            } else {
-                document.body.classList.remove('a5-mode');
-            }
+            document.body.classList.remove('a5-mode', 'a6-mode');
+            if (size === 'A5') document.body.classList.add('a5-mode');
+            if (size === 'A6') document.body.classList.add('a6-mode');
             
             // Update button states
             document.querySelectorAll('.print-btn').forEach(btn => btn.classList.remove('active'));

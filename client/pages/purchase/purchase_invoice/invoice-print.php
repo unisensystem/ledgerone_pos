@@ -241,18 +241,11 @@
                     <td>Discount Amount:</td>
                     <td class="text-right" id="discountAmount">0.00</td>
                 </tr>
-                <tr id="gstPercentRow">
-                    <td>Tax (%):</td>
-                    <td class="text-right" id="gstPercent">0.00%</td>
-                </tr>
-                <tr id="gstAmountRow">
-                    <td>Tax Amount:</td>
-                    <td class="text-right" id="gstAmount">0.00</td>
-                </tr>
                 <tr id="shippingFeesRow">
                     <td><span id="shippingFeesLabel">Shipping Fees:</span></td>
                     <td class="text-right" id="shippingFees">0.00</td>
                 </tr>
+                <tbody id="invoiceTaxesRows"></tbody>
                 <tr class="total-row">
                     <td>Net Amount:</td>
                     <td class="text-right" id="netAmount">0.00</td>
@@ -335,8 +328,6 @@
             // Hide/show totals section rows
             document.getElementById('discountPercentRow').style.display = enableInvoiceCashDiscount ? '' : 'none';
             document.getElementById('discountAmountRow').style.display = enableInvoiceCashDiscountAmount ? '' : 'none';
-            document.getElementById('gstPercentRow').style.display = enableTaxation ? '' : 'none';
-            document.getElementById('gstAmountRow').style.display = enableTaxation ? '' : 'none';
             document.getElementById('shippingFeesRow').style.display = enableShippingFees ? '' : 'none';
         }
         
@@ -357,7 +348,7 @@
                 
                 if (invoiceData.success) {
                     populateCompanyData(invoiceData.invoice);
-                    populateInvoiceData(invoiceData.invoice, invoiceData.items);
+                    populateInvoiceData(invoiceData.invoice, invoiceData.items, invoiceData.invoice_taxes || []);
                 } else {
                     alert('Error loading invoice: ' + invoiceData.message);
                 }
@@ -380,7 +371,7 @@
         }
         }
         
-        function populateInvoiceData(invoice, items) {
+        function populateInvoiceData(invoice, items, invoiceTaxes) {
             // Populate header info
             document.getElementById('invoiceNo').textContent = invoice.bill_no;
             document.getElementById('invoiceDate').textContent = new Date(invoice.purchase_date).toLocaleDateString();
@@ -480,8 +471,6 @@
             document.getElementById('totalBill').textContent = `${currencySymbol} ${parseFloat(invoice.total_bill).toFixed(2)}`;
             document.getElementById('discountPercent').textContent = parseFloat(invoice.total_discount_percent).toFixed(2) + '%';
             document.getElementById('discountAmount').textContent = `${currencySymbol} ${parseFloat(invoice.total_discount_amount).toFixed(2)}`;
-            document.getElementById('gstPercent').textContent = parseFloat(invoice.total_tax_percent || 0).toFixed(2) + '%';
-            document.getElementById('gstAmount').textContent = `${currencySymbol} ${parseFloat(invoice.total_tax_amount || 0).toFixed(2)}`;
             
             // Display shipping fees with +/- indicator
             const shippingFeesType = invoice.shipping_fees_type || 'add';
@@ -489,6 +478,19 @@
             document.getElementById('shippingFeesLabel').textContent = `Shipping Fees (${shippingFeesSymbol}):`;
             document.getElementById('shippingFees').textContent = `${currencySymbol} ${parseFloat(invoice.shipping_fees || 0).toFixed(2)}`;
             
+            // Invoice-level taxes
+            const taxesContainer = document.getElementById('invoiceTaxesRows');
+            taxesContainer.innerHTML = '';
+            if (invoiceTaxes && invoiceTaxes.length > 0) {
+                invoiceTaxes.forEach(tax => {
+                    const taxAmt = parseFloat(tax.tax_amount || 0);
+                    if (taxAmt === 0) return;
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `<td>${tax.tax_name} (${parseFloat(tax.rate_percentage).toFixed(2)}%):</td><td class="text-right">${currencySymbol} ${taxAmt.toFixed(2)}</td>`;
+                    taxesContainer.appendChild(tr);
+                });
+            }
+
             document.getElementById('netAmount').textContent = `${currencySymbol} ${parseFloat(invoice.net_amount).toFixed(2)}`;
             
             // Convert net amount to words with multi-currency support

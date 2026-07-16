@@ -9,7 +9,7 @@ window.invoiceLevelTaxRegimes = [];
 async function loadInvoiceLevelTaxRegimes(supplierId, companyId = null) {
     if (!supplierId) {
         clearInvoiceLevelTaxes();
-        return;
+        return Promise.resolve();
     }
 
     try {
@@ -57,11 +57,11 @@ function renderInvoiceLevelTaxColumns() {
         percentInput.value = ratePercent.toFixed(3);
         percentInput.id = `invoiceTax_${regime.id}_percent`;
         percentInput.addEventListener('input', function() {
-            const netAmount = parseFloat(document.getElementById('netAmount')?.textContent) || 0;
+            const baseNetAmount = parseFloat(this.closest('.summary-grid')?.dataset.baseNet) || 0;
             const pct = parseFloat(this.value) || 0;
             const amountEl = document.getElementById(`invoiceTax_${regime.id}_amount`);
-            if (amountEl) amountEl.value = (netAmount * pct / 100).toFixed(3);
-            recalcNetReceivable();
+            if (amountEl) amountEl.value = (baseNetAmount * pct / 100).toFixed(3);
+            recalcNetAmount();
         });
         percentItem.innerHTML = `<span class="summary-label">${regime.regime_name} %</span>`;
         percentItem.appendChild(percentInput);
@@ -78,29 +78,18 @@ function renderInvoiceLevelTaxColumns() {
         amountInput.value = '0.00';
         amountInput.id = `invoiceTax_${regime.id}_amount`;
         amountInput.addEventListener('input', function() {
-            const netAmount = parseFloat(document.getElementById('netAmount')?.textContent) || 0;
+            const baseNetAmount = parseFloat(this.closest('.summary-grid')?.dataset.baseNet) || 0;
             const amt = parseFloat(this.value) || 0;
             const percentEl = document.getElementById(`invoiceTax_${regime.id}_percent`);
-            if (percentEl) percentEl.value = netAmount > 0 ? (amt / netAmount * 100).toFixed(3) : '0.000';
-            recalcNetReceivable();
+            if (percentEl) percentEl.value = baseNetAmount > 0 ? (amt / baseNetAmount * 100).toFixed(3) : '0.000';
+            recalcNetAmount();
         });
         amountItem.innerHTML = `<span class="summary-label">${regime.regime_name} Amt</span>`;
         amountItem.appendChild(amountInput);
         container.appendChild(amountItem);
     });
 
-    function recalcNetReceivable() {
-        const netAmount = parseFloat(document.getElementById('netAmount')?.textContent) || 0;
-        let totalTax = 0;
-        window.invoiceLevelTaxRegimes.forEach(r => {
-            totalTax += parseFloat(document.getElementById(`invoiceTax_${r.id}_amount`)?.value) || 0;
-        });
-        const netReceivableEl = document.getElementById('netReceivable');
-        if (netReceivableEl) netReceivableEl.textContent = (netAmount + totalTax).toFixed(3);
-    }
-    
-    // Trigger calculation after rendering
-    setTimeout(() => calculateInvoiceLevelTaxes(), 10);
+    // calculation is triggered by loadInvoiceLevelTaxRegimes after render
 }
 
 /**
@@ -108,35 +97,29 @@ function renderInvoiceLevelTaxColumns() {
  * Formula: Net Amount × (Rate % / 100) = Tax Amount
  */
 function calculateInvoiceLevelTaxes() {
-    if (!window.invoiceLevelTaxRegimes || window.invoiceLevelTaxRegimes.length === 0) {
-        return 0;
-    }
-
     const netAmountEl = document.getElementById('netAmount');
     if (!netAmountEl) return 0;
-    
-    const netAmount = parseFloat(netAmountEl.textContent) || 0;
+
+    const summaryGrid = netAmountEl.closest('.summary-grid');
+    const baseNet = parseFloat(summaryGrid?.dataset.baseNet) || parseFloat(netAmountEl.textContent) || 0;
+
+    if (!window.invoiceLevelTaxRegimes || window.invoiceLevelTaxRegimes.length === 0) {
+        netAmountEl.textContent = baseNet.toFixed(3);
+        return 0;
+    }
 
     let totalInvoiceTax = 0;
 
     window.invoiceLevelTaxRegimes.forEach(regime => {
-        const ratePercent = parseFloat(regime.rate_percentage) || 0;
-        const taxAmount = netAmount * (ratePercent / 100);
-
-        const amountEl = document.getElementById(`invoiceTax_${regime.id}_amount`);
-        if (amountEl) {
-            amountEl.value = taxAmount.toFixed(3);
-        }
-
+        const percentEl = document.getElementById(`invoiceTax_${regime.id}_percent`);
+        const amountEl  = document.getElementById(`invoiceTax_${regime.id}_amount`);
+        const ratePercent = parseFloat(percentEl?.value ?? regime.rate_percentage) || 0;
+        const taxAmount = baseNet * (ratePercent / 100);
+        if (amountEl) amountEl.value = taxAmount.toFixed(3);
         totalInvoiceTax += taxAmount;
     });
 
-    const netReceivableEl = document.getElementById('netReceivable');
-    if (netReceivableEl) {
-        const netReceivable = netAmount + totalInvoiceTax;
-        netReceivableEl.textContent = netReceivable.toFixed(3);
-    }
-
+    netAmountEl.textContent = (baseNet + totalInvoiceTax).toFixed(3);
     return totalInvoiceTax;
 }
 
@@ -149,13 +132,66 @@ function clearInvoiceLevelTaxes() {
     if (container) container.innerHTML = '';
 
     const netAmountEl = document.getElementById('netAmount');
-    const netAmount = parseFloat(netAmountEl?.textContent) || 0;
-    
-    const netReceivableEl = document.getElementById('netReceivable');
-    if (netReceivableEl) netReceivableEl.textContent = netAmount.toFixed(3);
+    const summaryGrid = netAmountEl?.closest('.summary-grid');
+    const baseNet = parseFloat(summaryGrid?.dataset.baseNet) || parseFloat(netAmountEl?.textContent) || 0;
+    if (netAmountEl) netAmountEl.textContent = baseNet.toFixed(3);
+}
+
+/**
+ * Recalculate Net Amount from baseNet + all current tax amount inputs
+ * Called when user manually edits a tax % or amount field
+ */
+function recalcNetAmount() {
+    const netAmountEl = document.getElementById('netAmount');
+    if (!netAmountEl) return;
+    const summaryGrid = netAmountEl.closest('.summary-grid');
+    const baseNet = parseFloat(summaryGrid?.dataset.baseNet) || 0;
+
+    let totalTax = 0;
+    window.invoiceLevelTaxRegimes.forEach(regime => {
+        const amountEl = document.getElementById(`invoiceTax_${regime.id}_amount`);
+        totalTax += parseFloat(amountEl?.value) || 0;
+    });
+
+    netAmountEl.textContent = (baseNet + totalTax).toFixed(3);
 }
 
 // Export functions
 window.loadInvoiceLevelTaxRegimes = loadInvoiceLevelTaxRegimes;
 window.calculateInvoiceLevelTaxes = calculateInvoiceLevelTaxes;
 window.clearInvoiceLevelTaxes = clearInvoiceLevelTaxes;
+
+/**
+ * Collect current invoice-level tax data for saving
+ * Returns array of { taxRegimeId, taxName, ratePercentage, baseAmount, taxAmount }
+ */
+window.getInvoiceTaxData = function() {
+    if (!window.invoiceLevelTaxRegimes || window.invoiceLevelTaxRegimes.length === 0) return [];
+    const summaryGrid = document.getElementById('netAmount')?.closest('.summary-grid');
+    const baseNet = parseFloat(summaryGrid?.dataset.baseNet) || 0;
+    return window.invoiceLevelTaxRegimes.map(regime => {
+        const pct = parseFloat(document.getElementById(`invoiceTax_${regime.id}_percent`)?.value) || 0;
+        const amt = parseFloat(document.getElementById(`invoiceTax_${regime.id}_amount`)?.value) || 0;
+        return {
+            taxRegimeId:    regime.id,
+            taxName:        regime.regime_name,
+            ratePercentage: pct,
+            baseAmount:     baseNet,
+            taxAmount:      amt
+        };
+    }).filter(t => t.taxAmount > 0 || t.ratePercentage > 0);
+};
+
+/**
+ * Restore saved invoice taxes in edit mode
+ * savedTaxes: array from DB { tax_regime_id, tax_name, rate_percentage, base_amount, tax_amount }
+ */
+window.restoreInvoiceTaxes = function(savedTaxes) {
+    if (!savedTaxes || savedTaxes.length === 0) return;
+    savedTaxes.forEach(tax => {
+        const regimeId = tax.tax_regime_id;
+        const percentEl = document.getElementById(`invoiceTax_${regimeId}_percent`);
+        if (percentEl) percentEl.value = parseFloat(tax.rate_percentage).toFixed(3);
+    });
+    calculateInvoiceLevelTaxes();
+};

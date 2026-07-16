@@ -1,5 +1,6 @@
 <?php
 require_once '../../../../includes/connection.php';
+require_once 'purchase-invoice-tax-helper.php';
 
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
@@ -39,19 +40,22 @@ try {
     $invoice = $inv->fetch(PDO::FETCH_ASSOC);
     if (!$invoice) throw new Exception('Source invoice not found');
 
-    // Fetch source items
-    $items_stmt = $pdo->prepare("SELECT * FROM purchase_invoice_items WHERE purchase_invoice_id = ? AND tenant_id = ?");
+    // Fetch source items (all rows including multi-unit entries)
+    $items_stmt = $pdo->prepare("SELECT * FROM purchase_invoice_items WHERE purchase_invoice_id = ? AND tenant_id = ? ORDER BY id");
     $items_stmt->execute([$source_id, $tenant_id]);
     $items = $items_stmt->fetchAll(PDO::FETCH_ASSOC);
 
-    // Resolve final values
+    // Fetch source invoice-level taxes
+    $source_taxes = getPurchaseInvoiceTaxes($pdo, $source_id, $tenant_id);
+
     $final_date     = $override_date ?? date('Y-m-d');
     $final_supplier = $override_supplier ?? $invoice['supplier_id'];
+    $fresh_balance  = (float)($input['previous_balance'] ?? 0);
 
     $pdo->beginTransaction();
 
-    // Generate bill_no inside transaction to avoid race condition (same as purchase-add.php)
-    $billStmt = $pdo->prepare("SELECT bill_no FROM purchase_invoice WHERE tenant_id = ? ORDER BY id DESC LIMIT 1");
+    // Generate bill_no inside transaction
+    $billStmt = $pdo->prepare("SELECT bill_no FROM purchase_invoice WHERE tenant_id = ? ORDER BY id DESC LIMIT 1 FOR UPDATE");
     $billStmt->execute([$tenant_id]);
     $lastBill = $billStmt->fetchColumn();
 
@@ -62,9 +66,6 @@ try {
         $newNumber = 1;
     }
     $new_bill_no = 'PUR-' . str_pad($newNumber, 4, '0', STR_PAD_LEFT);
-
-    // Use previous_balance sent from frontend (fetched via supplier-ledger API)
-    $fresh_balance = (float)($input['previous_balance'] ?? 0);
 
     // Insert duplicate invoice
     $stmt = $pdo->prepare("
@@ -109,7 +110,7 @@ try {
 
     $new_invoice_id = $pdo->lastInsertId();
 
-    // Insert duplicate items
+    // Insert duplicate items + stock ledger
     $item_stmt = $pdo->prepare("
         INSERT INTO purchase_invoice_items (
             tenant_id, purchase_invoice_id, product_id, uom_id,
@@ -118,6 +119,13 @@ try {
             tax_percent, tax_amount, foc_quantity, net_amount, size,
             created_by, updated_by
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ");
+
+    $stock_stmt = $pdo->prepare("
+        INSERT INTO stock_ledger (
+            tenant_id, account_id, branch_id, product_id, reference_table, reference_id,
+            qty_in, unit_cost, unit_id, transaction_type, transaction_date
+        ) VALUES (?, ?, ?, ?, 'purchase_invoice', ?, ?, ?, ?, 'Purchase Invoice', ?)
     ");
 
     foreach ($items as $item) {
@@ -142,25 +150,16 @@ try {
             $user_id
         ]);
 
-        // Stock ledger — same check as purchase-add.php
+        // Stock ledger — check stock_affects from products table
         if ($item['quantity'] > 0) {
             $product_stmt = $pdo->prepare("SELECT inventory_account_id, stock_affects FROM products WHERE id = ?");
             $product_stmt->execute([$item['product_id']]);
             $product = $product_stmt->fetch(PDO::FETCH_ASSOC);
 
-            $stockAffects = isset($product['stock_affects']) ? (int)$product['stock_affects'] : 1;
-            $account_id   = $product['inventory_account_id'] ?? null;
-
-            if ($stockAffects == 1 && $account_id) {
-                $stock_stmt = $pdo->prepare("
-                    INSERT INTO stock_ledger (
-                        tenant_id, account_id, branch_id, product_id, reference_table, reference_id,
-                        qty_in, unit_cost, unit_id, transaction_type, transaction_date
-                    ) VALUES (?, ?, ?, ?, 'purchase_invoice', ?, ?, ?, ?, 'Purchase Invoice', ?)
-                ");
+            if ($product && (int)($product['stock_affects'] ?? 1) == 1 && $product['inventory_account_id']) {
                 $stock_stmt->execute([
                     $tenant_id,
-                    $account_id,
+                    $product['inventory_account_id'],
                     $invoice['branch_id'],
                     $item['product_id'],
                     $new_invoice_id,
@@ -173,7 +172,20 @@ try {
         }
     }
 
-    // Accounting entries — identical to purchase-add.php
+    // Copy invoice-level taxes
+    if (!empty($source_taxes)) {
+        $taxes_to_save = array_map(fn($t) => [
+            'taxRegimeId'    => $t['tax_regime_id'],
+            'taxName'        => $t['tax_name'],
+            'ratePercentage' => $t['rate_percentage'],
+            'baseAmount'     => $t['base_amount'],
+            'taxAmount'      => $t['tax_amount'],
+        ], $source_taxes);
+
+        savePurchaseInvoiceTaxes($pdo, $tenant_id, $new_invoice_id, $taxes_to_save, $user_id);
+    }
+
+    // Accounting entries
     $ledger_stmt = $pdo->prepare("
         INSERT INTO accounting_ledger (
             tenant_id, transaction_type, reference_table, reference_id,
@@ -186,7 +198,7 @@ try {
     // 1. Debit - Purchases
     $ledger_stmt->execute([$tenant_id, $new_invoice_id, 19, $final_date, 'Purchase Invoice - ' . $new_bill_no, $purchaseAmount, 0]);
 
-    // 2. Debit - Input Tax Receivable
+    // 2. Debit - Input Tax Receivable (invoice-level GST)
     if ($invoice['total_tax_amount'] > 0) {
         $ledger_stmt->execute([$tenant_id, $new_invoice_id, 107, $final_date, 'Purchase Invoice - ' . $new_bill_no, $invoice['total_tax_amount'], 0]);
     }
@@ -203,6 +215,14 @@ try {
 
     // 5. Credit - Trade Creditors
     $ledger_stmt->execute([$tenant_id, $new_invoice_id, 14, $final_date, 'Purchase Invoice - ' . $new_bill_no, 0, $invoice['net_amount']]);
+
+    // 6. Debit - Input Tax Receivable for each invoice-level tax
+    foreach ($source_taxes as $tax) {
+        $taxAmt = floatval($tax['tax_amount'] ?? 0);
+        if ($taxAmt > 0) {
+            $ledger_stmt->execute([$tenant_id, $new_invoice_id, 107, $final_date, 'Purchase Invoice Tax - ' . $new_bill_no, $taxAmt, 0]);
+        }
+    }
 
     $pdo->commit();
 
