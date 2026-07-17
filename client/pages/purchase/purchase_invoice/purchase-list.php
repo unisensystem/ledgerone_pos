@@ -123,6 +123,21 @@ if (!$user_id) {
         </div>
     </div>
 
+    <!-- Duplicate Success Modal -->
+    <div class="modal" id="duplicateSuccessModal">
+        <div class="modal-content duplicate-success-content">
+            <div class="dup-success-icon"><i class="fas fa-check-circle"></i></div>
+            <h3 class="modal-title" style="text-align:center;">Invoice Duplicated!</h3>
+            <p class="dup-success-msg">New invoice <strong id="dupSuccessBillNo"></strong> has been created successfully.</p>
+            <div class="dup-success-timer">Auto-closing in <span id="dupSuccessCountdown">6</span>s</div>
+            <div class="modal-actions" style="justify-content:center;gap:10px;">
+                <button class="btn btn-secondary" id="dupSuccessCloseBtn"><i class="fas fa-times"></i> Close</button>
+                <button class="btn btn-success" id="dupSuccessPrintBtn"><i class="fas fa-print"></i> Print</button>
+                <button class="btn btn-primary" id="dupSuccessEditBtn"><i class="fas fa-edit"></i> Edit</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Duplicate Invoice Modal -->
     <div class="modal" id="duplicateModal">
         <div class="modal-content duplicate-modal-content">

@@ -502,7 +502,7 @@ document.addEventListener('DOMContentLoaded', function () {
             if (data.success) {
                 document.getElementById('duplicateModal').style.display = 'none';
                 duplicateInvoiceId = null;
-                loadInvoices(currentPage);
+                showDuplicateSuccess(data.bill_no || document.getElementById('duplicateNewBillNoDisplay').textContent, data.invoice_id || null);
             } else {
                 errorEl.textContent = data.message;
             }
@@ -518,6 +518,55 @@ document.addEventListener('DOMContentLoaded', function () {
             this.style.display = 'none';
             duplicateInvoiceId = null;
         }
+    });
+
+    let dupSuccessNewId = null;
+    let dupSuccessTimer = null;
+
+    function showDuplicateSuccess(billNo, newId) {
+        dupSuccessNewId = newId;
+        document.getElementById('dupSuccessBillNo').textContent = billNo;
+        document.getElementById('duplicateSuccessModal').style.display = 'flex';
+        loadInvoices(currentPage);
+
+        let secs = 6;
+        document.getElementById('dupSuccessCountdown').textContent = secs;
+        clearInterval(dupSuccessTimer);
+        dupSuccessTimer = setInterval(function() {
+            secs--;
+            document.getElementById('dupSuccessCountdown').textContent = secs;
+            if (secs <= 0) {
+                clearInterval(dupSuccessTimer);
+                closeDupSuccessModal();
+            }
+        }, 1000);
+    }
+
+    function closeDupSuccessModal() {
+        clearInterval(dupSuccessTimer);
+        document.getElementById('duplicateSuccessModal').style.display = 'none';
+        dupSuccessNewId = null;
+    }
+
+    document.getElementById('dupSuccessCloseBtn').addEventListener('click', closeDupSuccessModal);
+
+    document.getElementById('dupSuccessPrintBtn').addEventListener('click', function() {
+        if (dupSuccessNewId) {
+            window.open(`invoice-print.php?id=${dupSuccessNewId}`, '_blank');
+        }
+        closeDupSuccessModal();
+    });
+
+    document.getElementById('dupSuccessEditBtn').addEventListener('click', function() {
+        if (dupSuccessNewId) {
+            window.location.href = `purchase-add.php?edit=${dupSuccessNewId}`;
+        } else {
+            closeDupSuccessModal();
+        }
+    });
+
+    document.getElementById('duplicateSuccessModal').addEventListener('click', function(e) {
+        if (e.target === this) closeDupSuccessModal();
     });
 
 });

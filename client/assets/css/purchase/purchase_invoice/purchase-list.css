@@ -623,3 +623,35 @@ tbody tr:hover {
   border-color: var(--primary);
   box-shadow: 0 0 0 2px rgba(31, 123, 255, 0.1);
 }
+
+/* Duplicate Success Modal */
+.duplicate-success-content {
+  width: 400px;
+  text-align: center;
+  padding: 32px 24px 24px;
+}
+
+.dup-success-icon {
+  font-size: 52px;
+  color: var(--success);
+  margin-bottom: 12px;
+  animation: dup-pop 0.4s ease;
+}
+
+@keyframes dup-pop {
+  0% { transform: scale(0.5); opacity: 0; }
+  80% { transform: scale(1.1); }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.dup-success-msg {
+  font-size: 14px;
+  color: var(--body);
+  margin-bottom: 10px;
+}
+
+.dup-success-timer {
+  font-size: 12px;
+  color: var(--subtext);
+  margin-bottom: 4px;
+}

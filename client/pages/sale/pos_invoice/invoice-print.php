@@ -582,7 +582,7 @@
 
         <div class="totals-section">
             <table class="totals-table" id="totalsTable">
-                <tr>
+                <tr id="totalBillRow">
                     <td>Total Bill:</td>
                     <td class="text-right" id="totalBill">0.00</td>
                 </tr>
@@ -618,26 +618,26 @@
                     <td>Net Amount:</td>
                     <td class="text-right" id="netAmount">0.00</td>
                 </tr>
-                <tr>
+                <tr id="amountPaidRow">
                     <td>Amount Paid:</td>
                     <td class="text-right" id="amountPaid">0.00</td>
                 </tr>
-                <tr>
+                <tr id="paymentMethodRow">
                     <td>Payment Method:</td>
                     <td class="text-right" id="paymentMethod">-</td>
                 </tr>
-                <tr>
+                <tr id="remainingBalanceRow">
                     <td>Remaining Balance:</td>
                     <td class="text-right" id="remainingBalance">0.00</td>
                 </tr>
-                <tr style="border-top: 2px solid #ddd; height: 8px;">
+                <tr id="balanceDividerRow" style="border-top: 2px solid #ddd; height: 8px;">
                     <td colspan="2"></td>
                 </tr>
-                <tr style="background-color: #fff8f0; border: 1px solid #ffc9a3;">
+                <tr id="previousBalanceRow" style="background-color: #fff8f0; border: 1px solid #ffc9a3;">
                     <td style="font-weight: bold; padding: 10px; color: #ff8c42;">Previous Balance:</td>
                     <td class="text-right" id="previousBalanceAmount" style="font-weight: bold; padding: 10px; color: #ff8c42;">0.00</td>
                 </tr>
-                <tr style="background-color: #f0f8ff; border: 1px solid #b3d9ff;">
+                <tr id="totalBalanceRow" style="background-color: #f0f8ff; border: 1px solid #b3d9ff;">
                     <td style="font-weight: bold; padding: 10px; color: #1f7bff;">Total Balance:</td>
                     <td class="text-right" id="totalBalance" style="font-weight: bold; padding: 10px; color: #1f7bff;">0.00</td>
                 </tr>
@@ -1412,12 +1412,12 @@
             } else {
                 document.getElementById('totalBill').textContent = `${currencySymbol} ${parseFloat(invoice.total_bill).toFixed(2)}`;
 
-                if (enableInvoiceCashDiscountPercent) {
+                if (enableInvoiceCashDiscountPercent && parseFloat(invoice.total_discount_percent) > 0) {
                     document.getElementById('discountPercentRow').style.display = '';
                     document.getElementById('discountPercent').textContent = parseFloat(invoice.total_discount_percent).toFixed(2) + '%';
                 }
 
-                if (enableInvoiceCashDiscountAmount) {
+                if (enableInvoiceCashDiscountAmount && parseFloat(invoice.total_discount_amount) > 0) {
                     document.getElementById('discountAmountRow').style.display = '';
                     document.getElementById('discountAmount').textContent = `${currencySymbol} ${parseFloat(invoice.total_discount_amount).toFixed(2)}`;
                 }
@@ -1468,6 +1468,18 @@
                 const totalBalanceSign = totalBalanceValue >= 0 ? 'Dr' : 'Cr';
                 
                 document.getElementById('totalBalance').textContent = `${currencySymbol} ${Math.abs(totalBalanceValue).toFixed(2)} ${totalBalanceSign}`;
+
+                // Hide totals rows that have no meaningful value
+                hideTotalsRowIfEmpty('totalBillRow', 'totalBill');
+                hideTotalsRowIfEmpty('amountPaidRow', 'amountPaid');
+                hideTotalsRowIfEmpty('paymentMethodRow', 'paymentMethod', true);
+                hideTotalsRowIfEmpty('remainingBalanceRow', 'remainingBalance');
+                hideTotalsRowIfEmpty('previousBalanceRow', 'previousBalanceAmount', false, true);
+                hideTotalsRowIfEmpty('totalBalanceRow', 'totalBalance', false, true);
+                // Hide divider if both balance rows are hidden
+                const prevHidden = document.getElementById('previousBalanceRow').style.display === 'none';
+                const totalHidden = document.getElementById('totalBalanceRow').style.display === 'none';
+                if (prevHidden && totalHidden) document.getElementById('balanceDividerRow').style.display = 'none';
             }
 
             // Convert net amount to words with multi-currency support
@@ -1561,6 +1573,19 @@
                 }, 1000);
             }
         });
+
+        // Hide a totals row if its value cell is empty/zero/dash
+        function hideTotalsRowIfEmpty(rowId, cellId, isDash, isBalance) {
+            const row = document.getElementById(rowId);
+            const cell = document.getElementById(cellId);
+            if (!row || !cell) return;
+            const text = cell.textContent.trim();
+            const empty = !text
+                || (isDash && text === '-')
+                || /^[^\d]*\s*0\.00$/.test(text)
+                || (isBalance && /^[^\d]*\s*0\.00\s*(Dr|Cr)$/.test(text));
+            if (empty) row.style.display = 'none';
+        }
 
         // Auto-hide table columns with no meaningful data
         function hideEmptyTableColumns() {
