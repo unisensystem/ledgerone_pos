@@ -41,42 +41,38 @@ try {
     $orderStmt->execute([$order_id, $tenant_id]);
     $orderedItems = $orderStmt->fetchAll(PDO::FETCH_ASSOC);
     
-    // Get served quantities from sale_invoice
+    // Get served quantities grouped by product_id + uom_id
     $servedStmt = $pdo->prepare("
         SELECT 
             sii.product_id,
+            sii.uom_id,
             SUM(sii.quantity) as served_qty
         FROM sale_invoice si
         JOIN sale_invoice_items sii ON si.id = sii.sale_invoice_id
         WHERE si.sale_order_id = ? AND si.tenant_id = ? AND si.status = 'Posted'
-        GROUP BY sii.product_id
+        GROUP BY sii.product_id, sii.uom_id
     ");
     $servedStmt->execute([$order_id, $tenant_id]);
-    $servedItems = $servedStmt->fetchAll(PDO::FETCH_ASSOC);
-    
-    // Map served quantities
+
+    // Map: product_id_uom_id => served_qty
     $servedMap = [];
-    foreach ($servedItems as $item) {
-        $servedMap[$item['product_id']] = floatval($item['served_qty']);
+    foreach ($servedStmt->fetchAll(PDO::FETCH_ASSOC) as $s) {
+        $servedMap[$s['product_id'] . '_' . $s['uom_id']] = floatval($s['served_qty']);
     }
-    
-    // Combine data
+
+    // Combine — one row per sale_order_items row, matched by product_id + uom_id
     $fulfillment = [];
     foreach ($orderedItems as $item) {
-        $productId = $item['product_id'];
+        if ($item['parent_row_id']) continue;
         $orderedQty = floatval($item['ordered_qty']);
-        $servedQty = $servedMap[$productId] ?? 0;
-        $remainingQty = $orderedQty - $servedQty;
-        
+        $servedQty  = $servedMap[$item['product_id'] . '_' . $item['uom_id']] ?? 0;
         $fulfillment[] = [
-            'product_id' => $productId,
-            'product_name' => $item['product_name'],
-            'uom_name' => $item['uom_name'],
-            'ordered_qty' => $orderedQty,
-            'served_qty' => $servedQty,
-            'remaining_qty' => $remainingQty,
+            'product_name'        => $item['product_name'],
+            'uom_name'            => $item['uom_name'],
+            'ordered_qty'         => $orderedQty,
+            'served_qty'          => $servedQty,
+            'remaining_qty'       => $orderedQty - $servedQty,
             'fulfillment_percent' => $orderedQty > 0 ? round(($servedQty / $orderedQty) * 100, 2) : 0,
-            'parent_row_id' => $item['parent_row_id']
         ];
     }
     

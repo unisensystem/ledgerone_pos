@@ -1693,52 +1693,77 @@ function initializePage(permissions) {
                     itemsTable.deleteRow(0);
                 }
 
-                // Separate parents and children
-                const parentItems = data.items.filter(item => !item.parent_row_id);
-                const childItems = data.items.filter(item => item.parent_row_id);
-                const itemIdToRowMap = {};
+                // Group parent items by product_id (same as loadInvoiceData)
+                const itemsByProduct = {};
+                data.items.filter(item => !item.parent_row_id).forEach(item => {
+                    if (!itemsByProduct[item.product_id]) {
+                        itemsByProduct[item.product_id] = { baseItem: item, units: [] };
+                    }
+                    itemsByProduct[item.product_id].units.push({ uom_id: item.uom_id, quantity: item.quantity });
+                });
 
-                // Populate parent items
-                parentItems.forEach(item => {
-                    addRowDynamic();
+                for (const productGroup of Object.values(itemsByProduct)) {
+                    const item = productGroup.baseItem;
+                    await addRowDynamic();
                     const lastRow = itemsTable.rows[itemsTable.rows.length - 1];
-                    itemIdToRowMap[item.id] = lastRow;
-
-                    console.log('Loading item:', item.product_name, 'net_amount:', item.net_amount);
 
                     lastRow.cells[1].querySelector('.search-input').value = item.product_name;
                     lastRow.cells[1].querySelector('.item-code').value = item.product_id;
-                    lastRow.querySelector('.scheme-select').value = item.uom_id;
-                    lastRow.querySelector('.price-cell input').value = item.sale_price;
-                    lastRow.querySelector('.gross-cell input').value = item.gross_amount;
-                    lastRow.querySelector('.disc-percent-cell input').value = item.discount_percent || 0;
-                    lastRow.querySelector('.disc-amount-cell input').value = item.discount_amount || 0;
-                    lastRow.querySelector('.to-amount-cell input').value = item.trade_offer_amount || 0;
-                    lastRow.querySelector('.tax-percent-cell input').value = item.tax_percent || 0;
-                    lastRow.querySelector('.tax-amount-cell input').value = item.tax_amount || 0;
-                    lastRow.querySelector('.foc-cell input').value = item.foc_quantity || 0;
-                    
-                    const netInput = lastRow.querySelector('.net-cell input');
-                    console.log('Net input element found:', !!netInput, 'Setting to:', item.net_amount);
-                    netInput.value = item.net_amount;
-                    console.log('Net input value after setting:', netInput.value);
-                    
                     lastRow.dataset.stockAffects = item.stock_affects || 1;
                     lastRow.dataset.invoiceAffects = item.invoice_affects || 1;
                     lastRow.dataset.productId = item.product_id;
 
-                    // Show variants button if has children
+                    // Load UOM details so unit columns render correctly
+                    const product = dataCache.products.get(parseInt(item.product_id));
+                    if (product) {
+                        const uomDetails = await getProductUOMDetails(product);
+                        lastRow.dataset.productUomData = JSON.stringify(uomDetails);
+                        recalculateMaxColumns();
+
+                        productGroup.units.forEach(unit => {
+                            const unitInput = lastRow.querySelector(`.unit-input[data-unit-id="${unit.uom_id}"]`);
+                            if (unitInput) unitInput.value = unit.quantity;
+                        });
+                    }
+
+                    const priceInput = lastRow.querySelector('.price-cell input');
+                    if (priceInput) priceInput.value = item.sale_price;
+                    const grossInput = lastRow.querySelector('.gross-cell input');
+                    if (grossInput) grossInput.value = item.gross_amount;
+                    const discPercentInput = lastRow.querySelector('.disc-percent-cell input');
+                    if (discPercentInput) discPercentInput.value = item.discount_percent || 0;
+                    const discAmountInput = lastRow.querySelector('.disc-amount-cell input');
+                    if (discAmountInput) discAmountInput.value = item.discount_amount || 0;
+                    const toAmountInput = lastRow.querySelector('.to-amount-cell input');
+                    if (toAmountInput) toAmountInput.value = item.trade_offer_amount || 0;
+                    const taxPercentInput = lastRow.querySelector('.tax-percent-cell input');
+                    if (taxPercentInput) taxPercentInput.value = item.tax_percent || 0;
+                    const taxAmountInput = lastRow.querySelector('.tax-amount-cell input');
+                    if (taxAmountInput) taxAmountInput.value = item.tax_amount || 0;
+                    const focInput = lastRow.querySelector('.foc-cell input');
+                    if (focInput) focInput.value = item.foc_quantity || 0;
+                    const netInput = lastRow.querySelector('.net-cell input');
+                    if (netInput) netInput.value = item.net_amount;
+
+                    // Set scheme and trigger scheme change
+                    const schemeSelect = lastRow.querySelector('.scheme-select');
+                    if (schemeSelect) {
+                        schemeSelect.value = item.scheme || 'sale_on_tp';
+                        schemeSelect.dispatchEvent(new Event('change'));
+                    }
+
                     checkAndShowVariantsButton(lastRow, item.product_id);
-                });
+                }
 
                 // Store child items in parent dataset
+                const childItems = data.items.filter(item => item.parent_row_id);
                 childItems.forEach(child => {
-                    const parentRow = itemIdToRowMap[child.parent_row_id];
+                    // find parent row by product_id match
+                    const parentRow = Array.from(itemsTable.rows).find(r =>
+                        r.cells[1]?.querySelector('.item-code')?.value == child.parent_row_id
+                    );
                     if (!parentRow) return;
-
-                    if (!parentRow.dataset.childProducts) {
-                        parentRow.dataset.childProducts = JSON.stringify([]);
-                    }
+                    if (!parentRow.dataset.childProducts) parentRow.dataset.childProducts = JSON.stringify([]);
                     const childProducts = JSON.parse(parentRow.dataset.childProducts);
                     childProducts.push({
                         product_id: child.product_id,

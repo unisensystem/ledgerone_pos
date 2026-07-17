@@ -240,20 +240,16 @@ try {
             padding-top: 5px;
         }
         
+        .print-hidden {
+            display: none !important;
+        }
+
         @media print {
-            body {
-                margin: 0;
-            }
-            
-            .print-container {
-                margin: 0;
-                border: none;
-                box-shadow: none;
-            }
-            
-            .no-print {
-                display: none;
-            }
+            body { margin: 0; }
+            .print-container { margin: 0; border: none; box-shadow: none; }
+            .no-print { display: none !important; }
+            .modal-overlay { display: none !important; }
+            .print-hidden { display: none !important; }
         }
         
         .print-btn {
@@ -264,6 +260,121 @@ try {
             border-radius: 4px;
             cursor: pointer;
             margin-bottom: 20px;
+        }
+
+        .customize-btn {
+            background: #6c757d;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-bottom: 20px;
+            margin-left: 8px;
+        }
+
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.45);
+            z-index: 9998;
+        }
+
+        .modal-box-wrap {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal-box {
+            background: #fff;
+            border-radius: 8px;
+            width: 420px;
+            max-width: 95vw;
+            max-height: 85vh;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px 20px;
+            border-bottom: 1px solid #eee;
+        }
+
+        .modal-header h4 {
+            font-size: 15px;
+            font-weight: bold;
+            margin: 0;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            font-size: 20px;
+            cursor: pointer;
+            color: #999;
+            line-height: 1;
+        }
+
+        .modal-body {
+            padding: 16px 20px;
+            overflow-y: auto;
+            flex: 1;
+        }
+
+        .modal-body label {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 7px 0;
+            font-size: 13px;
+            cursor: pointer;
+            border-bottom: 1px solid #f5f5f5;
+        }
+
+        .modal-body label:last-child {
+            border-bottom: none;
+        }
+
+        .modal-body input[type=checkbox] {
+            width: 16px;
+            height: 16px;
+            cursor: pointer;
+        }
+
+        .modal-footer {
+            padding: 12px 20px;
+            border-top: 1px solid #eee;
+            display: flex;
+            justify-content: flex-end;
+            gap: 8px;
+        }
+
+        .btn-save {
+            background: #007bff;
+            color: #fff;
+            border: none;
+            padding: 8px 22px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 13px;
+        }
+
+        .btn-cancel {
+            background: #f0f0f0;
+            color: #333;
+            border: none;
+            padding: 8px 18px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 13px;
         }
         
         .attachment-section {
@@ -293,21 +404,58 @@ try {
     </style>
 </head>
 <body>
+    <!-- Customize Modal -->
+    <div class="modal-overlay" id="customizeModal" onclick="handleOverlayClick(event)">
+        <div class="modal-box-wrap">
+        <div class="modal-box">
+            <div class="modal-header">
+                <h4>&#9881; Customize Print</h4>
+                <button class="modal-close" onclick="closeModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <label><input type="checkbox" data-target="sec-logo"> Company Logo</label>
+                <label><input type="checkbox" data-target="sec-company-address"> Company Address</label>
+                <label><input type="checkbox" data-target="sec-company-contact"> Phone / Email</label>
+                <label><input type="checkbox" data-target="sec-voucher-left"> Voucher No &amp; Date</label>
+                <label><input type="checkbox" data-target="sec-voucher-mid"> Payment Method &amp; Currency</label>
+                <label><input type="checkbox" data-target="sec-voucher-right"> Previous &amp; Outstanding Balance</label>
+                <label><input type="checkbox" data-target="sec-customer-address"> Customer Address Row</label>
+                <label><input type="checkbox" data-target="sec-bill-no"> Bill No Row</label>
+                <label><input type="checkbox" data-target="sec-project"> Project Row</label>
+                <label><input type="checkbox" data-target="sec-bank"> Bank Account Row</label>
+                <label><input type="checkbox" data-target="sec-cheque-date"> Cheque Date Row</label>
+                <label><input type="checkbox" data-target="sec-cheque-no"> Cheque No Row</label>
+                <label><input type="checkbox" data-target="sec-attachment-row"> Attachment Row</label>
+                <label><input type="checkbox" data-target="sec-description"> Description Row</label>
+                <label><input type="checkbox" data-target="sec-attachment-preview"> Attachment Preview</label>
+                <label><input type="checkbox" data-target="sec-amount-words"> Amount in Words</label>
+                <label><input type="checkbox" data-target="sec-signatures"> Signatures</label>
+                <label><input type="checkbox" data-target="sec-footer"> Footer Text</label>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-cancel" onclick="closeModal()">Cancel</button>
+                <button class="btn-save" onclick="saveSettings()">Save</button>
+            </div>
+        </div>
+        </div>
+    </div>
+
     <div class="print-container">
         <button class="print-btn no-print" onclick="window.print()">Print Voucher</button>
+        <button class="customize-btn no-print" onclick="openModal()">&#9881; Customize Print</button>
         
         <div class="header">
             <?php if ($company['logo_url']): ?>
-            <div style="margin-bottom: 10px;">
+            <div id="sec-logo" style="margin-bottom: 10px;">
                 <img src="../../../assets/uploads/company_logo/<?php echo htmlspecialchars($company['logo_url']); ?>" alt="Company Logo" style="max-height: 80px; max-width: 200px;">
             </div>
             <?php endif; ?>
             <div class="company-name"><?php echo htmlspecialchars($company['company_name'] ?? 'LedgerOne ERP'); ?></div>
             <?php if ($company['address']): ?>
-            <div style="font-size: 12px; margin: 5px 0;"><?php echo htmlspecialchars($company['address']); ?></div>
+            <div id="sec-company-address" style="font-size: 12px; margin: 5px 0;"><?php echo htmlspecialchars($company['address']); ?></div>
             <?php endif; ?>
             <?php if ($company['phone'] || $company['email']): ?>
-            <div style="font-size: 12px; margin: 5px 0;">
+            <div id="sec-company-contact" style="font-size: 12px; margin: 5px 0;">
                 <?php if ($company['phone']): ?>Phone: <?php echo htmlspecialchars($company['phone']); ?><?php endif; ?>
                 <?php if ($company['phone'] && $company['email']): ?> | <?php endif; ?>
                 <?php if ($company['email']): ?>Email: <?php echo htmlspecialchars($company['email']); ?><?php endif; ?>
@@ -317,7 +465,7 @@ try {
         </div>
         
         <div class="voucher-info">
-            <div class="info-section">
+            <div class="info-section" id="sec-voucher-left">
                 <div class="info-row">
                     <span class="label">Voucher No:</span>
                     <?php echo htmlspecialchars($voucher['voucher_number']); ?>
@@ -327,7 +475,7 @@ try {
                     <?php echo date('d-M-Y', strtotime($voucher['voucher_date'])); ?>
                 </div>
             </div>
-            <div class="info-section">
+            <div class="info-section" id="sec-voucher-mid">
                 <div class="info-row">
                     <span class="label">Payment Method:</span>
                     <?php echo htmlspecialchars($voucher['payment_method']); ?>
@@ -337,7 +485,7 @@ try {
                     <?php echo htmlspecialchars($voucher['currency_name']); ?>
                 </div>
             </div>
-            <div class="info-section">
+            <div class="info-section" id="sec-voucher-right">
                 <div class="info-row">
                     <span class="label">Previous Balance:</span>
                     <?php echo $voucher['currency_symbol'] . number_format($voucher['previous_balance'], 2); ?>
@@ -355,49 +503,49 @@ try {
                 <td><?php echo htmlspecialchars(($voucher['customer_code'] ?: 'N/A') . ' - ' . ($voucher['customer_name'] ?: 'N/A')); ?></td>
             </tr>
             <?php if ($voucher['customer_address']): ?>
-            <tr>
+            <tr id="sec-customer-address">
                 <th>Address</th>
                 <td><?php echo htmlspecialchars($voucher['customer_address']); ?></td>
             </tr>
             <?php endif; ?>
             <?php if ($voucher['bill_no']): ?>
-            <tr>
+            <tr id="sec-bill-no">
                 <th>Bill No</th>
                 <td><?php echo htmlspecialchars($voucher['bill_no']); ?></td>
             </tr>
             <?php endif; ?>
             <?php if ($voucher['project_code']): ?>
-            <tr>
+            <tr id="sec-project">
                 <th>Project</th>
                 <td><?php echo htmlspecialchars($voucher['project_code'] . ' - ' . $voucher['project_name']); ?></td>
             </tr>
             <?php endif; ?>
             <?php if ($voucher['bank_name']): ?>
-            <tr>
+            <tr id="sec-bank">
                 <th>Bank Account</th>
                 <td><?php echo htmlspecialchars($voucher['bank_name'] . ' - ' . $voucher['account_number']); ?></td>
             </tr>
             <?php endif; ?>
             <?php if ($voucher['cheque_date'] && $voucher['cheque_date'] !== '0000-00-00'): ?>
-            <tr>
+            <tr id="sec-cheque-date">
                 <th>Cheque Date</th>
                 <td><?php echo date('d-M-Y', strtotime($voucher['cheque_date'])); ?></td>
             </tr>
             <?php endif; ?>
             <?php if ($voucher['cheque_no']): ?>
-            <tr>
+            <tr id="sec-cheque-no">
                 <th>Cheque No</th>
                 <td><?php echo htmlspecialchars($voucher['cheque_no']); ?></td>
             </tr>
             <?php endif; ?>
             <?php if ($voucher['attachment']): ?>
-            <tr>
+            <tr id="sec-attachment-row">
                 <th>Attachment</th>
                 <td><?php echo htmlspecialchars($voucher['attachment']); ?></td>
             </tr>
             <?php endif; ?>
             <?php if ($voucher['description']): ?>
-            <tr>
+            <tr id="sec-description">
                 <th>Description</th>
                 <td><?php echo htmlspecialchars($voucher['description'] ?: 'N/A'); ?></td>
             </tr>
@@ -405,7 +553,7 @@ try {
         </table>
         
         <?php if ($voucher['attachment']): ?>
-        <div class="attachment-section">
+        <div class="attachment-section" id="sec-attachment-preview">
             <h3>Attachment:</h3>
             <?php 
             $attachment_path = "../../../assets/uploads/receive_voucher/" . $voucher['attachment'];
@@ -423,12 +571,12 @@ try {
             <div class="total-amount">
                 Total Amount: <?php echo $voucher['currency_symbol'] . number_format($voucher['amount'], 2); ?>
             </div>
-            <div style="margin-top: 10px; font-style: italic;">
+            <div id="sec-amount-words" style="margin-top: 10px; font-style: italic;">
                 Amount in Words: <?php echo amountInWords($voucher['amount'], $voucher['currency_main_unit'], $voucher['currency_sub_unit']); ?>
             </div>
         </div>
         
-        <div class="signatures">
+        <div class="signatures" id="sec-signatures">
             <div class="signature-box">
                 <div class="signature-line">Prepared By</div>
             </div>
@@ -440,9 +588,58 @@ try {
             </div>
         </div>
         
-        <div style="text-align: center; margin-top: 30px; font-size: 10px; color: #666; border-top: 1px solid #ddd; padding-top: 10px;">
+        <div id="sec-footer" style="text-align: center; margin-top: 30px; font-size: 10px; color: #666; border-top: 1px solid #ddd; padding-top: 10px;">
             <i>This is a System Generated Voucher</i>
         </div>
     </div>
+    <script>
+        const STORAGE_KEY = 'rv_print_hidden';
+
+        function getHidden() {
+            try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || []; } catch(e) { return []; }
+        }
+
+        function applyHidden(hidden) {
+            document.querySelectorAll('[data-target]').forEach(function(cb) {
+                var id = cb.getAttribute('data-target');
+                var el = document.getElementById(id);
+                cb.checked = hidden.indexOf(id) === -1;
+                if (el) el.classList.toggle('print-hidden', hidden.indexOf(id) !== -1);
+            });
+        }
+
+        function openModal() {
+            applyHidden(getHidden());
+            document.getElementById('customizeModal').style.display = 'block';
+        }
+
+        function closeModal() {
+            document.getElementById('customizeModal').style.display = 'none';
+        }
+
+        function handleOverlayClick(e) {
+            if (e.target === document.getElementById('customizeModal')) closeModal();
+        }
+
+        function saveSettings() {
+            var hidden = [];
+            document.querySelectorAll('[data-target]').forEach(function(cb) {
+                var id = cb.getAttribute('data-target');
+                var el = document.getElementById(id);
+                if (!cb.checked) {
+                    hidden.push(id);
+                    if (el) el.classList.add('print-hidden');
+                } else {
+                    if (el) el.classList.remove('print-hidden');
+                }
+            });
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(hidden));
+            closeModal();
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            applyHidden(getHidden());
+        });
+    </script>
 </body>
 </html>

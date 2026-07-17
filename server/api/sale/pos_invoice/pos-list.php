@@ -97,14 +97,39 @@ try {
 
     $sql = "SELECT si.id, si.bill_no, si.sale_date,
                    c.customer_name, co.company_name,
-                   COUNT(sii.id) as item_count,
+                   COUNT(DISTINCT sii.id) as item_count,
                    si.net_amount,
-                   cur.symbol as currency_symbol
+                   cur.symbol as currency_symbol,
+                   CASE
+                       WHEN dc_counts.dc_count IS NULL OR dc_counts.dc_count = 0 THEN 'No DC'
+                       WHEN dc_counts.partial_count > 0 THEN 'Partial'
+                       ELSE 'Fulfilled'
+                   END as dc_status
             FROM sale_invoice si
             LEFT JOIN customers c   ON si.customer_id = c.id
             LEFT JOIN companies co  ON si.company_id  = co.id
             LEFT JOIN sale_invoice_items sii ON si.id = sii.sale_invoice_id
             LEFT JOIN ledgerone_public.currencies cur ON si.currency_id = cur.id
+            LEFT JOIN (
+                SELECT
+                    sii2.sale_invoice_id,
+                    COUNT(DISTINCT dc_hdr.id) as dc_count,
+                    SUM(
+                        CASE WHEN COALESCE(del.total_delivered, 0) < sii2.quantity THEN 1 ELSE 0 END
+                    ) as partial_count
+                FROM sale_invoice_items sii2
+                LEFT JOIN (
+                    SELECT dci.product_id, dci.uom_id, dc2.sale_invoice_id, dc2.tenant_id,
+                           SUM(dci.quantity) as total_delivered
+                    FROM delivery_chalan_items dci
+                    JOIN delivery_chalan dc2 ON dci.delivery_chalan_id = dc2.id
+                    GROUP BY dci.product_id, dci.uom_id, dc2.sale_invoice_id, dc2.tenant_id
+                ) del ON del.product_id = sii2.product_id
+                      AND del.uom_id = sii2.uom_id
+                      AND del.sale_invoice_id = sii2.sale_invoice_id
+                LEFT JOIN delivery_chalan dc_hdr ON dc_hdr.sale_invoice_id = sii2.sale_invoice_id
+                GROUP BY sii2.sale_invoice_id
+            ) dc_counts ON dc_counts.sale_invoice_id = si.id
             WHERE si.tenant_id = ? AND si.status = 'Posted'";
 
     $params = [$tenant_id];

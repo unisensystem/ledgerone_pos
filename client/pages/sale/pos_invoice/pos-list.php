@@ -192,8 +192,9 @@ if (!$user_id) {
                             <th width="12%">Invoice No</th>
                             <th width="15%">Date</th>
                             <th width="25%">Customer</th>
-                            <th width="12%">Items</th>
-                            <th width="15%">Total Amount</th>
+                            <th width="10%">Items</th>
+                            <th width="12%">Total Amount</th>
+                            <th width="10%">DC Status</th>
                             <th width="21%">Actions</th>
                         </tr>
                     </thead>
@@ -236,6 +237,32 @@ if (!$user_id) {
             <div class="modal-actions">
                 <button class="btn btn-secondary" id="cancelDeleteBtn">Cancel</button>
                 <button class="btn btn-danger" id="confirmDeleteBtn">Delete</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- DC Fulfillment Modal -->
+    <div class="modal" id="dcFulfillmentModal">
+        <div class="modal-content" style="width:800px; max-width:95%;">
+            <h3 class="modal-title">Delivery Chalan Status</h3>
+            <div class="table-container" style="max-height:400px; overflow-y:auto;">
+                <table style="width:100%; border-collapse:collapse;">
+                    <thead>
+                        <tr>
+                            <th style="padding:8px; border-bottom:1px solid var(--border-default);">Product</th>
+                            <th style="padding:8px; border-bottom:1px solid var(--border-default); text-align:right;">Invoiced</th>
+                            <th style="padding:8px; border-bottom:1px solid var(--border-default); text-align:right;">Delivered</th>
+                            <th style="padding:8px; border-bottom:1px solid var(--border-default); text-align:right;">Remaining</th>
+                            <th style="padding:8px; border-bottom:1px solid var(--border-default); text-align:right;">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="dcFulfillmentTableBody">
+                        <tr><td colspan="5" style="text-align:center; padding:20px;">Loading...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-secondary" id="closeDcFulfillmentBtn">Close</button>
             </div>
         </div>
     </div>

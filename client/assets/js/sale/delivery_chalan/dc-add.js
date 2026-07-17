@@ -141,9 +141,17 @@ async function loadSaleInvoiceItems(invoiceId) {
         const tbody = document.getElementById('itemsTable').getElementsByTagName('tbody')[0];
         while (tbody.rows.length > 0) tbody.deleteRow(0);
 
-        // Group items by product (parent only)
-        const parentItems = data.items.filter(i => !i.parent_row_id);
-        for (const item of parentItems) {
+        // Group items by product_id (same as loadInvoiceData does)
+        const itemsByProduct = {};
+        data.items.filter(i => !i.parent_row_id).forEach(item => {
+            if (!itemsByProduct[item.product_id]) {
+                itemsByProduct[item.product_id] = { baseItem: item, units: [] };
+            }
+            itemsByProduct[item.product_id].units.push({ uom_id: item.uom_id, quantity: item.quantity });
+        });
+
+        for (const productGroup of Object.values(itemsByProduct)) {
+            const item = productGroup.baseItem;
             await addRowDynamic();
             const lastRow = tbody.rows[tbody.rows.length - 1];
 
@@ -157,10 +165,24 @@ async function loadSaleInvoiceItems(invoiceId) {
             lastRow.dataset.stockAffects = item.stock_affects || 1;
             lastRow.dataset.invoiceAffects = item.invoice_affects || 1;
 
-            // Set quantity in unit input
-            const unitInput = lastRow.querySelector(`.unit-input[data-unit-id="${item.uom_id}"]`)
-                || lastRow.querySelector('.unit-input');
-            if (unitInput) unitInput.value = item.quantity;
+            // Load UOM details for this product so unit columns render correctly
+            const product = window.dataCache?.products?.get(parseInt(item.product_id));
+            if (product) {
+                const uomDetails = await getProductUOMDetails(product);
+                lastRow.dataset.productUomData = JSON.stringify(uomDetails);
+                recalculateMaxColumns();
+
+                // Set quantity for each unit
+                productGroup.units.forEach(unit => {
+                    const unitInput = lastRow.querySelector(`.unit-input[data-unit-id="${unit.uom_id}"]`);
+                    if (unitInput) unitInput.value = unit.quantity;
+                });
+            } else {
+                // Fallback: set quantity in first available unit input
+                const unitInput = lastRow.querySelector(`.unit-input[data-unit-id="${item.uom_id}"]`)
+                    || lastRow.querySelector('.unit-input');
+                if (unitInput) unitInput.value = item.quantity;
+            }
 
             // Set hidden price/amounts (needed for save)
             const priceInput = lastRow.querySelector('.price-cell input');

@@ -29,6 +29,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
         $stmt = $pdo->prepare("
             SELECT dc.*,
                    c.customer_name, c.customer_code,
+                   c.address AS customer_address,
                    co.company_name,
                    b.branch_name, b.branch_code, b.branch_type,
                    pb.branch_name  AS parent_branch_name,
@@ -41,14 +42,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
                    sm.full_name    AS supplier_man_name,
                    si.bill_no      AS sale_invoice_no
             FROM delivery_chalan dc
-            LEFT JOIN customers  c   ON dc.customer_id     = c.id
-            LEFT JOIN companies  co  ON dc.company_id      = co.id
-            LEFT JOIN branches   b   ON dc.branch_id       = b.id
-            LEFT JOIN branches   pb  ON b.parent_branch_id = pb.id
+            LEFT JOIN customers      c   ON dc.customer_id     = c.id
+            LEFT JOIN companies      co  ON dc.company_id      = co.id
+            LEFT JOIN branches       b   ON dc.branch_id       = b.id
+            LEFT JOIN branches       pb  ON b.parent_branch_id = pb.id
             LEFT JOIN ledgerone_public.currencies cur ON dc.currency_id = cur.id
-            LEFT JOIN employees  e   ON dc.sale_officer_id = e.id
-            LEFT JOIN employees  sm  ON dc.supplier_man_id = sm.id
-            LEFT JOIN projects   pr  ON dc.project_id         = pr.id
+            LEFT JOIN employees      e   ON dc.sale_officer_id = e.id
+            LEFT JOIN employees      sm  ON dc.supplier_man_id = sm.id
+            LEFT JOIN projects       pr  ON dc.project_id      = pr.id
+            LEFT JOIN sale_invoice   si  ON dc.sale_invoice_id = si.id
             WHERE dc.id = ? AND dc.tenant_id = ?
         ");
         $stmt->execute([$id, $tenant_id]);

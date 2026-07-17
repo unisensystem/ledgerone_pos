@@ -936,8 +936,8 @@
 
         function populateInvoiceData(invoice, items, closingBalanceData) {
             // Populate header info
-            document.getElementById('invoiceNo').textContent = invoice.bill_no;
             document.getElementById('invoiceNo').textContent = invoice.chalan_no || invoice.bill_no;
+            document.getElementById('customerName').textContent = invoice.customer_name || '-';
             document.getElementById('invoiceDate').textContent = new Date(invoice.delivery_date || invoice.sale_date).toLocaleDateString();
             // Delivery Chalan specific fields
             const chalanNoEl = document.getElementById('chalanNo'); if (chalanNoEl) chalanNoEl.textContent = invoice.chalan_no || invoice.bill_no;

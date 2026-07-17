@@ -408,33 +408,17 @@ function initializeListPage(permissions) {
             
             if (data.success && data.fulfillment.length > 0) {
                 tbody.innerHTML = '';
-                const parentItems = data.fulfillment.filter(item => !item.parent_row_id);
-                const childItems = data.fulfillment.filter(item => item.parent_row_id);
-                
-                parentItems.forEach((item, index) => {
+                data.fulfillment.forEach(item => {
+                    const pct = parseFloat(item.fulfillment_percent);
+                    const statusClass = pct >= 100 ? 'status-paid' : pct > 0 ? 'status-pending' : 'status-overdue';
                     const row = tbody.insertRow();
                     row.innerHTML = `
-                        <td style="padding: 8px; border-bottom: 1px solid var(--border-default);">${item.product_name}</td>
-                        <td style="padding: 8px; border-bottom: 1px solid var(--border-default); text-align: right;">${item.ordered_qty.toFixed(2)} ${item.uom_name}</td>
-                        <td style="padding: 8px; border-bottom: 1px solid var(--border-default); text-align: right;">${item.served_qty.toFixed(2)} ${item.uom_name}</td>
-                        <td style="padding: 8px; border-bottom: 1px solid var(--border-default); text-align: right;">${item.remaining_qty.toFixed(2)} ${item.uom_name}</td>
-                        <td style="padding: 8px; border-bottom: 1px solid var(--border-default); text-align: right;">
-                            <span class="status ${item.fulfillment_percent >= 100 ? 'status-paid' : item.fulfillment_percent > 0 ? 'status-pending' : 'status-overdue'}">
-                                ${item.fulfillment_percent.toFixed(0)}%
-                            </span>
-                        </td>
+                        <td style="padding:10px 8px;border-bottom:1px solid var(--border-default);">${item.product_name}</td>
+                        <td style="padding:10px 8px;border-bottom:1px solid var(--border-default);text-align:right;">${parseFloat(item.ordered_qty).toFixed(2)} ${item.uom_name}</td>
+                        <td style="padding:10px 8px;border-bottom:1px solid var(--border-default);text-align:right;">${parseFloat(item.served_qty).toFixed(2)} ${item.uom_name}</td>
+                        <td style="padding:10px 8px;border-bottom:1px solid var(--border-default);text-align:right;">${parseFloat(item.remaining_qty).toFixed(2)} ${item.uom_name}</td>
+                        <td style="padding:10px 8px;border-bottom:1px solid var(--border-default);text-align:right;"><span class="status ${statusClass}">${pct.toFixed(0)}%</span></td>
                     `;
-                    
-                    const children = childItems.filter(child => child.parent_row_id === (index + 1));
-                    children.forEach(child => {
-                        const childRow = tbody.insertRow();
-                        childRow.style.backgroundColor = 'var(--surface-1)';
-                        childRow.innerHTML = `
-                            <td style="padding: 8px; padding-left: 30px; border-bottom: 1px solid var(--border-default); color: var(--subtext); font-size: 12px;">↳ ${child.product_name}</td>
-                            <td style="padding: 8px; border-bottom: 1px solid var(--border-default); text-align: right; color: var(--subtext);">${child.ordered_qty.toFixed(2)} ${child.uom_name}</td>
-                            <td colspan="3" style="padding: 8px; border-bottom: 1px solid var(--border-default); text-align: center; color: var(--subtext);">-</td>
-                        `;
-                    });
                 });
             } else {
                 tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 20px;">No fulfillment data available</td></tr>';

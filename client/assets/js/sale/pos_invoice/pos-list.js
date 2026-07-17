@@ -331,7 +331,9 @@ function initializeListPage(permissions) {
                     company: invoice.company_name,
                     items: invoice.item_count,
                     totalAmount: parseFloat(invoice.net_amount),
-                    currencySymbol: invoice.currency_symbol || ''
+                    currencySymbol: invoice.currency_symbol || '',
+
+                    dcStatus: invoice.dc_status || 'No DC'
                 }));
                 currentPage = data.pagination.page;
                 totalPages = data.pagination.pages;
@@ -385,7 +387,14 @@ function initializeListPage(permissions) {
             row.insertCell(4).textContent = invoice.items;
             row.insertCell(5).textContent = formattedAmount;
 
-            const actionsCell = row.insertCell(6);
+            // DC Status cell
+            const dcStatusCell = row.insertCell(6);
+            const dcBadge = document.createElement('span');
+            dcBadge.className = 'status ' + (invoice.dcStatus === 'Fulfilled' ? 'status-paid' : invoice.dcStatus === 'Partial' ? 'status-pending' : 'status-overdue');
+            dcBadge.textContent = invoice.dcStatus;
+            dcStatusCell.appendChild(dcBadge);
+
+            const actionsCell = row.insertCell(7);
             const actionButtons = document.createElement('div');
             actionButtons.className = 'action-buttons';
 
@@ -423,6 +432,18 @@ function initializeListPage(permissions) {
             }
 
             actionButtons.appendChild(editBtn);
+
+           
+
+            if (invoice.dcStatus !== 'No DC') {
+                const viewDcBtn = document.createElement('button');
+                viewDcBtn.className = 'btn btn-secondary btn-sm';
+                viewDcBtn.innerHTML = '<i class="fas fa-tasks"></i>';
+                viewDcBtn.title = 'View DC Fulfillment';
+                viewDcBtn.addEventListener('click', () => viewDcFulfillment(invoice.id));
+                actionButtons.appendChild(viewDcBtn);
+            }
+
             actionButtons.appendChild(printBtn);
             actionButtons.appendChild(deleteBtn);
 
@@ -787,6 +808,43 @@ function initializeListPage(permissions) {
         }
     });
     
+    // DC Fulfillment modal
+    document.getElementById('closeDcFulfillmentBtn').addEventListener('click', function() {
+        document.getElementById('dcFulfillmentModal').style.display = 'none';
+    });
+    document.getElementById('dcFulfillmentModal').addEventListener('click', function(e) {
+        if (e.target === this) this.style.display = 'none';
+    });
+
+    async function viewDcFulfillment(invoiceId) {
+        document.getElementById('dcFulfillmentModal').style.display = 'flex';
+        const tbody = document.getElementById('dcFulfillmentTableBody');
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:20px;">Loading...</td></tr>';
+        try {
+            const response = await fetch(`../../../../server/api/sale/delivery_chalan/get-dc-fulfillment.php?invoice_id=${invoiceId}`);
+            const data = await response.json();
+            if (data.success && data.fulfillment.length > 0) {
+                tbody.innerHTML = '';
+                data.fulfillment.forEach(item => {
+                    const pct = parseFloat(item.fulfillment_percent);
+                    const cls = pct >= 100 ? 'status-paid' : pct > 0 ? 'status-pending' : 'status-overdue';
+                    const row = tbody.insertRow();
+                    row.innerHTML = `
+                        <td style="padding:10px 8px;border-bottom:1px solid var(--border-default);">${item.product_name} (${item.uom_name})</td>
+                        <td style="padding:10px 8px;border-bottom:1px solid var(--border-default);text-align:right;">${item.invoiced_qty}</td>
+                        <td style="padding:10px 8px;border-bottom:1px solid var(--border-default);text-align:right;">${item.delivered_qty}</td>
+                        <td style="padding:10px 8px;border-bottom:1px solid var(--border-default);text-align:right;">${item.remaining_qty}</td>
+                        <td style="padding:10px 8px;border-bottom:1px solid var(--border-default);text-align:right;"><span class="status ${cls}">${pct.toFixed(0)}%</span></td>
+                    `;
+                });
+            } else {
+                tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:20px;">No delivery chalan data found</td></tr>';
+            }
+        } catch (e) {
+            tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:20px;color:var(--error);">Error loading data</td></tr>';
+        }
+    }
+
     // Hide modal when clicking outside
     document.getElementById('deleteModal').addEventListener('click', function(e) {
         if (e.target === this) {
