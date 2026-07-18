@@ -23,6 +23,7 @@ function setupBrandAutofill() {
                     const brandSelect = document.getElementById('brand');
                     if (brandSelect) {
                         brandSelect.value = customer.brand_id;
+                        brandSelect.dispatchEvent(new Event('change'));
                     }
                 }
             }

@@ -216,11 +216,19 @@ if (!$user_id) {
             <div class="card">
                 <h2 class="card-title">Items</h2>
                 <div id="priceHistoryContainer" style="display: none; margin-bottom: 16px; padding: 8px 12px; background: var(--surface-2); border-radius: var(--radius); border-left: 4px solid var(--primary); width: fit-content;">
-                    <strong style="color: var(--heading); font-size: 12px;">Last 3 Sale Prices:</strong>
-                    <div id="priceHistoryContent" style="margin-top: 4px; font-size: 13px; color: var(--body);"></div>
-                </div>
-                <div id="stockContainer" style="display: none; margin-bottom: 16px; padding: 8px 12px; background: var(--surface-2); border-radius: var(--radius); border-left: 4px solid var(--success); width: fit-content;">
-                    <div id="stockContent" style="font-size: 13px; color: var(--body);"></div>
+                    <div style="display: flex; gap: 32px; align-items: flex-start;">
+                        <div id="salePricesSection" style="display: none;">
+                            <strong style="color: var(--heading); font-size: 12px;">Last 3 Sale Prices:</strong>
+                            <div id="priceHistoryContent" style="margin-top: 4px; font-size: 13px; color: var(--body);"></div>
+                        </div>
+                        <div id="purchaseHistoryInner" style="display: none; border-left: 1px solid var(--border-default); padding-left: 32px;">
+                            <strong style="color: var(--heading); font-size: 12px;">Last 3 Purchase Prices:</strong>
+                            <div id="purchaseHistoryContent" style="margin-top: 4px; font-size: 13px; color: var(--body);"></div>
+                        </div>
+                        <div id="stockContainer" style="display: none; border-left: 1px solid var(--border-default); padding-left: 32px;">
+                            <div id="stockContent" style="font-size: 13px; color: var(--body);"></div>
+                        </div>
+                    </div>
                 </div>
                 <div class="actions" style="margin-bottom: 16px; justify-content: flex-start;">
                     <button type="button" class="btn btn-secondary" onclick="openOverlay('../../inventory/products/product-add.php')" tabindex="-1">
@@ -1257,5 +1265,29 @@ if (!$user_id) {
     <script src="../../../assets/js/sale/pos_invoice/pos-add.js?v=<?php echo time(); ?>"></script>
     <script src="../../../assets/js/sale/pos_invoice/tax-integration.js?v=<?php echo time(); ?>"></script>
     <script src="../../../assets/js/sale/pos_invoice/supplier-product-filter.js?v=<?php echo time(); ?>"></script>
+
+    <!-- Stock Violation Modal -->
+    <div class="modal" id="stockViolationModal" style="display:none;">
+        <div class="modal-content" style="max-width: 560px;">
+            <h3 class="modal-title" style="color: var(--error);"><i class="fas fa-exclamation-triangle" style="margin-right: 8px;"></i>Insufficient Stock</h3>
+            <p style="margin: 0 0 16px; color: var(--body); font-size: 13px;">The following products exceed available stock. You can reduce the quantity or save anyway.</p>
+            <div class="table-container" style="max-height: 260px; overflow-y: auto;">
+                <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+                    <thead>
+                        <tr>
+                            <th style="padding: 8px 10px; text-align: left; border-bottom: 1px solid var(--border-default);">Product</th>
+                            <th style="padding: 8px 10px; text-align: center; border-bottom: 1px solid var(--border-default); color: var(--error);">Required</th>
+                            <th style="padding: 8px 10px; text-align: center; border-bottom: 1px solid var(--border-default); color: var(--success);">Available</th>
+                        </tr>
+                    </thead>
+                    <tbody id="stockViolationBody"></tbody>
+                </table>
+            </div>
+            <div class="modal-actions" style="margin-top: 20px;">
+                <button id="stockViolationCancel" class="btn btn-secondary" type="button">Reduce Quantity</button>
+                <button id="stockViolationConfirm" class="btn btn-primary" type="button"><i class="fas fa-save"></i> Save Anyway</button>
+            </div>
+        </div>
+    </div>
 </body>
 </html>

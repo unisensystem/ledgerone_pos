@@ -1,35 +1,49 @@
 // Stock validation for invoice saving
-// This function is called before saveInvoice to validate stock levels
 
-function validateStockBeforeSave() {
+function validateStockBeforeSave(onConfirm) {
     const itemsTable = document.getElementById('itemsTable')?.getElementsByTagName('tbody')[0];
-    if (!itemsTable) return true;
+    if (!itemsTable) { if (onConfirm) onConfirm(); return true; }
 
+    const violations = [];
     const rows = itemsTable.rows;
+
     for (let i = 0; i < rows.length; i++) {
         const row = rows[i];
-
-        // Skip child rows
         if (row.classList.contains('child-row')) continue;
 
-        const unitInputs = row.querySelectorAll('.unit-input');
         let totalQty = 0;
-        
-        unitInputs.forEach(input => {
-            const qty = parseFloat(input.value) || 0;
-            const cf = parseFloat(input.dataset.conversionFactor) || 1;
-            totalQty += qty * cf;
+        row.querySelectorAll('.unit-input').forEach(input => {
+            totalQty += (parseFloat(input.value) || 0) * (parseFloat(input.dataset.conversionFactor) || 1);
         });
 
-        // Check if required quantity exceeds available stock
         const availableStock = parseFloat(row.dataset.availableStock) || 0;
         const productName = row.cells[1]?.querySelector('.search-input')?.value || 'Unknown Product';
-        
+
         if (totalQty > 0 && availableStock > 0 && totalQty > availableStock) {
-            alert(`❌ Stock Validation Error!\n\nProduct: ${productName}\nRequired: ${totalQty.toFixed(3)} units\nAvailable: ${availableStock.toFixed(3)} units\n\nPlease reduce the quantity or check stock availability.`);
-            return false;
+            violations.push({ productName, required: totalQty, available: availableStock });
         }
     }
-    
-    return true;
+
+    if (violations.length === 0) {
+        if (onConfirm) onConfirm();
+        return true;
+    }
+
+    document.getElementById('stockViolationBody').innerHTML = violations.map(v => `
+        <tr>
+            <td style="padding:7px 10px;border-bottom:1px solid var(--border-default);">${v.productName}</td>
+            <td style="padding:7px 10px;border-bottom:1px solid var(--border-default);text-align:center;color:var(--error);font-weight:600;">${v.required.toFixed(3)}</td>
+            <td style="padding:7px 10px;border-bottom:1px solid var(--border-default);text-align:center;color:var(--success);font-weight:600;">${v.available.toFixed(3)}</td>
+        </tr>`).join('');
+
+    const modal = document.getElementById('stockViolationModal');
+    modal.style.display = 'flex';
+
+    document.getElementById('stockViolationCancel').onclick = () => { modal.style.display = 'none'; };
+    document.getElementById('stockViolationConfirm').onclick = () => {
+        modal.style.display = 'none';
+        if (onConfirm) onConfirm();
+    };
+
+    return false;
 }

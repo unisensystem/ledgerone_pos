@@ -3,6 +3,7 @@
 
 let productFilteringMode = 'showAll';
 let currentSalesOfficerId = null;
+let currentBrandId = null;
 
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', function() {
@@ -20,6 +21,7 @@ document.addEventListener('DOMContentLoaded', function() {
     setupRadioListeners();
     setupSalesOfficerListener();
     setupCustomerListener();
+    setupBrandListener();
 });
 
 // Setup radio button listeners
@@ -92,6 +94,45 @@ function setupCustomerListener() {
     });
 }
 
+// Setup brand listener
+function setupBrandListener() {
+    const brandSelect = document.getElementById('brand');
+    if (!brandSelect) return;
+
+    brandSelect.addEventListener('change', function () {
+        currentBrandId = this.value || null;
+        if (currentBrandId) {
+            applyBrandFilter(currentBrandId);
+        } else {
+            showAllProducts();
+        }
+    });
+}
+
+// Apply brand filter
+async function applyBrandFilter(brandId) {
+    console.log('Applying brand filter for brand:', brandId);
+    try {
+        const response = await fetch(`../../../../server/api/sale/pos_invoice/get-products-by-brand.php?brand_id=${brandId}`);
+        const data = await response.json();
+
+        if (data.success) {
+            console.log('Brand filter: loaded', data.products.length, 'products');
+            data.products.forEach(product => {
+                window.dataCache.products.set(parseInt(product.id), product);
+            });
+            window.filteredProducts = data.products;
+            updateAllDropdowns(data.products);
+        } else {
+            console.error('Brand filter error:', data.message);
+            showAllProducts();
+        }
+    } catch (error) {
+        console.error('Brand filter fetch error:', error);
+        showAllProducts();
+    }
+}
+
 // Apply filtering
 async function applyFilter(salesOfficerId) {
     console.log('Applying filter for Sales Officer:', salesOfficerId);
@@ -120,8 +161,9 @@ async function applyFilter(salesOfficerId) {
 // Show all products
 function showAllProducts() {
     console.log('Showing all products');
+    window.filteredProducts = null;
+    currentBrandId = null;
     if (typeof productsData !== 'undefined') {
-        // Make sure all products are in dataCache
         productsData.forEach(product => {
             window.dataCache.products.set(parseInt(product.id), product);
         });
@@ -189,9 +231,9 @@ if (origAddRow) {
                     const searchInput = lastRow.cells[1]?.querySelector('.search-input');
                     
                     if (searchInput && searchInput.dropdownOptions) {
-                        const products = (productFilteringMode === 'salesOfficerFilter' && currentSalesOfficerId) 
-                            ? window.filteredProducts || productsData 
-                            : productsData;
+                        const products = (productFilteringMode === 'salesOfficerFilter' && currentSalesOfficerId)
+                            ? window.filteredProducts || productsData
+                            : (currentBrandId ? window.filteredProducts || productsData : productsData);
                         updateDropdown(searchInput.dropdownOptions, products);
                     }
                 }

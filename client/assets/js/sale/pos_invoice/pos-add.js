@@ -421,9 +421,8 @@ function initializePage(permissions) {
             alert('You do not have permission to edit invoices.');
             return;
         }
-        if (validateFormLocal() && validateStockBeforeSave()) {
-            hideBalanceNotification();
-            saveInvoice('Posted');
+        if (validateFormLocal()) {
+            validateStockBeforeSave(() => { hideBalanceNotification(); saveInvoice('Posted'); });
         }
     });
 
@@ -557,10 +556,10 @@ function initializePage(permissions) {
             addRowDynamic();
         } else if (combo === shortcuts.save) {
             e.preventDefault();
-            if (validateForm() && validateStockBeforeSave()) saveInvoice('Posted');
+            if (validateForm()) validateStockBeforeSave(() => saveInvoice('Posted'));
         } else if (combo === shortcuts.draft) {
             e.preventDefault();
-            if (validateStockBeforeSave()) saveInvoice('Draft');
+            validateStockBeforeSave(() => saveInvoice('Draft'));
         } else if (combo === shortcuts.reset) {
             e.preventDefault();
             resetForm();
@@ -3309,6 +3308,13 @@ function initializePage(permissions) {
         if (dueDateGroupEl) dueDateGroupEl.style.display = '';
         if (dueDateEl) dueDateEl.value = '';
 
+        // Reset brand and clear brand filter
+        const brandEl = document.getElementById('brand');
+        if (brandEl) {
+            brandEl.value = '';
+            brandEl.dispatchEvent(new Event('change'));
+        }
+
         // Reset currency to base currency
         loadCurrencies();
 
@@ -4658,11 +4664,27 @@ function loadPriceHistoryForAllRows() {
     }
 }
 
+// Show/hide the combined container based on whether any section has content
+function updatePriceHistoryContainerVisibility() {
+    const salePricesEl = document.getElementById('priceHistoryContent');
+    const salePricesSection = document.getElementById('salePricesSection');
+    const purchaseEl = document.getElementById('purchaseHistoryInner');
+    const stockEl = document.getElementById('stockContainer');
+    const container = document.getElementById('priceHistoryContainer');
+    if (!container) return;
+    const hasSale = salePricesEl && salePricesEl.innerHTML.trim() !== '';
+    if (salePricesSection) salePricesSection.style.display = hasSale ? 'block' : 'none';
+    const hasPurchase = purchaseEl && purchaseEl.style.display !== 'none';
+    const hasStock = stockEl && stockEl.style.display !== 'none';
+    container.style.display = (hasSale || hasPurchase || hasStock) ? 'block' : 'none';
+}
+
 // Load price history
 async function loadPriceHistory(productId) {
     const customerId = document.getElementById('customerCode').value;
     if (!customerId || !productId) {
-        document.getElementById('priceHistoryContainer').style.display = 'none';
+        document.getElementById('priceHistoryContent').innerHTML = '';
+        updatePriceHistoryContainerVisibility();
         return;
     }
 
@@ -4677,16 +4699,83 @@ async function loadPriceHistory(productId) {
             }).join('');
 
             document.getElementById('priceHistoryContent').innerHTML = content;
-            document.getElementById('priceHistoryContainer').style.display = 'block';
+            updatePriceHistoryContainerVisibility();
         } else {
-            document.getElementById('priceHistoryContainer').style.display = 'none';
+            document.getElementById('priceHistoryContent').innerHTML = '';
+            updatePriceHistoryContainerVisibility();
         }
     } catch (error) {
         console.error('Error loading price history:', error);
-        document.getElementById('priceHistoryContainer').style.display = 'none';
+        document.getElementById('priceHistoryContent').innerHTML = '';
+        updatePriceHistoryContainerVisibility();
+    }
+    loadPurchaseHistory(productId);
+}
+
+function validateSalePriceVsPurchase(row) {
+    const latestPurchasePrice = parseFloat(row.dataset.latestPurchasePrice);
+    if (!latestPurchasePrice) return;
+    const priceInput = row.querySelector('.price-cell input');
+    if (!priceInput) return;
+    const salePrice = parseFloat(priceInput.value) || 0;
+    let warningEl = row.querySelector('.below-purchase-warning');
+    if (salePrice > 0 && salePrice < latestPurchasePrice) {
+        row.style.backgroundColor = 'rgba(255, 165, 0, 0.15)';
+        if (!warningEl) {
+            warningEl = document.createElement('div');
+            warningEl.className = 'below-purchase-warning';
+            warningEl.style.cssText = 'font-size:11px;color:#e67e00;font-weight:600;margin-top:2px;';
+            warningEl.textContent = `⚠️  Below purchase price (${latestPurchasePrice.toFixed(3)})`;
+            priceInput.parentElement.appendChild(warningEl);
+        } else {
+            warningEl.textContent = `⚠️  Below purchase price (${latestPurchasePrice.toFixed(3)})`;
+        }
+    } else {
+        row.style.backgroundColor = '';
+        if (warningEl) warningEl.remove();
     }
 }
 
+// Load purchase history
+async function loadPurchaseHistory(productId) {
+    if (!productId) {
+        document.getElementById('purchaseHistoryInner').style.display = 'none';
+        return;
+    }
+    try {
+        const response = await fetch(`../../../../server/api/sale/pos_invoice/get-purchase-history.php?product_id=${productId}`);
+        const data = await response.json();
+        if (data.success && data.history && data.history.length > 0) {
+            const latestPurchasePrice = parseFloat(data.history[0].purchase_price);
+            const content = data.history.map((item, index) => {
+                const date = new Date(item.purchase_date).toLocaleDateString();
+                return `<div>${index + 1}. ${date} - ${item.currency_symbol}${parseFloat(item.purchase_price).toFixed(3)} (Qty: ${item.quantity})</div>`;
+            }).join('');
+            document.getElementById('purchaseHistoryContent').innerHTML = content;
+            document.getElementById('purchaseHistoryInner').style.display = 'block';
+            // Store latest purchase price on the active row for validation
+            const itemsTable = document.getElementById('itemsTable')?.getElementsByTagName('tbody')[0];
+            if (itemsTable) {
+                const rows = itemsTable.rows;
+                for (let i = 0; i < rows.length; i++) {
+                    const codeInput = rows[i].cells[1]?.querySelector('.item-code');
+                    if (codeInput && codeInput.value == productId) {
+                        rows[i].dataset.latestPurchasePrice = latestPurchasePrice;
+                        validateSalePriceVsPurchase(rows[i]);
+                        break;
+                    }
+                }
+            }
+        } else {
+            document.getElementById('purchaseHistoryInner').style.display = 'none';
+        }
+    } catch (error) {
+        console.error('Error loading purchase history:', error);
+        document.getElementById('purchaseHistoryInner').style.display = 'none';
+    }
+}
+
+// Validate sale price vs latest purchase price
 // Load product stock
 async function loadProductStock(productId) {
     const branchId = document.getElementById('branch').value;
@@ -4716,6 +4805,7 @@ async function loadProductStock(productId) {
                 <div id="requiredQtyDisplay" style="margin-top: 8px; color: var(--body); font-size: 12px;"></div>
             `;
             document.getElementById('stockContainer').style.display = 'block';
+            document.getElementById('priceHistoryContainer').style.display = 'block';
             
             // Store stock info for validation
             const itemsTable = document.getElementById('itemsTable')?.getElementsByTagName('tbody')[0];
@@ -4733,10 +4823,12 @@ async function loadProductStock(productId) {
             }
         } else {
             document.getElementById('stockContainer').style.display = 'none';
+            updatePriceHistoryContainerVisibility();
         }
     } catch (error) {
         console.error('Error loading stock:', error);
         document.getElementById('stockContainer').style.display = 'none';
+        updatePriceHistoryContainerVisibility();
     }
 }
 
@@ -5496,6 +5588,7 @@ async function addRowDynamic() {
         
         // For Sale On TP: use standard calculation
         calculateRowAmounts(row, Number(totalQty), price);
+        validateSalePriceVsPurchase(row);
     });
     priceCell.appendChild(priceInput);
     
@@ -5542,6 +5635,17 @@ async function addRowDynamic() {
     discAmountInput.min = '0';
     discAmountInput.step = '0.001';
     discAmountInput.value = '0.00';
+    discAmountInput.addEventListener('input', function() {
+        const unitInputs = row.querySelectorAll('.unit-input');
+        let totalQty = 0;
+        unitInputs.forEach(input => {
+            const qty = parseFloat(input.value) || 0;
+            const cf = parseFloat(input.dataset.conversionFactor) || 1;
+            totalQty = totalQty + (qty * cf);
+        });
+        const price = parseFloat(row.querySelector('.price-cell input').value) || 0;
+        calculateRowAmounts(row, totalQty, price, 'amount');
+    });
     discAmountCell.appendChild(discAmountInput);
     
     // TO Amount
