@@ -710,13 +710,34 @@ if (!$user_id) {
                     <div style="padding: 12px; background: var(--surface-0); border-radius: 6px; border-left: 3px solid var(--info); font-size: 12px; color: var(--body);">
                         <strong style="display: block; margin-bottom: 8px;">Tracked Fields:</strong>
                         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
-                            <div>• Company</div>
-                            <div>• Invoice Type</div>
-                            <div>• Branch</div>
-                            <div>• Area / City</div>
-                            <div>• Brand</div>
-                            <div>• Sales Officer</div>
-                            <div>• Supplier Man</div>
+                            <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
+                                <input type="checkbox" id="trackField_company" style="width: auto;" checked>
+                                <span>Company</span>
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
+                                <input type="checkbox" id="trackField_invoiceType" style="width: auto;" checked>
+                                <span>Invoice Type</span>
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
+                                <input type="checkbox" id="trackField_branch" style="width: auto;" checked>
+                                <span>Branch</span>
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
+                                <input type="checkbox" id="trackField_areaCity" style="width: auto;" checked>
+                                <span>Area / City</span>
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
+                                <input type="checkbox" id="trackField_brand" style="width: auto;" checked>
+                                <span>Brand</span>
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
+                                <input type="checkbox" id="trackField_salesOfficer" style="width: auto;" checked>
+                                <span>Sales Officer</span>
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
+                                <input type="checkbox" id="trackField_supplierMan" style="width: auto;" checked>
+                                <span>Supplier Man</span>
+                            </label>
                         </div>
                         <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border-default);">
                             <strong style="display: block; margin-bottom: 8px;">Currently Saved:</strong>

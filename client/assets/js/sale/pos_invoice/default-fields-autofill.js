@@ -8,9 +8,31 @@ class DefaultFieldsAutofill {
     constructor() {
         this.storageKey = 'invoiceDefaultFields';
         this.settingsKey = 'invoiceDefaultFieldsSettings';
-        this.fieldsToTrack = ['company', 'invoiceType', 'branch', 'areaCity', 'brand', 'salesOfficer', 'supplierMan'];
+        this.trackedFieldsKey = 'invoiceTrackedFields';
+        this.allFields = ['company', 'invoiceType', 'branch', 'areaCity', 'brand', 'salesOfficer', 'supplierMan'];
+        this.fieldsToTrack = this.getTrackedFields();
         this.initializeListeners();
         this.setupPageVisibilityListener();
+    }
+
+    /**
+     * Get tracked fields from localStorage (user-selected)
+     */
+    getTrackedFields() {
+        try {
+            const saved = localStorage.getItem(this.trackedFieldsKey);
+            return saved ? JSON.parse(saved) : this.allFields;
+        } catch(e) {
+            return this.allFields;
+        }
+    }
+
+    /**
+     * Update tracked fields dynamically (called when checkboxes change)
+     */
+    updateTrackedFields(fields) {
+        this.fieldsToTrack = fields;
+        this.initializeListeners();
     }
 
     /**
@@ -47,34 +69,28 @@ class DefaultFieldsAutofill {
      * Initialize listeners on tracked fields
      */
     initializeListeners() {
-        // Listen for changes on tracked fields
         this.fieldsToTrack.forEach(fieldId => {
             const field = document.getElementById(fieldId);
-            if (field) {
+            if (field && !field._autofillListener) {
                 field.addEventListener('change', () => this.saveFieldValue(fieldId));
+                field._autofillListener = true;
             }
         });
 
-        // Special handling for searchable dropdowns (branch, areaCity)
         this.setupSearchableDropdownListeners();
 
-        // Re-initialize listeners after fields are loaded dynamically
         const reinitListener = setInterval(() => {
             let allFound = true;
             this.fieldsToTrack.forEach(fieldId => {
-                const field = document.getElementById(fieldId);
-                if (!field) {
-                    allFound = false;
-                }
+                if (!document.getElementById(fieldId)) allFound = false;
             });
-            
             if (allFound) {
                 clearInterval(reinitListener);
                 this.fieldsToTrack.forEach(fieldId => {
                     const field = document.getElementById(fieldId);
-                    if (field && !field.hasListener) {
+                    if (field && !field._autofillListener) {
                         field.addEventListener('change', () => this.saveFieldValue(fieldId));
-                        field.hasListener = true;
+                        field._autofillListener = true;
                     }
                 });
                 this.setupSearchableDropdownListeners();
@@ -110,34 +126,29 @@ class DefaultFieldsAutofill {
     }
 
     /**
-     * Save a field value to localStorage
+     * Save a field value to localStorage (saves both id and label)
      */
     saveFieldValue(fieldId) {
         const field = document.getElementById(fieldId);
         if (!field) return;
 
-        // For searchable dropdowns, also get the display text
-        let valueToSave = field.value;
-        
+        let id = field.value;
+        let label = id;
+
         if (fieldId === 'company' || fieldId === 'branch' || fieldId === 'areaCity') {
             const searchInput = document.getElementById(`${fieldId}Search`);
-            if (searchInput && searchInput.value) {
-                valueToSave = field.value;
-            }
+            if (searchInput && searchInput.value) label = searchInput.value;
+        } else if (field.tagName === 'SELECT') {
+            const selected = field.options[field.selectedIndex];
+            if (selected) label = selected.text;
         }
 
-        if (!valueToSave) return; // Don't save empty values
+        if (!id) return;
 
-        // Get current values
         let savedValues = this.getSavedValues();
-
-        // Update the field value
-        savedValues[fieldId] = valueToSave;
-
-        // Save back to localStorage
+        savedValues[fieldId] = { id, label };
         localStorage.setItem(this.storageKey, JSON.stringify(savedValues));
-
-        console.log(`✓ Saved ${fieldId}: ${valueToSave}`);
+        console.log(`✓ Saved ${fieldId}:`, { id, label });
     }
 
     /**
@@ -146,9 +157,19 @@ class DefaultFieldsAutofill {
     getSavedValues() {
         try {
             const saved = localStorage.getItem(this.storageKey);
-            return saved ? JSON.parse(saved) : {};
+            if (!saved) return {};
+            const parsed = JSON.parse(saved);
+            // Migrate old flat string format to {id, label} format
+            let migrated = false;
+            Object.keys(parsed).forEach(key => {
+                if (typeof parsed[key] === 'string') {
+                    parsed[key] = { id: parsed[key], label: parsed[key] };
+                    migrated = true;
+                }
+            });
+            if (migrated) localStorage.setItem(this.storageKey, JSON.stringify(parsed));
+            return parsed;
         } catch (error) {
-            console.error('Error reading saved values:', error);
             return {};
         }
     }
@@ -234,8 +255,11 @@ class DefaultFieldsAutofill {
         const savedValues = this.getSavedValues();
 
         this.fieldsToTrack.forEach(fieldId => {
-            if (savedValues[fieldId]) {
-                this.setFieldValue(fieldId, savedValues[fieldId]);
+            const entry = savedValues[fieldId];
+            if (entry) {
+                const id = typeof entry === 'object' ? entry.id : entry;
+                const label = typeof entry === 'object' ? entry.label : entry;
+                this.setFieldValue(fieldId, id, label);
             }
         });
 
@@ -246,18 +270,16 @@ class DefaultFieldsAutofill {
     /**
      * Set field value dynamically
      */
-    setFieldValue(fieldId, value) {
+    setFieldValue(fieldId, value, label) {
         const field = document.getElementById(fieldId);
         if (!field) {
             console.warn(`Field ${fieldId} not found`);
             return;
         }
 
-        // For searchable dropdowns (company, branch, areaCity)
         if (fieldId === 'company' || fieldId === 'branch' || fieldId === 'areaCity') {
-            this.setSearchableDropdownValue(fieldId, value);
+            this.setSearchableDropdownValue(fieldId, value, label);
         } else {
-            // For regular select fields
             field.value = value;
             field.dispatchEvent(new Event('change', { bubbles: true }));
         }
@@ -266,7 +288,7 @@ class DefaultFieldsAutofill {
     /**
      * Set searchable dropdown value and trigger search
      */
-    setSearchableDropdownValue(fieldId, value) {
+    setSearchableDropdownValue(fieldId, value, label) {
         const field = document.getElementById(fieldId);
         const searchInput = document.getElementById(`${fieldId}Search`);
         const dropdownOptions = document.getElementById(`${fieldId}Options`);
@@ -276,45 +298,35 @@ class DefaultFieldsAutofill {
             return;
         }
 
-        // Set the hidden value
         field.value = value;
 
-        // Wait for options to be populated if needed
         const trySetValue = (attempts = 0) => {
             const options = dropdownOptions.querySelectorAll('.dropdown-option');
             
             if (options.length === 0 && attempts < 10) {
-                // Options not loaded yet, try again
                 setTimeout(() => trySetValue(attempts + 1), 100);
                 return;
             }
 
-            // Find matching option text
-            let matchedText = value;
+            let matchedText = label || value;
             let matchedOption = null;
             options.forEach(option => {
-                const optionValue = option.getAttribute('data-value');
-                if (optionValue === value) {
+                if (option.getAttribute('data-value') === value) {
                     matchedText = option.textContent.trim();
                     matchedOption = option;
                 }
             });
 
-            // Set search input to display the value
             searchInput.value = matchedText;
-
-            // Trigger change event
             field.dispatchEvent(new Event('change', { bubbles: true }));
 
-            // If areaCity, trigger customer filter using option's data attributes
             if (fieldId === 'areaCity' && matchedOption && typeof window.filterCustomersByAreaCity === 'function') {
-                const filterType = matchedOption.getAttribute('data-filter-type');
-                const cityId     = matchedOption.getAttribute('data-city-id');
-                const areaId     = matchedOption.getAttribute('data-area-id');
-                window.filterCustomersByAreaCity(filterType, cityId, areaId);
+                window.filterCustomersByAreaCity(
+                    matchedOption.getAttribute('data-filter-type'),
+                    matchedOption.getAttribute('data-city-id'),
+                    matchedOption.getAttribute('data-area-id')
+                );
             }
-
-            console.log(`✓ Set searchable dropdown ${fieldId} to: ${value} (${matchedText})`);
         };
 
         trySetValue();
@@ -344,11 +356,14 @@ class DefaultFieldsAutofill {
     getSummary() {
         const savedValues = this.getSavedValues();
         const summary = {};
-
-        this.fieldsToTrack.forEach(fieldId => {
-            summary[fieldId] = savedValues[fieldId] || 'Not set';
+        this.allFields.forEach(fieldId => {
+            const entry = savedValues[fieldId];
+            if (entry && typeof entry === 'object') {
+                summary[fieldId] = entry.label || entry.id || 'Not set';
+            } else {
+                summary[fieldId] = entry || 'Not set';
+            }
         });
-
         return summary;
     }
 

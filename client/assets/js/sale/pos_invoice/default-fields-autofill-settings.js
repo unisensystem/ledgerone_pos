@@ -4,6 +4,8 @@
  */
 
 const SETTINGS_KEY = 'invoiceDefaultFieldsSettings';
+const TRACKED_FIELDS_KEY = 'invoiceTrackedFields';
+const ALL_FIELDS = ['company', 'invoiceType', 'branch', 'areaCity', 'brand', 'salesOfficer', 'supplierMan'];
 
 // Wait for page to load and defaultFieldsAutofill to be ready
 document.addEventListener('DOMContentLoaded', function () {
@@ -25,6 +27,20 @@ function initAutofillSettings() {
 
     // Load current setting into checkbox
     loadCurrentSetting();
+    loadTrackedFields();
+
+    // Save tracked field checkboxes immediately on change
+    ALL_FIELDS.forEach(fieldId => {
+        const cb = document.getElementById('trackField_' + fieldId);
+        if (cb) {
+            cb.addEventListener('change', function() {
+                saveTrackedFields();
+                if (window.defaultFieldsAutofill) {
+                    window.defaultFieldsAutofill.updateTrackedFields(getCheckedFields());
+                }
+            });
+        }
+    });
 
     // Save immediately when checkbox changes
     enableCheckbox.addEventListener('change', function (e) {
@@ -53,6 +69,7 @@ function initAutofillSettings() {
         invoiceSettingsBtn.addEventListener('click', function () {
             setTimeout(() => {
                 loadCurrentSetting();
+                loadTrackedFields();
                 updateSummaryDisplay();
             }, 100);
         });
@@ -60,6 +77,28 @@ function initAutofillSettings() {
 
     // Update summary display
     updateSummaryDisplay();
+}
+
+function getCheckedFields() {
+    return ALL_FIELDS.filter(fieldId => {
+        const cb = document.getElementById('trackField_' + fieldId);
+        return cb ? cb.checked : true;
+    });
+}
+
+function loadTrackedFields() {
+    try {
+        const saved = localStorage.getItem(TRACKED_FIELDS_KEY);
+        const tracked = saved ? JSON.parse(saved) : ALL_FIELDS;
+        ALL_FIELDS.forEach(fieldId => {
+            const cb = document.getElementById('trackField_' + fieldId);
+            if (cb) cb.checked = tracked.includes(fieldId);
+        });
+    } catch(e) {}
+}
+
+function saveTrackedFields() {
+    localStorage.setItem(TRACKED_FIELDS_KEY, JSON.stringify(getCheckedFields()));
 }
 
 /**
@@ -114,23 +153,14 @@ function saveSetting(isEnabled) {
  * Update the summary display with currently saved field values
  */
 function updateSummaryDisplay() {
-    if (!window.defaultFieldsAutofill) {
-        console.warn('⏳ defaultFieldsAutofill not ready yet');
-        return;
-    }
-
     const summaryDiv = document.getElementById('defaultFieldsSummary');
-    if (!summaryDiv) {
-        console.warn('⏳ summaryDiv not found');
-        return;
-    }
+    if (!summaryDiv) return;
 
-    const summary = window.defaultFieldsAutofill.getSummary();
-    const savedValues = window.defaultFieldsAutofill.getSavedValues();
-    
-    console.log('🔄 Updating summary:', { summary, savedValues });
-
-    let html = '';
+    let savedValues = {};
+    try {
+        const raw = localStorage.getItem('invoiceDefaultFields');
+        savedValues = raw ? JSON.parse(raw) : {};
+    } catch(e) {}
 
     const fieldLabels = {
         company: 'Company',
@@ -142,23 +172,23 @@ function updateSummaryDisplay() {
         supplierMan: 'Supplier Man'
     };
 
+    let html = '';
     for (const [fieldId, label] of Object.entries(fieldLabels)) {
-        const value = summary[fieldId] || 'Not set';
-        const isSaved = savedValues[fieldId] ? true : false;
+        const entry = savedValues[fieldId];
+        const isSaved = !!entry;
+        const displayVal = isSaved
+            ? (typeof entry === 'object' ? (entry.label || entry.id) : entry)
+            : 'Not set';
         const statusIcon = isSaved ? '✓' : '○';
         const statusColor = isSaved ? '#4caf50' : '#999';
 
-        html += `
-            <div style="display: flex; justify-content: space-between; align-items: center; padding: 4px 0;">
-                <span style="display: flex; align-items: center; gap: 6px;">
-                    <span style="color: ${statusColor}; font-weight: bold;">${statusIcon}</span>
-                    <span>${label}:</span>
-                </span>
-                <span style="color: var(--subtext); font-size: 11px; max-width: 200px; text-align: right;">
-                    ${value}
-                </span>
-            </div>
-        `;
+        html += `<div style="display: flex; justify-content: space-between; align-items: center; padding: 4px 0;">
+            <span style="display: flex; align-items: center; gap: 6px;">
+                <span style="color: ${statusColor}; font-weight: bold;">${statusIcon}</span>
+                <span>${label}:</span>
+            </span>
+            <span style="color: var(--subtext); font-size: 11px; max-width: 200px; text-align: right;">${displayVal}</span>
+        </div>`;
     }
 
     summaryDiv.innerHTML = html || '<span>No saved values yet</span>';
