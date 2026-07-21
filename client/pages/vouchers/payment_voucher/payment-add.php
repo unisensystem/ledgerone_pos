@@ -87,6 +87,12 @@ if (!$user_id) {
                                 <!-- Options will be populated by JS -->
                             </select>
                         </div>
+                        <div class="form-group" id="crExpenseGroup" style="display:none;">
+                            <label for="crExpenseRef">Expense Voucher (CR)</label>
+                            <select id="crExpenseRef">
+                                <option value="">Select CR Expense</option>
+                            </select>
+                        </div>
                         <div class="form-group">
                             <label for="billNo">Bill No</label>
                             <div class="searchable-dropdown">

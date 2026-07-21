@@ -529,6 +529,34 @@ function editVoucher(id) {
                         }
                     });
 
+                // Load CR expenses for this supplier
+                const crSelect = document.getElementById('editCrExpenseRef');
+                crSelect.innerHTML = '<option value="">Select CR Expense</option>';
+                const supplierCodeForCR = voucher.supplier_code;
+                if (supplierCodeForCR) {
+                    fetch(`../../../../server/api/vouchers/payment_voucher/get-supplier-cr-expenses.php?supplier_code=${supplierCodeForCR}`)
+                        .then(r => r.json())
+                        .then(crData => {
+                            if (crData.success && crData.data.length > 0) {
+                                crData.data.forEach(v => {
+                                    const opt = document.createElement('option');
+                                    opt.value = v.id;
+                                    opt.dataset.amount = v.total_amount;
+                                    opt.textContent = `${v.voucher_no} - ${v.date} - ${parseFloat(v.total_amount).toFixed(2)}${v.description ? ' (' + v.description + ')' : ''}`;
+                                    if (v.id == voucher.expense_voucher_ref_id) opt.selected = true;
+                                    crSelect.appendChild(opt);
+                                });
+                            }
+                        });
+                }
+
+                crSelect.onchange = function() {
+                    const sel = this.options[this.selectedIndex];
+                    if (sel && sel.dataset.amount) {
+                        document.getElementById('editAmount').value = parseFloat(sel.dataset.amount).toFixed(2);
+                    }
+                };
+
                 // Store voucher ID for saving
                 document.getElementById('editModal').dataset.voucherId = id;
                 document.getElementById('editModal').classList.add('show');
@@ -649,7 +677,8 @@ document.getElementById('saveEditBtn').addEventListener('click', function() {
         cheque_no: document.getElementById('editChequeNo').value || null,
         cheque_date: document.getElementById('editChequeDate').value || null,
         description: document.getElementById('editDescription').value || null,
-        project_id: document.getElementById('editProject').value || null
+        project_id: document.getElementById('editProject').value || null,
+        expense_voucher_ref_id: document.getElementById('editCrExpenseRef').value || null
     };
     
     // Disable button to prevent double submission

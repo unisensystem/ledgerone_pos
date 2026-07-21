@@ -58,6 +58,10 @@ try {
             pv.cheque_no,
             pv.cheque_date,
             pv.attachment,
+            pv.expense_voucher_ref_id,
+            ev.voucher_no as expense_voucher_no,
+            ev.total_amount as expense_voucher_amount,
+            ev.date as expense_voucher_date,
             s.supplier_name,
             s.supplier_code,
             s.address as supplier_address,
@@ -83,6 +87,7 @@ try {
         LEFT JOIN ledgerone_public.currencies c ON pv.currency_id = c.id
         LEFT JOIN bank_accounts ba ON pv.bank_account_id = ba.id
         LEFT JOIN companies co ON pv.company_id = co.id
+        LEFT JOIN expense_voucher ev ON pv.expense_voucher_ref_id = ev.id
         WHERE pv.id = ? AND pv.tenant_id = ?
     ");
     $stmt->execute([$voucher_id, $tenant_id]);
@@ -350,6 +355,12 @@ try {
             <tr>
                 <th>Bill No</th>
                 <td><?php echo htmlspecialchars($voucher['bill_no']); ?></td>
+            </tr>
+            <?php endif; ?>
+            <?php if ($voucher['expense_voucher_no']): ?>
+            <tr>
+                <th>Expense Ref (CR)</th>
+                <td><?php echo htmlspecialchars($voucher['expense_voucher_no']); ?> - <?php echo date('d-M-Y', strtotime($voucher['expense_voucher_date'])); ?> - <?php echo $voucher['currency_symbol'] . number_format($voucher['expense_voucher_amount'], 2); ?></td>
             </tr>
             <?php endif; ?>
             <?php if ($voucher['bank_name']): ?>

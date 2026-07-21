@@ -511,11 +511,18 @@ try {
         $invoices = $stmt->fetchAll(PDO::FETCH_ASSOC);
         
         // Get payment vouchers (exclude those linked to PDCs) with currency
-        $sql = "SELECT voucher_date as date, CONCAT('Payment - ', voucher_number) as description,
-                voucher_number as reference, amount as debit, 0 as credit, sub_account_id, currency_id
-                FROM payment_voucher 
-                WHERE tenant_id = ? AND supplier_id = ?
-                AND id NOT IN (SELECT reference_id FROM post_dated_cheques WHERE tenant_id = ? AND reference_table = 'payment_voucher')" . ($company_id ? " AND company_id = ?" : "");
+        $sql = "SELECT pv.voucher_date as date,
+                CONCAT('Payment - ', pv.voucher_number,
+                    CASE WHEN ev.voucher_no IS NOT NULL
+                        THEN CONCAT(' (Exp: ', ev.voucher_no, ')')
+                        ELSE ''
+                    END
+                ) as description,
+                pv.voucher_number as reference, pv.amount as debit, 0 as credit, pv.sub_account_id, pv.currency_id
+                FROM payment_voucher pv
+                LEFT JOIN expense_voucher ev ON pv.expense_voucher_ref_id = ev.id
+                WHERE pv.tenant_id = ? AND pv.supplier_id = ?
+                AND pv.id NOT IN (SELECT reference_id FROM post_dated_cheques WHERE tenant_id = ? AND reference_table = 'payment_voucher')" . ($company_id ? " AND pv.company_id = ?" : "");
         $params = [$tenant_id, $supplier_id, $tenant_id];
         if ($company_id) $params[] = $company_id;
         if ($from_date && $to_date) {

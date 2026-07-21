@@ -257,9 +257,22 @@ tbody tr:hover {
   color: var(--warning);
 }
 
+.status-partial {
+  background: rgba(8, 145, 178, 0.1);
+  color: #0891b2;
+}
+
 .status-overdue {
   background: rgba(227, 79, 79, 0.1);
   color: var(--error);
+}
+
+.payment-status {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
 }
 
 .pagination {

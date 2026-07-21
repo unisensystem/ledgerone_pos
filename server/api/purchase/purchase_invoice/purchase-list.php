@@ -42,13 +42,15 @@ try {
             pi.company_id,
             pi.supplier_id,
             s.supplier_name,
-            COUNT(pii.id) as item_count,
+            COUNT(DISTINCT pii.id) as item_count,
             pi.net_amount,
-            c.symbol as currency_symbol
+            c.symbol as currency_symbol,
+            COALESCE(SUM(DISTINCT pv.amount), 0) as paid_amount
         FROM purchase_invoice pi
         LEFT JOIN suppliers s ON pi.supplier_id = s.id
         LEFT JOIN purchase_invoice_items pii ON pi.id = pii.purchase_invoice_id
         LEFT JOIN ledgerone_public.currencies c ON pi.currency_id = c.id
+        LEFT JOIN payment_voucher pv ON pv.bill_no = pi.bill_no AND pv.tenant_id = pi.tenant_id
         WHERE pi.tenant_id = ? AND (pi.is_tax = 0 OR pi.is_tax IS NULL)
         GROUP BY pi.id
         ORDER BY pi.purchase_date DESC, pi.id DESC

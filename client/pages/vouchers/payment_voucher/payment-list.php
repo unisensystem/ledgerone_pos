@@ -195,6 +195,12 @@ if (!$user_id) {
                                 <option value="">Select Sub Account</option>
                             </select>
                         </div>
+                        <div class="form-group" id="editCrExpenseGroup">
+                            <label for="editCrExpenseRef">Expense Voucher (CR)</label>
+                            <select id="editCrExpenseRef">
+                                <option value="">Select CR Expense</option>
+                            </select>
+                        </div>
                         <div class="form-group">
                             <label for="editBillNo">Bill No</label>
                             <input type="text" id="editBillNo">

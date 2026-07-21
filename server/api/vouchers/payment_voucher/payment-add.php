@@ -54,6 +54,7 @@ try {
     $description = !empty($_POST['description']) ? $_POST['description'] : null;
     $project_id = !empty($_POST['project_id']) ? $_POST['project_id'] : null;
     $container_id = !empty($_POST['container_id']) ? $_POST['container_id'] : null;
+    $expense_voucher_ref_id = !empty($_POST['expense_voucher_ref_id']) ? $_POST['expense_voucher_ref_id'] : null;
     $attachment = null;
 
     // Handle file upload
@@ -152,23 +153,23 @@ try {
         $stmt = $pdo->prepare("
             INSERT INTO payment_voucher (
                 tenant_id, company_id, voucher_number, voucher_date, customer_id, sub_account_id, bill_no, 
-                amount, currency_id, payment_method_id, bank_account_id, cheque_no, cheque_date, description, attachment, project_id, container_id,
+                amount, currency_id, payment_method_id, bank_account_id, cheque_no, cheque_date, description, attachment, project_id, container_id, expense_voucher_ref_id,
                 created_by, updated_by
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ");
     } else {
         $stmt = $pdo->prepare("
             INSERT INTO payment_voucher (
                 tenant_id, company_id, voucher_number, voucher_date, supplier_id, sub_account_id, bill_no, 
-                amount, currency_id, payment_method_id, bank_account_id, cheque_no, cheque_date, description, attachment, project_id, container_id,
+                amount, currency_id, payment_method_id, bank_account_id, cheque_no, cheque_date, description, attachment, project_id, container_id, expense_voucher_ref_id,
                 created_by, updated_by
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ");
     }
     
     $stmt->execute([
         $tenant_id, $company_id, $voucher_number, $voucher_date, $entity['id'], $sub_account_id, $bill_no,
-        $amount, $currency_id, $payment_method_id, $bank_account_id, $cheque_no, $cheque_date, $description, $attachment, $project_id, $container_id,
+        $amount, $currency_id, $payment_method_id, $bank_account_id, $cheque_no, $cheque_date, $description, $attachment, $project_id, $container_id, $expense_voucher_ref_id,
         $user_id, $user_id
     ]);
     

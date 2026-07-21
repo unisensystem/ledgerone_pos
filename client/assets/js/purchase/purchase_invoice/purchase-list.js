@@ -134,6 +134,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     companyId: invoice.company_id,
                     items: invoice.item_count,
                     totalAmount: parseFloat(invoice.net_amount),
+                    paidAmount: parseFloat(invoice.paid_amount || 0),
                     currencySymbol: invoice.currency_symbol || ''
                 }));
                 currentPage = data.pagination.page;
@@ -210,7 +211,21 @@ document.addEventListener('DOMContentLoaded', function () {
             row.insertCell(4).textContent = invoice.items;
             row.insertCell(5).textContent = formattedAmount;
 
-            const actionsCell = row.insertCell(6);
+            // Payment status badge
+            const statusCell = row.insertCell(6);
+            const paid = invoice.paidAmount;
+            const total = invoice.totalAmount;
+            let statusLabel, statusClass;
+            if (paid >= total && total > 0) {
+                statusLabel = 'Paid'; statusClass = 'status-paid';
+            } else if (paid > 0) {
+                statusLabel = 'Partial'; statusClass = 'status-partial';
+            } else {
+                statusLabel = 'Pending'; statusClass = 'status-pending';
+            }
+            statusCell.innerHTML = `<span class="payment-status ${statusClass}">${statusLabel}</span>`;
+
+            const actionsCell = row.insertCell(7);
             const actionButtons = document.createElement('div');
             actionButtons.className = 'action-buttons';
 
@@ -296,6 +311,18 @@ document.addEventListener('DOMContentLoaded', function () {
         }
 
 
+
+        // Status filter
+        if (statusFilter.value) {
+            filteredInvoices = filteredInvoices.filter(invoice => {
+                const paid = invoice.paidAmount;
+                const total = invoice.totalAmount;
+                if (statusFilter.value === 'paid') return paid >= total && total > 0;
+                if (statusFilter.value === 'partial') return paid > 0 && paid < total;
+                if (statusFilter.value === 'pending') return paid <= 0;
+                return true;
+            });
+        }
 
         // Supplier Invoice No filter
         if (supplierInvoiceNoFilter.value) {

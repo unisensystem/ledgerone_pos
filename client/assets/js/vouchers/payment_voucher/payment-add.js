@@ -27,6 +27,8 @@ paymentTypeToggles.forEach(toggle => {
         document.getElementById('supplierDropdown').innerHTML = '';
         document.getElementById('subAccount').innerHTML = '<option value="">Select Sub Account</option>';
         document.getElementById('billNo').value = '';
+        document.getElementById('crExpenseRef').innerHTML = '<option value="">Select CR Expense</option>';
+        document.getElementById('crExpenseGroup').style.display = 'none';
     });
 });
 
@@ -213,6 +215,38 @@ function fetchSubAccountsForSupplier(supplierCode) {
         .catch(error => console.error('Error fetching sub-accounts:', error));
 }
 
+function fetchCRExpensesForSupplier(supplierCode) {
+    const crGroup = document.getElementById('crExpenseGroup');
+    const crSelect = document.getElementById('crExpenseRef');
+    crSelect.innerHTML = '<option value="">Select CR Expense</option>';
+    crGroup.style.display = 'none';
+
+    if (currentPaymentType !== 'supplier' || !supplierCode) return;
+
+    fetch(`../../../../server/api/vouchers/payment_voucher/get-supplier-cr-expenses.php?supplier_code=${supplierCode}`)
+        .then(r => r.json())
+        .then(data => {
+            if (data.success && data.data.length > 0) {
+                data.data.forEach(v => {
+                    const opt = document.createElement('option');
+                    opt.value = v.id;
+                    opt.dataset.amount = v.total_amount;
+                    opt.textContent = `${v.voucher_no} - ${v.date} - ${parseFloat(v.total_amount).toFixed(2)}${v.description ? ' (' + v.description + ')' : ''}`;
+                    crSelect.appendChild(opt);
+                });
+                crGroup.style.display = '';
+            }
+        })
+        .catch(err => console.error('Error fetching CR expenses:', err));
+}
+
+document.getElementById('crExpenseRef').addEventListener('change', function() {
+    const selected = this.options[this.selectedIndex];
+    if (selected && selected.dataset.amount) {
+        document.getElementById('amount').value = parseFloat(selected.dataset.amount).toFixed(2);
+    }
+});
+
 
 
 // Fetch bank accounts from API
@@ -377,6 +411,7 @@ function setupSearchableDropdown(inputId, dropdownId, data, displayKey, valueKey
                         if (inputId === 'supplierCode') {
                             fetchBillsForSupplier(this.dataset.value);
                             fetchSubAccountsForSupplier(this.dataset.value);
+                            fetchCRExpensesForSupplier(this.dataset.value);
                         }
                     });
 
@@ -419,6 +454,7 @@ function setupSearchableDropdown(inputId, dropdownId, data, displayKey, valueKey
                 if (inputId === 'supplierCode') {
                     fetchBillsForSupplier(selectedItem.dataset.value);
                     fetchSubAccountsForSupplier(selectedItem.dataset.value);
+                    fetchCRExpensesForSupplier(selectedItem.dataset.value);
                 }
             }
         } else if (e.key === 'Escape') {
@@ -470,6 +506,7 @@ function setupSearchableDropdown(inputId, dropdownId, data, displayKey, valueKey
                         if (inputId === 'supplierCode') {
                             fetchBillsForSupplier(this.dataset.value);
                             fetchSubAccountsForSupplier(this.dataset.value);
+                            fetchCRExpensesForSupplier(this.dataset.value);
                         }
                     });
                     
@@ -634,6 +671,9 @@ form.addEventListener('submit', function (e) {
     const containerValue = document.getElementById('container').value;
     if (containerValue) formData.append('container_id', containerValue);
 
+    const crExpenseValue = document.getElementById('crExpenseRef').value;
+    if (crExpenseValue) formData.append('expense_voucher_ref_id', crExpenseValue);
+
     const bankAccountValue = document.getElementById('bankAccount').value;
     if (bankAccountValue) formData.append('bank_account', bankAccountValue);
     
@@ -694,6 +734,8 @@ function resetForm() {
     document.getElementById('voucherDate').valueAsDate = new Date();
     document.getElementById('voucherNumber').value = 'Auto-generated';
     document.getElementById('project').value = '';
+    document.getElementById('crExpenseRef').innerHTML = '<option value="">Select CR Expense</option>';
+    document.getElementById('crExpenseGroup').style.display = 'none';
     currentFile = null;
     attachmentThumbnail.innerHTML = '<i class="fas fa-file"></i>';
     attachmentPreview.classList.remove('show');
