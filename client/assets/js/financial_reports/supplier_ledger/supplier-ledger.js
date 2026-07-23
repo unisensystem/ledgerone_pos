@@ -630,6 +630,23 @@ document.addEventListener('DOMContentLoaded', function () {
         window.open(`print.php?${params}`, '_blank');
     });
 
+    // PDF ledger
+    document.getElementById('pdf-ledger').addEventListener('click', function(e) {
+        e.preventDefault();
+        const isDetailed = detailedLedgerBtn.classList.contains('active');
+        const params = new URLSearchParams({
+            ledger_type: isDetailed ? 'detailed' : 'summary',
+            date_from: fromDate.value,
+            date_to: toDate.value,
+            pdf: '1'
+        });
+        if (supplierCode.value) params.append('supplier_id', supplierCode.value);
+        if (companyFilter.value) params.append('company_id', companyFilter.value);
+        if (currencyFilter.value) params.append('currency_id', currencyFilter.value);
+        if (expandedInvoices.size > 0) params.append('expanded', Array.from(expandedInvoices).join(','));
+        window.open(`print.php?${params}`, '_blank');
+    });
+
     // Close dropdown when clicking outside
     document.addEventListener('click', function (event) {
         if (!exportDropdown.contains(event.target) && !exportMenu.contains(event.target)) {

@@ -274,6 +274,9 @@ function renderVouchers(vouchersToRender) {
                             <button class="action-btn print" title="Print" data-id="${voucher.id}">
                                 <i class="fas fa-print"></i>
                             </button>
+                            <button class="action-btn pdf" title="Download PDF" style="background:#ffc107;color:#333;" data-id="${voucher.id}">
+                                <i class="fas fa-file-pdf"></i>
+                            </button>
                             <button class="action-btn delete" title="Delete" data-id="${voucher.id}">
                                 <i class="fas fa-trash"></i>
                             </button>
@@ -296,6 +299,13 @@ function renderVouchers(vouchersToRender) {
         btn.addEventListener('click', function () {
             const id = this.getAttribute('data-id');
             printVoucher(id);
+        });
+    });
+
+    document.querySelectorAll('.action-btn.pdf').forEach(btn => {
+        btn.addEventListener('click', function () {
+            const id = this.getAttribute('data-id');
+            window.open(`print.php?id=${id}&pdf=1`, '_blank');
         });
     });
 

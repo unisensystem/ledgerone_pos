@@ -272,6 +272,9 @@ function renderVouchers(vouchersToRender) {
                             <button class="action-btn print" title="Print" data-id="${voucher.id}" onclick="printVoucher(${voucher.id}); return false;">
                                 <i class="fas fa-print"></i>
                             </button>
+                            <button class="action-btn" title="Download PDF" style="background:#ffc107;color:#333;" data-id="${voucher.id}" onclick="window.open('print.php?id=${voucher.id}&pdf=1','_blank'); return false;">
+                                <i class="fas fa-file-pdf"></i>
+                            </button>
                             ${userPermissions.can_delete ? `<button class="action-btn delete" title="Delete" data-id="${voucher.id}" onclick="deleteVoucher(${voucher.id}); return false;">
                                 <i class="fas fa-trash"></i>
                             </button>` : ''}

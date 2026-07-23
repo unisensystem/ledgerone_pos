@@ -250,6 +250,13 @@ document.addEventListener('DOMContentLoaded', function () {
             printBtn.title = 'Print Invoice';
             printBtn.addEventListener('click', () => printInvoice(invoice.id));
 
+            // PDF button
+            const pdfBtn = document.createElement('button');
+            pdfBtn.className = 'btn btn-warning btn-sm';
+            pdfBtn.innerHTML = '<i class="fas fa-file-pdf"></i>';
+            pdfBtn.title = 'Download PDF';
+            pdfBtn.addEventListener('click', () => window.open(`invoice-print.php?id=${invoice.id}&pdf=1`, '_blank'));
+
             // Delete button
             const deleteBtn = document.createElement('button');
             deleteBtn.className = 'btn btn-danger btn-sm';
@@ -260,6 +267,7 @@ document.addEventListener('DOMContentLoaded', function () {
             actionButtons.appendChild(editBtn);
             actionButtons.appendChild(dupBtn);
             actionButtons.appendChild(printBtn);
+            actionButtons.appendChild(pdfBtn);
             actionButtons.appendChild(deleteBtn);
 
             actionsCell.appendChild(actionButtons);

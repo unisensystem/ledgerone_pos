@@ -692,6 +692,29 @@ document.addEventListener('DOMContentLoaded', function () {
         window.open(`print.php?${params}`, '_blank');
     });
 
+    // PDF ledger
+    document.getElementById('pdf-ledger').addEventListener('click', function(e) {
+        e.preventDefault();
+        const isDetailed = detailedLedgerBtn.classList.contains('active');
+        const params = new URLSearchParams({
+            ledger_type: isDetailed ? 'detailed' : 'summary',
+            date_from: fromDate.value,
+            date_to: toDate.value,
+            pdf: '1'
+        });
+        if (customerCode.value) {
+            const encryptedCode = encryptCustomerCode(customerCode.value);
+            params.append('customer_code', encryptedCode);
+            params.append('customer_id', customerCode.value);
+        }
+        if (distribution.value) params.append('distribution_id', distribution.value);
+        if (subAccount.value) params.append('sub_account_id', subAccount.value);
+        if (isDetailed && expandedRows.size > 0) params.append('expanded_rows', Array.from(expandedRows).join(','));
+        if (company.value) params.append('company_id', company.value);
+        if (currencyFilter.value) params.append('currency_id', currencyFilter.value);
+        window.open(`print.php?${params}`, '_blank');
+    });
+
     // Close dropdown when clicking outside
     document.addEventListener('click', function (event) {
         if (!exportDropdown.contains(event.target) && !exportMenu.contains(event.target)) {

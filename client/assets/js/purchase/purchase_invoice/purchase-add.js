@@ -44,7 +44,7 @@ document.addEventListener('DOMContentLoaded', function () {
         // Reset supplier
         document.getElementById('supplierCodeSearch').value = '';
         document.getElementById('supplierCode').value = '';
-        document.getElementById('previousBalance').value = '0.00';
+        document.getElementById('previousBalance').value = '0.000';
         document.getElementById('subAccountOptions').innerHTML = '';
         document.getElementById('subAccountSearch').value = '';
         document.getElementById('subAccount').value = '';
@@ -917,7 +917,7 @@ document.addEventListener('DOMContentLoaded', function () {
         grossAmount.type = 'text';
         grossAmount.className = 'table-input';
         grossAmount.readOnly = true;
-        grossAmount.value = '0.00';
+        grossAmount.value = '0.000';
         grossAmount.tabIndex = -1;
         cell8.appendChild(grossAmount);
 
@@ -939,7 +939,7 @@ document.addEventListener('DOMContentLoaded', function () {
         discountAmount.className = 'table-input';
         discountAmount.min = '0';
         discountAmount.step = '0.001';
-        discountAmount.value = '0.00';
+        discountAmount.value = '0.000';
         cell10.appendChild(discountAmount);
 
         // Trade Offer % (input)
@@ -960,7 +960,7 @@ document.addEventListener('DOMContentLoaded', function () {
         tradeOfferAmount.className = 'table-input';
         tradeOfferAmount.min = '0';
         tradeOfferAmount.step = '0.001';
-        tradeOfferAmount.value = '0.00';
+        tradeOfferAmount.value = '0.000';
         cell12.appendChild(tradeOfferAmount);
 
         // GST % (input)
@@ -981,7 +981,7 @@ document.addEventListener('DOMContentLoaded', function () {
         gstAmount.className = 'table-input';
         gstAmount.min = '0';
         gstAmount.step = '0.001';
-        gstAmount.value = '0.00';
+        gstAmount.value = '0.000';
         cell14.appendChild(gstAmount);
 
         // FOC Quantity (input)
@@ -1022,7 +1022,7 @@ document.addEventListener('DOMContentLoaded', function () {
         netAmount.type = 'text';
         netAmount.className = 'table-input';
         netAmount.readOnly = true;
-        netAmount.value = '0.00';
+        netAmount.value = '0.000';
         netAmount.tabIndex = 0;
 
         // Add tab navigation logic for Net Amount
@@ -1346,7 +1346,7 @@ document.addEventListener('DOMContentLoaded', function () {
         grossInput.type = 'text';
         grossInput.className = 'table-input';
         grossInput.readOnly = true;
-        grossInput.value = '0.00';
+        grossInput.value = '0.000';
         grossInput.tabIndex = -1;
         grossCell.appendChild(grossInput);
         
@@ -1381,7 +1381,7 @@ document.addEventListener('DOMContentLoaded', function () {
         discAmountInput.className = 'table-input';
         discAmountInput.min = '0';
         discAmountInput.step = '0.001';
-        discAmountInput.value = '0.00';
+        discAmountInput.value = '0.000';
         discAmountCell.appendChild(discAmountInput);
         
         // TO %
@@ -1415,7 +1415,7 @@ document.addEventListener('DOMContentLoaded', function () {
         toAmountInput.className = 'table-input';
         toAmountInput.min = '0';
         toAmountInput.step = '0.001';
-        toAmountInput.value = '0.00';
+        toAmountInput.value = '0.000';
         toAmountCell.appendChild(toAmountInput);
         
         // Tax %
@@ -1450,7 +1450,7 @@ document.addEventListener('DOMContentLoaded', function () {
         taxAmountInput.className = 'table-input';
         taxAmountInput.min = '0';
         taxAmountInput.step = '0.001';
-        taxAmountInput.value = '0.00';
+        taxAmountInput.value = '0.000';
         taxAmountInput.setAttribute('data-tax-amount', '');
         taxAmountCell.appendChild(taxAmountInput);
         
@@ -1472,7 +1472,7 @@ document.addEventListener('DOMContentLoaded', function () {
         netInput.type = 'text';
         netInput.className = 'table-input';
         netInput.readOnly = true;
-        netInput.value = '0.00';
+        netInput.value = '0.000';
         netInput.tabIndex = 0;
         netCell.appendChild(netInput);
         
@@ -2150,9 +2150,9 @@ document.addEventListener('DOMContentLoaded', function () {
         addRowDynamic();
 
         // Reset summary
-        document.getElementById('totalBill').textContent = '0.00';
-        document.getElementById('totalDiscountAmount').value = '0.00';
-        document.getElementById('netAmount').textContent = '0.00';
+        document.getElementById('totalBill').textContent = '0.000';
+        document.getElementById('totalDiscountAmount').value = '0.000';
+        document.getElementById('netAmount').textContent = '0.000';
 
         // Set default date to today
         document.getElementById('purchaseDate').value = today;
@@ -2163,7 +2163,7 @@ document.addEventListener('DOMContentLoaded', function () {
         document.getElementById('branchSearch').value = '';
         document.getElementById('branch').value = '';
         document.getElementById('container').value = '';
-        document.getElementById('previousBalance').value = '0.00';
+        document.getElementById('previousBalance').value = '0.000';
         document.getElementById('project').value = '';
         const assocReset = document.getElementById('associatedCompany');
         if (assocReset) assocReset.innerHTML = '<option value="">Select Associated Company</option>';

@@ -87,7 +87,9 @@ $company_timezone = $company['timezone'] ?? 'UTC';
     </style>
 </head>
 <body>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <button class="print-btn no-print" onclick="window.print()">Print Report</button>
+    <button class="print-btn no-print" style="background:#28a745;" onclick="downloadAsPdf()">Download PDF</button>
     
     <div class="header">
         <?php if ($company_logo): ?><img src="../../../assets/uploads/company_logo/<?php echo $company_logo; ?>" alt="Company Logo" class="company-logo"><?php endif; ?>
@@ -126,6 +128,36 @@ $company_timezone = $company['timezone'] ?? 'UTC';
     </div>
 
     <script>
+        function downloadAsPdf() {
+            const element = document.body;
+            const ledgerType = '<?php echo $ledger_type; ?>';
+            const filename = `customer-ledger-${ledgerType}-<?php echo date('Y-m-d'); ?>.pdf`;
+            html2pdf().set({
+                margin: 0.3,
+                filename: filename,
+                image: { type: 'jpeg', quality: 0.98 },
+                html2canvas: { scale: 2, useCORS: true },
+                jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' }
+            }).from(element).save();
+        }
+
+        const isPdfMode = new URLSearchParams(window.location.search).get('pdf') === '1';
+        if (isPdfMode) {
+            window.addEventListener('invoiceLoaded', function() {
+                setTimeout(() => {
+                    const element = document.body;
+                    const ledgerType = '<?php echo $ledger_type; ?>';
+                    html2pdf().set({
+                        margin: 0.3,
+                        filename: `customer-ledger-${ledgerType}-<?php echo date('Y-m-d'); ?>.pdf`,
+                        image: { type: 'jpeg', quality: 0.98 },
+                        html2canvas: { scale: 2, useCORS: true },
+                        jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' }
+                    }).from(element).save().then(() => window.close());
+                }, 500);
+            });
+        }
+
         const currencySymbol = '<?php echo $currency_symbol; ?>';
         const expandedRows = '<?php echo $expanded_rows; ?>'.split(',').filter(r => r);
         const params = new URLSearchParams();
@@ -256,6 +288,7 @@ $company_timezone = $company['timezone'] ?? 'UTC';
             `;
             
             document.getElementById('report-content').innerHTML = html;
+            window.dispatchEvent(new Event('invoiceLoaded'));
         }
 
         async function renderDetailedReport(data, openingBalance) {
@@ -418,6 +451,7 @@ $company_timezone = $company['timezone'] ?? 'UTC';
             `;
             
             document.getElementById('report-content').insertAdjacentHTML('beforeend', html);
+            window.dispatchEvent(new Event('invoiceLoaded'));
             }
         }
     </script>

@@ -26,6 +26,7 @@ function initializeListPage(permissions) {
     let currentPage = 1;
     let totalPages = 1;
     const invoicesTable = document.getElementById('invoicesTable').getElementsByTagName('tbody')[0];
+    let duplicateInvoiceId = null;
     
     // Filter elements
     const dateFrom = document.getElementById('dateFrom');
@@ -59,6 +60,7 @@ function initializeListPage(permissions) {
                     invoiceNo: invoice.bill_no,
                     date: invoice.sale_date,
                     customer: invoice.customer_name,
+                    customerId: invoice.customer_id || null,
                     company: invoice.company_name,
                     items: invoice.item_count,
                     totalAmount: parseFloat(invoice.net_amount),
@@ -135,6 +137,15 @@ function initializeListPage(permissions) {
                 window.open(`invoice-print2.php?id=${invoice.id}`, '_blank');
             });
 
+            // PDF button
+            const pdfBtn = document.createElement('button');
+            pdfBtn.className = 'btn btn-warning btn-sm';
+            pdfBtn.innerHTML = '<i class="fas fa-file-pdf"></i>';
+            pdfBtn.title = 'Download PDF';
+            pdfBtn.addEventListener('click', () => {
+                window.open(`invoice-print2.php?id=${invoice.id}&pdf=1`, '_blank');
+            });
+
             // Delete button
             const deleteBtn = document.createElement('button');
             deleteBtn.className = 'btn btn-danger btn-sm';
@@ -148,9 +159,18 @@ function initializeListPage(permissions) {
                 deleteBtn.style.cursor = 'not-allowed';
             }
 
+            // Duplicate button
+            const dupBtn = document.createElement('button');
+            dupBtn.className = 'btn btn-secondary btn-sm';
+            dupBtn.innerHTML = '<i class="fas fa-copy"></i>';
+            dupBtn.title = 'Duplicate Invoice';
+            dupBtn.addEventListener('click', () => openDuplicateModal(invoice.id, invoice.invoiceNo, invoice.customerId));
+
             actionButtons.appendChild(editBtn);
+            actionButtons.appendChild(dupBtn);
             actionButtons.appendChild(printBtn);
             actionButtons.appendChild(customPrintBtn);
+            actionButtons.appendChild(pdfBtn);
             actionButtons.appendChild(deleteBtn);
 
             actionsCell.appendChild(actionButtons);
@@ -481,5 +501,199 @@ function initializeListPage(permissions) {
             this.style.display = 'none';
             deleteInvoiceId = null;
         }
+    });
+
+    // ── Duplicate Invoice ──────────────────────────────────────────────
+    async function fetchDupCustomerBalance(customerId) {
+        const el = document.getElementById('dupCustomerBalance');
+        if (!customerId || !el) return;
+        el.textContent = 'Loading...';
+        el.style.display = 'block';
+        try {
+            const res = await fetch(`../../../../server/api/financial_reports/customer_ledger/customer-ledger.php?customer_id=${customerId}&type=summary`);
+            const data = await res.json();
+            if (data.success && data.data && data.data.length > 0) {
+                const balance = parseFloat(data.data[0].closing_balance || 0);
+                const label = balance >= 0 ? 'Dr' : 'Cr';
+                el.textContent = `Balance: ${label} ${Math.abs(balance).toFixed(3)}`;
+            } else {
+                el.textContent = ''; el.style.display = 'none';
+            }
+        } catch (e) { el.textContent = ''; el.style.display = 'none'; }
+    }
+
+    function openDuplicateModal(id, billNo, originalCustomerId) {
+        duplicateInvoiceId = id;
+        document.getElementById('duplicateSourceBillNo').textContent = billNo;
+        document.getElementById('duplicateNewBillNoDisplay').textContent = 'Generating...';
+        document.getElementById('duplicateError').textContent = '';
+        document.getElementById('duplicateDate').value = new Date().toISOString().split('T')[0];
+        document.getElementById('dupCustomerSearch').value = '';
+        document.getElementById('dupCustomerId').value = '';
+        document.getElementById('confirmDuplicateBtn').dataset.originalCustomerId = originalCustomerId || '';
+        const balEl = document.getElementById('dupCustomerBalance');
+        if (balEl) { balEl.textContent = ''; balEl.style.display = 'none'; }
+        document.getElementById('duplicateModal').style.display = 'flex';
+
+        if (originalCustomerId) fetchDupCustomerBalance(originalCustomerId);
+
+        fetch('../../../../server/api/sale/sale_tax_invoice/sti-next-bill-no.php')
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    document.getElementById('duplicateNewBillNoDisplay').textContent = data.bill_no;
+                    document.getElementById('confirmDuplicateBtn').dataset.billNo = data.bill_no;
+                }
+            })
+            .catch(() => { document.getElementById('duplicateNewBillNoDisplay').textContent = 'Error'; });
+    }
+
+    document.getElementById('cancelDuplicateBtn').addEventListener('click', function () {
+        document.getElementById('duplicateModal').style.display = 'none';
+        duplicateInvoiceId = null;
+    });
+
+    document.getElementById('duplicateModal').addEventListener('click', function (e) {
+        if (e.target === this) { this.style.display = 'none'; duplicateInvoiceId = null; }
+    });
+
+    document.getElementById('confirmDuplicateBtn').addEventListener('click', async function () {
+        const previewBillNo = document.getElementById('duplicateNewBillNoDisplay').textContent;
+        const errorEl = document.getElementById('duplicateError');
+        if (!previewBillNo || previewBillNo === 'Generating...') {
+            errorEl.textContent = 'Please wait, generating invoice number...';
+            return;
+        }
+        this.disabled = true;
+        this.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Duplicating...';
+        try {
+            const newCustomerId = document.getElementById('dupCustomerId').value || null;
+            const originalCustomerId = this.dataset.originalCustomerId || null;
+            const balanceCustomerId = newCustomerId || originalCustomerId;
+            let previousBalance = 0;
+            if (balanceCustomerId) {
+                const balRes = await fetch(`../../../../server/api/financial_reports/customer_ledger/customer-ledger.php?customer_id=${balanceCustomerId}&type=summary`);
+                const balData = await balRes.json();
+                if (balData.success && balData.data && balData.data.length > 0) {
+                    previousBalance = parseFloat(balData.data[0].closing_balance || 0);
+                }
+            }
+            const payload = {
+                invoice_id:       duplicateInvoiceId,
+                sale_date:        document.getElementById('duplicateDate').value || null,
+                customer_id:      newCustomerId,
+                previous_balance: previousBalance
+            };
+            const response = await fetch('../../../../server/api/sale/sale_tax_invoice/sti-duplicate.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            const data = await response.json();
+            if (data.success) {
+                document.getElementById('duplicateModal').style.display = 'none';
+                duplicateInvoiceId = null;
+                showDuplicateSuccess(data.bill_no, data.invoice_id);
+            } else {
+                errorEl.textContent = data.message;
+            }
+        } catch (err) {
+            errorEl.textContent = 'Error: ' + err.message;
+        }
+        this.disabled = false;
+        this.innerHTML = '<i class="fas fa-copy"></i> Confirm Duplicate';
+    });
+
+    // Duplicate customer dropdown
+    async function loadDupCustomers() {
+        try {
+            const response = await fetch('../../../../server/api/sale/sale_tax_invoice/get-customers.php');
+            const data = await response.json();
+            if (data.success) {
+                const dupOptions = document.getElementById('dupCustomerOptions');
+                dupOptions.innerHTML = '';
+                data.customers.forEach(c => {
+                    const opt = document.createElement('div');
+                    opt.className = 'dropdown-option';
+                    opt.setAttribute('data-value', c.id);
+                    opt.textContent = `${c.customer_code} - ${c.customer_name}`;
+                    dupOptions.appendChild(opt);
+                });
+                initDupCustomerDropdown();
+            }
+        } catch (e) { console.error(e); }
+    }
+    loadDupCustomers();
+
+    function initDupCustomerDropdown() {
+        const searchInput      = document.getElementById('dupCustomerSearch');
+        const optionsContainer = document.getElementById('dupCustomerOptions');
+        const hiddenInput      = document.getElementById('dupCustomerId');
+
+        searchInput.addEventListener('click', function (e) {
+            e.stopPropagation();
+            optionsContainer.style.display = 'block';
+            filterDupOpts();
+        });
+        searchInput.addEventListener('input', filterDupOpts);
+
+        optionsContainer.addEventListener('click', function (e) {
+            if (e.target.classList.contains('dropdown-option')) {
+                const customerId = e.target.getAttribute('data-value');
+                hiddenInput.value = customerId;
+                searchInput.value = e.target.textContent;
+                optionsContainer.style.display = 'none';
+                fetchDupCustomerBalance(customerId);
+            }
+        });
+
+        function filterDupOpts() {
+            const term = searchInput.value.toLowerCase();
+            Array.from(optionsContainer.getElementsByClassName('dropdown-option')).forEach(opt => {
+                opt.style.display = opt.textContent.toLowerCase().includes(term) ? 'block' : 'none';
+            });
+        }
+    }
+
+    // ── Duplicate Success Modal ───────────────────────────────────────
+    let dupSuccessNewId = null;
+    let dupSuccessTimer = null;
+
+    function showDuplicateSuccess(billNo, newId) {
+        dupSuccessNewId = newId;
+        document.getElementById('dupSuccessBillNo').textContent = billNo;
+        document.getElementById('duplicateSuccessModal').style.display = 'flex';
+        loadInvoices(currentPage);
+
+        let secs = 6;
+        document.getElementById('dupSuccessCountdown').textContent = secs;
+        clearInterval(dupSuccessTimer);
+        dupSuccessTimer = setInterval(function () {
+            secs--;
+            document.getElementById('dupSuccessCountdown').textContent = secs;
+            if (secs <= 0) { clearInterval(dupSuccessTimer); closeDupSuccessModal(); }
+        }, 1000);
+    }
+
+    function closeDupSuccessModal() {
+        clearInterval(dupSuccessTimer);
+        document.getElementById('duplicateSuccessModal').style.display = 'none';
+        dupSuccessNewId = null;
+    }
+
+    document.getElementById('dupSuccessCloseBtn').addEventListener('click', closeDupSuccessModal);
+
+    document.getElementById('dupSuccessPrintBtn').addEventListener('click', function () {
+        if (dupSuccessNewId) window.open(`invoice-print.php?id=${dupSuccessNewId}`, '_blank');
+        closeDupSuccessModal();
+    });
+
+    document.getElementById('dupSuccessEditBtn').addEventListener('click', function () {
+        if (dupSuccessNewId) window.location.href = `pos-add.php?edit=${dupSuccessNewId}`;
+        else closeDupSuccessModal();
+    });
+
+    document.getElementById('duplicateSuccessModal').addEventListener('click', function (e) {
+        if (e.target === this) closeDupSuccessModal();
     });
 }

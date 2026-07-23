@@ -418,6 +418,13 @@ function initializeListPage(permissions) {
             printBtn.title = 'Print Invoice';
             printBtn.addEventListener('click', () => printInvoice(invoice.id));
 
+            // PDF button
+            const pdfBtn = document.createElement('button');
+            pdfBtn.className = 'btn btn-warning btn-sm';
+            pdfBtn.innerHTML = '<i class="fas fa-file-pdf"></i>';
+            pdfBtn.title = 'Download PDF';
+            pdfBtn.addEventListener('click', () => downloadPdf(invoice.id, invoice.invoiceNo));
+
             // Delete button
             const deleteBtn = document.createElement('button');
             deleteBtn.className = 'btn btn-danger btn-sm';
@@ -445,6 +452,7 @@ function initializeListPage(permissions) {
             }
 
             actionButtons.appendChild(printBtn);
+            actionButtons.appendChild(pdfBtn);
             actionButtons.appendChild(deleteBtn);
 
             actionsCell.appendChild(actionButtons);
@@ -696,6 +704,10 @@ function initializeListPage(permissions) {
 
     function printInvoice(id) {
         showPrintOptions(id);
+    }
+
+    async function downloadPdf(id, invoiceNo) {
+        window.open(`invoice-print.php?id=${id}&pdf=1`, '_blank');
     }
     
     // Print options modal

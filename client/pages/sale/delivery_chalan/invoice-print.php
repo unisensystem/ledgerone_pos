@@ -371,6 +371,7 @@
 <body>
     <div class="no-print">
         <button class="print-btn" onclick="window.print()">Print Invoice</button>
+        <button class="print-btn active" onclick="downloadAsPdf()">Download PDF</button>
         <button class="print-btn" onclick="setPaperSize('A3')" id="btnA3">A3</button>
         <button class="print-btn" onclick="setPaperSize('A4')" id="btnA4">A4</button>
         <button class="print-btn" onclick="setPaperSize('A5')" id="btnA5">A5</button>
@@ -536,6 +537,7 @@
         </div>
     </div>
 
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
     <script>
@@ -1376,6 +1378,9 @@
                 document.getElementById('generatedOnSection').style.display = 'none';
             }
 
+            // Signal that invoice data is loaded
+            window.dispatchEvent(new Event('invoiceLoaded'));
+
             // Generate QR Code if enabled
             setTimeout(() => {
                 const enablePrintQRCode = localStorage.getItem('enablePrintQRCode') === 'true';
@@ -1397,8 +1402,38 @@
             }, 500);
         }
 
+        // Auto-trigger PDF download if ?pdf=1
+        const isPdfMode = new URLSearchParams(window.location.search).get('pdf') === '1';
+        if (isPdfMode) {
+            window.addEventListener('invoiceLoaded', function() {
+                setTimeout(() => {
+                    const element = document.querySelector('.invoice-container');
+                    const chalanNo = document.getElementById('invoiceNo').textContent.trim() || 'chalan';
+                    html2pdf().set({
+                        margin: 0.3,
+                        filename: `delivery-chalan-${chalanNo}.pdf`,
+                        image: { type: 'jpeg', quality: 0.98 },
+                        html2canvas: { scale: 2, useCORS: true },
+                        jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' }
+                    }).from(element).save().then(() => window.close());
+                }, 500);
+            });
+        }
+
         // Set generated on date
         document.getElementById('generatedOn').textContent = new Date().toLocaleString();
+
+        function downloadAsPdf() {
+            const element = document.querySelector('.invoice-container');
+            const chalanNo = document.getElementById('invoiceNo').textContent.trim() || 'chalan';
+            html2pdf().set({
+                margin: 0.3,
+                filename: `delivery-chalan-${chalanNo}.pdf`,
+                image: { type: 'jpeg', quality: 0.98 },
+                html2canvas: { scale: 2, useCORS: true },
+                jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' }
+            }).from(element).save();
+        }
 
         // Load data on page load
         loadData();

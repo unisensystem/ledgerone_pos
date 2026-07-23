@@ -186,16 +186,16 @@ if (!$user_id) {
                                 <th colspan="2">Totals</th>
                                 <th data-col="size"></th>
                                 <!-- Dynamic unit totals will be inserted here -->
-                                <th id="totalPurchasePrice">0.00</th>
-                                <th id="totalGrossAmount">0.00</th>
+                                <th id="totalPurchasePrice">0.000</th>
+                                <th id="totalGrossAmount">0.000</th>
                                 <th data-col="disc-percent"></th>
-                                <th id="totalDiscountAmountItems" data-col="disc-amount">0.00</th>
+                                <th id="totalDiscountAmountItems" data-col="disc-amount">0.000</th>
                                 <th data-col="to-percent"></th>
-                                <th id="totalTradeOfferAmountItems" data-col="to-amount">0.00</th>
+                                <th id="totalTradeOfferAmountItems" data-col="to-amount">0.000</th>
                                 <th data-col="tax-percent"></th>
-                                <th id="totalTaxAmountItems" data-col="tax-amount">0.00</th>
-                                <th id="totalFOCQty" data-col="foc">0.00</th>
-                                <th id="totalNetAmountItems">0.00</th>
+                                <th id="totalTaxAmountItems" data-col="tax-amount">0.000</th>
+                                <th id="totalFOCQty" data-col="foc">0.000</th>
+                                <th id="totalNetAmountItems">0.000</th>
                                 <th></th>
                             </tr>
                         </tfoot>
@@ -213,7 +213,7 @@ if (!$user_id) {
                 <div class="summary-grid">
                     <div class="summary-item">
                         <span class="summary-label" id="totalBillLabel">Total Bill</span>
-                        <span class="summary-value" id="totalBill">0.00</span>
+                        <span class="summary-value" id="totalBill">0.000</span>
                     </div>
                     <div class="summary-item">
                         <span class="summary-label">Discount %</span>
@@ -221,12 +221,12 @@ if (!$user_id) {
                     </div>
                     <div class="summary-item">
                         <span class="summary-label" id="totalDiscountAmountLabel">Discount Amount</span>
-                        <input type="number" id="totalDiscountAmount" class="table-input" min="0" step="0.001" value="0">
+                        <input type="number" id="totalDiscountAmount" class="table-input" min="0" step="0.001" value="0.000">
                     </div>
                     <div class="summary-item">
                         <span class="summary-label" id="shippingFeesLabel">Shipping Fees</span>
                         <div style="display: flex; flex-direction: column; gap: 8px; width: 100%;">
-                            <input type="number" id="shippingFees" class="table-input" min="0" step="0.001" value="0" placeholder="Enter shipping fees">
+                            <input type="number" id="shippingFees" class="table-input" min="0" step="0.001" value="0.000" placeholder="Enter shipping fees">
                             <div style="display: flex; gap: 12px; align-items: center;">
                                 <label style="display: flex; align-items: center; gap: 4px; cursor: pointer; margin: 0;">
                                     <input type="radio" name="shippingFeesType" id="shippingFeesAdd" value="add" checked style="width: auto; height: auto; margin: 0;">
@@ -243,7 +243,7 @@ if (!$user_id) {
                     <div id="invoiceLevelTaxesContainer"></div>
                     <div class="summary-item">
                         <span class="summary-label" id="netAmountSummaryLabel">Net Amount</span>
-                        <span class="summary-value" id="netAmount" style="color: var(--primary); font-size: 16px; font-weight: 700;">0.00</span>
+                        <span class="summary-value" id="netAmount" style="color: var(--primary); font-size: 16px; font-weight: 700;">0.000</span>
                     </div>
                     <div class="summary-item full-width">
                         <span class="summary-label">Remarks</span>

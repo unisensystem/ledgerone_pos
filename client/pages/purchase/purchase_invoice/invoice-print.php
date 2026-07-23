@@ -37,6 +37,7 @@
 <body>
     <div class="no-print">
         <button class="print-btn" onclick="window.print()">Print Invoice</button>
+        <button class="print-btn" id="downloadPdfBtn" onclick="downloadAsPdf()" style="background:#28a745;">&#8595; Download PDF</button>
     </div>
 
     <div class="invoice-container">
@@ -106,16 +107,16 @@
                     <th>Totals</th>
                     <th data-col="size"></th>
                     <th></th>
-                    <th class="text-right" id="totalUnitPrice">0.00</th>
-                    <th class="text-right" id="totalGrossAmount">0.00</th>
+                    <th class="text-right" id="totalUnitPrice">0.000</th>
+                    <th class="text-right" id="totalGrossAmount">0.000</th>
                     <th data-col="disc_pct"></th>
-                    <th class="text-right" data-col="disc_amt" id="totalDiscountAmountItems">0.00</th>
+                    <th class="text-right" data-col="disc_amt" id="totalDiscountAmountItems">0.000</th>
                     <th data-col="to_pct"></th>
-                    <th class="text-right" data-col="to_amt" id="totalTradeOfferAmountItems">0.00</th>
+                    <th class="text-right" data-col="to_amt" id="totalTradeOfferAmountItems">0.000</th>
                     <th data-col="tax_pct"></th>
-                    <th class="text-right" data-col="tax_amt" id="totalGSTAmountItems">0.00</th>
-                    <th class="text-right" data-col="foc" id="totalFOCQty">0.00</th>
-                    <th class="text-right" id="totalNetAmountItems">0.00</th>
+                    <th class="text-right" data-col="tax_amt" id="totalGSTAmountItems">0.000</th>
+                    <th class="text-right" data-col="foc" id="totalFOCQty">0.000</th>
+                    <th class="text-right" id="totalNetAmountItems">0.000</th>
                 </tr>
             </tfoot>
         </table>
@@ -125,24 +126,24 @@
                 <tbody>
                     <tr>
                         <td>Total Bill:</td>
-                        <td class="text-right" id="totalBill">0.00</td>
+                        <td class="text-right" id="totalBill">0.000</td>
                     </tr>
                     <tr id="discountPercentRow" style="display:none;">
                         <td>Discount (%):</td>
-                        <td class="text-right" id="discountPercent">0.00%</td>
+                        <td class="text-right" id="discountPercent">0.000%</td>
                     </tr>
                     <tr id="discountAmountRow" style="display:none;">
                         <td>Discount Amount:</td>
-                        <td class="text-right" id="discountAmount">0.00</td>
+                        <td class="text-right" id="discountAmount">0.000</td>
                     </tr>
                     <tr id="shippingFeesRow" style="display:none;">
                         <td><span id="shippingFeesLabel">Shipping Fees:</span></td>
-                        <td class="text-right" id="shippingFees">0.00</td>
+                        <td class="text-right" id="shippingFees">0.000</td>
                     </tr>
                     <tr id="invoiceTaxesAnchor" style="display:none;"></tr>
                     <tr class="total-row">
                         <td>Net Amount:</td>
-                        <td class="text-right" id="netAmount">0.00</td>
+                        <td class="text-right" id="netAmount">0.000</td>
                     </tr>
                 </tbody>
             </table>
@@ -279,7 +280,7 @@
                         unitMap[u] = (unitMap[u] || 0) + qty;
                     }
                 });
-                const unitQtyDisplay = Object.entries(unitMap).map(([u, q]) => `${q.toFixed(2)} ${u}`).join(', ') || '-';
+                const unitQtyDisplay = Object.entries(unitMap).map(([u, q]) => `${q.toFixed(3)} ${u}`).join(', ') || '-';
 
                 const row = tbody.insertRow();
                 row.innerHTML = `
@@ -287,16 +288,16 @@
                     <td>${item.product_name}</td>
                     <td data-col="size" style="display:${enableSize ? '' : 'none'}">${item.size || '-'}</td>
                     <td>${unitQtyDisplay}</td>
-                    <td class="text-right">${currencySymbol} ${parseFloat(item.purchase_price).toFixed(2)}</td>
-                    <td class="text-right">${currencySymbol} ${parseFloat(item.gross_amount).toFixed(2)}</td>
-                    <td class="text-right" data-col="disc_pct" style="display:${enableInlineCashDiscount ? '' : 'none'}">${parseFloat(item.discount_percent || 0).toFixed(2)}%</td>
-                    <td class="text-right" data-col="disc_amt" style="display:${enableInlineCashDiscountAmount ? '' : 'none'}">${currencySymbol} ${parseFloat(item.discount_amount || 0).toFixed(2)}</td>
-                    <td class="text-right" data-col="to_pct" style="display:${enableTradeOffer ? '' : 'none'}">${parseFloat(item.trade_offer_percent || 0).toFixed(2)}%</td>
-                    <td class="text-right" data-col="to_amt" style="display:${enableTradeOfferAmount ? '' : 'none'}">${currencySymbol} ${parseFloat(item.trade_offer_amount || 0).toFixed(2)}</td>
-                    <td class="text-right" data-col="tax_pct" style="display:${enableTaxation ? '' : 'none'}">${parseFloat(item.tax_percent || 0).toFixed(2)}%</td>
-                    <td class="text-right" data-col="tax_amt" style="display:${enableTaxation ? '' : 'none'}">${currencySymbol} ${parseFloat(item.tax_amount || 0).toFixed(2)}</td>
-                    <td class="text-right" data-col="foc" style="display:${enableFOC ? '' : 'none'}">${parseFloat(item.foc_quantity || 0).toFixed(2)}</td>
-                    <td class="text-right">${currencySymbol} ${parseFloat(item.net_amount).toFixed(2)}</td>
+                    <td class="text-right">${currencySymbol} ${parseFloat(item.purchase_price).toFixed(3)}</td>
+                    <td class="text-right">${currencySymbol} ${parseFloat(item.gross_amount).toFixed(3)}</td>
+                    <td class="text-right" data-col="disc_pct" style="display:${enableInlineCashDiscount ? '' : 'none'}">${parseFloat(item.discount_percent || 0).toFixed(3)}%</td>
+                    <td class="text-right" data-col="disc_amt" style="display:${enableInlineCashDiscountAmount ? '' : 'none'}">${currencySymbol} ${parseFloat(item.discount_amount || 0).toFixed(3)}</td>
+                    <td class="text-right" data-col="to_pct" style="display:${enableTradeOffer ? '' : 'none'}">${parseFloat(item.trade_offer_percent || 0).toFixed(3)}%</td>
+                    <td class="text-right" data-col="to_amt" style="display:${enableTradeOfferAmount ? '' : 'none'}">${currencySymbol} ${parseFloat(item.trade_offer_amount || 0).toFixed(3)}</td>
+                    <td class="text-right" data-col="tax_pct" style="display:${enableTaxation ? '' : 'none'}">${parseFloat(item.tax_percent || 0).toFixed(3)}%</td>
+                    <td class="text-right" data-col="tax_amt" style="display:${enableTaxation ? '' : 'none'}">${currencySymbol} ${parseFloat(item.tax_amount || 0).toFixed(3)}</td>
+                    <td class="text-right" data-col="foc" style="display:${enableFOC ? '' : 'none'}">${parseFloat(item.foc_quantity || 0).toFixed(3)}</td>
+                    <td class="text-right">${currencySymbol} ${parseFloat(item.net_amount).toFixed(3)}</td>
                 `;
 
                 totalUnitPrice += parseFloat(item.purchase_price);
@@ -308,30 +309,30 @@
                 totalNet       += parseFloat(item.net_amount);
             });
 
-            document.getElementById('totalUnitPrice').textContent           = `${currencySymbol} ${totalUnitPrice.toFixed(2)}`;
-            document.getElementById('totalGrossAmount').textContent         = `${currencySymbol} ${totalGross.toFixed(2)}`;
-            document.getElementById('totalDiscountAmountItems').textContent = `${currencySymbol} ${totalDisc.toFixed(2)}`;
-            document.getElementById('totalTradeOfferAmountItems').textContent = `${currencySymbol} ${totalTO.toFixed(2)}`;
-            document.getElementById('totalGSTAmountItems').textContent      = `${currencySymbol} ${totalGST.toFixed(2)}`;
-            document.getElementById('totalFOCQty').textContent              = totalFOC.toFixed(2);
-            document.getElementById('totalNetAmountItems').textContent      = `${currencySymbol} ${totalNet.toFixed(2)}`;
+            document.getElementById('totalUnitPrice').textContent           = `${currencySymbol} ${totalUnitPrice.toFixed(3)}`;
+            document.getElementById('totalGrossAmount').textContent         = `${currencySymbol} ${totalGross.toFixed(3)}`;
+            document.getElementById('totalDiscountAmountItems').textContent = `${currencySymbol} ${totalDisc.toFixed(3)}`;
+            document.getElementById('totalTradeOfferAmountItems').textContent = `${currencySymbol} ${totalTO.toFixed(3)}`;
+            document.getElementById('totalGSTAmountItems').textContent      = `${currencySymbol} ${totalGST.toFixed(3)}`;
+            document.getElementById('totalFOCQty').textContent              = totalFOC.toFixed(3);
+            document.getElementById('totalNetAmountItems').textContent      = `${currencySymbol} ${totalNet.toFixed(3)}`;
 
             // Totals section
-            document.getElementById('totalBill').textContent = `${currencySymbol} ${parseFloat(invoice.total_bill).toFixed(2)}`;
+            document.getElementById('totalBill').textContent = `${currencySymbol} ${parseFloat(invoice.total_bill).toFixed(3)}`;
 
             if (enableInvoiceCashDiscount && parseFloat(invoice.total_discount_percent) > 0) {
                 document.getElementById('discountPercentRow').style.display = '';
-                document.getElementById('discountPercent').textContent = parseFloat(invoice.total_discount_percent).toFixed(2) + '%';
+                document.getElementById('discountPercent').textContent = parseFloat(invoice.total_discount_percent).toFixed(3) + '%';
             }
             if (enableInvoiceCashDiscountAmount && parseFloat(invoice.total_discount_amount) > 0) {
                 document.getElementById('discountAmountRow').style.display = '';
-                document.getElementById('discountAmount').textContent = `${currencySymbol} ${parseFloat(invoice.total_discount_amount).toFixed(2)}`;
+                document.getElementById('discountAmount').textContent = `${currencySymbol} ${parseFloat(invoice.total_discount_amount).toFixed(3)}`;
             }
             if (enableShippingFees && parseFloat(invoice.shipping_fees || 0) > 0) {
                 const sym = (invoice.shipping_fees_type || 'add') === 'add' ? '+' : '-';
                 document.getElementById('shippingFeesRow').style.display = '';
                 document.getElementById('shippingFeesLabel').textContent = `Shipping Fees (${sym}):`;
-                document.getElementById('shippingFees').textContent = `${currencySymbol} ${parseFloat(invoice.shipping_fees).toFixed(2)}`;
+                document.getElementById('shippingFees').textContent = `${currencySymbol} ${parseFloat(invoice.shipping_fees).toFixed(3)}`;
             }
 
             // Invoice-level taxes
@@ -343,12 +344,12 @@
                     if (taxAmt === 0) return;
                     const tr = document.createElement('tr');
                     tr.className = 'dynamic-tax-row';
-                    tr.innerHTML = `<td>${tax.tax_name} (${parseFloat(tax.rate_percentage).toFixed(2)}%):</td><td class="text-right">${currencySymbol} ${taxAmt.toFixed(2)}</td>`;
+                    tr.innerHTML = `<td>${tax.tax_name} (${parseFloat(tax.rate_percentage).toFixed(3)}%):</td><td class="text-right">${currencySymbol} ${taxAmt.toFixed(3)}</td>`;
                     anchor.parentNode.insertBefore(tr, anchor);
                 });
             }
 
-            document.getElementById('netAmount').textContent = `${currencySymbol} ${parseFloat(invoice.net_amount).toFixed(2)}`;
+            document.getElementById('netAmount').textContent = `${currencySymbol} ${parseFloat(invoice.net_amount).toFixed(3)}`;
 
             // Amount in words
             const currencyUnitMap = {
@@ -378,6 +379,8 @@
 
             // Auto-hide table columns where all values are zero/empty
             hideEmptyTableColumns();
+
+            window.dispatchEvent(new Event('invoiceLoaded'));
         }
 
         function hideEmptyTableColumns() {
@@ -394,7 +397,7 @@
 
                 const allEmpty = bodyCells.every(td => {
                     const t = td.textContent.trim();
-                    return !t || t === '-' || t === '0.00' || t === '0.00%' || /^[^\d]*\s*0\.00$/.test(t);
+                    return !t || t === '-' || t === '0.000' || t === '0.000%' || /^[^\d]*\s*0\.000$/.test(t);
                 });
 
                 if (allEmpty) {
@@ -425,8 +428,35 @@
             return result.trim();
         }
 
+        async function downloadAsPdf() {
+            const btn = document.getElementById('downloadPdfBtn');
+            btn.disabled = true;
+            btn.textContent = 'Generating...';
+            document.querySelectorAll('.no-print').forEach(el => el.style.setProperty('display', 'none', 'important'));
+            const invoiceNo = document.getElementById('invoiceNo').textContent || 'Invoice';
+            await html2pdf().set({
+                margin: 8,
+                filename: `Invoice-${invoiceNo}.pdf`,
+                image: { type: 'jpeg', quality: 0.98 },
+                html2canvas: { scale: 2, useCORS: true, allowTaint: true, logging: false },
+                jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+            }).from(document.querySelector('.invoice-container')).save();
+            document.querySelectorAll('.no-print').forEach(el => el.style.removeProperty('display'));
+            btn.disabled = false;
+            btn.textContent = '\u2193 Download PDF';
+        }
+
+        if (new URLSearchParams(window.location.search).get('pdf') === '1') {
+            window.addEventListener('invoiceLoaded', async () => {
+                await new Promise(r => setTimeout(r, 300));
+                await downloadAsPdf();
+                window.close();
+            });
+        }
+
         document.getElementById('generatedOn').textContent = new Date().toLocaleString();
         loadData();
     </script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 </body>
 </html>

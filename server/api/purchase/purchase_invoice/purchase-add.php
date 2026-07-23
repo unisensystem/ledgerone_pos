@@ -77,7 +77,7 @@ try {
         $input['supplierId'],
         $input['branchId'],
         $input['containerId'] ?? null,
-        extractBalanceAmount($input['previousBalance'] ?? '0.00'),
+        extractBalanceAmount($input['previousBalance'] ?? '0.000'),
         $input['totalBill'],
         $input['totalDiscountPercent'] ?? 0.00,
         $input['totalDiscountAmount'] ?? 0.00,

@@ -134,6 +134,9 @@ $all_symbols = $stmt2->fetchAll();
                         <a href="#" class="dropdown-item" id="print-ledger">
                             <i class="fas fa-print"></i> Print Ledger
                         </a>
+                        <a href="#" class="dropdown-item" id="pdf-ledger">
+                            <i class="fas fa-file-pdf"></i> Download PDF
+                        </a>
                         <a href="#" class="dropdown-item">
                             <i class="fas fa-file-excel"></i> Export To Excel
                         </a>

@@ -649,6 +649,23 @@ $logoAbsUrl = $logoFile ? '/ledgerone_erp/client/assets/uploads/company_logo/' .
     </table>
 
 </div>
-<script>window.print();</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+<script>
+    const isPdf = new URLSearchParams(window.location.search).get('pdf') === '1';
+    if (isPdf) {
+        (async function() {
+            await html2pdf().set({
+                margin: 0,
+                filename: 'TaxInvoice-<?php echo htmlspecialchars($invoice["bill_no"]); ?>.pdf',
+                image: { type: 'jpeg', quality: 0.98 },
+                html2canvas: { scale: 2, useCORS: true, allowTaint: true, logging: false },
+                jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+            }).from(document.querySelector('.page')).save();
+            window.close();
+        })();
+    } else {
+        window.print();
+    }
+</script>
 </body>
 </html>

@@ -75,7 +75,7 @@ function renderInvoiceLevelTaxColumns() {
         amountInput.className = 'table-input';
         amountInput.min = '0';
         amountInput.step = '0.001';
-        amountInput.value = '0.00';
+        amountInput.value = '0.000';
         amountInput.id = `invoiceTax_${regime.id}_amount`;
         amountInput.addEventListener('input', function() {
             const baseNetAmount = parseFloat(this.closest('.summary-grid')?.dataset.baseNet) || 0;

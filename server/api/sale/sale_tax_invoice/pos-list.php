@@ -80,6 +80,7 @@ try {
             si.id,
             si.bill_no,
             si.sale_date,
+            si.customer_id,
             c.customer_name,
             co.company_name,
             COUNT(sii.id) as item_count,

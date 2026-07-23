@@ -514,6 +514,7 @@
         <button class="print-btn" onclick="setPaperSize('A4')" id="btnA4">A4</button>
         <button class="print-btn" onclick="setPaperSize('A5')" id="btnA5">A5</button>
         <button class="print-btn" onclick="setPaperSize('A6')" id="btnA6">A6</button>
+        <button class="print-btn" id="downloadPdfBtn" onclick="downloadAsPdf()" style="background:#28a745;">&#8595; Download PDF</button>
     </div>
 
     <div class="invoice-container">
@@ -687,6 +688,7 @@
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <script>
         // Paper size management
         function setPaperSize(size) {
@@ -1530,6 +1532,9 @@
             // Auto-hide table columns that have no meaningful data
             hideEmptyTableColumns();
 
+            // Dispatch event so PDF auto-download can trigger
+            window.dispatchEvent(new Event('invoiceLoaded'));
+
             // Generate QR Code if enabled
             setTimeout(() => {
                 const enablePrintQRCode = localStorage.getItem('enablePrintQRCode') === 'true';
@@ -1553,6 +1558,42 @@
 
         // Set generated on date
         document.getElementById('generatedOn').textContent = new Date().toLocaleString();
+
+        // Download PDF function
+        async function downloadAsPdf() {
+            const btn = document.getElementById('downloadPdfBtn');
+            btn.disabled = true;
+            btn.textContent = 'Generating...';
+
+            // Hide no-print elements temporarily
+            document.querySelectorAll('.no-print').forEach(el => el.style.setProperty('display', 'none', 'important'));
+
+            const invoiceNo = document.getElementById('invoiceNo').textContent || 'Invoice';
+            const paperSize = localStorage.getItem('invoicePaperSize') || 'A4';
+            const sizeMap = { A3: 'a3', A4: 'a4', A5: 'a5', A6: [105, 148] };
+            const format = sizeMap[paperSize] || 'a4';
+
+            await html2pdf().set({
+                margin: 8,
+                filename: `Invoice-${invoiceNo}.pdf`,
+                image: { type: 'jpeg', quality: 0.98 },
+                html2canvas: { scale: 2, useCORS: true, allowTaint: true, logging: false },
+                jsPDF: { unit: 'mm', format: format, orientation: 'portrait' }
+            }).from(document.querySelector('.invoice-container')).save();
+
+            document.querySelectorAll('.no-print').forEach(el => el.style.removeProperty('display'));
+            btn.disabled = false;
+            btn.textContent = '\u2193 Download PDF';
+        }
+
+        // Auto-trigger PDF download if ?pdf=1 in URL
+        if (new URLSearchParams(window.location.search).get('pdf') === '1') {
+            window.addEventListener('invoiceLoaded', async () => {
+                await new Promise(r => setTimeout(r, 300));
+                await downloadAsPdf();
+                window.close();
+            });
+        }
 
         // Load data on page load
         loadData();

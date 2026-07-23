@@ -442,6 +442,7 @@ try {
 
     <div class="print-container">
         <button class="print-btn no-print" onclick="window.print()">Print Voucher</button>
+        <button class="print-btn no-print" style="background:#28a745;" onclick="downloadAsPdf()">Download PDF</button>
         <button class="customize-btn no-print" onclick="openModal()">&#9881; Customize Print</button>
         
         <div class="header">
@@ -592,6 +593,7 @@ try {
             <i>This is a System Generated Voucher</i>
         </div>
     </div>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <script>
         const STORAGE_KEY = 'rv_print_hidden';
 
@@ -640,6 +642,32 @@ try {
         document.addEventListener('DOMContentLoaded', function() {
             applyHidden(getHidden());
         });
+
+        function downloadAsPdf() {
+            const element = document.querySelector('.print-container');
+            const voucherNo = '<?php echo addslashes($voucher['voucher_number']); ?>';
+            html2pdf().set({
+                margin: 0.3,
+                filename: `receive-voucher-${voucherNo}.pdf`,
+                image: { type: 'jpeg', quality: 0.98 },
+                html2canvas: { scale: 2, useCORS: true },
+                jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' }
+            }).from(element).save();
+        }
+
+        <?php if (isset($_GET['pdf']) && $_GET['pdf'] === '1'): ?>
+        window.addEventListener('DOMContentLoaded', function() {
+            const element = document.querySelector('.print-container');
+            const voucherNo = '<?php echo addslashes($voucher['voucher_number']); ?>';
+            html2pdf().set({
+                margin: 0.3,
+                filename: `receive-voucher-${voucherNo}.pdf`,
+                image: { type: 'jpeg', quality: 0.98 },
+                html2canvas: { scale: 2, useCORS: true },
+                jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' }
+            }).from(element).save().then(() => window.close());
+        });
+        <?php endif; ?>
     </script>
 </body>
 </html>
