@@ -362,8 +362,8 @@ function calculateRowAmounts(row, totalQty, price, source) {
     
     row.querySelector('.tax-amount-cell input').value = taxAmt.toFixed(3);
     
-    // Net amount
-    const net = afterTradeOffer + taxAmt;
+    // Net amount (tax excluded)
+    const net = afterTradeOffer;
     row.querySelector('.net-cell input').value = net.toFixed(3);
     
     // Update summary

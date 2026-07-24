@@ -1,0 +1,27 @@
+﻿async function loadCustomers() {
+    const response = await fetch('../../../../server/api/sale/pos_invoice/get-customers.php');
+    const data = await response.json();
+    if (data.success) {
+        customersData = data.customers;
+        const customerSelect = document.getElementById('customer');
+        customerSelect.innerHTML = '<option value="">Select Customer</option>';
+        data.customers.forEach(customer => {
+            const option = document.createElement('option');
+            option.value = customer.id;
+            option.textContent = `${customer.customer_code} - ${customer.customer_name}`;
+            customerSelect.appendChild(option);
+        });
+        
+        const cashCustomer = data.customers.find(c => c.customer_name === 'Cash Customer');
+        if (cashCustomer) {
+            customerSelect.value = cashCustomer.id;
+            currentInvoice.customer = cashCustomer.id;
+            await fetchCustomerBalance(cashCustomer.id);
+        }
+    }
+}
+
+async function fetchCustomerBalance(customerId) {
+    try {
+        const response = await fetch(`../../../../server/api/financial_reports/customer_ledger/customer-ledger.php?customer_id=${customerId}&type=summary`);
+        const data = await response.json();

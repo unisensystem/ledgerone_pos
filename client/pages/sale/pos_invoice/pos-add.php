@@ -57,7 +57,7 @@ if (!$user_id) {
                     <div class="form-group" id="companyGroup">
                         <label for="company" class="required">Company</label>
                         <div class="searchable-dropdown">
-                            <input type="text" class="search-input" placeholder="Search company..." id="companySearch" autocomplete="off">
+                            <input type="text" class="search-input" placeholder="Search company..." id="companySearch" autocomplete="off" tabindex="-1">
                             <div class="dropdown-options" id="companyOptions">
                                 <!-- Options loaded dynamically -->
                             </div>
@@ -70,7 +70,7 @@ if (!$user_id) {
                     <div class="form-group" id="branchGroup">
                         <label for="branch" class="required">Branch</label>
                         <div class="searchable-dropdown">
-                            <input type="text" class="search-input" placeholder="Search branch..." id="branchSearch" autocomplete="off">
+                            <input type="text" class="search-input" placeholder="Search branch..." id="branchSearch" autocomplete="off" tabindex="-1">
                             <div class="dropdown-options" id="branchOptions">
                                 <!-- Options loaded dynamically -->
                             </div>
@@ -97,28 +97,31 @@ if (!$user_id) {
                     <!-- 6. Brand -->
                     <div class="form-group" id="brandGroup" style="display:none;">
                         <label for="brand">Brand</label>
-                        <select id="brand" tabindex="-1">
-                            <option value="">Select Brand</option>
-                            <!-- Options loaded dynamically -->
-                        </select>
+                        <div class="searchable-dropdown">
+                            <input type="text" class="search-input" placeholder="Search brand..." id="brandSearch" autocomplete="off" tabindex="-1">
+                            <div class="dropdown-options" id="brandOptions"></div>
+                            <input type="hidden" id="brand">
+                        </div>
                     </div>
                     
                     <!-- 7. Sales Officer -->
                     <div class="form-group" id="salesOfficerGroup">
                         <label for="salesOfficer">Sales Officer</label>
-                        <select id="salesOfficer" tabindex="-1">
-                            <option value="">Select Sales Officer</option>
-                            <!-- Options loaded dynamically -->
-                        </select>
+                        <div class="searchable-dropdown">
+                            <input type="text" class="search-input" placeholder="Search sales officer..." id="salesOfficerSearch" autocomplete="off" tabindex="-1">
+                            <div class="dropdown-options" id="salesOfficerOptions"></div>
+                            <input type="hidden" id="salesOfficer">
+                        </div>
                     </div>
                     
                     <!-- 8. Supplier Man -->
                     <div class="form-group" id="supplierManGroup">
                         <label for="supplierMan">Supplier Man</label>
-                        <select id="supplierMan" tabindex="-1">
-                            <option value="">Select Supplier Man</option>
-                            <!-- Options loaded dynamically -->
-                        </select>
+                        <div class="searchable-dropdown">
+                            <input type="text" class="search-input" placeholder="Search supplier man..." id="supplierManSearch" autocomplete="off" tabindex="-1">
+                            <div class="dropdown-options" id="supplierManOptions"></div>
+                            <input type="hidden" id="supplierMan">
+                        </div>
                     </div>
                     
                     <!-- 9. Area / City -->
@@ -136,7 +139,7 @@ if (!$user_id) {
                         <label for="customerCode" class="required">Customer Code</label>
                         <div style="display: flex; gap: 8px; align-items: flex-start;">
                             <div class="searchable-dropdown" style="flex: 1;">
-                                <input type="text" class="search-input" placeholder="Search customer code..." id="customerCodeSearch" autocomplete="off">
+                                <input type="text" class="search-input" placeholder="Search customer code..." id="customerCodeSearch" autocomplete="off" tabindex="1">
                                 <div class="dropdown-options" id="customerCodeOptions">
                                     <!-- Options loaded dynamically -->
                                 </div>

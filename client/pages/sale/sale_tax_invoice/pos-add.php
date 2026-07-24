@@ -332,15 +332,34 @@ if (!$user_id) {
 
     <!-- Success Modal -->
     <div class="modal" id="successModal">
-        <div class="modal-content">
-            <h3 class="modal-title">Invoice Saved Successfully!</h3>
-            <p>What would you like to do next?</p>
-            <div class="modal-actions">
-                <button class="btn btn-secondary" id="printLaterBtn">
-                    Print Later
+        <div class="success-modal-content">
+            <!-- Countdown Ring -->
+            <div class="success-countdown-wrap">
+                <svg class="success-ring" viewBox="0 0 44 44">
+                    <circle class="success-ring-bg" cx="22" cy="22" r="19"/>
+                    <circle class="success-ring-fill" id="countdownRing" cx="22" cy="22" r="19"/>
+                </svg>
+                <span class="success-countdown-num" id="countdownNum">5</span>
+            </div>
+
+            <!-- Icon + Title -->
+            <div class="success-icon"><i class="fas fa-check"></i></div>
+            <h3 class="success-title">Invoice Saved!</h3>
+            <p class="success-sub">New invoice starts automatically in <strong id="countdownText">5</strong>s</p>
+
+            <!-- Actions -->
+            <div class="success-actions">
+                <button class="success-btn success-btn-ghost" id="printLaterBtn">
+                    <i class="fas fa-clock"></i> Print Later
+                    <kbd>Esc</kbd>
                 </button>
-                <button class="btn btn-primary" id="printInvoiceBtn">
-                    <i class="fas fa-print"></i> Print Invoice
+                <button class="success-btn success-btn-new" id="newInvoiceBtn">
+                    <i class="fas fa-plus"></i> New Invoice
+                    <kbd>Enter</kbd>
+                </button>
+                <button class="success-btn success-btn-print" id="printInvoiceBtn">
+                    <i class="fas fa-print"></i> Print
+                    <kbd>P</kbd>
                 </button>
             </div>
         </div>

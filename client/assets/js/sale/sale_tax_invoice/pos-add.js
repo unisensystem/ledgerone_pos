@@ -1,4 +1,4 @@
-﻿// Global variables for products and UOM data
+// Global variables for products and UOM data
 let uomData = [];
 let branchesData = [];
 let companiesData = [];
@@ -3180,20 +3180,53 @@ function initializePage(permissions) {
     
     if (printLaterBtn) {
         printLaterBtn.addEventListener('click', function () {
-            const modal = document.getElementById('successModal');
-            if (modal) modal.style.display = 'none';
-            performReset();
+            stopSuccessCountdown();
+            window.location.href = 'pos-list.php';
+        });
+    }
+
+
+
+
+
+
+    const newInvoiceBtn = document.getElementById('newInvoiceBtn');
+    if (newInvoiceBtn) {
+        newInvoiceBtn.addEventListener('click', function () {
+            stopSuccessCountdown();
+            document.getElementById('successModal').style.display = 'none';
+            if (isEditMode) {
+                window.location.href = 'pos-add.php';
+            } else {
+                window.location.reload();
+            }
         });
     }
 
     if (printInvoiceBtn) {
         printInvoiceBtn.addEventListener('click', function () {
-            const modal = document.getElementById('successModal');
-            if (modal) modal.style.display = 'none';
+            stopSuccessCountdown();
+            document.getElementById('successModal').style.display = 'none';
             const invoiceId = isEditMode ? editId : window.lastInvoiceId;
             showPrintOptions(invoiceId);
         });
     }
+
+    // Success modal keyboard shortcuts
+    document.addEventListener('keydown', function(e) {
+        const modal = document.getElementById('successModal');
+        if (!modal || modal.style.display !== 'flex') return;
+        if (e.key === 'Escape') {
+            e.preventDefault();
+            document.getElementById('printLaterBtn')?.click();
+        } else if (e.key === 'Enter') {
+            e.preventDefault();
+            window.location.reload();
+        } else if (e.key === 'p' || e.key === 'P') {
+            e.preventDefault();
+            document.getElementById('printInvoiceBtn')?.click();
+        }
+    });
 
     // Print options modal
     function showPrintOptions(invoiceId) {
@@ -3788,6 +3821,7 @@ function saveInvoice(status = 'Posted') {
                 } else {
                     window.lastInvoiceId = data.invoice_id;
                     document.getElementById('successModal').style.display = 'flex';
+                    startSuccessCountdown();
                 }
             } else {
                 alert('Error: ' + data.message);
@@ -5489,5 +5523,50 @@ function updateSerialNumbers() {
     const rows = tbody.rows;
     for (let i = 0; i < rows.length; i++) {
         rows[i].cells[0].textContent = i + 1;
+    }
+}
+
+// Success Modal Countdown
+let _successCountdownInterval = null;
+const _SUCCESS_COUNTDOWN = 5;
+const _RING_CIRCUMFERENCE = 2 * Math.PI * 19; // r=19 => ~119.38
+
+function startSuccessCountdown() {
+    stopSuccessCountdown();
+    let remaining = _SUCCESS_COUNTDOWN;
+
+    const numEl = document.getElementById('countdownNum');
+    const textEl = document.getElementById('countdownText');
+    const ringEl = document.getElementById('countdownRing');
+
+    if (ringEl) {
+        ringEl.style.strokeDasharray = _RING_CIRCUMFERENCE;
+        ringEl.style.strokeDashoffset = 0;
+    }
+    if (numEl) numEl.textContent = remaining;
+    if (textEl) textEl.textContent = remaining;
+
+    _successCountdownInterval = setInterval(function () {
+        remaining--;
+        if (numEl) numEl.textContent = remaining;
+        if (textEl) textEl.textContent = remaining;
+        if (ringEl) {
+            const offset = _RING_CIRCUMFERENCE * (1 - remaining / _SUCCESS_COUNTDOWN);
+            ringEl.style.strokeDashoffset = offset;
+        }
+        if (remaining <= 0) {
+            stopSuccessCountdown();
+            const modal = document.getElementById('successModal');
+            if (modal) modal.style.display = 'none';
+
+            window.location.reload();
+        }
+    }, 1000);
+}
+
+function stopSuccessCountdown() {
+    if (_successCountdownInterval) {
+        clearInterval(_successCountdownInterval);
+        _successCountdownInterval = null;
     }
 }

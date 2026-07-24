@@ -209,17 +209,12 @@ document.addEventListener('DOMContentLoaded', async function() {
         }
     });
     
-    document.getElementById('customer').addEventListener('change', async function() {
-        currentInvoice.customer = parseInt(this.value);
-        if (this.value) {
-            await fetchCustomerBalance(this.value);
-            // Auto-populate supplier man
-            const customer = customersData.find(c => c.id == this.value);
-            if (customer && customer.supplier_man_id) {
-                document.getElementById('supplierMan').value = customer.supplier_man_id;
-            } else {
-                document.getElementById('supplierMan').value = '';
-            }
+    document.addEventListener('click', function(e) {
+        if (!e.target.closest('#branchSearch') && !e.target.closest('#branchOptions')) {
+            document.getElementById('branchOptions').style.display = 'none';
+        }
+        if (!e.target.closest('#companySearch') && !e.target.closest('#companyOptions')) {
+            document.getElementById('companyOptions').style.display = 'none';
         }
     });
     
@@ -308,7 +303,7 @@ document.addEventListener('DOMContentLoaded', async function() {
             document.getElementById('quickProduct').focus();
         } else if (combo === shortcuts.customer) {
             e.preventDefault();
-            document.getElementById('customer').focus();
+            document.getElementById('customerSearch').focus();
         } else if (combo === shortcuts.branch) {
             e.preventDefault();
             document.getElementById('branchSearch').focus();
@@ -753,8 +748,8 @@ window.loadDraft = async function(draftId) {
             currentInvoice.items = [];
             
             // Set customer
-            document.getElementById('customer').value = invoice.customer_id;
-            currentInvoice.customer = invoice.customer_id;
+            const draftCustomer = customersData.find(c => c.id == invoice.customer_id);
+            if (draftCustomer) selectCustomer(draftCustomer.id, `${draftCustomer.customer_code} - ${draftCustomer.customer_name}`);
             
             // Set branch
             const branch = branchesData.find(b => b.id == invoice.branch_id);
@@ -842,22 +837,122 @@ async function loadCustomers() {
     const data = await response.json();
     if (data.success) {
         customersData = data.customers;
-        const customerSelect = document.getElementById('customer');
-        customerSelect.innerHTML = '<option value="">Select Customer</option>';
+        const optionsDiv = document.getElementById('customerOptions');
+        optionsDiv.innerHTML = '';
         data.customers.forEach(customer => {
-            const option = document.createElement('option');
-            option.value = customer.id;
-            option.textContent = `${customer.customer_code} - ${customer.customer_name}`;
-            customerSelect.appendChild(option);
+            const div = document.createElement('div');
+            div.className = 'dropdown-option';
+            div.style.cssText = 'padding: 8px 10px; cursor: pointer; border-bottom: 1px solid var(--border-default);';
+            div.textContent = `${customer.customer_code} - ${customer.customer_name}`;
+            div.dataset.id = customer.id;
+            div.addEventListener('click', function() {
+                selectCustomer(customer.id, this.textContent);
+                document.getElementById('customer')._justSelected = true;
+                fetchCustomerBalance(customer.id);
+                const c = customersData.find(x => x.id == customer.id);
+                if (c && c.supplier_man_id) document.getElementById('supplierMan').value = c.supplier_man_id;
+                else document.getElementById('supplierMan').value = '';
+            });
+            optionsDiv.appendChild(div);
         });
-        
+        initCustomerSearch();
         const cashCustomer = data.customers.find(c => c.customer_name === 'Cash Customer');
         if (cashCustomer) {
-            customerSelect.value = cashCustomer.id;
-            currentInvoice.customer = cashCustomer.id;
+            selectCustomer(cashCustomer.id, `${cashCustomer.customer_code} - ${cashCustomer.customer_name}`);
             await fetchCustomerBalance(cashCustomer.id);
         }
     }
+}
+
+function selectCustomer(id, text) {
+    document.getElementById('customer').value = id;
+    document.getElementById('customerSearch').value = text;
+    document.getElementById('customerOptions').style.display = 'none';
+    currentInvoice.customer = parseInt(id);
+}
+
+function initCustomerSearch() {
+    const search = document.getElementById('customerSearch');
+    const optionsDiv = document.getElementById('customerOptions');
+    let selectedIndex = -1;
+
+    function getVisible() {
+        return Array.from(optionsDiv.getElementsByClassName('dropdown-option'))
+            .filter(o => o.style.display !== 'none');
+    }
+
+    function updateSelection(visible) {
+        visible.forEach((o, i) => {
+            o.style.backgroundColor = i === selectedIndex ? '#1a6cdc' : '';
+            o.style.color = i === selectedIndex ? 'white' : '';
+        });
+        if (selectedIndex >= 0 && visible[selectedIndex]) {
+            visible[selectedIndex].scrollIntoView({ block: 'nearest' });
+        }
+    }
+
+    function filterOptions() {
+        const term = search.value.toLowerCase();
+        Array.from(optionsDiv.getElementsByClassName('dropdown-option')).forEach(o => {
+            o.style.display = o.textContent.toLowerCase().includes(term) ? 'block' : 'none';
+            o.style.backgroundColor = '';
+            o.style.color = '';
+        });
+    }
+
+    search.addEventListener('click', function(e) {
+        e.stopPropagation();
+        search.select();
+        optionsDiv.style.display = 'block';
+        filterOptions();
+    });
+
+    search.addEventListener('focus', function() {
+        search._prevValue = search.value;
+        search.value = '';
+        selectedIndex = -1;
+        optionsDiv.style.display = 'block';
+        filterOptions();
+    });
+
+    search.addEventListener('blur', function() {
+        setTimeout(() => {
+            if (!document.getElementById('customer')._justSelected && search._prevValue) {
+                if (!document.getElementById('customer').value) search.value = search._prevValue;
+            }
+            document.getElementById('customer')._justSelected = false;
+        }, 200);
+    });
+
+    search.addEventListener('input', function() {
+        selectedIndex = -1;
+        filterOptions();
+        optionsDiv.style.display = 'block';
+    });
+
+    search.addEventListener('keydown', function(e) {
+        const visible = getVisible();
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            selectedIndex = Math.min(selectedIndex + 1, visible.length - 1);
+            updateSelection(visible);
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            selectedIndex = Math.max(selectedIndex - 1, -1);
+            updateSelection(visible);
+        } else if (e.key === 'Enter') {
+            e.preventDefault();
+            if (selectedIndex >= 0 && visible[selectedIndex]) {
+                visible[selectedIndex].click();
+            } else if (visible.length > 0) {
+                visible[0].click();
+            }
+        }
+    });
+
+    document.addEventListener('click', function() {
+        optionsDiv.style.display = 'none';
+    });
 }
 
 async function fetchCustomerBalance(customerId) {

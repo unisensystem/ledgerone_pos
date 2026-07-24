@@ -459,6 +459,17 @@ function initializePage(permissions) {
         }
     });
 
+    // Tab from customerCodeSearch → first product row search input
+    document.getElementById('customerCodeSearch').addEventListener('keydown', function (e) {
+        if (e.key === 'Tab' && !e.shiftKey) {
+            const firstRowSearch = itemsTable.rows[0]?.cells[1]?.querySelector('.search-input');
+            if (firstRowSearch) {
+                e.preventDefault();
+                firstRowSearch.focus();
+            }
+        }
+    });
+
     // Shortcut Settings Modal
     const shortcutSettingsBtn = document.getElementById('shortcutSettingsBtn');
     if (shortcutSettingsBtn) {
@@ -932,6 +943,23 @@ function initializePage(permissions) {
 
         if (!searchInput || !optionsContainer || !hiddenInput) return;
 
+        let selectedIndex = -1;
+
+        function getVisibleOptions() {
+            return Array.from(optionsContainer.getElementsByClassName('dropdown-option'))
+                .filter(o => o.style.display !== 'none');
+        }
+
+        function updateSelection(visibleOptions) {
+            visibleOptions.forEach((o, i) => {
+                o.style.backgroundColor = i === selectedIndex ? '#1a6cdc' : '';
+                o.style.color = i === selectedIndex ? 'white' : '';
+            });
+            if (selectedIndex >= 0 && visibleOptions[selectedIndex]) {
+                visibleOptions[selectedIndex].scrollIntoView({ block: 'nearest' });
+            }
+        }
+
         function filterAreaCityOptions() {
             const term = searchInput.value.toLowerCase();
             const options = optionsContainer.getElementsByClassName('dropdown-option');
@@ -954,6 +982,7 @@ function initializePage(permissions) {
         searchInput.addEventListener('focus', function () {
             searchInput._prevValue = searchInput.value;
             searchInput.value = '';
+            selectedIndex = -1;
             openDropdown();
         });
 
@@ -969,7 +998,28 @@ function initializePage(permissions) {
         });
 
         searchInput.addEventListener('input', function () {
+            selectedIndex = -1;
             filterAreaCityOptions();
+        });
+
+        searchInput.addEventListener('keydown', function (e) {
+            const visibleOptions = getVisibleOptions();
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                selectedIndex = Math.min(selectedIndex + 1, visibleOptions.length - 1);
+                updateSelection(visibleOptions);
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                selectedIndex = Math.max(selectedIndex - 1, -1);
+                updateSelection(visibleOptions);
+            } else if (e.key === 'Enter') {
+                e.preventDefault();
+                if (selectedIndex >= 0 && visibleOptions[selectedIndex]) {
+                    visibleOptions[selectedIndex].click();
+                } else if (visibleOptions.length > 0) {
+                    visibleOptions[0].click();
+                }
+            }
         });
 
         optionsContainer.addEventListener('click', function (e) {
@@ -1119,29 +1169,33 @@ function initializePage(permissions) {
             const data = await response.json();
 
             if (data.success) {
-                const salesOfficerSelect = document.getElementById('salesOfficer');
-                salesOfficerSelect.innerHTML = '<option value="">Select Sales Officer</option>';
+                const salesOfficerOptions = document.getElementById('salesOfficerOptions');
+                salesOfficerOptions.innerHTML = '';
+                const supplierManOptions = document.getElementById('supplierManOptions');
+                supplierManOptions.innerHTML = '';
 
-                const supplierManSelect = document.getElementById('supplierMan');
-                supplierManSelect.innerHTML = '<option value="">Select Supplier Man</option>';
-
+                const fragment1 = document.createDocumentFragment();
+                const fragment2 = document.createDocumentFragment();
                 data.employees.forEach(employee => {
-                    const option = document.createElement('option');
-                    option.value = employee.id;
-                    option.textContent = `${employee.employee_id} - ${employee.full_name}`;
-                    salesOfficerSelect.appendChild(option);
+                    const empText = `${employee.employee_id} - ${employee.full_name}`;
 
-                    const option2 = document.createElement('option');
-                    option2.value = employee.id;
-                    option2.textContent = `${employee.employee_id} - ${employee.full_name}`;
-                    supplierManSelect.appendChild(option2);
+                    const opt1 = document.createElement('div');
+                    opt1.className = 'dropdown-option';
+                    opt1.setAttribute('data-value', employee.id);
+                    opt1.textContent = empText;
+                    fragment1.appendChild(opt1);
+
+                    const opt2 = document.createElement('div');
+                    opt2.className = 'dropdown-option';
+                    opt2.setAttribute('data-value', employee.id);
+                    opt2.textContent = empText;
+                    fragment2.appendChild(opt2);
                 });
+                salesOfficerOptions.appendChild(fragment1);
+                supplierManOptions.appendChild(fragment2);
 
-                // Set last selected sales officer
-                const lastSalesOfficer = localStorage.getItem('lastSelectedSalesOfficer');
-                if (lastSalesOfficer) {
-                    salesOfficerSelect.value = lastSalesOfficer;
-                }
+                initSearchableDropdown('salesOfficerSearch', 'salesOfficerOptions', 'salesOfficer');
+                initSearchableDropdown('supplierManSearch', 'supplierManOptions', 'supplierMan');
             }
         } catch (error) {
             console.error('Error loading employees:', error);
@@ -1182,16 +1236,21 @@ function initializePage(permissions) {
 
             if (data.success) {
                 brandsData = data.brands;
-                const brandSelect = document.getElementById('brand');
-                brandSelect.innerHTML = '<option value="">Select Brand</option>';
+                const brandOptions = document.getElementById('brandOptions');
+                brandOptions.innerHTML = '';
 
+                const fragment = document.createDocumentFragment();
                 data.brands.forEach(brand => {
-                    const option = document.createElement('option');
-                    option.value = brand.id;
-                    option.textContent = brand.supplier_name;
+                    const option = document.createElement('div');
+                    option.className = 'dropdown-option';
+                    option.setAttribute('data-value', brand.id);
                     option.setAttribute('data-code', brand.supplier_code);
-                    brandSelect.appendChild(option);
+                    option.textContent = brand.supplier_name;
+                    fragment.appendChild(option);
                 });
+                brandOptions.appendChild(fragment);
+
+                initSearchableDropdown('brandSearch', 'brandOptions', 'brand');
             }
         } catch (error) {
             console.error('Error loading brands:', error);
@@ -1400,9 +1459,23 @@ function initializePage(permissions) {
                 const remarksEl = document.getElementById('remarks');
                 if (remarksEl) remarksEl.value = invoice.remarks || '';
                 const salesOfficerEl = document.getElementById('salesOfficer');
-                if (salesOfficerEl) salesOfficerEl.value = invoice.sales_officer_id || '';
+                const salesOfficerSearchEl = document.getElementById('salesOfficerSearch');
+                if (salesOfficerEl) {
+                    salesOfficerEl.value = invoice.sales_officer_id || '';
+                    if (salesOfficerSearchEl && invoice.sales_officer_id) {
+                        const soOpt = document.querySelector(`#salesOfficerOptions .dropdown-option[data-value="${invoice.sales_officer_id}"]`);
+                        if (soOpt) salesOfficerSearchEl.value = soOpt.textContent;
+                    }
+                }
                 const supplierManEl = document.getElementById('supplierMan');
-                if (supplierManEl) supplierManEl.value = invoice.supplier_man_id || '';
+                const supplierManSearchEl = document.getElementById('supplierManSearch');
+                if (supplierManEl) {
+                    supplierManEl.value = invoice.supplier_man_id || '';
+                    if (supplierManSearchEl && invoice.supplier_man_id) {
+                        const smOpt = document.querySelector(`#supplierManOptions .dropdown-option[data-value="${invoice.supplier_man_id}"]`);
+                        if (smOpt) supplierManSearchEl.value = smOpt.textContent;
+                    }
+                }
                 const biltyNoEl = document.getElementById('biltyNo');
                 if (biltyNoEl) biltyNoEl.value = invoice.bilty_no || '';
                 const transportNameEl = document.getElementById('transportName');
@@ -1428,10 +1501,11 @@ function initializePage(permissions) {
 
                 // Set brand
                 if (invoice.brand_id) {
-                    const brandEl = document.getElementById('brand');
-                    if (brandEl) {
-                        brandEl.value = invoice.brand_id;
-                        console.log('Brand loaded:', invoice.brand_id, 'Element value:', brandEl.value);
+                    const brand = brandsData.find(b => b.id == invoice.brand_id);
+                    if (brand) {
+                        document.getElementById('brandSearch').value = brand.supplier_name;
+                        document.getElementById('brand').value = invoice.brand_id;
+                        console.log('Brand loaded:', invoice.brand_id);
                     }
                 }
 
@@ -1662,9 +1736,23 @@ function initializePage(permissions) {
                 const prevBalanceEl = document.getElementById('previousBalance');
                 if (prevBalanceEl) prevBalanceEl.value = `${order.current_balance >= 0 ? 'Dr' : 'Cr'} ${Math.abs(order.current_balance).toFixed(3)}`;
                 const salesOfficerEl = document.getElementById('salesOfficer');
-                if (salesOfficerEl) salesOfficerEl.value = order.sale_officer_id || '';
+                const salesOfficerSearchEl = document.getElementById('salesOfficerSearch');
+                if (salesOfficerEl) {
+                    salesOfficerEl.value = order.sale_officer_id || '';
+                    if (salesOfficerSearchEl && order.sale_officer_id) {
+                        const soOpt = document.querySelector(`#salesOfficerOptions .dropdown-option[data-value="${order.sale_officer_id}"]`);
+                        if (soOpt) salesOfficerSearchEl.value = soOpt.textContent;
+                    }
+                }
                 const supplierManEl = document.getElementById('supplierMan');
-                if (supplierManEl) supplierManEl.value = order.supplier_man_id || '';
+                const supplierManSearchEl = document.getElementById('supplierManSearch');
+                if (supplierManEl) {
+                    supplierManEl.value = order.supplier_man_id || '';
+                    if (supplierManSearchEl && order.supplier_man_id) {
+                        const smOpt = document.querySelector(`#supplierManOptions .dropdown-option[data-value="${order.supplier_man_id}"]`);
+                        if (smOpt) supplierManSearchEl.value = smOpt.textContent;
+                    }
+                }
                 const biltyNoEl = document.getElementById('biltyNo');
                 if (biltyNoEl) biltyNoEl.value = order.bilty_no || '';
                 const transportNameEl = document.getElementById('transportName');
@@ -1898,14 +1986,27 @@ function initializePage(permissions) {
                     // Auto-populate sales officer if associated
                     const salesOfficerId = e.target.getAttribute('data-sales-officer');
                     if (salesOfficerId) {
-                        document.getElementById('salesOfficer').value = salesOfficerId;
+                        const soHidden = document.getElementById('salesOfficer');
+                        const soSearch = document.getElementById('salesOfficerSearch');
+                        const soOptions = document.getElementById('salesOfficerOptions');
+                        if (soHidden) soHidden.value = salesOfficerId;
+                        if (soSearch && soOptions) {
+                            const soOpt = soOptions.querySelector(`.dropdown-option[data-value="${salesOfficerId}"]`);
+                            if (soOpt) soSearch.value = soOpt.textContent;
+                        }
                     }
 
                     // Auto-populate supplier man if associated
                     const supplierManId = e.target.getAttribute('data-supplier-man');
                     if (supplierManId && supplierManId !== '' && supplierManId !== 'null' && supplierManId !== 'undefined') {
-                        const supplierManSelect = document.getElementById('supplierMan');
-                        supplierManSelect.value = supplierManId;
+                        const smHidden = document.getElementById('supplierMan');
+                        const smSearch = document.getElementById('supplierManSearch');
+                        const smOptions = document.getElementById('supplierManOptions');
+                        if (smHidden) smHidden.value = supplierManId;
+                        if (smSearch && smOptions) {
+                            const smOpt = smOptions.querySelector(`.dropdown-option[data-value="${supplierManId}"]`);
+                            if (smOpt) smSearch.value = smOpt.textContent;
+                        }
                     }
 
                     // Auto-populate withholding tax
@@ -1941,6 +2042,21 @@ function initializePage(permissions) {
 
                     // Load price history for all rows
                     loadPriceHistoryForAllRows();
+
+                    // Auto-populate brand from customer's brand_id
+                    if (e.target.getAttribute('data-value')) {
+                        const selectedCustomer = customersData.find(c => c.id == value);
+                        if (selectedCustomer && selectedCustomer.brand_id) {
+                            const matchedBrand = typeof brandsData !== 'undefined' ? brandsData.find(b => b.id == selectedCustomer.brand_id) : null;
+                            const brandSearchEl = document.getElementById('brandSearch');
+                            const brandHiddenEl = document.getElementById('brand');
+                            if (brandSearchEl && brandHiddenEl) {
+                                brandHiddenEl.value = selectedCustomer.brand_id;
+                                if (matchedBrand) brandSearchEl.value = matchedBrand.supplier_name;
+                                brandHiddenEl.dispatchEvent(new Event('change'));
+                            }
+                        }
+                    }
                 }
 
                 // Save branch selection
@@ -1970,7 +2086,8 @@ function initializePage(permissions) {
 
                 // Remove error state if any
                 hiddenInput.classList.remove('error');
-                document.getElementById(hiddenInputId + 'Error').style.display = 'none';
+                const errorEl = document.getElementById(hiddenInputId + 'Error');
+                if (errorEl) errorEl.style.display = 'none';
             }
         });
 
@@ -2462,8 +2579,8 @@ function initializePage(permissions) {
 
             gstAmount.value = gstAmt.toFixed(3);
 
-            // Calculate net amount
-            const net = afterTradeOffer + gstAmt;
+            // Calculate net amount (tax excluded)
+            const net = afterTradeOffer;
             netAmount.value = net.toFixed(3);
 
             // Update invoice summary
@@ -2530,8 +2647,8 @@ function initializePage(permissions) {
 
             gstAmount.value = gstAmt.toFixed(3);
 
-            // Calculate net amount
-            const net = afterTradeOffer + gstAmt;
+            // Calculate net amount (tax excluded)
+            const net = afterTradeOffer;
             netAmount.value = net.toFixed(3);
 
             // Update invoice summary
@@ -2598,8 +2715,8 @@ function initializePage(permissions) {
 
             gstAmount.value = gstAmt.toFixed(3);
 
-            // Calculate net amount
-            const net = afterTradeOffer + gstAmt;
+            // Calculate net amount (tax excluded)
+            const net = afterTradeOffer;
             netAmount.value = net.toFixed(3);
 
             // Update invoice summary
@@ -2646,8 +2763,8 @@ function initializePage(permissions) {
             const taxPct = afterTradeOffer > 0 ? (taxAmt / afterTradeOffer) * 100 : 0;
             taxPercent.value = taxPct.toFixed(3);
 
-            // Calculate net amount
-            const net = afterTradeOffer + taxAmt;
+            // Calculate net amount (tax excluded)
+            const net = afterTradeOffer;
             netAmount.value = net.toFixed(3);
 
             // Update invoice summary
@@ -3309,11 +3426,25 @@ function initializePage(permissions) {
         if (dueDateEl) dueDateEl.value = '';
 
         // Reset brand and clear brand filter
+        const brandSearchEl = document.getElementById('brandSearch');
         const brandEl = document.getElementById('brand');
+        if (brandSearchEl) brandSearchEl.value = '';
         if (brandEl) {
             brandEl.value = '';
             brandEl.dispatchEvent(new Event('change'));
         }
+
+        // Reset sales officer
+        const salesOfficerSearchEl = document.getElementById('salesOfficerSearch');
+        const salesOfficerEl = document.getElementById('salesOfficer');
+        if (salesOfficerSearchEl) salesOfficerSearchEl.value = '';
+        if (salesOfficerEl) salesOfficerEl.value = '';
+
+        // Reset supplier man
+        const supplierManSearchEl = document.getElementById('supplierManSearch');
+        const supplierManEl = document.getElementById('supplierMan');
+        if (supplierManSearchEl) supplierManSearchEl.value = '';
+        if (supplierManEl) supplierManEl.value = '';
 
         // Reset currency to base currency
         loadCurrencies();
@@ -3818,7 +3949,6 @@ function saveInvoice(status = 'Posted') {
     });
 
     const brandValue = document.getElementById('brand')?.value;
-    console.log('Brand value before save:', brandValue, 'Type:', typeof brandValue);
     
     const formData = {
         saleDate: document.getElementById('saleDate').value,
@@ -5802,6 +5932,13 @@ function initTableDropdownDynamic(container, row) {
     });
     
     searchInput.addEventListener('keydown', function(e) {
+        if (e.key === 'Tab' && e.shiftKey) {
+            e.preventDefault();
+            optionsContainer.style.display = 'none';
+            document.getElementById('customerCodeSearch').focus();
+            return;
+        }
+
         const visibleOptions = Array.from(optionsContainer.getElementsByClassName('dropdown-option'))
             .filter(option => option.style.display !== 'none');
         

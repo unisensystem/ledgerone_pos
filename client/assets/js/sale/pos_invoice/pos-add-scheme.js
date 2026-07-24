@@ -470,8 +470,8 @@ function calculateRowAmountsWithScheme(row, totalQty, price) {
         gstAmountInput.value = gstAmt.toFixed(3);
     }
     
-    // Net amount
-    const net = afterTradeOffer + gstAmt;
+    // Net amount (tax excluded)
+    const net = afterTradeOffer;
     const netInput = row.querySelector('.net-cell input');
     if (netInput) {
         netInput.value = net.toFixed(3);

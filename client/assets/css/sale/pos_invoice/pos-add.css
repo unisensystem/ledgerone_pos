@@ -3,6 +3,7 @@
   --primary: #1f7bff;
   --primary-hover: #1a6cdc;
   --primary-active: #1559b8;
+  --primary-rgb: 31, 123, 255;
   --surface-0: #ffffff;
   --surface-1: #f7f9fc;
   --surface-2: #eff2f7;
@@ -11,12 +12,16 @@
   --subtext: #6b7280;
   --border-default: #e1e6ee;
   --border-strong: #c9cfda;
+  --border-color: #e1e6ee;
   --success: #2fbf71;
   --warning: #e8b23f;
   --error: #e34f4f;
+  --info: #3b82f6;
   --shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
   --radius: 8px;
   --card-radius: 12px;
+  --card-bg: #ffffff;
+  --input-bg: #f7f9fc;
 }
 
 * {
@@ -1280,6 +1285,7 @@ td:has(.unit-label) .unit-input {
 }
 
 
+.dark-theme .summary-section {
   background: linear-gradient(135deg, var(--surface-1) 0%, var(--surface-0) 100%);
   border-color: var(--border-default);
 }

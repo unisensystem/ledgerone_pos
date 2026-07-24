@@ -102,7 +102,7 @@ class DefaultFieldsAutofill {
      * Setup special listeners for searchable dropdowns
      */
     setupSearchableDropdownListeners() {
-        ['company', 'branch', 'areaCity'].forEach(fieldId => {
+        ['company', 'branch', 'areaCity', 'brand', 'salesOfficer', 'supplierMan'].forEach(fieldId => {
             const hiddenField = document.getElementById(fieldId);
             const searchInput = document.getElementById(`${fieldId}Search`);
             const optionsContainer = document.getElementById(`${fieldId}Options`);
@@ -135,7 +135,7 @@ class DefaultFieldsAutofill {
         let id = field.value;
         let label = id;
 
-        if (fieldId === 'company' || fieldId === 'branch' || fieldId === 'areaCity') {
+        if (fieldId === 'company' || fieldId === 'branch' || fieldId === 'areaCity' || fieldId === 'brand' || fieldId === 'salesOfficer' || fieldId === 'supplierMan') {
             const searchInput = document.getElementById(`${fieldId}Search`);
             if (searchInput && searchInput.value) label = searchInput.value;
         } else if (field.tagName === 'SELECT') {
@@ -277,7 +277,7 @@ class DefaultFieldsAutofill {
             return;
         }
 
-        if (fieldId === 'company' || fieldId === 'branch' || fieldId === 'areaCity') {
+        if (fieldId === 'company' || fieldId === 'branch' || fieldId === 'areaCity' || fieldId === 'brand' || fieldId === 'salesOfficer' || fieldId === 'supplierMan') {
             this.setSearchableDropdownValue(fieldId, value, label);
         } else {
             field.value = value;

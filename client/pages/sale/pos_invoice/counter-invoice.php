@@ -253,6 +253,7 @@ $user_employee_id = $user['employee_id'] ?? null;
         /* Counter Mode - Dropdowns (positioned outside container) */
         body.counter-mode #branchOptions,
         body.counter-mode #companyOptions,
+        body.counter-mode #customerOptions,
         body.counter-mode #productSuggestions {
             background: #1a1f2e !important;
             border: 1px solid #3a4556 !important;
@@ -333,6 +334,19 @@ $user_employee_id = $user['employee_id'] ?? null;
         body.counter-mode #companyOptions > div.selected {
             background: #00d4ff !important;
             color: #0f1419 !important;
+        }
+
+        /* Light mode dropdown options */
+        .dropdown-option {
+            padding: 8px 10px;
+            cursor: pointer;
+            border-bottom: 1px solid var(--border-default);
+            background: white;
+            color: #2f3b4c;
+        }
+
+        .dropdown-option:hover {
+            background: #f7f9fc;
         }
 
         /* Light mode branch options */
@@ -969,10 +983,12 @@ $user_employee_id = $user['employee_id'] ?? null;
             <div class="customer-panel">
                 <div class="form-group-micro">
                     <div class="form-label">CUSTOMER</div>
-                    <div style="display: flex; gap: 4px;">
-                        <select id="customer" class="font-bold" style="flex: 1;">
-                            <option value="">Loading...</option>
-                        </select>
+                    <div style="display: flex; gap: 4px; position: relative;">
+                        <div style="position: relative; flex: 1;">
+                            <input type="text" id="customerSearch" placeholder="Search customer..." autocomplete="off" class="font-bold" style="width: 100%;">
+                            <div id="customerOptions" style="display: none; position: absolute; top: 100%; left: 0; right: 0; background: white; border: 1px solid var(--border-default); border-radius: 4px; max-height: 200px; overflow-y: auto; z-index: 1000; box-shadow: 0 4px 8px rgba(0,0,0,0.1);"></div>
+                        </div>
+                        <input type="hidden" id="customer">
                         <button class="btn btn-primary btn-micro" onclick="openCustomerForm()" title="Add New Customer" style="height: 32px; width: 32px;">
                             <i class="fas fa-plus"></i>
                         </button>
