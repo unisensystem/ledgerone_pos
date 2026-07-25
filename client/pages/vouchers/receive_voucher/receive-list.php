@@ -13,6 +13,8 @@ if (!$user_id) {
     header('Location: ../../auth/login.html');
     exit();
 }
+$initialSearch = $_GET['search'] ?? '';
+
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -119,7 +121,7 @@ if (!$user_id) {
                 <div class="table-actions">
                     <div class="search-box">
                         <i class="fas fa-search search-icon"></i>
-                        <input type="text" id="searchInput" placeholder="Search vouchers...">
+<input type="text" id="searchInput" placeholder="Search vouchers..." value="<?= htmlspecialchars($initialSearch) ?>">
                     </div>
                     <button class="btn btn-secondary btn-icon" id="exportBtn" title="Export">
                         <i class="fas fa-download"></i>
@@ -263,6 +265,17 @@ if (!$user_id) {
         </div>
     </div>
 
-    <script src="../../../assets/js/vouchers/receive_voucher/receive-list.js"></script>
+   <script src="../../../assets/js/vouchers/receive_voucher/receive-list.js"></script>
+<?php if ($initialSearch): ?>
+<script>
+    window.addEventListener('load', function() {
+        const searchInput = document.getElementById('searchInput');
+        if (searchInput) {
+            searchInput.dispatchEvent(new Event('input', { bubbles: true }));
+            searchInput.dispatchEvent(new Event('keyup', { bubbles: true }));
+        }
+    });
+</script>
+<?php endif; ?>
 </body>
 </html>

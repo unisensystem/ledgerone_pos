@@ -826,6 +826,20 @@ $hasDateFilter = $dateFrom && $dateTo;
                 </div>
             </div>
 
+            <!-- Global Search -->
+            <div class="quick-actions" style="position: relative;">
+                <div class="ledger-search-box" style="position: relative;">
+                    <input type="text" id="globalSearchInput" class="ledger-input"
+                        placeholder="Search invoice number, voucher, amount... (e.g. INV-001 or 400)"
+                        autocomplete="off" style="font-size: 15px;">
+                </div>
+                <div id="globalSearchResults" style="
+                    display:none; position:absolute; top:100%; left:0; right:0;
+                    background:white; border:1.5px solid #d6dbe4; border-radius:0.5rem;
+                    margin-top:0.5rem; max-height:400px; overflow-y:auto; z-index:500;
+                    box-shadow: 0 8px 24px rgba(0,0,0,0.12);">
+                </div>
+            </div>
             <!-- KPI Cards -->
             <div class="kpi-grid">
                 <div class="kpi-card">
@@ -902,19 +916,31 @@ $hasDateFilter = $dateFrom && $dateTo;
                 <div class="ledger-search-box" style="flex-direction: column; align-items: stretch;">
                     <div style="display:flex; gap:1rem; flex-wrap:wrap; align-items:center; width:100%;">
                         <select id="shortcutPageSelect" class="ledger-input" style="flex:1; min-width:220px;">
-                            <option value="">Select Page...</option>
-                            <option value="sale-invoice" data-label="Sale Invoice">Sale Invoice</option>
-                            <option value="purchase-invoice" data-label="Purchase Invoice">Purchase Invoice</option>
-                            <option value="receive-voucher" data-label="Receive Voucher (RV)">Receive Voucher (RV)</option>
-                            <option value="payment-voucher" data-label="Payment Voucher (PV)">Payment Voucher (PV)</option>
-                            <option value="expense-voucher" data-label="Expense Voucher (EV)">Expense Voucher (EV)</option>
-                            <option value="customer-ledger" data-label="Customer Ledger">Customer Ledger</option>
-                            <option value="supplier-ledger" data-label="Supplier Ledger">Supplier Ledger</option>
-                            <option value="pos-invoice" data-label="POS Invoice">POS Invoice</option>
-                            <option value="new-product" data-label="Product List">Product List</option>
-                            <option value="new-customer" data-label="New Customer">New Customer</option>
-                            <option value="new-supplier" data-label="New Supplier">New Supplier</option>
-                        </select>
+    <option value="">Select Page...</option>
+
+    <!-- Lists -->
+    <option value="sale-invoice" data-label="Sale Invoice List">Sale Invoice List</option>
+    <option value="purchase-invoice" data-label="Purchase Invoice List">Purchase Invoice List</option>
+    <option value="receive-voucher" data-label="Receive Voucher List">Receive Voucher List</option>
+    <option value="payment-voucher" data-label="Payment Voucher List">Payment Voucher List</option>
+    <option value="expense-voucher" data-label="Expense Voucher List">Expense Voucher List</option>
+    <option value="customer-ledger" data-label="Customer Ledger">Customer Ledger</option>
+    <option value="supplier-ledger" data-label="Supplier Ledger">Supplier Ledger</option>
+    <option value="pos-invoice" data-label="POS Invoice">POS Invoice</option>
+    <option value="new-product" data-label="Product List">Product List</option>
+    <option value="new-customer" data-label="New Customer List">New Customer List</option>
+    <option value="new-supplier" data-label="New Supplier List">New Supplier List</option>
+
+    <!-- Entries -->
+    <option value="sale-invoice-entry" data-label="Sale Invoice Entry">Sale Invoice Entry</option>
+    <option value="purchase-invoice-entry" data-label="Purchase Invoice Entry">Purchase Invoice Entry</option>
+    <option value="rv-entry" data-label="RV Entry">Receive Voucher Entry</option>
+    <option value="pv-entry" data-label="PV Entry">Payment Voucher Entry</option>
+    <option value="delivery-challan-entry" data-label="Delivery Challan Entry">Delivery Challan Entry</option>
+    <option value="new-customer-entry" data-label="New Customer Entry">New Customer Entry</option>
+    <option value="new-supplier-entry" data-label="New Supplier Entry">New Supplier Entry</option>
+    <option value="new-item-entry" data-label="New Item Entry">New Item Entry</option>
+</select>
                         <input type="text" id="shortcutKeyInput" class="ledger-input"
                             style="flex:0 0 220px; text-align:center; cursor:pointer; background:#f8fafc;"
                             placeholder="Click here, then press keys" readonly>
@@ -2154,47 +2180,108 @@ $hasDateFilter = $dateFrom && $dateTo;
                 shortcutKeyInput.value = capturedCombo;
             });
 
-            async function saveShortcut() {
-                const select = document.getElementById('shortcutPageSelect');
-                const pageKey = select.value;
-                const pageLabel = select.options[select.selectedIndex]?.dataset.label || '';
+           async function saveShortcut() {
+    const select = document.getElementById('shortcutPageSelect');
+    const pageKey = select.value;
+    const pageLabel = select.options[select.selectedIndex]?.dataset.label || '';
 
-                if (!pageKey) { alert('Pehle koi page select karein'); return; }
-                if (!capturedCombo) { alert('Key box par click karke shortcut key press karein'); return; }
+    if (!pageKey) { alert('Pehle koi page select karein'); return; }
+    if (!capturedCombo) { alert('Key box par click karke shortcut key press karein'); return; }
+
+    try {
+        const res = await fetch('../../../server/api/shortcuts/shortcuts.php?action=save', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ key_combo: capturedCombo, page_key: pageKey, page_label: pageLabel })
+        });
+        const data = await res.json();
+        if (data.success) {
+            capturedCombo = '';
+            shortcutKeyInput.value = '';
+            select.value = '';
+            loadShortcutsUI();
+            if (window.DashboardCore) await window.DashboardCore.loadShortcuts();   // 👈 ye line add karo
+        } else {
+            alert(data.message || 'Save failed');
+        }
+    } catch (err) {
+        console.error(err);
+        alert('Error saving shortcut');
+    }
+}
+
+          async function deleteShortcut(id) {
+    try {
+        await fetch('../../../server/api/shortcuts/shortcuts.php?action=delete', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id })
+        });
+        loadShortcutsUI();
+        if (window.DashboardCore) await window.DashboardCore.loadShortcuts();   // 👈 ye line add karo
+    } catch (err) {
+        console.error(err);
+    }
+}
+
+// ---------- Global Search ----------
+            let searchDebounceTimer;
+            const globalSearchInput = document.getElementById('globalSearchInput');
+            const globalSearchResults = document.getElementById('globalSearchResults');
+
+            globalSearchInput?.addEventListener('input', function () {
+                clearTimeout(searchDebounceTimer);
+                const q = this.value.trim();
+
+                if (q.length < 1) {
+                    globalSearchResults.style.display = 'none';
+                    return;
+                }
+
+                searchDebounceTimer = setTimeout(() => runGlobalSearch(q), 300);
+            });
+
+            async function runGlobalSearch(q) {
+                globalSearchResults.style.display = 'block';
+                globalSearchResults.innerHTML = '<div style="padding:1rem; color:#64748b; font-size:13px;"><i class="fas fa-spinner fa-spin"></i> Searching...</div>';
 
                 try {
-                    const res = await fetch('../../../server/api/shortcuts/shortcuts.php?action=save', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ key_combo: capturedCombo, page_key: pageKey, page_label: pageLabel })
-                    });
+                    const res = await fetch('../../../server/api/global_search/global-search.php?q=' + encodeURIComponent(q));
                     const data = await res.json();
-                    if (data.success) {
-                        capturedCombo = '';
-                        shortcutKeyInput.value = '';
-                        select.value = '';
-                        loadShortcutsUI();
-                    } else {
-                        alert(data.message || 'Save failed');
+
+                    if (!data.success || !data.data.length) {
+                        globalSearchResults.innerHTML = '<div style="padding:1rem; color:#64748b; font-size:13px;">No result </div>';
+                        return;
                     }
+
+                    globalSearchResults.innerHTML = data.data.map(item => `
+                        <div class="search-result-item" onclick="window.location.href='${item.url}'" style="
+                            display:flex; justify-content:space-between; align-items:center;
+                            padding:0.75rem 1rem; cursor:pointer; border-bottom:1px solid #f1f5f9;
+                            transition: background 0.15s;"
+                            onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background='white'">
+                            <div>
+                                <div style="font-size:11px; color:#3b82f6; font-weight:600; text-transform:uppercase;">${item.module}</div>
+                                <div style="font-size:14px; color:#0f172a; font-weight:600;">${item.number}${item.party ? ' — ' + item.party : ''}</div>
+                                ${item.date ? `<div style="font-size:12px; color:#94a3b8;">${item.date}</div>` : ''}
+                            </div>
+                            <div style="font-size:14px; font-weight:700; color:#16a34a;">
+                                ${item.amount !== null ? 'Rs ' + parseFloat(item.amount).toLocaleString('en-PK') : ''}
+                            </div>
+                        </div>
+                    `).join('');
                 } catch (err) {
                     console.error(err);
-                    alert('Error saving shortcut');
+                    globalSearchResults.innerHTML = '<div style="padding:1rem; color:#dc2626; font-size:13px;">Error loading results</div>';
                 }
             }
 
-            async function deleteShortcut(id) {
-                try {
-                    await fetch('../../../server/api/shortcuts/shortcuts.php?action=delete', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ id })
-                    });
-                    loadShortcutsUI();
-                } catch (err) {
-                    console.error(err);
+            // Close dropdown on outside click
+            document.addEventListener('click', function (e) {
+                if (!e.target.closest('#globalSearchInput') && !e.target.closest('#globalSearchResults')) {
+                    globalSearchResults.style.display = 'none';
                 }
-            }
+            });
 
             async function loadShortcutsUI() {
                 const list = document.getElementById('shortcutsList');

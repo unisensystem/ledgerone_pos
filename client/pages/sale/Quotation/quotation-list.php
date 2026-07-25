@@ -14,7 +14,7 @@ if (!$user_id || !$tenant_id) {
     header('Location: ../../auth/login.html');
     exit;
 }
-
+$initialSearch = $_GET['search'] ?? '';
 // ════════════════════════════════════════════════════════════
 //  AJAX — JSON actions
 // ════════════════════════════════════════════════════════════
@@ -495,7 +495,7 @@ tbody td{padding:10px 13px;color:#2f3b4c;vertical-align:middle}
     <div class="filter-body">
       <div class="fg">
         <label>Quotation No.</label>
-        <input type="text" id="fQtn" placeholder="e.g. QTN-0023" oninput="debouncedFetch()"/>
+<input type="text" id="fQtn" placeholder="e.g. QTN-0023" oninput="debouncedFetch()" value="<?= htmlspecialchars($initialSearch) ?>"/>
       </div>
       <div class="fg">
         <label>Customer Name</label>

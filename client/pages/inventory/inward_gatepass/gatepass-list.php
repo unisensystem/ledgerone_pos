@@ -13,6 +13,7 @@ if (!$user_id) {
     header('Location: ../../auth/login.html');
     exit();
 }
+$initialSearch = $_GET['search'] ?? '';
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -46,7 +47,7 @@ if (!$user_id) {
         <!-- Search and Filter Bar -->
         <div class="search-filter-bar">
             <div class="search-box">
-                <input type="text" id="search-input" placeholder="Search by IGP code, supplier, or product...">
+<input type="text" id="search-input" placeholder="Search by IGP code, supplier, or product..." value="<?= htmlspecialchars($initialSearch) ?>">
                 <i class="fas fa-search search-icon"></i>
             </div>
 
@@ -119,6 +120,17 @@ if (!$user_id) {
     </div>
 
     <script src="../../../assets/js/inventory/inward_gatepass/gatepass-list.js"></script>
+<?php if ($initialSearch): ?>
+<script>
+    window.addEventListener('load', function() {
+        const searchInput = document.getElementById('search-input');
+        if (searchInput) {
+            searchInput.dispatchEvent(new Event('input', { bubbles: true }));
+            searchInput.dispatchEvent(new Event('keyup', { bubbles: true }));
+        }
+    });
+</script>
+<?php endif; ?>
 </body>
 
 </html>

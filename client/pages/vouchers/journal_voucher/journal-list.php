@@ -28,9 +28,6 @@ if (!$user_id) {
         <div class="header">
             <h1>Journal Entries</h1>
             <div class="header-actions">
-                <a href="adjustment-add.php" class="btn btn-secondary">
-                    <i class="fas fa-sliders-h"></i> Balance Adjustment
-                </a>
                 <a href="#" class="btn btn-primary" id="newEntryBtn">
                     <i class="fas fa-plus"></i> New Journal Entry
                 </a>

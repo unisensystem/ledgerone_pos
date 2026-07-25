@@ -13,6 +13,7 @@ if (!$user_id) {
     header('Location: ../../auth/login.html');
     exit();
 }
+$initialSearch = $_GET['search'] ?? '';
 
 // Get base currency symbol
 require_once '../../../../includes/connection.php';
@@ -102,7 +103,7 @@ $currency_symbol = $currency['symbol'];
             
             <div class="search-box">
                 <i class="fas fa-search search-icon"></i>
-                <input type="text" class="search-input" id="searchInput" placeholder="Search by code, branch, or reason...">
+<input type="text" class="search-input" id="searchInput" placeholder="Search by code, branch, or reason..." value="<?= htmlspecialchars($initialSearch) ?>">
             </div>
         </div>
         
@@ -285,9 +286,20 @@ $currency_symbol = $currency['symbol'];
         <div class="toast-message">Operation completed successfully!</div>
     </div>
 
-    <script src="../../../assets/js/inventory/stock_adjustment/adjustment-list.js"></script>
-    <script>
-        window.currencySymbol = '<?php echo $currency_symbol; ?>';
-    </script>
+  <script src="../../../assets/js/inventory/stock_adjustment/adjustment-list.js"></script>
+<?php if ($initialSearch): ?>
+<script>
+    window.addEventListener('load', function() {
+        const searchInput = document.getElementById('searchInput');
+        if (searchInput) {
+            searchInput.dispatchEvent(new Event('input', { bubbles: true }));
+            searchInput.dispatchEvent(new Event('keyup', { bubbles: true }));
+        }
+    });
+</script>
+<?php endif; ?>
+<script>
+    window.currencySymbol = '<?php echo $currency_symbol; ?>';
+</script>
 </body>
 </html>

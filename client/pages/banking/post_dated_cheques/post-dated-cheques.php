@@ -13,6 +13,8 @@ if (!$user_id) {
     header('Location: ../../auth/login.html');
     exit();
 }
+// 👇 ADD KARO
+$initialSearch = $_GET['search'] ?? '';
 
 // Get base currency symbol
 require_once '../../../../includes/connection.php';
@@ -113,7 +115,7 @@ $currency_symbol = $currency['symbol'] ?? '$';
                 <div class="filters-grid">
                     <div class="form-group">
                         <label class="form-label">Cheque No</label>
-                        <input type="text" class="form-input" id="cheque-no-filter" placeholder="Enter cheque number">
+<input type="text" class="form-input" id="cheque-no-filter" placeholder="Enter cheque number" value="<?= htmlspecialchars($initialSearch) ?>">
                     </div>
 
                     <div class="form-group">
@@ -292,7 +294,15 @@ $currency_symbol = $currency['symbol'] ?? '$';
     <script>
         const CURRENCY_SYMBOL = '<?php echo $currency_symbol; ?>';
     </script>
-    <script src="../../../assets/js/banking/post_dated_cheques/post-dated-cheques.js"></script>
+<script src="../../../assets/js/banking/post_dated_cheques/post-dated-cheques.js"></script>
+<?php if ($initialSearch): ?>
+<script>
+    window.addEventListener('load', function() {
+        const applyBtn = document.getElementById('apply-filters');
+        if (applyBtn) applyBtn.click();
+    });
+</script>
+<?php endif; ?>
 </body>
 
 </html>

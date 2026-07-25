@@ -13,6 +13,7 @@ if (!$user_id) {
     header('Location: ../../auth/login.html');
     exit();
 }
+$initialSearch = $_GET['search'] ?? '';
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -69,7 +70,7 @@ if (!$user_id) {
             <div class="actions">
                 <div class="search-box">
                     <i class="fas fa-search"></i>
-                    <input type="text" id="searchInput" placeholder="Search by invoice number, customer...">
+<input type="text" id="searchInput" placeholder="Search by invoice number, customer..." value="<?= htmlspecialchars($initialSearch) ?>">
                 </div>
                 <button class="btn btn-primary" id="newInvoiceBtn">
                     <i class="fas fa-plus"></i> New Return
@@ -117,6 +118,17 @@ if (!$user_id) {
         </div>
     </div>
 
-    <script src="../../../assets/js/sale/sale_return/return-list.js"></script>
+<script src="../../../assets/js/sale/sale_return/return-list.js"></script>
+<?php if ($initialSearch): ?>
+<script>
+    window.addEventListener('load', function() {
+        const searchInput = document.getElementById('searchInput');
+        if (searchInput) {
+            searchInput.dispatchEvent(new Event('input', { bubbles: true }));
+            searchInput.dispatchEvent(new Event('keyup', { bubbles: true }));
+        }
+    });
+</script>
+<?php endif; ?>
 </body>
 </html>

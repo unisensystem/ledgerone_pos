@@ -3,6 +3,7 @@ require_once '../../../../includes/dashboard.php';
 if (session_status() == PHP_SESSION_NONE) session_start();
 $user_id = $_SESSION['user_id'] ?? null;
 if (!$user_id) { header('Location: ../../auth/login.html'); exit(); }
+$initialSearch = $_GET['search'] ?? '';
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -82,7 +83,7 @@ if (!$user_id) { header('Location: ../../auth/login.html'); exit(); }
                 <div class="table-actions">
                     <div class="search-box">
                         <i class="fas fa-search search-icon"></i>
-                        <input type="text" id="searchInput" placeholder="Search vouchers...">
+<input type="text" id="searchInput" placeholder="Search vouchers..." value="<?= htmlspecialchars($initialSearch) ?>">
                     </div>
                     <button class="btn btn-secondary btn-icon" id="exportBtn" title="Export"><i class="fas fa-download"></i></button>
                     <button class="btn btn-secondary btn-icon" id="refreshBtn" title="Refresh"><i class="fas fa-sync-alt"></i></button>
@@ -213,6 +214,17 @@ if (!$user_id) { header('Location: ../../auth/login.html'); exit(); }
         </div>
     </div>
 
-    <script src="../../../assets/js/vouchers/transfer_voucher/transfer-list.js"></script>
+<script src="../../../assets/js/vouchers/transfer_voucher/transfer-list.js"></script>
+<?php if ($initialSearch): ?>
+<script>
+    window.addEventListener('load', function() {
+        const searchInput = document.getElementById('searchInput');
+        if (searchInput) {
+            searchInput.dispatchEvent(new Event('input', { bubbles: true }));
+            searchInput.dispatchEvent(new Event('keyup', { bubbles: true }));
+        }
+    });
+</script>
+<?php endif; ?>
 </body>
 </html>

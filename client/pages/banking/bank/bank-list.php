@@ -13,6 +13,8 @@ if (!$user_id) {
     header('Location: ../../auth/login.html');
     exit();
 }
+// 👇 ADD KARO
+$initialSearch = $_GET['search'] ?? '';
 
 // Get base currency symbol
 require_once '../../../../includes/connection.php';
@@ -113,8 +115,8 @@ $currency_symbol = $currency['symbol'] ?? '$';
                 <div class="search-box filter-group">
                     <label class="filter-label">Search Accounts</label>
                     <i class="fas fa-search"></i>
-                    <input type="text" class="filter-input" id="searchInput"
-                        placeholder="Search by bank name, account number, or branch...">
+                    <input type="text" class="filter-input" id="searchInput" placeholder="Search by bank name, account number, or branch..." value="<?= htmlspecialchars($initialSearch) ?>">
+                    
                 </div>
                 <div class="filter-group">
                     <label class="filter-label">Account Type</label>
@@ -369,7 +371,18 @@ $currency_symbol = $currency['symbol'] ?? '$';
         </div>
     </div>
 
-    <script src="../../../assets/js/banking/bank/bank-list.js"></script>
+   <script src="../../../assets/js/banking/bank/bank-list.js"></script>
+<?php if ($initialSearch): ?>
+<script>
+    window.addEventListener('load', function() {
+        const searchInput = document.getElementById('searchInput');
+        if (searchInput) {
+            searchInput.dispatchEvent(new Event('input', { bubbles: true }));
+            searchInput.dispatchEvent(new Event('keyup', { bubbles: true }));
+        }
+    });
+</script>
+<?php endif; ?>
 </body>
 
 </html>

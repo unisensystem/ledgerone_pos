@@ -13,6 +13,7 @@ if (!$user_id) {
     header('Location: ../../auth/login.html');
     exit();
 }
+$initialSearch = $_GET['search'] ?? '';
 
 // Get base currency symbol
 require_once '../../../../includes/connection.php';
@@ -64,7 +65,7 @@ $currency_symbol = $currency['symbol'];
                     <div class="form-group">
                         <label class="form-label" for="search">Search Transfers</label>
                         <div class="search-input-container">
-                            <input type="text" id="search" class="form-input search-input" placeholder="Search by transfer code, branch...">
+<input type="text" id="search" class="form-input search-input" placeholder="Search by transfer code, branch..." value="<?= htmlspecialchars($initialSearch) ?>">
                             <i class="fas fa-search search-icon"></i>
                         </div>
                     </div>
@@ -194,6 +195,17 @@ $currency_symbol = $currency['symbol'];
     </div>
 
     <script src="../../../assets/js/inventory/stock_transfer/transfer-list.js"></script>
+<?php if ($initialSearch): ?>
+<script>
+    window.addEventListener('load', function() {
+        const searchInput = document.getElementById('search');
+        if (searchInput) {
+            searchInput.dispatchEvent(new Event('input', { bubbles: true }));
+            searchInput.dispatchEvent(new Event('keyup', { bubbles: true }));
+        }
+    });
+</script>
+<?php endif; ?>
     <script>
         // Pass currency symbol to JavaScript
         window.currencySymbol = '<?php echo $currency_symbol; ?>';

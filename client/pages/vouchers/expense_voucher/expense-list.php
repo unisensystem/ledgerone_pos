@@ -13,7 +13,7 @@ if (!$user_id) {
     header('Location: ../../auth/login.html');
     exit();
 }
-
+$initialSearch = $_GET['search'] ?? '';
 // Get base currency symbol
 require_once '../../../../includes/connection.php';
 $stmt = $pdo->prepare("
@@ -49,7 +49,7 @@ $currency_symbol = $currency['symbol'];
             <div class="header-actions">
                 <div class="search-box">
                     <i class="fas fa-search search-icon"></i>
-                    <input type="text" id="globalSearch" placeholder="Search vouchers, descriptions...">
+<input type="text" id="globalSearch" placeholder="Search vouchers, descriptions..." value="<?= htmlspecialchars($initialSearch) ?>">
                 </div>
                 <button class="btn btn-primary" id="newEntryBtn">
                     <i class="fas fa-plus"></i>
@@ -204,7 +204,6 @@ $currency_symbol = $currency['symbol'];
                             <th>Expense Account</th>
                             <th>Cost Center</th>
                             <th>Amount</th>
-                            <th>Cash Flow</th>
                             <th>Actions</th>
                         </tr>
                     </thead>
@@ -273,18 +272,6 @@ $currency_symbol = $currency['symbol'];
                         <strong>Company:</strong>
                         <p id="viewCompany"></p>
                     </div>
-                    <div>
-                        <strong>Vendor:</strong>
-                        <p id="viewVendor"></p>
-                    </div>
-                    <div>
-                        <strong>Type:</strong>
-                        <p id="viewType"></p>
-                    </div>
-                    <div>
-                        <strong>Effect on Cash Flow:</strong>
-                        <p id="viewCashFlow"></p>
-                    </div>
                     <div style="grid-column: 1 / -1;">
                         <strong>Description:</strong>
                         <p id="viewDescription"></p>
@@ -315,7 +302,18 @@ $currency_symbol = $currency['symbol'];
         </div>
     </div>
 
-    <script src="../../../assets/js/vouchers/expense_voucher/expense-list.js"></script>
+   <script src="../../../assets/js/vouchers/expense_voucher/expense-list.js"></script>
+<?php if ($initialSearch): ?>
+<script>
+    window.addEventListener('load', function() {
+        const searchInput = document.getElementById('globalSearch');
+        if (searchInput) {
+            searchInput.dispatchEvent(new Event('input', { bubbles: true }));
+            searchInput.dispatchEvent(new Event('keyup', { bubbles: true }));
+        }
+    });
+</script>
+<?php endif; ?>
 </body>
 
 </html>
