@@ -13,7 +13,6 @@ if (!$user_id) {
     header('Location: ../../auth/login.html');
     exit();
 }
-// 👇 ADD KARO
 $initialSearch = $_GET['search'] ?? '';
 ?>
 <!DOCTYPE html>
@@ -45,7 +44,7 @@ $initialSearch = $_GET['search'] ?? '';
                 <div class="form-group">
                     <label for="customerFilter">Customer</label>
                     <div class="searchable-dropdown">
-<input type="text" id="searchInput" placeholder="Search by invoice number, customer..." value="<?= htmlspecialchars($initialSearch) ?>">
+                        <input type="text" class="search-input" placeholder="Search customer..." id="customerFilterSearch" autocomplete="off">
                         <div class="dropdown-options" id="customerFilterOptions">
                             <!-- Options loaded dynamically -->
                         </div>
@@ -54,11 +53,11 @@ $initialSearch = $_GET['search'] ?? '';
                 </div>
 
             </div>
-            
+
             <div class="actions">
                 <div class="search-box">
                     <i class="fas fa-search"></i>
-                    <input type="text" id="searchInput" placeholder="Search by invoice number, customer...">
+                    <input type="text" id="searchInput" placeholder="Search by chalan number, customer..." value="<?= htmlspecialchars($initialSearch) ?>">
                 </div>
                 <div style="display:flex; gap:10px;">
                     <button class="btn btn-secondary" id="resetFiltersBtn">
@@ -125,7 +124,66 @@ $initialSearch = $_GET['search'] ?? '';
         </div>
     </div>
 
-<script src="../../../assets/js/sale/delivery_chalan/pos-list.js"></script>
+    <!-- Duplicate Chalan Modal -->
+    <div class="modal" id="duplicateModal">
+        <div class="modal-content duplicate-modal-content">
+            <div class="duplicate-modal-header">
+                <div class="duplicate-modal-icon"><i class="fas fa-copy"></i></div>
+                <div>
+                    <h3 class="modal-title" style="margin-bottom:4px;">Duplicate Chalan</h3>
+                    <p class="duplicate-modal-sub">All items &amp; details will be copied exactly</p>
+                </div>
+            </div>
+            <div class="duplicate-info-row">
+                <div class="duplicate-info-box">
+                    <span class="duplicate-info-label">Source Chalan</span>
+                    <span class="duplicate-info-value" id="duplicateSourceBillNo"></span>
+                </div>
+                <div class="duplicate-arrow"><i class="fas fa-arrow-right"></i></div>
+                <div class="duplicate-info-box duplicate-info-box--new">
+                    <span class="duplicate-info-label">New Chalan</span>
+                    <span class="duplicate-info-value" id="duplicateNewBillNoDisplay">Generating...</span>
+                </div>
+            </div>
+            <div class="duplicate-fields">
+                <div class="duplicate-field-group">
+                    <label for="duplicateDate">Delivery Date</label>
+                    <input type="date" id="duplicateDate">
+                </div>
+                <div class="duplicate-field-group">
+                    <label>Customer <span class="dup-optional">(optional — keep same)</span></label>
+                    <div class="searchable-dropdown">
+                        <input type="text" class="search-input" autocomplete="off" placeholder="Keep original customer" id="dupCustomerSearch">
+                        <div class="dropdown-options" id="dupCustomerOptions"></div>
+                        <input type="hidden" id="dupCustomerId">
+                    </div>
+                </div>
+            </div>
+            <p class="duplicate-readonly-note"><i class="fas fa-info-circle"></i> Chalan number is auto-generated. Leave customer blank to keep original.</p>
+            <span id="duplicateError" style="color:var(--error);font-size:12px;display:block;margin-top:8px;"></span>
+            <div class="modal-actions">
+                <button class="btn btn-secondary" id="cancelDuplicateBtn">Cancel</button>
+                <button class="btn btn-primary" id="confirmDuplicateBtn"><i class="fas fa-copy"></i> Confirm Duplicate</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Duplicate Success Modal -->
+    <div class="modal" id="duplicateSuccessModal">
+        <div class="modal-content duplicate-success-content">
+            <div class="dup-success-icon"><i class="fas fa-check-circle"></i></div>
+            <h3 class="modal-title" style="text-align:center;">Chalan Duplicated!</h3>
+            <p class="dup-success-msg">New chalan <strong id="dupSuccessBillNo"></strong> has been created successfully.</p>
+            <div class="dup-success-timer">Auto-closing in <span id="dupSuccessCountdown">6</span>s</div>
+            <div class="modal-actions" style="justify-content:center;gap:10px;">
+                <button class="btn btn-secondary" id="dupSuccessCloseBtn"><i class="fas fa-times"></i> Close</button>
+                <button class="btn btn-success" id="dupSuccessPrintBtn"><i class="fas fa-print"></i> Print</button>
+                <button class="btn btn-primary" id="dupSuccessEditBtn"><i class="fas fa-edit"></i> Edit</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="../../../assets/js/sale/delivery_chalan/pos-list.js"></script>
 <?php if ($initialSearch): ?>
 <script>
     window.addEventListener('load', function() {

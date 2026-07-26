@@ -236,6 +236,12 @@ $initialSearch = $_GET['search'] ?? '';
                             <label for="editChequeDate">Cheque Date</label>
                             <input type="date" id="editChequeDate">
                         </div>
+                        <div class="form-group" id="editCrExpenseGroup">
+                            <label for="editCrExpenseRef">Expense Voucher (CR)</label>
+                            <select id="editCrExpenseRef">
+                                <option value="">Select CR Expense</option>
+                            </select>
+                        </div>
                     </div>
                     <div class="form-group full-width">
                         <label for="editDescription">Description</label>
