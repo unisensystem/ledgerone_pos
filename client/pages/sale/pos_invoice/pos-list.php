@@ -93,8 +93,14 @@ $initialSearch = $_GET['search'] ?? '';
                     <button class="btn btn-secondary" id="resetFiltersBtn">
                         <i class="fas fa-rotate-left"></i> Reset
                     </button>
+                    <button class="btn btn-secondary" id="customizeFiltersBtn">
+                        <i class="fas fa-sliders"></i> Filters
+                    </button>
                     <button class="btn btn-success" id="printSelectedBtn" style="display:none;">
                         <i class="fas fa-print"></i> Print Selected (<span id="selectedCount">0</span>)
+                    </button>
+                    <button class="btn btn-danger" id="deleteSelectedBtn" style="display:none;">
+                        <i class="fas fa-trash"></i> Delete (<span id="selectedDeleteCount">0</span>)
                     </button>
                     <button class="btn btn-primary" id="newInvoiceBtn">
                         <i class="fas fa-plus"></i> New Invoice
@@ -153,6 +159,21 @@ $initialSearch = $_GET['search'] ?? '';
             <div class="modal-actions">
                 <button class="btn btn-secondary" id="cancelDeleteBtn">Cancel</button>
                 <button class="btn btn-danger" id="confirmDeleteBtn">Delete</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Customize Filters Modal -->
+    <div class="modal" id="customizeFiltersModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:1000; align-items:center; justify-content:center;">
+        <div class="modal-content" style="max-width:420px; width:90%;">
+            <h3 class="modal-title">Customize Filters</h3>
+            <div style="margin-bottom:12px;">
+                <button class="btn btn-secondary" id="filterCustomizeSelectAll" style="font-size:13px; padding:6px 14px;">Select All</button>
+            </div>
+            <div id="filterToggleList" style="display:flex; flex-direction:column; gap:8px; max-height:360px; overflow-y:auto; padding-right:4px;"></div>
+            <div class="modal-actions" style="margin-top:16px;">
+                <button class="btn btn-secondary" id="closeCustomizeFiltersBtn">Cancel</button>
+                <button class="btn btn-primary" id="saveCustomizeFiltersBtn">Save</button>
             </div>
         </div>
     </div>
