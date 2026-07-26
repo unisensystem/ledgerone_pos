@@ -87,10 +87,7 @@ $initialSearch = $_GET['search'] ?? '';
             <div class="actions">
                 <div class="search-box">
                     <i class="fas fa-search"></i>
-<input type="text" id="searchInput" placeholder="Search by invoice number, customer..." value="<?= htmlspecialchars($initialSearch) ?>">
-                    <button class="btn btn-primary" id="searchBtn" style="padding:6px 14px; margin-left:6px;">
-                        <i class="fas fa-search"></i>
-                    </button>
+                    <input type="text" id="searchInput" placeholder="Search by invoice number, customer..." value="<?= htmlspecialchars($initialSearch) ?>">
                 </div>
                 <div style="display:flex; gap:10px;">
                     <button class="btn btn-primary" id="applyFiltersBtn">
@@ -132,11 +129,12 @@ $initialSearch = $_GET['search'] ?? '';
                     <thead>
                         <tr>
                             <th width="3%"><input type="checkbox" id="selectAllCheckbox" title="Select All"></th>
-                            <th width="12%">Invoice No</th>
-                            <th width="15%">Date</th>
-                            <th width="25%">Customer</th>
-                            <th width="12%">Items</th>
-                            <th width="15%">Total Amount</th>
+                            <th width="11%">Invoice No</th>
+                            <th width="12%">Date</th>
+                            <th width="22%">Customer</th>
+                            <th width="8%">Items</th>
+                            <th width="13%">Total Amount</th>
+                            <th width="10%">Status</th>
                             <th width="21%">Actions</th>
                         </tr>
                     </thead>
