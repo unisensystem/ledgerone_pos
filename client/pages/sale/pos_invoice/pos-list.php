@@ -206,7 +206,7 @@ $initialSearch = $_GET['search'] ?? '';
         </div>
     </div>
 
-    <script src="../../../assets/js/sale/pos_invoice/pos-list.js"></script>
+    <script src="../../../assets/js/sale/pos_invoice/pos-list.js?v=<?= filemtime(__DIR__ . '/../../../assets/js/sale/pos_invoice/pos-list.js') ?>"></script>
 <?php if ($initialSearch): ?>
 <script>
     // Global search se aane par existing search box ko auto-trigger karo
