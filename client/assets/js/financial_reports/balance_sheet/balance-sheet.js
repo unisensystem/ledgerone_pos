@@ -207,27 +207,30 @@ document.addEventListener('DOMContentLoaded', function () {
         // Calculate from data structure
         let totalAssets = 0;
         let totalLiabilities = 0;
-        let totalEquity = 0;
-        
+        let equityAccountsSum = 0;
+
         if (balanceSheetData['1']) {
             Object.values(balanceSheetData['1']).forEach(sub => {
                 sub.accounts.forEach(acc => totalAssets += parseFloat(acc.balance));
             });
         }
-        
+
         if (balanceSheetData['2']) {
             Object.values(balanceSheetData['2']).forEach(sub => {
                 sub.accounts.forEach(acc => totalLiabilities += parseFloat(acc.balance));
             });
         }
-        
+
         if (balanceSheetData['3']) {
             Object.values(balanceSheetData['3']).forEach(sub => {
-                sub.accounts.forEach(acc => totalEquity += parseFloat(acc.balance));
+                sub.accounts.forEach(acc => equityAccountsSum += parseFloat(acc.balance));
             });
         }
 
-        const totalLiabilitiesEquityValue = totalLiabilities + totalEquity;
+        // Equity = Assets - Liabilities (fundamental accounting equation).
+        // This is negative when liabilities exceed assets, reflecting insolvency.
+        const totalEquity = totalAssets - totalLiabilities;
+        const totalLiabilitiesEquityValue = totalLiabilities + totalEquity; // always equals totalAssets
 
         // Update DOM
         const assetsGrandTotal = document.getElementById('assets-grand-total');
@@ -235,12 +238,16 @@ document.addEventListener('DOMContentLoaded', function () {
         const equityTotal = document.getElementById('equity-total');
         const retainedEarningsTotal = document.getElementById('retained-earnings-total');
         const liabilitiesEquityGrandTotal = document.getElementById('liabilities-equity-grand-total');
-        
+
         if (assetsGrandTotal) assetsGrandTotal.textContent = formatCurrency(totalAssets);
         if (totalAssetsEl) totalAssetsEl.textContent = formatCurrency(totalAssets);
         if (liabilitiesTotal) liabilitiesTotal.textContent = formatCurrency(totalLiabilities);
-        if (retainedEarningsTotal) retainedEarningsTotal.textContent = formatCurrency(totalEquity);
-        if (equityTotal) equityTotal.textContent = formatCurrency(totalEquity);
+        if (retainedEarningsTotal) retainedEarningsTotal.textContent = formatCurrency(equityAccountsSum);
+        if (equityTotal) {
+            equityTotal.textContent = formatCurrency(totalEquity);
+            equityTotal.style.color = totalEquity < 0 ? 'var(--error)' : '';
+            equityTotal.style.fontWeight = totalEquity < 0 ? '700' : '';
+        }
         if (liabilitiesEquityGrandTotal) liabilitiesEquityGrandTotal.textContent = formatCurrency(totalLiabilitiesEquityValue);
         if (totalLiabilitiesEquityEl) totalLiabilitiesEquityEl.textContent = formatCurrency(totalLiabilitiesEquityValue);
 

@@ -159,11 +159,15 @@ try {
         // Equity normally has credit balance (negative, so use abs)
         
         if ($head_id === 1) {
+            // Assets: debit-normal, show as positive
             $item['balance'] = abs($balance);
         } elseif ($head_id === 2) {
+            // Liabilities: credit-normal, display magnitude positively
             $item['balance'] = abs($balance);
         } else {
-            $item['balance'] = abs($balance);
+            // Equity: credit-normal = positive (capital/retained earnings).
+            // Debit balance means accumulated losses — keep negative so it displays correctly.
+            $item['balance'] = $balance < 0 ? abs($balance) : -$balance;
         }
         
         $sub_account_id = $account['sub_account_id'];
