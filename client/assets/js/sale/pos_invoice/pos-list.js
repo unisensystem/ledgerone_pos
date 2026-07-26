@@ -204,13 +204,13 @@ function initializeListPage(permissions) {
         document.getElementById('customizeFiltersModal').style.display = 'flex';
     }
 
-    document.getElementById('customizeFiltersBtn').addEventListener('click', openCustomizeModal);
+    document.getElementById('customizeFiltersBtn')?.addEventListener('click', openCustomizeModal);
 
-    document.getElementById('filterCustomizeSelectAll').addEventListener('click', () => {
+    document.getElementById('filterCustomizeSelectAll')?.addEventListener('click', () => {
         document.querySelectorAll('#filterToggleList input[type="checkbox"]').forEach(cb => cb.checked = true);
     });
 
-    document.getElementById('saveCustomizeFiltersBtn').addEventListener('click', () => {
+    document.getElementById('saveCustomizeFiltersBtn')?.addEventListener('click', () => {
         const hidden = [];
         document.querySelectorAll('#filterToggleList input[type="checkbox"]').forEach(cb => {
             if (!cb.checked) hidden.push(cb.dataset.fkey);
@@ -220,11 +220,11 @@ function initializeListPage(permissions) {
         document.getElementById('customizeFiltersModal').style.display = 'none';
     });
 
-    document.getElementById('closeCustomizeFiltersBtn').addEventListener('click', () => {
+    document.getElementById('closeCustomizeFiltersBtn')?.addEventListener('click', () => {
         document.getElementById('customizeFiltersModal').style.display = 'none';
     });
 
-    document.getElementById('customizeFiltersModal').addEventListener('click', function(e) {
+    document.getElementById('customizeFiltersModal')?.addEventListener('click', function(e) {
         if (e.target === this) this.style.display = 'none';
     });
 
@@ -238,10 +238,10 @@ function initializeListPage(permissions) {
         const deleteSelectedBtn = document.getElementById('deleteSelectedBtn');
         const selectedCount = document.getElementById('selectedCount');
         const selectedDeleteCount = document.getElementById('selectedDeleteCount');
-        printSelectedBtn.style.display = count > 0 ? 'inline-flex' : 'none';
-        deleteSelectedBtn.style.display = count > 0 && permissions.includes('Delete') ? 'inline-flex' : 'none';
-        selectedCount.textContent = count;
-        selectedDeleteCount.textContent = count;
+        if (printSelectedBtn) printSelectedBtn.style.display = count > 0 ? 'inline-flex' : 'none';
+        if (deleteSelectedBtn) deleteSelectedBtn.style.display = count > 0 && permissions.includes('Delete') ? 'inline-flex' : 'none';
+        if (selectedCount) selectedCount.textContent = count;
+        if (selectedDeleteCount) selectedDeleteCount.textContent = count;
         const allCheckboxes = invoicesTable.querySelectorAll('.row-checkbox');
         const selectAll = document.getElementById('selectAllCheckbox');
         if (allCheckboxes.length > 0) {
@@ -280,7 +280,7 @@ function initializeListPage(permissions) {
         }
     });
 
-    document.getElementById('deleteSelectedBtn').addEventListener('click', function () {
+    document.getElementById('deleteSelectedBtn')?.addEventListener('click', function () {
         if (selectedIds.size === 0) return;
         deleteInvoiceId = null; // bulk mode
         document.querySelector('#deleteModal p').textContent =
