@@ -19,7 +19,6 @@ if ($q === '' || strlen($q) < 1) {
     exit();
 }
 
-// Whitelisted config — table/column names are hardcoded, never from user input
 $modules = [
     'quotation' => [
         'label' => 'Quotation', 'table' => 'quotations', 'id_col' => 'id',
@@ -143,10 +142,18 @@ foreach ($modules as $cfg) {
     $conditions = ["t.`{$cfg['number_col']}` LIKE ?"];
     $params = [$tenant_id, "%$q%"];
 
-    if ($cfg['amount_col']) {
-        $conditions[] = "t.`{$cfg['amount_col']}` LIKE ?";
+    // Amount: EXACT match only — "600" won't match 6000 or 5600
+    if ($cfg['amount_col'] && is_numeric($q)) {
+        $conditions[] = "t.`{$cfg['amount_col']}` = ?";
+        $params[] = $q;
+    }
+
+    // Party name search — "ali" matches Ali/Ali Raza, "ali raza" matches only Ali Raza
+    if ($cfg['party_table']) {
+        $conditions[] = "p.`{$cfg['party_name_col']}` LIKE ?";
         $params[] = "%$q%";
     }
+
     $whereExtra = '(' . implode(' OR ', $conditions) . ')';
 
     $select = "t.`{$cfg['id_col']}` AS id, t.`{$cfg['number_col']}` AS number_val";
@@ -182,7 +189,6 @@ foreach ($modules as $cfg) {
             ];
         }
     } catch (PDOException $e) {
-        // skip module on error, don't break whole search
         continue;
     }
 }
