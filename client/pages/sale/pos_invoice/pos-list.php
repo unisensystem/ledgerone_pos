@@ -88,8 +88,14 @@ $initialSearch = $_GET['search'] ?? '';
                 <div class="search-box">
                     <i class="fas fa-search"></i>
 <input type="text" id="searchInput" placeholder="Search by invoice number, customer..." value="<?= htmlspecialchars($initialSearch) ?>">
+                    <button class="btn btn-primary" id="searchBtn" style="padding:6px 14px; margin-left:6px;">
+                        <i class="fas fa-search"></i>
+                    </button>
                 </div>
                 <div style="display:flex; gap:10px;">
+                    <button class="btn btn-primary" id="applyFiltersBtn">
+                        <i class="fas fa-filter"></i> Apply
+                    </button>
                     <button class="btn btn-secondary" id="resetFiltersBtn">
                         <i class="fas fa-rotate-left"></i> Reset
                     </button>
@@ -174,6 +180,30 @@ $initialSearch = $_GET['search'] ?? '';
             <div class="modal-actions" style="margin-top:16px;">
                 <button class="btn btn-secondary" id="closeCustomizeFiltersBtn">Cancel</button>
                 <button class="btn btn-primary" id="saveCustomizeFiltersBtn">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- DC Fulfillment Modal -->
+    <div class="modal" id="dcFulfillmentModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:1000; align-items:center; justify-content:center;">
+        <div class="modal-content" style="max-width:700px; width:95%;">
+            <h3 class="modal-title">DC Fulfillment</h3>
+            <div class="table-container" style="max-height:400px; overflow-y:auto;">
+                <table style="width:100%; border-collapse:collapse;">
+                    <thead>
+                        <tr>
+                            <th style="padding:10px 8px; text-align:left;">Product</th>
+                            <th style="padding:10px 8px; text-align:right;">Invoiced Qty</th>
+                            <th style="padding:10px 8px; text-align:right;">Delivered Qty</th>
+                            <th style="padding:10px 8px; text-align:right;">Remaining</th>
+                            <th style="padding:10px 8px; text-align:right;">Fulfillment</th>
+                        </tr>
+                    </thead>
+                    <tbody id="dcFulfillmentTableBody"></tbody>
+                </table>
+            </div>
+            <div class="modal-actions" style="margin-top:16px;">
+                <button class="btn btn-secondary" id="closeDcFulfillmentBtn">Close</button>
             </div>
         </div>
     </div>

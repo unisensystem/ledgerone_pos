@@ -575,8 +575,8 @@ function initializeListPage(permissions) {
     document.getElementById('dateFrom').addEventListener('change', () => applyFilters());
     document.getElementById('dateTo').addEventListener('change', () => applyFilters());
     searchInput.addEventListener('keydown', e => { if (e.key === 'Enter') applyFilters(); });
-    document.getElementById('searchBtn').addEventListener('click', () => applyFilters());
-    document.getElementById('applyFiltersBtn').addEventListener('click', () => applyFilters());
+    document.getElementById('searchBtn')?.addEventListener('click', () => applyFilters());
+    document.getElementById('applyFiltersBtn')?.addEventListener('click', () => applyFilters());
     document.getElementById('projectFilter')?.addEventListener('change', () => applyFilters());
 
     // Update pagination
@@ -821,10 +821,10 @@ function initializeListPage(permissions) {
     });
     
     // DC Fulfillment modal
-    document.getElementById('closeDcFulfillmentBtn').addEventListener('click', function() {
+    document.getElementById('closeDcFulfillmentBtn')?.addEventListener('click', function() {
         document.getElementById('dcFulfillmentModal').style.display = 'none';
     });
-    document.getElementById('dcFulfillmentModal').addEventListener('click', function(e) {
+    document.getElementById('dcFulfillmentModal')?.addEventListener('click', function(e) {
         if (e.target === this) this.style.display = 'none';
     });
 
