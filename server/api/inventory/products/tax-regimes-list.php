@@ -26,10 +26,10 @@ try {
     $stmt = $pdo->prepare("
         SELECT id, regime_name, description 
         FROM tax_regimes 
-        WHERE is_active = 1 
+        WHERE is_active = 1 AND (tenant_id = :tenant_id OR tenant_id = 0)
         ORDER BY regime_name
     ");
-    $stmt->execute();
+    $stmt->execute([':tenant_id' => $tenant_id]);
     $regimes = $stmt->fetchAll(PDO::FETCH_ASSOC);
     
     echo json_encode(['success' => true, 'regimes' => $regimes]);

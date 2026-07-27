@@ -162,7 +162,25 @@ function changePage(page) {
 }
 
 function printReport() {
-    window.open('print.php', '_blank');
+    const company = document.getElementById('companyFilter').value;
+    const dateRange = document.getElementById('dateRangeFilter').value;
+    const bucket = document.getElementById('bucketFilter').value;
+    const params = new URLSearchParams();
+
+    if (company) params.set('company_id', company);
+    if (bucket && bucket !== 'all') params.set('bucket', bucket);
+
+    if (dateRange === 'custom') {
+        const from = document.getElementById('dateFrom').value;
+        const to = document.getElementById('dateTo').value;
+        if (from) params.set('date_from', from);
+        if (to) params.set('date_to', to);
+    } else if (dateRange !== 'all') {
+        params.set('date_range', dateRange);
+    }
+
+    const url = 'print.php' + (params.toString() ? '?' + params.toString() : '');
+    window.open(url, '_blank');
 }
 
 function exportToExcel() {
