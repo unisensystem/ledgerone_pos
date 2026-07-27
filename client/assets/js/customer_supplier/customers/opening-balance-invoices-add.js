@@ -450,7 +450,6 @@ function validateFormData() {
         const rowErrors = [];
         
         if (!customerId) rowErrors.push('Customer is required');
-        if (!invoiceNumber) rowErrors.push('Invoice number is required');
         if (!invoiceDate) rowErrors.push('Invoice date is required');
         if (!debit || isNaN(parseFloat(debit)) || parseFloat(debit) <= 0) {
             rowErrors.push('Debit amount must be greater than 0');

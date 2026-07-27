@@ -95,7 +95,7 @@ function initializeListPage(permissions) {
             });
 
             // Format amount with currency symbol
-            const formattedAmount = `${invoice.currencySymbol} ${parseFloat(invoice.totalAmount).toFixed(2)}`;
+            const formattedAmount = `${invoice.currencySymbol} ${parseFloat(invoice.totalAmount).toFixed(3)}`;
 
             // Create cells
             row.insertCell(0).textContent = invoice.invoiceNo;
@@ -181,7 +181,7 @@ function initializeListPage(permissions) {
     
     function updateSummary(count, total, currencySymbol) {
         document.getElementById('totalInvoiceCount').textContent = count;
-        document.getElementById('totalAmountSum').textContent = `${currencySymbol} ${total.toFixed(2)}`;
+        document.getElementById('totalAmountSum').textContent = `${currencySymbol} ${total.toFixed(3)}`;
     }
 
     // Initial load

@@ -7,8 +7,8 @@ function updateInvoiceSummaryWithAIT() {
     const withholdingTaxAmount = netAmount * (withholdingTaxPercent / 100);
     const netReceivable = netAmount - withholdingTaxAmount;
     
-    document.getElementById('withholdingTaxAmount').textContent = withholdingTaxAmount.toFixed(2);
-    document.getElementById('netReceivable').textContent = netReceivable.toFixed(2);
+    document.getElementById('withholdingTaxAmount').textContent = withholdingTaxAmount.toFixed(3);
+    document.getElementById('netReceivable').textContent = netReceivable.toFixed(3);
 }
 
 // Customer selection handler with tax info
@@ -17,7 +17,7 @@ function handleCustomerTaxInfo(customer) {
     
     // Set withholding tax percentage
     const withholdingTaxPercent = parseFloat(customer.advance_income_tax_percentage || 0);
-    document.getElementById('withholdingTaxPercent').value = withholdingTaxPercent.toFixed(2);
+    document.getElementById('withholdingTaxPercent').value = withholdingTaxPercent.toFixed(3);
     
     // Handle non-filer customers (is_filer = 0 means higher tax rate)
     if (customer.is_filer == 0 && withholdingTaxPercent > 0) {

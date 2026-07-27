@@ -195,6 +195,10 @@ document.addEventListener('DOMContentLoaded', function () {
                         const option = new Option(company.company_name, company.id);
                         companySelect.appendChild(option);
                     });
+                    // Auto-select if only one company
+                    if (data.companies.length === 1) {
+                        companySelect.value = data.companies[0].id;
+                    }
                 }
             })
             .catch(err => console.error('loadCompanies error:', err));

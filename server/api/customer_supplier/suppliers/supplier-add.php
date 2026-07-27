@@ -34,18 +34,20 @@ try {
         throw new Exception('Company is required');
     }
     
-    // Generate supplier code based on last supplier_code in database
-    $stmt = $pdo->prepare("SELECT supplier_code FROM suppliers WHERE tenant_id = ? ORDER BY id DESC LIMIT 1");
-    $stmt->execute([$tenant_id]);
+    $pdo->beginTransaction();
+
+    // Generate supplier code per-company with lock to prevent duplicates
+    $stmt = $pdo->prepare("SELECT supplier_code FROM suppliers WHERE tenant_id = ? AND company_id = ? ORDER BY id DESC LIMIT 1 FOR UPDATE");
+    $stmt->execute([$tenant_id, (int)$input['companyId']]);
     $lastSupplier = $stmt->fetch();
-    
+
     if ($lastSupplier) {
         $lastNum = (int)substr($lastSupplier['supplier_code'], 5);
         $nextNum = $lastNum + 1;
     } else {
         $nextNum = 1;
     }
-    
+
     $supplier_code = 'SUPP-' . str_pad($nextNum, 5, '0', STR_PAD_LEFT);
     
     // Prepare data
@@ -72,7 +74,7 @@ try {
     ];
     
     // Generate ID - get max ID across all tenants to avoid conflicts
-    $stmt = $pdo->prepare("SELECT COALESCE(MAX(id), 0) + 1 as new_id FROM suppliers");
+    $stmt = $pdo->prepare("SELECT COALESCE(MAX(id), 0) + 1 as new_id FROM suppliers FOR UPDATE");
     $stmt->execute();
     $new_id = $stmt->fetch()['new_id'];
     $data['id'] = $new_id;
@@ -157,6 +159,8 @@ try {
         }
     }
     
+    $pdo->commit();
+
     echo json_encode([
         'success' => true,
         'message' => 'Supplier created successfully',
@@ -165,6 +169,7 @@ try {
     ]);
     
 } catch (Exception $e) {
+    if ($pdo->inTransaction()) $pdo->rollBack();
     http_response_code(400);
     echo json_encode([
         'success' => false,

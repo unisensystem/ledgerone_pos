@@ -342,6 +342,10 @@ $currency_symbol = $currency['symbol'] ?? '$';
             <div class="modal-body">
                 <div class="form-grid">
                     <div class="form-group col-4">
+                        <label>Company</label>
+                        <div class="view-field" id="viewCompany"></div>
+                    </div>
+                    <div class="form-group col-4">
                         <label>Supplier Code</label>
                         <div class="view-field" id="viewSupplierCode"></div>
                     </div>

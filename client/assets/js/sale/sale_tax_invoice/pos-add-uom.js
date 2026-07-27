@@ -193,7 +193,7 @@ function updateRowUnitCells(row) {
             input.type = 'number';
             input.className = 'table-input unit-input';
             input.min = '0';
-            input.step = '0.01';
+            input.step = '0.001';
             // RESTORE the existing value if it exists, otherwise default to '0'
             input.value = existingValues[uomDetail.id] || '0';
             input.dataset.unitId = uomDetail.id;
@@ -262,12 +262,12 @@ function calculateRowAmounts(row, totalQty, price) {
     const gross = Number(totalQty) * Number(price);
     const grossInput = row.querySelector('.gross-cell input');
     if (grossInput) {
-        grossInput.value = gross.toFixed(2);
+        grossInput.value = gross.toFixed(3);
     }
     
     // Discount amount
     const discountAmt = gross * (discountPercent / 100);
-    row.querySelector('.disc-amount-cell input').value = discountAmt.toFixed(2);
+    row.querySelector('.disc-amount-cell input').value = discountAmt.toFixed(3);
     
     // After discount
     const afterDiscount = gross - discountAmt;
@@ -310,11 +310,11 @@ function calculateRowAmounts(row, totalQty, price) {
     }
     // If application_level is 'invoice', tax is NOT applied here (will be applied at invoice level)
     
-    row.querySelector('.tax-amount-cell input').value = taxAmt.toFixed(2);
+    row.querySelector('.tax-amount-cell input').value = taxAmt.toFixed(3);
     
     // Net amount
     const net = afterTradeOffer + taxAmt;
-    row.querySelector('.net-cell input').value = net.toFixed(2);
+    row.querySelector('.net-cell input').value = net.toFixed(3);
     
     // Update summary
     updateInvoiceSummaryDynamic();
@@ -401,16 +401,16 @@ function updateInvoiceSummaryDynamic() {
     const totalFocQtyEl = document.getElementById('totalFocQty');
     const totalNetAmountItemsEl = document.getElementById('totalNetAmountItems');
     
-    if (totalSalePriceEl) totalSalePriceEl.textContent = totalPurchasePrice.toFixed(2);
-    if (totalGrossAmountEl) totalGrossAmountEl.textContent = totalGrossAmount.toFixed(2);
-    if (totalDiscountAmountItemsEl) totalDiscountAmountItemsEl.textContent = totalDiscountAmountItems.toFixed(2);
-    if (totalTradeOfferAmountEl) totalTradeOfferAmountEl.textContent = totalTradeOfferAmountItems.toFixed(2);
-    if (totalTaxAmountEl) totalTaxAmountEl.textContent = totalTaxAmountItems.toFixed(2);
-    if (totalFocQtyEl) totalFocQtyEl.textContent = totalFOCQty.toFixed(2);
-    if (totalNetAmountItemsEl) totalNetAmountItemsEl.textContent = totalNetAmountItems.toFixed(2);
+    if (totalSalePriceEl) totalSalePriceEl.textContent = totalPurchasePrice.toFixed(3);
+    if (totalGrossAmountEl) totalGrossAmountEl.textContent = totalGrossAmount.toFixed(3);
+    if (totalDiscountAmountItemsEl) totalDiscountAmountItemsEl.textContent = totalDiscountAmountItems.toFixed(3);
+    if (totalTradeOfferAmountEl) totalTradeOfferAmountEl.textContent = totalTradeOfferAmountItems.toFixed(3);
+    if (totalTaxAmountEl) totalTaxAmountEl.textContent = totalTaxAmountItems.toFixed(3);
+    if (totalFocQtyEl) totalFocQtyEl.textContent = totalFOCQty.toFixed(3);
+    if (totalNetAmountItemsEl) totalNetAmountItemsEl.textContent = totalNetAmountItems.toFixed(3);
     
     const totalBillEl = document.getElementById('totalBill');
-    if (totalBillEl) totalBillEl.textContent = totalBill.toFixed(2);
+    if (totalBillEl) totalBillEl.textContent = totalBill.toFixed(3);
     
     // Calculate invoice-level discount
     const discountPercentEl = document.getElementById('totalDiscountPercent');
@@ -425,8 +425,8 @@ function updateInvoiceSummaryDynamic() {
     const totalDiscountAmountEl = document.getElementById('totalDiscountAmount');
     const netAmountEl = document.getElementById('netAmount');
     
-    if (totalDiscountAmountEl) totalDiscountAmountEl.value = discountAmount.toFixed(2);
-    if (netAmountEl) netAmountEl.textContent = netAmount.toFixed(2);
+    if (totalDiscountAmountEl) totalDiscountAmountEl.value = discountAmount.toFixed(3);
+    if (netAmountEl) netAmountEl.textContent = netAmount.toFixed(3);
 
     // Expose totals for invoice-level tax base resolution
     window.currentTotalBill = totalBill;
@@ -443,7 +443,7 @@ function updateInvoiceSummaryDynamic() {
     const netReceivableEl = document.getElementById('netReceivable');
 
     if (withholdingTaxAmountEl) {
-        withholdingTaxAmountEl.textContent = withholdingTaxAmount.toFixed(2);
+        withholdingTaxAmountEl.textContent = withholdingTaxAmount.toFixed(3);
     }
 
     // Apply invoice-level taxes and factor exclusive tax into net receivable
@@ -453,14 +453,14 @@ function updateInvoiceSummaryDynamic() {
     }
 
     if (netReceivableEl) {
-        netReceivableEl.textContent = netReceivable.toFixed(2);
+        netReceivableEl.textContent = netReceivable.toFixed(3);
     }
 
     // Auto-fill Amount Paid when Invoice Type is Cash
     const amountPaidEl = document.getElementById('amountPaid');
     const invoiceTypeEl = document.getElementById('invoiceType');
     if (amountPaidEl && invoiceTypeEl && invoiceTypeEl.value === 'Cash') {
-        amountPaidEl.value = netReceivable.toFixed(2);
+        amountPaidEl.value = netReceivable.toFixed(3);
     }
 
     // Update remaining balance
@@ -469,7 +469,7 @@ function updateInvoiceSummaryDynamic() {
 
     const remainingBalanceEl = document.getElementById('remainingBalance');
     if (remainingBalanceEl) {
-        remainingBalanceEl.value = remainingBalance.toFixed(2);
+        remainingBalanceEl.value = remainingBalance.toFixed(3);
     }
 }
 

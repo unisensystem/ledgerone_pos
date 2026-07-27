@@ -16,7 +16,8 @@ if (!$tenant_id) {
 }
 
 $customer_id = $_GET['customer_id'] ?? null;
-$product_id = $_GET['product_id'] ?? null;
+$product_id  = $_GET['product_id']  ?? null;
+$company_id  = isset($_GET['company_id']) ? (int)$_GET['company_id'] : null;
 
 if (!$customer_id || !$product_id) {
     echo json_encode(['success' => true, 'history' => []]);
@@ -24,7 +25,7 @@ if (!$customer_id || !$product_id) {
 }
 
 try {
-    $stmt = $pdo->prepare("
+    $sql = "
         SELECT 
             si.sale_date,
             sii.sale_price,
@@ -37,10 +38,17 @@ try {
         AND si.customer_id = ? 
         AND sii.product_id = ?
         AND si.status = 'Posted'
-        ORDER BY si.sale_date DESC, si.id DESC
-        LIMIT 3
-    ");
-    $stmt->execute([$tenant_id, $customer_id, $product_id]);
+    ";
+    $params = [$tenant_id, $customer_id, $product_id];
+
+    if ($company_id) {
+        $sql .= " AND si.company_id = ?";
+        $params[] = $company_id;
+    }
+
+    $sql .= " ORDER BY si.sale_date DESC, si.id DESC LIMIT 3";
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute($params);
     $history = $stmt->fetchAll(PDO::FETCH_ASSOC);
     
     echo json_encode(['success' => true, 'history' => $history]);

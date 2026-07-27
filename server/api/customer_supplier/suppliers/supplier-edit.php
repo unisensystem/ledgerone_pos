@@ -24,7 +24,7 @@ try {
             throw new Exception('Supplier ID is required');
         }
 
-        $stmt = $pdo->prepare("SELECT s.*, p.project_name, p.project_code, ci.city_name as project_city_name FROM suppliers s LEFT JOIN projects p ON p.id = s.project_id LEFT JOIN cities ci ON ci.id = p.city_id WHERE s.id = ? AND s.tenant_id = ?");
+        $stmt = $pdo->prepare("SELECT s.*, co.company_name, p.project_name, p.project_code, ci.city_name as project_city_name FROM suppliers s LEFT JOIN companies co ON co.id = s.company_id LEFT JOIN projects p ON p.id = s.project_id LEFT JOIN cities ci ON ci.id = p.city_id WHERE s.id = ? AND s.tenant_id = ?");
         $stmt->execute([$supplier_id, $tenant_id]);
         $supplier = $stmt->fetch(PDO::FETCH_ASSOC);
 

@@ -384,7 +384,10 @@ function initializePage(permissions) {
     const form = document.getElementById('invoiceForm');
 
     // Load all data, then initialize dropdowns and add first row
-    Promise.all([loadCustomersLocal(), loadCompanies(), loadBranches(), loadProductsLocal(), loadUOM(), loadUOMGroupUnits(), loadCurrencies(), loadBankAccounts(), loadEmployees(), loadSaleOrders(), loadBrandsData(), loadProjects(), loadContainers()]).then(() => {
+    Promise.all([loadCompanies()]).then(() => {
+        // After companies load (and auto-select if only one), load company-filtered data
+        const companyId = document.getElementById('company').value || null;
+        Promise.all([loadCustomersLocal(), loadProductsLocal(), loadBranches(), loadUOM(), loadUOMGroupUnits(), loadCurrencies(), loadBankAccounts(), loadEmployees(), loadSaleOrders(), loadBrandsData(), loadProjects(), loadContainers()]).then(() => {
         initSearchableDropdown('customerCodeSearch', 'customerCodeOptions', 'customerCode');
         initSearchableDropdown('companySearch', 'companyOptions', 'company');
         initSearchableDropdown('branchSearch', 'branchOptions', 'branch');
@@ -403,6 +406,7 @@ function initializePage(permissions) {
             addRowDynamic();
         }
     });
+    }); // end outer loadCompanies promise
 
     // Add row button event - use dynamic row creation
     addRowBtn.addEventListener('click', addRowDynamic);
@@ -837,7 +841,8 @@ function initializePage(permissions) {
 
     // Load customers from API
     async function loadCustomersLocal() {
-        await loadCustomers();
+        const companyId = document.getElementById('company').value;
+        await loadCustomers(companyId || null);
         await populateAreaCityDropdown();
     }
 
@@ -1117,7 +1122,8 @@ function initializePage(permissions) {
 
     // Load products from API
     async function loadProductsLocal() {
-        await loadProducts();
+        const companyId = document.getElementById('company').value;
+        await loadProducts(companyId || null);
     }
 
     // Load UOM from API
@@ -2073,10 +2079,20 @@ function initializePage(permissions) {
                 if (hiddenInputId === 'company') {
                     localStorage.setItem('lastSelectedCompany', value);
                     
+                    // Reload customers and products filtered by selected company
+                    loadCustomers(value);
+                    loadProducts(value);
+
+                    // Reload invoice number for selected company
+                    preloadNextInvoiceNumber(value);
+
+                    // Clear current customer selection since it may not belong to new company
+                    document.getElementById('customerCodeSearch').value = '';
+                    document.getElementById('customerCode').value = '';
+
                     // Reload invoice-level taxes when company changes (country filter)
                     const customerId = document.getElementById('customerCode')?.value;
                     if (customerId && typeof loadInvoiceLevelTaxRegimes === 'function') {
-                        console.log('Company changed, reloading invoice-level taxes for company:', value);
                         loadInvoiceLevelTaxRegimes(customerId, value);
                     }
                 }
@@ -4819,7 +4835,10 @@ async function loadPriceHistory(productId) {
     }
 
     try {
-        const response = await fetch(`../../../../server/api/sale/pos_invoice/get-price-history.php?customer_id=${customerId}&product_id=${productId}`);
+        const companyId = document.getElementById('company').value;
+        let phUrl = `../../../../server/api/sale/pos_invoice/get-price-history.php?customer_id=${customerId}&product_id=${productId}`;
+        if (companyId) phUrl += `&company_id=${companyId}`;
+        const response = await fetch(phUrl);
         const data = await response.json();
 
         if (data.success && data.history && data.history.length > 0) {
@@ -4873,7 +4892,10 @@ async function loadPurchaseHistory(productId) {
         return;
     }
     try {
-        const response = await fetch(`../../../../server/api/sale/pos_invoice/get-purchase-history.php?product_id=${productId}`);
+        const companyIdPH = document.getElementById('company').value;
+        let purchUrl = `../../../../server/api/sale/pos_invoice/get-purchase-history.php?product_id=${productId}`;
+        if (companyIdPH) purchUrl += `&company_id=${companyIdPH}`;
+        const response = await fetch(purchUrl);
         const data = await response.json();
         if (data.success && data.history && data.history.length > 0) {
             const latestPurchasePrice = parseFloat(data.history[0].purchase_price);
@@ -4915,9 +4937,10 @@ async function loadProductStock(productId) {
     }
 
     try {
-        const url = branchId
-            ? `../../../../server/api/sale/pos_invoice/get-product-stock.php?product_id=${productId}&branch_id=${branchId}`
-            : `../../../../server/api/sale/pos_invoice/get-product-stock.php?product_id=${productId}`;
+        const companyIdStock = document.getElementById('company').value;
+        let url = `../../../../server/api/sale/pos_invoice/get-product-stock.php?product_id=${productId}`;
+        if (branchId) url += `&branch_id=${branchId}`;
+        if (companyIdStock) url += `&company_id=${companyIdStock}`;
 
         const response = await fetch(url);
         const data = await response.json();
@@ -5053,9 +5076,12 @@ document.addEventListener('keydown', function (e) {
 });
 
 // Preload next invoice number for instant display
-async function preloadNextInvoiceNumber() {
+async function preloadNextInvoiceNumber(companyId = null) {
     try {
-        const response = await fetch('../../../../server/api/sale/pos_invoice/get-next-invoice-number.php');
+        const url = companyId
+            ? `../../../../server/api/sale/pos_invoice/get-next-invoice-number.php?company_id=${companyId}`
+            : '../../../../server/api/sale/pos_invoice/get-next-invoice-number.php';
+        const response = await fetch(url);
         const data = await response.json();
         if (data.success && data.nextNumber) {
             const billNoEl = document.getElementById('billNo');
@@ -5456,9 +5482,12 @@ function validateForm() {
 }
 
 // Load customers - global function
-async function loadCustomers() {
+async function loadCustomers(companyId = null) {
     try {
-        const response = await fetch('../../../../server/api/sale/pos_invoice/get-customers.php');
+        const url = companyId
+            ? `../../../../server/api/sale/pos_invoice/get-customers.php?company_id=${companyId}`
+            : '../../../../server/api/sale/pos_invoice/get-customers.php';
+        const response = await fetch(url);
         const data = await response.json();
 
         if (data.success) {
@@ -5467,6 +5496,7 @@ async function loadCustomers() {
             if (!codeOptions) return;
 
             codeOptions.innerHTML = '';
+            dataCache.customers.clear();
 
             const fragment = document.createDocumentFragment();
             data.customers.forEach(customer => {
@@ -5483,12 +5513,6 @@ async function loadCustomers() {
                 codeOption.setAttribute('data-credit-limit', customer.credit_limit || 0);
                 codeOption.setAttribute('data-withholding-tax', customer.advance_income_tax_percentage || 0);
                 codeOption.textContent = getCustomerDisplayText(customer);
-                
-                if (customer.id == 613) {
-                    console.log('Customer 613 loaded:', customer);
-                    console.log('supplier_man_id:', customer.supplier_man_id);
-                }
-                
                 fragment.appendChild(codeOption);
             });
             codeOptions.appendChild(fragment);
@@ -5514,20 +5538,46 @@ function getProductDisplayText(product) {
 }
 
 // Load products - global function
-async function loadProducts() {
+async function loadProducts(companyId = null) {
     try {
-        const response = await fetch('../../../../server/api/sale/pos_invoice/get-products.php');
+        const url = companyId
+            ? `../../../../server/api/sale/pos_invoice/get-products.php?company_id=${companyId}`
+            : '../../../../server/api/sale/pos_invoice/get-products.php';
+        const response = await fetch(url);
         const data = await response.json();
 
         if (data.success) {
             productsData = data.products;
+            dataCache.products.clear();
             data.products.forEach(product => {
                 dataCache.products.set(product.id, product);
             });
+            // Rebuild product dropdowns in all existing rows
+            rebuildProductDropdowns();
         }
     } catch (error) {
         console.error('Error loading products:', error);
     }
+}
+
+// Rebuild product dropdown options in all existing item rows after reload
+function rebuildProductDropdowns() {
+    const tbody = document.getElementById('itemsTable')?.getElementsByTagName('tbody')[0];
+    if (!tbody) return;
+    Array.from(tbody.rows).forEach(row => {
+        const searchInput = row.querySelector('.search-input');
+        if (!searchInput || !searchInput.dropdownOptions) return;
+        const optionsContainer = searchInput.dropdownOptions;
+        optionsContainer.innerHTML = productsData.map(product => {
+            const codes = [];
+            if (product.qr_code) codes.push(product.qr_code);
+            if (product.barcode) codes.push(product.barcode);
+            const codeDisplay = (localStorage.getItem('productDisplayMode') || 'code_and_name') === 'code_and_name' && codes.length > 0 ? ` (${codes.join(' - ')})` : '';
+            const photoHtml = product.photo ? `<img src="../../../assets/uploads/products/${product.photo}" alt="${product.name}" style="width:30px;height:30px;object-fit:cover;margin-right:8px;border-radius:4px;">` : '';
+            const productDisplayText = getProductDisplayText(product);
+            return `<div class="dropdown-option" data-product='${JSON.stringify(product)}' data-display-text="${productDisplayText}" style="display:flex;align-items:center;">${photoHtml}${productDisplayText}${codeDisplay}</div>`;
+        }).join('');
+    });
 }
 
 // Barcode scanner support - auto-submit on Enter

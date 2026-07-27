@@ -45,11 +45,6 @@ try {
                 continue;
             }
             
-            if (empty($invoice['invoice_number'])) {
-                $errors[] = "Row " . ($index + 1) . ": Invoice number is required";
-                continue;
-            }
-            
             if (empty($invoice['invoice_date'])) {
                 $errors[] = "Row " . ($index + 1) . ": Invoice date is required";
                 continue;
@@ -67,16 +62,18 @@ try {
             $invoice_date = trim($invoice['invoice_date']);
             $debit = floatval($invoice['debit']);
             
-            // Check if invoice already exists
-            $checkStmt = $pdo->prepare("
-                SELECT id FROM opening_balance_invoices 
-                WHERE tenant_id = ? AND customer_id = ? AND invoice_number = ?
-            ");
-            $checkStmt->execute([$tenant_id, $customer_id, $invoice_number]);
-            
-            if ($checkStmt->rowCount() > 0) {
-                $errors[] = "Row " . ($index + 1) . ": Invoice number already exists for this customer";
-                continue;
+            // Check if invoice already exists (only if invoice_number provided)
+            if (!empty($invoice_number)) {
+                $checkStmt = $pdo->prepare("
+                    SELECT id FROM opening_balance_invoices 
+                    WHERE tenant_id = ? AND customer_id = ? AND invoice_number = ?
+                ");
+                $checkStmt->execute([$tenant_id, $customer_id, $invoice_number]);
+                
+                if ($checkStmt->rowCount() > 0) {
+                    $errors[] = "Row " . ($index + 1) . ": Invoice number already exists for this customer";
+                    continue;
+                }
             }
             
             // Insert opening balance invoice

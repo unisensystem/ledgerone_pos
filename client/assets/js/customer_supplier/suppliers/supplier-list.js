@@ -161,6 +161,9 @@ document.addEventListener('DOMContentLoaded', function () {
         document.getElementById('viewOpeningCredit').textContent = `${currencySymbol}${parseFloat(supplier.opening_credit_amount || 0).toFixed(2)}`;
         document.getElementById('viewAitPercent').textContent = `${parseFloat(supplier.ait_percent || 0).toFixed(2)}%`;
 
+        // Company
+        document.getElementById('viewCompany').textContent = supplier.company_name || '-';
+
         // Party Type
         const partyTypeMap = { registered_company: 'Registered Company', unregistered: 'Unregistered' };
         document.getElementById('viewPartyType').textContent = partyTypeMap[supplier.party_type] || '-';

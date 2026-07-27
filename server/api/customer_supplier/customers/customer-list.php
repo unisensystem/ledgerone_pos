@@ -34,6 +34,16 @@ try {
     // Build WHERE clause
     $where = ['c.tenant_id = ?'];
     $params = [$tenant_id];
+
+    // Filter by user's assigned companies
+    $stmtUC = $pdo->prepare("SELECT company_id FROM user_companies WHERE tenant_id = ? AND user_id = ?");
+    $stmtUC->execute([$tenant_id, $user_id]);
+    $assignedCompanies = $stmtUC->fetchAll(PDO::FETCH_COLUMN);
+    if (!empty($assignedCompanies)) {
+        $ph = implode(',', array_fill(0, count($assignedCompanies), '?'));
+        $where[] = "c.company_id IN ($ph)";
+        $params = array_merge($params, $assignedCompanies);
+    }
     
     if ($search) {
         $where[] = '(c.customer_name LIKE ? OR c.customer_code LIKE ? OR c.email LIKE ? OR c.primary_phone LIKE ? OR ct.type_name LIKE ? OR cc.category_name LIKE ? OR s.brand_name LIKE ?)';

@@ -58,7 +58,7 @@ function renderInvoiceLevelTaxColumns() {
         percentItem.dataset.taxRegimeId = regime.id;
         percentItem.innerHTML = `
             <span class="summary-label">${regime.regime_name} %</span>
-            <span class="summary-value" id="invoiceTax_${regime.id}_percent">${ratePercent.toFixed(2)}</span>
+            <span class="summary-value" id="invoiceTax_${regime.id}_percent">${ratePercent.toFixed(3)}</span>
         `;
         container.appendChild(percentItem);
 
@@ -68,7 +68,7 @@ function renderInvoiceLevelTaxColumns() {
         amountItem.dataset.taxRegimeId = regime.id;
         amountItem.innerHTML = `
             <span class="summary-label">${regime.regime_name} Amt</span>
-            <span class="summary-value" id="invoiceTax_${regime.id}_amount">0.00</span>
+            <span class="summary-value" id="invoiceTax_${regime.id}_amount">0.000</span>
         `;
         container.appendChild(amountItem);
     });
@@ -193,8 +193,8 @@ function calculateInvoiceLevelTaxes() {
 
             const percentEl = document.getElementById(`invoiceTax_${regime.id}_percent`);
             const amountEl  = document.getElementById(`invoiceTax_${regime.id}_amount`);
-            if (percentEl) percentEl.textContent = ratePercent.toFixed(2);
-            if (amountEl)  amountEl.textContent  = taxAmount.toFixed(2);
+            if (percentEl) percentEl.textContent = ratePercent.toFixed(3);
+            if (amountEl)  amountEl.textContent  = taxAmount.toFixed(3);
 
             if (!isTaxInclusive) phase1ExclusiveTax += taxAmount;
         });
@@ -231,15 +231,15 @@ function calculateInvoiceLevelTaxes() {
 
             const percentEl = document.getElementById(`invoiceTax_${regime.id}_percent`);
             const amountEl  = document.getElementById(`invoiceTax_${regime.id}_amount`);
-            if (percentEl) percentEl.textContent = ratePercent.toFixed(2);
-            if (amountEl)  amountEl.textContent  = taxAmount.toFixed(2);
+            if (percentEl) percentEl.textContent = ratePercent.toFixed(3);
+            if (amountEl)  amountEl.textContent  = taxAmount.toFixed(3);
 
             if (!isTaxInclusive) phase2ExclusiveTax += taxAmount;
         });
 
     // Update Net Amount and Net Receivable with all exclusive taxes added
     const totalExclusiveTax = phase1ExclusiveTax + phase2ExclusiveTax;
-    const finalAmount = (baseNetAmount + totalExclusiveTax).toFixed(2);
+    const finalAmount = (baseNetAmount + totalExclusiveTax).toFixed(3);
 
     const netAmountEl = document.getElementById('netAmount');
     if (netAmountEl) netAmountEl.textContent = finalAmount;
@@ -259,7 +259,7 @@ function clearInvoiceLevelTaxes() {
     if (container) container.innerHTML = '';
 
     const netReceivableEl = document.getElementById('netReceivable');
-    if (netReceivableEl) netReceivableEl.textContent = '0.00';
+    if (netReceivableEl) netReceivableEl.textContent = '0.000';
 }
 
 // Export functions

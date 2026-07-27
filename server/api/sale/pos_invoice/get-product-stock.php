@@ -16,7 +16,8 @@ if (!$tenant_id) {
 }
 
 $product_id = $_GET['product_id'] ?? null;
-$branch_id = $_GET['branch_id'] ?? null;
+$branch_id  = $_GET['branch_id']  ?? null;
+$company_id = isset($_GET['company_id']) ? (int)$_GET['company_id'] : null;
 
 if (!$product_id) {
     echo json_encode(['success' => true, 'stock' => 0, 'unit_name' => '']);
@@ -59,7 +60,11 @@ try {
     
     $params = [$tenant_id, $product_id, $inventoryAccountId];
     
-    if ($branch_id) {
+    if ($company_id) {
+        $query .= " AND sl.branch_id IN (SELECT id FROM branches WHERE company_id = ? AND tenant_id = ?)";
+        $params[] = $company_id;
+        $params[] = $tenant_id;
+    } elseif ($branch_id) {
         $query .= " AND sl.branch_id = ?";
         $params[] = $branch_id;
     }

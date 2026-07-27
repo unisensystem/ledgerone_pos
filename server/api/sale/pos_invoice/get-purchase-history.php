@@ -16,6 +16,7 @@ if (!$tenant_id) {
 }
 
 $product_id = $_GET['product_id'] ?? null;
+$company_id = isset($_GET['company_id']) ? (int)$_GET['company_id'] : null;
 
 if (!$product_id) {
     echo json_encode(['success' => true, 'history' => []]);
@@ -23,7 +24,7 @@ if (!$product_id) {
 }
 
 try {
-    $stmt = $pdo->prepare("
+    $sql = "
         SELECT 
             pi.purchase_date,
             pii.purchase_price,
@@ -34,10 +35,17 @@ try {
         LEFT JOIN ledgerone_public.currencies cur ON pi.currency_id = cur.id
         WHERE pi.tenant_id = ?
         AND pii.product_id = ?
-        ORDER BY pi.purchase_date DESC, pi.id DESC
-        LIMIT 3
-    ");
-    $stmt->execute([$tenant_id, $product_id]);
+    ";
+    $params = [$tenant_id, $product_id];
+
+    if ($company_id) {
+        $sql .= " AND pi.company_id = ?";
+        $params[] = $company_id;
+    }
+
+    $sql .= " ORDER BY pi.purchase_date DESC, pi.id DESC LIMIT 3";
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute($params);
     $history = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
     echo json_encode(['success' => true, 'history' => $history]);

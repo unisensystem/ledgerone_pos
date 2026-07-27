@@ -36,6 +36,16 @@ try {
     $where = ['tenant_id = ?'];
     $params = [$tenant_id];
 
+    // Filter by user's assigned companies
+    $stmtUC = $pdo->prepare("SELECT company_id FROM user_companies WHERE tenant_id = ? AND user_id = ?");
+    $stmtUC->execute([$tenant_id, $user_id]);
+    $assignedCompanies = $stmtUC->fetchAll(PDO::FETCH_COLUMN);
+    if (!empty($assignedCompanies)) {
+        $ph = implode(',', array_fill(0, count($assignedCompanies), '?'));
+        $where[] = "company_id IN ($ph)";
+        $params = array_merge($params, $assignedCompanies);
+    }
+
     if ($search) {
         $where[] = '(supplier_name LIKE ? OR supplier_code LIKE ? OR email LIKE ? OR primary_phone LIKE ?)';
         $searchTerm = '%' . $search . '%';
@@ -80,15 +90,25 @@ try {
     $suppliers = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
     // Get stats
+    // Stats scoped to user's assigned companies
+    $statsWhere = ['tenant_id = ?'];
+    $statsParams = [$tenant_id];
+    if (!empty($assignedCompanies)) {
+        $ph = implode(',', array_fill(0, count($assignedCompanies), '?'));
+        $statsWhere[] = "company_id IN ($ph)";
+        $statsParams = array_merge($statsParams, $assignedCompanies);
+    }
+    $statsWhereClause = 'WHERE ' . implode(' AND ', $statsWhere);
+
     $statsSql = "SELECT 
         COUNT(*) as total_suppliers,
         COUNT(CASE WHEN is_blacklisted = FALSE THEN 1 END) as active_suppliers,
         COUNT(CASE WHEN is_blacklisted = TRUE THEN 1 END) as blacklisted_suppliers,
         SUM(CASE WHEN current_balance < 0 THEN ABS(current_balance) ELSE 0 END) as total_payables
-        FROM suppliers WHERE tenant_id = ?";
+        FROM suppliers $statsWhereClause";
 
     $stmt = $pdo->prepare($statsSql);
-    $stmt->execute([$tenant_id]);
+    $stmt->execute($statsParams);
     $stats = $stmt->fetch(PDO::FETCH_ASSOC);
 
     echo json_encode([

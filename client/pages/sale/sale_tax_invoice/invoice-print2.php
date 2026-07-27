@@ -566,10 +566,10 @@ $logoAbsUrl = $logoFile ? '/ledgerone_erp/client/assets/uploads/company_logo/' .
             <tr>
                 <td class="c"><?php echo $serial; ?></td>
                 <td class="l"><?php echo htmlspecialchars($item['product_name']); ?></td>
-                <td class="c"><?php echo number_format((float)$item['quantity'], 2); ?></td>
+                <td class="c"><?php echo number_format((float)$item['quantity'], 3); ?></td>
                 <td class="r"></td>
-                <td class="r"><?php echo number_format((float)$item['sale_price'], 2); ?></td>
-                <td class="r"><?php echo number_format((float)$item['net_amount'], 2); ?></td>
+                <td class="r"><?php echo number_format((float)$item['sale_price'], 3); ?></td>
+                <td class="r"><?php echo number_format((float)$item['net_amount'], 3); ?></td>
             </tr>
             <?php endforeach; ?>
             <?php for ($i = $serial; $i < 4; $i++): ?>
@@ -581,17 +581,17 @@ $logoAbsUrl = $logoFile ? '/ledgerone_erp/client/assets/uploads/company_logo/' .
             <tr class="t-amount">
                 <td></td>
                 <td class="t-label" colspan="4">AMOUNT</td>
-                <td class="t-value"><?php echo number_format((float)$invoice['total_bill'], 2); ?></td>
+                <td class="t-value"><?php echo number_format((float)$invoice['total_bill'], 3); ?></td>
             </tr>
             <tr>
                 <td></td>
                 <td class="t-label" colspan="4">AMOUNT RECEIVED</td>
-                <td class="t-value"><?php echo number_format((float)($invoice['amount_paid'] ?? 0), 2); ?></td>
+                <td class="t-value"><?php echo number_format((float)($invoice['amount_paid'] ?? 0), 3); ?></td>
             </tr>
             <tr>
                 <td></td>
                 <td class="t-label" colspan="4">TAXABLE AMOUNT</td>
-                <td class="t-value"><?php echo number_format($taxableAmount, 2); ?></td>
+                <td class="t-value"><?php echo number_format($taxableAmount, 3); ?></td>
             </tr>
             <?php foreach ($invoiceTaxes as $tax): ?>
             <?php if ((float)$tax['tax_amount'] > 0): ?>
@@ -603,7 +603,7 @@ $logoAbsUrl = $logoFile ? '/ledgerone_erp/client/assets/uploads/company_logo/' .
                         <?php echo (float)$tax['rate_percentage']; ?>%
                     <?php endif; ?>
                 </td>
-                <td class="t-value"><?php echo number_format((float)$tax['tax_amount'], 2); ?></td>
+                <td class="t-value"><?php echo number_format((float)$tax['tax_amount'], 3); ?></td>
             </tr>
             <?php endif; ?>
             <?php endforeach; ?>
@@ -611,13 +611,13 @@ $logoAbsUrl = $logoFile ? '/ledgerone_erp/client/assets/uploads/company_logo/' .
             <tr>
                 <td></td>
                 <td class="t-label" colspan="4">SHIPPING</td>
-                <td class="t-value"><?php echo number_format((float)$invoice['shipping_fees'], 2); ?></td>
+                <td class="t-value"><?php echo number_format((float)$invoice['shipping_fees'], 3); ?></td>
             </tr>
             <?php endif; ?>
             <tr class="t-total">
                 <td></td>
                 <td class="t-label" colspan="4">Total Amount</td>
-                <td class="t-value"><?php echo number_format((float)$invoice['net_amount'] - (float)($invoice['amount_paid'] ?? 0), 2); ?></td>
+                <td class="t-value"><?php echo number_format((float)$invoice['net_amount'] - (float)($invoice['amount_paid'] ?? 0), 3); ?></td>
             </tr>
             <tr class="t-words">
                 <td></td>

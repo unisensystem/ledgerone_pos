@@ -97,7 +97,7 @@ function applyTaxToRow(row, taxRate, formula, basePrice, applicationLevel = 'ite
     // Apply tax based on application_level
     if (applicationLevel === 'invoice') {
         if (taxPercentInput) {
-            taxPercentInput.value = '0.00';
+            taxPercentInput.value = '0.000';
             taxPercentInput.readOnly = true;
             taxPercentInput.disabled = false;
             taxPercentInput.style.backgroundColor = '#f0f0f0';
@@ -106,22 +106,22 @@ function applyTaxToRow(row, taxRate, formula, basePrice, applicationLevel = 'ite
             taxPercentInput.title = 'Tax applied at invoice level, not at item level';
         }
         if (taxAmountInput) {
-            taxAmountInput.value = '0.00';
+            taxAmountInput.value = '0.000';
         }
     } else {
         if (taxPercentInput) {
-            taxPercentInput.value = parseFloat(taxRate).toFixed(2);
+            taxPercentInput.value = parseFloat(taxRate).toFixed(3);
             taxPercentInput.readOnly = false;
             taxPercentInput.disabled = false;
             taxPercentInput.style.backgroundColor = '';
             taxPercentInput.style.cursor = 'auto';
             taxPercentInput.style.opacity = '1';
             taxPercentInput.title = isTaxInclusive
-                ? `${parseFloat(taxRate).toFixed(2)}% (Tax Inclusive — extracted from price)`
-                : `${parseFloat(taxRate).toFixed(2)}% (Tax Exclusive — added to price)`;
+                ? `${parseFloat(taxRate).toFixed(3)}% (Tax Inclusive — extracted from price)`
+                : `${parseFloat(taxRate).toFixed(3)}% (Tax Exclusive — added to price)`;
         }
         if (taxAmountInput) {
-            taxAmountInput.value = parseFloat(taxAmount).toFixed(2);
+            taxAmountInput.value = parseFloat(taxAmount).toFixed(3);
         }
     }
 
@@ -192,7 +192,7 @@ async function loadTaxForNewProduct(row, customerId, productId) {
         // Set Tax % based on application_level
         if (taxPercentInput) {
             if (applicationLevel === 'invoice') {
-                taxPercentInput.value = '0.00';
+                taxPercentInput.value = '0.000';
                 taxPercentInput.readOnly = true;
                 taxPercentInput.disabled = false;
                 taxPercentInput.style.backgroundColor = '#f0f0f0';
@@ -200,15 +200,15 @@ async function loadTaxForNewProduct(row, customerId, productId) {
                 taxPercentInput.style.opacity = '0.7';
                 taxPercentInput.title = 'Tax applied at invoice level, not at item level';
             } else {
-                taxPercentInput.value = parseFloat(taxResult.tax_rate).toFixed(2);
+                taxPercentInput.value = parseFloat(taxResult.tax_rate).toFixed(3);
                 taxPercentInput.readOnly = false;
                 taxPercentInput.disabled = false;
                 taxPercentInput.style.backgroundColor = '';
                 taxPercentInput.style.cursor = 'auto';
                 taxPercentInput.style.opacity = '1';
                 taxPercentInput.title = isTaxInclusive
-                    ? `${parseFloat(taxResult.tax_rate).toFixed(2)}% (Tax Inclusive — extracted from price)`
-                    : `${parseFloat(taxResult.tax_rate).toFixed(2)}% (Tax Exclusive — added to price)`;
+                    ? `${parseFloat(taxResult.tax_rate).toFixed(3)}% (Tax Inclusive — extracted from price)`
+                    : `${parseFloat(taxResult.tax_rate).toFixed(3)}% (Tax Exclusive — added to price)`;
             }
         }
         

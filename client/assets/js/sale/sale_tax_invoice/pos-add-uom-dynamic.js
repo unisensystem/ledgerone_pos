@@ -121,7 +121,7 @@ function updateRowUnitCells(row, uomConfig, maxUnits, existingValues = []) {
             input.type = 'number';
             input.className = 'table-input unit-input';
             input.min = '0';
-            input.step = '0.01';
+            input.step = '0.001';
             input.value = '0';
             input.dataset.unitId = unit.unitId;
             input.dataset.conversionFactor = unit.conversionFactor;
@@ -229,11 +229,11 @@ function calculateRowAmountsDynamic(row, totalQty) {
         netAmount = afterTO + gstAmount;
     }
     
-    if (grossInput) grossInput.value = grossAmount.toFixed(2);
-    if (discAmountInput) discAmountInput.value = discountAmount.toFixed(2);
-    if (toAmountInput) toAmountInput.value = tradeOfferAmount.toFixed(2);
-    if (gstAmountInput) gstAmountInput.value = gstAmount.toFixed(2);
-    if (netInput) netInput.value = netAmount.toFixed(2);
+    if (grossInput) grossInput.value = grossAmount.toFixed(3);
+    if (discAmountInput) discAmountInput.value = discountAmount.toFixed(3);
+    if (toAmountInput) toAmountInput.value = tradeOfferAmount.toFixed(3);
+    if (gstAmountInput) gstAmountInput.value = gstAmount.toFixed(3);
+    if (netInput) netInput.value = netAmount.toFixed(3);
 }
 
 // Update footer totals
@@ -259,7 +259,7 @@ function updateFooterTotalsDynamic() {
         
         const footerCell = document.getElementById(`totalUnit${i + 1}`);
         if (footerCell) {
-            footerCell.textContent = total.toFixed(2);
+            footerCell.textContent = total.toFixed(3);
         }
     }
     
@@ -292,13 +292,13 @@ function updateFooterTotalsDynamic() {
     const totalFocQtyEl = document.getElementById('totalFocQty');
     const totalNetAmountEl = document.getElementById('totalNetAmountItems');
     
-    if (totalSalePriceEl) totalSalePriceEl.textContent = totalSalePrice.toFixed(2);
-    if (totalGrossAmountEl) totalGrossAmountEl.textContent = totalGrossAmount.toFixed(2);
-    if (totalDiscountAmountEl) totalDiscountAmountEl.textContent = totalDiscountAmount.toFixed(2);
-    if (totalTradeOfferAmountEl) totalTradeOfferAmountEl.textContent = totalTradeOfferAmount.toFixed(2);
-    if (totalGstAmountEl) totalGstAmountEl.textContent = totalGstAmount.toFixed(2);
-    if (totalFocQtyEl) totalFocQtyEl.textContent = totalFocQty.toFixed(2);
-    if (totalNetAmountEl) totalNetAmountEl.textContent = totalNetAmount.toFixed(2);
+    if (totalSalePriceEl) totalSalePriceEl.textContent = totalSalePrice.toFixed(3);
+    if (totalGrossAmountEl) totalGrossAmountEl.textContent = totalGrossAmount.toFixed(3);
+    if (totalDiscountAmountEl) totalDiscountAmountEl.textContent = totalDiscountAmount.toFixed(3);
+    if (totalTradeOfferAmountEl) totalTradeOfferAmountEl.textContent = totalTradeOfferAmount.toFixed(3);
+    if (totalGstAmountEl) totalGstAmountEl.textContent = totalGstAmount.toFixed(3);
+    if (totalFocQtyEl) totalFocQtyEl.textContent = totalFocQty.toFixed(3);
+    if (totalNetAmountEl) totalNetAmountEl.textContent = totalNetAmount.toFixed(3);
 }
 
 // Recalculate max columns
@@ -364,8 +364,8 @@ function updateInvoiceSummaryDynamic() {
     
     const netAmount = totalBill - finalDiscount + shippingFees;
     
-    document.getElementById('totalBill').textContent = totalBill.toFixed(2);
-    document.getElementById('netAmount').textContent = netAmount.toFixed(2);
+    document.getElementById('totalBill').textContent = totalBill.toFixed(3);
+    document.getElementById('netAmount').textContent = netAmount.toFixed(3);
 
     // Expose totals for invoice-level tax base resolution
     window.currentTotalBill = totalBill;
@@ -378,7 +378,7 @@ function updateInvoiceSummaryDynamic() {
     let netReceivable = netAmount - withholdingTaxAmount;
 
     if (document.getElementById('withholdingTaxAmount')) {
-        document.getElementById('withholdingTaxAmount').textContent = withholdingTaxAmount.toFixed(2);
+        document.getElementById('withholdingTaxAmount').textContent = withholdingTaxAmount.toFixed(3);
     }
 
     // Apply invoice-level taxes (updates netReceivable element and returns exclusive tax total)
@@ -388,14 +388,14 @@ function updateInvoiceSummaryDynamic() {
     }
 
     if (document.getElementById('netReceivable')) {
-        document.getElementById('netReceivable').textContent = netReceivable.toFixed(2);
+        document.getElementById('netReceivable').textContent = netReceivable.toFixed(3);
     }
 
     // Update remaining balance
     const amountPaid = parseFloat(document.getElementById('amountPaid')?.value) || 0;
     const remainingBalance = netReceivable - amountPaid;
     if (document.getElementById('remainingBalance')) {
-        document.getElementById('remainingBalance').value = remainingBalance.toFixed(2);
+        document.getElementById('remainingBalance').value = remainingBalance.toFixed(3);
     }
 }
 

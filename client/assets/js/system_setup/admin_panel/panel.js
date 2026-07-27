@@ -1,7 +1,8 @@
 let users = [];
 let roles = [];
 let employees = [];
-let allBranches = [];   // all branches for the tenant
+let allBranches = [];
+let allCompanies = [];
 let stats = { total: 0, active: 0, blocked: 0 };
 
 // Fetch branches from API
@@ -9,11 +10,20 @@ async function fetchBranches() {
     try {
         const response = await fetch('../../../../server/api/system_setup/admin_panel/get-branches.php');
         const data = await response.json();
-        if (data.success) {
-            allBranches = data.branches;
-        }
+        if (data.success) allBranches = data.branches;
     } catch (error) {
         console.error('Error fetching branches:', error);
+    }
+}
+
+// Fetch companies from API
+async function fetchCompanies() {
+    try {
+        const response = await fetch('../../../../server/api/system_setup/admin_panel/get-companies.php');
+        const data = await response.json();
+        if (data.success) allCompanies = data.companies;
+    } catch (error) {
+        console.error('Error fetching companies:', error);
     }
 }
 
@@ -143,122 +153,133 @@ function renderUsersTable() {
  * @param {string} hiddenId   - id of the hidden input that stores selected IDs
  * @param {number[]} preselected - array of branch IDs to pre-select
  */
-function initBranchPicker(searchId, dropdownId, tagsId, hiddenId, preselected = []) {
-    const searchInput  = document.getElementById(searchId);
-    const dropdown     = document.getElementById(dropdownId);
+/**
+ * Generic multi-select picker.
+ * @param {string} searchId
+ * @param {string} dropdownId
+ * @param {string} tagsId
+ * @param {string} hiddenId
+ * @param {Array}  allItems      - array of objects with id + display fields
+ * @param {Function} getLabel   - fn(item) => display string
+ * @param {Function} getTag     - fn(item) => short tag string
+ * @param {number[]} preselected
+ * @param {string} emptyHint
+ */
+function initPicker(searchId, dropdownId, tagsId, hiddenId, allItems, getLabel, getTag, preselected = [], emptyHint = '') {
+    const searchInput   = document.getElementById(searchId);
+    const dropdown      = document.getElementById(dropdownId);
     const tagsContainer = document.getElementById(tagsId);
-    const hiddenInput  = document.getElementById(hiddenId);
-
+    const hiddenInput   = document.getElementById(hiddenId);
     let selectedIds = [...preselected];
-
-    function getDisplayText(b) {
-        return b.parent_branch_name
-            ? `${b.parent_branch_name} > ${b.branch_code} - ${b.branch_name} (${b.branch_type})`
-            : `${b.branch_code} - ${b.branch_name} (${b.branch_type})`;
-    }
 
     function renderTags() {
         tagsContainer.innerHTML = '';
         selectedIds.forEach(id => {
-            const branch = allBranches.find(b => b.id == id);
-            if (!branch) return;
+            const item = allItems.find(x => x.id == id);
+            if (!item) return;
             const tag = document.createElement('span');
             tag.style.cssText = 'display:inline-flex;align-items:center;gap:4px;padding:3px 8px;background:rgba(31,123,255,0.1);color:var(--primary);border-radius:12px;font-size:12px;';
-            tag.innerHTML = `${branch.branch_code} - ${branch.branch_name} <button type="button" data-id="${id}" style="background:none;border:none;color:var(--primary);cursor:pointer;font-size:14px;padding:0;line-height:1;">&times;</button>`;
+            tag.innerHTML = `${getTag(item)} <button type="button" data-id="${id}" style="background:none;border:none;color:var(--primary);cursor:pointer;font-size:14px;padding:0;line-height:1;">&times;</button>`;
             tag.querySelector('button').addEventListener('click', () => {
                 selectedIds = selectedIds.filter(x => x != id);
-                updateHidden();
-                renderTags();
-                renderDropdown(searchInput.value);
+                updateHidden(); renderTags(); renderDropdown(searchInput.value);
             });
             tagsContainer.appendChild(tag);
         });
-        // "All branches" hint
-        if (selectedIds.length === 0) {
+        if (selectedIds.length === 0 && emptyHint) {
             const hint = document.createElement('span');
             hint.style.cssText = 'font-size:12px;color:var(--subtext);';
-            hint.textContent = 'No branch selected — user will have no branch access.';
+            hint.textContent = emptyHint;
             tagsContainer.appendChild(hint);
         }
     }
 
-    function updateHidden() {
-        hiddenInput.value = JSON.stringify(selectedIds);
-    }
+    function updateHidden() { hiddenInput.value = JSON.stringify(selectedIds); }
 
     function renderDropdown(term = '') {
         dropdown.innerHTML = '';
-        const filtered = allBranches.filter(b => {
-            const text = getDisplayText(b).toLowerCase();
-            return text.includes(term.toLowerCase()) && !selectedIds.includes(b.id);
-        });
+        const filtered = allItems.filter(x => getLabel(x).toLowerCase().includes(term.toLowerCase()) && !selectedIds.includes(x.id));
         if (filtered.length === 0) {
-            dropdown.innerHTML = '<div style="padding:8px 12px;color:var(--subtext);font-size:13px;">No branches found</div>';
+            dropdown.innerHTML = '<div style="padding:8px 12px;color:var(--subtext);font-size:13px;">No results found</div>';
         } else {
-            filtered.forEach(b => {
+            filtered.forEach(x => {
                 const item = document.createElement('div');
                 item.style.cssText = 'padding:8px 12px;cursor:pointer;font-size:13px;';
-                item.textContent = getDisplayText(b);
+                item.textContent = getLabel(x);
                 item.addEventListener('mouseenter', () => item.style.background = 'var(--surface-1)');
                 item.addEventListener('mouseleave', () => item.style.background = '');
                 item.addEventListener('mousedown', (e) => {
                     e.preventDefault();
-                    selectedIds.push(b.id);
-                    updateHidden();
-                    renderTags();
-                    searchInput.value = '';
-                    renderDropdown('');
+                    selectedIds.push(x.id);
+                    updateHidden(); renderTags();
+                    searchInput.value = ''; renderDropdown('');
                 });
                 dropdown.appendChild(item);
             });
         }
     }
 
-    searchInput.addEventListener('focus', () => {
-        renderDropdown(searchInput.value);
-        dropdown.style.display = 'block';
-    });
-    searchInput.addEventListener('input', () => {
-        renderDropdown(searchInput.value);
-        dropdown.style.display = 'block';
-    });
-    searchInput.addEventListener('blur', () => {
-        setTimeout(() => { dropdown.style.display = 'none'; }, 150);
-    });
+    searchInput.addEventListener('focus', () => { renderDropdown(searchInput.value); dropdown.style.display = 'block'; });
+    searchInput.addEventListener('input', () => { renderDropdown(searchInput.value); dropdown.style.display = 'block'; });
+    searchInput.addEventListener('blur',  () => { setTimeout(() => { dropdown.style.display = 'none'; }, 150); });
+    updateHidden(); renderTags();
+}
 
-    // Init
-    updateHidden();
-    renderTags();
+function initBranchPicker(searchId, dropdownId, tagsId, hiddenId, preselected = []) {
+    initPicker(
+        searchId, dropdownId, tagsId, hiddenId,
+        allBranches,
+        b => b.parent_branch_name ? `${b.parent_branch_name} > ${b.branch_code} - ${b.branch_name} (${b.branch_type})` : `${b.branch_code} - ${b.branch_name} (${b.branch_type})`,
+        b => `${b.branch_code} - ${b.branch_name}`,
+        preselected,
+        'No branch selected — user will have no branch access.'
+    );
+}
+
+function initCompanyPicker(searchId, dropdownId, tagsId, hiddenId, preselected = []) {
+    initPicker(
+        searchId, dropdownId, tagsId, hiddenId,
+        allCompanies,
+        c => `${c.company_code} - ${c.company_name}`,
+        c => `${c.company_code} - ${c.company_name}`,
+        preselected,
+        'No company selected — user will have no company access.'
+    );
 }
 
 // ─── Modal functions ─────────────────────────────────────────────────────────
 function openCreateUserModal() {
     document.getElementById('createUserModal').style.display = 'flex';
-    // Init branch picker fresh (no preselected)
-    document.getElementById('createBranchIds').value = '[]';
-    document.getElementById('createSelectedBranches').innerHTML = '';
-    document.getElementById('createBranchSearch').value = '';
-    document.getElementById('createBranchDropdown').style.display = 'none';
+    ['createBranchIds', 'createCompanyIds'].forEach(id => document.getElementById(id).value = '[]');
+    ['createSelectedBranches', 'createSelectedCompanies'].forEach(id => document.getElementById(id).innerHTML = '');
+    ['createBranchSearch', 'createCompanySearch'].forEach(id => document.getElementById(id).value = '');
+    ['createBranchDropdown', 'createCompanyDropdown'].forEach(id => document.getElementById(id).style.display = 'none');
     initBranchPicker('createBranchSearch', 'createBranchDropdown', 'createSelectedBranches', 'createBranchIds', []);
+    initCompanyPicker('createCompanySearch', 'createCompanyDropdown', 'createSelectedCompanies', 'createCompanyIds', []);
 }
 
 function closeCreateUserModal() {
     document.getElementById('createUserModal').style.display = 'none';
     document.getElementById('createUserForm').reset();
-    document.getElementById('createSelectedBranches').innerHTML = '';
-    document.getElementById('createBranchIds').value = '';
+    ['createSelectedBranches', 'createSelectedCompanies'].forEach(id => document.getElementById(id).innerHTML = '');
+    ['createBranchIds', 'createCompanyIds'].forEach(id => document.getElementById(id).value = '');
 }
 
 async function openEditUserModal(userId) {
     const user = users.find(u => u.id === userId);
     if (!user) return;
 
-    // Fetch existing branch access for this user
     let preselectedBranches = [];
+    let preselectedCompanies = [];
     try {
-        const res = await fetch(`../../../../server/api/system_setup/admin_panel/user-branch.php?user_id=${userId}`);
-        const d = await res.json();
-        if (d.success) preselectedBranches = d.branches.map(b => b.branch_id);
+        const [brRes, coRes] = await Promise.all([
+            fetch(`../../../../server/api/system_setup/admin_panel/user-branch.php?user_id=${userId}`),
+            fetch(`../../../../server/api/system_setup/admin_panel/user-company.php?user_id=${userId}`)
+        ]);
+        const brData = await brRes.json();
+        const coData = await coRes.json();
+        if (brData.success) preselectedBranches  = brData.branches.map(b => b.branch_id);
+        if (coData.success) preselectedCompanies = coData.companies.map(c => c.company_id);
     } catch (_) {}
 
     const modalBody = document.querySelector('#editUserModal .modal-body');
@@ -307,6 +328,15 @@ async function openEditUserModal(userId) {
                     <div id="editSelectedBranches" style="display:flex; flex-wrap:wrap; gap:6px; margin-top:8px;"></div>
                     <input type="hidden" id="editBranchIds" value="">
                 </div>
+                <div class="form-group" style="grid-column: 1 / -1;">
+                    <label class="form-label">Company Access</label>
+                    <div style="position: relative;">
+                        <input type="text" id="editCompanySearch" class="form-input" placeholder="Search companies..." autocomplete="off">
+                        <div id="editCompanyDropdown" style="display:none; position:absolute; top:100%; left:0; right:0; background:var(--surface-card); border:1px solid var(--border-default); border-radius:var(--radius); max-height:200px; overflow-y:auto; z-index:1050; box-shadow:0 4px 12px rgba(0,0,0,0.1);"></div>
+                    </div>
+                    <div id="editSelectedCompanies" style="display:flex; flex-wrap:wrap; gap:6px; margin-top:8px;"></div>
+                    <input type="hidden" id="editCompanyIds" value="">
+                </div>
             </div>
         </form>
     `;
@@ -314,8 +344,8 @@ async function openEditUserModal(userId) {
     document.getElementById('editUserModal').style.display = 'flex';
     window.currentEditingUserId = userId;
 
-    // Init branch picker with preselected branches
     initBranchPicker('editBranchSearch', 'editBranchDropdown', 'editSelectedBranches', 'editBranchIds', preselectedBranches);
+    initCompanyPicker('editCompanySearch', 'editCompanyDropdown', 'editSelectedCompanies', 'editCompanyIds', preselectedCompanies);
 }
 
 function closeEditUserModal() {
@@ -629,7 +659,7 @@ async function createUser() {
             }
         }
 
-        // Step 3 — save branch access (if any selected)
+        // Step 3 — save branch access
         if (branchIds.length > 0 && newUserId) {
             const branchResponse = await fetch('../../../../server/api/system_setup/admin_panel/user-branch.php', {
                 method: 'POST',
@@ -639,9 +669,23 @@ async function createUser() {
             const branchData = await branchResponse.json();
             if (!branchData.success) {
                 alert('User created but branch access assignment failed: ' + branchData.message);
-                closeCreateUserModal();
-                fetchUsers();
-                return;
+                closeCreateUserModal(); fetchUsers(); return;
+            }
+        }
+
+        // Step 4 — save company access
+        let companyIds = [];
+        try { companyIds = JSON.parse(document.getElementById('createCompanyIds').value || '[]'); } catch (_) {}
+        if (companyIds.length > 0 && newUserId) {
+            const coResponse = await fetch('../../../../server/api/system_setup/admin_panel/user-company.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ user_id: newUserId, company_ids: companyIds })
+            });
+            const coData = await coResponse.json();
+            if (!coData.success) {
+                alert('User created but company access assignment failed: ' + coData.message);
+                closeCreateUserModal(); fetchUsers(); return;
             }
         }
 
@@ -669,9 +713,9 @@ async function saveUser() {
     const password   = document.getElementById('editPassword').value;
 
     let branchIds = [];
-    try {
-        branchIds = JSON.parse(document.getElementById('editBranchIds').value || '[]');
-    } catch (_) { branchIds = []; }
+    try { branchIds = JSON.parse(document.getElementById('editBranchIds').value || '[]'); } catch (_) {}
+    let companyIds = [];
+    try { companyIds = JSON.parse(document.getElementById('editCompanyIds').value || '[]'); } catch (_) {}
 
     try {
         // Step 1 — update user details
@@ -709,7 +753,7 @@ async function saveUser() {
             }
         }
 
-        // Step 3 — save branch access (replace existing)
+        // Step 3 — save branch access
         const branchResponse = await fetch('../../../../server/api/system_setup/admin_panel/user-branch.php', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -718,9 +762,19 @@ async function saveUser() {
         const branchData = await branchResponse.json();
         if (!branchData.success) {
             alert('User updated but branch access save failed: ' + branchData.message);
-            closeEditUserModal();
-            fetchUsers();
-            return;
+            closeEditUserModal(); fetchUsers(); return;
+        }
+
+        // Step 4 — save company access
+        const coResponse = await fetch('../../../../server/api/system_setup/admin_panel/user-company.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ user_id: parseInt(userId), company_ids: companyIds })
+        });
+        const coData = await coResponse.json();
+        if (!coData.success) {
+            alert('User updated but company access save failed: ' + coData.message);
+            closeEditUserModal(); fetchUsers(); return;
         }
 
         alert('User updated successfully!');
@@ -1222,6 +1276,7 @@ document.addEventListener('DOMContentLoaded', function () {
     fetchUsers();
     fetchRoles();
     fetchBranches();
+    fetchCompanies();
 
     // Close modals when clicking outside
     const modals = document.querySelectorAll('.modal-overlay');

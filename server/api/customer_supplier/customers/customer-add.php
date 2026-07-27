@@ -34,20 +34,22 @@ try {
         throw new Exception('Company is required');
     }
     
-    // Generate customer code based on last customer_code in database
-    $stmt = $pdo->prepare("SELECT customer_code FROM customers WHERE tenant_id = ? ORDER BY id DESC LIMIT 1");
-    $stmt->execute([$tenant_id]);
+    $pdo->beginTransaction();
+
+    // Generate customer code per-company with lock to prevent duplicates
+    $stmt = $pdo->prepare("SELECT customer_code FROM customers WHERE tenant_id = ? AND company_id = ? ORDER BY id DESC LIMIT 1 FOR UPDATE");
+    $stmt->execute([$tenant_id, (int)$input['companyId']]);
     $lastCustomer = $stmt->fetch();
-    
+
     if ($lastCustomer) {
         $lastNum = (int)substr($lastCustomer['customer_code'], 5);
         $nextNum = $lastNum + 1;
     } else {
         $nextNum = 1;
     }
-    
+
     $customer_code = 'CUST-' . str_pad($nextNum, 5, '0', STR_PAD_LEFT);
-    
+
     // Prepare data
     $data = [
         'tenant_id' => $tenant_id,
@@ -89,7 +91,7 @@ try {
     ];
     
     // Generate ID - get max ID across all tenants to avoid conflicts
-    $stmt = $pdo->prepare("SELECT COALESCE(MAX(id), 0) + 1 as new_id FROM customers");
+    $stmt = $pdo->prepare("SELECT COALESCE(MAX(id), 0) + 1 as new_id FROM customers FOR UPDATE");
     $stmt->execute();
     $new_id = $stmt->fetch()['new_id'];
     $data['id'] = $new_id;
@@ -227,6 +229,8 @@ try {
         }
     }
     
+    $pdo->commit();
+
     echo json_encode([
         'success' => true,
         'message' => 'Customer created successfully',
@@ -235,6 +239,7 @@ try {
     ]);
     
 } catch (Exception $e) {
+    if ($pdo->inTransaction()) $pdo->rollBack();
     http_response_code(400);
     echo json_encode([
         'success' => false,

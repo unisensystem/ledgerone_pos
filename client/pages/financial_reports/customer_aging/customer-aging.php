@@ -48,22 +48,15 @@ $currency_symbol = $currency['symbol'];
             <div class="card-header">
                 <h3>Report Filters</h3>
                 <div class="filter-actions">
-                    <div class="dropdown">
-                        <button class="btn btn-secondary dropdown-toggle">
-                            <i class="fas fa-download"></i> Export
-                        </button>
-                        <div class="dropdown-menu">
-                            <a href="#" class="dropdown-item" onclick="printReport(); return false;">
-                                <i class="fas fa-print"></i> Print Report
-                            </a>
-                            <a href="#" class="dropdown-item" onclick="exportToExcel(); return false;">
-                                <i class="fas fa-file-excel"></i> Export To Excel
-                            </a>
-                            <a href="#" class="dropdown-item" onclick="exportToJSON(); return false;">
-                                <i class="fas fa-file-code"></i> Export JSON
-                            </a>
-                        </div>
-                    </div>
+                    <button class="btn btn-secondary" onclick="printReport()">
+                        <i class="fas fa-print"></i> Print
+                    </button>
+                    <button class="btn btn-secondary" onclick="exportToExcel()">
+                        <i class="fas fa-file-excel"></i> Excel
+                    </button>
+                    <button class="btn btn-secondary" onclick="exportToJSON()">
+                        <i class="fas fa-file-code"></i> JSON
+                    </button>
                     <button class="btn btn-primary" id="applyFiltersBtn">
                         <i class="fas fa-filter"></i> Apply Filters
                     </button>
