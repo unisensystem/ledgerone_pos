@@ -2250,7 +2250,7 @@ $hasDateFilter = $dateFrom && $dateTo;
                     const data = await res.json();
 
                     if (!data.success || !data.data.length) {
-                        globalSearchResults.innerHTML = '<div style="padding:1rem; color:#64748b; font-size:13px;">No result </div>';
+                        globalSearchResults.innerHTML = '<div style="padding:1rem; color:#64748b; font-size:13px;">No result found</div>';
                         return;
                     }
 

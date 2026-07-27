@@ -134,6 +134,35 @@ $modules = [
         'party_table' => null, 'party_col' => null, 'party_name_col' => null,
         'list_url' => '../banking/post_dated_cheques/post-dated-cheques.php',
     ],
+
+    // ---- New: Item / Product ----
+    // Search matches product `code` (number_col) OR product `name` (extra_search_col).
+    'item' => [
+        'label' => 'Item', 'table' => 'products', 'id_col' => 'id',
+        'number_col' => 'code', 'amount_col' => 'mrp', 'date_col' => 'created_at',
+        'party_table' => null, 'party_col' => null, 'party_name_col' => null,
+        'extra_search_col' => 'name',
+        'list_url' => '../inventory/products/product-list.php',
+    ],
+
+    // ---- New: Employee ----
+    // Search matches `employee_id` (number_col) OR `full_name` (extra_search_col).
+    'employee' => [
+        'label' => 'Employee', 'table' => 'employees', 'id_col' => 'id',
+        'number_col' => 'employee_id', 'amount_col' => 'base_salary', 'date_col' => 'hire_date',
+        'party_table' => null, 'party_col' => null, 'party_name_col' => null,
+        'extra_search_col' => 'full_name',
+        'list_url' => '../hrm/employees/employee-list.php',
+    ],
+
+    // ---- New: Payroll ----
+    // Search matches `payroll_code`; amount = exact match on total_amount.
+    'payroll' => [
+        'label' => 'Payroll', 'table' => 'payroll_entries', 'id_col' => 'id',
+        'number_col' => 'payroll_code', 'amount_col' => 'total_amount', 'date_col' => 'payroll_date',
+        'party_table' => null, 'party_col' => null, 'party_name_col' => null,
+        'list_url' => '../hrm/payroll/payroll-list.php',
+    ],
 ];
 
 $results = [];
@@ -141,6 +170,12 @@ $results = [];
 foreach ($modules as $cfg) {
     $conditions = ["t.`{$cfg['number_col']}` LIKE ?"];
     $params = [$tenant_id, "%$q%"];
+
+    // Extra self-table search column (e.g. product name, employee full name)
+    if (!empty($cfg['extra_search_col'])) {
+        $conditions[] = "t.`{$cfg['extra_search_col']}` LIKE ?";
+        $params[] = "%$q%";
+    }
 
     // Amount: EXACT match only — "600" won't match 6000 or 5600
     if ($cfg['amount_col'] && is_numeric($q)) {
@@ -164,6 +199,9 @@ foreach ($modules as $cfg) {
     if ($cfg['party_table']) {
         $join = "LEFT JOIN `{$cfg['party_table']}` p ON t.`{$cfg['party_col']}` = p.id";
         $select .= ", p.`{$cfg['party_name_col']}` AS party_name";
+    } elseif (!empty($cfg['extra_search_col'])) {
+        // Show the self-table name (product name / employee full name) as the "party" column
+        $select .= ", t.`{$cfg['extra_search_col']}` AS party_name";
     } else {
         $select .= ", NULL AS party_name";
     }

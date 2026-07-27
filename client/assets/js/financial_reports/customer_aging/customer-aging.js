@@ -1,248 +1,421 @@
-let reportData = [];
-let filteredData = [];
-let summaryData = {};
-let currentPage = 1;
-const itemsPerPage = 10;
+// customer-aging.js
+// Handles: filter bar (company, customer, country/region/city/zone/area),
+// data loading, table + summary rendering, pagination, and exports.
 
-function buildUrl() {
-    const company = document.getElementById('companyFilter').value;
-    const dateRange = document.getElementById('dateRangeFilter').value;
-    const params = new URLSearchParams();
+const DATA_ENDPOINT = '../../../../server/api/financial_reports/customer_aging/customer-aging.php';
+const FILTERS_ENDPOINT = '../../../../server/api/financial_reports/customer_aging/location_filters.php';
 
-    if (company) params.set('company_id', company);
+const PAGE_SIZE = 10;
 
-    if (dateRange === 'custom') {
-        const from = document.getElementById('dateFrom').value;
-        const to = document.getElementById('dateTo').value;
-        if (from) params.set('date_from', from);
-        if (to) params.set('date_to', to);
-    } else if (dateRange !== 'all') {
-        params.set('date_range', dateRange);
+const state = {
+    page: 1,
+    allRows: [],       // full filtered dataset returned by the API
+    filters: {
+        company_id: '',
+        customer_id: '',
+        country_id: '',
+        region_id: '',
+        city_id: '',
+        zone_id: '',
+        area_id: ''
     }
+};
 
-    const base = '../../../../server/api/financial_reports/customer_aging/customer-aging.php';
-    return params.toString() ? base + '?' + params.toString() : base;
-}
+document.addEventListener('DOMContentLoaded', () => {
+    loadCompanies();
+    loadCountries();
+    setupCascadingFilters();
+    setupCustomerCombo();
+    setupButtons();
+    loadReportData();
 
-async function fetchReportData() {
-    try {
-        const response = await fetch(buildUrl());
-        const result = await response.json();
-        if (result.success) {
-            reportData = result.data;
-            summaryData = result.summary;
-            applyBucketFilter();
-            updateSummary();
-        } else {
-            alert('Error loading data: ' + result.message);
-        }
-    } catch (error) {
-        console.error('Error:', error);
-        alert('Failed to load report data');
-    }
-}
-
-function applyBucketFilter() {
-    const bucket = document.getElementById('bucketFilter').value;
-    filteredData = bucket === 'all' ? [...reportData] : reportData.filter(item => item.bucket === bucket);
-    currentPage = 1;
-    renderTable();
-}
-
-function updateSummary() {
-    const map = {
-        'all':     { value: summaryData.total_outstanding, count: null },
-        'current': { value: summaryData.bucket_current,   count: summaryData.count_current },
-        '1-15':    { value: summaryData.bucket_1_15,      count: summaryData.count_1_15 },
-        '16-30':   { value: summaryData.bucket_16_30,     count: summaryData.count_16_30 },
-        '31-45':   { value: summaryData.bucket_31_45,     count: summaryData.count_31_45 },
-        '45+':     { value: summaryData.bucket_45,        count: summaryData.count_45 }
-    };
-
-    document.querySelectorAll('.bucket-card').forEach(card => {
-        const d = map[card.dataset.bucket];
-        if (!d) return;
-        card.querySelector('.bucket-value').textContent = d.value || '$0.00';
-        if (d.count !== null && d.count !== undefined) {
-            card.querySelector('.mt-2').textContent = `${d.count} invoices`;
-        }
+    // Bucket cards: click to filter by that bucket
+    document.querySelectorAll('.bucket-card').forEach((card, index) => {
+        card.style.cursor = 'pointer';
+        card.addEventListener('click', function () {
+            const buckets = ['all', '15+', '25+', '45+'];
+            if (index < buckets.length) {
+                filterByBucket(buckets[index]);
+            }
+        });
     });
+});
+
+// ---------- Lookup loaders ----------
+
+async function loadCompanies() {
+    const rows = await fetchLookup('companies');
+    const select = document.getElementById('companyFilter');
+    resetSelect(select, 'All Companies');
+    rows.forEach(r => select.appendChild(makeOption(r.id, r.company_name)));
+
+    if (rows.length === 1) {
+        select.value = rows[0].id;
+        state.filters.company_id = rows[0].id;
+    }
 }
 
-function renderTable() {
-    const tableBody = document.getElementById('reportTableBody');
-    tableBody.innerHTML = '';
+async function loadCountries() {
+    const rows = await fetchLookup('countries');
+    const select = document.getElementById('countryFilter');
+    resetSelect(select, 'All Countries');
+    rows.forEach(r => select.appendChild(makeOption(r.id, r.country_name)));
+}
 
-    if (filteredData.length === 0) {
-        tableBody.innerHTML = '<tr><td colspan="10" style="text-align: center; padding: 20px;">No invoices found</td></tr>';
-        updatePaginationInfo();
+async function loadRegions(countryId) {
+    const select = document.getElementById('regionFilter');
+    resetSelect(select, 'All Regions');
+    if (!countryId) {
+        select.disabled = true;
         return;
     }
+    const rows = await fetchLookup('regions', { country_id: countryId });
+    rows.forEach(r => select.appendChild(makeOption(r.id, r.region_name)));
+    select.disabled = false;
+}
 
-    const startIndex = (currentPage - 1) * itemsPerPage;
-    const paginatedData = filteredData.slice(startIndex, startIndex + itemsPerPage);
+async function loadCities(regionId) {
+    const select = document.getElementById('cityFilter');
+    resetSelect(select, 'All Cities');
+    if (!regionId) {
+        select.disabled = true;
+        return;
+    }
+    const rows = await fetchLookup('cities', { region_id: regionId });
+    rows.forEach(r => select.appendChild(makeOption(r.id, r.city_name)));
+    select.disabled = false;
+}
 
-    paginatedData.forEach(item => {
-        let badgeClass = 'badge-success';
-        if (item.bucket === '1-15') badgeClass = 'badge-primary';
-        else if (item.bucket === '16-30' || item.bucket === '31-45') badgeClass = 'badge-warning';
-        else if (item.bucket === '45+') badgeClass = 'badge-error';
+async function loadZones(cityId) {
+    const select = document.getElementById('zoneFilter');
+    resetSelect(select, 'All Zones');
+    if (!cityId) {
+        select.disabled = true;
+        return;
+    }
+    const rows = await fetchLookup('zones', { city_id: cityId });
+    rows.forEach(r => select.appendChild(makeOption(r.id, r.city_zone_name)));
+    select.disabled = false;
+}
 
-        const row = document.createElement('tr');
-        row.innerHTML = `
-            <td>${item.id}</td>
-            <td><strong>${item.customerCode}</strong></td>
-            <td>${item.customerName}</td>
-            <td>${item.address}</td>
-            <td><span class="badge badge-primary">${item.invoiceNo}</span></td>
-            <td>${item.invoiceDate}</td>
-            <td>${item.type}</td>
-            <td><strong>${item.amount}</strong></td>
-            <td>${item.daysOverdue} days</td>
-            <td><span class="badge ${badgeClass}">${item.bucket === 'current' ? 'Current' : item.bucket + ' days'}</span></td>
-        `;
-        tableBody.appendChild(row);
+async function loadAreas(zoneId) {
+    const select = document.getElementById('areaFilter');
+    resetSelect(select, 'All Areas');
+    if (!zoneId) {
+        select.disabled = true;
+        return;
+    }
+    const rows = await fetchLookup('areas', { zone_id: zoneId });
+    rows.forEach(r => select.appendChild(makeOption(r.id, r.area_name)));
+    select.disabled = false;
+}
+
+function setupCascadingFilters() {
+    document.getElementById('countryFilter').addEventListener('change', async (e) => {
+        state.filters.country_id = e.target.value;
+        state.filters.region_id = state.filters.city_id = state.filters.zone_id = state.filters.area_id = '';
+        await loadRegions(e.target.value);
+        resetSelect(document.getElementById('cityFilter'), 'All Cities');
+        document.getElementById('cityFilter').disabled = true;
+        resetSelect(document.getElementById('zoneFilter'), 'All Zones');
+        document.getElementById('zoneFilter').disabled = true;
+        resetSelect(document.getElementById('areaFilter'), 'All Areas');
+        document.getElementById('areaFilter').disabled = true;
     });
 
-    updatePaginationInfo();
-    renderPaginationButtons();
+    document.getElementById('regionFilter').addEventListener('change', async (e) => {
+        state.filters.region_id = e.target.value;
+        state.filters.city_id = state.filters.zone_id = state.filters.area_id = '';
+        await loadCities(e.target.value);
+        resetSelect(document.getElementById('zoneFilter'), 'All Zones');
+        document.getElementById('zoneFilter').disabled = true;
+        resetSelect(document.getElementById('areaFilter'), 'All Areas');
+        document.getElementById('areaFilter').disabled = true;
+    });
+
+    document.getElementById('cityFilter').addEventListener('change', async (e) => {
+        state.filters.city_id = e.target.value;
+        state.filters.zone_id = state.filters.area_id = '';
+        await loadZones(e.target.value);
+        resetSelect(document.getElementById('areaFilter'), 'All Areas');
+        document.getElementById('areaFilter').disabled = true;
+    });
+
+    document.getElementById('zoneFilter').addEventListener('change', async (e) => {
+        state.filters.zone_id = e.target.value;
+        state.filters.area_id = '';
+        await loadAreas(e.target.value);
+    });
+
+    document.getElementById('areaFilter').addEventListener('change', (e) => {
+        state.filters.area_id = e.target.value;
+    });
+
+    document.getElementById('companyFilter').addEventListener('change', (e) => {
+        state.filters.company_id = e.target.value;
+    });
 }
 
-function updatePaginationInfo() {
-    const totalPages = Math.ceil(filteredData.length / itemsPerPage);
-    const startEntry = filteredData.length === 0 ? 0 : (currentPage - 1) * itemsPerPage + 1;
-    const endEntry = Math.min(currentPage * itemsPerPage, filteredData.length);
+// ---------- Customer: dropdown + type-to-search combobox ----------
 
-    document.querySelector('.card-header .pagination-info').textContent =
-        `Showing ${startEntry}-${endEntry} of ${filteredData.length} entries`;
-    document.querySelector('.pagination .pagination-info').textContent =
-        `Page ${filteredData.length === 0 ? 0 : currentPage} of ${Math.max(totalPages, 1)}`;
+function setupCustomerCombo() {
+    const input = document.getElementById('customerFilterInput');
+    const hidden = document.getElementById('customerFilter');
+    const dropdown = document.getElementById('customerDropdown');
+    let debounceTimer = null;
+
+    async function openWithResults(query) {
+        const rows = await fetchLookup('customers', query ? { q: query } : {});
+        dropdown.innerHTML = '';
+
+        const allOption = document.createElement('div');
+        allOption.className = 'combo-option';
+        allOption.textContent = 'All Customers';
+        allOption.addEventListener('click', () => selectCustomer('', ''));
+        dropdown.appendChild(allOption);
+
+        if (rows.length === 0) {
+            const empty = document.createElement('div');
+            empty.className = 'combo-empty';
+            empty.textContent = 'No matching customers';
+            dropdown.appendChild(empty);
+        } else {
+            rows.forEach(r => {
+                const opt = document.createElement('div');
+                opt.className = 'combo-option';
+                opt.textContent = `${r.customer_code} — ${r.customer_name}`;
+                opt.addEventListener('click', () => selectCustomer(r.id, `${r.customer_code} — ${r.customer_name}`));
+                dropdown.appendChild(opt);
+            });
+        }
+        dropdown.classList.add('open');
+    }
+
+    function selectCustomer(id, label) {
+        hidden.value = id;
+        input.value = label;
+        input.dataset.selectedLabel = label;
+        state.filters.customer_id = id;
+        dropdown.classList.remove('open');
+    }
+
+    input.addEventListener('focus', () => openWithResults(input.value.trim()));
+    input.addEventListener('input', () => {
+        clearTimeout(debounceTimer);
+        const q = input.value.trim();
+        if (hidden.value && q !== input.dataset.selectedLabel) {
+            hidden.value = '';
+            state.filters.customer_id = '';
+        }
+        debounceTimer = setTimeout(() => openWithResults(q), 250);
+    });
+
+    document.addEventListener('click', (e) => {
+        if (!document.getElementById('customerCombo').contains(e.target)) {
+            dropdown.classList.remove('open');
+        }
+    });
 }
 
-function renderPaginationButtons() {
-    const totalPages = Math.ceil(filteredData.length / itemsPerPage);
-    const paginationControls = document.querySelector('.pagination-controls');
-    paginationControls.innerHTML = '';
+// ---------- Buttons ----------
 
-    const prevBtn = document.createElement('button');
-    prevBtn.className = 'page-btn';
-    prevBtn.innerHTML = '<i class="fas fa-chevron-left"></i>';
-    prevBtn.disabled = currentPage === 1;
-    prevBtn.onclick = () => changePage(currentPage - 1);
-    paginationControls.appendChild(prevBtn);
+function setupButtons() {
+    document.getElementById('applyFiltersBtn').addEventListener('click', () => {
+        state.page = 1;
+        loadReportData();
+    });
 
-    for (let i = 1; i <= totalPages; i++) {
-        if (i === 1 || i === totalPages || (i >= currentPage - 1 && i <= currentPage + 1)) {
-            const pageBtn = document.createElement('button');
-            pageBtn.className = 'page-btn' + (i === currentPage ? ' active' : '');
-            pageBtn.textContent = i;
-            pageBtn.onclick = () => changePage(i);
-            paginationControls.appendChild(pageBtn);
-        } else if (i === currentPage - 2 || i === currentPage + 2) {
+    document.getElementById('resetFiltersBtn').addEventListener('click', () => {
+        state.filters = {
+            company_id: '', customer_id: '', country_id: '',
+            region_id: '', city_id: '', zone_id: '', area_id: ''
+        };
+        document.getElementById('companyFilter').value = '';
+        document.getElementById('customerFilterInput').value = '';
+        document.getElementById('customerFilter').value = '';
+        document.getElementById('countryFilter').value = '';
+        ['regionFilter', 'cityFilter', 'zoneFilter', 'areaFilter'].forEach(id => {
+            const el = document.getElementById(id);
+            resetSelect(el, `All ${id.replace('Filter', 's').replace(/^./, c => c.toUpperCase())}`);
+            el.disabled = true;
+        });
+        state.page = 1;
+        loadReportData();
+    });
+}
+
+function filterByBucket(bucket) {
+    // Placeholder hook for bucket-card clicks; extend as needed
+    // e.g. could set a client-side filter on state.allRows before renderPage()
+    console.log('Filter by bucket:', bucket);
+}
+
+// ---------- Data load + render ----------
+
+async function loadReportData() {
+    const params = new URLSearchParams();
+    Object.entries(state.filters).forEach(([key, val]) => {
+        if (val) params.append(key, val);
+    });
+
+    try {
+        const res = await fetch(`${DATA_ENDPOINT}?${params.toString()}`);
+        const json = await res.json();
+        if (!json.success) {
+            console.error(json.message);
+            return;
+        }
+        state.allRows = json.data;
+        renderSummary(json.summary);
+        renderPage();
+    } catch (err) {
+        console.error('Failed to load aging report:', err);
+    }
+}
+
+function renderSummary(summary) {
+    document.getElementById('totalOverdueValue').textContent = summary.total_overdue;
+    document.getElementById('bucket15Value').textContent = summary.bucket_15;
+    document.getElementById('bucket15Count').textContent = summary.count_15;
+    document.getElementById('bucket25Value').textContent = summary.bucket_25;
+    document.getElementById('bucket25Count').textContent = summary.count_25;
+    document.getElementById('bucket45Value').textContent = summary.bucket_45;
+    document.getElementById('bucket45Count').textContent = summary.count_45;
+}
+
+function renderPage() {
+    const total = state.allRows.length;
+    const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+    state.page = Math.min(state.page, totalPages);
+
+    const start = (state.page - 1) * PAGE_SIZE;
+    const pageRows = state.allRows.slice(start, start + PAGE_SIZE);
+
+    const tbody = document.getElementById('reportTableBody');
+    tbody.innerHTML = '';
+
+    if (total === 0) {
+        tbody.innerHTML = '<tr><td colspan="10" style="text-align: center; padding: 20px;">No overdue invoices found</td></tr>';
+    } else {
+        pageRows.forEach((row, i) => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td>${start + i + 1}</td>
+                <td>${escapeHtml(row.customerCode)}</td>
+                <td>${escapeHtml(row.customerName)}</td>
+                <td>${escapeHtml(row.address)}</td>
+                <td>${escapeHtml(row.invoiceNo)}</td>
+                <td>${escapeHtml(row.invoiceDate)}</td>
+                <td>${escapeHtml(row.type)}</td>
+                <td>${escapeHtml(row.amount)}</td>
+                <td>${row.daysOverdue}</td>
+                <td>${escapeHtml(row.bucket)}</td>
+            `;
+            tbody.appendChild(tr);
+        });
+    }
+
+    const infoText = total === 0
+        ? 'Showing 0 entries'
+        : `Showing ${start + 1}-${Math.min(start + PAGE_SIZE, total)} of ${total} entries`;
+    document.getElementById('paginationInfoTop').textContent = infoText;
+    document.getElementById('paginationInfoBottom').textContent = `Page ${total === 0 ? 0 : state.page} of ${totalPages}`;
+
+    renderPaginationControls(totalPages);
+}
+
+function renderPaginationControls(totalPages) {
+    const controls = document.getElementById('paginationControls');
+    controls.innerHTML = '';
+
+    const prev = document.createElement('button');
+    prev.className = 'btn btn-ghost';
+    prev.innerHTML = '<i class="fas fa-chevron-left"></i>';
+    prev.disabled = state.page <= 1;
+    prev.addEventListener('click', () => { state.page--; renderPage(); });
+    controls.appendChild(prev);
+
+    for (let p = 1; p <= totalPages; p++) {
+        if (p === 1 || p === totalPages || (p >= state.page - 1 && p <= state.page + 1)) {
+            const btn = document.createElement('button');
+            btn.className = 'btn ' + (p === state.page ? 'btn-primary' : 'btn-ghost');
+            btn.textContent = p;
+            btn.addEventListener('click', () => { state.page = p; renderPage(); });
+            controls.appendChild(btn);
+        } else if (p === state.page - 2 || p === state.page + 2) {
             const dots = document.createElement('span');
             dots.textContent = '...';
             dots.style.padding = '0 8px';
-            paginationControls.appendChild(dots);
+            controls.appendChild(dots);
         }
     }
 
-    const nextBtn = document.createElement('button');
-    nextBtn.className = 'page-btn';
-    nextBtn.innerHTML = '<i class="fas fa-chevron-right"></i>';
-    nextBtn.disabled = currentPage === totalPages || totalPages === 0;
-    nextBtn.onclick = () => changePage(currentPage + 1);
-    paginationControls.appendChild(nextBtn);
+    const next = document.createElement('button');
+    next.className = 'btn btn-ghost';
+    next.innerHTML = '<i class="fas fa-chevron-right"></i>';
+    next.disabled = state.page >= totalPages;
+    next.addEventListener('click', () => { state.page++; renderPage(); });
+    controls.appendChild(next);
 }
 
-function changePage(page) {
-    const totalPages = Math.ceil(filteredData.length / itemsPerPage);
-    if (page < 1 || page > totalPages) return;
-    currentPage = page;
-    renderTable();
-}
+// ---------- Exports ----------
 
 function printReport() {
-    const company = document.getElementById('companyFilter').value;
-    const dateRange = document.getElementById('dateRangeFilter').value;
-    const bucket = document.getElementById('bucketFilter').value;
-    const params = new URLSearchParams();
-
-    if (company) params.set('company_id', company);
-    if (bucket && bucket !== 'all') params.set('bucket', bucket);
-
-    if (dateRange === 'custom') {
-        const from = document.getElementById('dateFrom').value;
-        const to = document.getElementById('dateTo').value;
-        if (from) params.set('date_from', from);
-        if (to) params.set('date_to', to);
-    } else if (dateRange !== 'all') {
-        params.set('date_range', dateRange);
-    }
-
-    const url = 'print.php' + (params.toString() ? '?' + params.toString() : '');
-    window.open(url, '_blank');
-}
-
-function exportToExcel() {
-    alert('Exporting report to Excel format');
+    window.print();
 }
 
 function exportToJSON() {
-    const dataStr = JSON.stringify(filteredData, null, 2);
-    const dataBlob = new Blob([dataStr], { type: 'application/json' });
-    const url = URL.createObjectURL(dataBlob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = 'customer-aging-report.json';
-    link.click();
+    const blob = new Blob([JSON.stringify(state.allRows, null, 2)], { type: 'application/json' });
+    downloadBlob(blob, 'customer-aging-report.json');
+}
+
+function exportToExcel() {
+    const headers = ['S#', 'Customer Code', 'Customer Name', 'Address', 'Invoice No', 'Invoice Date', 'Type', 'Amount', 'Days Overdue', 'Bucket'];
+    const rows = state.allRows.map((row, i) => [
+        i + 1, row.customerCode, row.customerName, row.address,
+        row.invoiceNo, row.invoiceDate, row.type, row.amount, row.daysOverdue, row.bucket
+    ]);
+    const csv = [headers, ...rows]
+        .map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(','))
+        .join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    downloadBlob(blob, 'customer-aging-report.csv');
+}
+
+function downloadBlob(blob, filename) {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
     URL.revokeObjectURL(url);
 }
 
-async function loadCompanies() {
-    try {
-        const response = await fetch('../../../../server/api/financial_reports/customer_aging/get-companies.php');
-        const result = await response.json();
-        if (result.success) {
-            const companyFilter = document.getElementById('companyFilter');
-            companyFilter.innerHTML = '<option value="">All Companies</option>';
-            result.data.forEach(company => {
-                companyFilter.innerHTML += `<option value="${company.id}">${company.company_name}</option>`;
-            });
-            if (result.data.length === 1) companyFilter.value = result.data[0].id;
-        }
-    } catch (error) {
-        console.error('Error loading companies:', error);
-    }
+// ---------- Helpers ----------
+
+async function fetchLookup(type, extraParams = {}) {
+    const params = new URLSearchParams({ type, ...extraParams });
+    const res = await fetch(`${FILTERS_ENDPOINT}?${params.toString()}`);
+    const json = await res.json();
+    return json.success ? json.data : [];
 }
 
-document.addEventListener('DOMContentLoaded', async function () {
-    await loadCompanies();
-    await fetchReportData();
+function makeOption(value, label) {
+    const opt = document.createElement('option');
+    opt.value = value;
+    opt.textContent = label;
+    return opt;
+}
 
-    document.getElementById('dateRangeFilter').addEventListener('change', function () {
-        const isCustom = this.value === 'custom';
-        document.getElementById('customDateGroup').style.display = isCustom ? '' : 'none';
-        document.getElementById('customDateGroupTo').style.display = isCustom ? '' : 'none';
-    });
+function resetSelect(select, placeholderLabel) {
+    select.innerHTML = '';
+    select.appendChild(makeOption('', placeholderLabel));
+}
 
-    document.getElementById('applyFiltersBtn').addEventListener('click', fetchReportData);
-
-    document.getElementById('bucketFilter').addEventListener('change', applyBucketFilter);
-
-    document.querySelectorAll('.bucket-card').forEach(card => {
-        card.style.cursor = 'pointer';
-        card.addEventListener('click', function () {
-            document.getElementById('bucketFilter').value = this.dataset.bucket;
-            applyBucketFilter();
-        });
-    });
-
-    document.getElementById('resetFiltersBtn').addEventListener('click', function () {
-        document.getElementById('companyFilter').value = '';
-        document.getElementById('dateRangeFilter').value = '30days';
-        document.getElementById('bucketFilter').value = 'all';
-        document.getElementById('customDateGroup').style.display = 'none';
-        document.getElementById('customDateGroupTo').style.display = 'none';
-        fetchReportData();
-    });
-});
+function escapeHtml(str) {
+    if (str === null || str === undefined) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+}

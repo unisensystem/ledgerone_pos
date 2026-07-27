@@ -13,6 +13,8 @@ if (!$user_id) {
     header('Location: ../../auth/login.html');
     exit();
 }
+// 👇 ADD KARO
+$initialSearch = $_GET['search'] ?? '';
 
 // Get base currency symbol
 require_once '../../../../includes/connection.php';
@@ -95,8 +97,9 @@ $currency_symbol = $currency['symbol'] ?? '$';
             <div class="filters-row">
                 <div class="search-box">
                     <i class="fas fa-search"></i>
-                    <input type="text" id="searchInput" placeholder="Search employees by name, ID, or department..." 
-                           oninput="filterEmployees()">
+                   <input type="text" id="searchInput" placeholder="Search employees by name, ID, or department..." 
+       value="<?= htmlspecialchars($initialSearch) ?>"
+       oninput="filterEmployees()">
                 </div>
                 <div class="filter-group">
                     <label>Department</label>
@@ -553,5 +556,14 @@ $currency_symbol = $currency['symbol'] ?? '$';
     </div>
 
     <script src="../../../assets/js/hrm/employees/employee-list.js"></script>
+<?php if ($initialSearch): ?>
+<script>
+    window.addEventListener('load', function() {
+        if (typeof filterEmployees === 'function') {
+            filterEmployees();
+        }
+    });
+</script>
+<?php endif; ?>
 </body>
 </html>

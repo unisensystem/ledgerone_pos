@@ -13,7 +13,8 @@ if (!$user_id) {
     header('Location: ../../auth/login.html');
     exit();
 }
-
+// 👇 ADD KARO
+$initialSearch = $_GET['search'] ?? '';
 // Get base currency symbol
 require_once '../../../../includes/connection.php';
 $stmt = $pdo->prepare("
@@ -124,8 +125,8 @@ $currency_symbol = $currency['symbol'] ?? '$';
                     <h3>Payroll Records</h3>
                     <div class="table-actions">
                         <div class="search-box">
-                            <input type="text" placeholder="Search payroll..." id="searchInput">
-                            <i class="fas fa-search"></i>
+                           <input type="text" placeholder="Search payroll..." id="searchInput"
+       value="<?= htmlspecialchars($initialSearch) ?>">
                         </div>
                         <button class="btn btn-icon btn-secondary" id="exportBtn" title="Export">
                             <i class="fas fa-download"></i>
@@ -200,6 +201,16 @@ $currency_symbol = $currency['symbol'] ?? '$';
     <script>
         const currencySymbol = '<?php echo $currency_symbol; ?>';
     </script>
-    <script src="../../../assets/js/hrm/payroll/payroll-list.js"></script>
+<script src="../../../assets/js/hrm/payroll/payroll-list.js"></script>
+<?php if ($initialSearch): ?>
+<script>
+    window.addEventListener('load', function() {
+        const searchInput = document.getElementById('searchInput');
+        if (searchInput) {
+            searchInput.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+    });
+</script>
+<?php endif; ?>
 </body>
 </html>
