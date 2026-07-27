@@ -37,7 +37,7 @@ if ($is_edit) {
     $adjustment_data = $stmt->fetch();
     
     $stmt = $pdo->prepare("
-        SELECT p.code as product_code, sai.product_id, sai.qty, sai.rate, sai.stock_value
+        SELECT p.code as product_code, sai.product_id, sai.unit_id, sai.qty, sai.rate, sai.stock_value
         FROM stock_adjustment_items sai
         JOIN products p ON sai.product_id = p.id
         WHERE sai.tenant_id = ? AND sai.adjustment_id = ?
@@ -151,10 +151,11 @@ if ($is_edit) {
                         <thead>
                             <tr>
                                 <th width="5%">S#</th>
-                                <th width="30%">Product Code</th>
-                                <th width="15%">Quantity</th>
-                                <th width="15%">Rate (<?php echo $currency_symbol; ?>)</th>
-                                <th width="15%">Gross (<?php echo $currency_symbol; ?>)</th>
+                                <th width="25%">Product Code</th>
+                                <th width="12%">Unit</th>
+                                <th width="13%">Quantity</th>
+                                <th width="13%">Rate (<?php echo $currency_symbol; ?>)</th>
+                                <th width="12%">Gross (<?php echo $currency_symbol; ?>)</th>
                                 <th width="20%">Actions</th>
                             </tr>
                         </thead>

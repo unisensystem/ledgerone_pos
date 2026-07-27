@@ -234,6 +234,7 @@ $currency_symbol = $currency['symbol'];
                             <tr>
                                 <th>Product Code</th>
                                 <th>Product Name</th>
+                                <th>Unit</th>
                                 <th>Quantity</th>
                                 <th>Rate</th>
                                 <th>Gross</th>

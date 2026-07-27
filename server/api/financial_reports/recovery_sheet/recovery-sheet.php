@@ -19,15 +19,15 @@ if (!$user_id || !$tenant_id) {
     exit;
 }
 
-$date_from = $_GET['date_from'] ?? null;
-$date_to = $_GET['date_to'] ?? null;
-$recovery_officer_id = $_GET['recovery_officer_id'] ?? null;
-$country_id = $_GET['country_id'] ?? null;
-$region_id = $_GET['region_id'] ?? null;
-$city_id = $_GET['city_id'] ?? null;
-$city_zone_id = $_GET['city_zone_id'] ?? null;
-$area_id = $_GET['area_id'] ?? null;
-$company_id = !empty($_GET['company_id']) ? $_GET['company_id'] : null;
+$date_from           = !empty($_GET['date_from'])           ? $_GET['date_from']           : null;
+$date_to             = !empty($_GET['date_to'])             ? $_GET['date_to']             : null;
+$recovery_officer_id = !empty($_GET['recovery_officer_id']) ? (int)$_GET['recovery_officer_id'] : null;
+$country_id          = !empty($_GET['country_id'])          ? (int)$_GET['country_id']          : null;
+$region_id           = !empty($_GET['region_id'])           ? (int)$_GET['region_id']           : null;
+$city_id             = !empty($_GET['city_id'])             ? (int)$_GET['city_id']             : null;
+$city_zone_id        = !empty($_GET['city_zone_id'])        ? (int)$_GET['city_zone_id']        : null;
+$area_id             = !empty($_GET['area_id'])             ? (int)$_GET['area_id']             : null;
+$company_id          = !empty($_GET['company_id'])          ? (int)$_GET['company_id']          : null;
 
 try {
     $query = "
@@ -111,6 +111,9 @@ try {
         AND c.status = 'ACTIVE'
         AND si.status = 'Posted'
         AND si.net_amount > 0
+        " . ($recovery_officer_id ? " AND si.sale_officer_id = ?" : "") . "
+        " . ($date_from ? " AND si.sale_date >= ?" : "") . "
+        " . ($date_to ? " AND si.sale_date <= ?" : "") . "
         " . ($company_id ? " AND si.company_id = ?" : "") . "
         " . ($country_id ? " AND c.country_id = ?" : "") . "
         " . ($region_id ? " AND c.region_id = ?" : "") . "
@@ -121,15 +124,19 @@ try {
         ORDER BY customer_name
     ";
 
-    $params = [$tenant_id, $tenant_id];
-    if ($date_from) $params[] = $date_from;
-    if ($date_to) $params[] = $date_to;
-    if ($recovery_officer_id) $params[] = $recovery_officer_id;
-    
+    // UNION Part 1: opening_balance_invoices
+    // balance subquery: rv.tenant_id
+    $params = [$tenant_id];
+    // received subquery: rv.tenant_id, date_from, date_to, recovery_officer_id
     $params[] = $tenant_id;
     if ($date_from) $params[] = $date_from;
     if ($date_to) $params[] = $date_to;
-    
+    if ($recovery_officer_id) $params[] = $recovery_officer_id;
+    // returns subquery: sr.tenant_id, date_from, date_to
+    $params[] = $tenant_id;
+    if ($date_from) $params[] = $date_from;
+    if ($date_to) $params[] = $date_to;
+    // WHERE: obi.tenant_id, territory filters
     $params[] = $tenant_id;
     if ($company_id) $params[] = $company_id;
     if ($country_id) $params[] = $country_id;
@@ -137,18 +144,24 @@ try {
     if ($city_id) $params[] = $city_id;
     if ($city_zone_id) $params[] = $city_zone_id;
     if ($area_id) $params[] = $area_id;
-    
+
+    // UNION Part 2: sale_invoice
+    // balance subquery: rv.tenant_id
     $params[] = $tenant_id;
+    // received subquery: rv.tenant_id, date_from, date_to, recovery_officer_id
     $params[] = $tenant_id;
     if ($date_from) $params[] = $date_from;
     if ($date_to) $params[] = $date_to;
     if ($recovery_officer_id) $params[] = $recovery_officer_id;
-    
+    // returns subquery: sr.tenant_id, date_from, date_to
     $params[] = $tenant_id;
     if ($date_from) $params[] = $date_from;
     if ($date_to) $params[] = $date_to;
-    
+    // WHERE: si.tenant_id, sale_officer_id, sale_date range, territory filters
     $params[] = $tenant_id;
+    if ($recovery_officer_id) $params[] = $recovery_officer_id;
+    if ($date_from) $params[] = $date_from;
+    if ($date_to) $params[] = $date_to;
     if ($company_id) $params[] = $company_id;
     if ($country_id) $params[] = $country_id;
     if ($region_id) $params[] = $region_id;

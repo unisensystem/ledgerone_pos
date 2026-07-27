@@ -325,8 +325,12 @@ document.addEventListener('DOMContentLoaded', function () {
         sortTable(currentSort.column);
     }
 
+    // Track currently viewed adjustment id
+    let currentViewId = null;
+
     // Show adjustment details in modal
     function showAdjustmentDetails(id) {
+        currentViewId = id;
         const adj = adjustments.find(a => a.id === id);
         if (!adj) return;
 
@@ -423,6 +427,7 @@ document.addEventListener('DOMContentLoaded', function () {
                         row.innerHTML = `
                             <td>${item.product_code}</td>
                             <td>${item.product_name}</td>
+                            <td>${item.uom_name || '-'}</td>
                             <td>${item.qty}</td>
                             <td>${window.currencySymbol}${parseFloat(item.rate).toFixed(2)}</td>
                             <td><strong>${itemTotal}</strong></td>
@@ -434,6 +439,106 @@ document.addEventListener('DOMContentLoaded', function () {
 
         // Show modal
         document.getElementById('viewModal').classList.add('show');
+    }
+
+    // Print adjustment
+    function printAdjustment(id) {
+        const adj = adjustments.find(a => a.id === id);
+        if (!adj) return;
+
+        fetch(`../../../../server/api/inventory/stock_adjustment/get-items.php?id=${id}`)
+            .then(response => response.json())
+            .then(data => {
+                const items = data.success ? data.items : [];
+                const dateObj = new Date(adj.date);
+                const formattedDate = dateObj.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+                const typeLabel = adj.type === 'increase' ? '▲ Increase' : '▼ Decrease';
+
+                let itemRows = items.map((item, i) => `
+                    <tr>
+                        <td>${i + 1}</td>
+                        <td>${item.product_code}</td>
+                        <td>${item.product_name}</td>
+                        <td>${item.uom_name || '-'}</td>
+                        <td>${item.qty}</td>
+                        <td>${window.currencySymbol}${parseFloat(item.rate).toFixed(2)}</td>
+                        <td>${window.currencySymbol}${parseFloat(item.stock_value).toFixed(2)}</td>
+                    </tr>
+                `).join('');
+
+                const printWindow = window.open('', '_blank');
+                printWindow.document.write(`
+                    <!DOCTYPE html>
+                    <html>
+                    <head>
+                        <title>Stock Adjustment - ${adj.code}</title>
+                        <style>
+                            * { margin: 0; padding: 0; box-sizing: border-box; }
+                            body { font-family: Arial, sans-serif; padding: 30px; color: #333; font-size: 13px; }
+                            .header { text-align: center; border-bottom: 2px solid #333; padding-bottom: 15px; margin-bottom: 20px; }
+                            .header h1 { font-size: 20px; margin-bottom: 4px; }
+                            .header p { color: #666; font-size: 12px; }
+                            .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 30px; margin-bottom: 20px; }
+                            .info-row { display: flex; gap: 8px; }
+                            .info-label { font-weight: bold; color: #555; min-width: 130px; }
+                            .info-value { color: #333; }
+                            table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+                            th { background: #f0f0f0; border: 1px solid #ccc; padding: 8px; text-align: left; font-size: 12px; }
+                            td { border: 1px solid #ccc; padding: 7px 8px; font-size: 12px; }
+                            tr:nth-child(even) td { background: #fafafa; }
+                            .total-row td { font-weight: bold; background: #f0f0f0; }
+                            .footer { margin-top: 30px; display: flex; justify-content: space-between; }
+                            .sign-box { text-align: center; }
+                            .sign-line { border-top: 1px solid #333; width: 150px; margin: 40px auto 5px; }
+                            @media print { body { padding: 15px; } }
+                        </style>
+                    </head>
+                    <body>
+                        <div class="header">
+                            <h1>Stock Adjustment</h1>
+                            <p>Adjustment Code: <strong>${adj.code}</strong> &nbsp;|&nbsp; Date: ${formattedDate}</p>
+                        </div>
+                        <div class="info-grid">
+                            <div class="info-row"><span class="info-label">Branch:</span><span class="info-value">${adj.branch}</span></div>
+                            <div class="info-row"><span class="info-label">Company:</span><span class="info-value">${adj.companyName}</span></div>
+                            <div class="info-row"><span class="info-label">Type:</span><span class="info-value">${typeLabel}</span></div>
+                            <div class="info-row"><span class="info-label">Main Reason:</span><span class="info-value">${adj.mainReason}</span></div>
+                            <div class="info-row"><span class="info-label">Primary Reason:</span><span class="info-value">${adj.primaryReason}</span></div>
+                            <div class="info-row"><span class="info-label">Secondary Reason:</span><span class="info-value">${adj.secondaryReason}</span></div>
+                            ${adj.remarks ? `<div class="info-row" style="grid-column:1/-1"><span class="info-label">Remarks:</span><span class="info-value">${adj.remarks}</span></div>` : ''}
+                        </div>
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>#</th>
+                                    <th>Product Code</th>
+                                    <th>Product Name</th>
+                                    <th>Unit</th>
+                                    <th>Quantity</th>
+                                    <th>Rate</th>
+                                    <th>Gross</th>
+                                </tr>
+                            </thead>
+                            <tbody>${itemRows}</tbody>
+                            <tfoot>
+                                <tr class="total-row">
+                                    <td colspan="6" style="text-align:right">Total:</td>
+                                    <td>${window.currencySymbol}${adj.totalValue.toFixed(2)}</td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                        <div class="footer">
+                            <div class="sign-box"><div class="sign-line"></div><p>Prepared By</p></div>
+                            <div class="sign-box"><div class="sign-line"></div><p>Checked By</p></div>
+                            <div class="sign-box"><div class="sign-line"></div><p>Approved By</p></div>
+                        </div>
+                    </body>
+                    </html>
+                `);
+                printWindow.document.close();
+                printWindow.focus();
+                setTimeout(() => printWindow.print(), 500);
+            });
     }
 
     // Show delete confirmation
@@ -591,32 +696,8 @@ document.addEventListener('DOMContentLoaded', function () {
 
         // Print details button
         document.getElementById('printDetailsBtn').addEventListener('click', function () {
-            const modalContent = document.querySelector('.modal-content').cloneNode(true);
-            const printWindow = window.open('', '_blank');
-
-            printWindow.document.write(`
-                <html>
-                <head>
-                    <title>Adjustment Details - ${document.getElementById('modalDetails').querySelector('.detail-value').textContent}</title>
-                    <style>
-                        body { font-family: Arial, sans-serif; padding: 20px; }
-                        h1 { color: #333; }
-                        .detail-group { margin-bottom: 15px; }
-                        .detail-label { font-weight: bold; color: #666; }
-                        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-                        th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
-                        th { background-color: #f5f5f5; }
-                    </style>
-                </head>
-                <body>
-                    <h1>Adjustment Details</h1>
-                    ${modalContent.innerHTML}
-                </body>
-                </html>
-            `);
-
-            printWindow.document.close();
-            printWindow.print();
+            const adj = adjustments.find(a => a.id === parseInt(document.getElementById('confirmDeleteBtn').dataset.id || 0));
+            printAdjustment(currentViewId);
         });
 
         // Delete confirmation
@@ -656,11 +737,11 @@ document.addEventListener('DOMContentLoaded', function () {
                 window.location.href = `adjustment-add.php?id=${id}`;
             }
 
-            // Print button
+            // Print button (from list)
             if (event.target.closest('.print-btn')) {
                 const btn = event.target.closest('.print-btn');
                 const id = parseInt(btn.dataset.id);
-                window.open(`print.php?id=${id}`, '_blank');
+                printAdjustment(id);
             }
 
             // Delete button

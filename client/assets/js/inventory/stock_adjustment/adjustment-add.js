@@ -273,6 +273,23 @@ document.addEventListener('DOMContentLoaded', function () {
         })
         .catch(error => console.error('Error fetching companies:', error));
 
+    // Fetch units from API
+    let units = [];
+    let unitsLoaded = false;
+    fetch('../../../../server/api/inventory/stock_adjustment/get-units.php')
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                units = data.units;
+                unitsLoaded = true;
+                // Add first row only after units are loaded (and not in edit mode)
+                if (!isEdit) {
+                    addTableRow();
+                }
+            }
+        })
+        .catch(error => console.error('Error fetching units:', error));
+
     // Fetch products from API
     let products = [];
     let productsMap = {};
@@ -287,19 +304,26 @@ document.addEventListener('DOMContentLoaded', function () {
                 
                 // Load items after products are fetched
                 if (isEdit && window.adjustmentData) {
-                    setTimeout(() => {
-                        items = []; // Clear any existing items
-                        window.adjustmentData.items.forEach(item => {
-                            items.push({
-                                id: itemCounter++,
-                                productCode: item.product_code,
-                                quantity: parseFloat(item.qty),
-                                rate: parseFloat(item.rate),
-                                gross: parseFloat(item.stock_value)
+                    const tryRender = () => {
+                        if (unitsLoaded) {
+                            items = [];
+                            window.adjustmentData.items.forEach(item => {
+                                items.push({
+                                    id: itemCounter++,
+                                    productCode: `${item.product_code} - ${productsMap[item.product_code]?.name || ''}`,
+                                    productId: productsMap[item.product_code]?.id || '',
+                                    unitId: item.unit_id || '',
+                                    quantity: parseFloat(item.qty),
+                                    rate: parseFloat(item.rate),
+                                    gross: parseFloat(item.stock_value)
+                                });
                             });
-                        });
-                        renderTable();
-                    }, 500);
+                            renderTable();
+                        } else {
+                            setTimeout(tryRender, 100);
+                        }
+                    };
+                    setTimeout(tryRender, 200);
                 }
             }
         })
@@ -308,6 +332,10 @@ document.addEventListener('DOMContentLoaded', function () {
     // Initialize items table with one empty row
     let itemCounter = 1;
     let items = [];
+
+    function getUnitOptions(selectedId) {
+        return units.map(u => `<option value="${u.id}" ${u.id == selectedId ? 'selected' : ''}>${u.uom_name}</option>`).join('');
+    }
 
     // Branch dropdown functionality
     const branchInput = document.getElementById('branchInput');
@@ -357,20 +385,23 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     });
 
-    // Product dropdown functionality for table rows
+    // Shared floating dropdown for product search
+    const floatingDropdown = document.createElement('div');
+    floatingDropdown.className = 'product-options-floating';
+    document.body.appendChild(floatingDropdown);
+    let activeProductInput = null;
+
+    function positionFloatingDropdown() {
+        if (!activeProductInput) return;
+        const rect = activeProductInput.getBoundingClientRect();
+        floatingDropdown.style.top = (rect.bottom + window.scrollY) + 'px';
+        floatingDropdown.style.left = (rect.left + window.scrollX) + 'px';
+        floatingDropdown.style.width = rect.width + 'px';
+    }
+
     function setupProductDropdown(inputElement, rowIndex) {
-        const dropdownId = `productOptions${rowIndex}`;
-        let dropdown = document.getElementById(dropdownId);
-
-        if (!dropdown) {
-            dropdown = document.createElement('div');
-            dropdown.id = dropdownId;
-            dropdown.className = 'dropdown-options';
-            inputElement.parentNode.appendChild(dropdown);
-        }
-
         function populateProductOptions() {
-            dropdown.innerHTML = '';
+            floatingDropdown.innerHTML = '';
             const searchTerm = inputElement.value.toLowerCase();
 
             products.forEach(product => {
@@ -379,33 +410,53 @@ document.addEventListener('DOMContentLoaded', function () {
                     const option = document.createElement('div');
                     option.className = 'dropdown-option';
                     option.textContent = `${product.code} - ${product.name}`;
-                    option.addEventListener('click', function () {
-                        inputElement.value = product.code;
-                        hideDropdown(dropdown);
+                    option.addEventListener('mousedown', function (e) {
+                        e.preventDefault();
+                        inputElement.value = `${product.code} - ${product.name}`;
+                        inputElement.dataset.productId = product.id;
+                        floatingDropdown.style.display = 'none';
+                        activeProductInput = null;
+                        if (product.default_unit_id) {
+                            const unitSel = inputElement.closest('tr').querySelector('.unit-select');
+                            if (unitSel) unitSel.value = product.default_unit_id;
+                        }
                         updateGross(rowIndex);
                         clearError(inputElement);
                     });
-                    dropdown.appendChild(option);
+                    floatingDropdown.appendChild(option);
                 }
             });
 
-            if (dropdown.children.length > 0) {
-                showDropdown(dropdown);
+            if (floatingDropdown.children.length > 0) {
+                activeProductInput = inputElement;
+                positionFloatingDropdown();
+                floatingDropdown.style.display = 'block';
             } else {
-                hideDropdown(dropdown);
+                floatingDropdown.style.display = 'none';
             }
         }
 
-        inputElement.addEventListener('input', populateProductOptions);
         inputElement.addEventListener('focus', populateProductOptions);
+        inputElement.addEventListener('input', populateProductOptions);
 
-        // Close dropdown when clicking outside
-        document.addEventListener('click', function (e) {
-            if (!inputElement.contains(e.target) && !dropdown.contains(e.target)) {
-                hideDropdown(dropdown);
-            }
+        inputElement.addEventListener('blur', function () {
+            setTimeout(() => {
+                if (activeProductInput === inputElement) {
+                    floatingDropdown.style.display = 'none';
+                    activeProductInput = null;
+                }
+            }, 150);
         });
     }
+
+    document.addEventListener('click', function (e) {
+        if (activeProductInput && !activeProductInput.contains(e.target) && !floatingDropdown.contains(e.target)) {
+            floatingDropdown.style.display = 'none';
+            activeProductInput = null;
+        }
+    });
+
+    window.addEventListener('scroll', positionFloatingDropdown, true);
 
     // Helper functions for dropdowns
     function showDropdown(dropdown) {
@@ -431,21 +482,26 @@ document.addEventListener('DOMContentLoaded', function () {
         row.innerHTML = `
             <td>${itemCounter}</td>
             <td>
-                <div class="select-with-search">
-                    <input type="text" class="table-input product-input" placeholder="Search product code">
+                <div class="searchable-dropdown">
+                    <div class="dropdown-input-container">
+                        <input type="text" class="table-input product-input" placeholder="Search product" data-product-id="">
+                        <i class="fas fa-chevron-down"></i>
+                    </div>
                 </div>
+            </td>
+            <td>
+                <select class="table-input unit-select">
+                    <option value="">Select Unit</option>
+                    ${getUnitOptions('')}
+                </select>
             </td>
             <td><input type="number" class="table-input quantity-input" min="0" step="0.01" placeholder="0.00"></td>
             <td><input type="number" class="table-input rate-input" min="0" step="0.01" placeholder="0.00"></td>
             <td><input type="text" class="table-input gross-input" readonly value="0.00"></td>
             <td>
                 <div class="table-actions">
-                    <button class="icon-btn add-btn" title="Add row after">
-                        <i class="fas fa-plus"></i>
-                    </button>
-                    <button class="icon-btn remove-btn" title="Remove row">
-                        <i class="fas fa-minus"></i>
-                    </button>
+                    <button class="icon-btn add-btn" title="Add row after"><i class="fas fa-plus"></i></button>
+                    <button class="icon-btn remove-btn" title="Remove row"><i class="fas fa-minus"></i></button>
                 </div>
             </td>
         `;
@@ -456,6 +512,8 @@ document.addEventListener('DOMContentLoaded', function () {
         items.push({
             id: itemCounter,
             productCode: '',
+            productId: '',
+            unitId: '',
             quantity: 0,
             rate: 0,
             gross: 0
@@ -529,7 +587,7 @@ document.addEventListener('DOMContentLoaded', function () {
         const rateInput = row.querySelector('.rate-input');
 
         // Check product code
-        if (!productInput.value.trim()) {
+        if (!productInput.value.trim() || !productInput.dataset.productId) {
             productInput.classList.add('field-error');
             isValid = false;
         } else {
@@ -564,6 +622,13 @@ document.addEventListener('DOMContentLoaded', function () {
             emptyState.style.display = 'block';
             return;
         }
+        // Sync unit values before re-render
+        document.querySelectorAll('#itemsTableBody tr').forEach((row, i) => {
+            if (items[i]) {
+                items[i].unitId = row.querySelector('.unit-select')?.value || '';
+                items[i].productId = row.querySelector('.product-input')?.dataset.productId || '';
+            }
+        });
 
         emptyState.style.display = 'none';
         tableBody.innerHTML = '';
@@ -573,9 +638,18 @@ document.addEventListener('DOMContentLoaded', function () {
             row.innerHTML = `
                 <td>${index + 1}</td>
                 <td>
-                    <div class="select-with-search">
-                        <input type="text" class="table-input product-input" value="${item.productCode}" placeholder="Search product code">
-                    </div>
+                    <div class="searchable-dropdown">
+                        <div class="dropdown-input-container">
+                            <input type="text" class="table-input product-input" value="${item.productCode}" data-product-id="${item.productId || ''}" placeholder="Search product">
+                            <i class="fas fa-chevron-down"></i>
+                        </div>
+                        </div>
+                </td>
+                <td>
+                    <select class="table-input unit-select">
+                        <option value="">Select Unit</option>
+                        ${getUnitOptions(item.unitId)}
+                    </select>
                 </td>
                 <td><input type="number" class="table-input quantity-input" min="0" step="0.01" value="${item.quantity}" placeholder="0.00"></td>
                 <td><input type="number" class="table-input rate-input" min="0" step="0.01" value="${item.rate}" placeholder="0.00"></td>
@@ -757,10 +831,12 @@ document.addEventListener('DOMContentLoaded', function () {
                 remarks: document.getElementById('remarks').value,
                 accounting_treatment: accountingTreatment,
                 items: items.map((item, index) => {
-                    const productCode = document.querySelectorAll('.product-input')[index].value;
-                    const product = productsMap[productCode];
+                    const productInput = document.querySelectorAll('.product-input')[index];
+                    const productId = productInput.dataset.productId;
+                    const unitId = document.querySelectorAll('.unit-select')[index]?.value || null;
                     return {
-                        product_id: product.id,
+                        product_id: productId,
+                        unit_id: unitId,
                         quantity: item.quantity,
                         rate: item.rate,
                         gross: item.gross
@@ -834,8 +910,8 @@ document.addEventListener('DOMContentLoaded', function () {
         addTableRow();
     }
 
-    // Initialize with one empty row only if not editing
-    if (!isEdit) {
+    // Initialize with one empty row only if not editing — handled inside fetchUnits after units load
+    if (false) {
         addTableRow();
     }
 });

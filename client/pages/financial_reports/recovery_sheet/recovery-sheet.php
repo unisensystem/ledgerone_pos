@@ -143,102 +143,6 @@ $currency_symbol = $currency['symbol'];
                             </tr>
                         </thead>
                         <tbody>
-                            <!-- Row 1 -->
-                            <tr>
-                                <td>1</td>
-                                <td>INV-2023-00123</td>
-                                <td>ABC Manufacturing Co.</td>
-                                <td>123 Industrial Ave, Cityville</td>
-                                <td>(555) 123-4567</td>
-                <td class="balance-positive"><?php echo $currency_symbol; ?>2,500.00</td>
-                                <td></td>
-                                <td></td>
-                                <td><div class="signature-cell"></div></td>
-                            </tr>
-                            <!-- Row 2 -->
-                            <tr>
-                                <td>2</td>
-                                <td>INV-2023-00145</td>
-                                <td>XYZ Retail Solutions</td>
-                                <td>456 Commerce St, Townsville</td>
-                                <td>(555) 987-6543</td>
-                                <td class="balance-positive"><?php echo $currency_symbol; ?>1,850.50</td>
-                                <td></td>
-                                <td></td>
-                                <td><div class="signature-cell"></div></td>
-                            </tr>
-                            <!-- Row 3 -->
-                            <tr>
-                                <td>3</td>
-                                <td>INV-2023-00167</td>
-                                <td>Global Logistics Inc.</td>
-                                <td>789 Harbor Rd, Port City</td>
-                                <td>(555) 456-7890</td>
-                                <td class="balance-positive"><?php echo $currency_symbol; ?>0.00</td>
-                                <td></td>
-                                <td></td>
-                                <td><div class="signature-cell"></div></td>
-                            </tr>
-                            <!-- Row 4 -->
-                            <tr>
-                                <td>4</td>
-                                <td>INV-2023-00189</td>
-                                <td>Prime Construction Ltd.</td>
-                                <td>321 Builder's Blvd, Constructown</td>
-                                <td>(555) 234-5678</td>
-                                <td class="balance-positive"><?php echo $currency_symbol; ?>5,750.25</td>
-                                <td></td>
-                                <td></td>
-                                <td><div class="signature-cell"></div></td>
-                            </tr>
-                            <!-- Row 5 -->
-                            <tr>
-                                <td>5</td>
-                                <td>INV-2023-00201</td>
-                                <td>Metro Food Services</td>
-                                <td>654 Culinary Ct, Foodville</td>
-                                <td>(555) 876-5432</td>
-                                <td class="balance-positive"><?php echo $currency_symbol; ?>980.00</td>
-                                <td></td>
-                                <td></td>
-                                <td><div class="signature-cell"></div></td>
-                            </tr>
-                            <!-- Row 6 -->
-                            <tr>
-                                <td>6</td>
-                                <td>INV-2023-00234</td>
-                                <td>Tech Innovations Corp.</td>
-                                <td>987 Digital Dr, Tech City</td>
-                                <td>(555) 345-6789</td>
-                                <td class="balance-positive"><?php echo $currency_symbol; ?>3,420.75</td>
-                                <td></td>
-                                <td></td>
-                                <td><div class="signature-cell"></div></td>
-                            </tr>
-                            <!-- Row 7 -->
-                            <tr>
-                                <td>7</td>
-                                <td>INV-2023-00256</td>
-                                <td>Green Energy Solutions</td>
-                                <td>147 Solar St, Ecotown</td>
-                                <td>(555) 654-3210</td>
-                                <td class="balance-positive"><?php echo $currency_symbol; ?>0.00</td>
-                                <td></td>
-                                <td></td>
-                                <td><div class="signature-cell"></div></td>
-                            </tr>
-                            <!-- Row 8 -->
-                            <tr>
-                                <td>8</td>
-                                <td>INV-2023-00278</td>
-                                <td>City Hospital Network</td>
-                                <td>258 Medical Ave, Healthville</td>
-                                <td>(555) 765-4321</td>
-                                <td class="balance-positive"><?php echo $currency_symbol; ?>6,150.00</td>
-                                <td></td>
-                                <td></td>
-                                <td><div class="signature-cell"></div></td>
-                            </tr>
                         </tbody>
                     </table>
                 </div>
@@ -247,7 +151,7 @@ $currency_symbol = $currency['symbol'];
                     <div class="summary">
                         <div class="summary-item">
                             <div class="summary-label">Total Balance</div>
-                            <div class="summary-value balance-positive"><?php echo $currency_symbol; ?>20,651.50</div>
+                            <div class="summary-value balance-positive"><?php echo $currency_symbol; ?>0.00</div>
                         </div>
                     </div>
                     <div class="actions">
