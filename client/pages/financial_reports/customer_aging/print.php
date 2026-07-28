@@ -59,17 +59,19 @@ $sql = "
         c.customer_code,
         c.customer_name,
         c.address,
-        COALESCE(SUM(rv.amount), 0) as paid_amount,
+        COALESCE(SUM(DISTINCT rv.amount), 0) as paid_amount,
+        COALESCE(SUM(DISTINCT sr.net_amount), 0) as returned_amount,
         DATEDIFF(CURDATE(), si.sale_date) as days_overdue,
         'Sale Invoice' as invoice_type
     FROM sale_invoice si
     JOIN customers c ON si.customer_id = c.id
     LEFT JOIN receive_voucher rv ON rv.bill_no = si.bill_no AND rv.tenant_id = ?
+    LEFT JOIN sale_return sr ON sr.sale_invoice_no = si.id AND sr.tenant_id = ? AND sr.status = 'Posted'
     WHERE si.tenant_id = ? AND si.status = 'Posted'
     {$siDateCond}
     {$siCompCond}
     GROUP BY si.id
-    HAVING (si.net_amount - paid_amount) > 0
+    HAVING (si.net_amount - paid_amount - returned_amount) > 0
 
     UNION ALL
 
@@ -81,7 +83,8 @@ $sql = "
         c.customer_code,
         c.customer_name,
         c.address,
-        COALESCE(SUM(rv.amount), 0) as paid_amount,
+        COALESCE(SUM(DISTINCT rv.amount), 0) as paid_amount,
+        0 as returned_amount,
         DATEDIFF(CURDATE(), obi.invoice_date) as days_overdue,
         'Opening Balance' as invoice_type
     FROM opening_balance_invoices obi
@@ -96,7 +99,7 @@ $sql = "
     ORDER BY days_overdue DESC
 ";
 
-$params = [$tenant_id, $tenant_id];
+$params = [$tenant_id, $tenant_id, $tenant_id];
 $params = array_merge($params, $dateParams);
 if ($company_id) $params[] = $company_id;
 $params[] = $tenant_id;
@@ -119,7 +122,7 @@ $summary = [
 ];
 
 foreach ($invoices as $invoice) {
-    $outstanding = $invoice['net_amount'] - $invoice['paid_amount'];
+    $outstanding = $invoice['net_amount'] - $invoice['paid_amount'] - $invoice['returned_amount'];
     $days = (int)$invoice['days_overdue'];
 
     if ($days <= 0) {

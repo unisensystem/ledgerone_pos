@@ -85,6 +85,12 @@ try {
                 FROM receive_voucher rv
                 WHERE rv.bill_no = si.bill_no
                 AND rv.tenant_id = ?
+            ), 0) - COALESCE((
+                SELECT SUM(sr.net_amount)
+                FROM sale_return sr
+                WHERE sr.sale_invoice_no = si.id
+                AND sr.tenant_id = ?
+                AND sr.status = 'Posted'
             ), 0) as current_balance,
             si.net_amount as total_sales,
             COALESCE((
@@ -124,6 +130,9 @@ try {
         ORDER BY customer_name
     ";
 
+    // wrap in outer query to filter out zero/negative balances
+    $query = "SELECT * FROM ($query) AS recovery_data WHERE current_balance > 0";
+
     // UNION Part 1: opening_balance_invoices
     // balance subquery: rv.tenant_id
     $params = [$tenant_id];
@@ -146,7 +155,8 @@ try {
     if ($area_id) $params[] = $area_id;
 
     // UNION Part 2: sale_invoice
-    // balance subquery: rv.tenant_id
+    // balance subquery: rv.tenant_id, sr.tenant_id
+    $params[] = $tenant_id;
     $params[] = $tenant_id;
     // received subquery: rv.tenant_id, date_from, date_to, recovery_officer_id
     $params[] = $tenant_id;
