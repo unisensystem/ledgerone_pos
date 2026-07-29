@@ -35,9 +35,11 @@ try {
             p.name as product_name,
             sai.qty,
             sai.rate,
-            sai.stock_value
+            sai.stock_value,
+            u.uom_name
         FROM stock_adjustment_items sai
         JOIN products p ON sai.product_id = p.id
+        LEFT JOIN uom u ON sai.unit_id = u.id
         WHERE sai.tenant_id = ? AND sai.adjustment_id = ?
     ");
     $stmt->execute([$tenant_id, $adjustment_id]);

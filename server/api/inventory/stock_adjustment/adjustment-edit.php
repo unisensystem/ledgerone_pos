@@ -79,8 +79,8 @@ try {
     // Insert stock adjustment items
     $stmt = $pdo->prepare("
         INSERT INTO stock_adjustment_items 
-        (tenant_id, adjustment_id, product_id, qty, rate, stock_value)
-        VALUES (?, ?, ?, ?, ?, ?)
+        (tenant_id, adjustment_id, product_id, unit_id, qty, rate, stock_value)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
     ");
     
     foreach ($items as $item) {
@@ -88,6 +88,7 @@ try {
             $tenant_id,
             $adjustment_id,
             $item['product_id'],
+            $item['unit_id'] ?? null,
             $item['quantity'],
             $item['rate'],
             $item['gross']
@@ -100,7 +101,7 @@ try {
     $stmt = $pdo->prepare("
         INSERT INTO stock_ledger 
         (tenant_id, account_id, branch_id, product_id, reference_table, reference_id, stock_status, qty_in, qty_out, unit_cost, unit_id, transaction_type, transaction_date)
-        VALUES (?, ?, ?, ?, 'stock_adjustment', ?, ?, ?, ?, ?, 1, 'Stock Adjustment', ?)
+        VALUES (?, ?, ?, ?, 'stock_adjustment', ?, ?, ?, ?, ?, ?, 'Stock Adjustment', ?)
     ");
     
     foreach ($items as $item) {
@@ -122,6 +123,7 @@ try {
             $qty_in,
             $qty_out,
             $item['rate'],
+            $item['unit_id'] ?? null,
             $date
         ]);
     }

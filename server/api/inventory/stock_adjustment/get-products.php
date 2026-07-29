@@ -24,7 +24,7 @@ if (!$user_id || !$tenant_id) {
 
 try {
     $stmt = $pdo->prepare("
-        SELECT code, name, id
+        SELECT code, name, id, default_unit_id
         FROM products
         WHERE tenant_id = ? AND is_active = 1
         ORDER BY name ASC
