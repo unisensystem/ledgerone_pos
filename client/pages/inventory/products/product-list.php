@@ -13,8 +13,8 @@ if (!$user_id) {
     header('Location: ../../auth/login.html');
     exit();
 }
-// 👇 ADD KARO
 $initialSearch = $_GET['search'] ?? '';
+
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -70,6 +70,13 @@ $initialSearch = $_GET['search'] ?? '';
                         <path d="M5 7H11M5 10H11" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
                     </svg>
                     Bulk Opening Stock
+                </button>
+                <button class="btn btn-secondary" id="bulkRateUpdateBtn" onclick="location.href='bulk-rate-update.php'" title="Update rates for multiple products">
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M2 8h12M8 2v12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                        <circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="1.5"/>
+                    </svg>
+                    Bulk Rate Update
                 </button>
                 <button class="btn btn-primary" id="addProductBtn">
                     <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -131,6 +138,12 @@ $initialSearch = $_GET['search'] ?? '';
                         <option value="inactive">Inactive</option>
                     </select>
                 </div>
+                <div class="filter-group">
+                    <label for="vendor">Vendor</label>
+                    <select id="vendor">
+                        <option value="">All Vendors</option>
+                    </select>
+                </div>
                 <div class="filter-actions">
                     <button class="btn btn-secondary" id="applyFilters">Apply Filters</button>
                     <button class="btn btn-ghost" id="resetFilters">Reset</button>
@@ -150,6 +163,7 @@ $initialSearch = $_GET['search'] ?? '';
                             <th>Type</th>
                             <th>UOM</th>
                             <th>Category</th>
+                            <th>Vendor</th>
                             <th>Price</th>
                             <th>Status</th>
                             <th>Actions</th>
@@ -163,7 +177,7 @@ $initialSearch = $_GET['search'] ?? '';
 
             <!-- Empty State (hidden by default) -->
             <div id="emptyState" class="empty-state" style="display: none;">
-                <div class="empty-state-icon">📦</div>
+                <div class="empty-state-icon">≡ƒôª</div>
                 <h3>No products found</h3>
                 <p>Try adjusting your search or filters, or add a new product.</p>
                 <button class="btn btn-primary" id="addFirstProduct" style="margin-top: 16px;">Add Your First Product</button>
@@ -196,7 +210,7 @@ $initialSearch = $_GET['search'] ?? '';
     <script src="https://cdn.jsdelivr.net/npm/qrious@4.0.2/dist/qrious.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jsbarcode/3.11.5/JsBarcode.all.min.js"></script>
     <script src="../../../assets/js/inventory/products/product-list.js"></script>
-<?php if ($initialSearch): ?>
+    <?php if ($initialSearch): ?>
 <script>
     window.addEventListener('load', function() {
         const applyBtn = document.getElementById('applyFilters');
