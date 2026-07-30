@@ -68,7 +68,7 @@ try {
     $countryCondition  = $country_id  ? ' AND c.country_id = ?' : '';
     $regionCondition   = $region_id   ? ' AND c.region_id = ?' : '';
     $cityCondition     = $city_id     ? ' AND c.city_id = ?' : '';
-    $zoneCondition     = $zone_id     ? ' AND c.zone_id = ?' : '';
+$zoneCondition     = $zone_id     ? ' AND c.city_zone_id = ?' : '';
     $areaCondition     = $area_id     ? ' AND c.area_id = ?' : '';
 
     // Shared filter fragment + params (same for both branches since both join `customers c`)
