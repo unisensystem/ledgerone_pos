@@ -52,13 +52,13 @@ try {
             break;
 
         case 'areas':
-            if (empty($_GET['zone_id'])) {
-                echo json_encode(['success' => true, 'data' => []]);
-                exit;
-            }
-            $stmt = $pdo->prepare("SELECT id, area_name FROM areas WHERE tenant_id = ? AND zone_id = ? ORDER BY area_name");
-            $stmt->execute([$tenant_id, $_GET['zone_id']]);
-            break;
+    if (empty($_GET['zone_id'])) {
+        echo json_encode(['success' => true, 'data' => []]);
+        exit;
+    }
+    $stmt = $pdo->prepare("SELECT id, area_name FROM areas WHERE tenant_id = ? AND city_zone_id = ? ORDER BY area_name");
+    $stmt->execute([$tenant_id, $_GET['zone_id']]);
+    break;
 
         case 'customers':
             $q = '%' . ($_GET['q'] ?? '') . '%';
