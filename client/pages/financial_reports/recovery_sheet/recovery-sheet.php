@@ -28,6 +28,7 @@ $currency_symbol = $currency['symbol'];
 ?>
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -36,10 +37,11 @@ $currency_symbol = $currency['symbol'];
     <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
     <link rel="stylesheet" href="../../../assets/css/financial_reports/recovery_sheet/recovery-sheet.css">
 </head>
+
 <body>
     <div class="app-container">
         <!-- Main Content -->
-        <div class="main-content">
+        <div class="main-content" style="margin-left: 6px;" >
             <!-- Topbar -->
             <div class="topbar">
                 <div class="page-title">Recovery Management</div>
@@ -133,12 +135,14 @@ $currency_symbol = $currency['symbol'];
                             <tr>
                                 <th>S#</th>
                                 <th>Bill No</th>
+                                <th>Invoice Date</th>
                                 <th>Customer Name</th>
                                 <th>Address</th>
                                 <th>Primary Phone No</th>
                                 <th>Balance</th>
                                 <th>Received Amount</th>
                                 <th>Sales Return</th>
+                                <th>Days Overdue</th>
                                 <th>Signature</th>
                             </tr>
                         </thead>
@@ -177,4 +181,5 @@ $currency_symbol = $currency['symbol'];
     <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
     <script src="../../../assets/js/financial_reports/recovery_sheet/recovery-sheet.js"></script>
 </body>
+
 </html>
