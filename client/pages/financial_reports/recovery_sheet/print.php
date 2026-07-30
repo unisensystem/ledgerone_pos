@@ -101,13 +101,15 @@ if ($area_id) {
     $area_name = $s->fetchColumn() ?: '';
 }
 
-// ── Data query (exact same logic as API) ────────────────────────────────────
+// ── Data query (exact same logic as API, with invoice_date + days_overdue) ──
 $query = "
     SELECT
         c.customer_name,
         c.address,
         c.primary_phone,
         obi.invoice_number AS bill_no,
+        obi.invoice_date,
+        DATEDIFF(CURDATE(), obi.invoice_date) AS days_overdue,
         obi.debit - COALESCE((
             SELECT SUM(rv.amount)
             FROM receive_voucher rv
@@ -151,6 +153,8 @@ $query = "
         c.address,
         c.primary_phone,
         si.bill_no,
+        si.sale_date AS invoice_date,
+        DATEDIFF(CURDATE(), si.sale_date) AS days_overdue,
         si.net_amount - COALESCE((
             SELECT SUM(rv.amount)
             FROM receive_voucher rv
@@ -276,38 +280,38 @@ $territory_str   = implode(' > ', $territory_parts);
         .print-container {
             max-width: 1100px;
             margin: 0 auto;
-            padding: 20px;
+            padding: 14px;
         }
 
         /* ── Header ── */
         .print-header {
             text-align: center;
             border-bottom: 2px solid #000;
-            padding-bottom: 12px;
-            margin-bottom: 14px;
+            padding-bottom: 8px;
+            margin-bottom: 10px;
         }
         .print-header img {
-            max-height: 70px;
-            max-width: 200px;
-            margin-bottom: 6px;
+            max-height: 50px;
+            max-width: 150px;
+            margin-bottom: 4px;
             display: block;
             margin-left: auto;
             margin-right: auto;
         }
-        .print-header .company-name { font-size: 18px; font-weight: bold; margin-bottom: 3px; }
-        .print-header .company-sub  { font-size: 11px; color: #444; margin-bottom: 2px; }
-        .print-header .report-title { font-size: 15px; font-weight: bold; margin-top: 8px; }
+        .print-header .company-name { font-size: 15px; font-weight: bold; margin-bottom: 2px; }
+        .print-header .company-sub  { font-size: 9px; color: #444; margin-bottom: 1px; }
+        .print-header .report-title { font-size: 13px; font-weight: bold; margin-top: 5px; }
 
         /* ── Filter info ── */
         .filter-bar {
             display: flex;
             flex-wrap: wrap;
-            gap: 6px 20px;
+            gap: 4px 16px;
             background: #f5f5f5;
             border: 1px solid #ddd;
-            padding: 8px 12px;
-            margin-bottom: 12px;
-            font-size: 10px;
+            padding: 5px 10px;
+            margin-bottom: 8px;
+            font-size: 9px;
         }
         .filter-bar span { color: #555; }
         .filter-bar strong { color: #000; }
@@ -316,61 +320,64 @@ $territory_str   = implode(' > ', $territory_parts);
         .summary-row {
             display: grid;
             grid-template-columns: repeat(3, 1fr);
-            gap: 8px;
-            margin-bottom: 14px;
+            gap: 6px;
+            margin-bottom: 10px;
         }
         .summary-box {
             border: 1px solid #ddd;
-            border-left: 4px solid #1f7bff;
-            padding: 8px 12px;
+            border-left: 3px solid #1f7bff;
+            padding: 5px 10px;
             text-align: center;
         }
         .summary-box.green  { border-left-color: #2fbf71; }
         .summary-box.orange { border-left-color: #e8a23f; }
-        .summary-box .s-label { font-size: 10px; color: #666; margin-bottom: 3px; }
-        .summary-box .s-value { font-size: 14px; font-weight: bold; }
+        .summary-box .s-label { font-size: 9px; color: #666; margin-bottom: 2px; }
+        .summary-box .s-value { font-size: 12px; font-weight: bold; }
 
         /* ── Table ── */
         table {
             width: 100%;
             border-collapse: collapse;
-            margin-bottom: 16px;
+            margin-bottom: 12px;
         }
         th {
             background: #f0f0f0;
             border: 1px solid #bbb;
-            padding: 7px 6px;
-            font-size: 10px;
+            padding: 5px 4px;
+            font-size: 9px;
             font-weight: bold;
+            text-align: center;
         }
         td {
             border: 1px solid #ccc;
-            padding: 6px;
-            font-size: 10px;
+            padding: 4px;
+            font-size: 11px;
             vertical-align: middle;
+            text-align: center;
         }
         tr:nth-child(even) td { background: #fafafa; }
         .text-right  { text-align: right; }
         .text-center { text-align: center; }
-        .signature-cell { height: 36px; }
+        .text-left   { text-align: left; }
+        .signature-cell { height: 24px; }
 
         /* ── Footer ── */
         .print-footer {
             border-top: 2px solid #000;
-            padding-top: 10px;
-            margin-top: 10px;
+            padding-top: 6px;
+            margin-top: 6px;
         }
         .totals-row {
             display: flex;
             justify-content: space-between;
             font-weight: bold;
-            font-size: 11px;
-            margin-bottom: 20px;
+            font-size: 9px;
+            margin-bottom: 14px;
         }
         .signatures {
             display: flex;
             justify-content: space-between;
-            margin-top: 40px;
+            margin-top: 25px;
         }
         .sig-box {
             width: 30%;
@@ -378,16 +385,16 @@ $territory_str   = implode(' > ', $territory_parts);
         }
         .sig-line {
             border-bottom: 1px solid #000;
-            height: 35px;
-            margin-bottom: 4px;
+            height: 24px;
+            margin-bottom: 3px;
         }
-        .sig-label { font-size: 10px; color: #444; }
+        .sig-label { font-size: 9px; color: #444; }
 
         .generated-by {
             text-align: center;
-            font-size: 9px;
+            font-size: 8px;
             color: #888;
-            margin-top: 16px;
+            margin-top: 12px;
         }
 
         /* ── No-data ── */
@@ -501,15 +508,17 @@ $territory_str   = implode(' > ', $territory_parts);
     <table>
         <thead>
             <tr>
-                <th class="text-center" style="width:4%">S#</th>
-                <th style="width:11%">Bill No</th>
-                <th style="width:18%">Customer Name</th>
-                <th style="width:20%">Address</th>
-                <th style="width:10%">Phone</th>
-                <th class="text-right" style="width:10%">Balance</th>
-                <th style="width:10%">Received</th>
-                <th style="width:10%">Return</th>
-                <th style="width:7%">Signature</th>
+                <th class="text-center" style="width:1%">S#</th>
+                <th style="width:3%">Bill No</th>
+                <th style="width:3%">Date</th>
+                <th style="width:2%">Customer Name</th>
+                <th style="width:8%">Address</th>
+                <th style="width:2%">Phone</th>
+                <th class="text-center" style="width:3%">Balance</th>
+                <th class="text-center" style="width:2%">Received</th>
+                <th class="text-center" style="width:3%">Return</th>
+                <th class="text-center" style="width:2%">Days Overdue</th>
+                <th style="width:6%">Signature</th>
             </tr>
         </thead>
         <tbody>
@@ -519,6 +528,7 @@ $territory_str   = implode(' > ', $territory_parts);
             <tr>
                 <td class="text-center"><?php echo $i + 1; ?></td>
                 <td><?php echo htmlspecialchars($row['bill_no'] ?? ''); ?></td>
+                <td><?php echo !empty($row['invoice_date']) ? date('d-m-y', strtotime($row['invoice_date'])) : ''; ?></td>
                 <td><?php echo htmlspecialchars($row['customer_name'] ?? ''); ?></td>
                 <td><?php echo htmlspecialchars($row['address'] ?? ''); ?></td>
                 <td><?php echo htmlspecialchars($row['primary_phone'] ?? ''); ?></td>
@@ -527,6 +537,7 @@ $territory_str   = implode(' > ', $territory_parts);
                 </td>
                 <td></td>
                 <td></td>
+                <td class="text-center"><?php echo isset($row['days_overdue']) ? (int)$row['days_overdue'] : ''; ?></td>
                 <td><div class="signature-cell"></div></td>
             </tr>
             <?php endforeach; ?>
