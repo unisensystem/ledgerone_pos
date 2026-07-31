@@ -51,9 +51,6 @@ $initialSearch = $_GET['search'] ?? '';
                     <label for="customerFilter">Customer</label>
                     <select id="customerFilter">
                         <option value="">All Customers</option>
-                        <option value="ABC Suppliers">ABC Suppliers</option>
-                        <option value="XYZ Corporation">XYZ Corporation</option>
-                        <option value="Global Fuel Inc">Global Fuel Inc</option>
                     </select>
                 </div>
                 <div class="form-group">

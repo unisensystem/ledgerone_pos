@@ -30,14 +30,26 @@ try {
     // Get filters
     $dateFrom = $_GET['dateFrom'] ?? null;
     $dateTo = $_GET['dateTo'] ?? null;
-    $companyFilter = $_GET['company'] ?? null;
+    $companyFilter = isset($_GET['company_id']) && $_GET['company_id'] !== '' ? (int)$_GET['company_id'] : null;
     $customerFilter = $_GET['customer'] ?? null;
     $search = $_GET['search'] ?? null;
     
+    // Get user's assigned companies
+    $stmtUC = $pdo->prepare("SELECT company_id FROM user_companies WHERE tenant_id = ? AND user_id = ?");
+    $stmtUC->execute([$tenant_id, $user_id]);
+    $assignedCompanies = $stmtUC->fetchAll(PDO::FETCH_COLUMN);
+
     // Build WHERE clause
     $whereConditions = ["si.tenant_id = ?", "si.status = 'Posted'"];
     $params = [$tenant_id];
-    
+
+    // Restrict to user's assigned companies if any
+    if (!empty($assignedCompanies)) {
+        $ph = implode(',', array_fill(0, count($assignedCompanies), '?'));
+        $whereConditions[] = "si.company_id IN ($ph)";
+        $params = array_merge($params, $assignedCompanies);
+    }
+
     if ($dateFrom) {
         $whereConditions[] = "si.sale_date >= ?";
         $params[] = $dateFrom;
@@ -47,7 +59,7 @@ try {
         $params[] = $dateTo;
     }
     if ($companyFilter) {
-        $whereConditions[] = "co.company_name = ?";
+        $whereConditions[] = "si.company_id = ?";
         $params[] = $companyFilter;
     }
     if ($customerFilter) {
@@ -82,6 +94,7 @@ try {
             si.sale_date,
             si.customer_id,
             c.customer_name,
+            si.company_id,
             co.company_name,
             COUNT(sii.id) as item_count,
             si.net_amount,

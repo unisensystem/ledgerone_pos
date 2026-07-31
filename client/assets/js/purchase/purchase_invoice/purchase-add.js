@@ -20,7 +20,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const form = document.getElementById('invoiceForm');
 
     // Load all data, then initialize dropdowns and add first row
-    Promise.all([loadSuppliers(), loadBranches(), loadProducts(), loadUOM(), loadCurrencies(), loadCompanies(), loadAssocCompanies(), loadPurchaseOrders(), loadProjects(), fetchContainers()]).then(() => {
+    Promise.all([loadSuppliers(), loadProducts(), loadUOM(), loadCurrencies(), loadCompanies(), loadAssocCompanies(), loadPurchaseOrders(), loadProjects(), fetchContainers()]).then(() => {
         initSearchableDropdown('supplierCodeSearch', 'supplierCodeOptions', 'supplierCode');
         initSearchableDropdown('branchSearch', 'branchOptions', 'branch');
         initSearchableDropdown('purchaseOrderSearch', 'purchaseOrderOptions', 'purchaseOrder');
@@ -50,8 +50,8 @@ document.addEventListener('DOMContentLoaded', function () {
         document.getElementById('subAccount').value = '';
 
         if (!assocCompanyId) {
-            // Show all suppliers
-            loadSuppliers();
+            const currentCompanyId = document.getElementById('company')?.value || null;
+            loadSuppliers(currentCompanyId);
             return;
         }
 
@@ -94,14 +94,16 @@ document.addEventListener('DOMContentLoaded', function () {
     document.getElementById('closeSupplierModalBtn').addEventListener('click', function () {
         document.getElementById('addSupplierModal').style.display = 'none';
         document.getElementById('supplierIframe').src = '';
-        loadSuppliers();
+        const currentCompanyId = document.getElementById('company')?.value || null;
+        loadSuppliers(currentCompanyId);
     });
 
     // Close product modal
     document.getElementById('closeProductModalBtn').addEventListener('click', function () {
         document.getElementById('addProductModal').style.display = 'none';
         document.getElementById('productIframe').src = '';
-        loadProducts();
+        const currentCompanyId = document.getElementById('company')?.value || null;
+        loadProducts(currentCompanyId).then(() => rebuildProductDropdowns());
     });
 
     // Close modals when clicking outside
@@ -137,9 +139,12 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 
     // Load suppliers from API
-    async function loadSuppliers() {
+    async function loadSuppliers(companyId = null) {
         try {
-            const response = await fetch('../../../../server/api/purchase/purchase_invoice/get-suppliers.php');
+            const url = companyId
+                ? `../../../../server/api/purchase/purchase_invoice/get-suppliers.php?company_id=${companyId}`
+                : '../../../../server/api/purchase/purchase_invoice/get-suppliers.php';
+            const response = await fetch(url);
             const data = await response.json();
 
             if (data.success) {
@@ -162,9 +167,12 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     // Load branches from API
-    async function loadBranches() {
+    async function loadBranches(companyId = null) {
         try {
-            const response = await fetch('../../../../server/api/purchase/purchase_invoice/get-branches.php');
+            const url = companyId
+                ? `../../../../server/api/purchase/purchase_invoice/get-branches.php?company_id=${companyId}`
+                : '../../../../server/api/purchase/purchase_invoice/get-branches.php';
+            const response = await fetch(url);
             const data = await response.json();
 
             if (data.success) {
@@ -190,9 +198,12 @@ document.addEventListener('DOMContentLoaded', function () {
 
 
     // Load products from API
-    async function loadProducts() {
+    async function loadProducts(companyId = null) {
         try {
-            const response = await fetch('../../../../server/api/purchase/purchase_invoice/get-products.php');
+            const url = companyId
+                ? `../../../../server/api/purchase/purchase_invoice/get-products.php?company_id=${companyId}`
+                : '../../../../server/api/purchase/purchase_invoice/get-products.php';
+            const response = await fetch(url);
             const data = await response.json();
 
             if (data.success) {
@@ -284,9 +295,15 @@ document.addEventListener('DOMContentLoaded', function () {
                     companySelect.appendChild(option);
                 });
 
-                // Auto-select if only one company
+                // Auto-select if only one company, else load all branches
                 if (data.companies.length === 1) {
                     companySelect.value = data.companies[0].id;
+                    const autoCompanyId = data.companies[0].id;
+                    loadSuppliers(autoCompanyId);
+                    loadProducts(autoCompanyId).then(() => rebuildProductDropdowns());
+                    loadBranches(autoCompanyId);
+                } else {
+                    loadBranches();
                 }
             }
         } catch (error) {
@@ -542,6 +559,15 @@ document.addEventListener('DOMContentLoaded', function () {
                 document.getElementById('transportName').value = invoice.transport_name || '';
                 document.getElementById('company').value = invoice.company_id || '';
                 document.getElementById('associatedCompany').value = invoice.assoc_company_id || '';
+
+                // Reload dropdowns filtered by this invoice's company
+                const editCompanyId = invoice.company_id || null;
+                await Promise.all([
+                    loadSuppliers(editCompanyId),
+                    loadProducts(editCompanyId),
+                    loadBranches(editCompanyId)
+                ]);
+                rebuildProductDropdowns();
                 document.getElementById('supplierCodeSearch').value = `${invoice.supplier_code || ''} - ${invoice.supplier_name || ''}`;
                 document.getElementById('supplierCode').value = invoice.supplier_id || '';
                 const branchText = invoice.parent_branch_name
@@ -1884,7 +1910,29 @@ document.addEventListener('DOMContentLoaded', function () {
         if (supplierId && window.loadInvoiceLevelTaxRegimes) {
             window.loadInvoiceLevelTaxRegimes(supplierId, companyId);
         }
+        // Reload suppliers, products, branches filtered by selected company
+        loadSuppliers(companyId);
+        loadProducts(companyId).then(() => rebuildProductDropdowns());
+        loadBranches(companyId);
+        // Clear current supplier and branch selection
+        document.getElementById('supplierCodeSearch').value = '';
+        document.getElementById('supplierCode').value = '';
+        document.getElementById('branchSearch').value = '';
+        document.getElementById('branch').value = '';
     });
+
+    function rebuildProductDropdowns() {
+        const tbody = document.getElementById('itemsTable')?.getElementsByTagName('tbody')[0];
+        if (!tbody) return;
+        Array.from(tbody.rows).forEach(row => {
+            const searchInput = row.querySelector('.search-input');
+            if (!searchInput || !searchInput.dropdownOptions) return;
+            const optionsContainer = searchInput.dropdownOptions;
+            optionsContainer.innerHTML = productsData.map(product => {
+                return `<div class="dropdown-option" data-product='${JSON.stringify(product)}' style="display:flex;align-items:center;">${product.code} - ${product.name}</div>`;
+            }).join('');
+        });
+    }
 
     function updateInvoiceSummaryFromAmount() {
         let totalBill = 0;

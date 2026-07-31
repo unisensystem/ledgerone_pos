@@ -100,6 +100,8 @@ try {
                    COUNT(DISTINCT sii.id) as item_count,
                    si.net_amount,
                    cur.symbol as currency_symbol,
+                   u.full_name as created_by_name,
+                   so.full_name as sales_officer_name,
                    CASE
                        WHEN dc_counts.dc_count IS NULL OR dc_counts.dc_count = 0 THEN 'No DC'
                        WHEN dc_counts.partial_count > 0 THEN 'Partial'
@@ -110,6 +112,8 @@ try {
             LEFT JOIN companies co  ON si.company_id  = co.id
             LEFT JOIN sale_invoice_items sii ON si.id = sii.sale_invoice_id
             LEFT JOIN ledgerone_public.currencies cur ON si.currency_id = cur.id
+            LEFT JOIN users u ON si.created_by = u.id
+            LEFT JOIN employees so ON si.sale_officer_id = so.id
             LEFT JOIN (
                 SELECT
                     sii2.sale_invoice_id,

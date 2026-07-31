@@ -25,6 +25,7 @@ function initializeListPage(permissions) {
     let invoices = [];
     let currentPage = 1;
     let totalPages = 1;
+    let pageLimit = parseInt(localStorage.getItem('pos_list_page_limit')) || 10;
     const invoicesTable = document.getElementById('invoicesTable').getElementsByTagName('tbody')[0];
     let selectedIds = new Set();
 
@@ -298,7 +299,7 @@ function initializeListPage(permissions) {
     // Load invoices from API
     async function loadInvoices(page = 1) {
         try {
-            const params = new URLSearchParams({ page, limit: 10 });
+            const params = new URLSearchParams({ page, limit: pageLimit });
 
             const dateFrom = document.getElementById('dateFrom');
             const dateTo   = document.getElementById('dateTo');
@@ -333,7 +334,9 @@ function initializeListPage(permissions) {
                     totalAmount: parseFloat(invoice.net_amount),
                     currencySymbol: invoice.currency_symbol || '',
 
-                    dcStatus: invoice.dc_status || 'No DC'
+                    dcStatus: invoice.dc_status || 'No DC',
+                    createdBy: invoice.created_by_name || 'N/A',
+                    salesOfficer: invoice.sales_officer_name || 'N/A'
                 }));
                 currentPage = data.pagination.page;
                 totalPages = data.pagination.pages;
@@ -384,17 +387,21 @@ function initializeListPage(permissions) {
             row.insertCell(1).textContent = invoice.invoiceNo;
             row.insertCell(2).textContent = formattedDate;
             row.insertCell(3).textContent = invoice.customer || 'N/A';
-            row.insertCell(4).textContent = invoice.items;
-            row.insertCell(5).textContent = formattedAmount;
+            row.insertCell(4).textContent = invoice.salesOfficer;
+            row.insertCell(5).textContent = invoice.items;
+            row.insertCell(6).textContent = formattedAmount;
 
             // DC Status cell
-            const dcStatusCell = row.insertCell(6);
+            const dcStatusCell = row.insertCell(7);
             const dcBadge = document.createElement('span');
             dcBadge.className = 'status ' + (invoice.dcStatus === 'Fulfilled' ? 'status-paid' : invoice.dcStatus === 'Partial' ? 'status-pending' : 'status-overdue');
             dcBadge.textContent = invoice.dcStatus;
             dcStatusCell.appendChild(dcBadge);
 
-            const actionsCell = row.insertCell(7);
+            // Created By cell
+            row.insertCell(8).textContent = invoice.createdBy;
+
+            const actionsCell = row.insertCell(9);
             const actionButtons = document.createElement('div');
             actionButtons.className = 'action-buttons';
 
@@ -465,6 +472,22 @@ function initializeListPage(permissions) {
         document.getElementById('totalInvoiceCount').textContent = count;
         document.getElementById('totalAmountSum').textContent = `${currencySymbol} ${total.toFixed(3)}`;
     }
+
+    // Page limit change
+    const pageLimitSelect = document.getElementById('pageLimitSelect');
+    if (pageLimitSelect) {
+        pageLimitSelect.value = pageLimit;
+        pageLimitSelect.addEventListener('change', function () {
+            pageLimit = parseInt(this.value);
+            localStorage.setItem('pos_list_page_limit', pageLimit);
+            loadInvoices(1);
+        });
+    }
+
+    // Set default dates to today
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById('dateFrom').value = today;
+    document.getElementById('dateTo').value = today;
 
     // Initial load
     loadInvoices();

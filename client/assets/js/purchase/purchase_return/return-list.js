@@ -24,10 +24,36 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
+    // Load suppliers for filter dropdown
+    async function loadSuppliers(companyId = '') {
+        try {
+            const url = companyId
+                ? `../../../../server/api/purchase/purchase_return/get-suppliers.php?company_id=${companyId}`
+                : '../../../../server/api/purchase/purchase_return/get-suppliers.php';
+            const response = await fetch(url);
+            const data = await response.json();
+            if (data.success) {
+                const supplierFilter = document.getElementById('supplierFilter');
+                supplierFilter.innerHTML = '<option value="">All Suppliers</option>';
+                data.suppliers.forEach(s => {
+                    const option = document.createElement('option');
+                    option.value = s.id;
+                    option.textContent = s.supplier_name;
+                    supplierFilter.appendChild(option);
+                });
+            }
+        } catch (error) {
+            console.error('Error loading suppliers:', error);
+        }
+    }
+
     // Load invoices from API
     async function loadInvoices(page = 1) {
         try {
-            const response = await fetch(`../../../../server/api/purchase/purchase_return/return-list.php?page=${page}&limit=10`);
+            const companyId = document.getElementById('companyFilter').value;
+            const params = new URLSearchParams({ page, limit: 10 });
+            if (companyId) params.append('company_id', companyId);
+            const response = await fetch(`../../../../server/api/purchase/purchase_return/return-list.php?${params}`);
             const data = await response.json();
             
             if (data.success) {
@@ -36,6 +62,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     invoiceNo: invoice.bill_no,
                     date: invoice.purchase_date,
                     supplier: invoice.supplier_name,
+                    supplierId: invoice.supplier_id,
                     items: invoice.item_count,
                     totalAmount: parseFloat(invoice.net_amount),
                     currencySymbol: invoice.currency_symbol || '',
@@ -111,6 +138,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // Initial load
     loadCompanies();
+    loadSuppliers();
     loadInvoices();
 
     // Filter functionality
@@ -147,7 +175,7 @@ document.addEventListener('DOMContentLoaded', function () {
         // Supplier filter
         if (supplierFilter.value) {
             filteredInvoices = filteredInvoices.filter(invoice =>
-                invoice.supplier === supplierFilter.value
+                invoice.supplierId == supplierFilter.value
             );
         }
 
@@ -158,7 +186,7 @@ document.addEventListener('DOMContentLoaded', function () {
             const searchTerm = searchInput.value.toLowerCase();
             filteredInvoices = filteredInvoices.filter(invoice =>
                 invoice.invoiceNo.toLowerCase().includes(searchTerm) ||
-                invoice.supplier.toLowerCase().includes(searchTerm)
+                (invoice.supplier && invoice.supplier.toLowerCase().includes(searchTerm))
             );
         }
 
@@ -168,7 +196,7 @@ document.addEventListener('DOMContentLoaded', function () {
     // Add event listeners for filters
     dateFrom.addEventListener('change', applyFilters);
     dateTo.addEventListener('change', applyFilters);
-    companyFilter.addEventListener('change', applyFilters);
+    companyFilter.addEventListener('change', () => { loadSuppliers(companyFilter.value); loadInvoices(1); });
     supplierFilter.addEventListener('change', applyFilters);
     statusFilter.addEventListener('change', applyFilters);
     searchInput.addEventListener('input', applyFilters);

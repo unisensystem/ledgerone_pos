@@ -16,7 +16,7 @@ if (!$tenant_id) {
 }
 
 $product_id = $_GET['product_id'] ?? null;
-$branch_id = $_GET['branch_id'] ?? null;
+$company_id = isset($_GET['company_id']) && $_GET['company_id'] !== '' ? (int)$_GET['company_id'] : null;
 
 if (!$product_id) {
     echo json_encode(['success' => true, 'stock' => 0, 'unit_name' => '']);
@@ -44,7 +44,7 @@ try {
     $unitName = $productData['uom_name'] ?? '';
     $baseUnitId = $productData['base_unit_id'];
     
-    // Get stock from stock_ledger with conversion factors applied (same as stock position)
+    // Get stock from stock_ledger — sum across all branches of the company
     $query = "
         SELECT 
             COALESCE(SUM(
@@ -54,14 +54,15 @@ try {
         FROM stock_ledger sl
         LEFT JOIN uom u ON sl.unit_id = u.id
         LEFT JOIN product_uom_conversions puc ON sl.product_id = puc.product_id AND sl.unit_id = puc.uom_id
+        LEFT JOIN branches b ON sl.branch_id = b.id
         WHERE sl.tenant_id = ? AND sl.product_id = ? AND sl.account_id = ?
     ";
     
     $params = [$tenant_id, $product_id, $inventoryAccountId];
     
-    if ($branch_id) {
-        $query .= " AND sl.branch_id = ?";
-        $params[] = $branch_id;
+    if ($company_id) {
+        $query .= " AND b.company_id = ?";
+        $params[] = $company_id;
     }
     
     $stmt = $pdo->prepare($query);

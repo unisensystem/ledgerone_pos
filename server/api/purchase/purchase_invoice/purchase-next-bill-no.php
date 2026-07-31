@@ -14,18 +14,17 @@ if (!$tenant_id) {
 }
 
 try {
-    $billStmt = $pdo->prepare("SELECT bill_no FROM purchase_invoice WHERE tenant_id = ? ORDER BY id DESC LIMIT 1");
-    $billStmt->execute([$tenant_id]);
-    $lastBill = $billStmt->fetchColumn();
+    $company_id = isset($_GET['company_id']) && $_GET['company_id'] !== '' ? (int)$_GET['company_id'] : null;
 
-    if ($lastBill) {
-        $lastNumber = (int)substr($lastBill, 4);
-        $newNumber = $lastNumber + 1;
+    if ($company_id) {
+        $billStmt = $pdo->prepare("SELECT MAX(CAST(SUBSTRING(bill_no, 5) AS UNSIGNED)) FROM purchase_invoice WHERE tenant_id = ? AND company_id = ? AND bill_no LIKE 'PUR-%'");
+        $billStmt->execute([$tenant_id, $company_id]);
     } else {
-        $newNumber = 1;
+        $billStmt = $pdo->prepare("SELECT MAX(CAST(SUBSTRING(bill_no, 5) AS UNSIGNED)) FROM purchase_invoice WHERE tenant_id = ? AND bill_no LIKE 'PUR-%'");
+        $billStmt->execute([$tenant_id]);
     }
-
-    $billNo = 'PUR-' . str_pad($newNumber, 4, '0', STR_PAD_LEFT);
+    $lastNumber = (int)$billStmt->fetchColumn();
+    $billNo = 'PUR-' . str_pad($lastNumber + 1, 4, '0', STR_PAD_LEFT);
 
     echo json_encode(['success' => true, 'bill_no' => $billNo]);
 } catch (Exception $e) {
