@@ -11,6 +11,33 @@ $customer_id = $_GET['customer_id'] ?? null;
 if (!$customer_id) { echo json_encode(['success' => true, 'data' => []]); exit; }
 
 try {
+    // Get company IDs this user has access to (within current tenant)
+    $companyStmt = $pdo->prepare("
+        SELECT company_id
+        FROM user_companies
+        WHERE user_id = ? AND tenant_id = ?
+    ");
+    $companyStmt->execute([$user_id, $tenant_id]);
+    $companyIds = $companyStmt->fetchAll(PDO::FETCH_COLUMN);
+
+    if (empty($companyIds)) {
+        echo json_encode(['success' => true, 'data' => []]);
+        exit;
+    }
+
+    $placeholders = implode(',', array_fill(0, count($companyIds), '?'));
+
+    // Verify this customer belongs to one of the user's assigned companies
+    $checkStmt = $pdo->prepare("
+        SELECT id FROM customers 
+        WHERE tenant_id = ? AND id = ? AND company_id IN ($placeholders)
+    ");
+    $checkStmt->execute(array_merge([$tenant_id, $customer_id], $companyIds));
+    if (!$checkStmt->fetch()) {
+        echo json_encode(['success' => true, 'data' => []]);
+        exit;
+    }
+
     $stmt = $pdo->prepare("
         SELECT 
             pdc.id,
