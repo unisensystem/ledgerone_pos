@@ -17,7 +17,9 @@ if (!$tenant_id || !$user_id) {
 }
 
 try {
-    $stmt = $pdo->prepare("
+    $company_id = isset($_GET['company_id']) && $_GET['company_id'] !== '' ? (int)$_GET['company_id'] : null;
+
+    $sql = "
         SELECT
             b.id,
             b.branch_code,
@@ -30,9 +32,17 @@ try {
         WHERE ub.tenant_id = ?
           AND ub.user_id   = ?
           AND b.is_active  = 1
-        ORDER BY pb.branch_name, b.branch_name
-    ");
-    $stmt->execute([$tenant_id, $user_id]);
+    ";
+    $params = [$tenant_id, $user_id];
+
+    if ($company_id) {
+        $sql .= " AND b.company_id = ?";
+        $params[] = $company_id;
+    }
+
+    $sql .= " ORDER BY pb.branch_name, b.branch_name";
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute($params);
     $branches = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
     echo json_encode(['success' => true, 'branches' => $branches]);

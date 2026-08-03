@@ -191,13 +191,15 @@ $initialSearch = $_GET['search'] ?? '';
                     <thead>
                         <tr>
                             <th width="3%"><input type="checkbox" id="selectAllCheckbox" title="Select All"></th>
-                            <th width="12%">Invoice No</th>
-                            <th width="15%">Date</th>
-                            <th width="25%">Customer</th>
-                            <th width="10%">Items</th>
-                            <th width="12%">Total Amount</th>
-                            <th width="10%">DC Status</th>
-                            <th width="21%">Actions</th>
+                            <th width="10%">Invoice No</th>
+                            <th width="9%">Date</th>
+                            <th width="16%">Customer</th>
+                            <th width="10%">Sales Officer</th>
+                            <th width="5%">Items</th>
+                            <th width="10%">Total Amount</th>
+                            <th width="8%">DC Status</th>
+                            <th width="10%">Created By</th>
+                            <th width="19%">Actions</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -207,12 +209,18 @@ $initialSearch = $_GET['search'] ?? '';
             </div>
 
             <div class="pagination">
-                <div class="pagination-info" id="paginationInfo">
-                    Showing 0 to 0 of 0 entries
+                <div style="display:flex; align-items:center; gap:10px;">
+                    <div class="pagination-info" id="paginationInfo">Showing 0 to 0 of 0 entries</div>
+                    <select id="pageLimitSelect" style="height:34px; padding:0 10px; font-size:13px; width:auto;">
+                        <option value="10">10</option>
+                        <option value="25">25</option>
+                        <option value="50">50</option>
+                        <option value="100">100</option>
+                        <option value="250">250</option>
+                    </select>
+                    <span style="font-size:13px; color:var(--subtext);">per page</span>
                 </div>
-                <div class="pagination-controls" id="paginationControls">
-                    <!-- Dynamic pagination buttons will be generated here -->
-                </div>
+                <div class="pagination-controls" id="paginationControls"></div>
             </div>
         </div>
     </div>

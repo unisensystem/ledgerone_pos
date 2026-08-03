@@ -16,7 +16,10 @@ if (!$tenant_id) {
 }
 
 try {
-    $stmt = $pdo->prepare("
+    $company_id  = isset($_GET['company_id'])  && $_GET['company_id']  !== '' ? (int)$_GET['company_id']  : null;
+    $supplier_id = isset($_GET['supplier_id']) && $_GET['supplier_id'] !== '' ? (int)$_GET['supplier_id'] : null;
+
+    $sql = "
         SELECT 
             pi.id, 
             pi.bill_no, 
@@ -27,10 +30,14 @@ try {
         FROM purchase_invoice pi
         LEFT JOIN suppliers s ON pi.supplier_id = s.id
         LEFT JOIN ledgerone_public.currencies c ON pi.currency_id = c.id
-        WHERE pi.tenant_id = ? 
-        ORDER BY pi.purchase_date DESC, pi.bill_no DESC
-    ");
-    $stmt->execute([$tenant_id]);
+        WHERE pi.tenant_id = ?
+    ";
+    $params = [$tenant_id];
+    if ($company_id)  { $sql .= " AND pi.company_id = ?";  $params[] = $company_id; }
+    if ($supplier_id) { $sql .= " AND pi.supplier_id = ?"; $params[] = $supplier_id; }
+    $sql .= " ORDER BY pi.purchase_date DESC, pi.bill_no DESC LIMIT 200";
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute($params);
     $invoices = $stmt->fetchAll(PDO::FETCH_ASSOC);
     
     echo json_encode(['success' => true, 'invoices' => $invoices]);

@@ -8,18 +8,30 @@ header('Access-Control-Allow-Headers: Content-Type');
 
 session_start();
 $tenant_id = $_SESSION['tenant_id'] ?? null;
+$user_id   = $_SESSION['user_id']   ?? null;
 
-if (!$tenant_id) {
+if (!$tenant_id || !$user_id) {
     http_response_code(401);
     echo json_encode(['success' => false, 'message' => 'Unauthorized']);
     exit;
 }
 
 try {
-    $stmt = $pdo->prepare("SELECT id, company_name, legal_name FROM companies WHERE tenant_id = ? AND is_active = 1 ORDER BY company_name");
-    $stmt->execute([$tenant_id]);
+    $user_id = $_SESSION['user_id'] ?? null;
+    $stmtUC = $pdo->prepare("SELECT company_id FROM user_companies WHERE tenant_id = ? AND user_id = ?");
+    $stmtUC->execute([$tenant_id, $user_id]);
+    $assigned = $stmtUC->fetchAll(PDO::FETCH_COLUMN);
+
+    if (!empty($assigned)) {
+        $ph = implode(',', array_fill(0, count($assigned), '?'));
+        $stmt = $pdo->prepare("SELECT id, company_name FROM companies WHERE tenant_id = ? AND is_active = 1 AND id IN ($ph) ORDER BY company_name");
+        $stmt->execute(array_merge([$tenant_id], $assigned));
+    } else {
+        $stmt = $pdo->prepare("SELECT id, company_name FROM companies WHERE tenant_id = ? AND is_active = 1 ORDER BY company_name");
+        $stmt->execute([$tenant_id]);
+    }
     $companies = $stmt->fetchAll(PDO::FETCH_ASSOC);
-    
+
     echo json_encode(['success' => true, 'companies' => $companies]);
 } catch (Exception $e) {
     http_response_code(500);

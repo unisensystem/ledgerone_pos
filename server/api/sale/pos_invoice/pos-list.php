@@ -100,6 +100,8 @@ try {
                    COUNT(DISTINCT sii.id) as item_count,
                    si.net_amount,
                    cur.symbol as currency_symbol,
+                   u.full_name as created_by_name,
+                   so.full_name as sales_officer_name,
                    CASE
                        WHEN dc_counts.dc_count IS NULL OR dc_counts.dc_count = 0 THEN 'No DC'
                        WHEN dc_counts.partial_count > 0 THEN 'Partial'
@@ -110,6 +112,8 @@ try {
             LEFT JOIN companies co  ON si.company_id  = co.id
             LEFT JOIN sale_invoice_items sii ON si.id = sii.sale_invoice_id
             LEFT JOIN ledgerone_public.currencies cur ON si.currency_id = cur.id
+            LEFT JOIN users u ON si.created_by = u.id
+            LEFT JOIN employees so ON si.sale_officer_id = so.id
             LEFT JOIN (
                 SELECT
                     sii2.sale_invoice_id,
@@ -133,16 +137,6 @@ try {
             WHERE si.tenant_id = ? AND si.status = 'Posted'";
 
     $params = [$tenant_id];
-
-    // user_companies filter — same pattern as get-companies.php
-    $stmtUC = $pdo->prepare("SELECT company_id FROM user_companies WHERE tenant_id = ? AND user_id = ?");
-    $stmtUC->execute([$tenant_id, $user_id]);
-    $assignedCompanies = $stmtUC->fetchAll(PDO::FETCH_COLUMN);
-    if (!empty($assignedCompanies)) {
-        $ph = implode(',', array_fill(0, count($assignedCompanies), '?'));
-        $sql      .= " AND si.company_id IN ($ph)";
-        $params    = array_merge($params, $assignedCompanies);
-    }
 
     if ($date_from) { $sql .= " AND si.sale_date >= ?"; $params[] = $date_from; }
     if ($date_to)   { $sql .= " AND si.sale_date <= ?"; $params[] = $date_to; }
@@ -170,10 +164,6 @@ try {
                  LEFT JOIN companies co ON si.company_id  = co.id
                  WHERE si.tenant_id = ? AND si.status = 'Posted'";
     $countParams = [$tenant_id];
-    if (!empty($assignedCompanies)) {
-        $countSql    .= " AND si.company_id IN ($ph)";
-        $countParams  = array_merge($countParams, $assignedCompanies);
-    }
 
     if ($date_from) { $countSql .= " AND si.sale_date >= ?"; $countParams[] = $date_from; }
     if ($date_to)   { $countSql .= " AND si.sale_date <= ?"; $countParams[] = $date_to; }

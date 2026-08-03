@@ -41,14 +41,18 @@ try {
         throw new Exception('At least one item is required');
     }
 
-    // Generate sequential bill number
-    $billStmt = $pdo->prepare("SELECT bill_no FROM sale_return WHERE tenant_id = ? ORDER BY id DESC LIMIT 1");
-    $billStmt->execute([$tenant_id]);
+    // Generate sequential bill number — company-wise
+    $companyId = $input['companyId'] ?? null;
+    $billSql = "SELECT bill_no FROM sale_return WHERE tenant_id = ?";
+    $billParams = [$tenant_id];
+    if ($companyId) { $billSql .= " AND company_id = ?"; $billParams[] = $companyId; }
+    $billSql .= " ORDER BY id DESC LIMIT 1";
+    $billStmt = $pdo->prepare($billSql);
+    $billStmt->execute($billParams);
     $lastBill = $billStmt->fetchColumn();
 
-    if ($lastBill) {
-        $lastNumber = (int) substr($lastBill, 4);
-        $newNumber = $lastNumber + 1;
+    if ($lastBill && preg_match('/SR-0*(\d+)$/', $lastBill, $m)) {
+        $newNumber = (int)$m[1] + 1;
     } else {
         $newNumber = 1;
     }

@@ -360,7 +360,8 @@ function initializePage(permissions) {
     const form = document.getElementById('invoiceForm');
 
     // Load all data, then initialize dropdowns and add first row
-    Promise.all([loadCustomersLocal(), loadCompanies(), loadBranches(), loadProductsLocal(), loadUOM(), loadUOMGroupUnits(), loadCurrencies(), loadBankAccounts(), loadEmployees(), loadSaleOrders(), loadProjects(), fetchContainers()]).then(() => {
+    // Note: loadBranches is NOT in Promise.all — called inside loadCompanies() after company is known
+    Promise.all([loadCustomersLocal(), loadCompanies(), loadProductsLocal(), loadUOM(), loadUOMGroupUnits(), loadCurrencies(), loadBankAccounts(), loadEmployees(), loadSaleOrders(), loadProjects(), fetchContainers()]).then(() => {
         console.log('All data loaded. Project dropdown populated.');
         initSearchableDropdown('customerCodeSearch', 'customerCodeOptions', 'customerCode');
         initSearchableDropdown('companySearch', 'companyOptions', 'company');
@@ -773,10 +774,13 @@ function initializePage(permissions) {
         await populateAreaCityDropdown();
     }
 
-    // Load branches from API
-    async function loadBranches() {
+    // Load branches from API — filtered by company if provided
+    async function loadBranches(companyId = null) {
         try {
-            const response = await fetch('../../../../server/api/sale/sale_tax_invoice/get-branches.php');
+            const url = companyId
+                ? `../../../../server/api/sale/sale_tax_invoice/get-branches.php?company_id=${companyId}`
+                : '../../../../server/api/sale/sale_tax_invoice/get-branches.php';
+            const response = await fetch(url);
             const data = await response.json();
 
             if (data.success) {
@@ -798,16 +802,6 @@ function initializePage(permissions) {
                     fragment.appendChild(option);
                 });
                 branchOptions.appendChild(fragment);
-
-                // Set last selected branch
-                const lastBranchId = localStorage.getItem('lastSelectedBranch');
-                if (lastBranchId) {
-                    const lastBranch = dataCache.branches.get(parseInt(lastBranchId));
-                    if (lastBranch) {
-                        document.getElementById('branchSearch').value = `${lastBranch.branch_code} - ${lastBranch.branch_name} (${lastBranch.branch_type})`;
-                        document.getElementById('branch').value = lastBranchId;
-                    }
-                }
             }
         } catch (error) {
             console.error('Error loading branches:', error);
@@ -975,11 +969,19 @@ function initializePage(permissions) {
                 });
                 companyOptions.appendChild(fragment);
 
-                // Auto-select if only one company
+                // Auto-select if only one company — reload products & branches filtered by it
                 if (data.companies.length === 1) {
                     const company = data.companies[0];
                     document.getElementById('companySearch').value = company.company_name;
                     document.getElementById('company').value = company.id;
+                    const autoCompanyId = company.id;
+                    await loadProductsLocal(autoCompanyId);
+                    await loadBranches(autoCompanyId);
+                    await loadCustomers(autoCompanyId);
+                    preloadNextInvoiceNumber(autoCompanyId);
+                } else {
+                    // Multiple companies — load all branches (no filter)
+                    await loadBranches();
                 }
             }
         } catch (error) {
@@ -987,9 +989,9 @@ function initializePage(permissions) {
         }
     }
 
-    // Load products from API
-    async function loadProductsLocal() {
-        await loadProducts();
+    // Load products from API — filtered by company if provided
+    async function loadProductsLocal(companyId = null) {
+        await loadProducts(companyId);
     }
 
     // Load UOM from API
@@ -1327,13 +1329,19 @@ function initializePage(permissions) {
                     }
                 }
 
-                // Set company
+                // Set company and reload products/branches filtered by it
                 if (invoice.company_id) {
                     const company = companiesData.find(c => c.id == invoice.company_id);
                     if (company) {
                         document.getElementById('companySearch').value = company.company_name;
                         document.getElementById('company').value = invoice.company_id;
                     }
+                    const editCompanyId = invoice.company_id;
+                    await Promise.all([
+                        loadProductsLocal(editCompanyId),
+                        loadBranches(editCompanyId),
+                        loadCustomers(editCompanyId)
+                    ]);
                 }
 
 
@@ -1762,8 +1770,20 @@ function initializePage(permissions) {
                 // Save company selection
                 if (hiddenInputId === 'company') {
                     localStorage.setItem('lastSelectedCompany', value);
-                    
-                    // Reload invoice-level taxes when company changes (country filter)
+
+                    // Reload products, branches and customers filtered by selected company
+                    loadProductsLocal(value);
+                    loadBranches(value);
+                    loadCustomers(value);
+                    preloadNextInvoiceNumber(value);
+
+                    // Clear branch and customer selection
+                    document.getElementById('branchSearch').value = '';
+                    document.getElementById('branch').value = '';
+                    document.getElementById('customerCodeSearch').value = '';
+                    document.getElementById('customerCode').value = '';
+
+                    // Reload invoice-level taxes when company changes
                     const customerId = document.getElementById('customerCode')?.value;
                     if (customerId && typeof loadInvoiceLevelTaxRegimes === 'function') {
                         console.log('Company changed, reloading invoice-level taxes for company:', value);
@@ -4211,9 +4231,10 @@ function closeOverlay() {
     modal.style.display = 'none';
     iframe.src = '';
 
-    // Reload data after closing overlay
-    loadCustomers();
-    loadProducts();
+    // Reload data after closing overlay — filtered by current company
+    const currentCompanyId = document.getElementById('company')?.value || null;
+    loadCustomers(currentCompanyId);
+    loadProducts(currentCompanyId);
 }
 
 // Listen for messages from iframe
@@ -4269,15 +4290,15 @@ async function loadPriceHistory(productId) {
 
 // Load product stock
 async function loadProductStock(productId) {
-    const branchId = document.getElementById('branch').value;
+    const companyId = document.getElementById('company')?.value;
     if (!productId) {
         document.getElementById('stockContainer').style.display = 'none';
         return;
     }
 
     try {
-        const url = branchId
-            ? `../../../../server/api/sale/sale_tax_invoice/get-product-stock.php?product_id=${productId}&branch_id=${branchId}`
+        const url = companyId
+            ? `../../../../server/api/sale/sale_tax_invoice/get-product-stock.php?product_id=${productId}&company_id=${companyId}`
             : `../../../../server/api/sale/sale_tax_invoice/get-product-stock.php?product_id=${productId}`;
 
         const response = await fetch(url);
@@ -4507,9 +4528,12 @@ document.addEventListener('keydown', function (e) {
 });
 
 // Preload next invoice number for instant display
-async function preloadNextInvoiceNumber() {
+async function preloadNextInvoiceNumber(companyId = null) {
     try {
-        const response = await fetch('../../../../server/api/sale/sale_tax_invoice/get-next-invoice-number.php');
+        const url = companyId
+            ? `../../../../server/api/sale/sale_tax_invoice/get-next-invoice-number.php?company_id=${companyId}`
+            : '../../../../server/api/sale/sale_tax_invoice/get-next-invoice-number.php';
+        const response = await fetch(url);
         const data = await response.json();
         if (data.success && data.nextNumber) {
             const billNoEl = document.getElementById('billNo');
@@ -4910,9 +4934,12 @@ function validateForm() {
 }
 
 // Load customers - global function
-async function loadCustomers() {
+async function loadCustomers(companyId = null) {
     try {
-        const response = await fetch('../../../../server/api/sale/sale_tax_invoice/get-customers.php');
+        const url = companyId
+            ? `../../../../server/api/sale/sale_tax_invoice/get-customers.php?company_id=${companyId}`
+            : '../../../../server/api/sale/sale_tax_invoice/get-customers.php';
+        const response = await fetch(url);
         const data = await response.json();
 
         if (data.success) {
@@ -4952,10 +4979,13 @@ async function loadCustomers() {
     }
 }
 
-// Load products - global function
-async function loadProducts() {
+// Load products - global function (accepts optional companyId for company-wise filtering)
+async function loadProducts(companyId = null) {
     try {
-        const response = await fetch('../../../../server/api/sale/sale_tax_invoice/get-products.php');
+        const url = companyId
+            ? `../../../../server/api/sale/sale_tax_invoice/get-products.php?company_id=${companyId}`
+            : '../../../../server/api/sale/sale_tax_invoice/get-products.php';
+        const response = await fetch(url);
         const data = await response.json();
 
         if (data.success) {
@@ -4963,9 +4993,31 @@ async function loadProducts() {
             data.products.forEach(product => {
                 dataCache.products.set(product.id, product);
             });
+            refreshAllProductDropdowns();
         }
     } catch (error) {
         console.error('Error loading products:', error);
+    }
+}
+
+function refreshAllProductDropdowns() {
+    const codeOptionsHtml = productsData.map(product => {
+        const codes = [];
+        if (product.qr_code) codes.push(product.qr_code);
+        if (product.barcode) codes.push(product.barcode);
+        const codeDisplay = codes.length > 0 ? ` (${codes.join(' - ')})` : '';
+        const photoHtml = product.photo ? `<img src="../../../assets/uploads/products/${product.photo}" alt="${product.name}" style="width: 30px; height: 30px; object-fit: cover; margin-right: 8px; border-radius: 4px;">` : '';
+        return `<div class="dropdown-option" data-product='${JSON.stringify(product)}' style="display: flex; align-items: center;">${photoHtml}${product.code} - ${product.name}${codeDisplay}</div>`;
+    }).join('');
+
+    const tbody = document.getElementById('itemsTable')?.getElementsByTagName('tbody')[0];
+    if (!tbody) return;
+
+    for (const row of tbody.rows) {
+        const searchInput = row.querySelector('.search-input');
+        if (searchInput && searchInput.dropdownOptions) {
+            searchInput.dropdownOptions.innerHTML = codeOptionsHtml;
+        }
     }
 }
 

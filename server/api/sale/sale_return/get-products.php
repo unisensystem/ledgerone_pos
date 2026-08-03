@@ -16,7 +16,9 @@ if (!$tenant_id) {
 }
 
 try {
-    $stmt = $pdo->prepare("
+    $company_id = isset($_GET['company_id']) && $_GET['company_id'] !== '' ? (int)$_GET['company_id'] : null;
+
+    $sql = "
         SELECT 
             p.id, p.code, p.name, p.mrp as sale_price, p.trade_price, 
             p.default_unit_id, p.barcode, p.qr_code, p.photo, p.carton_conversion,
@@ -25,10 +27,13 @@ try {
             CASE WHEN p.uom_type = 'group' AND p.uom_group_id IS NOT NULL THEN 1 ELSE 0 END as has_group
         FROM products p
         LEFT JOIN uom u ON p.default_unit_id = u.id
-        WHERE p.tenant_id = ? AND p.is_active = 1 
-        ORDER BY p.name
-    ");
-    $stmt->execute([$tenant_id]);
+        WHERE p.tenant_id = ? AND p.is_active = 1
+    ";
+    $params = [$tenant_id];
+    if ($company_id) { $sql .= " AND p.company_id = ?"; $params[] = $company_id; }
+    $sql .= " ORDER BY p.name";
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute($params);
     $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
     
     // Load UOM group units for products with groups

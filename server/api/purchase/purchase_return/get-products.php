@@ -16,7 +16,7 @@ if (!$tenant_id) {
 }
 
 try {
-    $stmt = $pdo->prepare("
+    $sql = "
         SELECT 
             p.id, 
             p.code, 
@@ -41,10 +41,14 @@ try {
             u.conversion_factor as default_conversion_factor
         FROM products p
         LEFT JOIN uom u ON p.default_unit_id = u.id
-        WHERE p.tenant_id = ? AND p.is_active = 1 
-        ORDER BY p.name
-    ");
-    $stmt->execute([$tenant_id]);
+        WHERE p.tenant_id = ? AND p.is_active = 1
+    ";
+    $params = [$tenant_id];
+    $company_id = isset($_GET['company_id']) && $_GET['company_id'] !== '' ? (int)$_GET['company_id'] : null;
+    if ($company_id) { $sql .= " AND p.company_id = ?"; $params[] = $company_id; }
+    $sql .= " ORDER BY p.name";
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute($params);
     $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
     
     // Get UOM group units for products with uom_type = 'group'

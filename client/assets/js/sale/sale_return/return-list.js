@@ -46,10 +46,36 @@ function initializeListPage(permissions) {
         }
     }
 
+    // Load customers for filter dropdown
+    async function loadCustomers(companyId = '') {
+        try {
+            const url = companyId
+                ? `../../../../server/api/sale/sale_return/get-customers.php?company_id=${companyId}`
+                : '../../../../server/api/sale/sale_return/get-customers.php';
+            const response = await fetch(url);
+            const data = await response.json();
+            if (data.success) {
+                const customerFilter = document.getElementById('customerFilter');
+                customerFilter.innerHTML = '<option value="">All Customers</option>';
+                data.customers.forEach(c => {
+                    const option = document.createElement('option');
+                    option.value = c.id;
+                    option.textContent = c.customer_name;
+                    customerFilter.appendChild(option);
+                });
+            }
+        } catch (error) {
+            console.error('Error loading customers:', error);
+        }
+    }
+
     // Load invoices from API
     async function loadInvoices(page = 1) {
         try {
-            const response = await fetch(`../../../../server/api/sale/sale_return/return-list.php?page=${page}&limit=10`);
+            const companyId = document.getElementById('companyFilter').value;
+            const params = new URLSearchParams({ page, limit: 10 });
+            if (companyId) params.append('company_id', companyId);
+            const response = await fetch(`../../../../server/api/sale/sale_return/return-list.php?${params}`);
             const data = await response.json();
             
             if (data.success) {
@@ -58,6 +84,7 @@ function initializeListPage(permissions) {
                     invoiceNo: invoice.bill_no,
                     date: invoice.sale_date,
                     customer: invoice.customer_name,
+                    customer_id: invoice.customer_id,
                     company_id: invoice.company_id,
                     items: invoice.item_count,
                     totalAmount: parseFloat(invoice.net_amount),
@@ -145,6 +172,7 @@ function initializeListPage(permissions) {
 
     // Initial load
     loadCompanies();
+    loadCustomers();
     loadInvoices();
 
     // Filter functionality
@@ -181,18 +209,16 @@ function initializeListPage(permissions) {
         // Customer filter
         if (customerFilter.value) {
             filteredInvoices = filteredInvoices.filter(invoice =>
-                invoice.customer === customerFilter.value
+                invoice.customer_id == customerFilter.value
             );
         }
-
-
 
         // Search filter
         if (searchInput.value) {
             const searchTerm = searchInput.value.toLowerCase();
             filteredInvoices = filteredInvoices.filter(invoice =>
                 invoice.invoiceNo.toLowerCase().includes(searchTerm) ||
-                invoice.customer.toLowerCase().includes(searchTerm)
+                (invoice.customer && invoice.customer.toLowerCase().includes(searchTerm))
             );
         }
 
@@ -202,7 +228,7 @@ function initializeListPage(permissions) {
     // Add event listeners for filters
     dateFrom.addEventListener('change', applyFilters);
     dateTo.addEventListener('change', applyFilters);
-    companyFilter.addEventListener('change', applyFilters);
+    companyFilter.addEventListener('change', () => { loadCustomers(companyFilter.value); loadInvoices(1); });
     customerFilter.addEventListener('change', applyFilters);
     statusFilter.addEventListener('change', applyFilters);
     searchInput.addEventListener('input', applyFilters);

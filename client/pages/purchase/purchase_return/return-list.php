@@ -50,9 +50,6 @@ if (!$user_id) {
                     <label for="supplierFilter">Supplier</label>
                     <select id="supplierFilter">
                         <option value="">All Suppliers</option>
-                        <option value="ABC Suppliers">ABC Suppliers</option>
-                        <option value="XYZ Corporation">XYZ Corporation</option>
-                        <option value="Global Fuel Inc">Global Fuel Inc</option>
                     </select>
                 </div>
                 <div class="form-group">

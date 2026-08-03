@@ -219,7 +219,7 @@ document.addEventListener('DOMContentLoaded', function () {
         if (!tbody) return;
         tbody.innerHTML = '';
         if (!rows.length) {
-            tbody.innerHTML = '<tr><td colspan="9" style="text-align:center">No records found</td></tr>';
+tbody.innerHTML = '<tr><td colspan="11" style="text-align:center">No records found</td></tr>';
             return;
         }
         rows.forEach((row, i) => {
@@ -227,17 +227,20 @@ document.addEventListener('DOMContentLoaded', function () {
             const balClass = bal >= 0 ? 'balance-positive' : 'balance-negative';
             const balText  = (bal < 0 ? '-' : '') + currencySymbol + Math.abs(bal).toFixed(2);
             const tr = document.createElement('tr');
-            tr.innerHTML = `
-                <td>${i + 1}</td>
-                <td>${row.bill_no || ''}</td>
-                <td>${row.customer_name || ''}</td>
-                <td>${row.address || ''}</td>
-                <td>${row.primary_phone || ''}</td>
-                <td class="${balClass}">${balText}</td>
-                <td></td>
-                <td></td>
-                <td><div class="signature-cell"></div></td>
-            `;
+          tr.innerHTML = `
+    <td>${i + 1}</td>
+    <td>${row.bill_no || ''}</td>
+    <td>${row.invoice_date || ''}</td>
+    <td>${row.customer_name || ''}</td>
+    <td>${row.address || ''}</td>
+    <td>${row.primary_phone || ''}</td>
+    <td class="${balClass}">${balText}</td>
+    <td></td>
+    <td></td>
+        <td>${row.days_overdue ?? ''}</td>
+
+    <td><div class="signature-cell"></div></td>
+`;
             tbody.appendChild(tr);
         });
     }
@@ -251,8 +254,7 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function exportToCSV() {
-        const rows = [['S#', 'Bill No', 'Customer Name', 'Address', 'Primary Phone No', 'Balance', 'Received Amount', 'Sales Return', 'Signature']];
-        document.querySelectorAll('tbody tr').forEach(tr => {
+const rows = [['S#', 'Bill No', 'Invoice Date', 'Days Overdue', 'Customer Name', 'Address', 'Primary Phone No', 'Balance', 'Received Amount', 'Sales Return', 'Signature']];        document.querySelectorAll('tbody tr').forEach(tr => {
             const cols = tr.querySelectorAll('td');
             const r = [];
             for (let i = 0; i < cols.length - 1; i++) r.push(cols[i].textContent.trim());

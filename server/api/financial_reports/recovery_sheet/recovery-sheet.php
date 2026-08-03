@@ -31,11 +31,13 @@ $company_id          = !empty($_GET['company_id'])          ? (int)$_GET['compan
 
 try {
     $query = "
-        SELECT 
+       SELECT 
             c.customer_name,
             c.address,
             c.primary_phone,
             obi.invoice_number as bill_no,
+            obi.invoice_date,
+            DATEDIFF(CURDATE(), obi.invoice_date) as days_overdue,
             obi.debit - COALESCE((
                 SELECT SUM(rv.amount)
                 FROM receive_voucher rv
@@ -75,11 +77,13 @@ try {
         
         UNION ALL
         
-        SELECT 
+       SELECT 
             c.customer_name,
             c.address,
             c.primary_phone,
             si.bill_no,
+            si.sale_date as invoice_date,
+            DATEDIFF(CURDATE(), si.sale_date) as days_overdue,
             si.net_amount - COALESCE((
                 SELECT SUM(rv.amount)
                 FROM receive_voucher rv

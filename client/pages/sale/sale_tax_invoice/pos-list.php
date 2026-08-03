@@ -89,12 +89,13 @@ if (!$user_id) {
                 <table id="invoicesTable">
                     <thead>
                         <tr>
-                            <th width="12%">Invoice No</th>
-                            <th width="15%">Date</th>
-                            <th width="25%">Customer</th>
-                            <th width="12%">Items</th>
-                            <th width="15%">Total Amount</th>
-                            <th width="21%">Actions</th>
+                            <th width="10%">Invoice No</th>
+                            <th width="10%">Date</th>
+                            <th width="20%">Customer</th>
+                            <th width="15%">Company</th>
+                            <th width="8%">Items</th>
+                            <th width="12%">Total Amount</th>
+                            <th width="25%">Actions</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -186,6 +187,6 @@ if (!$user_id) {
         </div>
     </div>
 
-    <script src="../../../assets/js/sale/sale_tax_invoice/pos-list.js?v=2"></script>
+    <script src="../../../assets/js/sale/sale_tax_invoice/pos-list.js?v=3"></script>
 </body>
 </html>

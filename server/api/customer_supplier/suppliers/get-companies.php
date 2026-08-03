@@ -13,9 +13,12 @@ if (!$tenant_id || !$user_id) {
 }
 
 try {
-    $stmt = $pdo->prepare("SELECT company_id FROM user_companies WHERE tenant_id = ? AND user_id = ?");
-    $stmt->execute([$tenant_id, $user_id]);
-    $assigned = $stmt->fetchAll(PDO::FETCH_COLUMN);
+    $assigned = [];
+    try {
+        $stmt = $pdo->prepare("SELECT company_id FROM user_companies WHERE tenant_id = ? AND user_id = ?");
+        $stmt->execute([$tenant_id, $user_id]);
+        $assigned = $stmt->fetchAll(PDO::FETCH_COLUMN);
+    } catch (Exception $e) { /* table may not exist yet; show all */ }
 
     if (!empty($assigned)) {
         $ph = implode(',', array_fill(0, count($assigned), '?'));

@@ -26,9 +26,12 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     // Load suppliers for filter + duplicate modal
-    async function loadSuppliers() {
+    async function loadSuppliers(companyId = '') {
         try {
-            const response = await fetch('../../../../server/api/purchase/purchase_invoice/get-suppliers.php');
+            const url = companyId
+                ? `../../../../server/api/purchase/purchase_invoice/get-suppliers.php?company_id=${companyId}`
+                : '../../../../server/api/purchase/purchase_invoice/get-suppliers.php';
+            const response = await fetch(url);
             const data = await response.json();
             
             if (data.success) {
@@ -39,7 +42,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     data.suppliers.forEach(supplier => {
                         const option = document.createElement('div');
                         option.className = 'dropdown-option';
-                        option.setAttribute('data-value', supplier.supplier_name);
+                        option.setAttribute('data-value', supplier.id);
                         option.textContent = supplier.supplier_name;
                         supplierFilterOptions.appendChild(option);
                     });
@@ -120,7 +123,15 @@ document.addEventListener('DOMContentLoaded', function () {
     // Load invoices from API
     async function loadInvoices(page = 1) {
         try {
-            const response = await fetch(`../../../../server/api/purchase/purchase_invoice/purchase-list.php?page=${page}&limit=10`);
+            const params = new URLSearchParams({ page, limit: 10 });
+            if (companyFilter.value)              params.set('company_id',           companyFilter.value);
+            if (supplierFilter.value)             params.set('supplier_id',          supplierFilter.value);
+            if (dateFrom.value)                   params.set('date_from',            dateFrom.value);
+            if (dateTo.value)                     params.set('date_to',              dateTo.value);
+            if (statusFilter.value)               params.set('status',               statusFilter.value);
+            if (searchInput.value.trim())         params.set('search',               searchInput.value.trim());
+            if (supplierInvoiceNoFilter.value.trim()) params.set('supplier_invoice_no', supplierInvoiceNoFilter.value.trim());
+            const response = await fetch(`../../../../server/api/purchase/purchase_invoice/purchase-list.php?${params}`);
             const data = await response.json();
             
             if (data.success) {
@@ -241,7 +252,7 @@ document.addEventListener('DOMContentLoaded', function () {
             dupBtn.className = 'btn btn-secondary btn-sm';
             dupBtn.innerHTML = '<i class="fas fa-copy"></i>';
             dupBtn.title = 'Duplicate Invoice';
-            dupBtn.addEventListener('click', () => openDuplicateModal(invoice.id, invoice.invoiceNo, invoice.supplierId));
+            dupBtn.addEventListener('click', () => openDuplicateModal(invoice.id, invoice.invoiceNo, invoice.supplierId, invoice.companyId));
 
             // Print button
             const printBtn = document.createElement('button');
@@ -274,12 +285,7 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-    // Initial load
-    loadCompanies();
-    loadSuppliers();
-    loadInvoices();
-
-    // Filter functionality
+    // Filter elements
     const dateFrom = document.getElementById('dateFrom');
     const dateTo = document.getElementById('dateTo');
     const companyFilter = document.getElementById('companyFilter');
@@ -288,74 +294,23 @@ document.addEventListener('DOMContentLoaded', function () {
     const searchInput = document.getElementById('searchInput');
     const supplierInvoiceNoFilter = document.getElementById('supplierInvoiceNoFilter');
 
-    function applyFilters() {
-        let filteredInvoices = [...invoices];
+    function applyFilters() { loadInvoices(1); }
 
-        // Date filter
-        if (dateFrom.value) {
-            filteredInvoices = filteredInvoices.filter(invoice =>
-                new Date(invoice.date) >= new Date(dateFrom.value)
-            );
-        }
-
-        if (dateTo.value) {
-            filteredInvoices = filteredInvoices.filter(invoice =>
-                new Date(invoice.date) <= new Date(dateTo.value)
-            );
-        }
-
-        // Company filter
-        if (companyFilter.value) {
-            filteredInvoices = filteredInvoices.filter(invoice =>
-                invoice.companyId == companyFilter.value
-            );
-        }
-
-        // Supplier filter
-        if (supplierFilter.value) {
-            filteredInvoices = filteredInvoices.filter(invoice =>
-                invoice.supplier === supplierFilter.value
-            );
-        }
-
-
-
-        // Status filter
-        if (statusFilter.value) {
-            filteredInvoices = filteredInvoices.filter(invoice => {
-                const paid = invoice.paidAmount;
-                const total = invoice.totalAmount;
-                if (statusFilter.value === 'paid') return paid >= total && total > 0;
-                if (statusFilter.value === 'partial') return paid > 0 && paid < total;
-                if (statusFilter.value === 'pending') return paid <= 0;
-                return true;
-            });
-        }
-
-        // Supplier Invoice No filter
-        if (supplierInvoiceNoFilter.value) {
-            const term = supplierInvoiceNoFilter.value.toLowerCase();
-            filteredInvoices = filteredInvoices.filter(invoice =>
-                invoice.supplierInvoiceNo.toLowerCase().includes(term)
-            );
-        }
-
-        // Search filter
-        if (searchInput.value) {
-            const searchTerm = searchInput.value.toLowerCase();
-            filteredInvoices = filteredInvoices.filter(invoice =>
-                invoice.invoiceNo.toLowerCase().includes(searchTerm) ||
-                invoice.supplier.toLowerCase().includes(searchTerm)
-            );
-        }
-
-        populateTable(filteredInvoices);
-    }
+    // Initial load
+    loadCompanies();
+    loadSuppliers();
+    loadInvoices();
 
     // Add event listeners for filters
     dateFrom.addEventListener('change', applyFilters);
     dateTo.addEventListener('change', applyFilters);
-    companyFilter.addEventListener('change', applyFilters);
+    companyFilter.addEventListener('change', function() {
+        // Reset supplier filter and reload suppliers for selected company
+        document.getElementById('supplierFilterSearch').value = '';
+        supplierFilter.value = '';
+        loadSuppliers(this.value);
+        applyFilters();
+    });
     supplierFilter.addEventListener('change', applyFilters);
     statusFilter.addEventListener('change', applyFilters);
     searchInput.addEventListener('input', applyFilters);
@@ -467,7 +422,7 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 
     // Duplicate invoice
-    function openDuplicateModal(id, currentBillNo, originalSupplierId) {
+    function openDuplicateModal(id, currentBillNo, originalSupplierId, invoiceCompanyId) {
         duplicateInvoiceId = id;
         document.getElementById('duplicateSourceBillNo').textContent = currentBillNo;
         document.getElementById('duplicateNewBillNoDisplay').textContent = 'Generating...';
@@ -476,14 +431,14 @@ document.addEventListener('DOMContentLoaded', function () {
         document.getElementById('dupSupplierSearch').value = '';
         document.getElementById('dupSupplierId').value = '';
         document.getElementById('confirmDuplicateBtn').dataset.originalSupplierId = originalSupplierId || '';
+        document.getElementById('confirmDuplicateBtn').dataset.invoiceCompanyId = invoiceCompanyId || '';
         const dupBalEl = document.getElementById('dupSupplierBalance');
         if (dupBalEl) { dupBalEl.textContent = ''; dupBalEl.style.display = 'none'; }
         document.getElementById('duplicateModal').style.display = 'flex';
 
-        // Fetch original supplier balance on modal open
         if (originalSupplierId) fetchDupSupplierBalance(originalSupplierId);
 
-        fetch('../../../../server/api/purchase/purchase_invoice/purchase-next-bill-no.php')
+        fetch(`../../../../server/api/purchase/purchase_invoice/purchase-next-bill-no.php?company_id=${invoiceCompanyId || ''}`)
             .then(r => r.json())
             .then(data => {
                 if (data.success) {

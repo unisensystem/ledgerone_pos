@@ -47,7 +47,7 @@ function initializeListPage(permissions) {
             // Add filters if present
             if (dateFrom.value) params.append('dateFrom', dateFrom.value);
             if (dateTo.value) params.append('dateTo', dateTo.value);
-            if (companyFilter.value) params.append('company', companyFilter.value);
+            if (companyFilter.value) params.append('company_id', companyFilter.value);
             if (customerFilter.value) params.append('customer', customerFilter.value);
             if (searchInput.value) params.append('search', searchInput.value);
             
@@ -62,6 +62,7 @@ function initializeListPage(permissions) {
                     customer: invoice.customer_name,
                     customerId: invoice.customer_id || null,
                     company: invoice.company_name,
+                    companyId: invoice.company_id || null,
                     items: invoice.item_count,
                     totalAmount: parseFloat(invoice.net_amount),
                     currencySymbol: invoice.currency_symbol || ''
@@ -101,10 +102,11 @@ function initializeListPage(permissions) {
             row.insertCell(0).textContent = invoice.invoiceNo;
             row.insertCell(1).textContent = formattedDate;
             row.insertCell(2).textContent = invoice.customer || 'N/A';
-            row.insertCell(3).textContent = invoice.items;
-            row.insertCell(4).textContent = formattedAmount;
+            row.insertCell(3).textContent = invoice.company || '-';
+            row.insertCell(4).textContent = invoice.items;
+            row.insertCell(5).textContent = formattedAmount;
 
-            const actionsCell = row.insertCell(5);
+            const actionsCell = row.insertCell(6);
             const actionButtons = document.createElement('div');
             actionButtons.className = 'action-buttons';
 
@@ -164,7 +166,7 @@ function initializeListPage(permissions) {
             dupBtn.className = 'btn btn-secondary btn-sm';
             dupBtn.innerHTML = '<i class="fas fa-copy"></i>';
             dupBtn.title = 'Duplicate Invoice';
-            dupBtn.addEventListener('click', () => openDuplicateModal(invoice.id, invoice.invoiceNo, invoice.customerId));
+            dupBtn.addEventListener('click', () => openDuplicateModal(invoice.id, invoice.invoiceNo, invoice.customerId, invoice.companyId));
 
             actionButtons.appendChild(editBtn);
             actionButtons.appendChild(dupBtn);
@@ -186,13 +188,17 @@ function initializeListPage(permissions) {
 
     // Initial load
     loadInvoices();
-    loadCustomers();
     loadCompanies();
+    loadCustomers();
     
     // Load customers for filter
-    async function loadCustomers() {
+    let customerDropdownInitialized = false;
+    async function loadCustomers(companyId = null) {
         try {
-            const response = await fetch('../../../../server/api/sale/sale_tax_invoice/get-customers.php');
+            const url = companyId
+                ? `../../../../server/api/sale/sale_tax_invoice/get-customers.php?company_id=${companyId}`
+                : '../../../../server/api/sale/sale_tax_invoice/get-customers.php';
+            const response = await fetch(url);
             const data = await response.json();
             if (data.success) {
                 const customerFilterOptions = document.getElementById('customerFilterOptions');
@@ -205,7 +211,10 @@ function initializeListPage(permissions) {
                     option.textContent = `${customer.customer_code} - ${customer.customer_name}`;
                     customerFilterOptions.appendChild(option);
                 });
-                initSearchableDropdown('customerFilterSearch', 'customerFilterOptions', 'customerFilter');
+                if (!customerDropdownInitialized) {
+                    initSearchableDropdown('customerFilterSearch', 'customerFilterOptions', 'customerFilter');
+                    customerDropdownInitialized = true;
+                }
             }
         } catch (error) {
             console.error('Error loading customers:', error);
@@ -223,7 +232,7 @@ function initializeListPage(permissions) {
                 data.companies.forEach(company => {
                     const option = document.createElement('div');
                     option.className = 'dropdown-option';
-                    option.setAttribute('data-value', company.company_name);
+                    option.setAttribute('data-value', company.id);
                     option.setAttribute('data-name', company.company_name);
                     option.textContent = company.company_name;
                     companyFilterOptions.appendChild(option);
@@ -258,6 +267,14 @@ function initializeListPage(permissions) {
                 searchInput.value = name || (hiddenInputId === 'customerFilter' ? 'All Customers' : 'All Companies');
                 hiddenInput.value = value;
                 optionsContainer.style.display = 'none';
+
+                // When company changes, reload customers and clear customer filter
+                if (hiddenInputId === 'companyFilter') {
+                    document.getElementById('customerFilterSearch').value = '';
+                    document.getElementById('customerFilter').value = '';
+                    loadCustomers(value || null);
+                }
+
                 applyFilters();
             }
         });
@@ -522,7 +539,7 @@ function initializeListPage(permissions) {
         } catch (e) { el.textContent = ''; el.style.display = 'none'; }
     }
 
-    function openDuplicateModal(id, billNo, originalCustomerId) {
+    function openDuplicateModal(id, billNo, originalCustomerId, companyId) {
         duplicateInvoiceId = id;
         document.getElementById('duplicateSourceBillNo').textContent = billNo;
         document.getElementById('duplicateNewBillNoDisplay').textContent = 'Generating...';
@@ -531,13 +548,17 @@ function initializeListPage(permissions) {
         document.getElementById('dupCustomerSearch').value = '';
         document.getElementById('dupCustomerId').value = '';
         document.getElementById('confirmDuplicateBtn').dataset.originalCustomerId = originalCustomerId || '';
+        document.getElementById('confirmDuplicateBtn').dataset.companyId = companyId || '';
         const balEl = document.getElementById('dupCustomerBalance');
         if (balEl) { balEl.textContent = ''; balEl.style.display = 'none'; }
         document.getElementById('duplicateModal').style.display = 'flex';
 
         if (originalCustomerId) fetchDupCustomerBalance(originalCustomerId);
 
-        fetch('../../../../server/api/sale/sale_tax_invoice/sti-next-bill-no.php')
+        const billNoUrl = companyId
+            ? `../../../../server/api/sale/sale_tax_invoice/sti-next-bill-no.php?company_id=${companyId}`
+            : '../../../../server/api/sale/sale_tax_invoice/sti-next-bill-no.php';
+        fetch(billNoUrl)
             .then(r => r.json())
             .then(data => {
                 if (data.success) {

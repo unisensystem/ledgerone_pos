@@ -16,8 +16,14 @@ if (!$tenant_id) {
 }
 
 try {
-    $stmt = $pdo->prepare("SELECT id, supplier_code, supplier_name, current_balance FROM suppliers WHERE tenant_id = ? AND status = 'ACTIVE' ORDER BY supplier_name");
-    $stmt->execute([$tenant_id]);
+    $company_id = isset($_GET['company_id']) && $_GET['company_id'] !== '' ? (int)$_GET['company_id'] : null;
+
+    $sql = "SELECT id, supplier_code, supplier_name, current_balance FROM suppliers WHERE tenant_id = ? AND status = 'ACTIVE'";
+    $params = [$tenant_id];
+    if ($company_id) { $sql .= " AND company_id = ?"; $params[] = $company_id; }
+    $sql .= " ORDER BY supplier_name";
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute($params);
     $suppliers = $stmt->fetchAll(PDO::FETCH_ASSOC);
     
     echo json_encode(['success' => true, 'suppliers' => $suppliers]);

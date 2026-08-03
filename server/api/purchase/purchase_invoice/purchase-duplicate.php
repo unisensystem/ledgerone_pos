@@ -54,18 +54,17 @@ try {
 
     $pdo->beginTransaction();
 
-    // Generate bill_no inside transaction
-    $billStmt = $pdo->prepare("SELECT bill_no FROM purchase_invoice WHERE tenant_id = ? ORDER BY id DESC LIMIT 1 FOR UPDATE");
-    $billStmt->execute([$tenant_id]);
-    $lastBill = $billStmt->fetchColumn();
-
-    if ($lastBill) {
-        $lastNumber = (int)substr($lastBill, 4);
-        $newNumber  = $lastNumber + 1;
+    // Generate bill_no per company inside transaction
+    $dupCompanyId = $invoice['company_id'] ?? null;
+    if ($dupCompanyId) {
+        $billStmt = $pdo->prepare("SELECT MAX(CAST(SUBSTRING(bill_no, 5) AS UNSIGNED)) FROM purchase_invoice WHERE tenant_id = ? AND company_id = ? AND bill_no LIKE 'PUR-%' FOR UPDATE");
+        $billStmt->execute([$tenant_id, $dupCompanyId]);
     } else {
-        $newNumber = 1;
+        $billStmt = $pdo->prepare("SELECT MAX(CAST(SUBSTRING(bill_no, 5) AS UNSIGNED)) FROM purchase_invoice WHERE tenant_id = ? AND bill_no LIKE 'PUR-%' FOR UPDATE");
+        $billStmt->execute([$tenant_id]);
     }
-    $new_bill_no = 'PUR-' . str_pad($newNumber, 4, '0', STR_PAD_LEFT);
+    $lastNumber = (int)$billStmt->fetchColumn();
+    $new_bill_no = 'PUR-' . str_pad($lastNumber + 1, 4, '0', STR_PAD_LEFT);
 
     // Insert duplicate invoice
     $stmt = $pdo->prepare("

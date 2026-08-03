@@ -9,13 +9,15 @@ const editId = urlParams.get('edit');
 const isEditMode = !!editId;
 
 document.addEventListener('DOMContentLoaded', async function() {
-    await Promise.all([loadProducts(), loadCustomers(), loadBranches(), loadCurrencies(), loadBankAccounts(), loadUOM(), loadSaleInvoices(), loadEmployees(), loadCompanies(), loadProjects()]);
+    await Promise.all([loadProducts(), loadCustomers(), loadCurrencies(), loadBankAccounts(), loadUOM(), loadSaleInvoices(), loadEmployees(), loadCompanies(), loadProjects()]);
     loadShortcuts();
     updateDate();
     await loadNextReturnNo();
     
     
     initDropdown('branchSearch', 'branchOptions', 'branch', branchesData, (b) => `${b.branch_code} - ${b.branch_name} (${b.branch_type})`, (id) => { currentReturn.branch = parseInt(id); localStorage.setItem('lastSelectedBranch', id); });
+    // Sync branchesData loaded by loadCompanies into the dropdown
+    document.getElementById('branchSearch').updateData(branchesData);
     initDropdown('customerSearch', 'customerOptions', 'customer', customersData, (c) => `${c.customer_code} - ${c.customer_name}`, (id) => { 
         currentReturn.customer = parseInt(id); 
         
@@ -72,10 +74,6 @@ document.addEventListener('DOMContentLoaded', async function() {
     
     const baseCurrency = currenciesData.find(c => c.is_base_currency == 1);
     if (baseCurrency) currentReturn.currency = baseCurrency.currency_id;
-    
-    document.getElementById('company').addEventListener('change', function() {
-        currentReturn.company = parseInt(this.value) || null;
-    });
     
     document.getElementById('paymentMethod').addEventListener('change', function() {
         document.getElementById('bankAccountContainer').classList.toggle('hidden', this.value !== 'bank_transfer');
@@ -1094,22 +1092,52 @@ async function loadEditData(returnId) {
     }
 }
 
-async function loadProducts() {
-    const response = await fetch('../../../../server/api/sale/sale_return/get-products.php');
+async function loadProducts(companyId = null) {
+    const url = companyId
+        ? `../../../../server/api/sale/sale_return/get-products.php?company_id=${companyId}`
+        : '../../../../server/api/sale/sale_return/get-products.php';
+    const response = await fetch(url);
     const data = await response.json();
     if (data.success) productsData = data.products;
 }
 
-async function loadCustomers() {
-    const response = await fetch('../../../../server/api/sale/sale_return/get-customers.php');
+async function loadCustomers(companyId = null) {
+    const url = companyId
+        ? `../../../../server/api/sale/sale_return/get-customers.php?company_id=${companyId}`
+        : '../../../../server/api/sale/sale_return/get-customers.php';
+    const response = await fetch(url);
     const data = await response.json();
-    if (data.success) customersData = data.customers;
+    if (data.success) {
+        customersData = data.customers;
+        const customerSearch = document.getElementById('customerSearch');
+        if (customerSearch && customerSearch.updateData) customerSearch.updateData(customersData);
+    }
 }
 
-async function loadBranches() {
-    const response = await fetch('../../../../server/api/sale/sale_return/get-branches.php');
+async function loadSaleInvoices(companyId = null) {
+    const url = companyId
+        ? `../../../../server/api/sale/sale_return/get-sale-invoices.php?company_id=${companyId}`
+        : '../../../../server/api/sale/sale_return/get-sale-invoices.php';
+    const response = await fetch(url);
     const data = await response.json();
-    if (data.success) branchesData = data.branches;
+    if (data.success) {
+        invoicesData = data.invoices;
+        const invoiceSearch = document.getElementById('invoiceSearch');
+        if (invoiceSearch && invoiceSearch.updateData) invoiceSearch.updateData(invoicesData);
+    }
+}
+
+async function loadBranches(companyId = null) {
+    const url = companyId
+        ? `../../../../server/api/sale/sale_return/get-branches.php?company_id=${companyId}`
+        : '../../../../server/api/sale/sale_return/get-branches.php';
+    const response = await fetch(url);
+    const data = await response.json();
+    if (data.success) {
+        branchesData = data.branches;
+        const branchSearch = document.getElementById('branchSearch');
+        if (branchSearch && branchSearch.updateData) branchSearch.updateData(branchesData);
+    }
 }
 
 async function loadCurrencies() {
@@ -1140,22 +1168,6 @@ async function loadUOM() {
     if (data.success) uomData = data.uoms;
 }
 
-async function loadSaleInvoices() {
-    const response = await fetch('../../../../server/api/sale/sale_return/get-sale-invoices.php');
-    const data = await response.json();
-    if (data.success) {
-        invoicesData = data.invoices.map(inv => ({
-            ...inv,
-            customer_id: inv.customer_id || extractCustomerIdFromName(inv.customer_name)
-        }));
-    }
-}
-
-function extractCustomerIdFromName(customerName) {
-    const customer = customersData.find(c => c.customer_name === customerName);
-    return customer ? customer.id : null;
-}
-
 async function loadEmployees() {
     const response = await fetch('../../../../server/api/sale/sale_return/get-employees.php');
     const data = await response.json();
@@ -1175,12 +1187,32 @@ async function loadCompanies() {
             option.textContent = `${c.company_code} - ${c.company_name}`;
             select.appendChild(option);
         });
-        
+
         // Auto-select if only one company
         if (data.companies.length === 1) {
-            select.value = data.companies[0].id;
-            currentReturn.company = data.companies[0].id;
+            const autoId = data.companies[0].id;
+            select.value = autoId;
+            currentReturn.company = autoId;
+            await Promise.all([loadProducts(autoId), loadCustomers(autoId), loadSaleInvoices(autoId), loadBranches(autoId)]);
+            loadNextReturnNo(autoId);
         }
+
+        // Company change handler
+        select.addEventListener('change', async function() {
+            const companyId = parseInt(this.value) || null;
+            currentReturn.company = companyId;
+            // Clear customer, invoice, branch selections
+            document.getElementById('customerSearch').value = '';
+            document.getElementById('customer').value = '';
+            currentReturn.customer = null;
+            document.getElementById('invoiceSearch').value = '';
+            document.getElementById('saleInvoice').value = '';
+            document.getElementById('branchSearch').value = '';
+            document.getElementById('branch').value = '';
+            currentReturn.branch = null;
+            await Promise.all([loadProducts(companyId), loadCustomers(companyId), loadSaleInvoices(companyId), loadBranches(companyId)]);
+            loadNextReturnNo(companyId);
+        });
     }
 }
 
@@ -1201,9 +1233,12 @@ function updateDate() {
     document.getElementById('currentDate').value = new Date().toISOString().split('T')[0];
 }
 
-async function loadNextReturnNo() {
+async function loadNextReturnNo(companyId = null) {
     try {
-        const response = await fetch('../../../../server/api/sale/sale_return/get-next-invoice-number.php');
+        const url = companyId
+            ? `../../../../server/api/sale/sale_return/get-next-invoice-number.php?company_id=${companyId}`
+            : '../../../../server/api/sale/sale_return/get-next-invoice-number.php';
+        const response = await fetch(url);
         const data = await response.json();
         if (data.success) document.getElementById('returnNo').textContent = data.nextNumber;
     } catch (error) {

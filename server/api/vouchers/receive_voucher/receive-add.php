@@ -27,6 +27,27 @@ error_log('POST data: ' . print_r($_POST, true));
 error_log('Recovery officer: ' . ($_POST['recovery_officer'] ?? 'NOT SET'));
 
 try {
+    // Get company IDs this user has access to (within current tenant)
+    $companyStmt = $pdo->prepare("
+        SELECT company_id
+        FROM user_companies
+        WHERE user_id = ? AND tenant_id = ?
+    ");
+    $companyStmt->execute([$user_id, $tenant_id]);
+    $allowedCompanyIds = $companyStmt->fetchAll(PDO::FETCH_COLUMN);
+
+    if (empty($allowedCompanyIds)) {
+        echo json_encode(['success' => false, 'error' => 'No company assigned to your account']);
+        exit();
+    }
+
+    // Company is now mandatory, and must be one the user is authorized for
+    $company_id = $_POST['company_id'] ?? null;
+    if (empty($company_id) || !in_array($company_id, $allowedCompanyIds)) {
+        echo json_encode(['success' => false, 'error' => 'Invalid or unauthorized company']);
+        exit();
+    }
+
     // Generate sequential voucher number
     $currentYear = date('Y');
     $stmt = $pdo->prepare("SELECT voucher_number FROM receive_voucher WHERE tenant_id = ? AND voucher_number LIKE ? ORDER BY id DESC LIMIT 1");
@@ -46,7 +67,6 @@ try {
     // Get form data
     $voucher_date = $_POST['voucher_date'] ?? '';
     $customer_code = $_POST['customer_code'] ?? '';
-    $company_id = $_POST['company_id'] ?? null;
     $previous_balance = (!empty($_POST['previous_balance']) && $_POST['previous_balance'] !== 'null') ? floatval($_POST['previous_balance']) : 0;
     $sub_account_id = (!empty($_POST['sub_account_id']) && $_POST['sub_account_id'] !== 'null') ? intval($_POST['sub_account_id']) : null;
     $bill_no = !empty($_POST['bill_no']) ? $_POST['bill_no'] : null;
@@ -136,9 +156,9 @@ try {
         $attachment = $finalFileName;
     }
 
-    // Get customer ID from customer code
-    $stmt = $pdo->prepare("SELECT id FROM customers WHERE tenant_id = ? AND customer_code = ?");
-    $stmt->execute([$tenant_id, $customer_code]);
+    // Get customer ID from customer code, restricted to the submitted (authorized) company
+    $stmt = $pdo->prepare("SELECT id FROM customers WHERE tenant_id = ? AND customer_code = ? AND company_id = ?");
+    $stmt->execute([$tenant_id, $customer_code, $company_id]);
     $customer = $stmt->fetch(PDO::FETCH_ASSOC);
     
     if (!$customer) {
