@@ -33,6 +33,32 @@ if (!$id || $is_cash_flow === null) {
 }
 
 try {
+    // Get company IDs this user has access to (within current tenant)
+    $companyStmt = $pdo->prepare("
+        SELECT company_id
+        FROM user_companies
+        WHERE user_id = ? AND tenant_id = ?
+    ");
+    $companyStmt->execute([$user_id, $tenant_id]);
+    $allowedCompanyIds = $companyStmt->fetchAll(PDO::FETCH_COLUMN);
+
+    if (empty($allowedCompanyIds)) {
+        http_response_code(404);
+        echo json_encode(['error' => 'Voucher not found']);
+        exit();
+    }
+
+    // Verify voucher belongs to an allowed company before updating
+    $checkStmt = $pdo->prepare("SELECT company_id FROM expense_voucher WHERE id = ? AND tenant_id = ?");
+    $checkStmt->execute([$id, $tenant_id]);
+    $voucher = $checkStmt->fetch(PDO::FETCH_ASSOC);
+
+    if (!$voucher || !in_array($voucher['company_id'], $allowedCompanyIds)) {
+        http_response_code(404);
+        echo json_encode(['error' => 'Voucher not found']);
+        exit();
+    }
+
     $stmt = $pdo->prepare("UPDATE expense_voucher SET is_cash_flow = ? WHERE id = ? AND tenant_id = ?");
     $stmt->execute([$is_cash_flow, $id, $tenant_id]);
     echo json_encode(['success' => true]);

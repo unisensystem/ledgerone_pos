@@ -24,13 +24,32 @@ if (!$supplier_code) {
 }
 
 try {
-    // First get supplier ID from supplier_code
-    $stmt = $pdo->prepare("SELECT id FROM suppliers WHERE tenant_id = ? AND supplier_code = ?");
-    $stmt->execute([$tenant_id, $supplier_code]);
+    // Get company IDs this user has access to (within current tenant)
+    $companyStmt = $pdo->prepare("
+        SELECT company_id
+        FROM user_companies
+        WHERE user_id = ? AND tenant_id = ?
+    ");
+    $companyStmt->execute([$user_id, $tenant_id]);
+    $companyIds = $companyStmt->fetchAll(PDO::FETCH_COLUMN);
+
+    if (empty($companyIds)) {
+        echo json_encode(['success' => true, 'data' => []]);
+        exit();
+    }
+
+    $placeholders = implode(',', array_fill(0, count($companyIds), '?'));
+
+    // First get supplier ID from supplier_code, restricted to user's assigned companies
+    $stmt = $pdo->prepare("
+        SELECT id FROM suppliers 
+        WHERE tenant_id = ? AND supplier_code = ? AND company_id IN ($placeholders)
+    ");
+    $stmt->execute(array_merge([$tenant_id, $supplier_code], $companyIds));
     $supplier = $stmt->fetch(PDO::FETCH_ASSOC);
     
     if (!$supplier) {
-        echo json_encode(['success' => true, 'data' => [], 'debug' => 'Supplier not found']);
+        echo json_encode(['success' => true, 'data' => []]);
         exit();
     }
     
@@ -45,7 +64,7 @@ try {
     $stmt->execute([$tenant_id, $supplier['id']]);
     $bills = $stmt->fetchAll(PDO::FETCH_ASSOC);
     
-    echo json_encode(['success' => true, 'data' => $bills, 'debug' => ['supplier_id' => $supplier['id'], 'tenant_id' => $tenant_id]]);
+    echo json_encode(['success' => true, 'data' => $bills]);
 } catch (Exception $e) {
     http_response_code(500);
     echo json_encode(['error' => 'Database error', 'message' => $e->getMessage()]);

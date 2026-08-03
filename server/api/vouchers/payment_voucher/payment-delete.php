@@ -31,12 +31,26 @@ if (!$voucher_id) {
 }
 
 try {
-    // Get payment method to determine which table to delete from
-    $stmt = $pdo->prepare("SELECT payment_method_id FROM payment_voucher WHERE id = ? AND tenant_id = ?");
+    // Get company IDs this user has access to (within current tenant)
+    $companyStmt = $pdo->prepare("
+        SELECT company_id
+        FROM user_companies
+        WHERE user_id = ? AND tenant_id = ?
+    ");
+    $companyStmt->execute([$user_id, $tenant_id]);
+    $allowedCompanyIds = $companyStmt->fetchAll(PDO::FETCH_COLUMN);
+
+    if (empty($allowedCompanyIds)) {
+        echo json_encode(['success' => false, 'error' => 'Voucher not found']);
+        exit();
+    }
+
+    // Get payment method to determine which table to delete from, verify company access
+    $stmt = $pdo->prepare("SELECT payment_method_id, company_id FROM payment_voucher WHERE id = ? AND tenant_id = ?");
     $stmt->execute([$voucher_id, $tenant_id]);
     $voucher = $stmt->fetch(PDO::FETCH_ASSOC);
 
-    if (!$voucher) {
+    if (!$voucher || !in_array($voucher['company_id'], $allowedCompanyIds)) {
         echo json_encode(['success' => false, 'error' => 'Voucher not found']);
         exit();
     }

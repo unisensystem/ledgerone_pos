@@ -40,6 +40,40 @@ if (!$date || !$voucher_number || empty($entries)) {
 }
 
 try {
+    // Get company IDs this user has access to (within current tenant)
+    $companyStmt = $pdo->prepare("
+        SELECT company_id
+        FROM user_companies
+        WHERE user_id = ? AND tenant_id = ?
+    ");
+    $companyStmt->execute([$user_id, $tenant_id]);
+    $allowedCompanyIds = $companyStmt->fetchAll(PDO::FETCH_COLUMN);
+
+    if (empty($allowedCompanyIds)) {
+        http_response_code(403);
+        echo json_encode(['error' => 'No company assigned to your account']);
+        exit();
+    }
+
+    // Company is mandatory, and must be one the user is authorized for
+    $company_id = $input['company_id'] ?? null;
+    if (empty($company_id) || !in_array($company_id, $allowedCompanyIds)) {
+        http_response_code(403);
+        echo json_encode(['error' => 'Invalid or unauthorized company']);
+        exit();
+    }
+
+    // If a vendor is specified, verify it belongs to the submitted company
+    if ($vendor_id) {
+        $vendorCheck = $pdo->prepare("SELECT id FROM suppliers WHERE id = ? AND tenant_id = ? AND company_id = ?");
+        $vendorCheck->execute([$vendor_id, $tenant_id, $company_id]);
+        if (!$vendorCheck->fetch()) {
+            http_response_code(400);
+            echo json_encode(['error' => 'Vendor not found']);
+            exit();
+        }
+    }
+
     $pdo->beginTransaction();
     
     // Calculate total amount and items
@@ -51,7 +85,7 @@ try {
         INSERT INTO expense_voucher (tenant_id, company_id, voucher_no, date, description, total_amount, total_items, project_id, container_id, vendor_id, type, is_cash_flow)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ");
-    $stmt->execute([$tenant_id, $input['company_id'], $voucher_number, $date, $description, $total_amount, $total_items, $project_id, $container_id, $vendor_id, $type, $is_cash_flow]);
+    $stmt->execute([$tenant_id, $company_id, $voucher_number, $date, $description, $total_amount, $total_items, $project_id, $container_id, $vendor_id, $type, $is_cash_flow]);
     $voucher_id = $pdo->lastInsertId();
     
     foreach ($entries as $entry) {
@@ -103,7 +137,7 @@ try {
                 INSERT INTO post_dated_cheques (tenant_id, company_id, cheque_no, account_id, bank_account_id, transaction_type, amount, cheque_date, reference_id, reference_table)
                 VALUES (?, ?, ?, ?, ?, 'Expense', ?, ?, ?, 'expense_voucher')
             ");
-            $stmt->execute([$tenant_id, $input['company_id'], $cheque_no, $expense_account_id, $bank_account_id, $amount, $cheque_date, $voucher_id]);
+            $stmt->execute([$tenant_id, $company_id, $cheque_no, $expense_account_id, $bank_account_id, $amount, $cheque_date, $voucher_id]);
         }
     }
     

@@ -17,8 +17,28 @@ if (!$user_id || $tenant_id === null) {
 }
 
 try {
-    $stmt = $pdo->prepare("SELECT id, bank_name, account_number FROM bank_accounts WHERE tenant_id = ? AND is_active = 1");
-    $stmt->execute([$tenant_id]);
+    // Get company IDs this user has access to (within current tenant)
+    $companyStmt = $pdo->prepare("
+        SELECT company_id
+        FROM user_companies
+        WHERE user_id = ? AND tenant_id = ?
+    ");
+    $companyStmt->execute([$user_id, $tenant_id]);
+    $companyIds = $companyStmt->fetchAll(PDO::FETCH_COLUMN);
+
+    if (empty($companyIds)) {
+        echo json_encode(['success' => true, 'data' => []]);
+        exit();
+    }
+
+    $placeholders = implode(',', array_fill(0, count($companyIds), '?'));
+
+    $stmt = $pdo->prepare("
+        SELECT id, bank_name, account_number 
+        FROM bank_accounts 
+        WHERE tenant_id = ? AND is_active = 1 AND company_id IN ($placeholders)
+    ");
+    $stmt->execute(array_merge([$tenant_id], $companyIds));
     $bankAccounts = $stmt->fetchAll(PDO::FETCH_ASSOC);
     
     echo json_encode(['success' => true, 'data' => $bankAccounts]);

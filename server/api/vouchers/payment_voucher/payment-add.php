@@ -23,6 +23,27 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 }
 
 try {
+    // Get company IDs this user has access to (within current tenant)
+    $companyStmt = $pdo->prepare("
+        SELECT company_id
+        FROM user_companies
+        WHERE user_id = ? AND tenant_id = ?
+    ");
+    $companyStmt->execute([$user_id, $tenant_id]);
+    $allowedCompanyIds = $companyStmt->fetchAll(PDO::FETCH_COLUMN);
+
+    if (empty($allowedCompanyIds)) {
+        echo json_encode(['success' => false, 'error' => 'No company assigned to your account']);
+        exit();
+    }
+
+    // Company is mandatory, and must be one the user is authorized for
+    $company_id = $_POST['company_id'] ?? null;
+    if (empty($company_id) || !in_array($company_id, $allowedCompanyIds)) {
+        echo json_encode(['success' => false, 'error' => 'Invalid or unauthorized company']);
+        exit();
+    }
+
     // Generate sequential voucher number
     $stmt = $pdo->prepare("SELECT voucher_number FROM payment_voucher WHERE tenant_id = ? ORDER BY id DESC LIMIT 1");
     $stmt->execute([$tenant_id]);
@@ -42,7 +63,6 @@ try {
     $payment_type = $_POST['payment_type'] ?? 'supplier';
     $voucher_date = $_POST['voucher_date'] ?? '';
     $supplier_code = $_POST['supplier_code'] ?? '';
-    $company_id = $_POST['company_id'] ?? null;
     $sub_account_id = !empty($_POST['sub_account_id']) ? $_POST['sub_account_id'] : null;
     $bill_no = !empty($_POST['bill_no']) ? $_POST['bill_no'] : null;
     $amount = $_POST['amount'] ?? 0;
@@ -127,10 +147,10 @@ try {
         $attachment = $finalFileName;
     }
 
-    // Get supplier/customer ID from code
+    // Get supplier/customer ID from code, restricted to the submitted (authorized) company
     if ($payment_type === 'customer') {
-        $stmt = $pdo->prepare("SELECT id FROM customers WHERE tenant_id = ? AND customer_code = ?");
-        $stmt->execute([$tenant_id, $supplier_code]);
+        $stmt = $pdo->prepare("SELECT id FROM customers WHERE tenant_id = ? AND customer_code = ? AND company_id = ?");
+        $stmt->execute([$tenant_id, $supplier_code, $company_id]);
         $entity = $stmt->fetch(PDO::FETCH_ASSOC);
         
         if (!$entity) {
@@ -138,8 +158,8 @@ try {
             exit();
         }
     } else {
-        $stmt = $pdo->prepare("SELECT id FROM suppliers WHERE tenant_id = ? AND supplier_code = ?");
-        $stmt->execute([$tenant_id, $supplier_code]);
+        $stmt = $pdo->prepare("SELECT id FROM suppliers WHERE tenant_id = ? AND supplier_code = ? AND company_id = ?");
+        $stmt->execute([$tenant_id, $supplier_code, $company_id]);
         $entity = $stmt->fetch(PDO::FETCH_ASSOC);
         
         if (!$entity) {
