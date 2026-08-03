@@ -208,26 +208,54 @@ try {
             $stmt->execute([$tenant_id, 'customer_opening', 'customers', $customer_id, 2, 'Customer opening credit balance', 0, $opening_credit]);
         }
         
-        // Delete existing sub accounts
-        $stmt = $pdo->prepare("DELETE FROM customer_sub_accounts WHERE tenant_id = ? AND customer_id = ?");
-        $stmt->execute([$tenant_id, $customer_id]);
-        
-        // Insert new sub accounts
-        $sub_accounts = $input['subAccounts'] ?? [];
-        if (!empty($sub_accounts)) {
-            $sub_sql = "INSERT INTO customer_sub_accounts (tenant_id, customer_id, sub_account_name, debit, credit) VALUES (?, ?, ?, ?, ?)";
-            $stmt = $pdo->prepare($sub_sql);
-            foreach ($sub_accounts as $sub) {
-                if (!empty($sub['sub_account_name'])) {
-                    $stmt->execute([
-                        $tenant_id, 
-                        $customer_id, 
-                        $sub['sub_account_name'],
-                        floatval($sub['debit'] ?? 0),
-                        floatval($sub['credit'] ?? 0)
-                    ]);
-                }
+        // Upsert sub-accounts: update existing rows (by id), insert new ones,
+        // delete only rows that were explicitly removed from the form.
+        // Never DELETE-all + re-INSERT: that burns new auto-increment IDs and
+        // orphans every transaction (sale_invoice, receive_voucher, etc.) that
+        // holds a reference to the old IDs.
+        $sub_accounts  = $input['subAccounts'] ?? [];
+        $kept_ids      = [];
+
+        $update_sub = $pdo->prepare(
+            "UPDATE customer_sub_accounts
+             SET sub_account_name = ?, debit = ?, credit = ?
+             WHERE id = ? AND tenant_id = ? AND customer_id = ?"
+        );
+        $insert_sub = $pdo->prepare(
+            "INSERT INTO customer_sub_accounts (tenant_id, customer_id, sub_account_name, debit, credit)
+             VALUES (?, ?, ?, ?, ?)"
+        );
+
+        foreach ($sub_accounts as $sub) {
+            if (empty($sub['sub_account_name'])) continue;
+
+            $name   = trim($sub['sub_account_name']);
+            $debit  = floatval($sub['debit']  ?? 0);
+            $credit = floatval($sub['credit'] ?? 0);
+
+            if (!empty($sub['id'])) {
+                // Existing row — update in place, keeping the same primary key
+                $update_sub->execute([$name, $debit, $credit, (int)$sub['id'], $tenant_id, $customer_id]);
+                $kept_ids[] = (int)$sub['id'];
+            } else {
+                // New row added via the form
+                $insert_sub->execute([$tenant_id, $customer_id, $name, $debit, $credit]);
+                $kept_ids[] = (int)$pdo->lastInsertId();
             }
+        }
+
+        // Delete only sub-accounts the user explicitly removed
+        if (!empty($kept_ids)) {
+            $ph = implode(',', array_fill(0, count($kept_ids), '?'));
+            $del_stmt = $pdo->prepare(
+                "DELETE FROM customer_sub_accounts
+                 WHERE tenant_id = ? AND customer_id = ? AND id NOT IN ($ph)"
+            );
+            $del_stmt->execute(array_merge([$tenant_id, $customer_id], $kept_ids));
+        } else {
+            // User removed every sub-account
+            $pdo->prepare("DELETE FROM customer_sub_accounts WHERE tenant_id = ? AND customer_id = ?")
+                ->execute([$tenant_id, $customer_id]);
         }
         
         echo json_encode(['success' => true, 'message' => 'Customer updated successfully']);
