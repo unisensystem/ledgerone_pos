@@ -10,6 +10,7 @@ document.addEventListener('DOMContentLoaded', function () {
         { id: 'supplierName',     label: 'Brand Name - Company',   visible: true },
         { id: 'brandName',        label: 'Supplier Name',          visible: true },
         { id: 'address',          label: 'Address',                visible: true },
+        { id: 'citySearch',       label: 'City',                   visible: true },
         { id: 'primaryPhone',     label: 'Primary Phone',          visible: true },
         { id: 'secondaryPhone',   label: 'Secondary Phone',        visible: false },
         { id: 'email',            label: 'Email Address',          visible: false },
@@ -18,6 +19,7 @@ document.addEventListener('DOMContentLoaded', function () {
         { id: 'openingDebit',     label: 'Opening Debit Amount',   visible: true },
         { id: 'openingCredit',    label: 'Opening Credit Amount',  visible: true },
         { id: 'aitPercent',       label: 'AIT %',                  visible: false },
+        { id: 'creditDays',       label: 'Credit Days',            visible: true },
         { id: 'partyType',        label: 'Party Type',             visible: true },
         { id: 'subAccountsTable', label: '📋 Sub Accounts',        visible: true },
         { id: 'blacklist',        label: 'Blacklist Supplier',     visible: true },
@@ -48,8 +50,8 @@ document.addEventListener('DOMContentLoaded', function () {
         if (fieldId === 'subAccountsTable') {
             return el.closest('.form-section') || el.closest('.form-group');
         }
-        // chips containers: find the form-group wrapper
-        if (fieldId === 'assocCompanySearch' || fieldId === 'salesmanSearch') {
+        // chips/search containers: find the form-group wrapper
+        if (fieldId === 'assocCompanySearch' || fieldId === 'salesmanSearch' || fieldId === 'citySearch') {
             return el.closest('.form-group');
         }
         const fg = el.closest('.form-group');
@@ -174,16 +176,23 @@ document.addEventListener('DOMContentLoaded', function () {
     const assocCompanyIdsInput = document.getElementById('assocCompanyIds');
     const assocCompanyChipsContainer = document.getElementById('assocCompanyChipsContainer');
 
+    // City autocomplete elements
+    const citySearch = document.getElementById('citySearch');
+    const cityHidden = document.getElementById('city');
+    const cityDropdown = document.getElementById('cityDropdown');
+
     let employees = [];
     let selectedSalesmen = [];
     let allCompanies = [];
     let selectedAssocCompanies = [];
+    let allCities = [];
     let isSubmitting = false;
 
-    // Load companies and employees
+    // Load companies, employees, projects, cities
     loadCompanies();
     loadEmployees();
     loadProjects();
+    loadCities();
 
     function loadCompanies() {
         fetch('../../../../server/api/customer_supplier/suppliers/get-companies.php')
@@ -227,6 +236,17 @@ document.addEventListener('DOMContentLoaded', function () {
                 }
             })
             .catch(err => console.error('loadProjects error:', err));
+    }
+
+    function loadCities() {
+        fetch('../../../../server/api/customer_supplier/suppliers/get-cities.php')
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    allCities = data.cities;
+                }
+            })
+            .catch(err => console.error('loadCities error:', err));
     }
 
     // Salesman search functionality
@@ -304,6 +324,43 @@ document.addEventListener('DOMContentLoaded', function () {
         salesmanIdsInput.value = selectedSalesmen.map(s => s.id).join(',');
     }
 
+    // City dropdown rendering
+    function renderCityDropdown(list) {
+        if (list.length > 0) {
+            cityDropdown.innerHTML = list.map(c =>
+                `<div class="salesman-dropdown-item" data-name="${c.city_name}">${c.city_name}</div>`
+            ).join('');
+            cityDropdown.style.display = 'block';
+        } else {
+            cityDropdown.style.display = 'none';
+        }
+    }
+
+    citySearch.addEventListener('focus', function () {
+        const term = this.value.toLowerCase();
+        const list = term
+            ? allCities.filter(c => c.city_name.toLowerCase().includes(term))
+            : allCities;
+        renderCityDropdown(list);
+    });
+
+    citySearch.addEventListener('input', function () {
+        const term = this.value.toLowerCase();
+        cityHidden.value = ''; // typed value not yet confirmed as a valid selection
+        if (!term) { cityDropdown.style.display = 'none'; return; }
+        const filtered = allCities.filter(c => c.city_name.toLowerCase().includes(term));
+        renderCityDropdown(filtered);
+    });
+
+    cityDropdown.addEventListener('click', function (e) {
+        const item = e.target.closest('.salesman-dropdown-item');
+        if (item) {
+            citySearch.value = item.dataset.name;
+            cityHidden.value = item.dataset.name;
+            cityDropdown.style.display = 'none';
+        }
+    });
+
     // Close dropdown when clicking outside
     document.addEventListener('click', function(e) {
         if (!salesmanChipsContainer.contains(e.target) && !salesmanDropdown.contains(e.target)) {
@@ -311,6 +368,9 @@ document.addEventListener('DOMContentLoaded', function () {
         }
         if (!assocCompanyChipsContainer.contains(e.target) && !assocCompanyDropdown.contains(e.target)) {
             assocCompanyDropdown.style.display = 'none';
+        }
+        if (!citySearch.contains(e.target) && !cityDropdown.contains(e.target)) {
+            cityDropdown.style.display = 'none';
         }
     });
 
@@ -501,6 +561,7 @@ document.addEventListener('DOMContentLoaded', function () {
             supplierName: document.getElementById('supplierName').value.trim(),
             brandName: document.getElementById('brandName').value.trim(),
             address: document.getElementById('address').value.trim(),
+            city: document.getElementById('city').value.trim(),
             primaryPhone: document.getElementById('primaryPhone').value.trim(),
             secondaryPhone: document.getElementById('secondaryPhone').value.trim(),
             identityCard: document.getElementById('identityCard').value.trim(),
@@ -508,6 +569,7 @@ document.addEventListener('DOMContentLoaded', function () {
             openingDebit: document.getElementById('openingDebit').value || 0,
             openingCredit: document.getElementById('openingCredit').value || 0,
             aitPercent: document.getElementById('aitPercent').value || 0,
+            creditDays: document.getElementById('creditDays').value || 0,
             partyType: document.getElementById('partyType').value || null,
             blacklist: document.getElementById('blacklist').checked,
             subAccounts: subAccounts
@@ -531,6 +593,8 @@ document.addEventListener('DOMContentLoaded', function () {
                     updateSalesmanIdsInput();
                     selectedAssocCompanies = [];
                     renderAssocCompanyChips();
+                    citySearch.value = '';
+                    cityHidden.value = '';
                 }, 2000);
             } else {
                 throw new Error(data.message);
@@ -555,6 +619,8 @@ document.addEventListener('DOMContentLoaded', function () {
             updateSalesmanIdsInput();
             selectedAssocCompanies = [];
             renderAssocCompanyChips();
+            citySearch.value = '';
+            cityHidden.value = '';
         }
     });
 });
