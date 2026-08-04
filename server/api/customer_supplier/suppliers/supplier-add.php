@@ -59,6 +59,7 @@ try {
         'supplier_code' => $supplier_code,
         'supplier_name' => trim($input['supplierName']),
         'address' => !empty($input['address']) ? trim($input['address']) : null,
+        'city' => !empty($input['city']) ? trim($input['city']) : null,
         'brand_name' => !empty($input['brandName']) ? trim($input['brandName']) : null,
         'primary_phone' => !empty($input['primaryPhone']) ? trim($input['primaryPhone']) : null,
         'secondary_phone' => !empty($input['secondaryPhone']) ? trim($input['secondaryPhone']) : null,
@@ -67,6 +68,7 @@ try {
         'opening_debit_amount' => floatval($input['openingDebit'] ?? 0),
         'opening_credit_amount' => floatval($input['openingCredit'] ?? 0),
         'ait_percent' => floatval($input['aitPercent'] ?? 0),
+        'credit_days' => isset($input['creditDays']) && $input['creditDays'] !== '' ? (int)$input['creditDays'] : 0,
         'party_type' => !empty($input['partyType']) ? trim($input['partyType']) : null,
         'is_blacklisted' => isset($input['blacklist']) && $input['blacklist'] === true ? 1 : 0,
         'created_by' => $user_id,
@@ -80,7 +82,7 @@ try {
     $data['id'] = $new_id;
     
     // Insert supplier
-    $sql = "INSERT INTO suppliers (id, tenant_id, company_id, salesman_id, project_id, supplier_code, supplier_name, brand_name, address, primary_phone, secondary_phone, identity_card_no, email, opening_debit_amount, opening_credit_amount, ait_percent, party_type, is_blacklisted, created_by, updated_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+    $sql = "INSERT INTO suppliers (id, tenant_id, company_id, salesman_id, project_id, supplier_code, supplier_name, brand_name, address, city, primary_phone, secondary_phone, identity_card_no, email, opening_debit_amount, opening_credit_amount, ait_percent, credit_days, party_type, is_blacklisted, created_by, updated_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
     
     $stmt = $pdo->prepare($sql);
     $stmt->execute([
@@ -93,6 +95,7 @@ try {
         $data['supplier_name'],
         $data['brand_name'],
         $data['address'],
+        $data['city'],
         $data['primary_phone'],
         $data['secondary_phone'],
         $data['identity_card_no'],
@@ -100,6 +103,7 @@ try {
         $data['opening_debit_amount'],
         $data['opening_credit_amount'],
         $data['ait_percent'],
+        $data['credit_days'],
         $data['party_type'],
         $data['is_blacklisted'],
         $data['created_by'],
