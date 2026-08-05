@@ -134,6 +134,7 @@ $currency_symbol = $currency['symbol'] ?? '$';
                     <thead>
                         <tr>
                             <th>Sr#</th>
+                            <th>Company</th>
                             <th>Customer Code</th>
                             <th>Shop Name</th>
                             <th>Customer Name</th>

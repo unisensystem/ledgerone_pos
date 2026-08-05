@@ -67,8 +67,10 @@ document.addEventListener('DOMContentLoaded', function () {
             const hasOpeningHistory = openingDebit > 0 || openingCredit > 0;
 
             const row = document.createElement('tr');
+            row.dataset.id = customer.id;
             row.innerHTML = `
                         <td>${startSr + index}</td>
+                        <td>${customer.company_name || '-'}</td>
                         <td><span class="customer-code">${customer.customer_code}</span></td>
                         <td>${customer.shop_name || '-'}</td>
                         <td><span class="customer-name">${customer.customer_name}</span></td>
@@ -595,9 +597,8 @@ document.addEventListener('DOMContentLoaded', function () {
         if (!target) return;
 
         const row = target.closest('tr');
-        const customerCode = row.querySelector('.customer-code').textContent;
         const customerName = row.querySelector('.customer-name').textContent;
-        const customerId = customers.find(c => c.customer_code === customerCode)?.id;
+        const customerId = row.dataset.id;
 
         if (target.classList.contains('edit')) {
             if (!userPermissions.includes('Edit')) {

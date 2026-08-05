@@ -1,0 +1,337 @@
+- generic [ref=e1]:
+  - generic [ref=e2]:
+    - button "" [ref=e3]
+    - banner [ref=e5]:
+      - generic [ref=e7]:
+        - heading "Z & S Meal and Foods (Private) Limited" [level=1] [ref=e8]
+        - text: Z & S Meal and Foods (Private) Limited
+      - generic [ref=e9]:
+        - generic [ref=e10]: 09:49:32 PM
+        - generic [ref=e11]: Wed, Aug 5
+      - generic [ref=e12]:
+        - generic [ref=e13]: Version
+        - generic [ref=e14]: "1.0"
+      - generic [ref=e15]:
+        - generic [ref=e16]:
+          - generic [ref=e17]: Zafar
+          - generic [ref=e18]: Super Admin
+        - generic [ref=e19]: 
+    - navigation [ref=e22]:
+      - generic [ref=e23]:
+        - button "Toggle navigation" [ref=e24] [cursor=pointer]:
+          - generic [ref=e25]: 
+        - generic [ref=e26]:
+          - generic [ref=e27]: 
+          - generic [ref=e28]: LedgerOne
+      - generic [ref=e29]:
+        - button " Home" [ref=e30] [cursor=pointer]:
+          - generic [ref=e31]: 
+          - generic [ref=e32]: Home
+        - button " Customer/Supplier " [ref=e34] [cursor=pointer]:
+          - generic [ref=e35]: 
+          - generic [ref=e36]: Customer/Supplier
+          - generic [ref=e37]: 
+        - button " Sale " [ref=e39] [cursor=pointer]:
+          - generic [ref=e40]: 
+          - generic [ref=e41]: Sale
+          - generic [ref=e42]: 
+        - button " Purchase " [ref=e44] [cursor=pointer]:
+          - generic [ref=e45]: 
+          - generic [ref=e46]: Purchase
+          - generic [ref=e47]: 
+        - button " Inventory " [ref=e49] [cursor=pointer]:
+          - generic [ref=e50]: 
+          - generic [ref=e51]: Inventory
+          - generic [ref=e52]: 
+        - button " Vouchers " [ref=e54] [cursor=pointer]:
+          - generic [ref=e55]: 
+          - generic [ref=e56]: Vouchers
+          - generic [ref=e57]: 
+        - button " Banking " [ref=e59] [cursor=pointer]:
+          - generic [ref=e60]: 
+          - generic [ref=e61]: Banking
+          - generic [ref=e62]: 
+        - text:  
+        - button " Chart Of Accounts" [ref=e63] [cursor=pointer]:
+          - generic [ref=e64]: 
+          - generic [ref=e65]: Chart Of Accounts
+        - button " Financial Reports " [ref=e67] [cursor=pointer]:
+          - generic [ref=e68]: 
+          - generic [ref=e69]: Financial Reports
+          - generic [ref=e70]: 
+        - button " HRM " [ref=e72] [cursor=pointer]:
+          - generic [ref=e73]: 
+          - generic [ref=e74]: HRM
+          - generic [ref=e75]: 
+        - button " Manufacturing " [ref=e77] [cursor=pointer]:
+          - generic [ref=e78]: 
+          - generic [ref=e79]: Manufacturing
+          - generic [ref=e80]: 
+        - button " Master Setup " [ref=e82] [cursor=pointer]:
+          - generic [ref=e83]: 
+          - generic [ref=e84]: Master Setup
+          - generic [ref=e85]: 
+        - button " System Setup " [ref=e87] [cursor=pointer]:
+          - generic [ref=e88]: 
+          - generic [ref=e89]: System Setup
+          - generic [ref=e90]: 
+        - button " Logout" [ref=e92] [cursor=pointer]:
+          - generic [ref=e93]: 
+          - generic [ref=e94]: Logout
+  - generic [ref=e95]:
+    - generic [ref=e97]:
+      - link "+ Add Customer" [ref=e98] [cursor=pointer]:
+        - /url: customer-add.php
+        - generic [ref=e99]: +
+        - text: Add Customer
+      - link " Add Opening Invoices" [ref=e100] [cursor=pointer]:
+        - /url: opening-balance-invoices-add.php
+        - generic [ref=e101]: 
+        - text: Add Opening Invoices
+    - generic [ref=e102]:
+      - heading " Customers Management" [level=1] [ref=e103]:
+        - generic [ref=e104]: 
+        - text: Customers Management
+      - generic [ref=e105]: Showing 1-10 of 45 customers
+    - generic [ref=e106]:
+      - generic [ref=e107]:
+        - generic [ref=e108]: 
+        - generic [ref=e110]: "366"
+        - generic [ref=e111]: Total Customers
+      - generic [ref=e112]:
+        - generic [ref=e113]: 
+        - generic [ref=e115]: "366"
+        - generic [ref=e116]: Active Customers
+      - generic [ref=e117]:
+        - generic [ref=e118]: 
+        - generic [ref=e120]: "0"
+        - generic [ref=e121]: Blacklisted
+    - generic [ref=e122]:
+      - generic [ref=e123]:
+        - generic [ref=e124]:
+          - generic [ref=e125]: 
+          - textbox "Search by any field..." [active] [ref=e126]: Yaseen Bakery
+        - generic [ref=e127]:
+          - combobox [ref=e128]:
+            - option "Show 10" [selected]
+            - option "Show 25"
+            - option "Show 50"
+            - option "Show 100"
+            - option "Show 500"
+            - option "Show All"
+          - combobox [ref=e129]:
+            - option "All Companies" [selected]
+            - option "Z & S Meal and Foods (Private) Limited"
+            - option "Z&S Foods"
+          - combobox [ref=e130]:
+            - option "All Statuses" [selected]
+            - option "Active"
+            - option "Blacklisted"
+          - generic [ref=e131]:
+            - button " Export " [ref=e132] [cursor=pointer]:
+              - generic [ref=e133]: 
+              - text: Export
+              - generic [ref=e134]: 
+            - text:   
+      - table [ref=e136]:
+        - rowgroup [ref=e137]:
+          - row [ref=e138]:
+            - columnheader "Sr#" [ref=e139]
+            - columnheader "Company" [ref=e140]
+            - columnheader "Customer Code" [ref=e141]
+            - columnheader "Shop Name" [ref=e142]
+            - columnheader "Customer Name" [ref=e143]
+            - columnheader "Address" [ref=e144]
+            - columnheader "Group" [ref=e145]
+            - columnheader "Category" [ref=e146]
+            - columnheader "City" [ref=e147]
+            - columnheader "Zone" [ref=e148]
+            - columnheader "Area" [ref=e149]
+            - columnheader "Phone" [ref=e150]
+            - columnheader "Opening Balance" [ref=e151]
+            - columnheader "Status" [ref=e152]
+            - columnheader "Actions" [ref=e153]
+        - rowgroup [ref=e154]:
+          - row [ref=e599]:
+            - cell "1" [ref=e600]
+            - cell "Z&S Foods" [ref=e601]
+            - cell "CUST-00304" [ref=e602]
+            - cell "-" [ref=e603]
+            - cell "Yaseen Bakery - Liyari" [ref=e604]
+            - cell "-" [ref=e605]
+            - cell "-" [ref=e606]
+            - cell "-" [ref=e607]
+            - cell "KARACHI" [ref=e608]
+            - cell "Lyari-75660" [ref=e609]
+            - cell "Eagle Chowwkak" [ref=e610]
+            - cell "-" [ref=e611]
+            - cell "₨0.00" [ref=e612]
+            - cell "Active" [ref=e613]
+            - cell [ref=e615]:
+              - generic [ref=e616]:
+                - button "" [ref=e617] [cursor=pointer]
+                - button "" [ref=e619] [cursor=pointer]
+                - button "" [ref=e621] [cursor=pointer]
+      - generic [ref=e395]:
+        - generic [ref=e396]: Showing 1-1 of 1 customers
+        - generic [ref=e397]:
+          - button "" [disabled] [ref=e398] [cursor=pointer]
+          - button "1" [ref=e623] [cursor=pointer]
+          - button "" [disabled] [ref=e436] [cursor=pointer]
+  - text:   * *  + +     
+  - generic [ref=e447]:
+    - generic [ref=e448]:
+      - heading " Customer Details" [level=3] [ref=e449]:
+        - generic [ref=e450]: 
+        - text: Customer Details
+      - button "" [ref=e451] [cursor=pointer]
+    - generic [ref=e454]:
+      - generic [ref=e455]:
+        - generic [ref=e456]: Company
+        - generic [ref=e457]: Z&S Foods
+      - generic [ref=e458]:
+        - generic [ref=e459]: Customer Code
+        - generic [ref=e460]: CUST-00304
+      - generic [ref=e461]:
+        - generic [ref=e462]: Customer Group
+        - generic [ref=e463]: "-"
+      - generic [ref=e464]:
+        - generic [ref=e465]: Customer Category
+        - generic [ref=e466]: "-"
+      - generic [ref=e467]:
+        - generic [ref=e468]: Brand Name
+        - generic [ref=e469]: "-"
+      - generic [ref=e470]:
+        - generic [ref=e471]: Shop Name
+        - generic [ref=e472]: "-"
+      - generic [ref=e473]:
+        - generic [ref=e474]: Customer Name
+        - generic [ref=e475]: Yaseen Bakery - Liyari
+      - generic [ref=e476]:
+        - generic [ref=e477]: Out Station
+        - generic [ref=e478]: "No"
+      - generic [ref=e479]:
+        - generic [ref=e480]: Address
+        - generic [ref=e481]: "-"
+      - generic [ref=e482]:
+        - generic [ref=e483]: P.O. Box No
+        - generic [ref=e484]: "-"
+      - generic [ref=e485]:
+        - generic [ref=e486]: Primary Phone
+        - generic [ref=e487]: "-"
+      - generic [ref=e488]:
+        - generic [ref=e489]: Secondary Phone
+        - generic [ref=e490]: "-"
+      - generic [ref=e491]:
+        - generic [ref=e492]: Email
+        - generic [ref=e493]: "-"
+      - generic [ref=e494]:
+        - generic [ref=e495]: Identity Card
+        - generic [ref=e496]: "-"
+      - generic [ref=e497]:
+        - generic [ref=e498]: Sales Officer
+        - generic [ref=e499]: "-"
+      - generic [ref=e500]:
+        - generic [ref=e501]: Supplier Man
+        - generic [ref=e502]: "-"
+      - generic [ref=e503]:
+        - generic [ref=e504]:
+          - generic [ref=e505]: 
+          - text: Project
+        - generic [ref=e506]: "-"
+      - generic [ref=e507]:
+        - generic [ref=e508]: Country
+        - generic [ref=e509]: PAKISTAN
+      - generic [ref=e510]:
+        - generic [ref=e511]: Region
+        - generic [ref=e512]: Sindh
+      - generic [ref=e513]:
+        - generic [ref=e514]: City
+        - generic [ref=e515]: KARACHI
+      - generic [ref=e516]:
+        - generic [ref=e517]: City Zone
+        - generic [ref=e518]: Lyari-75660
+      - generic [ref=e519]:
+        - generic [ref=e520]: Area
+        - generic [ref=e521]: Eagle Chowwkak
+      - generic [ref=e522]:
+        - generic [ref=e523]: Sales Tax Registered
+        - generic [ref=e524]: "No"
+      - generic [ref=e525]:
+        - generic [ref=e526]: STRN
+        - generic [ref=e527]: "-"
+      - generic [ref=e528]:
+        - generic [ref=e529]: Is Filer
+        - generic [ref=e530]: "No"
+      - generic [ref=e531]:
+        - generic [ref=e532]: NTN
+        - generic [ref=e533]: "-"
+      - generic [ref=e534]:
+        - generic [ref=e535]: Advance Income Tax %
+        - generic [ref=e536]: 0.00%
+      - generic [ref=e537]:
+        - generic [ref=e538]: Default Discount %
+        - generic [ref=e539]: 0.00%
+      - generic [ref=e540]:
+        - generic [ref=e541]: Credit Limit
+        - generic [ref=e542]: ₨0.00
+      - generic [ref=e543]:
+        - generic [ref=e544]: Credit Period Limit (Days)
+        - generic [ref=e545]: 0 days
+      - generic [ref=e546]:
+        - generic [ref=e547]: Opening Debit
+        - generic [ref=e548]: ₨0.00
+      - generic [ref=e549]:
+        - generic [ref=e550]: Opening Credit
+        - generic [ref=e551]: ₨0.00
+      - generic [ref=e552]:
+        - generic [ref=e553]: Opening Balance Invoices
+        - table [ref=e555]:
+          - rowgroup [ref=e556]:
+            - row [ref=e557]:
+              - columnheader "Distribution" [ref=e558]
+              - columnheader "Sales Officer" [ref=e559]
+              - columnheader "Invoice Number" [ref=e560]
+              - columnheader "Debit (Dr)" [ref=e561]
+              - columnheader "Invoice Date" [ref=e562]
+          - rowgroup [ref=e563]:
+            - row [ref=e624]:
+              - cell "No invoices" [ref=e625]
+      - generic [ref=e566]:
+        - generic [ref=e567]: Sub Accounts
+        - table [ref=e569]:
+          - rowgroup [ref=e570]:
+            - row [ref=e571]:
+              - columnheader "S#" [ref=e572]
+              - columnheader "Sub Account Name" [ref=e573]
+              - columnheader "Debit (Dr)" [ref=e574]
+              - columnheader "Credit (Cr)" [ref=e575]
+          - rowgroup [ref=e576]:
+            - row [ref=e626]:
+              - cell "No sub accounts" [ref=e627]
+      - generic [ref=e579]:
+        - generic [ref=e580]: Current Balance
+        - generic [ref=e581]: ₨0.00
+      - generic [ref=e582]:
+        - generic [ref=e583]: Is Wholesaler
+        - generic [ref=e584]: "No"
+      - generic [ref=e585]:
+        - generic [ref=e586]: Status
+        - generic [ref=e587]: Active
+      - generic [ref=e589]:
+        - generic [ref=e590]: Created Date
+        - generic [ref=e591]: 7/13/2026
+      - generic [ref=e592]:
+        - generic [ref=e593]: Last Updated
+        - generic [ref=e594]: 7/14/2026
+    - generic [ref=e595]:
+      - button "Close" [ref=e596] [cursor=pointer]
+      - button " Edit Customer" [ref=e597] [cursor=pointer]:
+        - generic [ref=e598]: 
+        - text: Edit Customer
+  - generic [ref=e438]:
+    - generic [ref=e439]: 
+    - generic [ref=e441]:
+      - generic [ref=e442]: Success
+      - generic [ref=e443]: Customer deleted successfully!
+    - button "" [ref=e444] [cursor=pointer]

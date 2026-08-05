@@ -22,6 +22,23 @@ if (!$user_id || !$tenant_id) {
     exit;
 }
 
+function normalizeCompanyNameWords($name) {
+    $name = strtolower($name);
+    $words = preg_split('/[^a-z0-9]+/', $name, -1, PREG_SPLIT_NO_EMPTY);
+    $stopwords = ['the', 'and', 'of', 'co', 'company', 'corp', 'corporation', 'inc',
+        'incorporated', 'ltd', 'limited', 'pvt', 'private', 'llc', 'llp', 'plc'];
+    return array_values(array_diff($words, $stopwords));
+}
+
+function companyNameSimilarity($name1, $name2) {
+    $words1 = normalizeCompanyNameWords($name1);
+    $words2 = normalizeCompanyNameWords($name2);
+    $smaller = min(count($words1), count($words2));
+    if ($smaller === 0) return 0;
+    $common = array_intersect($words1, $words2);
+    return count($common) / $smaller;
+}
+
 function convertToWebP($sourcePath, $targetPath) {
     $imageInfo = getimagesize($sourcePath);
     $mimeType = $imageInfo['mime'];
@@ -57,7 +74,36 @@ try {
         echo json_encode(['success' => false, 'message' => 'Company name is required']);
         exit;
     }
-    
+
+    $companyName = trim($_POST['company_name']);
+
+    // Block exact duplicates (case-insensitive) outright
+    $dupStmt = $pdo->prepare("SELECT id FROM companies WHERE tenant_id = ? AND LOWER(TRIM(company_name)) = LOWER(?)");
+    $dupStmt->execute([$tenant_id, $companyName]);
+    if ($dupStmt->fetch()) {
+        http_response_code(409);
+        echo json_encode(['success' => false, 'message' => "A company named \"$companyName\" already exists."]);
+        exit;
+    }
+
+    // Warn (don't block) on near-duplicate names, e.g. "Z&S Foods" vs "Z & S Meal and Foods (Private) Limited"
+    $confirmDuplicate = isset($_POST['confirm_duplicate']) && $_POST['confirm_duplicate'] === '1';
+    if (!$confirmDuplicate) {
+        $existingStmt = $pdo->prepare("SELECT id, company_name FROM companies WHERE tenant_id = ?");
+        $existingStmt->execute([$tenant_id]);
+        foreach ($existingStmt->fetchAll() as $existing) {
+            if (companyNameSimilarity($companyName, $existing['company_name']) >= 0.6) {
+                echo json_encode([
+                    'success' => false,
+                    'duplicate_warning' => true,
+                    'message' => "This looks similar to an existing company \"{$existing['company_name']}\". Create it as a separate company anyway?",
+                    'similar_company' => $existing
+                ]);
+                exit;
+            }
+        }
+    }
+
     $logoFileName = null;
     
     // Handle logo upload
@@ -128,7 +174,7 @@ try {
     $result = $stmt->execute([
         $tenant_id,
         $companyCode,
-        $_POST['company_name'],
+        $companyName,
         $_POST['legal_name'] ?? null,
         $_POST['email'] ?? null,
         $_POST['phone'] ?? null,

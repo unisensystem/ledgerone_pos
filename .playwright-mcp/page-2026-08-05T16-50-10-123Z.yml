@@ -1,0 +1,362 @@
+- generic [ref=e1]:
+  - generic [ref=e2]:
+    - button "" [ref=e3]
+    - banner [ref=e5]:
+      - generic [ref=e7]:
+        - heading "Z & S Meal and Foods (Private) Limited" [level=1] [ref=e8]
+        - text: Z & S Meal and Foods (Private) Limited
+      - generic [ref=e9]:
+        - generic [ref=e10]: 09:50:09 PM
+        - generic [ref=e11]: Wed, Aug 5
+      - generic [ref=e12]:
+        - generic [ref=e13]: Version
+        - generic [ref=e14]: "1.0"
+      - generic [ref=e15]:
+        - generic [ref=e16]:
+          - generic [ref=e17]: Zafar
+          - generic [ref=e18]: Super Admin
+        - generic [ref=e19]: 
+    - navigation [ref=e22]:
+      - generic [ref=e23]:
+        - button "Toggle navigation" [ref=e24] [cursor=pointer]:
+          - generic [ref=e25]: 
+        - generic [ref=e26]:
+          - generic [ref=e27]: 
+          - generic [ref=e28]: LedgerOne
+      - generic [ref=e29]:
+        - button " Home" [ref=e30] [cursor=pointer]:
+          - generic [ref=e31]: 
+          - generic [ref=e32]: Home
+        - button " Customer/Supplier " [ref=e34] [cursor=pointer]:
+          - generic [ref=e35]: 
+          - generic [ref=e36]: Customer/Supplier
+          - generic [ref=e37]: 
+        - button " Sale " [ref=e39] [cursor=pointer]:
+          - generic [ref=e40]: 
+          - generic [ref=e41]: Sale
+          - generic [ref=e42]: 
+        - button " Purchase " [ref=e44] [cursor=pointer]:
+          - generic [ref=e45]: 
+          - generic [ref=e46]: Purchase
+          - generic [ref=e47]: 
+        - button " Inventory " [ref=e49] [cursor=pointer]:
+          - generic [ref=e50]: 
+          - generic [ref=e51]: Inventory
+          - generic [ref=e52]: 
+        - button " Vouchers " [ref=e54] [cursor=pointer]:
+          - generic [ref=e55]: 
+          - generic [ref=e56]: Vouchers
+          - generic [ref=e57]: 
+        - button " Banking " [ref=e59] [cursor=pointer]:
+          - generic [ref=e60]: 
+          - generic [ref=e61]: Banking
+          - generic [ref=e62]: 
+        - text:  
+        - button " Chart Of Accounts" [ref=e63] [cursor=pointer]:
+          - generic [ref=e64]: 
+          - generic [ref=e65]: Chart Of Accounts
+        - button " Financial Reports " [ref=e67] [cursor=pointer]:
+          - generic [ref=e68]: 
+          - generic [ref=e69]: Financial Reports
+          - generic [ref=e70]: 
+        - button " HRM " [ref=e72] [cursor=pointer]:
+          - generic [ref=e73]: 
+          - generic [ref=e74]: HRM
+          - generic [ref=e75]: 
+        - button " Manufacturing " [ref=e77] [cursor=pointer]:
+          - generic [ref=e78]: 
+          - generic [ref=e79]: Manufacturing
+          - generic [ref=e80]: 
+        - button " Master Setup " [ref=e82] [cursor=pointer]:
+          - generic [ref=e83]: 
+          - generic [ref=e84]: Master Setup
+          - generic [ref=e85]: 
+        - button " System Setup " [ref=e87] [cursor=pointer]:
+          - generic [ref=e88]: 
+          - generic [ref=e89]: System Setup
+          - generic [ref=e90]: 
+        - button " Logout" [ref=e92] [cursor=pointer]:
+          - generic [ref=e93]: 
+          - generic [ref=e94]: Logout
+  - generic [ref=e95]:
+    - generic [ref=e97]:
+      - link "+ Add Customer" [ref=e98] [cursor=pointer]:
+        - /url: customer-add.php
+        - generic [ref=e99]: +
+        - text: Add Customer
+      - link " Add Opening Invoices" [ref=e100] [cursor=pointer]:
+        - /url: opening-balance-invoices-add.php
+        - generic [ref=e101]: 
+        - text: Add Opening Invoices
+    - generic [ref=e102]:
+      - heading " Customers Management" [level=1] [ref=e103]:
+        - generic [ref=e104]: 
+        - text: Customers Management
+      - generic [ref=e105]: Showing 1-10 of 45 customers
+    - generic [ref=e106]:
+      - generic [ref=e107]:
+        - generic [ref=e108]: 
+        - generic [ref=e110]: "366"
+        - generic [ref=e111]: Total Customers
+      - generic [ref=e112]:
+        - generic [ref=e113]: 
+        - generic [ref=e115]: "366"
+        - generic [ref=e116]: Active Customers
+      - generic [ref=e117]:
+        - generic [ref=e118]: 
+        - generic [ref=e120]: "0"
+        - generic [ref=e121]: Blacklisted
+    - generic [ref=e122]:
+      - generic [ref=e123]:
+        - generic [ref=e124]:
+          - generic [ref=e125]: 
+          - textbox "Search by any field..." [active] [ref=e126]: Yaseen Bakery
+        - generic [ref=e127]:
+          - combobox [ref=e128]:
+            - option "Show 10" [selected]
+            - option "Show 25"
+            - option "Show 50"
+            - option "Show 100"
+            - option "Show 500"
+            - option "Show All"
+          - combobox [ref=e129]:
+            - option "All Companies" [selected]
+            - option "Z & S Meal and Foods (Private) Limited"
+            - option "Z&S Foods"
+          - combobox [ref=e130]:
+            - option "All Statuses" [selected]
+            - option "Active"
+            - option "Blacklisted"
+          - generic [ref=e131]:
+            - button " Export " [ref=e132] [cursor=pointer]:
+              - generic [ref=e133]: 
+              - text: Export
+              - generic [ref=e134]: 
+            - text:   
+      - table [ref=e136]:
+        - rowgroup [ref=e137]:
+          - row [ref=e138]:
+            - columnheader "Sr#" [ref=e139]
+            - columnheader "Company" [ref=e140]
+            - columnheader "Customer Code" [ref=e141]
+            - columnheader "Shop Name" [ref=e142]
+            - columnheader "Customer Name" [ref=e143]
+            - columnheader "Address" [ref=e144]
+            - columnheader "Group" [ref=e145]
+            - columnheader "Category" [ref=e146]
+            - columnheader "City" [ref=e147]
+            - columnheader "Zone" [ref=e148]
+            - columnheader "Area" [ref=e149]
+            - columnheader "Phone" [ref=e150]
+            - columnheader "Opening Balance" [ref=e151]
+            - columnheader "Status" [ref=e152]
+            - columnheader "Actions" [ref=e153]
+        - rowgroup [ref=e154]:
+          - row [ref=e599]:
+            - cell "1" [ref=e600]
+            - cell "Z&S Foods" [ref=e601]
+            - cell "CUST-00304" [ref=e602]
+            - cell "-" [ref=e603]
+            - cell "Yaseen Bakery - Liyari" [ref=e604]
+            - cell "-" [ref=e605]
+            - cell "-" [ref=e606]
+            - cell "-" [ref=e607]
+            - cell "KARACHI" [ref=e608]
+            - cell "Lyari-75660" [ref=e609]
+            - cell "Eagle Chowwkak" [ref=e610]
+            - cell "-" [ref=e611]
+            - cell "₨0.00" [ref=e612]
+            - cell "Active" [ref=e613]
+            - cell [ref=e615]:
+              - generic [ref=e616]:
+                - button "" [ref=e617] [cursor=pointer]
+                - button "" [ref=e619] [cursor=pointer]
+                - button "" [ref=e621] [cursor=pointer]
+      - generic [ref=e395]:
+        - generic [ref=e396]: Showing 1-1 of 1 customers
+        - generic [ref=e397]:
+          - button "" [disabled] [ref=e398] [cursor=pointer]
+          - button "1" [ref=e623] [cursor=pointer]
+          - button "" [disabled] [ref=e436] [cursor=pointer]
+  - generic [ref=e630]:
+    - generic [ref=e631]:
+      - heading " Edit Customer" [level=3] [ref=e632]:
+        - generic [ref=e633]: 
+        - text: Edit Customer
+      - button "" [ref=e634] [cursor=pointer]
+    - generic [ref=e636]:
+      - generic [ref=e638]:
+        - generic [ref=e639]:
+          - generic [ref=e640]: Company*
+          - combobox [ref=e641]
+          - combobox [ref=e644] [cursor=pointer]:
+            - textbox "Z&S Foods" [ref=e645]
+        - generic [ref=e646]:
+          - generic [ref=e647]: Customer Code
+          - textbox [ref=e648]: CUST-00304
+        - generic [ref=e649]:
+          - generic [ref=e650]: Customer Group
+          - combobox [ref=e651]
+          - combobox [ref=e654] [cursor=pointer]:
+            - textbox "Select Customer Type" [ref=e655]
+        - generic [ref=e656]:
+          - generic [ref=e657]: Customer Category
+          - combobox [ref=e658]
+          - combobox [ref=e661] [cursor=pointer]:
+            - textbox "Select Customer Category" [ref=e662]
+        - generic [ref=e663]:
+          - generic [ref=e664]: Brand Name
+          - combobox [ref=e665]
+          - combobox [ref=e668] [cursor=pointer]:
+            - textbox "Select Brand Name" [ref=e669]
+        - generic [ref=e670]:
+          - generic [ref=e671]: Customer Name*
+          - textbox [ref=e672]: Yaseen Bakery - Liyari
+        - generic [ref=e673]:
+          - generic [ref=e674]: Shop Name
+          - textbox [ref=e675]
+        - generic [ref=e677]:
+          - checkbox "Out Station" [ref=e678]
+          - generic [ref=e679]: Out Station
+        - generic [ref=e680]:
+          - generic [ref=e681]: Address
+          - textbox [ref=e682]
+        - generic [ref=e683]:
+          - generic [ref=e684]: P.O. Box No
+          - textbox [ref=e685]
+        - generic [ref=e686]:
+          - generic [ref=e687]: Primary Phone
+          - textbox [ref=e688]
+        - generic [ref=e689]:
+          - generic [ref=e690]: Secondary Phone
+          - textbox [ref=e691]
+        - generic [ref=e692]:
+          - generic [ref=e693]: Email
+          - textbox [ref=e694]
+        - generic [ref=e695]:
+          - generic [ref=e696]: Identity Card
+          - textbox [ref=e697]
+        - generic [ref=e698]:
+          - generic [ref=e699]: Sales Officer
+          - combobox [ref=e700]
+          - combobox [ref=e703] [cursor=pointer]:
+            - textbox "Select Sales Officer" [ref=e704]
+        - generic [ref=e705]:
+          - generic [ref=e706]: Supplier Man
+          - combobox [ref=e707]
+          - combobox [ref=e710] [cursor=pointer]:
+            - textbox "Select Supplier Man" [ref=e711]
+        - generic [ref=e712]:
+          - generic [ref=e713]:
+            - generic [ref=e714]: 
+            - text: Project
+          - combobox [ref=e715]
+          - combobox [ref=e718] [cursor=pointer]:
+            - textbox "Select Project" [ref=e719]
+        - generic [ref=e720]:
+          - generic [ref=e721]: Country
+          - combobox [ref=e722]
+          - combobox [ref=e725] [cursor=pointer]:
+            - button "Remove all items" [ref=e726]: ×
+            - textbox "PAKISTAN" [ref=e727]
+        - generic [ref=e728]:
+          - generic [ref=e729]: Region
+          - combobox [ref=e730]
+          - combobox [ref=e733] [cursor=pointer]:
+            - button "Remove all items" [ref=e734]: ×
+            - textbox "Sindh" [ref=e735]
+        - generic [ref=e736]:
+          - generic [ref=e737]: City
+          - combobox [ref=e738]
+          - combobox [ref=e741] [cursor=pointer]:
+            - button "Remove all items" [ref=e742]: ×
+            - textbox "KARACHI" [ref=e743]
+        - generic [ref=e744]:
+          - generic [ref=e745]: City Zone
+          - combobox [ref=e746]
+          - combobox [ref=e749] [cursor=pointer]:
+            - button "Remove all items" [ref=e750]: ×
+            - textbox "Lyari-75660" [ref=e751]
+        - generic [ref=e752]:
+          - generic [ref=e753]: Area
+          - combobox [ref=e754]
+          - combobox [ref=e757] [cursor=pointer]:
+            - button "Remove all items" [ref=e758]: ×
+            - textbox "Eagle Chowwkak" [ref=e759]
+        - generic [ref=e761]:
+          - checkbox "Is Sales Tax Registered?" [ref=e762]
+          - generic [ref=e763]: Is Sales Tax Registered?
+        - generic [ref=e765]:
+          - checkbox "Is Filer?" [ref=e766]
+          - generic [ref=e767]: Is Filer?
+        - generic [ref=e768]:
+          - generic [ref=e769]: Advance Income Tax %
+          - spinbutton [ref=e770]: "0.00"
+        - generic [ref=e771]:
+          - generic [ref=e772]: Default Discount %
+          - spinbutton [ref=e773]: "0.00"
+        - generic [ref=e774]:
+          - generic [ref=e775]: Credit Limit
+          - spinbutton [ref=e776]: "0.00"
+        - generic [ref=e777]:
+          - generic [ref=e778]: Credit Period Limit (Days)
+          - spinbutton [ref=e779]: "0"
+        - generic [ref=e780]:
+          - generic [ref=e781]: Opening Debit
+          - spinbutton [ref=e782]: "0.00"
+        - generic [ref=e783]:
+          - generic [ref=e784]: Opening Credit
+          - spinbutton [ref=e785]: "0.00"
+        - generic [ref=e786]:
+          - generic [ref=e787]: Opening Balance Invoices
+          - table [ref=e789]:
+            - rowgroup [ref=e790]:
+              - row [ref=e791]:
+                - columnheader "Distribution" [ref=e792]
+                - columnheader "Sales Officer" [ref=e793]
+                - columnheader "Invoice Number" [ref=e794]
+                - columnheader "Debit (Dr)" [ref=e795]
+                - columnheader "Invoice Date" [ref=e796]
+                - columnheader "Actions" [ref=e797]
+            - rowgroup
+            - rowgroup [ref=e798]:
+              - row [ref=e799]:
+                - cell [ref=e800]:
+                  - button "+ Add Invoice" [ref=e801] [cursor=pointer]:
+                    - generic [ref=e802]: +
+                    - text: Add Invoice
+        - generic [ref=e803]:
+          - generic [ref=e804]: Sub Accounts
+          - table [ref=e806]:
+            - rowgroup [ref=e807]:
+              - row [ref=e808]:
+                - columnheader "S#" [ref=e809]
+                - columnheader "Sub Account Name" [ref=e810]
+                - columnheader "Debit (Dr)" [ref=e811]
+                - columnheader "Credit (Cr)" [ref=e812]
+                - columnheader "Actions" [ref=e813]
+            - rowgroup
+            - rowgroup [ref=e814]:
+              - row [ref=e815]:
+                - cell [ref=e816]:
+                  - button "+ Add Sub Account" [ref=e817] [cursor=pointer]:
+                    - generic [ref=e818]: +
+                    - text: Add Sub Account
+        - generic [ref=e820]:
+          - checkbox "Is Wholesaler?" [ref=e821]
+          - generic [ref=e822]: Is Wholesaler?
+        - generic [ref=e824]:
+          - checkbox "Blacklist Customer" [ref=e825]
+          - generic [ref=e826]: Blacklist Customer
+      - generic [ref=e827]:
+        - button "Cancel" [ref=e828] [cursor=pointer]
+        - button " Update Customer" [ref=e829] [cursor=pointer]:
+          - generic [ref=e830]: 
+          - text: Update Customer
+  - text:       - - - - - - - -  - - 
+  - generic [ref=e438]:
+    - generic [ref=e439]: 
+    - generic [ref=e441]:
+      - generic [ref=e442]: Success
+      - generic [ref=e443]: Customer deleted successfully!
+    - button "" [ref=e444] [cursor=pointer]

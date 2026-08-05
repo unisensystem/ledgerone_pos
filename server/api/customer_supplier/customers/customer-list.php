@@ -68,7 +68,8 @@ try {
     $whereClause = 'WHERE ' . implode(' AND ', $where);
 
     // Shared joins used by both count and list queries
-    $joins = "LEFT JOIN customer_types ct ON c.customer_type_id = ct.id AND (ct.tenant_id = 0 OR ct.tenant_id = c.tenant_id)
+    $joins = "LEFT JOIN companies comp ON c.company_id = comp.id AND comp.tenant_id = c.tenant_id
+            LEFT JOIN customer_types ct ON c.customer_type_id = ct.id AND (ct.tenant_id = 0 OR ct.tenant_id = c.tenant_id)
             LEFT JOIN customer_categories cc ON c.customer_category_id = cc.id AND cc.tenant_id = c.tenant_id
             LEFT JOIN suppliers s ON c.brand_id = s.id
             LEFT JOIN cities ci ON c.city_id = ci.id AND ci.tenant_id = c.tenant_id
@@ -83,7 +84,8 @@ try {
     
     // Get customers
     $sql = "SELECT c.id, c.customer_code, c.customer_name, c.shop_name, c.address, c.primary_phone, c.email,
-            c.current_balance, c.opening_debit_amount, c.opening_credit_amount, c.is_blacklisted, c.created_at, 
+            c.current_balance, c.opening_debit_amount, c.opening_credit_amount, c.is_blacklisted, c.created_at,
+            comp.company_name as company_name,
             ct.type_name as customer_group_name,
             cc.category_name as customer_category_name,
             s.brand_name as brand_name,

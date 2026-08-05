@@ -1,0 +1,6 @@
+[    1034ms] [LOG] Chart of Accounts permission check: true @ http://localhost/ledgerone_erp/client/assets/js/dashboard/dashboard-core.js?v=1785948430701:1310
+[    1049ms] [LOG] Subscription status: active @ http://localhost/ledgerone_erp/client/assets/js/dashboard/dashboard-core.js?v=1785948430701:1375
+[    1083ms] TypeError: Cannot read properties of undefined (reading 'forEach')
+    at http://localhost/ledgerone_erp/client/assets/js/customer_supplier/customers/customer-list.js:825:31
+[  168951ms] TypeError: Cannot read properties of undefined (reading 'forEach')
+    at http://localhost/ledgerone_erp/client/assets/js/customer_supplier/customers/customer-list.js:825:31

@@ -44,15 +44,32 @@ try {
         }
         
         // Check if customer exists and belongs to tenant
-        $stmt = $pdo->prepare("SELECT id FROM customers WHERE id = ? AND tenant_id = ?");
+        $stmt = $pdo->prepare("SELECT company_id, customer_code FROM customers WHERE id = ? AND tenant_id = ?");
         $stmt->execute([$customer_id, $tenant_id]);
-        if (!$stmt->fetch()) {
+        $existingCustomer = $stmt->fetch();
+        if (!$existingCustomer) {
             throw new Exception('Customer not found');
         }
-        
+
+        $newCompanyId = !empty($input['companyId']) ? (int)$input['companyId'] : null;
+        $customerCode = $existingCustomer['customer_code'];
+
+        // Moving a customer to a different company: give it that company's own next
+        // sequential code instead of carrying over the old company's number, so each
+        // company's CUST-##### sequence stays its own (see customer-add.php).
+        if ($newCompanyId !== null && $newCompanyId !== (int)$existingCustomer['company_id']) {
+            $codeStmt = $pdo->prepare("SELECT customer_code FROM customers WHERE tenant_id = ? AND company_id = ? ORDER BY id DESC LIMIT 1 FOR UPDATE");
+            $codeStmt->execute([$tenant_id, $newCompanyId]);
+            $lastCustomer = $codeStmt->fetch();
+
+            $nextNum = $lastCustomer ? ((int)substr($lastCustomer['customer_code'], 5) + 1) : 1;
+            $customerCode = 'CUST-' . str_pad($nextNum, 5, '0', STR_PAD_LEFT);
+        }
+
         // Update customer
-        $sql = "UPDATE customers SET 
-                company_id = ?, 
+        $sql = "UPDATE customers SET
+                company_id = ?,
+                customer_code = ?,
                 customer_type_id = ?, 
                 customer_category_id = ?,
                 brand_id = ?,
@@ -91,7 +108,8 @@ try {
         $stmt = $pdo->prepare($sql);
         $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
         $stmt->execute([
-            !empty($input['companyId']) ? (int)$input['companyId'] : null,
+            $newCompanyId,
+            $customerCode,
             !empty($input['customerTypeId']) ? (int)$input['customerTypeId'] : null,
             !empty($input['customerCategoryId']) ? (int)$input['customerCategoryId'] : null,
             !empty($input['brandId']) ? (int)$input['brandId'] : null,

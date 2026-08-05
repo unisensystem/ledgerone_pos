@@ -116,15 +116,31 @@ document.addEventListener('DOMContentLoaded', function() {
         if (logoFile) {
             formData.append('logo_file', logoFile);
         }
-        
+
         try {
-            const response = await fetch('../../../../server/api/system_setup/company-profile/company-add.php', {
+            let response = await fetch('../../../../server/api/system_setup/company-profile/company-add.php', {
                 method: 'POST',
                 body: formData
             });
-            
-            const result = await response.json();
-            
+
+            let result = await response.json();
+
+            // Near-duplicate company name found - ask the user to confirm before creating it anyway
+            if (!result.success && result.duplicate_warning) {
+                const proceed = confirm(result.message);
+                if (proceed) {
+                    formData.append('confirm_duplicate', '1');
+                    response = await fetch('../../../../server/api/system_setup/company-profile/company-add.php', {
+                        method: 'POST',
+                        body: formData
+                    });
+                    result = await response.json();
+                } else {
+                    submitBtn.disabled = false;
+                    return;
+                }
+            }
+
             if (result.success) {
                 successNotification.textContent = result.message;
                 showNotification(successNotification);

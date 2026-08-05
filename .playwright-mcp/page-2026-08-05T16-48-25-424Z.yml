@@ -1,0 +1,402 @@
+- generic [ref=e1]:
+  - generic [ref=e2]:
+    - button "" [ref=e3]
+    - banner [ref=e5]:
+      - generic [ref=e7]:
+        - heading "Z & S Meal and Foods (Private) Limited" [level=1] [ref=e8]
+        - text: Z & S Meal and Foods (Private) Limited
+      - generic [ref=e9]:
+        - generic [ref=e10]: 09:48:24 PM
+        - generic [ref=e11]: Wed, Aug 5
+      - generic [ref=e12]:
+        - generic [ref=e13]: Version
+        - generic [ref=e14]: "1.0"
+      - generic [ref=e15]:
+        - generic [ref=e16]:
+          - generic [ref=e17]: Zafar
+          - generic [ref=e18]: Super Admin
+        - generic [ref=e19]: 
+    - navigation [ref=e22]:
+      - generic [ref=e23]:
+        - button "Toggle navigation" [ref=e24] [cursor=pointer]:
+          - generic [ref=e25]: 
+        - generic [ref=e26]:
+          - generic [ref=e27]: 
+          - generic [ref=e28]: LedgerOne
+      - generic [ref=e29]:
+        - button " Home" [ref=e30] [cursor=pointer]:
+          - generic [ref=e31]: 
+          - generic [ref=e32]: Home
+        - button " Customer/Supplier " [ref=e34] [cursor=pointer]:
+          - generic [ref=e35]: 
+          - generic [ref=e36]: Customer/Supplier
+          - generic [ref=e37]: 
+        - button " Sale " [ref=e39] [cursor=pointer]:
+          - generic [ref=e40]: 
+          - generic [ref=e41]: Sale
+          - generic [ref=e42]: 
+        - button " Purchase " [ref=e44] [cursor=pointer]:
+          - generic [ref=e45]: 
+          - generic [ref=e46]: Purchase
+          - generic [ref=e47]: 
+        - button " Inventory " [ref=e49] [cursor=pointer]:
+          - generic [ref=e50]: 
+          - generic [ref=e51]: Inventory
+          - generic [ref=e52]: 
+        - button " Vouchers " [ref=e54] [cursor=pointer]:
+          - generic [ref=e55]: 
+          - generic [ref=e56]: Vouchers
+          - generic [ref=e57]: 
+        - button " Banking " [ref=e59] [cursor=pointer]:
+          - generic [ref=e60]: 
+          - generic [ref=e61]: Banking
+          - generic [ref=e62]: 
+        - text:  
+        - button " Chart Of Accounts" [ref=e63] [cursor=pointer]:
+          - generic [ref=e64]: 
+          - generic [ref=e65]: Chart Of Accounts
+        - button " Financial Reports " [ref=e67] [cursor=pointer]:
+          - generic [ref=e68]: 
+          - generic [ref=e69]: Financial Reports
+          - generic [ref=e70]: 
+        - button " HRM " [ref=e72] [cursor=pointer]:
+          - generic [ref=e73]: 
+          - generic [ref=e74]: HRM
+          - generic [ref=e75]: 
+        - button " Manufacturing " [ref=e77] [cursor=pointer]:
+          - generic [ref=e78]: 
+          - generic [ref=e79]: Manufacturing
+          - generic [ref=e80]: 
+        - button " Master Setup " [ref=e82] [cursor=pointer]:
+          - generic [ref=e83]: 
+          - generic [ref=e84]: Master Setup
+          - generic [ref=e85]: 
+        - button " System Setup " [ref=e87] [cursor=pointer]:
+          - generic [ref=e88]: 
+          - generic [ref=e89]: System Setup
+          - generic [ref=e90]: 
+        - button " Logout" [ref=e92] [cursor=pointer]:
+          - generic [ref=e93]: 
+          - generic [ref=e94]: Logout
+  - generic [ref=e95]:
+    - generic [ref=e97]:
+      - link "+ Add Customer" [ref=e98] [cursor=pointer]:
+        - /url: customer-add.php
+        - generic [ref=e99]: +
+        - text: Add Customer
+      - link " Add Opening Invoices" [ref=e100] [cursor=pointer]:
+        - /url: opening-balance-invoices-add.php
+        - generic [ref=e101]: 
+        - text: Add Opening Invoices
+    - generic [ref=e102]:
+      - heading " Customers Management" [level=1] [ref=e103]:
+        - generic [ref=e104]: 
+        - text: Customers Management
+      - generic [ref=e105]: Showing 1-10 of 45 customers
+    - generic [ref=e106]:
+      - generic [ref=e107]:
+        - generic [ref=e108]: 
+        - generic [ref=e110]: "366"
+        - generic [ref=e111]: Total Customers
+      - generic [ref=e112]:
+        - generic [ref=e113]: 
+        - generic [ref=e115]: "366"
+        - generic [ref=e116]: Active Customers
+      - generic [ref=e117]:
+        - generic [ref=e118]: 
+        - generic [ref=e120]: "0"
+        - generic [ref=e121]: Blacklisted
+    - generic [ref=e122]:
+      - generic [ref=e123]:
+        - generic [ref=e124]:
+          - generic [ref=e125]: 
+          - textbox "Search by any field..." [active] [ref=e126]
+        - generic [ref=e127]:
+          - combobox [ref=e128]:
+            - option "Show 10" [selected]
+            - option "Show 25"
+            - option "Show 50"
+            - option "Show 100"
+            - option "Show 500"
+            - option "Show All"
+          - combobox [ref=e129]:
+            - option "All Companies" [selected]
+            - option "Z & S Meal and Foods (Private) Limited"
+            - option "Z&S Foods"
+          - combobox [ref=e130]:
+            - option "All Statuses" [selected]
+            - option "Active"
+            - option "Blacklisted"
+          - generic [ref=e131]:
+            - button " Export " [ref=e132] [cursor=pointer]:
+              - generic [ref=e133]: 
+              - text: Export
+              - generic [ref=e134]: 
+            - text:   
+      - table [ref=e136]:
+        - rowgroup [ref=e137]:
+          - row [ref=e138]:
+            - columnheader "Sr#" [ref=e139]
+            - columnheader "Company" [ref=e140]
+            - columnheader "Customer Code" [ref=e141]
+            - columnheader "Shop Name" [ref=e142]
+            - columnheader "Customer Name" [ref=e143]
+            - columnheader "Address" [ref=e144]
+            - columnheader "Group" [ref=e145]
+            - columnheader "Category" [ref=e146]
+            - columnheader "City" [ref=e147]
+            - columnheader "Zone" [ref=e148]
+            - columnheader "Area" [ref=e149]
+            - columnheader "Phone" [ref=e150]
+            - columnheader "Opening Balance" [ref=e151]
+            - columnheader "Status" [ref=e152]
+            - columnheader "Actions" [ref=e153]
+        - rowgroup [ref=e154]:
+          - row [ref=e155]:
+            - cell "1" [ref=e156]
+            - cell "Z&S Foods" [ref=e157]
+            - cell "CUST-00372" [ref=e158]
+            - cell "-" [ref=e159]
+            - cell "SHEREEN MAHAL" [ref=e160]
+            - cell "-" [ref=e161]
+            - cell "-" [ref=e162]
+            - cell "-" [ref=e163]
+            - cell "-" [ref=e164]
+            - cell "-" [ref=e165]
+            - cell "-" [ref=e166]
+            - cell "-" [ref=e167]
+            - cell "₨0.00" [ref=e168]
+            - cell "Active" [ref=e169]
+            - cell [ref=e171]:
+              - generic [ref=e172]:
+                - button "" [ref=e173] [cursor=pointer]
+                - button "" [ref=e175] [cursor=pointer]
+                - button "" [ref=e177] [cursor=pointer]
+          - row [ref=e179]:
+            - cell "2" [ref=e180]
+            - cell "Z & S Meal and Foods (Private) Limited" [ref=e181]
+            - cell "CUST-00304" [ref=e182]
+            - cell "-" [ref=e183]
+            - cell "Rahman Enterprises" [ref=e184]
+            - cell "-" [ref=e185]
+            - cell "-" [ref=e186]
+            - cell "-" [ref=e187]
+            - cell "-" [ref=e188]
+            - cell "-" [ref=e189]
+            - cell "-" [ref=e190]
+            - cell "-" [ref=e191]
+            - cell "₨3469412.00" [ref=e192]
+            - cell "Active" [ref=e193]
+            - cell [ref=e195]:
+              - generic [ref=e196]:
+                - button "" [ref=e197] [cursor=pointer]
+                - button "" [ref=e199] [cursor=pointer]
+                - button "" [ref=e201] [cursor=pointer]
+          - row [ref=e203]:
+            - cell "3" [ref=e204]
+            - cell "Z & S Meal and Foods (Private) Limited" [ref=e205]
+            - cell "CUST-00303" [ref=e206]
+            - cell "-" [ref=e207]
+            - cell "Rahman Enterprises ( DO NOT USE THIS CUSTOMER )" [ref=e208]
+            - cell "-" [ref=e209]
+            - cell "Retail" [ref=e210]
+            - cell "-" [ref=e211]
+            - cell "KARACHI" [ref=e212]
+            - cell "-" [ref=e213]
+            - cell "-" [ref=e214]
+            - cell "-" [ref=e215]
+            - cell "₨0.00" [ref=e216]
+            - cell "Active" [ref=e217]
+            - cell [ref=e219]:
+              - generic [ref=e220]:
+                - button "" [ref=e221] [cursor=pointer]
+                - button "" [ref=e223] [cursor=pointer]
+                - button "" [ref=e225] [cursor=pointer]
+          - row [ref=e227]:
+            - cell "4" [ref=e228]
+            - cell "Z&S Foods" [ref=e229]
+            - cell "CUST-00371" [ref=e230]
+            - cell "-" [ref=e231]
+            - cell "Jiwani Store" [ref=e232]
+            - cell "-" [ref=e233]
+            - cell "-" [ref=e234]
+            - cell "-" [ref=e235]
+            - cell "-" [ref=e236]
+            - cell "-" [ref=e237]
+            - cell "-" [ref=e238]
+            - cell "-" [ref=e239]
+            - cell "₨0.00" [ref=e240]
+            - cell "Active" [ref=e241]
+            - cell [ref=e243]:
+              - generic [ref=e244]:
+                - button "" [ref=e245] [cursor=pointer]
+                - button "" [ref=e247] [cursor=pointer]
+                - button "" [ref=e249] [cursor=pointer]
+          - row [ref=e251]:
+            - cell "5" [ref=e252]
+            - cell "Z&S Foods" [ref=e253]
+            - cell "CUST-00370" [ref=e254]
+            - cell "-" [ref=e255]
+            - cell "Ejaz Dairy" [ref=e256]
+            - cell "-" [ref=e257]
+            - cell "-" [ref=e258]
+            - cell "-" [ref=e259]
+            - cell "-" [ref=e260]
+            - cell "-" [ref=e261]
+            - cell "-" [ref=e262]
+            - cell "-" [ref=e263]
+            - cell "₨0.00" [ref=e264]
+            - cell "Active" [ref=e265]
+            - cell [ref=e267]:
+              - generic [ref=e268]:
+                - button "" [ref=e269] [cursor=pointer]
+                - button "" [ref=e271] [cursor=pointer]
+                - button "" [ref=e273] [cursor=pointer]
+          - row [ref=e275]:
+            - cell "6" [ref=e276]
+            - cell "Z&S Foods" [ref=e277]
+            - cell "CUST-00369" [ref=e278]
+            - cell "-" [ref=e279]
+            - cell "Hafiz Rabri" [ref=e280]
+            - cell "-" [ref=e281]
+            - cell "-" [ref=e282]
+            - cell "-" [ref=e283]
+            - cell "-" [ref=e284]
+            - cell "-" [ref=e285]
+            - cell "-" [ref=e286]
+            - cell "-" [ref=e287]
+            - cell "₨0.00" [ref=e288]
+            - cell "Active" [ref=e289]
+            - cell [ref=e291]:
+              - generic [ref=e292]:
+                - button "" [ref=e293] [cursor=pointer]
+                - button "" [ref=e295] [cursor=pointer]
+                - button "" [ref=e297] [cursor=pointer]
+          - row [ref=e299]:
+            - cell "7" [ref=e300]
+            - cell "Z&S Foods" [ref=e301]
+            - cell "CUST-00368" [ref=e302]
+            - cell "-" [ref=e303]
+            - cell "Furqan - Hasilpur" [ref=e304]
+            - cell "-" [ref=e305]
+            - cell "-" [ref=e306]
+            - cell "-" [ref=e307]
+            - cell "-" [ref=e308]
+            - cell "-" [ref=e309]
+            - cell "-" [ref=e310]
+            - cell "-" [ref=e311]
+            - cell "₨0.00" [ref=e312]
+            - cell "Active" [ref=e313]
+            - cell [ref=e315]:
+              - generic [ref=e316]:
+                - button "" [ref=e317] [cursor=pointer]
+                - button "" [ref=e319] [cursor=pointer]
+                - button "" [ref=e321] [cursor=pointer]
+          - row [ref=e323]:
+            - cell "8" [ref=e324]
+            - cell "Z&S Foods" [ref=e325]
+            - cell "CUST-00367" [ref=e326]
+            - cell "-" [ref=e327]
+            - cell "Zala Bakers" [ref=e328]
+            - cell "-" [ref=e329]
+            - cell "-" [ref=e330]
+            - cell "-" [ref=e331]
+            - cell "-" [ref=e332]
+            - cell "-" [ref=e333]
+            - cell "-" [ref=e334]
+            - cell "-" [ref=e335]
+            - cell "₨0.00" [ref=e336]
+            - cell "Active" [ref=e337]
+            - cell [ref=e339]:
+              - generic [ref=e340]:
+                - button "" [ref=e341] [cursor=pointer]
+                - button "" [ref=e343] [cursor=pointer]
+                - button "" [ref=e345] [cursor=pointer]
+          - row [ref=e347]:
+            - cell "9" [ref=e348]
+            - cell "Z&S Foods" [ref=e349]
+            - cell "CUST-00366" [ref=e350]
+            - cell "-" [ref=e351]
+            - cell "Saleem Bhai" [ref=e352]
+            - cell "-" [ref=e353]
+            - cell "-" [ref=e354]
+            - cell "-" [ref=e355]
+            - cell "-" [ref=e356]
+            - cell "-" [ref=e357]
+            - cell "-" [ref=e358]
+            - cell "-" [ref=e359]
+            - cell "₨0.00" [ref=e360]
+            - cell "Active" [ref=e361]
+            - cell [ref=e363]:
+              - generic [ref=e364]:
+                - button "" [ref=e365] [cursor=pointer]
+                - button "" [ref=e367] [cursor=pointer]
+                - button "" [ref=e369] [cursor=pointer]
+          - row [ref=e371]:
+            - cell "10" [ref=e372]
+            - cell "Z&S Foods" [ref=e373]
+            - cell "CUST-00365" [ref=e374]
+            - cell "-" [ref=e375]
+            - cell "DIVINE" [ref=e376]
+            - cell "-" [ref=e377]
+            - cell "-" [ref=e378]
+            - cell "-" [ref=e379]
+            - cell "-" [ref=e380]
+            - cell "-" [ref=e381]
+            - cell "-" [ref=e382]
+            - cell "-" [ref=e383]
+            - cell "₨0.00" [ref=e384]
+            - cell "Active" [ref=e385]
+            - cell [ref=e387]:
+              - generic [ref=e388]:
+                - button "" [ref=e389] [cursor=pointer]
+                - button "" [ref=e391] [cursor=pointer]
+                - button "" [ref=e393] [cursor=pointer]
+      - generic [ref=e395]:
+        - generic [ref=e396]: Showing 1-10 of 360 customers
+        - generic [ref=e397]:
+          - button "" [disabled] [ref=e398] [cursor=pointer]
+          - button "1" [ref=e400] [cursor=pointer]
+          - button "2" [ref=e401] [cursor=pointer]
+          - button "3" [ref=e402] [cursor=pointer]
+          - button "4" [ref=e403] [cursor=pointer]
+          - button "5" [ref=e404] [cursor=pointer]
+          - button "6" [ref=e405] [cursor=pointer]
+          - button "7" [ref=e406] [cursor=pointer]
+          - button "8" [ref=e407] [cursor=pointer]
+          - button "9" [ref=e408] [cursor=pointer]
+          - button "10" [ref=e409] [cursor=pointer]
+          - button "11" [ref=e410] [cursor=pointer]
+          - button "12" [ref=e411] [cursor=pointer]
+          - button "13" [ref=e412] [cursor=pointer]
+          - button "14" [ref=e413] [cursor=pointer]
+          - button "15" [ref=e414] [cursor=pointer]
+          - button "16" [ref=e415] [cursor=pointer]
+          - button "17" [ref=e416] [cursor=pointer]
+          - button "18" [ref=e417] [cursor=pointer]
+          - button "19" [ref=e418] [cursor=pointer]
+          - button "20" [ref=e419] [cursor=pointer]
+          - button "21" [ref=e420] [cursor=pointer]
+          - button "22" [ref=e421] [cursor=pointer]
+          - button "23" [ref=e422] [cursor=pointer]
+          - button "24" [ref=e423] [cursor=pointer]
+          - button "25" [ref=e424] [cursor=pointer]
+          - button "26" [ref=e425] [cursor=pointer]
+          - button "27" [ref=e426] [cursor=pointer]
+          - button "28" [ref=e427] [cursor=pointer]
+          - button "29" [ref=e428] [cursor=pointer]
+          - button "30" [ref=e429] [cursor=pointer]
+          - button "31" [ref=e430] [cursor=pointer]
+          - button "32" [ref=e431] [cursor=pointer]
+          - button "33" [ref=e432] [cursor=pointer]
+          - button "34" [ref=e433] [cursor=pointer]
+          - button "35" [ref=e434] [cursor=pointer]
+          - button "36" [ref=e435] [cursor=pointer]
+          - button "" [ref=e436] [cursor=pointer]
+  - text:   * *  + +        - - - - - - - -  - - - - - - - 
+  - generic [ref=e438]:
+    - generic [ref=e439]: 
+    - generic [ref=e441]:
+      - generic [ref=e442]: Success
+      - generic [ref=e443]: Customer deleted successfully!
+    - button "" [ref=e444] [cursor=pointer]
