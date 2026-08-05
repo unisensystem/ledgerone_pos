@@ -134,10 +134,10 @@ $currency_symbol = $currency['symbol'] ?? '$';
                     <thead>
                         <tr>
                             <th>Sr#</th>
-                            <th>Company</th>
                             <th>Customer Code</th>
-                            <th>Shop Name</th>
-                            <th>Customer Name</th>
+                                                        <th>Customer Name</th>
+
+                            <th>Shopkeeper Name</th>
                             <th>Address</th>
                             <th>Group</th>
                             <th>Category</th>
@@ -214,15 +214,16 @@ $currency_symbol = $currency['symbol'] ?? '$';
                             <label class="required">Customer Name</label>
                             <input type="text" id="editCustomerName" required>
                         </div>
-                        <div class="form-group col-6">
-                            <label>Shop Name</label>
-                            <input type="text" id="editShopName">
-                        </div>
+                        
                         <div class="form-group col-6">
                             <div class="checkbox-group">
                                 <input type="checkbox" id="editOutStation">
                                 <label for="editOutStation">Out Station</label>
                             </div>
+                        </div>
+                        <div class="form-group col-6">
+                            <label>Shopkeeper Name</label>
+                            <input type="text" id="editShopName">
                         </div>
                         <div class="form-group col-12">
                             <label>Address</label>
@@ -485,14 +486,17 @@ $currency_symbol = $currency['symbol'] ?? '$';
                         <label>Brand Name</label>
                         <div class="view-field" id="viewBrandName"></div>
                     </div>
-                    <div class="form-group col-4">
-                        <label>Shop Name</label>
-                        <div class="view-field" id="viewShopName"></div>
-                    </div>
-                    <div class="form-group col-8">
+                     <div class="form-group col-8">
                         <label>Customer Name</label>
-                        <div class="view-field" id="viewCustomerName"></div>
+                                                <div class="view-field" id="viewShopName"></div>
+
                     </div>
+                    <div class="form-group col-4">
+                        <label>Shopkeeper Name </label>
+                                                <div class="view-field" id="viewCustomerName"></div>
+
+                    </div>
+                   
                     <div class="form-group col-4">
                         <label>Out Station</label>
                         <div class="view-field" id="viewOutStation"></div>
