@@ -51,47 +51,51 @@ try {
         }
 
         // Update supplier
-        $sql = "UPDATE suppliers SET 
-                company_id = ?, 
-                salesman_id = ?, 
-                project_id = ?, 
-                supplier_name = ?, 
-                brand_name = ?, 
-                address = ?, 
-                primary_phone = ?, 
-                secondary_phone = ?, 
-                identity_card_no = ?, 
-                email = ?, 
-                opening_debit_amount = ?, 
-                opening_credit_amount = ?, 
-                ait_percent = ?, 
-                party_type = ?,
-                is_blacklisted = ?, 
-                updated_by = ?, 
-                updated_at = CURRENT_TIMESTAMP 
-                WHERE id = ? AND tenant_id = ?";
+      $sql = "UPDATE suppliers SET 
+        company_id = ?, 
+        salesman_id = ?, 
+        project_id = ?, 
+        supplier_name = ?, 
+        brand_name = ?, 
+        address = ?, 
+        city = ?,
+        primary_phone = ?, 
+        secondary_phone = ?, 
+        identity_card_no = ?, 
+        email = ?, 
+        opening_debit_amount = ?, 
+        opening_credit_amount = ?, 
+        ait_percent = ?, 
+        credit_days = ?,
+        party_type = ?,
+        is_blacklisted = ?, 
+        updated_by = ?, 
+        updated_at = CURRENT_TIMESTAMP 
+        WHERE id = ? AND tenant_id = ?";
 
-        $stmt = $pdo->prepare($sql);
-        $stmt->execute([
-            !empty($input['companyId']) ? (int)$input['companyId'] : null,
-            !empty($input['salesmanId']) ? trim($input['salesmanId']) : null,
-            !empty($input['projectId']) ? (int)$input['projectId'] : null,
-            trim($input['supplierName']),
-            !empty($input['brandName']) ? trim($input['brandName']) : null,
-            !empty($input['address']) ? trim($input['address']) : null,
-            !empty($input['primaryPhone']) ? trim($input['primaryPhone']) : null,
-            !empty($input['secondaryPhone']) ? trim($input['secondaryPhone']) : null,
-            !empty($input['identityCard']) ? trim($input['identityCard']) : null,
-            !empty($input['email']) ? trim($input['email']) : null,
-            floatval($input['openingDebit'] ?? 0),
-            floatval($input['openingCredit'] ?? 0),
-            floatval($input['aitPercent'] ?? 0),
-            !empty($input['partyType']) ? trim($input['partyType']) : null,
-            isset($input['blacklist']) && $input['blacklist'] === true ? 1 : 0,
-            $user_id,
-            $supplier_id,
-            $tenant_id
-        ]);
+$stmt = $pdo->prepare($sql);
+$stmt->execute([
+    !empty($input['companyId']) ? (int)$input['companyId'] : null,
+    !empty($input['salesmanId']) ? trim($input['salesmanId']) : null,
+    !empty($input['projectId']) ? (int)$input['projectId'] : null,
+    trim($input['supplierName']),
+    !empty($input['brandName']) ? trim($input['brandName']) : null,
+    !empty($input['address']) ? trim($input['address']) : null,
+    !empty($input['city']) ? trim($input['city']) : null,
+    !empty($input['primaryPhone']) ? trim($input['primaryPhone']) : null,
+    !empty($input['secondaryPhone']) ? trim($input['secondaryPhone']) : null,
+    !empty($input['identityCard']) ? trim($input['identityCard']) : null,
+    !empty($input['email']) ? trim($input['email']) : null,
+    floatval($input['openingDebit'] ?? 0),
+    floatval($input['openingCredit'] ?? 0),
+    floatval($input['aitPercent'] ?? 0),
+    isset($input['creditDays']) && $input['creditDays'] !== '' ? (int)$input['creditDays'] : 0,
+    !empty($input['partyType']) ? trim($input['partyType']) : null,
+    isset($input['blacklist']) && $input['blacklist'] === true ? 1 : 0,
+    $user_id,
+    $supplier_id,
+    $tenant_id
+]);
 
         // Delete existing opening balance ledger entries
         $stmt = $pdo->prepare("DELETE FROM accounting_ledger WHERE tenant_id = ? AND transaction_type = 'supplier_opening' AND reference_table = 'suppliers' AND reference_id = ?");
