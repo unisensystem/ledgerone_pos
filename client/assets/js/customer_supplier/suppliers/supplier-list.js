@@ -1,23 +1,51 @@
 let suppliers = [];
 let currentPage = 1;
 let totalPages = 1;
+let currentLimit = 10;
+let showAllMode = false;
+let employeesMap = {};
 
 document.addEventListener('DOMContentLoaded', function () {
     const suppliersTable = document.getElementById('suppliersTable');
     const searchInput = document.getElementById('searchInput');
     const statusFilter = document.getElementById('statusFilter');
     const companyFilter = document.getElementById('companyFilter');
+    const showAllToggle = document.getElementById('showAllToggle');
 
     loadCompanyFilter();
+    loadEmployeesMap();
     loadSuppliers();
 
+    // Load employees once so salesman IDs can be resolved to names in the table
+    function loadEmployeesMap() {
+        fetch('../../../../server/api/customer_supplier/suppliers/get-employees.php')
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    data.employees.forEach(emp => { employeesMap[emp.id] = emp.full_name; });
+                    // Re-render in case suppliers already loaded before employees resolved
+                    if (suppliers.length) renderSuppliers(suppliers);
+                }
+            })
+            .catch(err => console.error('loadEmployeesMap error:', err));
+    }
+
+    function getSalesmanNames(salesmanId) {
+        if (!salesmanId) return '-';
+        const ids = String(salesmanId).split(',').map(s => s.trim()).filter(Boolean);
+        const names = ids.map(id => employeesMap[id]).filter(Boolean);
+        return names.length ? names.join(', ') : '-';
+    }
+
     function loadSuppliers() {
+        showAllMode = showAllToggle ? showAllToggle.checked : false;
         const params = new URLSearchParams({
             search: searchInput.value,
             status: statusFilter.value,
             company: companyFilter.value,
             page: currentPage,
-            limit: 10
+            limit: 10,
+            show_all: showAllMode ? '1' : '0'
         });
 
         fetch(`../../../../server/api/customer_supplier/suppliers/supplier-list.php?${params}`)
@@ -34,14 +62,22 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function renderSuppliers(suppliersToRender) {
         suppliersTable.innerHTML = '';
-        suppliersToRender.forEach(supplier => {
+        const startIndex = showAllMode ? 0 : (currentPage - 1) * currentLimit;
+        suppliersToRender.forEach((supplier, idx) => {
             const status = supplier.is_blacklisted ? 'blacklisted' : 'active';
+            const balance = `${currencySymbol}${parseFloat(supplier.current_balance || 0).toFixed(2)}`;
             const row = document.createElement('tr');
             row.innerHTML = `
+                <td>${startIndex + idx + 1}</td>
                 <td><span class="customer-code">${supplier.supplier_code}</span></td>
                 <td><span class="customer-name">${supplier.supplier_name || '-'}</span></td>
-                <td><span class="customer-name">${supplier.brand_name}</span></td>
+                <td><span class="customer-name">${supplier.brand_name || '-'}</span></td>
+                <td>${supplier.address || '-'}</td>
+                <td>${supplier.city || '-'}</td>
                 <td>${supplier.primary_phone || '-'}</td>
+                <td>${supplier.credit_days ?? 0}</td>
+                <td>${balance}</td>
+                <td>${getSalesmanNames(supplier.salesman_id)}</td>
                 <td><span class="status-badge status-${status}">${status.charAt(0).toUpperCase() + status.slice(1)}</span></td>
                 <td>
                     <div class="action-buttons">
@@ -153,6 +189,7 @@ document.addEventListener('DOMContentLoaded', function () {
         document.getElementById('viewSupplierCode').textContent = supplier.supplier_code;
         document.getElementById('viewSupplierName').textContent = supplier.supplier_name;
         document.getElementById('viewAddress').textContent = supplier.address || '-';
+        document.getElementById('viewCity').textContent = supplier.city || '-';
         document.getElementById('viewPrimaryPhone').textContent = supplier.primary_phone || '-';
         document.getElementById('viewSecondaryPhone').textContent = supplier.secondary_phone || '-';
         document.getElementById('viewEmail').textContent = supplier.email || '-';
@@ -160,6 +197,7 @@ document.addEventListener('DOMContentLoaded', function () {
         document.getElementById('viewOpeningDebit').textContent = `${currencySymbol}${parseFloat(supplier.opening_debit_amount || 0).toFixed(2)}`;
         document.getElementById('viewOpeningCredit').textContent = `${currencySymbol}${parseFloat(supplier.opening_credit_amount || 0).toFixed(2)}`;
         document.getElementById('viewAitPercent').textContent = `${parseFloat(supplier.ait_percent || 0).toFixed(2)}%`;
+        document.getElementById('viewCreditDays').textContent = supplier.credit_days ?? 0;
 
         // Company
         document.getElementById('viewCompany').textContent = supplier.company_name || '-';
@@ -243,6 +281,7 @@ document.addEventListener('DOMContentLoaded', function () {
     let editSelectedSalesmen = [];
     let editAllCompanies     = [];
     let editSelectedAssocCompanies = [];
+    let editAllCities        = [];
 
     const editSalesmanSearch        = document.getElementById('editSalesmanSearch');
     const editSalesmanChipsList     = document.getElementById('editSalesmanChipsList');
@@ -255,6 +294,11 @@ document.addEventListener('DOMContentLoaded', function () {
     const editAssocCompanyDropdown      = document.getElementById('editAssocCompanyDropdown');
     const editAssocCompanyIdsInput      = document.getElementById('editAssocCompanyIds');
     const editAssocCompanyChipsContainer = document.getElementById('editAssocCompanyChipsContainer');
+
+    // City autocomplete elements (edit modal)
+    const editCitySearch   = document.getElementById('editCitySearch');
+    const editCityHidden   = document.getElementById('editCity');
+    const editCityDropdown = document.getElementById('editCityDropdown');
 
     function renderEditSalesmanChips() {
         editSalesmanChipsList.innerHTML = editSelectedSalesmen.map(s => `
@@ -318,6 +362,7 @@ document.addEventListener('DOMContentLoaded', function () {
     // Escape modal's overflow-y:auto by anchoring the dropdown to body with position:fixed
     document.body.appendChild(editSalesmanDropdown);
     document.body.appendChild(editAssocCompanyDropdown);
+    document.body.appendChild(editCityDropdown);
 
     // Assoc company search
     editAssocCompanySearch.addEventListener('focus', function() {
@@ -403,6 +448,55 @@ document.addEventListener('DOMContentLoaded', function () {
         editSalesmanSearch.focus();
     });
 
+    // City search (edit modal)
+    function loadEditCities() {
+        return fetch('../../../../server/api/customer_supplier/suppliers/get-cities.php')
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) editAllCities = data.cities;
+            })
+            .catch(err => console.error('loadEditCities error:', err));
+    }
+
+    function renderEditCityDropdown(list) {
+        if (list.length > 0) {
+            const rect = editCitySearch.getBoundingClientRect();
+            editCityDropdown.style.top   = (rect.bottom + 2) + 'px';
+            editCityDropdown.style.left  = rect.left + 'px';
+            editCityDropdown.style.width = rect.width + 'px';
+            editCityDropdown.innerHTML = list.map(c =>
+                `<div class="edit-salesman-dropdown-item" data-name="${c.city_name}">${c.city_name}</div>`
+            ).join('');
+            editCityDropdown.style.display = 'block';
+        } else {
+            editCityDropdown.style.display = 'none';
+        }
+    }
+
+    editCitySearch.addEventListener('focus', function () {
+        const term = this.value.toLowerCase();
+        const list = term
+            ? editAllCities.filter(c => c.city_name.toLowerCase().includes(term))
+            : editAllCities;
+        renderEditCityDropdown(list);
+    });
+
+    editCitySearch.addEventListener('input', function () {
+        const term = this.value.toLowerCase();
+        editCityHidden.value = '';
+        if (!term) { editCityDropdown.style.display = 'none'; return; }
+        renderEditCityDropdown(editAllCities.filter(c => c.city_name.toLowerCase().includes(term)));
+    });
+
+    editCityDropdown.addEventListener('click', function (e) {
+        const item = e.target.closest('.edit-salesman-dropdown-item');
+        if (item) {
+            editCitySearch.value = item.dataset.name;
+            editCityHidden.value = item.dataset.name;
+            editCityDropdown.style.display = 'none';
+        }
+    });
+
     document.addEventListener('click', function (e) {
         if (editModal.classList.contains('show') &&
             !editSalesmanChipsContainer.contains(e.target) &&
@@ -414,6 +508,11 @@ document.addEventListener('DOMContentLoaded', function () {
             !editAssocCompanyDropdown.contains(e.target)) {
             editAssocCompanyDropdown.style.display = 'none';
         }
+        if (editModal.classList.contains('show') &&
+            !editCitySearch.contains(e.target) &&
+            !editCityDropdown.contains(e.target)) {
+            editCityDropdown.style.display = 'none';
+        }
     });
 
     function closeEditModal() {
@@ -422,6 +521,8 @@ document.addEventListener('DOMContentLoaded', function () {
         document.getElementById('editProject').value = '';
         resetEditSalesmanChips();
         resetEditAssocCompanyChips();
+        editCitySearch.value = '';
+        editCityHidden.value = '';
     }
 
     editModalClose.addEventListener('click', closeEditModal);
@@ -454,6 +555,7 @@ document.addEventListener('DOMContentLoaded', function () {
             supplierName:   document.getElementById('editSupplierName').value.trim(),
             brandName:      document.getElementById('editBrandName').value.trim(),
             address:        document.getElementById('editAddress').value.trim(),
+            city:           document.getElementById('editCity').value.trim(),
             primaryPhone:   document.getElementById('editPrimaryPhone').value.trim(),
             secondaryPhone: document.getElementById('editSecondaryPhone').value.trim(),
             identityCard:   document.getElementById('editIdentityCard').value.trim(),
@@ -461,6 +563,7 @@ document.addEventListener('DOMContentLoaded', function () {
             openingDebit:   document.getElementById('editOpeningDebit').value  || 0,
             openingCredit:  document.getElementById('editOpeningCredit').value || 0,
             aitPercent:     document.getElementById('editAitPercent').value    || 0,
+            creditDays:     document.getElementById('editCreditDays').value    || 0,
             partyType:      document.getElementById('editPartyType').value      || null,
             blacklist:      document.getElementById('editBlacklist').checked,
             subAccounts
@@ -532,6 +635,8 @@ document.addEventListener('DOMContentLoaded', function () {
         currentEditingId = id;
         resetEditSalesmanChips();
         resetEditAssocCompanyChips();
+        editCitySearch.value = '';
+        editCityHidden.value = '';
 
         fetch(`../../../../server/api/customer_supplier/suppliers/supplier-edit.php?id=${id}`)
             .then(r => r.json())
@@ -551,6 +656,9 @@ document.addEventListener('DOMContentLoaded', function () {
         document.getElementById('editSupplierName').value  = supplier.supplier_name;
         document.getElementById('editBrandName').value     = supplier.brand_name    || '';
         document.getElementById('editAddress').value       = supplier.address       || '';
+        editCitySearch.value                                = supplier.city          || '';
+        editCityHidden.value                                = supplier.city          || '';
+        if (!editAllCities.length) loadEditCities();
         document.getElementById('editPrimaryPhone').value  = supplier.primary_phone || '';
         document.getElementById('editSecondaryPhone').value = supplier.secondary_phone || '';
         document.getElementById('editEmail').value         = supplier.email         || '';
@@ -558,6 +666,7 @@ document.addEventListener('DOMContentLoaded', function () {
         document.getElementById('editOpeningDebit').value  = supplier.opening_debit_amount  || 0;
         document.getElementById('editOpeningCredit').value = supplier.opening_credit_amount || 0;
         document.getElementById('editAitPercent').value    = supplier.ait_percent   || 0;
+        document.getElementById('editCreditDays').value    = supplier.credit_days   ?? 0;
         document.getElementById('editPartyType').value     = supplier.party_type    || '';
         document.getElementById('editBlacklist').checked   = supplier.is_blacklisted == 1;
 
@@ -659,10 +768,24 @@ document.addEventListener('DOMContentLoaded', function () {
     function updatePagination(pagination) {
         currentPage = pagination.page;
         totalPages = pagination.pages;
+        currentLimit = pagination.limit || 10;
         const tableInfo = document.getElementById('tableInfo');
-        const start = ((pagination.page - 1) * pagination.limit) + 1;
-        const end = Math.min(pagination.page * pagination.limit, pagination.total);
-        tableInfo.textContent = `Showing ${start}-${end} of ${pagination.total} suppliers`;
+        const paginationInfo = document.getElementById('paginationInfo');
+        const paginationControls = document.querySelector('.pagination-controls');
+
+        if (pagination.show_all) {
+            const text = `Showing all ${pagination.total} suppliers`;
+            tableInfo.textContent = text;
+            if (paginationInfo) paginationInfo.textContent = text;
+            if (paginationControls) paginationControls.style.display = 'none';
+        } else {
+            if (paginationControls) paginationControls.style.display = '';
+            const start = ((pagination.page - 1) * pagination.limit) + 1;
+            const end = Math.min(pagination.page * pagination.limit, pagination.total);
+            const text = `Showing ${start}-${end} of ${pagination.total} suppliers`;
+            tableInfo.textContent = text;
+            if (paginationInfo) paginationInfo.textContent = text;
+        }
     }
 
     let searchTimeout;
@@ -698,6 +821,13 @@ document.addEventListener('DOMContentLoaded', function () {
         currentPage = 1;
         loadSuppliers();
     });
+
+    if (showAllToggle) {
+        showAllToggle.addEventListener('change', function() {
+            currentPage = 1;
+            loadSuppliers();
+        });
+    }
 
     document.getElementById('prevPage').addEventListener('click', function () {
         if (currentPage > 1) {
