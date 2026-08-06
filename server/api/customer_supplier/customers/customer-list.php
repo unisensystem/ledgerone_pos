@@ -49,9 +49,9 @@ try {
     }
     
     if ($search) {
-        $where[] = '(c.customer_name LIKE ? OR c.customer_code LIKE ? OR c.email LIKE ? OR c.primary_phone LIKE ? OR ct.type_name LIKE ? OR cc.category_name LIKE ? OR s.brand_name LIKE ?)';
+        $where[] = '(c.customer_name LIKE ? OR c.shop_name LIKE ? OR c.customer_code LIKE ? OR c.address LIKE ? OR c.email LIKE ? OR c.primary_phone LIKE ? OR ct.type_name LIKE ? OR cc.category_name LIKE ? OR s.brand_name LIKE ? OR ci.city_name LIKE ? OR cz.city_zone_name LIKE ? OR ar.area_name LIKE ?)';
         $searchTerm = '%' . $search . '%';
-        $params = array_merge($params, [$searchTerm, $searchTerm, $searchTerm, $searchTerm, $searchTerm, $searchTerm, $searchTerm]);
+        $params = array_merge($params, array_fill(0, 12, $searchTerm));
     }
     
     if ($status === 'active') {
@@ -66,26 +66,32 @@ try {
     }
     
     $whereClause = 'WHERE ' . implode(' AND ', $where);
-    
-    // Get total count
-    $countSql = "SELECT COUNT(*) as total FROM customers c
-            LEFT JOIN customer_types ct ON c.customer_type_id = ct.id AND (ct.tenant_id = 0 OR ct.tenant_id = c.tenant_id)
+
+    // Shared joins used by both count and list queries
+    $joins = "LEFT JOIN customer_types ct ON c.customer_type_id = ct.id AND (ct.tenant_id = 0 OR ct.tenant_id = c.tenant_id)
             LEFT JOIN customer_categories cc ON c.customer_category_id = cc.id AND cc.tenant_id = c.tenant_id
             LEFT JOIN suppliers s ON c.brand_id = s.id
-            $whereClause";
+            LEFT JOIN cities ci ON c.city_id = ci.id AND ci.tenant_id = c.tenant_id
+            LEFT JOIN city_zones cz ON c.city_zone_id = cz.id AND cz.tenant_id = c.tenant_id
+            LEFT JOIN areas ar ON c.area_id = ar.id AND ar.tenant_id = c.tenant_id";
+    
+    // Get total count
+    $countSql = "SELECT COUNT(*) as total FROM customers c $joins $whereClause";
     $stmt = $pdo->prepare($countSql);
     $stmt->execute($params);
     $total = $stmt->fetch()['total'];
     
     // Get customers
-    $sql = "SELECT c.id, c.customer_code, c.customer_name, c.primary_phone, c.email, c.current_balance, c.is_blacklisted, c.created_at, 
+    $sql = "SELECT c.id, c.customer_code, c.customer_name, c.shop_name, c.address, c.primary_phone, c.email,
+            c.current_balance, c.opening_debit_amount, c.opening_credit_amount, c.is_blacklisted, c.created_at, 
             ct.type_name as customer_group_name,
             cc.category_name as customer_category_name,
-            s.brand_name as brand_name
+            s.brand_name as brand_name,
+            ci.city_name as city_name,
+            cz.city_zone_name as zone_name,
+            ar.area_name as area_name
             FROM customers c
-            LEFT JOIN customer_types ct ON c.customer_type_id = ct.id AND (ct.tenant_id = 0 OR ct.tenant_id = c.tenant_id)
-            LEFT JOIN customer_categories cc ON c.customer_category_id = cc.id AND cc.tenant_id = c.tenant_id
-            LEFT JOIN suppliers s ON c.brand_id = s.id
+            $joins
             $whereClause 
             ORDER BY c.created_at DESC 
             LIMIT $limit OFFSET $offset";
