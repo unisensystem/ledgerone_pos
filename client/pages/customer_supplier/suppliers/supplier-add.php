@@ -197,6 +197,29 @@ if (!$user_id) {
                             <textarea id="address" placeholder="Enter complete supplier address"></textarea>
                         </div>
 
+          <div class="form-group col-6" style="position: relative;">
+    <label for="citySearch">
+        <i class="fas fa-city"></i>
+        City
+    </label>
+    <input type="text" id="citySearch" autocomplete="off" maxlength="255" placeholder="Search city...">
+    <input type="hidden" id="city" value="">
+    <div id="cityDropdown" style="
+        display: none;
+        position: absolute;
+        top: 100%;
+        left: 0;
+        right: 0;
+        z-index: 9999;
+        background: var(--surface-1, #fff);
+        border: 1px solid var(--border-default, #ccc);
+        border-radius: 8px;
+        max-height: 200px;
+        overflow-y: auto;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    "></div>
+</div>
+
                         <div class="form-group col-6">
                             <label for="primaryPhone">
                                 <i class="fas fa-phone"></i>
@@ -293,6 +316,18 @@ if (!$user_id) {
                                 AIT %
                             </label>
                             <input type="number" id="aitPercent" step="0.01" min="0" max="100" placeholder="0.00">
+                        </div>
+
+                        <div class="form-group col-6">
+                            <label for="creditDays">
+                                <i class="fas fa-calendar-day"></i>
+                                Credit Days
+                            </label>
+                            <input type="number" id="creditDays" step="1" min="0" placeholder="0">
+                            <div class="helper-text">
+                                <i class="fas fa-info-circle"></i>
+                                Number of days allowed before payment is due
+                            </div>
                         </div>
 
                         <div class="form-group col-6">
