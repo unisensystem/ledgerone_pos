@@ -41,29 +41,6 @@ try {
         exit();
     }
 
-    // Company is now mandatory, and must be one the user is authorized for
-    $company_id = $_POST['company_id'] ?? null;
-    if (empty($company_id) || !in_array($company_id, $allowedCompanyIds)) {
-        echo json_encode(['success' => false, 'error' => 'Invalid or unauthorized company']);
-        exit();
-    }
-
-    // Generate sequential voucher number
-    $currentYear = date('Y');
-    $stmt = $pdo->prepare("SELECT voucher_number FROM receive_voucher WHERE tenant_id = ? AND voucher_number LIKE ? ORDER BY id DESC LIMIT 1");
-    $stmt->execute([$tenant_id, 'RV-' . $currentYear . '-%']);
-    $lastVoucher = $stmt->fetch(PDO::FETCH_ASSOC);
-    
-    if ($lastVoucher) {
-        // Extract number from last voucher (e.g., RV-2024-0001 -> 1)
-        preg_match('/RV-\d{4}-(\d+)/', $lastVoucher['voucher_number'], $matches);
-        $nextNumber = isset($matches[1]) ? intval($matches[1]) + 1 : 1;
-    } else {
-        $nextNumber = 1;
-    }
-    
-    $voucher_number = 'RV-' . $currentYear . '-' . str_pad($nextNumber, 4, '0', STR_PAD_LEFT);
-    
     // Get form data
     $voucher_date = $_POST['voucher_date'] ?? '';
     $customer_code = $_POST['customer_code'] ?? '';
@@ -85,6 +62,41 @@ try {
     $attachment = null;
     $recovery_officer_id = (!empty($_POST['recovery_officer']) && $_POST['recovery_officer'] !== 'null') ? $_POST['recovery_officer'] : null;
     $against_pdc_id = (!empty($_POST['against_pdc_id']) && $_POST['against_pdc_id'] !== 'null') ? intval($_POST['against_pdc_id']) : null;
+
+    // Look up the customer within ANY company the user has access to — do NOT require
+    // the form's selected Company to match the customer's actual company.
+    // The customer's own company_id is the source of truth and is used for the voucher.
+    $placeholders = implode(',', array_fill(0, count($allowedCompanyIds), '?'));
+    $stmt = $pdo->prepare("
+        SELECT id, company_id FROM customers 
+        WHERE tenant_id = ? AND customer_code = ? AND company_id IN ($placeholders)
+    ");
+    $stmt->execute(array_merge([$tenant_id, $customer_code], $allowedCompanyIds));
+    $customer = $stmt->fetch(PDO::FETCH_ASSOC);
+
+    if (!$customer) {
+        echo json_encode(['success' => false, 'error' => 'Customer not found']);
+        exit();
+    }
+
+    // Company is derived from the customer, not from the form's Company dropdown
+    $company_id = $customer['company_id'];
+
+    // Generate sequential voucher number
+    $currentYear = date('Y');
+    $stmt = $pdo->prepare("SELECT voucher_number FROM receive_voucher WHERE tenant_id = ? AND voucher_number LIKE ? ORDER BY id DESC LIMIT 1");
+    $stmt->execute([$tenant_id, 'RV-' . $currentYear . '-%']);
+    $lastVoucher = $stmt->fetch(PDO::FETCH_ASSOC);
+    
+    if ($lastVoucher) {
+        // Extract number from last voucher (e.g., RV-2024-0001 -> 1)
+        preg_match('/RV-\d{4}-(\d+)/', $lastVoucher['voucher_number'], $matches);
+        $nextNumber = isset($matches[1]) ? intval($matches[1]) + 1 : 1;
+    } else {
+        $nextNumber = 1;
+    }
+    
+    $voucher_number = 'RV-' . $currentYear . '-' . str_pad($nextNumber, 4, '0', STR_PAD_LEFT);
 
     // Handle file upload
     if (isset($_FILES['attachment']) && $_FILES['attachment']['error'] === UPLOAD_ERR_OK) {
@@ -154,16 +166,6 @@ try {
         }
         
         $attachment = $finalFileName;
-    }
-
-    // Get customer ID from customer code, restricted to the submitted (authorized) company
-    $stmt = $pdo->prepare("SELECT id FROM customers WHERE tenant_id = ? AND customer_code = ? AND company_id = ?");
-    $stmt->execute([$tenant_id, $customer_code, $company_id]);
-    $customer = $stmt->fetch(PDO::FETCH_ASSOC);
-    
-    if (!$customer) {
-        echo json_encode(['success' => false, 'error' => 'Customer not found']);
-        exit();
     }
 
     // Insert receive voucher
