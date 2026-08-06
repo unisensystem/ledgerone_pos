@@ -351,6 +351,7 @@ document.addEventListener('DOMContentLoaded', function () {
     // Form Validation
     const form = document.getElementById('customerForm');
     const customerName = document.getElementById('customerName');
+    
     const primaryPhone = document.getElementById('primaryPhone');
     const secondaryPhone = document.getElementById('secondaryPhone');
     const identityCard = document.getElementById('identityCard');
