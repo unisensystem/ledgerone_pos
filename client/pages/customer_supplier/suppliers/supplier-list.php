@@ -28,35 +28,26 @@ $currency_symbol = $currency['symbol'] ?? '$';
 ?>
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>LedgerOne ERP - Suppliers List</title>
+    <title>LedgerOne ERP - Customers List</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="../../../assets/css/customer_supplier/suppliers/supplier-list.css">
-    <style>
-        .edit-salesman-chip { display:inline-flex; align-items:center; gap:4px; background:var(--primary,#4f46e5); color:#fff; border-radius:999px; padding:2px 10px; font-size:13px; }
-        .edit-salesman-chip .chip-remove { cursor:pointer; font-size:16px; line-height:1; opacity:.8; }
-        .edit-salesman-chip .chip-remove:hover { opacity:1; }
-        .edit-salesman-dropdown-item { padding:8px 12px; cursor:pointer; font-size:14px; }
-        .edit-salesman-dropdown-item:hover { background:var(--surface-2,#f3f4f6); }
-        .edit-assoc-company-chip { display:inline-flex; align-items:center; gap:4px; background:var(--success,#2fbf71); color:#fff; border-radius:999px; padding:2px 10px; font-size:13px; }
-        .edit-assoc-company-chip .chip-remove { cursor:pointer; font-size:16px; line-height:1; opacity:.8; }
-        .edit-assoc-company-chip .chip-remove:hover { opacity:1; }
-        .show-all-toggle { display:flex; align-items:center; gap:6px; font-size:14px; color:var(--body,#374151); cursor:pointer; padding:0 8px; }
-        .show-all-toggle input { cursor:pointer; }
-    </style>
+    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+    <link rel="stylesheet" href="../../../assets/css/customer_supplier/customers/customer-list.css">
 </head>
-
 <body class="light-mode">
     <div class="container">
         <div class="header">
             <div class="header-actions">
-                <a href="supplier-add.php" class="btn btn-primary">
+                <a href="customer-add.php" class="btn btn-primary">
                     <i class="fas fa-plus"></i>
-                    Add Supplier
+                    Add Customer
+                </a>
+                <a href="opening-balance-invoices-add.php" class="btn btn-success">
+                    <i class="fas fa-file-invoice-dollar"></i>
+                    Add Opening Invoices
                 </a>
             </div>
         </div>
@@ -64,9 +55,9 @@ $currency_symbol = $currency['symbol'] ?? '$';
         <div class="page-title">
             <h1>
                 <i class="fas fa-users"></i>
-                Suppliers Management
+                Customers Management
             </h1>
-            <div class="pagination-info" id="paginationInfo">Showing 1-10 of 45 suppliers</div>
+            <div class="pagination-info" id="paginationInfo">Showing 1-10 of 45 customers</div>
         </div>
 
         <!-- Stats Cards -->
@@ -76,14 +67,14 @@ $currency_symbol = $currency['symbol'] ?? '$';
                     <i class="fas fa-users"></i>
                 </div>
                 <div class="stat-value">45</div>
-                <div class="stat-label">Total Suppliers</div>
+                <div class="stat-label">Total Customers</div>
             </div>
             <div class="stat-card">
                 <div class="stat-icon">
                     <i class="fas fa-user-check"></i>
                 </div>
                 <div class="stat-value">42</div>
-                <div class="stat-label">Active Suppliers</div>
+                <div class="stat-label">Active Customers</div>
             </div>
             <div class="stat-card">
                 <div class="stat-icon">
@@ -98,9 +89,17 @@ $currency_symbol = $currency['symbol'] ?? '$';
             <div class="filters-bar">
                 <div class="search-box">
                     <i class="fas fa-search"></i>
-                    <input type="text" id="searchInput" placeholder="Search suppliers (name, code, phone, address, city...)">
+                    <input type="text" id="searchInput" placeholder="Search by any field...">
                 </div>
                 <div class="filter-options">
+                    <select class="filter-select" id="rowsPerPage">
+                        <option value="10">Show 10</option>
+                        <option value="25">Show 25</option>
+                        <option value="50">Show 50</option>
+                        <option value="100">Show 100</option>
+                        <option value="500">Show 500</option>
+                        <option value="all">Show All</option>
+                    </select>
                     <select class="filter-select" id="companyFilter">
                         <option value="">All Companies</option>
                     </select>
@@ -109,10 +108,6 @@ $currency_symbol = $currency['symbol'] ?? '$';
                         <option value="active">Active</option>
                         <option value="blacklisted">Blacklisted</option>
                     </select>
-                    <label class="show-all-toggle" for="showAllToggle">
-                        <input type="checkbox" id="showAllToggle">
-                        Show All
-                    </label>
                     <div class="dropdown">
                         <button class="btn btn-secondary" id="exportBtn">
                             <i class="fas fa-download"></i>
@@ -139,27 +134,29 @@ $currency_symbol = $currency['symbol'] ?? '$';
                     <thead>
                         <tr>
                             <th>Sr#</th>
-                            <th>Supplier Code</th>
-                            <th>Brand Name</th>
-                            <th>Supplier Name</th>
+                            <th>Customer Code</th>
+                            <th>Customer Name</th>
+                            <th>Shopkeeper Name</th>
                             <th>Address</th>
+                            <th>Group</th>
+                            <th>Category</th>
                             <th>City</th>
+                            <th>Zone</th>
+                            <th>Area</th>
                             <th>Phone</th>
-                            <th>Credit Days</th>
-                            <th>Balance</th>
-                            <th>Salesman</th>
+                            <th>Opening Balance</th>
                             <th>Status</th>
                             <th>Actions</th>
                         </tr>
                     </thead>
-                    <tbody id="suppliersTable">
-                        <!-- Supplier rows will be populated by JavaScript -->
+                    <tbody id="customersTable">
+                        <!-- Customer rows will be populated by JavaScript -->
                     </tbody>
                 </table>
             </div>
 
             <div class="pagination">
-                <div class="pagination-info" id="tableInfo">Showing 1-10 of 45 suppliers</div>
+                <div class="pagination-info" id="tableInfo">Showing 1-10 of 45 customers</div>
                 <div class="pagination-controls">
                     <button class="pagination-btn" id="prevPage">
                         <i class="fas fa-chevron-left"></i>
@@ -172,16 +169,16 @@ $currency_symbol = $currency['symbol'] ?? '$';
         </div>
     </div>
 
-    <!-- Edit Supplier Modal -->
+    <!-- Edit Customer Modal -->
     <div class="modal" id="editModal">
-        <div class="modal-content">
+        <div class="modal-content" style="max-width: 1000px;">
             <div class="modal-header">
-                <h3><i class="fas fa-edit"></i> Edit Supplier</h3>
+                <h3><i class="fas fa-edit"></i> Edit Customer</h3>
                 <button class="modal-close" id="editModalClose">
                     <i class="fas fa-times"></i>
                 </button>
             </div>
-            <form id="editSupplierForm">
+            <form id="editCustomerForm">
                 <div class="modal-body">
                     <div class="form-grid">
                         <div class="form-group col-4">
@@ -190,46 +187,50 @@ $currency_symbol = $currency['symbol'] ?? '$';
                                 <option value="">Select Company</option>
                             </select>
                         </div>
-                        <div class="form-group col-4" style="position:relative;">
-                            <label>Associated Companies</label>
-                            <div id="editAssocCompanyChipsContainer" style="border:1px solid var(--border-default,#ccc);border-radius:8px;padding:6px 8px;background:var(--input-bg,#fff);cursor:text;min-height:48px;">
-                                <div id="editAssocCompanyChipsList" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:4px;"></div>
-                                <input type="text" id="editAssocCompanySearch" placeholder="Search company..." autocomplete="off" style="border:none;outline:none;background:transparent;width:100%;font-size:14px;padding:2px 4px;height:auto;">
+                        <div class="form-group col-4">
+                            <label>Customer Code</label>
+                            <input type="text" id="editCustomerCode" readonly>
+                        </div>
+                        <div class="form-group col-4">
+                            <label>Customer Group</label>
+                            <select id="editCustomerType">
+                                <option value="">Select Customer Group</option>
+                            </select>
+                        </div>
+                        <div class="form-group col-4">
+                            <label>Customer Category</label>
+                            <select id="editCustomerCategory">
+                                <option value="">Select Customer Category</option>
+                            </select>
+                        </div>
+                        <div class="form-group col-4">
+                            <label>Brand Name</label>
+                            <select id="editBrandName">
+                                <option value="">Select Brand</option>
+                            </select>
+                        </div>
+                        <div class="form-group col-6">
+                            <label class="required">Customer Name</label>
+                            <input type="text" id="editCustomerName" required>
+                        </div>
+                        <div class="form-group col-6">
+                            <label>Shopkeeper Name</label>
+                            <input type="text" id="editShopName">
+                        </div>
+                        <div class="form-group col-6">
+                            <div class="checkbox-group">
+                                <input type="checkbox" id="editOutStation">
+                                <label for="editOutStation">Out Station</label>
                             </div>
-                            <div id="editAssocCompanyDropdown" style="display:none;position:fixed;z-index:99999;background:var(--surface-1,#fff);border:1px solid var(--border-default,#ccc);border-radius:8px;max-height:200px;overflow-y:auto;box-shadow:0 4px 12px rgba(0,0,0,.15);"></div>
-                            <input type="hidden" id="editAssocCompanyIds" value="">
-                        </div>
-                        <div class="form-group col-4">
-                            <label>Supplier Code</label>
-                            <input type="text" id="editSupplierCode" readonly>
-                        </div>
-                        <div class="form-group col-4">
-                            <label>Salesman</label>
-                            <div id="editSalesmanChipsContainer" style="border:1px solid var(--border-default,#ccc);border-radius:8px;padding:6px 8px;background:var(--input-bg,#fff);cursor:text;position:relative;">
-                                <div id="editSalesmanChipsList" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:4px;"></div>
-                                <input type="text" id="editSalesmanSearch" placeholder="Search salesman..." autocomplete="off" style="border:none;outline:none;background:transparent;width:100%;font-size:14px;padding:2px 4px;">
-                            </div>
-                            <div id="editSalesmanDropdown" style="display:none;z-index:9999;background:var(--surface-1,#fff);border:1px solid var(--border-default,#ccc);border-radius:8px;max-height:200px;overflow-y:auto;box-shadow:0 4px 12px rgba(0,0,0,.1);"></div>
-                            <input type="hidden" id="editSalesmanIds" value="">
-                        </div>
-                        <div class="form-group col-4">
-                            <label class="required">Brand Name - Company</label>
-                            <input type="text" id="editSupplierName" required>
-                        </div>
-                        <div class="form-group col-4">
-                            <label>Supplier Name</label>
-                            <input type="text" id="editBrandName">
                         </div>
                         <div class="form-group col-12">
                             <label>Address</label>
                             <textarea id="editAddress"></textarea>
                         </div>
-                     <div class="form-group col-6" style="position:relative;">
-    <label>City</label>
-    <input type="text" id="editCitySearch" autocomplete="off" maxlength="255" placeholder="Search city...">
-    <input type="hidden" id="editCity" value="">
-    <div id="editCityDropdown" style="display:none;position:fixed;z-index:99999;background:var(--surface-1,#fff);border:1px solid var(--border-default,#ccc);border-radius:8px;max-height:200px;overflow-y:auto;box-shadow:0 4px 12px rgba(0,0,0,.15);"></div>
-</div>
+                        <div class="form-group col-6">
+                            <label>P.O. Box No</label>
+                            <input type="text" id="editPoBoxNo" maxlength="50">
+                        </div>
                         <div class="form-group col-6">
                             <label>Primary Phone</label>
                             <input type="text" id="editPrimaryPhone" maxlength="15">
@@ -247,27 +248,15 @@ $currency_symbol = $currency['symbol'] ?? '$';
                             <input type="text" id="editIdentityCard" maxlength="15">
                         </div>
                         <div class="form-group col-6">
-                            <label>Opening Debit</label>
-                            <input type="number" id="editOpeningDebit" step="0.01" min="0">
+                            <label>Sales Officer</label>
+                            <select id="editSalesOfficer">
+                                <option value="">Select Sales Officer</option>
+                            </select>
                         </div>
                         <div class="form-group col-6">
-                            <label>Opening Credit</label>
-                            <input type="number" id="editOpeningCredit" step="0.01" min="0">
-                        </div>
-                        <div class="form-group col-6">
-                            <label>AIT %</label>
-                            <input type="number" id="editAitPercent" step="0.01" min="0" max="100">
-                        </div>
-                        <div class="form-group col-6">
-                            <label>Credit Days</label>
-                            <input type="number" id="editCreditDays" step="1" min="0">
-                        </div>
-                        <div class="form-group col-6">
-                            <label><i class="fas fa-building"></i> Party Type</label>
-                            <select id="editPartyType">
-                                <option value="">Select Party Type</option>
-                                <option value="registered_company">Registered Company</option>
-                                <option value="unregistered">Unregistered</option>
+                            <label>Supplier Man</label>
+                            <select id="editSupplierMan">
+                                <option value="">Select Supplier Man</option>
                             </select>
                         </div>
                         <div class="form-group col-6">
@@ -276,38 +265,150 @@ $currency_symbol = $currency['symbol'] ?? '$';
                                 <option value="">Select Project</option>
                             </select>
                         </div>
-                        <div class="form-group col-12">
-                            <label>Sub Accounts</label>
-                            <div class="table-container">
-                                <table id="editSubAccountsTable">
-                                    <thead>
+                        <div class="form-group col-4">
+                            <label>Country</label>
+                            <select id="editCountry">
+                                <option value="">Select Country</option>
+                            </select>
+                        </div>
+                        <div class="form-group col-4">
+                            <label>Region</label>
+                            <select id="editRegion" disabled>
+                                <option value="">Select Region</option>
+                            </select>
+                        </div>
+                        <div class="form-group col-4">
+                            <label>City</label>
+                            <select id="editCity" disabled>
+                                <option value="">Select City</option>
+                            </select>
+                        </div>
+                        <div class="form-group col-6">
+                            <label>City Zone</label>
+                            <select id="editCityZone" disabled>
+                                <option value="">Select City Zone</option>
+                            </select>
+                        </div>
+                        <div class="form-group col-6">
+                            <label>Area</label>
+                            <select id="editArea" disabled>
+                                <option value="">Select Area</option>
+                            </select>
+                        </div>
+                        <div class="form-group col-6">
+                            <div class="checkbox-group">
+                                <input type="checkbox" id="editIsSalesTaxRegistered">
+                                <label for="editIsSalesTaxRegistered">Is Sales Tax Registered?</label>
+                            </div>
+                        </div>
+                        <div class="form-group col-6" id="editStrnGroup" style="display: none;">
+                            <label>STRN</label>
+                            <input type="text" id="editStrn" maxlength="50">
+                        </div>
+                        <div class="form-group col-6">
+                            <div class="checkbox-group">
+                                <input type="checkbox" id="editIsFiler">
+                                <label for="editIsFiler">Is Filer?</label>
+                            </div>
+                        </div>
+                        <div class="form-group col-6" id="editNtnGroup" style="display: none;">
+                            <label>NTN</label>
+                            <input type="text" id="editNtn" maxlength="50">
+                        </div>
+                        <div class="form-group col-6">
+                            <label>Advance Income Tax %</label>
+                            <input type="number" id="editAdvanceIncomeTax" step="0.01" min="0" max="100">
+                        </div>
+                        <div class="form-group col-6">
+                            <label>Default Discount %</label>
+                            <input type="number" id="editDefaultDiscount" step="0.01" min="0" max="100">
+                        </div>
+                        <div class="form-group col-6">
+                            <label>Credit Limit</label>
+                            <input type="number" id="editBalanceLimit" step="0.01" min="0">
+                        </div>
+                        <div class="form-group col-6">
+                            <label>Credit Period Limit (Days)</label>
+                            <input type="number" id="editBalancePeriodLimit" min="0">
+                        </div>
+                        <div class="form-group col-6">
+                            <label>Opening Debit</label>
+                            <input type="number" id="editOpeningDebit" step="0.01" min="0" readonly>
+                        </div>
+                        <div class="form-group col-6">
+                            <label>Opening Credit</label>
+                            <input type="number" id="editOpeningCredit" step="0.01" min="0">
+                        </div>
+                        
+                        <!-- Opening Balance Invoices Section -->
+                        <div class="form-group col-12" id="editOpeningInvoicesSection">
+                            <label>Opening Balance Invoices</label>
+                            <div style="overflow-x: auto;">
+                                <table style="width: 100%; border-collapse: collapse; border: 1px solid var(--border-default);">
+                                    <thead style="background: var(--surface-2);">
                                         <tr>
-                                            <th style="width: 60px;">S#</th>
-                                            <th>Sub Account Name</th>
-                                            <th style="width: 150px;">Debit</th>
-                                            <th style="width: 150px;">Credit</th>
-                                            <th style="width: 100px;">Actions</th>
+                                            <th style="padding: 12px; border: 1px solid var(--border-default); text-align: left;">Distribution</th>
+                                            <th style="padding: 12px; border: 1px solid var(--border-default); text-align: left;">Sales Officer</th>
+                                            <th style="padding: 12px; border: 1px solid var(--border-default); text-align: left;">Invoice Number</th>
+                                            <th style="padding: 12px; border: 1px solid var(--border-default); text-align: left;">Debit (Dr)</th>
+                                            <th style="padding: 12px; border: 1px solid var(--border-default); text-align: left;">Invoice Date</th>
+                                            <th style="padding: 12px; border: 1px solid var(--border-default); text-align: center; width: 80px;">Actions</th>
                                         </tr>
                                     </thead>
-                                    <tbody id="editSubAccountsBody">
+                                    <tbody id="editInvoicesTableBody">
+                                    </tbody>
+                                    <tfoot>
                                         <tr>
-                                            <td>1</td>
-                                            <td><input type="text" class="sub-account-input" placeholder="Enter sub account name"></td>
-                                            <td><input type="number" class="sub-account-debit" step="0.01" min="0" placeholder="0.00"></td>
-                                            <td><input type="number" class="sub-account-credit" step="0.01" min="0" placeholder="0.00"></td>
-                                            <td>
-                                                <button type="button" class="btn-icon btn-add" title="Add Row"><i class="fas fa-plus"></i></button>
-                                                <button type="button" class="btn-icon btn-remove" title="Remove Row"><i class="fas fa-minus"></i></button>
+                                            <td colspan="6" style="padding: 12px; border: 1px solid var(--border-default);">
+                                                <button type="button" class="btn btn-secondary btn-sm" id="editAddInvoiceBtn">
+                                                    <i class="fas fa-plus"></i> Add Invoice
+                                                </button>
                                             </td>
                                         </tr>
-                                    </tbody>
+                                    </tfoot>
                                 </table>
                             </div>
                         </div>
+                        
+                        <!-- Sub Accounts Section -->
                         <div class="form-group col-12">
+                            <label>Sub Accounts</label>
+                            <div style="overflow-x: auto;">
+                                <table style="width: 100%; border-collapse: collapse; border: 1px solid var(--border-default);">
+                                    <thead style="background: var(--surface-2);">
+                                        <tr>
+                                            <th style="padding: 12px; border: 1px solid var(--border-default); text-align: left; width: 80px;">S#</th>
+                                            <th style="padding: 12px; border: 1px solid var(--border-default); text-align: left;">Sub Account Name</th>
+                                            <th style="padding: 12px; border: 1px solid var(--border-default); text-align: left; width: 150px;">Debit (Dr)</th>
+                                            <th style="padding: 12px; border: 1px solid var(--border-default); text-align: left; width: 150px;">Credit (Cr)</th>
+                                            <th style="padding: 12px; border: 1px solid var(--border-default); text-align: center; width: 100px;">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="editSubAccountsTableBody">
+                                    </tbody>
+                                    <tfoot>
+                                        <tr>
+                                            <td colspan="5" style="padding: 12px; border: 1px solid var(--border-default);">
+                                                <button type="button" class="btn btn-secondary btn-sm" id="editAddSubAccountBtn">
+                                                    <i class="fas fa-plus"></i> Add Sub Account
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    </tfoot>
+                                </table>
+                            </div>
+                        </div>
+                        
+                        <div class="form-group col-6">
+                            <div class="checkbox-group">
+                                <input type="checkbox" id="editIsWholesaler">
+                                <label for="editIsWholesaler">Is Wholesaler?</label>
+                            </div>
+                        </div>
+                        <div class="form-group col-6">
                             <div class="checkbox-group">
                                 <input type="checkbox" id="editBlacklist">
-                                <label for="editBlacklist">Blacklist Supplier</label>
+                                <label for="editBlacklist">Blacklist Customer</label>
                             </div>
                         </div>
                     </div>
@@ -315,18 +416,18 @@ $currency_symbol = $currency['symbol'] ?? '$';
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" id="editCancelBtn">Cancel</button>
                     <button type="submit" class="btn btn-primary" id="editSaveBtn">
-                        <i class="fas fa-save"></i> Update Supplier
+                        <i class="fas fa-save"></i> Update Customer
                     </button>
                 </div>
             </form>
         </div>
     </div>
 
-    <!-- Delete Supplier Modal -->
+    <!-- Delete Customer Modal -->
     <div class="modal" id="deleteModal">
         <div class="modal-content" style="max-width: 500px;">
             <div class="modal-header">
-                <h3><i class="fas fa-trash"></i> Delete Supplier</h3>
+                <h3><i class="fas fa-trash"></i> Delete Customer</h3>
                 <button class="modal-close" id="deleteModalClose">
                     <i class="fas fa-times"></i>
                 </button>
@@ -338,7 +439,7 @@ $currency_symbol = $currency['symbol'] ?? '$';
                     </div>
                     <h4 style="margin-bottom: 16px; color: var(--heading);">Are you sure?</h4>
                     <p style="color: var(--body); margin-bottom: 24px;">
-                        You are about to delete supplier <strong id="deleteSupplierName"></strong>.
+                        You are about to delete customer <strong id="deleteCustomerName"></strong>. 
                         This action cannot be undone.
                     </p>
                 </div>
@@ -346,17 +447,17 @@ $currency_symbol = $currency['symbol'] ?? '$';
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" id="deleteCancelBtn">Cancel</button>
                 <button type="button" class="btn" id="deleteConfirmBtn" style="background: var(--error); color: white;">
-                    <i class="fas fa-trash"></i> Delete Supplier
+                    <i class="fas fa-trash"></i> Delete Customer
                 </button>
             </div>
         </div>
     </div>
 
-    <!-- View Supplier Modal -->
+    <!-- View Customer Modal -->
     <div class="modal" id="viewModal">
-        <div class="modal-content">
+        <div class="modal-content" style="max-width: 1000px;">
             <div class="modal-header">
-                <h3><i class="fas fa-eye"></i> Supplier Details</h3>
+                <h3><i class="fas fa-eye"></i> Customer Details</h3>
                 <button class="modal-close" id="viewModalClose">
                     <i class="fas fa-times"></i>
                 </button>
@@ -368,32 +469,40 @@ $currency_symbol = $currency['symbol'] ?? '$';
                         <div class="view-field" id="viewCompany"></div>
                     </div>
                     <div class="form-group col-4">
-                        <label>Supplier Code</label>
-                        <div class="view-field" id="viewSupplierCode"></div>
+                        <label>Customer Code</label>
+                        <div class="view-field" id="viewCustomerCode"></div>
                     </div>
                     <div class="form-group col-4">
-                        <label>Salesman</label>
-                        <div class="view-field" id="viewSalesman"></div>
+                        <label>Customer Group</label>
+                        <div class="view-field" id="viewCustomerType"></div>
                     </div>
                     <div class="form-group col-4">
-                        <label>Associated Companies</label>
-                        <div class="view-field" id="viewAssocCompanies"></div>
+                        <label>Customer Category</label>
+                        <div class="view-field" id="viewCustomerCategory"></div>
                     </div>
                     <div class="form-group col-4">
-                        <label>Brand Name - Company</label>
-                        <div class="view-field" id="viewSupplierName"></div>
-                    </div>
-                    <div class="form-group col-4">
-                        <label>Supplier Name</label>
+                        <label>Brand Name</label>
                         <div class="view-field" id="viewBrandName"></div>
+                    </div>
+                    <div class="form-group col-4">
+                        <label>Shopkeeper Name</label>
+                        <div class="view-field" id="viewShopName"></div>
+                    </div>
+                    <div class="form-group col-8">
+                        <label>Customer Name</label>
+                        <div class="view-field" id="viewCustomerName"></div>
+                    </div>
+                    <div class="form-group col-4">
+                        <label>Out Station</label>
+                        <div class="view-field" id="viewOutStation"></div>
                     </div>
                     <div class="form-group col-12">
                         <label>Address</label>
                         <div class="view-field" id="viewAddress"></div>
                     </div>
                     <div class="form-group col-6">
-                        <label>City</label>
-                        <div class="view-field" id="viewCity"></div>
+                        <label>P.O. Box No</label>
+                        <div class="view-field" id="viewPoBoxNo"></div>
                     </div>
                     <div class="form-group col-6">
                         <label>Primary Phone</label>
@@ -412,6 +521,70 @@ $currency_symbol = $currency['symbol'] ?? '$';
                         <div class="view-field" id="viewIdentityCard"></div>
                     </div>
                     <div class="form-group col-6">
+                        <label>Sales Officer</label>
+                        <div class="view-field" id="viewSalesOfficer"></div>
+                    </div>
+                    <div class="form-group col-6">
+                        <label>Supplier Man</label>
+                        <div class="view-field" id="viewSupplierMan"></div>
+                    </div>
+                    <div class="form-group col-6">
+                        <label><i class="fas fa-project-diagram"></i> Project</label>
+                        <div class="view-field" id="viewProject"></div>
+                    </div>
+                    <div class="form-group col-4">
+                        <label>Country</label>
+                        <div class="view-field" id="viewCountry"></div>
+                    </div>
+                    <div class="form-group col-4">
+                        <label>Region</label>
+                        <div class="view-field" id="viewRegion"></div>
+                    </div>
+                    <div class="form-group col-4">
+                        <label>City</label>
+                        <div class="view-field" id="viewCity"></div>
+                    </div>
+                    <div class="form-group col-6">
+                        <label>City Zone</label>
+                        <div class="view-field" id="viewCityZone"></div>
+                    </div>
+                    <div class="form-group col-6">
+                        <label>Area</label>
+                        <div class="view-field" id="viewArea"></div>
+                    </div>
+                    <div class="form-group col-6">
+                        <label>Sales Tax Registered</label>
+                        <div class="view-field" id="viewIsSalesTaxRegistered"></div>
+                    </div>
+                    <div class="form-group col-6">
+                        <label>STRN</label>
+                        <div class="view-field" id="viewStrn"></div>
+                    </div>
+                    <div class="form-group col-6">
+                        <label>Is Filer</label>
+                        <div class="view-field" id="viewIsFiler"></div>
+                    </div>
+                    <div class="form-group col-6">
+                        <label>NTN</label>
+                        <div class="view-field" id="viewNtn"></div>
+                    </div>
+                    <div class="form-group col-6">
+                        <label>Advance Income Tax %</label>
+                        <div class="view-field" id="viewAdvanceIncomeTax"></div>
+                    </div>
+                    <div class="form-group col-6">
+                        <label>Default Discount %</label>
+                        <div class="view-field" id="viewDefaultDiscount"></div>
+                    </div>
+                    <div class="form-group col-6">
+                        <label>Credit Limit</label>
+                        <div class="view-field" id="viewBalanceLimit"></div>
+                    </div>
+                    <div class="form-group col-6">
+                        <label>Credit Period Limit (Days)</label>
+                        <div class="view-field" id="viewBalancePeriodLimit"></div>
+                    </div>
+                    <div class="form-group col-6">
                         <label>Opening Debit</label>
                         <div class="view-field" id="viewOpeningDebit"></div>
                     </div>
@@ -419,25 +592,59 @@ $currency_symbol = $currency['symbol'] ?? '$';
                         <label>Opening Credit</label>
                         <div class="view-field" id="viewOpeningCredit"></div>
                     </div>
-                    <div class="form-group col-6">
-                        <label>AIT %</label>
-                        <div class="view-field" id="viewAitPercent"></div>
+                    
+                    <!-- Opening Balance Invoices Section -->
+                    <div class="form-group col-12" id="viewOpeningInvoicesSection">
+                        <label>Opening Balance Invoices</label>
+                        <div style="overflow-x: auto;">
+                            <table style="width: 100%; border-collapse: collapse; border: 1px solid var(--border-default);">
+                                <thead style="background: var(--surface-2);">
+                                    <tr>
+                                        <th style="padding: 12px; border: 1px solid var(--border-default); text-align: left;">Distribution</th>
+                                        <th style="padding: 12px; border: 1px solid var(--border-default); text-align: left;">Sales Officer</th>
+                                        <th style="padding: 12px; border: 1px solid var(--border-default); text-align: left;">Invoice Number</th>
+                                        <th style="padding: 12px; border: 1px solid var(--border-default); text-align: left;">Debit (Dr)</th>
+                                        <th style="padding: 12px; border: 1px solid var(--border-default); text-align: left;">Invoice Date</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="viewInvoicesTableBody">
+                                    <tr>
+                                        <td colspan="5" style="padding: 12px; border: 1px solid var(--border-default); text-align: center; color: var(--subtext);">No invoices</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
-                    <div class="form-group col-6">
-                        <label>Credit Days</label>
-                        <div class="view-field" id="viewCreditDays"></div>
+                    
+                    <!-- Sub Accounts Section -->
+                    <div class="form-group col-12">
+                        <label>Sub Accounts</label>
+                        <div style="overflow-x: auto;">
+                            <table style="width: 100%; border-collapse: collapse; border: 1px solid var(--border-default);">
+                                <thead style="background: var(--surface-2);">
+                                    <tr>
+                                        <th style="padding: 12px; border: 1px solid var(--border-default); text-align: left; width: 80px;">S#</th>
+                                        <th style="padding: 12px; border: 1px solid var(--border-default); text-align: left;">Sub Account Name</th>
+                                        <th style="padding: 12px; border: 1px solid var(--border-default); text-align: left; width: 150px;">Debit (Dr)</th>
+                                        <th style="padding: 12px; border: 1px solid var(--border-default); text-align: left; width: 150px;">Credit (Cr)</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="viewSubAccountsTableBody">
+                                    <tr>
+                                        <td colspan="4" style="padding: 12px; border: 1px solid var(--border-default); text-align: center; color: var(--subtext);">No sub accounts</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
-                    <div class="form-group col-6">
-                        <label>Party Type</label>
-                        <div class="view-field" id="viewPartyType"></div>
-                    </div>
-                    <div class="form-group col-6">
-                        <label><i class="fas fa-project-diagram"></i> Project</label>
-                        <div class="view-field" id="viewProject"></div>
-                    </div>
+                    
                     <div class="form-group col-6">
                         <label>Current Balance</label>
                         <div class="view-field" id="viewCurrentBalance"></div>
+                    </div>
+                    <div class="form-group col-6">
+                        <label>Is Wholesaler</label>
+                        <div class="view-field" id="viewIsWholesaler"></div>
                     </div>
                     <div class="form-group col-6">
                         <label>Status</label>
@@ -456,7 +663,7 @@ $currency_symbol = $currency['symbol'] ?? '$';
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" id="viewCloseBtn">Close</button>
                 <button type="button" class="btn btn-primary" id="viewEditBtn">
-                    <i class="fas fa-edit"></i> Edit Supplier
+                    <i class="fas fa-edit"></i> Edit Customer
                 </button>
             </div>
         </div>
@@ -468,17 +675,18 @@ $currency_symbol = $currency['symbol'] ?? '$';
         </div>
         <div class="notification-content">
             <div class="notification-title" id="notificationTitle">Success</div>
-            <div class="notification-message" id="notificationMessage">Supplier deleted successfully!</div>
+            <div class="notification-message" id="notificationMessage">Customer deleted successfully!</div>
         </div>
         <button class="notification-close" id="notificationClose">
             <i class="fas fa-times"></i>
         </button>
     </div>
 
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
     <script>
         const currencySymbol = '<?php echo $currency_symbol; ?>';
     </script>
-    <script src="../../../assets/js/customer_supplier/suppliers/supplier-list.js?v=<?php echo time(); ?>"></script>
+    <script src="../../../assets/js/customer_supplier/customers/customer-list.js"></script>
 </body>
-
 </html>
