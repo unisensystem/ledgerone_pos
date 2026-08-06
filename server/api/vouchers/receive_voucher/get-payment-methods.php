@@ -17,13 +17,13 @@ if (!$user_id || !$tenant_id) {
 }
 
 try {
-   $stmt = $pdo->prepare("
-    SELECT id, name 
-    FROM accounts 
-    WHERE tenant_id = ? AND sub_account_id = 1
-    ORDER BY name
-");
-$stmt->execute([$tenant_id]);;
+    $stmt = $pdo->prepare("
+        SELECT id, name 
+        FROM accounts 
+        WHERE sub_account_id = 1
+        ORDER BY name
+    ");
+    $stmt->execute();
     $methods = $stmt->fetchAll(PDO::FETCH_ASSOC);
     
     echo json_encode(['success' => true, 'data' => $methods]);
