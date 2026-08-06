@@ -28,6 +28,8 @@ try {
     $status = $_GET['status'] ?? '';
     $company = $_GET['company'] ?? '';
     $balance = $_GET['balance'] ?? '';
+    // "Show All" mode — bypasses pagination entirely
+    $showAll = isset($_GET['show_all']) && ($_GET['show_all'] === '1' || $_GET['show_all'] === 'true');
     $page = max(1, (int) ($_GET['page'] ?? 1));
     $limit = min(100, max(10, (int) ($_GET['limit'] ?? 10)));
     $offset = ($page - 1) * $limit;
@@ -49,10 +51,11 @@ try {
         $params = array_merge($params, $assignedCompanies);
     }
 
+    // Broadened global search — matches against every relevant text field
     if ($search) {
-        $where[] = '(supplier_name LIKE ? OR supplier_code LIKE ? OR email LIKE ? OR primary_phone LIKE ?)';
+        $where[] = '(supplier_name LIKE ? OR supplier_code LIKE ? OR brand_name LIKE ? OR email LIKE ? OR primary_phone LIKE ? OR secondary_phone LIKE ? OR address LIKE ? OR city LIKE ? OR identity_card_no LIKE ?)';
         $searchTerm = '%' . $search . '%';
-        $params = array_merge($params, [$searchTerm, $searchTerm, $searchTerm, $searchTerm]);
+        $params = array_merge($params, array_fill(0, 9, $searchTerm));
     }
 
     if ($status === 'active') {
@@ -82,11 +85,12 @@ try {
     $stmt->execute($params);
     $total = $stmt->fetch()['total'];
 
-    // Get suppliers
-    $sql = "SELECT id, supplier_code, supplier_name, brand_name, primary_phone, email, current_balance, is_blacklisted, created_at 
+    // Get suppliers — includes address, city, credit_days, salesman_id for the list table
+    $limitClause = $showAll ? '' : "LIMIT $limit OFFSET $offset";
+    $sql = "SELECT id, supplier_code, supplier_name, brand_name, address, city, credit_days, salesman_id, primary_phone, email, current_balance, is_blacklisted, created_at 
             FROM suppliers $whereClause 
             ORDER BY created_at DESC 
-            LIMIT $limit OFFSET $offset";
+            $limitClause";
 
     $stmt = $pdo->prepare($sql);
     $stmt->execute($params);
@@ -118,10 +122,11 @@ try {
         'success' => true,
         'suppliers' => $suppliers,
         'pagination' => [
-            'page' => $page,
-            'limit' => $limit,
+            'page' => $showAll ? 1 : $page,
+            'limit' => $showAll ? (int) $total : $limit,
             'total' => (int) $total,
-            'pages' => ceil($total / $limit)
+            'pages' => $showAll ? 1 : (int) ceil($total / $limit),
+            'show_all' => $showAll
         ],
         'stats' => $stats
     ]);
