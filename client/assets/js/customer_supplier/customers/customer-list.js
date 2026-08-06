@@ -51,7 +51,9 @@ document.addEventListener('DOMContentLoaded', function () {
     function renderCustomers(customersToRender) {
         customersTable.innerHTML = '';
 
-        customersToRender.forEach(customer => {
+        const startSr = ((currentPage - 1) * (rowsPerPage === 'all' ? customersToRender.length : rowsPerPage)) + 1;
+
+        customersToRender.forEach((customer, index) => {
             const status = customer.is_blacklisted ? 'blacklisted' : 'active';
 
             const editBtn = userPermissions.includes('Edit') ? 
@@ -59,24 +61,49 @@ document.addEventListener('DOMContentLoaded', function () {
             const deleteBtn = userPermissions.includes('Delete') ? 
                 `<button class="action-btn delete" title="Delete Customer"><i class="fas fa-trash"></i></button>` : '';
 
+            const balance = parseFloat(customer.current_balance || 0);
+            const openingDebit = parseFloat(customer.opening_debit_amount || 0);
+            const openingCredit = parseFloat(customer.opening_credit_amount || 0);
+            const hasOpeningHistory = openingDebit > 0 || openingCredit > 0;
+
             const row = document.createElement('tr');
-            row.innerHTML = `
-                        <td><span class="customer-code">${customer.customer_code}</span></td>
-                        <td><span class="customer-name">${customer.customer_name}</span></td>
-                        <td>${customer.customer_group_name || '-'}</td>
-                        <td>${customer.customer_category_name || '-'}</td>
-                        <td>${customer.primary_phone || '-'}</td>
-                        <td><span class="status-badge status-${status}">${status.charAt(0).toUpperCase() + status.slice(1)}</span></td>
-                        <td>
-                            <div class="action-buttons">
-                                ${editBtn}
-                                ${deleteBtn}
-                                <button class="action-btn" title="View Details">
-                                    <i class="fas fa-eye"></i>
-                                </button>
-                            </div>
-                        </td>
-                    `;
+            row.dataset.id = customer.id;
+         row.innerHTML = `
+            <td>${startSr + index}</td>
+            <td><span class="customer-code">${customer.customer_code}</span></td>
+            <td><span class="customer-name">${customer.customer_name}</span></td>
+            <td>${customer.shop_name || '-'}</td>
+            <td>${customer.address || '-'}</td>
+            <td>${customer.customer_group_name || '-'}</td>
+            <td>${customer.customer_category_name || '-'}</td>
+            <td>${customer.city_name || '-'}</td>
+            <td>${customer.zone_name || '-'}</td>
+            <td>${customer.area_name || '-'}</td>
+            <td>${customer.primary_phone || '-'}</td>
+            <td>
+                <span class="balance-badge" ...>
+                    ${currencySymbol}${balance.toFixed(2)}
+                </span>
+            </td>
+            <td><span class="status-badge status-${status}">${status.charAt(0).toUpperCase() + status.slice(1)}</span></td>
+            <td>
+                <div class="action-buttons">
+                    ${editBtn}
+                    ${deleteBtn}
+                    <button class="action-btn" title="View Details">
+                        <i class="fas fa-eye"></i>
+                    </button>
+                </div>
+            </td>
+        `;
+
+            // Clicking the balance badge opens the same View modal (already shows
+            // opening balance invoices + sub accounts history)
+            const balanceBadge = row.querySelector('.balance-badge');
+            if (hasOpeningHistory) {
+                balanceBadge.addEventListener('click', () => openViewModal(customer.id));
+            }
+
             customersTable.appendChild(row);
         });
     }
@@ -256,6 +283,7 @@ document.addEventListener('DOMContentLoaded', function () {
     function populateViewModal(customer) {
         document.getElementById('viewCustomerCode').textContent = customer.customer_code;
         document.getElementById('viewCustomerName').textContent = customer.customer_name;
+        document.getElementById('viewShopName').textContent = customer.shop_name || '-';
         
         // Load and display customer type
         if (customer.customer_type_id) {
@@ -568,9 +596,8 @@ document.addEventListener('DOMContentLoaded', function () {
         if (!target) return;
 
         const row = target.closest('tr');
-        const customerCode = row.querySelector('.customer-code').textContent;
         const customerName = row.querySelector('.customer-name').textContent;
-        const customerId = customers.find(c => c.customer_code === customerCode)?.id;
+        const customerId = row.dataset.id;
 
         if (target.classList.contains('edit')) {
             if (!userPermissions.includes('Edit')) {
@@ -839,6 +866,7 @@ document.addEventListener('DOMContentLoaded', function () {
         
         document.getElementById('editCustomerCode').value = customer.customer_code;
         document.getElementById('editCustomerName').value = customer.customer_name;
+        document.getElementById('editShopName').value = customer.shop_name || '';
         
         // Set customer type
         setTimeout(() => {
@@ -1256,6 +1284,7 @@ document.addEventListener('DOMContentLoaded', function () {
             customerCategoryId: $('#editCustomerCategory').val() || null,
             brandId: $('#editBrandName').val() || null,
             customerName: document.getElementById('editCustomerName').value.trim(),
+            shopName: document.getElementById('editShopName').value.trim(),
             address: document.getElementById('editAddress').value.trim(),
             poBoxNo: document.getElementById('editPoBoxNo').value.trim(),
             primaryPhone: document.getElementById('editPrimaryPhone').value.trim(),
@@ -1374,15 +1403,3 @@ document.addEventListener('DOMContentLoaded', function () {
             });
     }
 });
-
-    
-    // Customer Types Management
-    const typesModal = document.getElementById('typesModal');
-    const typesModalClose = document.getElementById('typesModalClose');
-    const typesCloseBtn = document.getElementById('typesCloseBtn');
-    const manageTypesBtn = document.getElementById('manageTypesBtn');
-    const addTypeBtn = document.getElementById('addTypeBtn');
-    const typesTableBody = document.getElementById('typesTableBody');
-    
-    const typeFormModal = document.getElementById('typeFormModal');
-    const typeFormModalClose = document.getElementById('typeFormModalClose');
