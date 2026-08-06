@@ -133,11 +133,18 @@ $currency_symbol = $currency['symbol'] ?? '$';
                 <table>
                     <thead>
                         <tr>
+                            <th>Sr#</th>
                             <th>Customer Code</th>
                             <th>Customer Name</th>
-                            <th>Customer Group</th>
-                            <th>Customer Category</th>
+                            <th>Shopkeeper Name</th>
+                            <th>Address</th>
+                            <th>Group</th>
+                            <th>Category</th>
+                            <th>City</th>
+                            <th>Zone</th>
+                            <th>Area</th>
                             <th>Phone</th>
+                            <th>Opening Balance</th>
                             <th>Status</th>
                             <th>Actions</th>
                         </tr>
@@ -202,9 +209,13 @@ $currency_symbol = $currency['symbol'] ?? '$';
                                 <option value="">Select Brand</option>
                             </select>
                         </div>
-                        <div class="form-group col-12">
+                        <div class="form-group col-6">
                             <label class="required">Customer Name</label>
                             <input type="text" id="editCustomerName" required>
+                        </div>
+                        <div class="form-group col-6">
+                            <label>Shopkeeper Name</label>
+                            <input type="text" id="editShopName">
                         </div>
                         <div class="form-group col-6">
                             <div class="checkbox-group">
@@ -472,6 +483,10 @@ $currency_symbol = $currency['symbol'] ?? '$';
                     <div class="form-group col-4">
                         <label>Brand Name</label>
                         <div class="view-field" id="viewBrandName"></div>
+                    </div>
+                    <div class="form-group col-4">
+                        <label>Shopkeeper Name</label>
+                        <div class="view-field" id="viewShopName"></div>
                     </div>
                     <div class="form-group col-8">
                         <label>Customer Name</label>
