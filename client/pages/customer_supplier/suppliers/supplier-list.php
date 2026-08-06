@@ -45,6 +45,8 @@ $currency_symbol = $currency['symbol'] ?? '$';
         .edit-assoc-company-chip { display:inline-flex; align-items:center; gap:4px; background:var(--success,#2fbf71); color:#fff; border-radius:999px; padding:2px 10px; font-size:13px; }
         .edit-assoc-company-chip .chip-remove { cursor:pointer; font-size:16px; line-height:1; opacity:.8; }
         .edit-assoc-company-chip .chip-remove:hover { opacity:1; }
+        .show-all-toggle { display:flex; align-items:center; gap:6px; font-size:14px; color:var(--body,#374151); cursor:pointer; padding:0 8px; }
+        .show-all-toggle input { cursor:pointer; }
     </style>
 </head>
 
@@ -96,7 +98,7 @@ $currency_symbol = $currency['symbol'] ?? '$';
             <div class="filters-bar">
                 <div class="search-box">
                     <i class="fas fa-search"></i>
-                    <input type="text" id="searchInput" placeholder="Search suppliers...">
+                    <input type="text" id="searchInput" placeholder="Search suppliers (name, code, phone, address, city...)">
                 </div>
                 <div class="filter-options">
                     <select class="filter-select" id="companyFilter">
@@ -107,6 +109,10 @@ $currency_symbol = $currency['symbol'] ?? '$';
                         <option value="active">Active</option>
                         <option value="blacklisted">Blacklisted</option>
                     </select>
+                    <label class="show-all-toggle" for="showAllToggle">
+                        <input type="checkbox" id="showAllToggle">
+                        Show All
+                    </label>
                     <div class="dropdown">
                         <button class="btn btn-secondary" id="exportBtn">
                             <i class="fas fa-download"></i>
@@ -132,10 +138,16 @@ $currency_symbol = $currency['symbol'] ?? '$';
                 <table>
                     <thead>
                         <tr>
+                            <th>Sr#</th>
                             <th>Supplier Code</th>
                             <th>Brand Name</th>
                             <th>Supplier Name</th>
+                            <th>Address</th>
+                            <th>City</th>
                             <th>Phone</th>
+                            <th>Credit Days</th>
+                            <th>Balance</th>
+                            <th>Salesman</th>
                             <th>Status</th>
                             <th>Actions</th>
                         </tr>
@@ -212,6 +224,12 @@ $currency_symbol = $currency['symbol'] ?? '$';
                             <label>Address</label>
                             <textarea id="editAddress"></textarea>
                         </div>
+                     <div class="form-group col-6" style="position:relative;">
+    <label>City</label>
+    <input type="text" id="editCitySearch" autocomplete="off" maxlength="255" placeholder="Search city...">
+    <input type="hidden" id="editCity" value="">
+    <div id="editCityDropdown" style="display:none;position:fixed;z-index:99999;background:var(--surface-1,#fff);border:1px solid var(--border-default,#ccc);border-radius:8px;max-height:200px;overflow-y:auto;box-shadow:0 4px 12px rgba(0,0,0,.15);"></div>
+</div>
                         <div class="form-group col-6">
                             <label>Primary Phone</label>
                             <input type="text" id="editPrimaryPhone" maxlength="15">
@@ -239,6 +257,10 @@ $currency_symbol = $currency['symbol'] ?? '$';
                         <div class="form-group col-6">
                             <label>AIT %</label>
                             <input type="number" id="editAitPercent" step="0.01" min="0" max="100">
+                        </div>
+                        <div class="form-group col-6">
+                            <label>Credit Days</label>
+                            <input type="number" id="editCreditDays" step="1" min="0">
                         </div>
                         <div class="form-group col-6">
                             <label><i class="fas fa-building"></i> Party Type</label>
@@ -370,6 +392,10 @@ $currency_symbol = $currency['symbol'] ?? '$';
                         <div class="view-field" id="viewAddress"></div>
                     </div>
                     <div class="form-group col-6">
+                        <label>City</label>
+                        <div class="view-field" id="viewCity"></div>
+                    </div>
+                    <div class="form-group col-6">
                         <label>Primary Phone</label>
                         <div class="view-field" id="viewPrimaryPhone"></div>
                     </div>
@@ -396,6 +422,10 @@ $currency_symbol = $currency['symbol'] ?? '$';
                     <div class="form-group col-6">
                         <label>AIT %</label>
                         <div class="view-field" id="viewAitPercent"></div>
+                    </div>
+                    <div class="form-group col-6">
+                        <label>Credit Days</label>
+                        <div class="view-field" id="viewCreditDays"></div>
                     </div>
                     <div class="form-group col-6">
                         <label>Party Type</label>
