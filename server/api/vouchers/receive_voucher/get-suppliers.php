@@ -17,40 +17,29 @@ if (!$user_id || !$tenant_id) {
 }
 
 try {
-    // Get company IDs this user has access to (within current tenant)
-    $companyStmt = $pdo->prepare("
-        SELECT company_id
-        FROM user_companies
-        WHERE user_id = ? AND tenant_id = ?
-    ");
+    // Restrict to companies this user is assigned to, if they have any assignments
+    $companyStmt = $pdo->prepare("SELECT company_id FROM user_companies WHERE user_id = ? AND tenant_id = ?");
     $companyStmt->execute([$user_id, $tenant_id]);
     $companyIds = $companyStmt->fetchAll(PDO::FETCH_COLUMN);
 
-    if (empty($companyIds)) {
-        echo json_encode([
-            'success' => true,
-            'data' => [],
-            'debug' => ['user_id' => $user_id, 'tenant_id' => $tenant_id, 'companyIds' => $companyIds]
-        ]);
-        exit();
+    $where = "tenant_id = ? AND status = 'ACTIVE'";
+    $params = [$tenant_id];
+    if (!empty($companyIds)) {
+        $placeholders = implode(',', array_fill(0, count($companyIds), '?'));
+        $where .= " AND company_id IN ($placeholders)";
+        $params = array_merge($params, $companyIds);
     }
-
-    $placeholders = implode(',', array_fill(0, count($companyIds), '?'));
 
     $stmt = $pdo->prepare("
         SELECT customer_code, customer_name, id
-        FROM customers 
-        WHERE tenant_id = ? AND status = 'ACTIVE' AND company_id IN ($placeholders)
+        FROM customers
+        WHERE $where
         ORDER BY customer_name
     ");
-    $stmt->execute(array_merge([$tenant_id], $companyIds));
+    $stmt->execute($params);
     $customers = $stmt->fetchAll(PDO::FETCH_ASSOC);
-    
-    echo json_encode([
-        'success' => true,
-        'data' => $customers,
-        'debug' => ['user_id' => $user_id, 'tenant_id' => $tenant_id, 'companyIds' => $companyIds]
-    ]);
+
+    echo json_encode(['success' => true, 'data' => $customers]);
 } catch (Exception $e) {
     http_response_code(500);
     echo json_encode(['error' => 'Database error']);

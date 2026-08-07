@@ -7,3 +7,6 @@ server/api/auth/register.php
 server/api/auth/checkout.php
 client/assets/js/dashboard/dashboard-loader.js
 .env
+
+# Local browser-automation test artifacts
+.playwright-mcp/
