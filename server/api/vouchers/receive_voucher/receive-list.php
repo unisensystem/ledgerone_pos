@@ -17,6 +17,28 @@ if (!$user_id || !$tenant_id) {
 }
 
 try {
+    // Get company IDs this user has access to (within current tenant)
+    $companyStmt = $pdo->prepare("
+        SELECT company_id
+        FROM user_companies
+        WHERE user_id = ? AND tenant_id = ?
+    ");
+    $companyStmt->execute([$user_id, $tenant_id]);
+    $allowedCompanyIds = $companyStmt->fetchAll(PDO::FETCH_COLUMN);
+
+    if (empty($allowedCompanyIds)) {
+        echo json_encode([
+            'success' => true,
+            'data' => [],
+            'summary' => ['grand_total' => 0, 'by_payment_method' => []],
+            'pagination' => [
+                'current_page' => 1, 'total_pages' => 0, 'total_records' => 0,
+                'limit' => 10, 'has_next' => false, 'has_prev' => false
+            ]
+        ]);
+        exit();
+    }
+
     // Get pagination parameters
     $page = isset($_GET['page']) ? max(1, intval($_GET['page'])) : 1;
     $limit = isset($_GET['limit']) ? max(1, min(100, intval($_GET['limit']))) : 10;
@@ -39,11 +61,10 @@ try {
     $where = ['rv.tenant_id = ?'];
     $params = [$tenant_id];
 
-    if (!empty($allowedCompanyIds)) {
-        $companyPlaceholders = implode(',', array_fill(0, count($allowedCompanyIds), '?'));
-        $where[] = "rv.company_id IN ($companyPlaceholders)";
-        $params = array_merge($params, $allowedCompanyIds);
-    }
+    // Always restrict to companies the user has access to
+    $companyPlaceholders = implode(',', array_fill(0, count($allowedCompanyIds), '?'));
+    $where[] = "rv.company_id IN ($companyPlaceholders)";
+    $params = array_merge($params, $allowedCompanyIds);
 
     if ($date_from) {
         $where[] = 'rv.voucher_date >= ?';
@@ -68,7 +89,7 @@ try {
     // company_id filter param must be one the user is actually allowed to see
     $company_id = $_GET['company_id'] ?? '';
     if ($company_id) {
-        if (!empty($allowedCompanyIds) && !in_array($company_id, $allowedCompanyIds)) {
+        if (!in_array($company_id, $allowedCompanyIds)) {
             echo json_encode([
                 'success' => true,
                 'data' => [],

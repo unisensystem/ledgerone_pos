@@ -25,8 +25,9 @@ try {
     $where = 'tenant_id = ? AND is_active = 1';
     $params = [$tenant_id];
     if (!empty($companyIds)) {
+        // Bank accounts with no company_id are shared/tenant-wide accounts, visible to everyone
         $placeholders = implode(',', array_fill(0, count($companyIds), '?'));
-        $where .= " AND company_id IN ($placeholders)";
+        $where .= " AND (company_id IS NULL OR company_id IN ($placeholders))";
         $params = array_merge($params, $companyIds);
     }
 

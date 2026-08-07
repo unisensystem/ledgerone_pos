@@ -34,13 +34,13 @@ try {
     $placeholders = implode(',', array_fill(0, count($companyIds), '?'));
 
     $stmt = $pdo->prepare("
-        SELECT id, bank_name, account_number 
-        FROM bank_accounts 
-        WHERE tenant_id = ? AND is_active = 1 AND company_id IN ($placeholders)
+        SELECT id, bank_name, account_number
+        FROM bank_accounts
+        WHERE tenant_id = ? AND is_active = 1 AND (company_id IS NULL OR company_id IN ($placeholders))
     ");
     $stmt->execute(array_merge([$tenant_id], $companyIds));
     $bankAccounts = $stmt->fetchAll(PDO::FETCH_ASSOC);
-    
+
     echo json_encode(['success' => true, 'data' => $bankAccounts]);
 } catch (Exception $e) {
     http_response_code(500);
