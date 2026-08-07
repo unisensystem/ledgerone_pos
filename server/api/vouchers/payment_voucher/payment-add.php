@@ -133,21 +133,21 @@ try {
         $attachment = $finalFileName;
     }
 
-    // Get supplier/customer ID from code, restricted to the submitted (authorized) company
+    // Get supplier/customer ID from code
     if ($payment_type === 'customer') {
-        $stmt = $pdo->prepare("SELECT id FROM customers WHERE tenant_id = ? AND customer_code = ? AND company_id = ?");
-        $stmt->execute([$tenant_id, $supplier_code, $company_id]);
+        $stmt = $pdo->prepare("SELECT id FROM customers WHERE tenant_id = ? AND customer_code = ?");
+        $stmt->execute([$tenant_id, $supplier_code]);
         $entity = $stmt->fetch(PDO::FETCH_ASSOC);
-        
+
         if (!$entity) {
             echo json_encode(['success' => false, 'error' => 'Customer not found']);
             exit();
         }
     } else {
-        $stmt = $pdo->prepare("SELECT id FROM suppliers WHERE tenant_id = ? AND supplier_code = ? AND company_id = ?");
-        $stmt->execute([$tenant_id, $supplier_code, $company_id]);
+        $stmt = $pdo->prepare("SELECT id FROM suppliers WHERE tenant_id = ? AND supplier_code = ?");
+        $stmt->execute([$tenant_id, $supplier_code]);
         $entity = $stmt->fetch(PDO::FETCH_ASSOC);
-        
+
         if (!$entity) {
             echo json_encode(['success' => false, 'error' => 'Supplier not found']);
             exit();

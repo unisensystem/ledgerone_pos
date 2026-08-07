@@ -48,10 +48,10 @@ try {
         exit();
     }
 
-    // If a vendor is specified, verify it belongs to the submitted company
+    // If a vendor is specified, verify it exists
     if ($vendor_id) {
-        $vendorCheck = $pdo->prepare("SELECT id FROM suppliers WHERE id = ? AND tenant_id = ? AND company_id = ?");
-        $vendorCheck->execute([$vendor_id, $tenant_id, $company_id]);
+        $vendorCheck = $pdo->prepare("SELECT id FROM suppliers WHERE id = ? AND tenant_id = ?");
+        $vendorCheck->execute([$vendor_id, $tenant_id]);
         if (!$vendorCheck->fetch()) {
             http_response_code(400);
             echo json_encode(['error' => 'Vendor not found']);
