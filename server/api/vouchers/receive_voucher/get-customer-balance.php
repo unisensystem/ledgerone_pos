@@ -24,29 +24,13 @@ if (!$customer_code) {
 }
 
 try {
-    // Get company IDs this user has access to (within current tenant)
-    $companyStmt = $pdo->prepare("
-        SELECT company_id
-        FROM user_companies
-        WHERE user_id = ? AND tenant_id = ?
-    ");
-    $companyStmt->execute([$user_id, $tenant_id]);
-    $companyIds = $companyStmt->fetchAll(PDO::FETCH_COLUMN);
-
-    if (empty($companyIds)) {
-        echo json_encode(['success' => true, 'balance' => 0]);
-        exit();
-    }
-
-    $placeholders = implode(',', array_fill(0, count($companyIds), '?'));
-
-    // Get customer ID, restricted to user's assigned companies
+    // Get customer ID
     $stmt = $pdo->prepare("
-        SELECT id, opening_debit_amount, opening_credit_amount 
-        FROM customers 
-        WHERE tenant_id = ? AND customer_code = ? AND company_id IN ($placeholders)
+        SELECT id, opening_debit_amount, opening_credit_amount
+        FROM customers
+        WHERE tenant_id = ? AND customer_code = ?
     ");
-    $stmt->execute(array_merge([$tenant_id, $customer_code], $companyIds));
+    $stmt->execute([$tenant_id, $customer_code]);
     $customer = $stmt->fetch(PDO::FETCH_ASSOC);
     
     if (!$customer) {

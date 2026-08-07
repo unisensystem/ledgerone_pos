@@ -17,28 +17,6 @@ if (!$user_id || !$tenant_id) {
 }
 
 try {
-    // Get company IDs this user has access to (within current tenant)
-    $companyStmt = $pdo->prepare("
-        SELECT company_id
-        FROM user_companies
-        WHERE user_id = ? AND tenant_id = ?
-    ");
-    $companyStmt->execute([$user_id, $tenant_id]);
-    $allowedCompanyIds = $companyStmt->fetchAll(PDO::FETCH_COLUMN);
-
-    if (empty($allowedCompanyIds)) {
-        echo json_encode([
-            'success' => true,
-            'data' => [],
-            'summary' => ['grand_total' => 0, 'by_payment_method' => []],
-            'pagination' => [
-                'current_page' => 1, 'total_pages' => 0, 'total_records' => 0,
-                'limit' => 10, 'has_next' => false, 'has_prev' => false
-            ]
-        ]);
-        exit();
-    }
-
     // Get payment type parameter
     $payment_type = $_GET['payment_type'] ?? 'supplier';
     
@@ -56,29 +34,10 @@ try {
     $company_id = $_GET['company_id'] ?? '';
     $project_id = $_GET['project_id'] ?? '';
 
-    // company_id filter param must be one the user is actually allowed to see
-    if ($company_id && !in_array($company_id, $allowedCompanyIds)) {
-        echo json_encode([
-            'success' => true,
-            'data' => [],
-            'summary' => ['grand_total' => 0, 'by_payment_method' => []],
-            'pagination' => [
-                'current_page' => 1, 'total_pages' => 0, 'total_records' => 0,
-                'limit' => $limit, 'has_next' => false, 'has_prev' => false
-            ]
-        ]);
-        exit();
-    }
-    
     // Build WHERE clause
     $whereConditions = [];
     $params = [$tenant_id];
 
-    // Always restrict to companies the user has access to
-    $companyPlaceholders = implode(',', array_fill(0, count($allowedCompanyIds), '?'));
-    $whereConditions[] = "pv.company_id IN ($companyPlaceholders)";
-    $params = array_merge($params, $allowedCompanyIds);
-    
     // Build query based on payment type
     if ($payment_type === 'customer') {
         $whereConditions[] = 'pv.customer_id IS NOT NULL';

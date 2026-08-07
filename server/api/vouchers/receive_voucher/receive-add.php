@@ -27,20 +27,6 @@ error_log('POST data: ' . print_r($_POST, true));
 error_log('Recovery officer: ' . ($_POST['recovery_officer'] ?? 'NOT SET'));
 
 try {
-    // Get company IDs this user has access to (within current tenant)
-    $companyStmt = $pdo->prepare("
-        SELECT company_id
-        FROM user_companies
-        WHERE user_id = ? AND tenant_id = ?
-    ");
-    $companyStmt->execute([$user_id, $tenant_id]);
-    $allowedCompanyIds = $companyStmt->fetchAll(PDO::FETCH_COLUMN);
-
-    if (empty($allowedCompanyIds)) {
-        echo json_encode(['success' => false, 'error' => 'No company assigned to your account']);
-        exit();
-    }
-
     // Get form data
     $voucher_date = $_POST['voucher_date'] ?? '';
     $customer_code = $_POST['customer_code'] ?? '';
@@ -63,15 +49,13 @@ try {
     $recovery_officer_id = (!empty($_POST['recovery_officer']) && $_POST['recovery_officer'] !== 'null') ? $_POST['recovery_officer'] : null;
     $against_pdc_id = (!empty($_POST['against_pdc_id']) && $_POST['against_pdc_id'] !== 'null') ? intval($_POST['against_pdc_id']) : null;
 
-    // Look up the customer within ANY company the user has access to — do NOT require
-    // the form's selected Company to match the customer's actual company.
+    // Look up the customer by customer_code within the tenant.
     // The customer's own company_id is the source of truth and is used for the voucher.
-    $placeholders = implode(',', array_fill(0, count($allowedCompanyIds), '?'));
     $stmt = $pdo->prepare("
-        SELECT id, company_id FROM customers 
-        WHERE tenant_id = ? AND customer_code = ? AND company_id IN ($placeholders)
+        SELECT id, company_id FROM customers
+        WHERE tenant_id = ? AND customer_code = ?
     ");
-    $stmt->execute(array_merge([$tenant_id, $customer_code], $allowedCompanyIds));
+    $stmt->execute([$tenant_id, $customer_code]);
     $customer = $stmt->fetch(PDO::FETCH_ASSOC);
 
     if (!$customer) {

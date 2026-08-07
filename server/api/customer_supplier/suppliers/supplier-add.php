@@ -36,9 +36,9 @@ try {
     
     $pdo->beginTransaction();
 
-    // Generate supplier code per-company with lock to prevent duplicates
-    $stmt = $pdo->prepare("SELECT supplier_code FROM suppliers WHERE tenant_id = ? AND company_id = ? ORDER BY id DESC LIMIT 1 FOR UPDATE");
-    $stmt->execute([$tenant_id, (int)$input['companyId']]);
+    // Generate supplier code tenant-wide with lock to prevent duplicates
+    $stmt = $pdo->prepare("SELECT supplier_code FROM suppliers WHERE tenant_id = ? ORDER BY id DESC LIMIT 1 FOR UPDATE");
+    $stmt->execute([$tenant_id]);
     $lastSupplier = $stmt->fetch();
 
     if ($lastSupplier) {

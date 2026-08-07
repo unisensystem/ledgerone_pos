@@ -35,20 +35,10 @@ try {
     $status      = isset($_GET['status'])      && $_GET['status']      !== '' ? $_GET['status']            : null;
     $supplier_invoice_no = isset($_GET['supplier_invoice_no']) && $_GET['supplier_invoice_no'] !== '' ? trim($_GET['supplier_invoice_no']) : null;
 
-    // user_companies filter
-    $ucStmt = $pdo->prepare("SELECT company_id FROM user_companies WHERE user_id = ? AND tenant_id = ?");
-    $ucStmt->execute([$user_id, $tenant_id]);
-    $userCompanyIds = $ucStmt->fetchAll(PDO::FETCH_COLUMN);
-
     // Build WHERE
     $where  = "pi.tenant_id = ? AND (pi.is_tax = 0 OR pi.is_tax IS NULL)";
     $params = [$tenant_id];
 
-    if (!empty($userCompanyIds)) {
-        $ph = implode(',', array_fill(0, count($userCompanyIds), '?'));
-        $where .= " AND pi.company_id IN ($ph)";
-        $params = array_merge($params, $userCompanyIds);
-    }
     if ($company_id) {
         $where .= " AND pi.company_id = ?";
         $params[] = $company_id;

@@ -17,18 +17,8 @@ if (!$tenant_id || !$user_id) {
 }
 
 try {
-    $ucStmt = $pdo->prepare("SELECT company_id FROM user_companies WHERE user_id = ?");
-    $ucStmt->execute([$user_id]);
-    $userCompanyIds = $ucStmt->fetchAll(PDO::FETCH_COLUMN);
-
-    if (!empty($userCompanyIds)) {
-        $placeholders = implode(',', array_fill(0, count($userCompanyIds), '?'));
-        $stmt = $pdo->prepare("SELECT id, company_code, company_name FROM companies WHERE tenant_id = ? AND is_active = 1 AND id IN ($placeholders) ORDER BY company_name");
-        $stmt->execute(array_merge([$tenant_id], $userCompanyIds));
-    } else {
-        $stmt = $pdo->prepare("SELECT id, company_code, company_name FROM companies WHERE tenant_id = ? AND is_active = 1 ORDER BY company_name");
-        $stmt->execute([$tenant_id]);
-    }
+    $stmt = $pdo->prepare("SELECT id, company_code, company_name FROM companies WHERE tenant_id = ? AND is_active = 1 ORDER BY company_name");
+    $stmt->execute([$tenant_id]);
     $companies = $stmt->fetchAll(PDO::FETCH_ASSOC);
     
     echo json_encode(['success' => true, 'companies' => $companies]);

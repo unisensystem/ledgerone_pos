@@ -48,15 +48,9 @@ try {
 
     $pdo->beginTransaction();
 
-    // Generate sequential bill number per company
-    $companyIdForBill = isset($input['companyId']) ? (int)$input['companyId'] : null;
-    if ($companyIdForBill) {
-        $billStmt = $pdo->prepare("SELECT MAX(CAST(SUBSTRING(bill_no, 5) AS UNSIGNED)) FROM sale_invoice WHERE tenant_id = ? AND company_id = ? AND bill_no LIKE 'SAL-%'");
-        $billStmt->execute([$tenant_id, $companyIdForBill]);
-    } else {
-        $billStmt = $pdo->prepare("SELECT MAX(CAST(SUBSTRING(bill_no, 5) AS UNSIGNED)) FROM sale_invoice WHERE tenant_id = ? AND bill_no LIKE 'SAL-%'");
-        $billStmt->execute([$tenant_id]);
-    }
+    // Generate sequential bill number tenant-wide
+    $billStmt = $pdo->prepare("SELECT MAX(CAST(SUBSTRING(bill_no, 5) AS UNSIGNED)) FROM sale_invoice WHERE tenant_id = ? AND bill_no LIKE 'SAL-%'");
+    $billStmt->execute([$tenant_id]);
     $lastNumber = (int) $billStmt->fetchColumn();
     $billNo = 'SAL-' . str_pad($lastNumber + 1, 4, '0', STR_PAD_LEFT);
 

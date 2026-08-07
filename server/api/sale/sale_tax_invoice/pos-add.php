@@ -49,15 +49,9 @@ try {
 
     $pdo->beginTransaction();
 
-    // Generate sequential bill number — company-wise
-    $companyId = $input['companyId'] ?? null;
-    if ($companyId) {
-        $billStmt = $pdo->prepare("SELECT bill_no FROM sale_invoice WHERE tenant_id = ? AND company_id = ? ORDER BY id DESC LIMIT 1");
-        $billStmt->execute([$tenant_id, $companyId]);
-    } else {
-        $billStmt = $pdo->prepare("SELECT bill_no FROM sale_invoice WHERE tenant_id = ? ORDER BY id DESC LIMIT 1");
-        $billStmt->execute([$tenant_id]);
-    }
+    // Generate sequential bill number — tenant-wide
+    $billStmt = $pdo->prepare("SELECT bill_no FROM sale_invoice WHERE tenant_id = ? ORDER BY id DESC LIMIT 1");
+    $billStmt->execute([$tenant_id]);
     $lastBill = $billStmt->fetchColumn();
 
     if ($lastBill) {

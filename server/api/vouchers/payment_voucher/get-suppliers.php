@@ -17,29 +17,13 @@ if (!$user_id || !$tenant_id) {
 }
 
 try {
-    // Get company IDs this user has access to (within current tenant)
-    $companyStmt = $pdo->prepare("
-        SELECT company_id
-        FROM user_companies
-        WHERE user_id = ? AND tenant_id = ?
-    ");
-    $companyStmt->execute([$user_id, $tenant_id]);
-    $companyIds = $companyStmt->fetchAll(PDO::FETCH_COLUMN);
-
-    if (empty($companyIds)) {
-        echo json_encode(['success' => true, 'data' => []]);
-        exit();
-    }
-
-    $placeholders = implode(',', array_fill(0, count($companyIds), '?'));
-
     $stmt = $pdo->prepare("
-        SELECT supplier_code, supplier_name 
-        FROM suppliers 
-        WHERE tenant_id = ? AND status = 'ACTIVE' AND company_id IN ($placeholders)
+        SELECT supplier_code, supplier_name
+        FROM suppliers
+        WHERE tenant_id = ? AND status = 'ACTIVE'
         ORDER BY supplier_name
     ");
-    $stmt->execute(array_merge([$tenant_id], $companyIds));
+    $stmt->execute([$tenant_id]);
     $suppliers = $stmt->fetchAll(PDO::FETCH_ASSOC);
     
     echo json_encode(['success' => true, 'data' => $suppliers]);

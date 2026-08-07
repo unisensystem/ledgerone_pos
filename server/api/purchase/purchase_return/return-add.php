@@ -43,14 +43,9 @@ try {
     
     $pdo->beginTransaction();
     
-    // Generate sequential bill number — company-wise
-    $companyId = $input['companyId'] ?? null;
-    $billSql = "SELECT bill_no FROM purchase_return WHERE tenant_id = ?";
-    $billParams = [$tenant_id];
-    if ($companyId) { $billSql .= " AND company_id = ?"; $billParams[] = $companyId; }
-    $billSql .= " ORDER BY id DESC LIMIT 1";
-    $billStmt = $pdo->prepare($billSql);
-    $billStmt->execute($billParams);
+    // Generate sequential bill number — tenant-wide
+    $billStmt = $pdo->prepare("SELECT bill_no FROM purchase_return WHERE tenant_id = ? ORDER BY id DESC LIMIT 1");
+    $billStmt->execute([$tenant_id]);
     $lastBill = $billStmt->fetchColumn();
 
     if ($lastBill && preg_match('/PRN-0*(\d+)$/', $lastBill, $m)) {

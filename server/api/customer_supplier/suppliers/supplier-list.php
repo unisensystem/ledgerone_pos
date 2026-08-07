@@ -38,19 +38,6 @@ try {
     $where = ['tenant_id = ?'];
     $params = [$tenant_id];
 
-    // Filter by user's assigned companies
-    $assignedCompanies = [];
-    try {
-        $stmtUC = $pdo->prepare("SELECT company_id FROM user_companies WHERE tenant_id = ? AND user_id = ?");
-        $stmtUC->execute([$tenant_id, $user_id]);
-        $assignedCompanies = $stmtUC->fetchAll(PDO::FETCH_COLUMN);
-    } catch (Exception $e) { /* table may not exist yet; show all */ }
-    if (!empty($assignedCompanies)) {
-        $ph = implode(',', array_fill(0, count($assignedCompanies), '?'));
-        $where[] = "company_id IN ($ph)";
-        $params = array_merge($params, $assignedCompanies);
-    }
-
     // Broadened global search — matches against every relevant text field
     if ($search) {
         $where[] = '(supplier_name LIKE ? OR supplier_code LIKE ? OR brand_name LIKE ? OR email LIKE ? OR primary_phone LIKE ? OR secondary_phone LIKE ? OR address LIKE ? OR city LIKE ? OR identity_card_no LIKE ?)';

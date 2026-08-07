@@ -12,16 +12,10 @@ if (!$tenant_id || !$user_id) {
     exit;
 }
 
-$company_id = $_GET['company_id'] ?? null;
-if (!$company_id) {
-    echo json_encode(['success' => false, 'message' => 'company_id is required']);
-    exit;
-}
-
 try {
-    // Get last customer_code for this specific company under this tenant
-    $stmt = $pdo->prepare("SELECT customer_code FROM customers WHERE tenant_id = ? AND company_id = ? ORDER BY id DESC LIMIT 1");
-    $stmt->execute([$tenant_id, (int)$company_id]);
+    // Get last customer_code for this tenant
+    $stmt = $pdo->prepare("SELECT customer_code FROM customers WHERE tenant_id = ? ORDER BY id DESC LIMIT 1");
+    $stmt->execute([$tenant_id]);
     $last = $stmt->fetch();
 
     if ($last) {

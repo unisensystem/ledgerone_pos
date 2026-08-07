@@ -17,29 +17,13 @@ if (!$user_id || !$tenant_id) {
 }
 
 try {
-    // Get company IDs this user has access to (within current tenant)
-    $companyStmt = $pdo->prepare("
-        SELECT company_id
-        FROM user_companies
-        WHERE user_id = ? AND tenant_id = ?
-    ");
-    $companyStmt->execute([$user_id, $tenant_id]);
-    $companyIds = $companyStmt->fetchAll(PDO::FETCH_COLUMN);
-
-    if (empty($companyIds)) {
-        echo json_encode(['success' => true, 'data' => []]);
-        exit();
-    }
-
-    // Bank accounts with no company_id are shared/tenant-wide accounts, visible to everyone
-    $placeholders = implode(',', array_fill(0, count($companyIds), '?'));
     $stmt = $pdo->prepare("
         SELECT id, bank_name, account_number
         FROM bank_accounts
-        WHERE tenant_id = ? AND is_active = 1 AND (company_id IS NULL OR company_id IN ($placeholders))
+        WHERE tenant_id = ? AND is_active = 1
         ORDER BY bank_name
     ");
-    $stmt->execute(array_merge([$tenant_id], $companyIds));
+    $stmt->execute([$tenant_id]);
     $accounts = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
     echo json_encode(['success' => true, 'data' => $accounts]);

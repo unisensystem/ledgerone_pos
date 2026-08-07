@@ -14,15 +14,8 @@ if (!$tenant_id) {
 }
 
 try {
-    $company_id = isset($_GET['company_id']) && $_GET['company_id'] !== '' ? (int)$_GET['company_id'] : null;
-
-    if ($company_id) {
-        $billStmt = $pdo->prepare("SELECT MAX(CAST(SUBSTRING(bill_no, 5) AS UNSIGNED)) FROM purchase_invoice WHERE tenant_id = ? AND company_id = ? AND bill_no LIKE 'PUR-%'");
-        $billStmt->execute([$tenant_id, $company_id]);
-    } else {
-        $billStmt = $pdo->prepare("SELECT MAX(CAST(SUBSTRING(bill_no, 5) AS UNSIGNED)) FROM purchase_invoice WHERE tenant_id = ? AND bill_no LIKE 'PUR-%'");
-        $billStmt->execute([$tenant_id]);
-    }
+    $billStmt = $pdo->prepare("SELECT MAX(CAST(SUBSTRING(bill_no, 5) AS UNSIGNED)) FROM purchase_invoice WHERE tenant_id = ? AND bill_no LIKE 'PUR-%'");
+    $billStmt->execute([$tenant_id]);
     $lastNumber = (int)$billStmt->fetchColumn();
     $billNo = 'PUR-' . str_pad($lastNumber + 1, 4, '0', STR_PAD_LEFT);
 

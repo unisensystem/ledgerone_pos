@@ -54,15 +54,9 @@ try {
 
     $pdo->beginTransaction();
 
-    // Generate bill_no per company inside transaction
-    $dupCompanyId = $invoice['company_id'] ?? null;
-    if ($dupCompanyId) {
-        $billStmt = $pdo->prepare("SELECT MAX(CAST(SUBSTRING(bill_no, 5) AS UNSIGNED)) FROM purchase_invoice WHERE tenant_id = ? AND company_id = ? AND bill_no LIKE 'PUR-%' FOR UPDATE");
-        $billStmt->execute([$tenant_id, $dupCompanyId]);
-    } else {
-        $billStmt = $pdo->prepare("SELECT MAX(CAST(SUBSTRING(bill_no, 5) AS UNSIGNED)) FROM purchase_invoice WHERE tenant_id = ? AND bill_no LIKE 'PUR-%' FOR UPDATE");
-        $billStmt->execute([$tenant_id]);
-    }
+    // Generate bill_no tenant-wide inside transaction
+    $billStmt = $pdo->prepare("SELECT MAX(CAST(SUBSTRING(bill_no, 5) AS UNSIGNED)) FROM purchase_invoice WHERE tenant_id = ? AND bill_no LIKE 'PUR-%' FOR UPDATE");
+    $billStmt->execute([$tenant_id]);
     $lastNumber = (int)$billStmt->fetchColumn();
     $new_bill_no = 'PUR-' . str_pad($lastNumber + 1, 4, '0', STR_PAD_LEFT);
 

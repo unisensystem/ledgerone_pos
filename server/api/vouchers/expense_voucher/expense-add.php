@@ -40,26 +40,11 @@ if (!$date || !$voucher_number || empty($entries)) {
 }
 
 try {
-    // Get company IDs this user has access to (within current tenant)
-    $companyStmt = $pdo->prepare("
-        SELECT company_id
-        FROM user_companies
-        WHERE user_id = ? AND tenant_id = ?
-    ");
-    $companyStmt->execute([$user_id, $tenant_id]);
-    $allowedCompanyIds = $companyStmt->fetchAll(PDO::FETCH_COLUMN);
-
-    if (empty($allowedCompanyIds)) {
-        http_response_code(403);
-        echo json_encode(['error' => 'No company assigned to your account']);
-        exit();
-    }
-
-    // Company is mandatory, and must be one the user is authorized for
+    // Company is mandatory
     $company_id = $input['company_id'] ?? null;
-    if (empty($company_id) || !in_array($company_id, $allowedCompanyIds)) {
-        http_response_code(403);
-        echo json_encode(['error' => 'Invalid or unauthorized company']);
+    if (empty($company_id)) {
+        http_response_code(400);
+        echo json_encode(['error' => 'Company is required']);
         exit();
     }
 

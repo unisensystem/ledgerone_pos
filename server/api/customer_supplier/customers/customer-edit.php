@@ -54,18 +54,6 @@ try {
         $newCompanyId = !empty($input['companyId']) ? (int)$input['companyId'] : null;
         $customerCode = $existingCustomer['customer_code'];
 
-        // Moving a customer to a different company: give it that company's own next
-        // sequential code instead of carrying over the old company's number, so each
-        // company's CUST-##### sequence stays its own (see customer-add.php).
-        if ($newCompanyId !== null && $newCompanyId !== (int)$existingCustomer['company_id']) {
-            $codeStmt = $pdo->prepare("SELECT customer_code FROM customers WHERE tenant_id = ? AND company_id = ? ORDER BY id DESC LIMIT 1 FOR UPDATE");
-            $codeStmt->execute([$tenant_id, $newCompanyId]);
-            $lastCustomer = $codeStmt->fetch();
-
-            $nextNum = $lastCustomer ? ((int)substr($lastCustomer['customer_code'], 5) + 1) : 1;
-            $customerCode = 'CUST-' . str_pad($nextNum, 5, '0', STR_PAD_LEFT);
-        }
-
         // Update customer
         $sql = "UPDATE customers SET
                 company_id = ?,

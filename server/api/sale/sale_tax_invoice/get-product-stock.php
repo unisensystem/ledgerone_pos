@@ -44,27 +44,21 @@ try {
     $unitName = $productData['uom_name'] ?? '';
     $baseUnitId = $productData['base_unit_id'];
     
-    // Get stock from stock_ledger — sum across all branches of the company
+    // Get stock from stock_ledger — total across the whole tenant
     $query = "
-        SELECT 
+        SELECT
             COALESCE(SUM(
-                (sl.qty_in * COALESCE(CASE WHEN u.base_unit_id IS NOT NULL AND u.unit_scope = 'universal' THEN u.conversion_factor WHEN puc.conversion_factor IS NOT NULL THEN puc.conversion_factor ELSE 1 END, 1)) - 
+                (sl.qty_in * COALESCE(CASE WHEN u.base_unit_id IS NOT NULL AND u.unit_scope = 'universal' THEN u.conversion_factor WHEN puc.conversion_factor IS NOT NULL THEN puc.conversion_factor ELSE 1 END, 1)) -
                 (sl.qty_out * COALESCE(CASE WHEN u.base_unit_id IS NOT NULL AND u.unit_scope = 'universal' THEN u.conversion_factor WHEN puc.conversion_factor IS NOT NULL THEN puc.conversion_factor ELSE 1 END, 1))
             ), 0) as stock
         FROM stock_ledger sl
         LEFT JOIN uom u ON sl.unit_id = u.id
         LEFT JOIN product_uom_conversions puc ON sl.product_id = puc.product_id AND sl.unit_id = puc.uom_id
-        LEFT JOIN branches b ON sl.branch_id = b.id
         WHERE sl.tenant_id = ? AND sl.product_id = ? AND sl.account_id = ?
     ";
-    
+
     $params = [$tenant_id, $product_id, $inventoryAccountId];
-    
-    if ($company_id) {
-        $query .= " AND b.company_id = ?";
-        $params[] = $company_id;
-    }
-    
+
     $stmt = $pdo->prepare($query);
     $stmt->execute($params);
     $result = $stmt->fetch(PDO::FETCH_ASSOC);

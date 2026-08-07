@@ -28,18 +28,8 @@ try {
     $offset = ($page - 1) * $limit;
     $company_id = isset($_GET['company_id']) && $_GET['company_id'] !== '' ? (int)$_GET['company_id'] : null;
 
-    // Get user_companies restriction
-    $ucStmt = $pdo->prepare("SELECT company_id FROM user_companies WHERE user_id = ?");
-    $ucStmt->execute([$user_id]);
-    $userCompanyIds = $ucStmt->fetchAll(PDO::FETCH_COLUMN);
-
     $companyWhere = '';
     $companyParams = [];
-    if (!empty($userCompanyIds)) {
-        $placeholders = implode(',', array_fill(0, count($userCompanyIds), '?'));
-        $companyWhere = " AND pi.company_id IN ($placeholders)";
-        $companyParams = $userCompanyIds;
-    }
     if ($company_id) {
         $companyWhere .= " AND pi.company_id = ?";
         $companyParams[] = $company_id;

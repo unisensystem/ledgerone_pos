@@ -36,9 +36,9 @@ try {
     
     $pdo->beginTransaction();
 
-    // Generate customer code per-company with lock to prevent duplicates
-    $stmt = $pdo->prepare("SELECT customer_code FROM customers WHERE tenant_id = ? AND company_id = ? ORDER BY id DESC LIMIT 1 FOR UPDATE");
-    $stmt->execute([$tenant_id, (int)$input['companyId']]);
+    // Generate customer code tenant-wide with lock to prevent duplicates
+    $stmt = $pdo->prepare("SELECT customer_code FROM customers WHERE tenant_id = ? ORDER BY id DESC LIMIT 1 FOR UPDATE");
+    $stmt->execute([$tenant_id]);
     $lastCustomer = $stmt->fetch();
 
     if ($lastCustomer) {
