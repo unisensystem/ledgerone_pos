@@ -6,8 +6,8 @@ $user_id = $_SESSION['user_id'] ?? null;
 $tenant_id = $_SESSION['tenant_id'] ?? null;
 if (!$user_id || !$tenant_id) { http_response_code(401); echo json_encode(['error' => 'Unauthorized']); exit(); }
 try {
-    $stmt = $pdo->prepare("SELECT id, name FROM accounts WHERE sub_account_id = 1 ORDER BY name");
-    $stmt->execute();
+    $stmt = $pdo->prepare("SELECT id, name FROM accounts WHERE (tenant_id = ? OR tenant_id = 0) AND sub_account_id = 1 ORDER BY name");
+    $stmt->execute([$tenant_id]);
     echo json_encode(['success' => true, 'data' => $stmt->fetchAll(PDO::FETCH_ASSOC)]);
 } catch (Exception $e) {
     http_response_code(500); echo json_encode(['error' => 'Database error', 'message' => $e->getMessage()]);

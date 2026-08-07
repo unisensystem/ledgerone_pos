@@ -20,7 +20,7 @@ try {
     $stmt = $pdo->prepare("
         SELECT id, name
         FROM accounts
-        WHERE tenant_id = ? AND sub_account_id = 1
+        WHERE (tenant_id = ? OR tenant_id = 0) AND sub_account_id = 1
         ORDER BY name
     ");
     $stmt->execute([$tenant_id]);
