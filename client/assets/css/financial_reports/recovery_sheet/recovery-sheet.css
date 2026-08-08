@@ -186,6 +186,12 @@ body {
   padding: 20px 24px;
   border-bottom: 1px solid var(--border-default);
   display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.report-header-top {
+  display: flex;
   justify-content: space-between;
   align-items: center;
 }
@@ -194,6 +200,147 @@ body {
   font-size: 18px;
   font-weight: 600;
   color: var(--heading);
+}
+
+/* Toggle Switch */
+.view-toggle-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.view-toggle-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--subtext);
+  transition: color 0.2s;
+}
+
+.view-toggle-label.active-label {
+  color: var(--primary);
+  font-weight: 600;
+}
+
+.toggle-switch {
+  position: relative;
+  display: inline-block;
+  width: 44px;
+  height: 24px;
+  cursor: pointer;
+}
+
+.toggle-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.toggle-slider {
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background-color: var(--border-strong);
+  border-radius: 24px;
+  transition: background-color 0.3s;
+}
+
+.toggle-slider:before {
+  position: absolute;
+  content: "";
+  height: 18px;
+  width: 18px;
+  left: 3px;
+  bottom: 3px;
+  background-color: white;
+  border-radius: 50%;
+  transition: transform 0.3s;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+
+.toggle-switch input:checked + .toggle-slider {
+  background-color: var(--primary);
+}
+
+.toggle-switch input:checked + .toggle-slider:before {
+  transform: translateX(20px);
+}
+
+/* Bills breakdown (expanded row in customer view) */
+.bills-breakdown {
+  padding: 12px 20px 16px;
+  background: var(--surface-1);
+}
+
+.bills-breakdown-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--subtext);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 10px;
+}
+
+.bills-breakdown table {
+  min-width: auto;
+  border: 1px solid var(--border-default);
+  font-size: 13px;
+}
+
+.bills-breakdown th {
+  padding: 8px 14px;
+  font-size: 12px;
+  background: var(--surface-2);
+}
+
+.bills-breakdown td {
+  padding: 8px 14px;
+}
+
+.bill-cleared {
+  background-color: rgba(47, 191, 113, 0.08) !important;
+}
+
+.bill-partial {
+  background-color: rgba(232, 178, 63, 0.1) !important;
+}
+
+.bill-pending {
+  background-color: transparent;
+}
+
+.bills-breakdown-legend {
+  display: flex;
+  gap: 16px;
+  margin-top: 10px;
+  font-size: 12px;
+  color: var(--subtext);
+}
+
+.bills-breakdown-legend span {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* Customer row (expandable) */
+.customer-row {
+  cursor: pointer;
+  user-select: none;
+}
+
+.customer-row:hover {
+  background-color: #edf4ff !important;
+}
+
+.expand-icon {
+  font-size: 11px;
+  color: var(--subtext);
+  transition: transform 0.2s;
+  display: inline-block;
+}
+
+.expand-row td {
+  padding: 0;
+  border-top: none;
 }
 
 .report-filters {

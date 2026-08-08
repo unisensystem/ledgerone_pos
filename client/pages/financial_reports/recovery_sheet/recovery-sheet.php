@@ -58,7 +58,17 @@ $currency_symbol = $currency['symbol'];
             <!-- Report Container -->
             <div class="report-container">
                 <div class="report-header">
-                    <div class="report-title">Recovery Sheet Report</div>
+                    <div class="report-header-top">
+                        <div class="report-title">Recovery Sheet Report</div>
+                        <div class="view-toggle-wrapper">
+                            <span class="view-toggle-label">Bill View</span>
+                            <label class="toggle-switch" title="Switch between per-bill and per-customer (auto-clear) view">
+                                <input type="checkbox" id="customerViewToggle">
+                                <span class="toggle-slider"></span>
+                            </label>
+                            <span class="view-toggle-label active-label" id="customerViewLabel">Customer View</span>
+                        </div>
+                    </div>
                     <div class="report-filters">
                         <div class="filter-item">
                             <label class="filter-label">Company</label>

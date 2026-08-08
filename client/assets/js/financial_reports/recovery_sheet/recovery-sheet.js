@@ -1,5 +1,20 @@
 document.addEventListener('DOMContentLoaded', function () {
 
+    let customerViewMode = false;
+    let lastRecoveryData = [];
+
+    // Toggle: Customer View
+    const customerViewToggle = document.getElementById('customerViewToggle');
+    const customerViewLabel  = document.getElementById('customerViewLabel');
+    if (customerViewToggle) {
+        customerViewToggle.addEventListener('change', function () {
+            customerViewMode = this.checked;
+            customerViewLabel.style.opacity = customerViewMode ? '1' : '0.5';
+            renderTable(lastRecoveryData);
+        });
+        customerViewLabel.style.opacity = '0.5';
+    }
+
     // Set default dates to current month
     const today = new Date();
     const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
@@ -202,6 +217,7 @@ document.addEventListener('DOMContentLoaded', function () {
             .then(r => r.json())
             .then(data => {
                 if (data.success) {
+                    lastRecoveryData = data.data;
                     renderTable(data.data);
                     updateSummary(data.summary);
                 } else {
@@ -214,34 +230,222 @@ document.addEventListener('DOMContentLoaded', function () {
             });
     }
 
+    function setTableHeaders(mode) {
+        const tr = document.querySelector('thead tr');
+        if (!tr) return;
+        if (mode === 'customer') {
+            tr.innerHTML = `
+                <th>S#</th>
+                <th>Customer Name</th>
+                <th>Address</th>
+                <th>Primary Phone No</th>
+                <th>Total Balance</th>
+                <th>Bills</th>
+                <th>Oldest Invoice</th>
+                <th>Days Overdue</th>
+                <th>Signature</th>
+            `;
+        } else {
+            tr.innerHTML = `
+                <th>S#</th>
+                <th>Bill No</th>
+                <th>Invoice Date</th>
+                <th>Customer Name</th>
+                <th>Address</th>
+                <th>Primary Phone No</th>
+                <th>Balance</th>
+                <th>Received Amount</th>
+                <th>Sales Return</th>
+                <th>Days Overdue</th>
+                <th>Signature</th>
+            `;
+        }
+    }
+
+    function groupByCustomer(rows) {
+        const map = {};
+        rows.forEach(row => {
+            const key = row.customer_name;
+            if (!map[key]) {
+                map[key] = {
+                    customer_name: row.customer_name,
+                    address: row.address,
+                    primary_phone: row.primary_phone,
+                    total_balance: 0,
+                    total_received: parseFloat(row.total_received) || 0,
+                    total_returns: parseFloat(row.total_returns) || 0,
+                    bills: []
+                };
+            }
+            map[key].total_balance += parseFloat(row.current_balance) || 0;
+            map[key].bills.push({
+                bill_no: row.bill_no,
+                invoice_date: row.invoice_date,
+                current_balance: parseFloat(row.current_balance) || 0,
+                days_overdue: parseInt(row.days_overdue) || 0
+            });
+        });
+
+        Object.values(map).forEach(c => {
+            c.bills.sort((a, b) => new Date(a.invoice_date) - new Date(b.invoice_date));
+        });
+
+        return Object.values(map).sort((a, b) => a.customer_name.localeCompare(b.customer_name));
+    }
+
+    function simulateAutoClear(bills, totalReceived) {
+        let remaining = totalReceived;
+        return bills.map(bill => {
+            const cleared = Math.min(remaining, bill.current_balance);
+            remaining = Math.max(0, remaining - cleared);
+            return {
+                ...bill,
+                cleared_amount: cleared,
+                is_fully_cleared: cleared >= bill.current_balance - 0.001
+            };
+        });
+    }
+
     function renderTable(rows) {
+        if (customerViewMode) {
+            renderTableCustomerView(rows);
+        } else {
+            renderTableBillView(rows);
+        }
+    }
+
+    function renderTableBillView(rows) {
         const tbody = document.querySelector('tbody');
         if (!tbody) return;
+        setTableHeaders('bill');
         tbody.innerHTML = '';
         if (!rows.length) {
-tbody.innerHTML = '<tr><td colspan="11" style="text-align:center">No records found</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="11" style="text-align:center">No records found</td></tr>';
             return;
         }
         rows.forEach((row, i) => {
-            const bal     = parseFloat(row.current_balance);
+            const bal      = parseFloat(row.current_balance);
             const balClass = bal >= 0 ? 'balance-positive' : 'balance-negative';
             const balText  = (bal < 0 ? '-' : '') + currencySymbol + Math.abs(bal).toFixed(2);
             const tr = document.createElement('tr');
-          tr.innerHTML = `
-    <td>${i + 1}</td>
-    <td>${row.bill_no || ''}</td>
-    <td>${row.invoice_date || ''}</td>
-    <td>${row.customer_name || ''}</td>
-    <td>${row.address || ''}</td>
-    <td>${row.primary_phone || ''}</td>
-    <td class="${balClass}">${balText}</td>
-    <td></td>
-    <td></td>
-        <td>${row.days_overdue ?? ''}</td>
-
-    <td><div class="signature-cell"></div></td>
-`;
+            tr.innerHTML = `
+                <td>${i + 1}</td>
+                <td>${row.bill_no || ''}</td>
+                <td>${row.invoice_date || ''}</td>
+                <td>${row.customer_name || ''}</td>
+                <td>${row.address || ''}</td>
+                <td>${row.primary_phone || ''}</td>
+                <td class="${balClass}">${balText}</td>
+                <td></td>
+                <td></td>
+                <td>${row.days_overdue ?? ''}</td>
+                <td><div class="signature-cell"></div></td>
+            `;
             tbody.appendChild(tr);
+        });
+    }
+
+    function renderTableCustomerView(rows) {
+        const tbody = document.querySelector('tbody');
+        if (!tbody) return;
+        setTableHeaders('customer');
+        tbody.innerHTML = '';
+
+        if (!rows.length) {
+            tbody.innerHTML = '<tr><td colspan="9" style="text-align:center">No records found</td></tr>';
+            return;
+        }
+
+        const grouped = groupByCustomer(rows);
+
+        grouped.forEach((customer, i) => {
+            const bal      = customer.total_balance;
+            const balClass = bal >= 0 ? 'balance-positive' : 'balance-negative';
+            const balText  = (bal < 0 ? '-' : '') + currencySymbol + Math.abs(bal).toFixed(2);
+            const oldestDate = customer.bills[0]?.invoice_date || '';
+            const oldestDays = customer.bills[0]?.days_overdue ?? '';
+
+            const tr = document.createElement('tr');
+            tr.className = 'customer-row';
+            tr.innerHTML = `
+                <td>${i + 1}</td>
+                <td><i class="fas fa-chevron-right expand-icon"></i> ${customer.customer_name || ''}</td>
+                <td>${customer.address || ''}</td>
+                <td>${customer.primary_phone || ''}</td>
+                <td class="${balClass}">${balText}</td>
+                <td>${customer.bills.length}</td>
+                <td>${oldestDate}</td>
+                <td>${oldestDays}</td>
+                <td><div class="signature-cell"></div></td>
+            `;
+            tbody.appendChild(tr);
+
+            // Build bill-breakdown expand row
+            const billsWithClear = simulateAutoClear(customer.bills, customer.total_received);
+            const breakdownRows = billsWithClear.map((bill, j) => {
+                const rowClass = bill.is_fully_cleared ? 'bill-cleared'
+                    : bill.cleared_amount > 0 ? 'bill-partial'
+                    : 'bill-pending';
+                const icon = bill.is_fully_cleared
+                    ? `<i class="fas fa-check-circle" style="color:var(--success)"></i>`
+                    : bill.cleared_amount > 0
+                        ? `<i class="fas fa-adjust" style="color:var(--warning)"></i>`
+                        : `<i class="fas fa-clock" style="color:var(--subtext)"></i>`;
+                const clearedText = bill.cleared_amount > 0
+                    ? currencySymbol + bill.cleared_amount.toFixed(2)
+                    : '—';
+                return `
+                    <tr class="${rowClass}">
+                        <td>${j + 1}</td>
+                        <td>${icon} ${bill.bill_no || 'N/A'}</td>
+                        <td>${bill.invoice_date || ''}</td>
+                        <td>${currencySymbol}${bill.current_balance.toFixed(2)}</td>
+                        <td>${clearedText}</td>
+                        <td>${bill.days_overdue}</td>
+                    </tr>
+                `;
+            }).join('');
+
+            const totalRecText = currencySymbol + customer.total_received.toFixed(2);
+
+            const expandTr = document.createElement('tr');
+            expandTr.className = 'expand-row';
+            expandTr.style.display = 'none';
+            expandTr.innerHTML = `
+                <td colspan="9">
+                    <div class="bills-breakdown">
+                        <div class="bills-breakdown-title">
+                            Auto-Clear Breakdown &mdash; Total Received: ${totalRecText} (oldest bill cleared first)
+                        </div>
+                        <table class="bills-breakdown-table">
+                            <thead>
+                                <tr>
+                                    <th>#</th>
+                                    <th>Bill No</th>
+                                    <th>Invoice Date</th>
+                                    <th>Outstanding</th>
+                                    <th>Auto-Cleared</th>
+                                    <th>Days Overdue</th>
+                                </tr>
+                            </thead>
+                            <tbody>${breakdownRows}</tbody>
+                        </table>
+                        <div class="bills-breakdown-legend">
+                            <span><i class="fas fa-check-circle" style="color:var(--success)"></i> Fully Cleared</span>
+                            <span><i class="fas fa-adjust" style="color:var(--warning)"></i> Partially Cleared</span>
+                            <span><i class="fas fa-clock" style="color:var(--subtext)"></i> Pending</span>
+                        </div>
+                    </div>
+                </td>
+            `;
+            tbody.appendChild(expandTr);
+
+            tr.addEventListener('click', function () {
+                const isExpanded = expandTr.style.display !== 'none';
+                expandTr.style.display = isExpanded ? 'none' : 'table-row';
+                const icon = tr.querySelector('.expand-icon');
+                if (icon) icon.style.transform = isExpanded ? '' : 'rotate(90deg)';
+            });
         });
     }
 
@@ -254,14 +458,33 @@ tbody.innerHTML = '<tr><td colspan="11" style="text-align:center">No records fou
     }
 
     function exportToCSV() {
-const rows = [['S#', 'Bill No', 'Invoice Date', 'Days Overdue', 'Customer Name', 'Address', 'Primary Phone No', 'Balance', 'Received Amount', 'Sales Return', 'Signature']];        document.querySelectorAll('tbody tr').forEach(tr => {
-            const cols = tr.querySelectorAll('td');
-            const r = [];
-            for (let i = 0; i < cols.length - 1; i++) r.push(cols[i].textContent.trim());
-            r.push('');
-            rows.push(r);
-        });
-        const blob = new Blob([rows.map(r => r.join(',')).join('\n')], { type: 'text/csv' });
+        let rows;
+        if (customerViewMode) {
+            rows = [['S#', 'Customer Name', 'Address', 'Primary Phone No', 'Total Balance', 'Bills Count', 'Oldest Invoice', 'Days Overdue']];
+            groupByCustomer(lastRecoveryData).forEach((c, i) => {
+                rows.push([
+                    i + 1,
+                    c.customer_name,
+                    c.address,
+                    c.primary_phone,
+                    c.total_balance.toFixed(2),
+                    c.bills.length,
+                    c.bills[0]?.invoice_date || '',
+                    c.bills[0]?.days_overdue || ''
+                ]);
+            });
+        } else {
+            rows = [['S#', 'Bill No', 'Invoice Date', 'Customer Name', 'Address', 'Primary Phone No', 'Balance', 'Received Amount', 'Sales Return', 'Days Overdue', 'Signature']];
+            document.querySelectorAll('tbody tr').forEach(tr => {
+                const cols = tr.querySelectorAll('td');
+                if (!cols.length) return;
+                const r = [];
+                for (let i = 0; i < cols.length - 1; i++) r.push(cols[i].textContent.trim());
+                r.push('');
+                rows.push(r);
+            });
+        }
+        const blob = new Blob([rows.map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n')], { type: 'text/csv' });
         const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(blob), download: 'recovery-sheet.csv' });
         a.click();
     }
