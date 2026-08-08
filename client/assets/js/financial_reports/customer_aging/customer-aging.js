@@ -456,7 +456,12 @@ function renderPaginationControls(totalPages) {
 // ---------- Exports ----------
 
 function printReport() {
-    window.print();
+    const params = new URLSearchParams();
+    Object.entries(state.filters).forEach(([key, val]) => {
+        if (val) params.append(key, val);
+    });
+    if (state.autoClearMode) params.append('auto_clear', '1');
+    window.open(`print.php?${params.toString()}`, '_blank');
 }
 
 function exportToJSON() {

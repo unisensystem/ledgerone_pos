@@ -246,8 +246,8 @@ document.addEventListener('DOMContentLoaded', function () {
                 <th>Address</th>
                 <th>Primary Phone No</th>
                 <th>Total Balance</th>
-                <th>Bills</th>
-                <th>Oldest Invoice</th>
+                <th>Received Amount</th>
+                <th>Sales Return</th>
                 <th>Days Overdue</th>
                 <th>Signature</th>
             `;
@@ -372,8 +372,9 @@ document.addEventListener('DOMContentLoaded', function () {
         grouped.forEach((customer, i) => {
             const bal      = customer.total_balance - customer.unallocated_received;
             const balClass = bal > 0 ? 'balance-positive' : bal < 0 ? 'balance-negative' : '';
-            const balText  = (bal < 0 ? '-' : '') + currencySymbol + Math.abs(bal).toFixed(2);
-            const oldestDate = customer.bills[0]?.invoice_date || '';
+            const balText    = (bal < 0 ? '-' : '') + currencySymbol + Math.abs(bal).toFixed(2);
+            const recText    = currencySymbol + customer.total_received.toFixed(2);
+            const retText    = currencySymbol + customer.total_returns.toFixed(2);
             const oldestDays = customer.bills[0]?.days_overdue ?? '';
 
             const tr = document.createElement('tr');
@@ -384,8 +385,8 @@ document.addEventListener('DOMContentLoaded', function () {
                 <td>${customer.address || ''}</td>
                 <td>${customer.primary_phone || ''}</td>
                 <td class="${balClass}">${balText}</td>
-                <td>${customer.bills.length}</td>
-                <td>${oldestDate}</td>
+                <td>${recText}</td>
+                <td>${retText}</td>
                 <td>${oldestDays}</td>
                 <td><div class="signature-cell"></div></td>
             `;
@@ -471,16 +472,17 @@ document.addEventListener('DOMContentLoaded', function () {
     function exportToCSV() {
         let rows;
         if (customerViewMode) {
-            rows = [['S#', 'Customer Name', 'Address', 'Primary Phone No', 'Total Balance', 'Bills Count', 'Oldest Invoice', 'Days Overdue']];
+            rows = [['S#', 'Customer Name', 'Address', 'Primary Phone No', 'Total Balance', 'Received Amount', 'Sales Return', 'Days Overdue']];
             groupByCustomer(lastRecoveryData).forEach((c, i) => {
+                const netBal = c.total_balance - c.unallocated_received;
                 rows.push([
                     i + 1,
                     c.customer_name,
                     c.address,
                     c.primary_phone,
-                    c.total_balance.toFixed(2),
-                    c.bills.length,
-                    c.bills[0]?.invoice_date || '',
+                    (netBal < 0 ? '-' : '') + Math.abs(netBal).toFixed(2),
+                    c.total_received.toFixed(2),
+                    c.total_returns.toFixed(2),
                     c.bills[0]?.days_overdue || ''
                 ]);
             });
