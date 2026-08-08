@@ -373,8 +373,6 @@ document.addEventListener('DOMContentLoaded', function () {
             const bal      = customer.total_balance - customer.unallocated_received;
             const balClass = bal > 0 ? 'balance-positive' : bal < 0 ? 'balance-negative' : '';
             const balText    = (bal < 0 ? '-' : '') + currencySymbol + Math.abs(bal).toFixed(2);
-            const recText    = currencySymbol + customer.total_received.toFixed(2);
-            const retText    = currencySymbol + customer.total_returns.toFixed(2);
             const oldestDays = customer.bills[0]?.days_overdue ?? '';
 
             const tr = document.createElement('tr');
@@ -385,8 +383,8 @@ document.addEventListener('DOMContentLoaded', function () {
                 <td>${customer.address || ''}</td>
                 <td>${customer.primary_phone || ''}</td>
                 <td class="${balClass}">${balText}</td>
-                <td>${recText}</td>
-                <td>${retText}</td>
+                <td></td>
+                <td></td>
                 <td>${oldestDays}</td>
                 <td><div class="signature-cell"></div></td>
             `;
