@@ -32,7 +32,7 @@ try {
     $customer_code = $_POST['customer_code'] ?? '';
     $previous_balance = (!empty($_POST['previous_balance']) && $_POST['previous_balance'] !== 'null') ? floatval($_POST['previous_balance']) : 0;
     $sub_account_id = (!empty($_POST['sub_account_id']) && $_POST['sub_account_id'] !== 'null') ? intval($_POST['sub_account_id']) : null;
-    $bill_no = !empty($_POST['bill_no']) ? $_POST['bill_no'] : null;
+    $bill_no = (!empty($_POST['bill_no']) && $_POST['bill_no'] !== 'null') ? $_POST['bill_no'] : null;
     $dsr_no = (!empty($_POST['dsr_no']) && $_POST['dsr_no'] !== 'null') ? $_POST['dsr_no'] : null;
     $project_id = (!empty($_POST['project_id']) && $_POST['project_id'] !== 'null') ? intval($_POST['project_id']) : null;
     $container_id = (!empty($_POST['container_id']) && $_POST['container_id'] !== 'null') ? intval($_POST['container_id']) : null;

@@ -68,7 +68,7 @@ try {
                 FROM receive_voucher rv
                 WHERE rv.customer_id = c.id
                 AND rv.tenant_id = ?
-                AND (rv.bill_no IS NULL OR rv.bill_no = '')
+                AND (rv.bill_no IS NULL OR rv.bill_no = '' OR rv.bill_no = 'null')
             ), 0) as unallocated_received
         FROM opening_balance_invoices obi
         JOIN customers c ON obi.customer_id = c.id
@@ -127,7 +127,7 @@ try {
                 FROM receive_voucher rv
                 WHERE rv.customer_id = c.id
                 AND rv.tenant_id = ?
-                AND (rv.bill_no IS NULL OR rv.bill_no = '')
+                AND (rv.bill_no IS NULL OR rv.bill_no = '' OR rv.bill_no = 'null')
             ), 0) as unallocated_received
         FROM sale_invoice si
         JOIN customers c ON si.customer_id = c.id
