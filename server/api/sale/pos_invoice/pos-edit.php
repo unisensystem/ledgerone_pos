@@ -140,7 +140,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
                 currency_id = ?, sale_date = ?, customer_id = ?, sub_account_id = ?, company_id = ?, branch_id = ?,
                 previous_balance = ?, sale_officer_id = ?, supplier_man_id = ?, brand_id = ?, sale_order_id = ?, bilty_no = ?, transport_name = ?, total_bill = ?, total_discount_percent = ?,
                 total_discount_amount = ?, extra_discount_1_percent = ?, extra_discount_1_amount = ?, extra_discount_2_percent = ?, extra_discount_2_amount = ?,
-                net_amount = ?, withholding_tax_percent = ?, withholding_tax_amount = ?, amount_paid_auto_fill = ?, remarks = ?, status = ?, project_id = ?, container_id = ?, updated_by = ?
+                net_amount = ?, withholding_tax_percent = ?, withholding_tax_amount = ?, amount_paid_auto_fill = ?, remarks = ?, status = ?, project_id = ?, container_id = ?, amount_returned = ?, updated_by = ?
             WHERE id = ? AND tenant_id = ?
         ");
         $stmt->execute([
@@ -172,6 +172,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
             $input['status'] ?? 'Posted',
             $input['projectId'] ?? null,
             (!empty($input['containerId']) && $input['containerId'] !== null && intval($input['containerId']) > 0) ? intval($input['containerId']) : null,
+            floatval($input['amountReturned'] ?? 0),
             $user_id,
             $invoice_id,
             $tenant_id
