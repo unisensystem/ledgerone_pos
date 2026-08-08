@@ -161,6 +161,7 @@ document.addEventListener('DOMContentLoaded', function () {
             if (zoneId    && zoneId    !== 'all') url += `&city_zone_id=${zoneId}`;
             if (areaId    && areaId    !== 'all') url += `&area_id=${areaId}`;
             if (companyId) url += `&company_id=${companyId}`;
+            if (customerViewMode) url += `&view=customer`;
             window.open(url, '_blank');
         });
     }

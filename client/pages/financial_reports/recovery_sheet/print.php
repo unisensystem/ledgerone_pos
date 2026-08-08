@@ -40,6 +40,7 @@ $city_id             = !empty($_GET['city_id'])             ? (int)$_GET['city_i
 $city_zone_id        = !empty($_GET['city_zone_id'])        ? (int)$_GET['city_zone_id']        : null;
 $area_id             = !empty($_GET['area_id'])             ? (int)$_GET['area_id']             : null;
 $company_id          = !empty($_GET['company_id'])          ? (int)$_GET['company_id']          : null;
+$view_mode           = (!empty($_GET['view']) && $_GET['view'] === 'customer') ? 'customer' : 'bill';
 
 // ── Company info ─────────────────────────────────────────────────────────────
 if ($company_id) {
@@ -133,7 +134,14 @@ $query = "
             AND sr.status = 'Posted'
             " . ($date_from ? " AND sr.sale_date >= ?" : "") . "
             " . ($date_to   ? " AND sr.sale_date <= ?" : "") . "
-        ), 0) AS total_returns
+        ), 0) AS total_returns,
+        COALESCE((
+            SELECT SUM(rv.amount)
+            FROM receive_voucher rv
+            WHERE rv.customer_id = c.id
+            AND rv.tenant_id = ?
+            AND (rv.bill_no IS NULL OR rv.bill_no = '' OR rv.bill_no = 'null')
+        ), 0) AS unallocated_received
     FROM opening_balance_invoices obi
     JOIN customers c ON obi.customer_id = c.id
     WHERE obi.tenant_id = ?
@@ -184,7 +192,14 @@ $query = "
             AND sr.status = 'Posted'
             " . ($date_from ? " AND sr.sale_date >= ?" : "") . "
             " . ($date_to   ? " AND sr.sale_date <= ?" : "") . "
-        ), 0) AS total_returns
+        ), 0) AS total_returns,
+        COALESCE((
+            SELECT SUM(rv.amount)
+            FROM receive_voucher rv
+            WHERE rv.customer_id = c.id
+            AND rv.tenant_id = ?
+            AND (rv.bill_no IS NULL OR rv.bill_no = '' OR rv.bill_no = 'null')
+        ), 0) AS unallocated_received
     FROM sale_invoice si
     JOIN customers c ON si.customer_id = c.id
     WHERE si.tenant_id = ?
@@ -215,6 +230,7 @@ if ($recovery_officer_id) $params[] = $recovery_officer_id;
 $params[] = $tenant_id;                          // returns subquery tenant
 if ($date_from) $params[] = $date_from;
 if ($date_to)   $params[] = $date_to;
+$params[] = $tenant_id;                          // unallocated_received subquery
 $params[] = $tenant_id;                          // WHERE obi.tenant_id
 if ($company_id)   $params[] = $company_id;
 if ($country_id)   $params[] = $country_id;
@@ -233,6 +249,7 @@ if ($recovery_officer_id) $params[] = $recovery_officer_id;
 $params[] = $tenant_id;                          // returns subquery tenant
 if ($date_from) $params[] = $date_from;
 if ($date_to)   $params[] = $date_to;
+$params[] = $tenant_id;                          // unallocated_received subquery
 $params[] = $tenant_id;                          // WHERE si.tenant_id
 if ($recovery_officer_id) $params[] = $recovery_officer_id;
 if ($date_from) $params[] = $date_from;
@@ -248,13 +265,66 @@ $stmt = $pdo->prepare($query);
 $stmt->execute($params);
 $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
+// ── Customer View grouping + FIFO simulation ────────────────────────────────
+function groupByCustomerAndSimulate($rows) {
+    $map = [];
+    foreach ($rows as $row) {
+        $name = $row['customer_name'];
+        if (!isset($map[$name])) {
+            $map[$name] = [
+                'customer_name'        => $row['customer_name'],
+                'address'              => $row['address'],
+                'primary_phone'        => $row['primary_phone'],
+                'total_received'       => floatval($row['total_received']),
+                'total_returns'        => floatval($row['total_returns']),
+                'unallocated_received' => floatval($row['unallocated_received']),
+                'bills'                => []
+            ];
+        }
+        $map[$name]['bills'][] = $row;
+    }
+    foreach ($map as &$customer) {
+        usort($customer['bills'], fn($a, $b) => strcmp($a['invoice_date'], $b['invoice_date']));
+        $remaining     = $customer['total_received'];
+        $total_balance = 0;
+        foreach ($customer['bills'] as &$bill) {
+            $balance        = floatval($bill['current_balance']);
+            $total_balance += $balance;
+            if ($remaining <= 0) {
+                $bill['sim_cleared'] = 0;
+                $bill['sim_balance'] = $balance;
+                $bill['sim_status']  = 'pending';
+            } else {
+                $cleared             = min($remaining, $balance);
+                $remaining          -= $cleared;
+                $sim_balance         = $balance - $cleared;
+                $bill['sim_cleared'] = $cleared;
+                $bill['sim_balance'] = $sim_balance;
+                $bill['sim_status']  = $sim_balance <= 0 ? 'cleared' : ($cleared > 0 ? 'partial' : 'pending');
+            }
+        }
+        $customer['total_balance'] = $total_balance;
+    }
+    return array_values($map);
+}
+
+$customers_grouped = ($view_mode === 'customer') ? groupByCustomerAndSimulate($rows) : [];
+
 $total_balance  = 0;
 $total_received = 0;
 $total_returns  = 0;
-foreach ($rows as $row) {
-    $total_balance  += $row['current_balance'];
-    $total_received += $row['total_received'];
-    $total_returns  += $row['total_returns'];
+if ($view_mode === 'customer') {
+    foreach ($customers_grouped as $customer) {
+        $total_balance  += $customer['total_balance'] - $customer['unallocated_received'];
+        $total_received += $customer['total_received'];
+        $total_returns  += $customer['total_returns'];
+    }
+} else {
+    foreach ($rows as $row) {
+        $total_balance  += $row['current_balance'];
+        $total_received += $row['total_received'];
+        $total_returns  += $row['total_returns'];
+    }
 }
 
 // Build territory string
@@ -397,6 +467,28 @@ $territory_str   = implode(' > ', $territory_parts);
             margin-top: 12px;
         }
 
+        /* ── Customer View rows ── */
+        .customer-header-row td {
+            background: #e8f0fe;
+            font-weight: bold;
+            border-top: 2px solid #1f7bff;
+        }
+        .bill-sub-row td { background: #fff; font-size: 10px; padding-left: 12px; }
+        .bill-sub-row:nth-child(even) td { background: #f9f9f9; }
+        .status-cleared  { color: #2fbf71; font-weight: bold; }
+        .status-partial  { color: #e8a23f; font-weight: bold; }
+        .status-pending  { color: #dc3545; font-weight: bold; }
+        .view-badge {
+            display: inline-block;
+            margin-left: 8px;
+            font-size: 9px;
+            background: #1f7bff;
+            color: #fff;
+            padding: 2px 7px;
+            border-radius: 10px;
+            vertical-align: middle;
+        }
+
         /* ── No-data ── */
         .no-data { text-align: center; padding: 30px; color: #888; font-size: 13px; }
 
@@ -462,7 +554,12 @@ $territory_str   = implode(' > ', $territory_parts);
                 <?php if ($company_email): ?>Email: <?php echo htmlspecialchars($company_email); ?><?php endif; ?>
             </div>
         <?php endif; ?>
-        <div class="report-title">Recovery Sheet Report</div>
+        <div class="report-title">
+            Recovery Sheet Report
+            <?php if ($view_mode === 'customer'): ?>
+                <span class="view-badge">Customer View</span>
+            <?php endif; ?>
+        </div>
     </div>
 
     <!-- Filter bar -->
@@ -504,6 +601,82 @@ $territory_str   = implode(' > ', $territory_parts);
     <!-- Table -->
     <?php if (empty($rows)): ?>
         <div class="no-data">No records found for the selected filters.</div>
+    <?php elseif ($view_mode === 'customer'): ?>
+    <table>
+        <thead>
+            <tr>
+                <th class="text-center" style="width:2%">S#</th>
+                <th style="width:12%">Customer Name</th>
+                <th style="width:10%">Address</th>
+                <th style="width:6%">Phone</th>
+                <th style="width:3%">Bill No</th>
+                <th style="width:5%">Date</th>
+                <th class="text-right" style="width:6%">Bill Balance</th>
+                <th class="text-right" style="width:6%">Auto-Clear</th>
+                <th class="text-right" style="width:6%">Remaining</th>
+                <th class="text-center" style="width:4%">Days</th>
+                <th class="text-center" style="width:5%">Status</th>
+                <th style="width:8%">Signature</th>
+            </tr>
+        </thead>
+        <tbody>
+        <?php $cIdx = 0; foreach ($customers_grouped as $customer):
+            $cIdx++;
+            $net_bal = $customer['total_balance'] - $customer['unallocated_received'];
+        ?>
+            <tr class="customer-header-row">
+                <td class="text-center"><?php echo $cIdx; ?></td>
+                <td><?php echo htmlspecialchars($customer['customer_name']); ?></td>
+                <td><?php echo htmlspecialchars($customer['address'] ?? ''); ?></td>
+                <td><?php echo htmlspecialchars($customer['primary_phone'] ?? ''); ?></td>
+                <td class="text-center" colspan="5">
+                    <?php echo count($customer['bills']); ?> bill(s) &nbsp;|&nbsp;
+                    Net Balance: <?php echo $currency_symbol . number_format($net_bal, 2); ?>
+                    <?php if ($customer['unallocated_received'] > 0): ?>
+                        &nbsp;<small style="font-weight:normal;color:#555">(<?php echo $currency_symbol . number_format($customer['unallocated_received'], 2); ?> unallocated)</small>
+                    <?php endif; ?>
+                </td>
+                <td></td>
+                <td></td>
+                <td><div class="signature-cell"></div></td>
+            </tr>
+            <?php foreach ($customer['bills'] as $bill):
+                $status_label = ['cleared' => 'Cleared', 'partial' => 'Partial', 'pending' => 'Pending'][$bill['sim_status']] ?? '';
+                $status_class = 'status-' . $bill['sim_status'];
+            ?>
+            <tr class="bill-sub-row">
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td><?php echo htmlspecialchars($bill['bill_no'] ?? ''); ?></td>
+                <td><?php echo !empty($bill['invoice_date']) ? date('d-m-y', strtotime($bill['invoice_date'])) : ''; ?></td>
+                <td class="text-right"><?php echo $currency_symbol . number_format(floatval($bill['current_balance']), 2); ?></td>
+                <td class="text-right"><?php echo $currency_symbol . number_format($bill['sim_cleared'], 2); ?></td>
+                <td class="text-right"><?php echo $currency_symbol . number_format($bill['sim_balance'], 2); ?></td>
+                <td class="text-center"><?php echo isset($bill['days_overdue']) ? (int)$bill['days_overdue'] : ''; ?></td>
+                <td class="text-center <?php echo $status_class; ?>"><?php echo $status_label; ?></td>
+                <td></td>
+            </tr>
+            <?php endforeach; ?>
+        <?php endforeach; ?>
+        </tbody>
+    </table>
+
+    <!-- Customer View Footer -->
+    <div class="print-footer">
+        <div class="totals-row">
+            <span>Total Customers: <?php echo count($customers_grouped); ?></span>
+            <span>Net Balance: <?php echo $currency_symbol . number_format($total_balance, 2); ?></span>
+            <span>Total Received: <?php echo $currency_symbol . number_format($total_received, 2); ?></span>
+            <span>Total Returns: <?php echo $currency_symbol . number_format($total_returns, 2); ?></span>
+        </div>
+        <div class="signatures">
+            <div class="sig-box"><div class="sig-line"></div><div class="sig-label">Recovery Agent</div></div>
+            <div class="sig-box"><div class="sig-line"></div><div class="sig-label">Supervisor</div></div>
+            <div class="sig-box"><div class="sig-line"></div><div class="sig-label">Accounts Officer</div></div>
+        </div>
+    </div>
     <?php else: ?>
     <table>
         <thead>
@@ -544,7 +717,7 @@ $territory_str   = implode(' > ', $territory_parts);
         </tbody>
     </table>
 
-    <!-- Footer totals -->
+    <!-- Bill View Footer -->
     <div class="print-footer">
         <div class="totals-row">
             <span>Total Records: <?php echo count($rows); ?></span>
@@ -552,21 +725,10 @@ $territory_str   = implode(' > ', $territory_parts);
             <span>Total Received: <?php echo $currency_symbol . number_format($total_received, 2); ?></span>
             <span>Total Returns: <?php echo $currency_symbol . number_format($total_returns, 2); ?></span>
         </div>
-
-        <!-- Signature lines -->
         <div class="signatures">
-            <div class="sig-box">
-                <div class="sig-line"></div>
-                <div class="sig-label">Recovery Agent</div>
-            </div>
-            <div class="sig-box">
-                <div class="sig-line"></div>
-                <div class="sig-label">Supervisor</div>
-            </div>
-            <div class="sig-box">
-                <div class="sig-line"></div>
-                <div class="sig-label">Accounts Officer</div>
-            </div>
+            <div class="sig-box"><div class="sig-line"></div><div class="sig-label">Recovery Agent</div></div>
+            <div class="sig-box"><div class="sig-line"></div><div class="sig-label">Supervisor</div></div>
+            <div class="sig-box"><div class="sig-line"></div><div class="sig-label">Accounts Officer</div></div>
         </div>
     </div>
     <?php endif; ?>
