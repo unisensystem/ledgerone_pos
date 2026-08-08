@@ -1845,15 +1845,18 @@ async function saveInvoice(status = 'Posted') {
         status: status === 'Draft' ? 'Draft' : 'Posted'
     };
     
+    console.log('[DEBUG] Saving invoice, amountReturned =', invoiceData.amountReturned, 'amountPaid =', invoiceData.amountPaid);
+
     try {
         const response = await fetch('../../../../server/api/sale/pos_invoice/pos-add.php', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(invoiceData)
         });
-        
+
         const data = await response.json();
-        
+        console.log('[DEBUG] pos-add response:', data);
+
         if (data.success) {
             showNotification('Invoice saved successfully!');
             // Redirect to thermal print

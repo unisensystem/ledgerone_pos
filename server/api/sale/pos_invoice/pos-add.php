@@ -438,7 +438,9 @@ try {
     echo json_encode([
         'success' => true,
         'message' => 'Sale invoice saved successfully',
-        'invoice_id' => $invoice_id
+        'invoice_id' => $invoice_id,
+        'debug_amount_returned_received' => $input['amountReturned'] ?? 'NOT_SET',
+        'debug_amount_returned_saved' => floatval($input['amountReturned'] ?? 0)
     ]);
 
 } catch (Exception $e) {
