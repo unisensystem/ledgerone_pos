@@ -34,21 +34,9 @@ try {
     $customerFilter = $_GET['customer'] ?? null;
     $search = $_GET['search'] ?? null;
     
-    // Get user's assigned companies
-    $stmtUC = $pdo->prepare("SELECT company_id FROM user_companies WHERE tenant_id = ? AND user_id = ?");
-    $stmtUC->execute([$tenant_id, $user_id]);
-    $assignedCompanies = $stmtUC->fetchAll(PDO::FETCH_COLUMN);
-
     // Build WHERE clause
     $whereConditions = ["si.tenant_id = ?", "si.status = 'Posted'"];
     $params = [$tenant_id];
-
-    // Restrict to user's assigned companies if any
-    if (!empty($assignedCompanies)) {
-        $ph = implode(',', array_fill(0, count($assignedCompanies), '?'));
-        $whereConditions[] = "si.company_id IN ($ph)";
-        $params = array_merge($params, $assignedCompanies);
-    }
 
     if ($dateFrom) {
         $whereConditions[] = "si.sale_date >= ?";

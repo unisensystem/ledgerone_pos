@@ -59,16 +59,7 @@ try {
     ";
     
     $params = [$tenant_id, $product_id, $inventoryAccountId];
-    
-    if ($company_id) {
-        $query .= " AND sl.branch_id IN (SELECT id FROM branches WHERE company_id = ? AND tenant_id = ?)";
-        $params[] = $company_id;
-        $params[] = $tenant_id;
-    } elseif ($branch_id) {
-        $query .= " AND sl.branch_id = ?";
-        $params[] = $branch_id;
-    }
-    
+
     $stmt = $pdo->prepare($query);
     $stmt->execute($params);
     $result = $stmt->fetch(PDO::FETCH_ASSOC);

@@ -17,40 +17,16 @@ if (!$user_id || !$tenant_id) {
 }
 
 try {
-    // Get company IDs this user has access to (within current tenant)
-    $companyStmt = $pdo->prepare("
-        SELECT company_id
-        FROM user_companies
-        WHERE user_id = ? AND tenant_id = ?
-    ");
-    $companyStmt->execute([$user_id, $tenant_id]);
-    $companyIds = $companyStmt->fetchAll(PDO::FETCH_COLUMN);
-
-    if (empty($companyIds)) {
-        echo json_encode([
-            'success' => true,
-            'data' => [],
-            'debug' => ['user_id' => $user_id, 'tenant_id' => $tenant_id, 'companyIds' => $companyIds]
-        ]);
-        exit();
-    }
-
-    $placeholders = implode(',', array_fill(0, count($companyIds), '?'));
-
     $stmt = $pdo->prepare("
         SELECT customer_code, customer_name, id
-        FROM customers 
-        WHERE tenant_id = ? AND status = 'ACTIVE' AND company_id IN ($placeholders)
+        FROM customers
+        WHERE tenant_id = ? AND status = 'ACTIVE'
         ORDER BY customer_name
     ");
-    $stmt->execute(array_merge([$tenant_id], $companyIds));
+    $stmt->execute([$tenant_id]);
     $customers = $stmt->fetchAll(PDO::FETCH_ASSOC);
-    
-    echo json_encode([
-        'success' => true,
-        'data' => $customers,
-        'debug' => ['user_id' => $user_id, 'tenant_id' => $tenant_id, 'companyIds' => $companyIds]
-    ]);
+
+    echo json_encode(['success' => true, 'data' => $customers]);
 } catch (Exception $e) {
     http_response_code(500);
     echo json_encode(['error' => 'Database error']);

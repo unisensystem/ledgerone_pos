@@ -23,24 +23,10 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 }
 
 try {
-    // Get company IDs this user has access to (within current tenant)
-    $companyStmt = $pdo->prepare("
-        SELECT company_id
-        FROM user_companies
-        WHERE user_id = ? AND tenant_id = ?
-    ");
-    $companyStmt->execute([$user_id, $tenant_id]);
-    $allowedCompanyIds = $companyStmt->fetchAll(PDO::FETCH_COLUMN);
-
-    if (empty($allowedCompanyIds)) {
-        echo json_encode(['success' => false, 'error' => 'No company assigned to your account']);
-        exit();
-    }
-
-    // Company is mandatory, and must be one the user is authorized for
+    // Company is mandatory
     $company_id = $_POST['company_id'] ?? null;
-    if (empty($company_id) || !in_array($company_id, $allowedCompanyIds)) {
-        echo json_encode(['success' => false, 'error' => 'Invalid or unauthorized company']);
+    if (empty($company_id)) {
+        echo json_encode(['success' => false, 'error' => 'Company is required']);
         exit();
     }
 
@@ -147,21 +133,21 @@ try {
         $attachment = $finalFileName;
     }
 
-    // Get supplier/customer ID from code, restricted to the submitted (authorized) company
+    // Get supplier/customer ID from code
     if ($payment_type === 'customer') {
-        $stmt = $pdo->prepare("SELECT id FROM customers WHERE tenant_id = ? AND customer_code = ? AND company_id = ?");
-        $stmt->execute([$tenant_id, $supplier_code, $company_id]);
+        $stmt = $pdo->prepare("SELECT id FROM customers WHERE tenant_id = ? AND customer_code = ?");
+        $stmt->execute([$tenant_id, $supplier_code]);
         $entity = $stmt->fetch(PDO::FETCH_ASSOC);
-        
+
         if (!$entity) {
             echo json_encode(['success' => false, 'error' => 'Customer not found']);
             exit();
         }
     } else {
-        $stmt = $pdo->prepare("SELECT id FROM suppliers WHERE tenant_id = ? AND supplier_code = ? AND company_id = ?");
-        $stmt->execute([$tenant_id, $supplier_code, $company_id]);
+        $stmt = $pdo->prepare("SELECT id FROM suppliers WHERE tenant_id = ? AND supplier_code = ?");
+        $stmt->execute([$tenant_id, $supplier_code]);
         $entity = $stmt->fetch(PDO::FETCH_ASSOC);
-        
+
         if (!$entity) {
             echo json_encode(['success' => false, 'error' => 'Supplier not found']);
             exit();

@@ -31,41 +31,21 @@ if (!$voucher_id) {
 }
 
 try {
-    // Get company IDs this user has access to (within current tenant)
-    $companyStmt = $pdo->prepare("
-        SELECT company_id
-        FROM user_companies
-        WHERE user_id = ? AND tenant_id = ?
-    ");
-    $companyStmt->execute([$user_id, $tenant_id]);
-    $allowedCompanyIds = $companyStmt->fetchAll(PDO::FETCH_COLUMN);
-
-    if (empty($allowedCompanyIds)) {
-        echo json_encode(['success' => false, 'error' => 'No company assigned to your account']);
-        exit();
-    }
-
-    // Get current voucher details, verify it belongs to an allowed company
+    // Get current voucher details
     $stmt = $pdo->prepare("SELECT payment_method_id, company_id FROM payment_voucher WHERE id = ? AND tenant_id = ?");
     $stmt->execute([$voucher_id, $tenant_id]);
     $voucher = $stmt->fetch(PDO::FETCH_ASSOC);
-    
-    if (!$voucher || !in_array($voucher['company_id'], $allowedCompanyIds)) {
+
+    if (!$voucher) {
         echo json_encode(['success' => false, 'error' => 'Voucher not found']);
         exit();
     }
 
     // Get JSON input
     $input = json_decode(file_get_contents('php://input'), true);
-    
+
     $voucher_date = $input['voucher_date'] ?? '';
     $company_id = $input['company_id'] ?? null;
-
-    // If company_id is being changed, it must also be one the user is authorized for
-    if (empty($company_id) || !in_array($company_id, $allowedCompanyIds)) {
-        echo json_encode(['success' => false, 'error' => 'Invalid or unauthorized company']);
-        exit();
-    }
 
     $sub_account_id = !empty($input['sub_account_id']) ? $input['sub_account_id'] : null;
     $bill_no = !empty($input['bill_no']) ? $input['bill_no'] : null;

@@ -18,12 +18,12 @@ if (!$user_id || !$tenant_id) {
 
 try {
     $stmt = $pdo->prepare("
-        SELECT id, name 
-        FROM accounts 
-        WHERE sub_account_id = 1
+        SELECT id, name
+        FROM accounts
+        WHERE (tenant_id = ? OR tenant_id = 0) AND sub_account_id = 1
         ORDER BY name
     ");
-    $stmt->execute();
+    $stmt->execute([$tenant_id]);
     $methods = $stmt->fetchAll(PDO::FETCH_ASSOC);
     
     echo json_encode(['success' => true, 'data' => $methods]);

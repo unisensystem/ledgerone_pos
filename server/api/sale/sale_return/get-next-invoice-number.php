@@ -16,14 +16,8 @@ if (!$tenant_id) {
 }
 
 try {
-    $company_id = isset($_GET['company_id']) && $_GET['company_id'] !== '' ? (int)$_GET['company_id'] : null;
-
-    $sql = "SELECT bill_no FROM sale_return WHERE tenant_id = ?";
-    $params = [$tenant_id];
-    if ($company_id) { $sql .= " AND company_id = ?"; $params[] = $company_id; }
-    $sql .= " ORDER BY id DESC LIMIT 1";
-    $billStmt = $pdo->prepare($sql);
-    $billStmt->execute($params);
+    $billStmt = $pdo->prepare("SELECT bill_no FROM sale_return WHERE tenant_id = ? ORDER BY id DESC LIMIT 1");
+    $billStmt->execute([$tenant_id]);
     $lastBill = $billStmt->fetchColumn();
 
     if ($lastBill && preg_match('/SR-0*(\d+)$/', $lastBill, $m)) {

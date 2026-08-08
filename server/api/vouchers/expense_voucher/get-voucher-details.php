@@ -25,21 +25,6 @@ if (!$voucher_id) {
 }
 
 try {
-    // Get company IDs this user has access to (within current tenant)
-    $companyStmt = $pdo->prepare("
-        SELECT company_id
-        FROM user_companies
-        WHERE user_id = ? AND tenant_id = ?
-    ");
-    $companyStmt->execute([$user_id, $tenant_id]);
-    $allowedCompanyIds = $companyStmt->fetchAll(PDO::FETCH_COLUMN);
-
-    if (empty($allowedCompanyIds)) {
-        http_response_code(404);
-        echo json_encode(['error' => 'Voucher not found']);
-        exit();
-    }
-
     // Get voucher header
     $stmt = $pdo->prepare("
         SELECT 
@@ -65,7 +50,7 @@ try {
     $stmt->execute([$voucher_id, $tenant_id]);
     $voucher = $stmt->fetch(PDO::FETCH_ASSOC);
     
-    if (!$voucher || !in_array($voucher['company_id'], $allowedCompanyIds)) {
+    if (!$voucher) {
         http_response_code(404);
         echo json_encode(['error' => 'Voucher not found']);
         exit();

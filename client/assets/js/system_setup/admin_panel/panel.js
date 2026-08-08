@@ -2,7 +2,6 @@ let users = [];
 let roles = [];
 let employees = [];
 let allBranches = [];
-let allCompanies = [];
 let stats = { total: 0, active: 0, blocked: 0 };
 
 // Fetch branches from API
@@ -13,17 +12,6 @@ async function fetchBranches() {
         if (data.success) allBranches = data.branches;
     } catch (error) {
         console.error('Error fetching branches:', error);
-    }
-}
-
-// Fetch companies from API
-async function fetchCompanies() {
-    try {
-        const response = await fetch('../../../../server/api/system_setup/admin_panel/get-companies.php');
-        const data = await response.json();
-        if (data.success) allCompanies = data.companies;
-    } catch (error) {
-        console.error('Error fetching companies:', error);
     }
 }
 
@@ -236,33 +224,21 @@ function initBranchPicker(searchId, dropdownId, tagsId, hiddenId, preselected = 
     );
 }
 
-function initCompanyPicker(searchId, dropdownId, tagsId, hiddenId, preselected = []) {
-    initPicker(
-        searchId, dropdownId, tagsId, hiddenId,
-        allCompanies,
-        c => `${c.company_code} - ${c.company_name}`,
-        c => `${c.company_code} - ${c.company_name}`,
-        preselected,
-        'No company selected — user will have no company access.'
-    );
-}
-
 // ─── Modal functions ─────────────────────────────────────────────────────────
 function openCreateUserModal() {
     document.getElementById('createUserModal').style.display = 'flex';
-    ['createBranchIds', 'createCompanyIds'].forEach(id => document.getElementById(id).value = '[]');
-    ['createSelectedBranches', 'createSelectedCompanies'].forEach(id => document.getElementById(id).innerHTML = '');
-    ['createBranchSearch', 'createCompanySearch'].forEach(id => document.getElementById(id).value = '');
-    ['createBranchDropdown', 'createCompanyDropdown'].forEach(id => document.getElementById(id).style.display = 'none');
+    document.getElementById('createBranchIds').value = '[]';
+    document.getElementById('createSelectedBranches').innerHTML = '';
+    document.getElementById('createBranchSearch').value = '';
+    document.getElementById('createBranchDropdown').style.display = 'none';
     initBranchPicker('createBranchSearch', 'createBranchDropdown', 'createSelectedBranches', 'createBranchIds', []);
-    initCompanyPicker('createCompanySearch', 'createCompanyDropdown', 'createSelectedCompanies', 'createCompanyIds', []);
 }
 
 function closeCreateUserModal() {
     document.getElementById('createUserModal').style.display = 'none';
     document.getElementById('createUserForm').reset();
-    ['createSelectedBranches', 'createSelectedCompanies'].forEach(id => document.getElementById(id).innerHTML = '');
-    ['createBranchIds', 'createCompanyIds'].forEach(id => document.getElementById(id).value = '');
+    document.getElementById('createSelectedBranches').innerHTML = '';
+    document.getElementById('createBranchIds').value = '';
 }
 
 async function openEditUserModal(userId) {
@@ -270,16 +246,10 @@ async function openEditUserModal(userId) {
     if (!user) return;
 
     let preselectedBranches = [];
-    let preselectedCompanies = [];
     try {
-        const [brRes, coRes] = await Promise.all([
-            fetch(`../../../../server/api/system_setup/admin_panel/user-branch.php?user_id=${userId}`),
-            fetch(`../../../../server/api/system_setup/admin_panel/user-company.php?user_id=${userId}`)
-        ]);
+        const brRes = await fetch(`../../../../server/api/system_setup/admin_panel/user-branch.php?user_id=${userId}`);
         const brData = await brRes.json();
-        const coData = await coRes.json();
-        if (brData.success) preselectedBranches  = brData.branches.map(b => b.branch_id);
-        if (coData.success) preselectedCompanies = coData.companies.map(c => c.company_id);
+        if (brData.success) preselectedBranches = brData.branches.map(b => b.branch_id);
     } catch (_) {}
 
     const modalBody = document.querySelector('#editUserModal .modal-body');
@@ -328,15 +298,6 @@ async function openEditUserModal(userId) {
                     <div id="editSelectedBranches" style="display:flex; flex-wrap:wrap; gap:6px; margin-top:8px;"></div>
                     <input type="hidden" id="editBranchIds" value="">
                 </div>
-                <div class="form-group" style="grid-column: 1 / -1;">
-                    <label class="form-label">Company Access</label>
-                    <div style="position: relative;">
-                        <input type="text" id="editCompanySearch" class="form-input" placeholder="Search companies..." autocomplete="off">
-                        <div id="editCompanyDropdown" style="display:none; position:absolute; top:100%; left:0; right:0; background:var(--surface-card); border:1px solid var(--border-default); border-radius:var(--radius); max-height:200px; overflow-y:auto; z-index:1050; box-shadow:0 4px 12px rgba(0,0,0,0.1);"></div>
-                    </div>
-                    <div id="editSelectedCompanies" style="display:flex; flex-wrap:wrap; gap:6px; margin-top:8px;"></div>
-                    <input type="hidden" id="editCompanyIds" value="">
-                </div>
             </div>
         </form>
     `;
@@ -345,7 +306,6 @@ async function openEditUserModal(userId) {
     window.currentEditingUserId = userId;
 
     initBranchPicker('editBranchSearch', 'editBranchDropdown', 'editSelectedBranches', 'editBranchIds', preselectedBranches);
-    initCompanyPicker('editCompanySearch', 'editCompanyDropdown', 'editSelectedCompanies', 'editCompanyIds', preselectedCompanies);
 }
 
 function closeEditUserModal() {
@@ -673,22 +633,6 @@ async function createUser() {
             }
         }
 
-        // Step 4 — save company access
-        let companyIds = [];
-        try { companyIds = JSON.parse(document.getElementById('createCompanyIds').value || '[]'); } catch (_) {}
-        if (companyIds.length > 0 && newUserId) {
-            const coResponse = await fetch('../../../../server/api/system_setup/admin_panel/user-company.php', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ user_id: newUserId, company_ids: companyIds })
-            });
-            const coData = await coResponse.json();
-            if (!coData.success) {
-                alert('User created but company access assignment failed: ' + coData.message);
-                closeCreateUserModal(); fetchUsers(); return;
-            }
-        }
-
         alert('User created successfully!');
         closeCreateUserModal();
         fetchUsers();
@@ -714,8 +658,6 @@ async function saveUser() {
 
     let branchIds = [];
     try { branchIds = JSON.parse(document.getElementById('editBranchIds').value || '[]'); } catch (_) {}
-    let companyIds = [];
-    try { companyIds = JSON.parse(document.getElementById('editCompanyIds').value || '[]'); } catch (_) {}
 
     try {
         // Step 1 — update user details
@@ -762,18 +704,6 @@ async function saveUser() {
         const branchData = await branchResponse.json();
         if (!branchData.success) {
             alert('User updated but branch access save failed: ' + branchData.message);
-            closeEditUserModal(); fetchUsers(); return;
-        }
-
-        // Step 4 — save company access
-        const coResponse = await fetch('../../../../server/api/system_setup/admin_panel/user-company.php', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ user_id: parseInt(userId), company_ids: companyIds })
-        });
-        const coData = await coResponse.json();
-        if (!coData.success) {
-            alert('User updated but company access save failed: ' + coData.message);
             closeEditUserModal(); fetchUsers(); return;
         }
 
@@ -1276,7 +1206,6 @@ document.addEventListener('DOMContentLoaded', function () {
     fetchUsers();
     fetchRoles();
     fetchBranches();
-    fetchCompanies();
 
     // Close modals when clicking outside
     const modals = document.querySelectorAll('.modal-overlay');
