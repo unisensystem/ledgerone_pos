@@ -279,6 +279,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     total_balance: 0,
                     total_received: parseFloat(row.total_received) || 0,
                     total_returns: parseFloat(row.total_returns) || 0,
+                    unallocated_received: parseFloat(row.unallocated_received) || 0,
                     bills: []
                 };
             }
@@ -368,8 +369,8 @@ document.addEventListener('DOMContentLoaded', function () {
         const grouped = groupByCustomer(rows);
 
         grouped.forEach((customer, i) => {
-            const bal      = customer.total_balance;
-            const balClass = bal >= 0 ? 'balance-positive' : 'balance-negative';
+            const bal      = customer.total_balance - customer.unallocated_received;
+            const balClass = bal > 0 ? 'balance-positive' : bal < 0 ? 'balance-negative' : '';
             const balText  = (bal < 0 ? '-' : '') + currencySymbol + Math.abs(bal).toFixed(2);
             const oldestDate = customer.bills[0]?.invoice_date || '';
             const oldestDays = customer.bills[0]?.days_overdue ?? '';

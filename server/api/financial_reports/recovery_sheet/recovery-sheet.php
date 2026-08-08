@@ -57,12 +57,19 @@ try {
             COALESCE((
                 SELECT SUM(sr.net_amount)
                 FROM sale_return sr
-                WHERE sr.customer_id = c.id 
+                WHERE sr.customer_id = c.id
                 AND sr.tenant_id = ?
                 AND sr.status = 'Posted'
                 " . ($date_from ? " AND sr.sale_date >= ?" : "") . "
                 " . ($date_to ? " AND sr.sale_date <= ?" : "") . "
-            ), 0) as total_returns
+            ), 0) as total_returns,
+            COALESCE((
+                SELECT SUM(rv.amount)
+                FROM receive_voucher rv
+                WHERE rv.customer_id = c.id
+                AND rv.tenant_id = ?
+                AND (rv.bill_no IS NULL OR rv.bill_no = '')
+            ), 0) as unallocated_received
         FROM opening_balance_invoices obi
         JOIN customers c ON obi.customer_id = c.id
         WHERE obi.tenant_id = ?
@@ -109,12 +116,19 @@ try {
             COALESCE((
                 SELECT SUM(sr.net_amount)
                 FROM sale_return sr
-                WHERE sr.customer_id = c.id 
+                WHERE sr.customer_id = c.id
                 AND sr.tenant_id = ?
                 AND sr.status = 'Posted'
                 " . ($date_from ? " AND sr.sale_date >= ?" : "") . "
                 " . ($date_to ? " AND sr.sale_date <= ?" : "") . "
-            ), 0) as total_returns
+            ), 0) as total_returns,
+            COALESCE((
+                SELECT SUM(rv.amount)
+                FROM receive_voucher rv
+                WHERE rv.customer_id = c.id
+                AND rv.tenant_id = ?
+                AND (rv.bill_no IS NULL OR rv.bill_no = '')
+            ), 0) as unallocated_received
         FROM sale_invoice si
         JOIN customers c ON si.customer_id = c.id
         WHERE si.tenant_id = ?
@@ -149,6 +163,8 @@ try {
     $params[] = $tenant_id;
     if ($date_from) $params[] = $date_from;
     if ($date_to) $params[] = $date_to;
+    // unallocated_received subquery: rv.tenant_id
+    $params[] = $tenant_id;
     // WHERE: obi.tenant_id, territory filters
     $params[] = $tenant_id;
     if ($company_id) $params[] = $company_id;
@@ -171,6 +187,8 @@ try {
     $params[] = $tenant_id;
     if ($date_from) $params[] = $date_from;
     if ($date_to) $params[] = $date_to;
+    // unallocated_received subquery: rv.tenant_id
+    $params[] = $tenant_id;
     // WHERE: si.tenant_id, sale_officer_id, sale_date range, territory filters
     $params[] = $tenant_id;
     if ($recovery_officer_id) $params[] = $recovery_officer_id;
