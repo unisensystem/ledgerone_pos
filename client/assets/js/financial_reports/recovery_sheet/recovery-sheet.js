@@ -9,10 +9,15 @@ document.addEventListener('DOMContentLoaded', function () {
     if (customerViewToggle) {
         customerViewToggle.addEventListener('change', function () {
             customerViewMode = this.checked;
-            customerViewLabel.style.opacity = customerViewMode ? '1' : '0.5';
-            renderTable(lastRecoveryData);
+            if (customerViewLabel) customerViewLabel.style.opacity = customerViewMode ? '1' : '0.5';
+            console.log('[Recovery] customerViewMode =', customerViewMode, '| data rows =', lastRecoveryData.length);
+            if (lastRecoveryData.length > 0) {
+                renderTable(lastRecoveryData);
+            } else {
+                loadRecoveryData();
+            }
         });
-        customerViewLabel.style.opacity = '0.5';
+        if (customerViewLabel) customerViewLabel.style.opacity = '0.5';
     }
 
     // Set default dates to current month
@@ -231,7 +236,7 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function setTableHeaders(mode) {
-        const tr = document.querySelector('thead tr');
+        const tr = document.querySelector('#recoveryTable thead tr');
         if (!tr) return;
         if (mode === 'customer') {
             tr.innerHTML = `
@@ -307,15 +312,19 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function renderTable(rows) {
-        if (customerViewMode) {
-            renderTableCustomerView(rows);
-        } else {
-            renderTableBillView(rows);
+        try {
+            if (customerViewMode) {
+                renderTableCustomerView(rows);
+            } else {
+                renderTableBillView(rows);
+            }
+        } catch (e) {
+            console.error('[Recovery] renderTable error:', e);
         }
     }
 
     function renderTableBillView(rows) {
-        const tbody = document.querySelector('tbody');
+        const tbody = document.querySelector('#recoveryTable tbody');
         if (!tbody) return;
         setTableHeaders('bill');
         tbody.innerHTML = '';
@@ -346,8 +355,8 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function renderTableCustomerView(rows) {
-        const tbody = document.querySelector('tbody');
-        if (!tbody) return;
+        const tbody = document.querySelector('#recoveryTable tbody');
+        if (!tbody) { console.error('[Recovery] #recoveryTable tbody not found'); return; }
         setTableHeaders('customer');
         tbody.innerHTML = '';
 
@@ -475,7 +484,7 @@ document.addEventListener('DOMContentLoaded', function () {
             });
         } else {
             rows = [['S#', 'Bill No', 'Invoice Date', 'Customer Name', 'Address', 'Primary Phone No', 'Balance', 'Received Amount', 'Sales Return', 'Days Overdue', 'Signature']];
-            document.querySelectorAll('tbody tr').forEach(tr => {
+            document.querySelectorAll('#recoveryTable tbody tr').forEach(tr => {
                 const cols = tr.querySelectorAll('td');
                 if (!cols.length) return;
                 const r = [];

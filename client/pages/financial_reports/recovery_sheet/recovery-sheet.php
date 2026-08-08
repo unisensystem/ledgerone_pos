@@ -140,7 +140,7 @@ $currency_symbol = $currency['symbol'];
                 </div>
 
                 <div class="table-container">
-                    <table>
+                    <table id="recoveryTable">
                         <thead>
                             <tr>
                                 <th>S#</th>
