@@ -44,6 +44,7 @@ try {
                 SELECT SUM(rv.amount)
                 FROM receive_voucher rv
                 WHERE rv.bill_no = obi.invoice_number
+                  AND rv.customer_id = c.id
                   AND rv.tenant_id = ?
             ), 0)                               AS current_balance,
             COALESCE((
@@ -99,6 +100,7 @@ try {
                 SELECT SUM(rv.amount)
                 FROM receive_voucher rv
                 WHERE rv.bill_no = si.bill_no
+                  AND rv.customer_id = c.id
                   AND rv.tenant_id = ?
             ), 0) - COALESCE((
                 SELECT SUM(sr.net_amount)

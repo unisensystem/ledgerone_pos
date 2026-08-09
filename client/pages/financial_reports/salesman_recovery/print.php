@@ -117,6 +117,7 @@ $inner = "
             SELECT SUM(rv.amount)
             FROM receive_voucher rv
             WHERE rv.bill_no = obi.invoice_number
+              AND rv.customer_id = c.id
               AND rv.tenant_id = ?
         ), 0)                               AS current_balance,
         COALESCE((
@@ -172,6 +173,7 @@ $inner = "
             SELECT SUM(rv.amount)
             FROM receive_voucher rv
             WHERE rv.bill_no = si.bill_no
+              AND rv.customer_id = c.id
               AND rv.tenant_id = ?
         ), 0) - COALESCE((
             SELECT SUM(sr.net_amount)
@@ -654,9 +656,8 @@ if ($view_mode === 'customer') {
             </tr>
             <?php foreach ($salesman['customers'] as $customer):
                 $cGlobal++;
-                $net_bal  = $customer['net_balance'];
-                $balClass = $net_bal < 0 ? 'color:#c00;' : '';
-                $balText  = ($net_bal < 0 ? '-' : '') . $currency_symbol . number_format(abs($net_bal), 2);
+                $net_bal = $customer['net_balance'];
+                $balText = ($net_bal < 0 ? '-' : '') . $currency_symbol . number_format(abs($net_bal), 2);
                 $oldestDays = $customer['bills'][0]['days_overdue'] ?? '';
             ?>
             <tr>

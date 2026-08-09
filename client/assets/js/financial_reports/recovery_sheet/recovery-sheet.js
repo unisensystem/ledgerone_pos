@@ -372,7 +372,7 @@ document.addEventListener('DOMContentLoaded', function () {
         grouped.forEach((customer, i) => {
             const bal      = customer.total_balance - customer.unallocated_received;
             const balClass = bal > 0 ? 'balance-positive' : bal < 0 ? 'balance-negative' : '';
-            const balText    = (bal < 0 ? '-' : '') + currencySymbol + Math.abs(bal).toFixed(2);
+            const balText  = (bal < 0 ? '-' : '') + currencySymbol + Math.abs(bal).toFixed(2);
             const oldestDays = customer.bills[0]?.days_overdue ?? '';
 
             const tr = document.createElement('tr');
