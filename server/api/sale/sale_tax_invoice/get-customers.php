@@ -34,7 +34,8 @@ try {
     $params = [$tenant_id];
 
     if ($company_id) {
-        $sql .= " AND c.company_id = ?";
+        // Universal customers (tenant_id=0) bypass company filter
+        $sql .= " AND (c.tenant_id = 0 OR c.company_id = ?)";
         $params[] = $company_id;
     }
 

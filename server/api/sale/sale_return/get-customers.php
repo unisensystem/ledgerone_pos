@@ -18,10 +18,14 @@ if (!$tenant_id) {
 try {
     $company_id = isset($_GET['company_id']) && $_GET['company_id'] !== '' ? (int)$_GET['company_id'] : null;
 
-    $sql = "SELECT c.id, c.customer_code, c.customer_name, c.current_balance, c.address, c.supplier_man_id, e.full_name as supplier_man_name FROM customers c LEFT JOIN employees e ON c.supplier_man_id = e.id WHERE (c.tenant_id = ? OR c.tenant_id = 0) AND c.status = 'ACTIVE'";
-    $params = [$tenant_id];
-    if ($company_id) { $sql .= " AND c.company_id = ?"; $params[] = $company_id; }
-    $sql .= " ORDER BY c.customer_name";
+    if ($company_id) {
+        // Universal customers (tenant_id=0) are always visible; tenant customers are filtered by company
+        $sql = "SELECT c.id, c.customer_code, c.customer_name, c.current_balance, c.address, c.supplier_man_id, e.full_name as supplier_man_name FROM customers c LEFT JOIN employees e ON c.supplier_man_id = e.id WHERE (c.tenant_id = 0 OR (c.tenant_id = ? AND c.company_id = ?)) AND c.status = 'ACTIVE' ORDER BY c.customer_name";
+        $params = [$tenant_id, $company_id];
+    } else {
+        $sql = "SELECT c.id, c.customer_code, c.customer_name, c.current_balance, c.address, c.supplier_man_id, e.full_name as supplier_man_name FROM customers c LEFT JOIN employees e ON c.supplier_man_id = e.id WHERE (c.tenant_id = ? OR c.tenant_id = 0) AND c.status = 'ACTIVE' ORDER BY c.customer_name";
+        $params = [$tenant_id];
+    }
     $stmt = $pdo->prepare($sql);
     $stmt->execute($params);
     $customers = $stmt->fetchAll(PDO::FETCH_ASSOC);
