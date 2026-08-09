@@ -70,7 +70,15 @@ try {
                 WHERE rv.customer_id = c.id
                   AND rv.tenant_id = ?
                   AND (rv.bill_no IS NULL OR rv.bill_no = '' OR rv.bill_no = 'null')
-            ), 0)                               AS unallocated_received
+            ), 0)                               AS unallocated_received,
+            COALESCE((
+                SELECT SUM(sr.net_amount)
+                FROM sale_return sr
+                WHERE sr.customer_id = c.id
+                  AND sr.tenant_id = ?
+                  AND sr.status = 'Posted'
+                  AND (sr.sale_invoice_no IS NULL OR sr.sale_invoice_no = 0)
+            ), 0)                               AS unallocated_returns
         FROM opening_balance_invoices obi
         JOIN customers c ON obi.customer_id = c.id
         LEFT JOIN employees e ON obi.employee_id = e.id
@@ -132,7 +140,15 @@ try {
                 WHERE rv.customer_id = c.id
                   AND rv.tenant_id = ?
                   AND (rv.bill_no IS NULL OR rv.bill_no = '' OR rv.bill_no = 'null')
-            ), 0)                               AS unallocated_received
+            ), 0)                               AS unallocated_received,
+            COALESCE((
+                SELECT SUM(sr.net_amount)
+                FROM sale_return sr
+                WHERE sr.customer_id = c.id
+                  AND sr.tenant_id = ?
+                  AND sr.status = 'Posted'
+                  AND (sr.sale_invoice_no IS NULL OR sr.sale_invoice_no = 0)
+            ), 0)                               AS unallocated_returns
         FROM sale_invoice si
         JOIN customers c ON si.customer_id = c.id
         LEFT JOIN employees e ON si.sale_officer_id = e.id
@@ -162,6 +178,7 @@ try {
     if ($date_from) $params[] = $date_from;
     if ($date_to)   $params[] = $date_to;
     $params[] = $tenant_id;                 // unallocated_received subquery
+    $params[] = $tenant_id;                 // unallocated_returns subquery
     $params[] = $tenant_id;                 // WHERE obi.tenant_id
     if ($salesman_id)  $params[] = $salesman_id;
     if ($company_id)   $params[] = $company_id;
@@ -181,6 +198,7 @@ try {
     if ($date_from) $params[] = $date_from;
     if ($date_to)   $params[] = $date_to;
     $params[] = $tenant_id;                 // unallocated_received subquery
+    $params[] = $tenant_id;                 // unallocated_returns subquery
     $params[] = $tenant_id;                 // WHERE si.tenant_id
     if ($salesman_id)  $params[] = $salesman_id;
     if ($date_from)    $params[] = $date_from;

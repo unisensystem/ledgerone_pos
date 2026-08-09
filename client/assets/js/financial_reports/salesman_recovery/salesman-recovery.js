@@ -260,6 +260,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     total_received:       parseFloat(row.total_received)       || 0,
                     total_returns:        parseFloat(row.total_returns)        || 0,
                     unallocated_received: parseFloat(row.unallocated_received) || 0,
+                    unallocated_returns:  parseFloat(row.unallocated_returns)  || 0,
                     bills:                []
                 };
             }
@@ -275,7 +276,7 @@ document.addEventListener('DOMContentLoaded', function () {
             const customers = Object.values(salesman.customers).map(customer => {
                 customer.bills.sort((a, b) => new Date(a.invoice_date) - new Date(b.invoice_date));
                 customer.total_balance = customer.bills.reduce((s, b) => s + b.current_balance, 0);
-                const rawNet = customer.total_balance - customer.unallocated_received;
+                const rawNet = customer.total_balance - customer.unallocated_received - customer.unallocated_returns;
                 customer.net_balance = rawNet > 0 ? rawNet : 0;
                 return customer;
             });

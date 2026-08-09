@@ -143,7 +143,15 @@ $inner = "
             WHERE rv.customer_id = c.id
               AND rv.tenant_id = ?
               AND (rv.bill_no IS NULL OR rv.bill_no = '' OR rv.bill_no = 'null')
-        ), 0)                               AS unallocated_received
+        ), 0)                               AS unallocated_received,
+        COALESCE((
+            SELECT SUM(sr.net_amount)
+            FROM sale_return sr
+            WHERE sr.customer_id = c.id
+              AND sr.tenant_id = ?
+              AND sr.status = 'Posted'
+              AND (sr.sale_invoice_no IS NULL OR sr.sale_invoice_no = 0)
+        ), 0)                               AS unallocated_returns
     FROM opening_balance_invoices obi
     JOIN customers c ON obi.customer_id = c.id
     LEFT JOIN employees e ON obi.employee_id = e.id
@@ -205,7 +213,15 @@ $inner = "
             WHERE rv.customer_id = c.id
               AND rv.tenant_id = ?
               AND (rv.bill_no IS NULL OR rv.bill_no = '' OR rv.bill_no = 'null')
-        ), 0)                               AS unallocated_received
+        ), 0)                               AS unallocated_received,
+        COALESCE((
+            SELECT SUM(sr.net_amount)
+            FROM sale_return sr
+            WHERE sr.customer_id = c.id
+              AND sr.tenant_id = ?
+              AND sr.status = 'Posted'
+              AND (sr.sale_invoice_no IS NULL OR sr.sale_invoice_no = 0)
+        ), 0)                               AS unallocated_returns
     FROM sale_invoice si
     JOIN customers c ON si.customer_id = c.id
     LEFT JOIN employees e ON si.sale_officer_id = e.id
@@ -234,8 +250,9 @@ if ($date_to)   $params[] = $date_to;
 $params[] = $tenant_id;
 if ($date_from) $params[] = $date_from;
 if ($date_to)   $params[] = $date_to;
-$params[] = $tenant_id;
-$params[] = $tenant_id;
+$params[] = $tenant_id;  // unallocated_received subquery
+$params[] = $tenant_id;  // unallocated_returns subquery
+$params[] = $tenant_id;  // WHERE obi.tenant_id
 if ($salesman_id)  $params[] = $salesman_id;
 if ($company_id)   $params[] = $company_id;
 if ($country_id)   $params[] = $country_id;
@@ -245,16 +262,17 @@ if ($city_zone_id) $params[] = $city_zone_id;
 if ($area_id)      $params[] = $area_id;
 
 // UNION Part 2 params
-$params[] = $tenant_id;
-$params[] = $tenant_id;
-$params[] = $tenant_id;
+$params[] = $tenant_id;  // balance rv.tenant_id
+$params[] = $tenant_id;  // balance sr.tenant_id
+$params[] = $tenant_id;  // received subquery tenant
 if ($date_from) $params[] = $date_from;
 if ($date_to)   $params[] = $date_to;
-$params[] = $tenant_id;
+$params[] = $tenant_id;  // returns subquery tenant
 if ($date_from) $params[] = $date_from;
 if ($date_to)   $params[] = $date_to;
-$params[] = $tenant_id;
-$params[] = $tenant_id;
+$params[] = $tenant_id;  // unallocated_received subquery
+$params[] = $tenant_id;  // unallocated_returns subquery
+$params[] = $tenant_id;  // WHERE si.tenant_id
 if ($salesman_id)  $params[] = $salesman_id;
 if ($date_from)    $params[] = $date_from;
 if ($date_to)      $params[] = $date_to;
@@ -307,6 +325,7 @@ function groupBySalesmanAndCustomerAndSimulate($rows) {
                 'total_received'       => floatval($row['total_received']),
                 'total_returns'        => floatval($row['total_returns']),
                 'unallocated_received' => floatval($row['unallocated_received']),
+                'unallocated_returns'  => floatval($row['unallocated_returns']),
                 'bills'                => []
             ];
         }
@@ -336,7 +355,7 @@ function groupBySalesmanAndCustomerAndSimulate($rows) {
                 }
             }
             $customer['total_balance'] = $total_balance;
-            $rawNet = $total_balance - $customer['unallocated_received'];
+            $rawNet = $total_balance - $customer['unallocated_received'] - $customer['unallocated_returns'];
             $customer['net_balance']   = $rawNet > 0 ? $rawNet : 0.0;
             $salesman['total_balance'] += $customer['net_balance'];
         }
