@@ -41,8 +41,9 @@ class CurrencyConverter {
         }
         
         try {
+            $ctx = stream_context_create(['http' => ['timeout' => 3]]);
             $url = "https://v6.exchangerate-api.com/v6/{$this->api_key}/latest/{$fromCode}";
-            $response = @file_get_contents($url);
+            $response = @file_get_contents($url, false, $ctx);
             
             if ($response === false) {
                 return 1;
