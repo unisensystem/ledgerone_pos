@@ -1,0 +1,246 @@
+/* ----- LIGHT THEME RESET & VARIABLES (based on ds_light) ----- */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  background-color: #f7f9fc; /* Surface-1 */
+  font-family:
+    "Inter",
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    Roboto,
+    sans-serif;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  min-height: 100vh;
+  padding: 32px 24px;
+  color: #2f3b4c; /* Body text */
+}
+
+/* main card – container for the form */
+.form-card {
+  max-width: 1080px;
+  width: 100%;
+  background: #ffffff; /* Surface-0 */
+  border-radius: 12px; /* card radius */
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06); /* soft shadow */
+  padding: 24px 28px 32px 28px; /* card padding 20-24 */
+}
+
+/* section title (exactly 18px / 600) */
+.section-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: #0e1a2b; /* heading */
+  margin-bottom: 20px; /* space before fields */
+  letter-spacing: -0.01em;
+}
+
+/* divider between sections (soft border) */
+.section-divider {
+  margin: 32px 0 28px 0; /* section spacing 32px */
+  border: none;
+  border-top: 1.5px solid #e1e6ee; /* default border */
+}
+
+/* ----- 12‑COL GRID (24px gutters) ----- */
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  gap: 24px; /* gutters 24px */
+}
+
+/* field wrapper – follows label → input → helper structure */
+.field {
+  display: flex;
+  flex-direction: column;
+  grid-column: span 4; /* desktop: 3 fields per row (12/3=4) */
+}
+
+/* label – 13px/500, margin-bottom 6px */
+.field label {
+  font-size: 13px;
+  font-weight: 500;
+  color: #2f3b4c; /* body color for label (matches spec) */
+  margin-bottom: 6px;
+  line-height: 1.4;
+}
+
+/* base input style */
+.field input {
+  height: 40px; /* exact 40px */
+  padding: 0 14px;
+  border: 1.5px solid #d6dbe4; /* default border */
+  border-radius: 8px; /* radius 8px */
+  background-color: #ffffff;
+  font-family: "Inter", sans-serif;
+  font-size: 14px;
+  color: #0e1a2b; /* heading-level for filled text */
+  outline: none;
+  transition:
+    border 0.15s ease,
+    box-shadow 0.15s ease;
+  width: 100%;
+}
+
+/* focus state: 2px primary + glow (simulated with box-shadow) */
+.field input:focus {
+  border: 2px solid #1f7bff; /* primary */
+  box-shadow: 0 0 0 2px rgba(31, 123, 255, 0.2); /* soft glow */
+}
+
+/* readonly field – Customers Code (still white but subtle) */
+.field input[readonly] {
+  background-color: #f2f4f8; /* disabled-like background but readable */
+  color: #2f3b4c;
+  border-color: #e1e4ea;
+  cursor: default;
+  pointer-events: none; /* visually readonly, no interaction */
+}
+
+/* required indicator: we use a small extra text, but browser style also possible */
+.required-star {
+  color: #e34f4f; /* error red = required star */
+  font-weight: 500;
+  margin-left: 2px;
+}
+
+/* helper text (optional) – initially hidden, shown on error */
+.helper-text {
+  font-size: 12px;
+  margin-top: 4px;
+  min-height: 18px; /* keep space even when empty */
+  color: #6b7280; /* subtext */
+  line-height: 1.4;
+}
+
+/* error state */
+.field.error input {
+  border-color: #e34f4f; /* error border */
+}
+.field.error .helper-text {
+  color: #e34f4f; /* error helper */
+}
+
+/* phone & email fields normal */
+/* disabled (not used, but style ready) */
+
+/* ---- form actions (right aligned) + sticky footer option ---- */
+.form-actions {
+  display: flex;
+  justify-content: space-between; /* title left, buttons right */
+  align-items: center;
+  margin-top: 40px;
+  border-top: 1.5px solid #e1e6ee; /* subtle separator */
+  padding-top: 24px;
+}
+
+.left-title {
+  font-size: 15px;
+  font-weight: 500;
+  color: #2f3b4c;
+}
+.left-title span {
+  color: #6b7280;
+  font-weight: 400;
+  margin-left: 8px;
+}
+
+.button-group {
+  display: flex;
+  gap: 12px;
+}
+
+/* ---- buttons exact from ds light ---- */
+.btn {
+  height: 40px;
+  padding: 0 20px;
+  border-radius: 8px;
+  font-family: "Inter", sans-serif;
+  font-weight: 500;
+  font-size: 14px;
+  border: none;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition:
+    background 0.15s,
+    border 0.15s;
+  line-height: 1;
+}
+
+.btn-primary {
+  background: #1f7bff;
+  color: #ffffff;
+}
+.btn-primary:hover {
+  background: #1a6cdc;
+}
+.btn-primary:active {
+  background: #1559b8;
+}
+
+.btn-secondary {
+  background: #eff2f7;
+  border: 1px solid #c9cfda;
+  color: #1f1f1f;
+}
+.btn-secondary:hover {
+  background: #e4e8ef;
+}
+.btn-secondary:active {
+  background: #d9dee7;
+}
+
+.btn-ghost {
+  background: transparent;
+  color: #1f7bff;
+  border: none;
+}
+.btn-ghost:hover {
+  background: #f0f6ff;
+}
+
+/* tablet: 2 fields per row */
+@media (max-width: 900px) {
+  .field {
+    grid-column: span 6; /* 12/6 = 2 fields */
+  }
+}
+
+/* mobile: 1 field per row */
+@media (max-width: 600px) {
+  .form-card {
+    padding: 20px 16px;
+  }
+  .field {
+    grid-column: span 12; /* 1 field */
+  }
+  .form-actions {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 16px;
+  }
+  .button-group {
+    width: 100%;
+    justify-content: flex-end;
+  }
+}
+
+/* small hint for required */
+.req-hint {
+  font-size: 12px;
+  color: #6b7280;
+  margin-top: 8px;
+}
+.req-hint i {
+  color: #e34f4f;
+  font-style: normal;
+}

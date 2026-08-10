@@ -1,0 +1,58 @@
+# FuelingSys ERP - Error Handling Configuration
+# Redirect all HTTP errors to appropriate PHP error pages
+
+# Enable rewrite engine
+RewriteEngine On
+
+# Set default error pages
+ErrorDocument 400 /errors/400.php
+ErrorDocument 401 /errors/401.php
+ErrorDocument 403 /errors/403.php
+ErrorDocument 404 /errors/404.php
+ErrorDocument 405 /errors/405.php
+ErrorDocument 408 /errors/408.php
+ErrorDocument 500 /errors/500.php
+ErrorDocument 502 /errors/502.php
+ErrorDocument 503 /errors/503.php
+ErrorDocument 504 /errors/504.php
+
+# Security headers for error pages
+<IfModule mod_headers.c>
+    # Protect error pages from being framed (clickjacking protection)
+    Header always set X-Frame-Options "SAMEORIGIN" env=IS_ERROR
+    
+    # Prevent MIME type sniffing
+    Header always set X-Content-Type-Options "nosniff" env=IS_ERROR
+    
+    # Enable XSS protection
+    Header always set X-XSS-Protection "1; mode=block" env=IS_ERROR
+    
+    # Set CSP for error pages
+    Header always set Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:;" env=IS_ERROR
+    
+    # Don't cache error pages
+    Header always set Cache-Control "no-cache, no-store, must-revalidate" env=IS_ERROR
+    Header always set Pragma "no-cache" env=IS_ERROR
+    Header always set Expires "0" env=IS_ERROR
+</IfModule>
+
+# Set environment variable for error pages
+SetEnvIf Request_URI "^/errors/" IS_ERROR
+
+# Custom 404 handling for missing files/directories
+<IfModule mod_rewrite.c>
+    # If the requested file or directory doesn't exist
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
+    # Redirect to 404 error page
+    RewriteRule ^(.*)$ /errors/404.php [L,QSA]
+</IfModule>
+
+# Protect error directory from direct access (optional)
+<FilesMatch "\.(php|html)$">
+    Order allow,deny
+    Allow from all
+</FilesMatch>
+
+# Prevent directory listing in errors folder
+Options -Indexes

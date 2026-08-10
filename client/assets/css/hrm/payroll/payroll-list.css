@@ -1,0 +1,526 @@
+/* Base styles and reset */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+}
+
+body {
+  background-color: #f7f9fc; /* Surface-1 */
+  color: #2f3b4c; /* Body text */
+  padding: 24px;
+  min-height: 100vh;
+}
+
+/* Layout grid based on DS */
+.container {
+  max-width: 1400px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  gap: 24px;
+}
+
+/* Header */
+.header {
+  grid-column: 1 / -1;
+  margin-bottom: 16px;
+}
+
+.header h1 {
+  color: #0e1a2b; /* Heading color */
+  font-size: 28px;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.header p {
+  color: #6b7280; /* Subtext */
+  font-size: 14px;
+}
+
+/* Main content */
+.main-content {
+  grid-column: 1 / -1;
+}
+
+/* Filters Card */
+.filters-card {
+  background-color: #ffffff; /* Surface-0 */
+  border-radius: 12px;
+  padding: 20px 24px;
+  margin-bottom: 24px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
+}
+
+.filters-title {
+  color: #0e1a2b;
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.filters-title i {
+  color: #1f7bff;
+}
+
+/* Filter form */
+.filters-form {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  align-items: end;
+}
+
+@media (max-width: 1024px) {
+  .filters-form {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  .filters-form {
+    grid-template-columns: 1fr;
+  }
+}
+
+.filter-field {
+  display: flex;
+  flex-direction: column;
+}
+
+.filter-field label {
+  font-size: 13px;
+  font-weight: 500;
+  color: #2f3b4c;
+  margin-bottom: 6px;
+}
+
+.filter-field input,
+.filter-field select {
+  height: 40px;
+  padding: 0 14px;
+  border: 1.5px solid #d6dbe4;
+  border-radius: 8px;
+  background-color: #ffffff;
+  font-size: 14px;
+  color: #2f3b4c;
+  transition: all 0.2s ease;
+}
+
+.filter-field input:focus,
+.filter-field select:focus {
+  outline: none;
+  border: 2px solid #1f7bff;
+  box-shadow: 0 0 0 2px rgba(31, 123, 255, 0.1);
+}
+
+.filter-actions {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+/* Buttons based on DS */
+.btn {
+  height: 40px;
+  padding: 0 16px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: all 0.2s ease;
+  border: none;
+}
+
+.btn-primary {
+  background-color: #1f7bff;
+  color: #ffffff;
+}
+
+.btn-primary:hover {
+  background-color: #1a6cdc;
+}
+
+.btn-primary:active {
+  background-color: #1559b8;
+}
+
+.btn-secondary {
+  background-color: #eff2f7;
+  color: #1f1f1f;
+  border: 1px solid #c9cfda;
+}
+
+.btn-secondary:hover {
+  background-color: #e4e8ef;
+}
+
+.btn-secondary:active {
+  background-color: #d9dee7;
+}
+
+.btn-ghost {
+  background-color: transparent;
+  color: #1f7bff;
+}
+
+.btn-ghost:hover {
+  background-color: #f0f6ff;
+}
+
+.btn-icon {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border-radius: 6px;
+}
+
+.btn-success {
+  background-color: #2fbf71;
+  color: white;
+}
+
+.btn-warning {
+  background-color: #e8b23f;
+  color: white;
+}
+
+.btn-danger {
+  background-color: #e34f4f;
+  color: white;
+}
+
+/* Actions bar */
+.actions-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.stats {
+  display: flex;
+  gap: 24px;
+  align-items: center;
+}
+
+.stat-item {
+  display: flex;
+  flex-direction: column;
+}
+
+.stat-label {
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.stat-value {
+  font-size: 18px;
+  font-weight: 600;
+  color: #0e1a2b;
+}
+
+/* Table container */
+.table-container {
+  background-color: #ffffff; /* Surface-0 */
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
+  margin-bottom: 24px;
+}
+
+.table-header {
+  padding: 20px 24px;
+  border-bottom: 1px solid #e1e6ee;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.table-header h3 {
+  color: #0e1a2b;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.table-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.search-box {
+  position: relative;
+}
+
+.search-box input {
+  height: 36px;
+  width: 240px;
+  padding: 0 36px 0 14px;
+  border: 1px solid #d6dbe4;
+  border-radius: 6px;
+  font-size: 13px;
+}
+
+.search-box i {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #6b7280;
+  font-size: 14px;
+}
+
+/* Table styles based on DS */
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+thead {
+  background-color: #f7f9fc; /* Header background */
+}
+
+th {
+  text-align: left;
+  padding: 16px 24px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #0e1a2b;
+  border-bottom: 1px solid #e1e6ee;
+  white-space: nowrap;
+}
+
+tbody tr {
+  height: 60px;
+  border-bottom: 1px solid #e1e6ee;
+}
+
+tbody tr:nth-child(even) {
+  background-color: #fafbfd; /* Alternating row */
+}
+
+tbody tr:hover {
+  background-color: #f0f6ff; /* Hover row */
+}
+
+td {
+  padding: 16px 24px;
+  font-size: 14px;
+  vertical-align: middle;
+}
+
+/* Status badges */
+.status-badge {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.status-draft {
+  background-color: #eff2f7;
+  color: #4b5563;
+}
+
+.status-pending {
+  background-color: #fef3c7;
+  color: #92400e;
+}
+
+.status-approved {
+  background-color: #d1fae5;
+  color: #065f46;
+}
+
+.status-rejected {
+  background-color: #fee2e2;
+  color: #991b1b;
+}
+
+.status-paid {
+  background-color: #dbeafe;
+  color: #1e40af;
+}
+
+/* Action buttons in table */
+.action-buttons {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.action-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: transparent;
+  border: 1px solid #e1e6ee;
+  color: #6b7280;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.action-btn:hover {
+  background-color: #f7f9fc;
+}
+
+.action-btn.view:hover {
+  color: #1f7bff;
+  border-color: #1f7bff;
+}
+
+.action-btn.edit:hover {
+  color: #e8b23f;
+  border-color: #e8b23f;
+}
+
+.action-btn.delete:hover {
+  color: #e34f4f;
+  border-color: #e34f4f;
+}
+
+.action-btn.print:hover {
+  color: #1f7bff;
+  border-color: #1f7bff;
+}
+
+/* Pagination */
+.pagination {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 24px;
+  border-top: 1px solid #e1e6ee;
+}
+
+.pagination-info {
+  font-size: 14px;
+  color: #6b7280;
+}
+
+.pagination-controls {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.pagination-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #ffffff;
+  border: 1px solid #d6dbe4;
+  color: #4b5563;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.pagination-btn:hover {
+  background-color: #f7f9fc;
+  border-color: #c9cfda;
+}
+
+.pagination-btn.active {
+  background-color: #1f7bff;
+  border-color: #1f7bff;
+  color: white;
+}
+
+.pagination-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Footer */
+.footer {
+  grid-column: 1 / -1;
+  text-align: center;
+  padding: 20px;
+  color: #6b7280;
+  font-size: 13px;
+  border-top: 1px solid #e1e6ee;
+  margin-top: 24px;
+}
+
+/* Empty state */
+.empty-state {
+  padding: 60px 24px;
+  text-align: center;
+  color: #6b7280;
+}
+
+.empty-state i {
+  font-size: 48px;
+  margin-bottom: 16px;
+  color: #d6dbe4;
+}
+
+.empty-state h4 {
+  font-size: 16px;
+  margin-bottom: 8px;
+  color: #4b5563;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  body {
+    padding: 16px;
+  }
+
+  .container {
+    gap: 16px;
+  }
+
+  .filters-card {
+    padding: 16px;
+  }
+
+  .table-header {
+    flex-direction: column;
+    gap: 16px;
+    align-items: flex-start;
+  }
+
+  .search-box input {
+    width: 100%;
+  }
+
+  .actions-bar {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .stats {
+    flex-wrap: wrap;
+    gap: 16px;
+  }
+
+  th,
+  td {
+    padding: 12px 16px;
+  }
+
+  .pagination {
+    flex-direction: column;
+    gap: 16px;
+  }
+}

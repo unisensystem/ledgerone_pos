@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Payment Successful - LedgerOne ERP</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="../../assets/css/auth/checkout.css">
+    <style>
+        .success-container {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--surface-1);
+            padding: var(--spacing-xl);
+        }
+        .success-card {
+            background: var(--surface-0);
+            border-radius: var(--radius-lg);
+            padding: var(--spacing-xxl);
+            max-width: 600px;
+            width: 100%;
+            text-align: center;
+            box-shadow: var(--shadow-medium);
+        }
+        .success-icon {
+            width: 80px;
+            height: 80px;
+            background: var(--success);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto var(--spacing-lg);
+            animation: scaleIn 0.5s ease;
+        }
+        .success-icon i {
+            font-size: 40px;
+            color: white;
+        }
+        @keyframes scaleIn {
+            from { transform: scale(0); }
+            to { transform: scale(1); }
+        }
+        .success-title {
+            font-size: 28px;
+            font-weight: 700;
+            color: var(--heading);
+            margin-bottom: var(--spacing-md);
+        }
+        .success-message {
+            font-size: 16px;
+            color: var(--body);
+            margin-bottom: var(--spacing-xl);
+            line-height: 1.6;
+        }
+        .info-box {
+            background: var(--surface-1);
+            padding: var(--spacing-lg);
+            border-radius: var(--radius-md);
+            margin-bottom: var(--spacing-xl);
+            text-align: left;
+        }
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            padding: var(--spacing-sm) 0;
+            border-bottom: 1px solid var(--border-default);
+        }
+        .info-row:last-child {
+            border-bottom: none;
+        }
+        .info-label {
+            color: var(--subtext);
+            font-size: 14px;
+        }
+        .info-value {
+            color: var(--heading);
+            font-weight: 600;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="success-container">
+        <div class="success-card">
+            <div class="success-icon">
+                <i class="fas fa-check"></i>
+            </div>
+            
+            <h1 class="success-title">Payment Successful!</h1>
+            
+            <p class="success-message">
+                Your subscription has been activated successfully. You can now access all features of LedgerOne ERP.
+            </p>
+
+            <div class="info-box">
+                <div class="info-row">
+                    <span class="info-label">Tenant ID</span>
+                    <span class="info-value" id="tenantId">Loading...</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Status</span>
+                    <span class="info-value" style="color: var(--success);">Active</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Next Steps</span>
+                    <span class="info-value">Login to your account</span>
+                </div>
+            </div>
+
+            <button class="btn btn-primary btn-full" onclick="window.location.href='login.html'">
+                <i class="fas fa-sign-in-alt"></i> Go to Login
+            </button>
+
+            <p style="margin-top: var(--spacing-lg); font-size: 14px; color: var(--subtext);">
+                <i class="fas fa-envelope"></i> A confirmation email has been sent to your registered email address.
+            </p>
+        </div>
+    </div>
+
+    <script>
+        // Get tenant_id from URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const tenantId = urlParams.get('tenant_id');
+        
+        if (tenantId) {
+            document.getElementById('tenantId').textContent = tenantId;
+        } else {
+            document.getElementById('tenantId').textContent = 'N/A';
+        }
+
+        // Auto redirect after 10 seconds
+        setTimeout(() => {
+            window.location.href = 'login.html';
+        }, 10000);
+    </script>
+</body>
+</html>

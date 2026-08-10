@@ -1,0 +1,262 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+}
+
+body {
+  background-color: #f7f9fc; /* Surface-1 */
+  color: #2f3b4c; /* Body text */
+  line-height: 1.5;
+  padding: 24px; /* Layout spacing */
+}
+
+.container {
+  max-width: 1400px;
+  margin: 0 auto;
+  background-color: #ffffff; /* Surface-0 */
+  border-radius: 12px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06); /* Card shadow */
+  overflow: hidden;
+}
+
+/* Header */
+.header {
+  padding: 24px;
+  border-bottom: 1px solid #e1e6ee; /* Default border */
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.title-section h1 {
+  color: #0e1a2b; /* Heading color */
+  font-size: 24px;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.title-section p {
+  color: #6b7280; /* Subtext */
+  font-size: 14px;
+}
+
+.actions {
+  display: flex;
+  gap: 12px;
+}
+
+/* Buttons - Light Theme */
+.btn {
+  height: 40px;
+  border-radius: 8px;
+  padding: 0 20px;
+  font-weight: 500;
+  font-size: 14px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: all 0.2s;
+  border: none;
+}
+
+.btn-primary {
+  background-color: #1f7bff; /* Primary */
+  color: #ffffff;
+}
+
+.btn-primary:hover {
+  background-color: #1a6cdc; /* Primary Hover */
+}
+
+.btn-primary:active {
+  background-color: #1559b8; /* Primary Active */
+}
+
+.btn-secondary {
+  background-color: #eff2f7; /* Secondary */
+  border: 1px solid #c9cfda; /* Strong border */
+  color: #1f1f1f;
+}
+
+.btn-secondary:hover {
+  background-color: #e4e8ef; /* Secondary Hover */
+}
+
+.btn-secondary:active {
+  background-color: #d9dee7; /* Secondary Active */
+}
+
+.btn-ghost {
+  background-color: transparent;
+  color: #1f7bff; /* Primary */
+}
+
+.btn-ghost:hover {
+  background-color: #f0f6ff; /* Ghost Hover */
+}
+
+/* Worksheet */
+.worksheet-container {
+  padding: 0 24px 24px;
+  overflow-x: auto;
+}
+
+.worksheet-info {
+  margin-bottom: 16px;
+  padding: 12px 16px;
+  background-color: #f7f9fc; /* Surface-1 */
+  border-radius: 8px;
+  font-size: 14px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.pagination-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.page-info {
+  font-weight: 500;
+  color: #0e1a2b;
+}
+
+.worksheet-table {
+  width: 100%;
+  border-collapse: collapse;
+  border: 1px solid #e1e6ee; /* Default border */
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.worksheet-table thead {
+  background-color: #f7f9fc; /* Table header */
+}
+
+.worksheet-table th {
+  padding: 16px 12px;
+  text-align: left;
+  font-weight: 600;
+  color: #0e1a2b; /* Heading color */
+  border-bottom: 1px solid #e1e6ee; /* Default border */
+  font-size: 14px;
+  position: sticky;
+  top: 0;
+  background-color: #f7f9fc;
+}
+
+.worksheet-table td {
+  padding: 12px;
+  border-bottom: 1px solid #e1e6ee; /* Default border */
+  height: 44px; /* Row height */
+}
+
+.worksheet-table tbody tr:nth-child(even) {
+  background-color: #fafbfd; /* Alternating row */
+}
+
+.worksheet-table tbody tr:hover {
+  background-color: #f0f6ff; /* Hover row */
+}
+
+/* Input fields - Light Theme */
+.input-field {
+  width: 100%;
+  height: 40px;
+  padding: 0 14px;
+  border: 1.5px solid #d6dbe4;
+  background-color: #ffffff;
+  border-radius: 8px;
+  font-size: 14px;
+  color: #2f3b4c; /* Body text */
+  transition: all 0.2s;
+}
+
+.input-field:focus {
+  outline: none;
+  border: 2px solid #1f7bff; /* Primary */
+  box-shadow: 0 0 0 2px rgba(31, 123, 255, 0.1); /* Focus glow */
+}
+
+.input-field:disabled {
+  background-color: #f2f4f8;
+  color: #9aa1ae;
+  border: 1.5px solid #e1e4ea;
+}
+
+.input-field.error {
+  border-color: #e34f4f; /* Error */
+}
+
+/* Footer */
+.footer {
+  padding: 20px 24px;
+  border-top: 1px solid #e1e6ee; /* Default border */
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background-color: #ffffff;
+}
+
+.summary {
+  display: flex;
+  gap: 32px;
+}
+
+.summary-item {
+  display: flex;
+  flex-direction: column;
+}
+
+.summary-label {
+  font-size: 13px;
+  color: #6b7280; /* Subtext */
+  margin-bottom: 4px;
+}
+
+.summary-value {
+  font-size: 18px;
+  font-weight: 600;
+  color: #0e1a2b; /* Heading color */
+}
+
+/* Responsive */
+@media (max-width: 1024px) {
+  .worksheet-table {
+    min-width: 900px;
+  }
+}
+
+@media (max-width: 768px) {
+  body {
+    padding: 12px;
+  }
+
+  .header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 16px;
+  }
+
+  .actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .footer {
+    flex-direction: column;
+    gap: 20px;
+    align-items: flex-start;
+  }
+
+  .summary {
+    width: 100%;
+    justify-content: space-between;
+  }
+}

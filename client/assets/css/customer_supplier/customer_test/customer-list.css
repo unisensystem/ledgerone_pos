@@ -1,0 +1,254 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  background-color: #f7f9fc; /* Surface-1 */
+  font-family:
+    "Inter",
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    Roboto,
+    sans-serif;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  min-height: 100vh;
+  padding: 32px 24px;
+  color: #2f3b4c; /* body text */
+}
+
+/* main card – identical to form card for consistency */
+.list-card {
+  max-width: 1280px;
+  width: 100%;
+  background: #ffffff; /* Surface-0 */
+  border-radius: 12px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
+  padding: 24px 28px 32px 28px;
+}
+
+/* header area with title and action button (like "new customer") */
+.list-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.list-header h2 {
+  font-size: 18px;
+  font-weight: 600;
+  color: #0e1a2b; /* heading */
+  letter-spacing: -0.01em;
+}
+
+/* primary button (exactly same as design system) */
+.btn-primary {
+  height: 40px;
+  padding: 0 20px;
+  border-radius: 8px;
+  background: #1f7bff;
+  color: #ffffff;
+  font-weight: 500;
+  font-size: 14px;
+  border: none;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s;
+  font-family: "Inter", sans-serif;
+}
+.btn-primary:hover {
+  background: #1a6cdc;
+}
+.btn-primary:active {
+  background: #1559b8;
+}
+
+/* filter / search bar (simple, optional but nice) */
+.filter-bar {
+  margin-bottom: 24px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.search-box {
+  display: flex;
+  align-items: center;
+  background: #ffffff;
+  border: 1.5px solid #d6dbe4;
+  border-radius: 8px;
+  height: 40px;
+  padding: 0 8px 0 14px;
+  min-width: 260px;
+}
+.search-box input {
+  border: none;
+  background: transparent;
+  height: 38px;
+  width: 100%;
+  font-size: 14px;
+  outline: none;
+  color: #0e1a2b;
+  font-family: "Inter", sans-serif;
+}
+.search-box input::placeholder {
+  color: #6b7280; /* subtext */
+}
+.search-box span {
+  color: #6b7280;
+  font-size: 16px;
+  padding: 0 4px;
+  cursor: default;
+}
+
+/* ----- table (light theme) ----- */
+.table-wrapper {
+  overflow-x: auto;
+  border-radius: 10px; /* subtle rounding inside card */
+  border: 1px solid #e1e6ee; /* default border */
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+  min-width: 680px;
+}
+
+th {
+  background-color: #f7f9fc; /* header background */
+  color: #2f3b4c; /* body text */
+  font-weight: 600;
+  font-size: 13px;
+  padding: 0 16px;
+  height: 44px; /* row height 44px */
+  text-align: left;
+  border-bottom: 1.5px solid #e1e6ee;
+  white-space: nowrap;
+}
+
+td {
+  padding: 0 16px;
+  height: 44px; /* row height 44px */
+  border-bottom: 1px solid #e1e6ee;
+  color: #0e1a2b; /* heading color for emphasis */
+}
+
+/* alternating row */
+tbody tr:nth-child(even) {
+  background-color: #fafbfd; /* alternating row */
+}
+
+/* hover row */
+tbody tr:hover {
+  background-color: #f0f6ff; /* hover row */
+}
+
+/* subtle styling for secondary info (like code, email) */
+.cell-subtle {
+  color: #6b7280; /* subtext for less emphasis */
+}
+
+/* status badges using semantic colors (optional) */
+.status-badge {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 30px;
+  font-size: 12px;
+  font-weight: 500;
+  background: #eff2f7;
+  color: #2f3b4c;
+}
+.status-active {
+  background: #e2f3e4;
+  color: #1c7e3a;
+}
+.status-inactive {
+  background: #fef1f1;
+  color: #b91c1c;
+}
+
+/* action icons / buttons (ghost style) */
+.action-btn {
+  background: transparent;
+  border: none;
+  color: #1f7bff;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  padding: 6px 8px;
+  border-radius: 6px;
+  transition: background 0.15s;
+  font-family: "Inter", sans-serif;
+}
+.action-btn:hover {
+  background: #f0f6ff;
+}
+.action-btn.delete {
+  color: #e34f4f;
+}
+.action-btn.delete:hover {
+  background: #fef2f2;
+}
+
+/* pagination row (optional, but fits corporate) */
+.pagination {
+  margin-top: 24px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  align-items: center;
+}
+.pagination-btn {
+  height: 36px;
+  width: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  background: #ffffff;
+  border: 1.5px solid #d6dbe4;
+  color: #2f3b4c;
+  cursor: pointer;
+  transition: all 0.1s;
+  font-size: 14px;
+}
+.pagination-btn:hover {
+  border-color: #1f7bff;
+  color: #1f7bff;
+}
+.pagination-btn.active {
+  background: #1f7bff;
+  border-color: #1f7bff;
+  color: white;
+}
+
+/* small helpers */
+.email-cell {
+  color: #6b7280;
+  font-size: 13px;
+}
+
+/* responsive */
+@media (max-width: 700px) {
+  .list-card {
+    padding: 20px 16px;
+  }
+  .filter-bar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .search-box {
+    width: 100%;
+  }
+}

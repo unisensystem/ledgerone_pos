@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LedgerOne ERP - Complete Subscription</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="../../assets/css/auth/checkout.css">
+</head>
+
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <div class="logo">
+                <i class="fas fa-book logo-icon"></i>
+                <span>LedgerOne ERP</span>
+            </div>
+
+            <div class="tenant-info">
+                <div>
+                    <div class="tenant-name">Acme Corporation</div>
+                    <div class="tenant-id">Tenant ID: ACME-2023-001</div>
+                </div>
+                <div>
+                    <i class="fas fa-building" style="color: var(--primary); font-size: 24px;"></i>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="checkout-container">
+            <!-- Left Column: Subscription Configuration -->
+            <div class="subscription-config">
+                <!-- Subscription Plan Selection -->
+                <div class="section">
+                    <h2 class="section-title">Step 1: Choose Your Plan</h2>
+                    <p style="color: var(--subtext); margin-bottom: var(--spacing-lg); text-align: center;">Select a
+                        ready-made plan or build your own custom solution</p>
+
+                    <div class="plan-grid">
+                        <div class="plan-card" data-plan="starter">
+                            <div class="plan-name">Starter</div>
+                            <div class="plan-description">Perfect for small businesses & startups</div>
+                            <div class="plan-price" data-monthly="2999" data-yearly="29990">PKR 2,999</div>
+                            <div class="plan-period" data-monthly="per month" data-yearly="per year">per month</div>
+                            <ul class="plan-features">
+                                <li><i class="fas fa-check"></i> Complete Accounting</li>
+                                <li><i class="fas fa-check"></i> Sales & Purchase Invoices</li>
+                                <li><i class="fas fa-check"></i> Basic Inventory</li>
+                                <li><i class="fas fa-check"></i> Financial Reports</li>
+                                <li><i class="fas fa-check"></i> 3 Users Included</li>
+                                <li><i class="fas fa-check"></i> 1 Branch</li>
+                            </ul>
+                        </div>
+
+                        <div class="plan-card selected" data-plan="business">
+                            <div class="plan-name">Business</div>
+                            <div class="plan-description">For growing businesses with teams</div>
+                            <div class="plan-price" data-monthly="5999" data-yearly="59990">PKR 5,999</div>
+                            <div class="plan-period" data-monthly="per month" data-yearly="per year">per month</div>
+                            <ul class="plan-features">
+                                <li><i class="fas fa-check"></i> Everything in Starter</li>
+                                <li><i class="fas fa-check"></i> POS System</li>
+                                <li><i class="fas fa-check"></i> Advanced Inventory</li>
+                                <li><i class="fas fa-check"></i> CRM & HR Module</li>
+                                <li><i class="fas fa-check"></i> 10 Users Included</li>
+                                <li><i class="fas fa-check"></i> Multi-Warehouse</li>
+                            </ul>
+                            <div class="plan-badge">Most Popular</div>
+                        </div>
+
+                        <div class="plan-card" data-plan="professional">
+                            <div class="plan-name">Professional</div>
+                            <div class="plan-description">For established businesses & distributors</div>
+                            <div class="plan-price" data-monthly="9999" data-yearly="99990">PKR 9,999</div>
+                            <div class="plan-period" data-monthly="per month" data-yearly="per year">per month</div>
+                            <ul class="plan-features">
+                                <li><i class="fas fa-check"></i> Everything in Business</li>
+                                <li><i class="fas fa-check"></i> FBR E-Filing Integration</li>
+                                <li><i class="fas fa-check"></i> Multi-Branch Management</li>
+                                <li><i class="fas fa-check"></i> Advanced Analytics</li>
+                                <li><i class="fas fa-check"></i> 20 Users Included</li>
+                                <li><i class="fas fa-check"></i> Priority Support</li>
+                            </ul>
+                        </div>
+
+                        <div class="plan-card" data-plan="enterprise">
+                            <div class="plan-name">Enterprise</div>
+                            <div class="plan-description">For large organizations & manufacturers</div>
+                            <div class="plan-price" data-monthly="19999" data-yearly="199990">PKR 19,999</div>
+                            <div class="plan-period" data-monthly="per month" data-yearly="per year">per month</div>
+                            <ul class="plan-features">
+                                <li><i class="fas fa-check"></i> Everything in Professional</li>
+                                <li><i class="fas fa-check"></i> Manufacturing Module</li>
+                                <li><i class="fas fa-check"></i> Project Management</li>
+                                <li><i class="fas fa-check"></i> API Access</li>
+                                <li><i class="fas fa-check"></i> 50 Users Included</li>
+                                <li><i class="fas fa-check"></i> Dedicated Support</li>
+                            </ul>
+                            <div class="plan-badge">Best Value</div>
+                        </div>
+                    </div>
+
+                    <div style="text-align: center; margin: var(--spacing-xl) 0; padding: var(--spacing-lg); background: var(--surface-1); border-radius: var(--radius-md);">
+                        <p style="color: var(--text-body); font-size: 14px; margin-bottom: var(--spacing-md);">Need more users, branches, or companies? Add them below after selecting your plan.</p>
+                    </div>
+
+                    <!-- Billing Cycle -->
+                    <div class="billing-toggle">
+                        <div class="billing-option active" data-cycle="monthly">
+                            Monthly Billing
+                        </div>
+                        <div class="billing-option" data-cycle="yearly">
+                            Annual Billing
+                            <span class="discount-badge">Save 17%</span>
+                        </div>
+                    </div>
+
+                    <!-- Add-ons Section -->
+                    <div style="margin: var(--spacing-xl) 0; padding: var(--spacing-lg); background: var(--surface-1); border-radius: var(--radius-md);">
+                        <h3 style="font-size: 18px; margin-bottom: var(--spacing-md); color: var(--heading);">Need More? Add Extra Resources</h3>
+
+                        <!-- User Count -->
+                        <div class="user-selector">
+                            <div class="user-count">
+                                <label class="user-count-label">
+                                    Number of Users
+                                    <i class="fas fa-question-circle"
+                                        style="color: var(--subtext); cursor: help; margin-left: 4px;"
+                                        title="How many people will use the system? Each person who logs in needs a user account."></i>
+                                </label>
+                                <div style="display: flex; align-items: center; gap: var(--spacing-md);">
+                                    <button type="button" class="qty-btn" id="userMinus">-</button>
+                                    <input type="number" class="user-input" id="userCount" min="3" max="1000" value="3"
+                                        readonly>
+                                    <button type="button" class="qty-btn" id="userPlus">+</button>
+                                </div>
+                            </div>
+                            <div class="user-price">
+                                <div class="user-price-amount" id="userPrice">PKR 0</div>
+                                <div class="plan-period">per month</div>
+                            </div>
+                        </div>
+
+                        <!-- Branches Count -->
+                        <div class="user-selector">
+                            <div class="user-count">
+                                <label class="user-count-label">
+                                    Number of Branches
+                                    <i class="fas fa-question-circle"
+                                        style="color: var(--subtext); cursor: help; margin-left: 4px;"
+                                        title="How many physical locations does your business have? Each shop/office/warehouse is a branch."></i>
+                                </label>
+                                <div style="display: flex; align-items: center; gap: var(--spacing-md);">
+                                    <button type="button" class="qty-btn" id="branchMinus">-</button>
+                                    <input type="number" class="user-input" id="branchCount" min="1" max="100" value="1"
+                                        readonly>
+                                    <button type="button" class="qty-btn" id="branchPlus">+</button>
+                                </div>
+                            </div>
+                            <div class="user-price">
+                                <div class="user-price-amount" id="branchPrice">PKR 0</div>
+                                <div class="plan-period">per month</div>
+                            </div>
+                        </div>
+
+                        <!-- Companies Count -->
+                        <div class="user-selector">
+                            <div class="user-count">
+                                <label class="user-count-label">
+                                    Number of Companies
+                                    <i class="fas fa-question-circle"
+                                        style="color: var(--subtext); cursor: help; margin-left: 4px;"
+                                        title="Do you manage multiple separate businesses? Each legal entity is a company."></i>
+                                </label>
+                                <div style="display: flex; align-items: center; gap: var(--spacing-md);">
+                                    <button type="button" class="qty-btn" id="companyMinus">-</button>
+                                    <input type="number" class="user-input" id="companyCount" min="1" max="50" value="1"
+                                        readonly>
+                                    <button type="button" class="qty-btn" id="companyPlus">+</button>
+                                </div>
+                            </div>
+                            <div class="user-price">
+                                <div class="user-price-amount" id="companyPrice">PKR 0</div>
+                                <div class="plan-period">per month</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Payment Method -->
+                    <div class="section">
+                        <h2 class="section-title">Payment Method</h2>
+
+                        <div class="payment-methods">
+                            <div class="payment-method selected" data-method="kuickpay">
+                                <div class="payment-icon">
+                                    <i class="fas fa-wallet"></i>
+                                </div>
+                                <div class="payment-details">
+                                    <div class="payment-title">🇵🇰 Pakistan Payment</div>
+                                    <div class="payment-desc">Card, JazzCash, EasyPaisa via KuickPay</div>
+                                </div>
+                                <i class="fas fa-check-circle" style="color: var(--primary);"></i>
+                            </div>
+
+                            <div class="payment-method" data-method="2checkout">
+                                <div class="payment-icon">
+                                    <i class="fas fa-credit-card"></i>
+                                </div>
+                                <div class="payment-details">
+                                    <div class="payment-title">🌍 International Payment</div>
+                                    <div class="payment-desc">Visa, Mastercard, Amex, PayPal via 2Checkout</div>
+                                </div>
+                                <i class="far fa-circle" style="color: var(--subtext);"></i>
+                            </div>
+
+                            <div class="payment-method" data-method="bank">
+                                <div class="payment-icon">
+                                    <i class="fas fa-university"></i>
+                                </div>
+                                <div class="payment-details">
+                                    <div class="payment-title">Bank Transfer</div>
+                                    <div class="payment-desc">Receive invoice for payment via bank transfer</div>
+                                </div>
+                                <i class="far fa-circle" style="color: var(--subtext);"></i>
+                            </div>
+                        </div>
+
+                        <!-- KuickPay Payment -->
+                        <div id="kuickpayDetails">
+                            <div
+                                style="background: var(--surface-1); padding: var(--spacing-lg); border-radius: var(--radius-md); margin-bottom: var(--spacing-lg);">
+                                <div
+                                    style="display: flex; align-items: center; gap: var(--spacing-md); margin-bottom: var(--spacing-md);">
+                                    <i class="fas fa-shield-alt" style="color: var(--success); font-size: 24px;"></i>
+                                    <div>
+                                        <div style="font-weight: 600; color: var(--heading);">Secure Payment via
+                                            KuickPay</div>
+                                        <div style="font-size: 14px; color: var(--subtext);">You'll be redirected to
+                                            KuickPay to complete payment</div>
+                                    </div>
+                                </div>
+                                <div style="display: flex; gap: var(--spacing-sm); flex-wrap: wrap;">
+                                    <span
+                                        style="padding: 4px 12px; background: white; border-radius: 4px; font-size: 12px; border: 1px solid var(--border-default);"><i
+                                            class="fab fa-cc-visa"></i> Visa</span>
+                                    <span
+                                        style="padding: 4px 12px; background: white; border-radius: 4px; font-size: 12px; border: 1px solid var(--border-default);"><i
+                                            class="fab fa-cc-mastercard"></i> Mastercard</span>
+                                    <span
+                                        style="padding: 4px 12px; background: white; border-radius: 4px; font-size: 12px; border: 1px solid var(--border-default);"><i
+                                            class="fas fa-mobile-alt"></i> JazzCash</span>
+                                    <span
+                                        style="padding: 4px 12px; background: white; border-radius: 4px; font-size: 12px; border: 1px solid var(--border-default);"><i
+                                            class="fas fa-money-bill-wave"></i> EasyPaisa</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 2Checkout Payment -->
+                        <div id="2checkoutDetails" style="display: none;">
+                            <div
+                                style="background: var(--surface-1); padding: var(--spacing-lg); border-radius: var(--radius-md); margin-bottom: var(--spacing-lg);">
+                                <div
+                                    style="display: flex; align-items: center; gap: var(--spacing-md); margin-bottom: var(--spacing-md);">
+                                    <i class="fas fa-shield-alt" style="color: var(--success); font-size: 24px;"></i>
+                                    <div>
+                                        <div style="font-weight: 600; color: var(--heading);">Secure International
+                                            Payment via 2Checkout</div>
+                                        <div style="font-size: 14px; color: var(--subtext);">You'll be redirected to
+                                            2Checkout to complete payment</div>
+                                    </div>
+                                </div>
+                                <div style="display: flex; gap: var(--spacing-sm); flex-wrap: wrap;">
+                                    <span
+                                        style="padding: 4px 12px; background: white; border-radius: 4px; font-size: 12px; border: 1px solid var(--border-default);"><i
+                                            class="fab fa-cc-visa"></i> Visa</span>
+                                    <span
+                                        style="padding: 4px 12px; background: white; border-radius: 4px; font-size: 12px; border: 1px solid var(--border-default);"><i
+                                            class="fab fa-cc-mastercard"></i> Mastercard</span>
+                                    <span
+                                        style="padding: 4px 12px; background: white; border-radius: 4px; font-size: 12px; border: 1px solid var(--border-default);"><i
+                                            class="fab fa-cc-amex"></i> Amex</span>
+                                    <span
+                                        style="padding: 4px 12px; background: white; border-radius: 4px; font-size: 12px; border: 1px solid var(--border-default);"><i
+                                            class="fab fa-cc-paypal"></i> PayPal</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Bank Transfer Details -->
+                        <div id="bankDetails" style="display: none;">
+                            <div
+                                style="background: var(--surface-1); padding: var(--spacing-lg); border-radius: var(--radius-md); margin-bottom: var(--spacing-lg);">
+                                <h4 style="margin-bottom: var(--spacing-md); color: var(--heading);">Bank Account
+                                    Details</h4>
+                                <div style="font-size: 14px; line-height: 1.8;">
+                                    <div><strong>Bank Name:</strong> Meezan Bank</div>
+                                    <div><strong>Account Title:</strong> UNISEN SYSTEMS (SMC-PRIVATE) LIMITED</div>
+                                    <div><strong>Account Number:</strong> 01234567890123</div>
+                                    <div><strong>IBAN:</strong> PK36MEZN0001234567890123</div>
+                                    <div><strong>Branch Code:</strong> 0123</div>
+                                </div>
+                            </div>
+                            <div
+                                style="background: #FFF3CD; border: 1px solid #FFE69C; padding: var(--spacing-lg); border-radius: var(--radius-md); margin-bottom: var(--spacing-md);">
+                                <div style="display: flex; gap: var(--spacing-md); align-items: start;">
+                                    <i class="fas fa-exclamation-triangle"
+                                        style="color: #856404; font-size: 20px; margin-top: 2px;"></i>
+                                    <div style="color: #856404; font-size: 14px; line-height: 1.6;">
+                                        <strong style="display: block; margin-bottom: 8px;">Important: Payment
+                                            Verification Required</strong>
+                                        After making the bank transfer, you MUST share the payment receipt within 24
+                                        hours. Include your Tenant ID in the message.
+                                        <div style="margin-top: 12px;">
+                                            <strong>Send receipt via:</strong><br>
+                                            📧 Email: <a href="mailto:billing@unisensystems.com"
+                                                style="color: #856404; text-decoration: underline;">billing@unisensystems.com</a><br>
+                                            📱 WhatsApp: <a href="https://wa.me/923468918711" target="_blank"
+                                                style="color: #856404; text-decoration: underline;">+92 346 8918711</a>
+                                        </div>
+                                        <div
+                                            style="margin-top: 12px; padding: 8px; background: white; border-radius: 4px; font-size: 13px;">
+                                            ⚠️ <strong>Unverified payments will be refunded within 7 business
+                                                days.</strong> Your subscription will not be activated without receipt
+                                            verification.
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+
+                    <!-- Form Actions -->
+                    <div style="display: flex; justify-content: flex-start; margin-top: var(--spacing-xl);">
+                        <button class="btn btn-secondary" id="backBtn">
+                            <i class="fas fa-arrow-left"></i> Back to Setup
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Right Column: Order Summary -->
+                <div class="order-summary">
+                    <h2 class="order-title">Subscription Summary</h2>
+
+                    <div class="order-details">
+                        <div class="order-item">
+                            <div>
+                                <div class="item-name">Professional Plan</div>
+                                <div class="item-note">15 users included</div>
+                            </div>
+                            <div class="item-price">$299.00</div>
+                        </div>
+
+                        <div class="order-item">
+                            <div>
+                                <div class="item-name">Additional Users</div>
+                                <div class="item-note">5 users × $3.00/user</div>
+                            </div>
+                            <div class="item-price" id="additionalUsers">$15.00</div>
+                        </div>
+
+                        <div class="order-item">
+                            <div class="item-name">Priority Support</div>
+                            <div class="item-price" id="addonSupport">$99.00</div>
+                        </div>
+
+                        <div class="order-item">
+                            <div class="item-name">Subtotal</div>
+                            <div class="item-price" id="subtotal">$413.00</div>
+                        </div>
+
+                        <div class="order-item" id="discountRow" style="display: flex;">
+                            <div>
+                                <div class="item-name" style="color: var(--success);">First 3 Months Discount (90%)
+                                </div>
+                                <div class="item-note">Promotional offer for new customers</div>
+                            </div>
+                            <div class="item-price" id="discount" style="color: var(--success);">-$371.70</div>
+                        </div>
+
+                        <div class="order-item">
+                            <div class="item-name">Tax (8.5%)</div>
+                            <div class="item-price" id="taxAmount">$35.11</div>
+                        </div>
+
+                        <div class="order-item total">
+                            <div>Total</div>
+                            <div id="orderTotal">$448.11</div>
+                        </div>
+                    </div>
+
+                    <div class="order-item">
+                        <div class="item-note">Billed <span id="billingFrequency">monthly</span></div>
+                    </div>
+
+                    <div
+                        style="background: var(--surface-1); padding: var(--spacing-md); border-radius: var(--radius-md); margin-bottom: var(--spacing-lg);">
+                        <div style="font-size: 13px; color: var(--subtext); line-height: 1.6;">
+                            <strong style="color: var(--success);">🎉 Special Launch Offer:</strong> Get 30% off your first month! Annual plans save 17% compared to monthly pricing.
+                        </div>
+                    </div>
+
+                    <!-- Terms -->
+                    <div class="terms-checkbox">
+                        <input type="checkbox" id="terms" required>
+                        <label for="terms">
+                            I agree to the LedgerOne ERP
+                            <a href="#" style="color: var(--primary);">Terms of Service</a>,
+                            <a href="#" style="color: var(--primary);">Service Level Agreement</a>, and
+                            <a href="#" style="color: var(--primary);">Data Processing Agreement</a>.
+                        </label>
+                    </div>
+
+                    <!-- Complete Subscription Button -->
+                    <button class="btn btn-primary btn-full" id="activateBtn">
+                        <i class="fas fa-rocket"></i> Activate Subscription
+                    </button>
+
+                    <!-- Trial Button -->
+                    <button class="btn btn-secondary btn-full" id="trialBtn" style="margin-top: var(--spacing-md);">
+                        <i class="fas fa-flask"></i> Start 14-Day Free Trial
+                    </button>
+
+                    <div class="form-helper" style="text-align: center; margin-top: var(--spacing-md);">
+                        <i class="fas fa-shield-alt" style="color: var(--success);"></i>
+                        Your subscription will start immediately after payment confirmation
+                    </div>
+                    <!-- Footer -->
+                    <div class="footer">
+                        <p>Need help with your subscription? <a href="#" style="color: var(--primary);">Contact
+                                Sales</a></p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <script src="../../assets/js/auth/checkout.js"></script>
+</body>
+
+</html>

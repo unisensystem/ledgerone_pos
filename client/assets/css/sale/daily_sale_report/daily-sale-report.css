@@ -1,0 +1,619 @@
+:root {
+  /* Light Theme Colors - From Design System */
+  --primary: #1f7bff;
+  --primary-hover: #1a6cdc;
+  --primary-active: #1559b8;
+  --surface-0: #ffffff;
+  --surface-1: #f7f9fc;
+  --surface-2: #eff2f7;
+  --heading: #0e1a2b;
+  --body: #2f3b4c;
+  --subtext: #6b7280;
+  --border-default: #e1e6ee;
+  --border-strong: #c9cfda;
+  --success: #2fbf71;
+  --warning: #e8b23f;
+  --error: #e34f4f;
+  --shadow-light: 0 2px 6px rgba(0, 0, 0, 0.06);
+  --shadow-medium: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+}
+
+body {
+  background-color: var(--surface-1);
+  color: var(--body);
+  line-height: 1.5;
+}
+
+.container {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 24px;
+}
+
+/* Header Styles */
+.header {
+  margin-bottom: 32px;
+}
+
+.page-title {
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--heading);
+  margin-bottom: 4px;
+}
+
+.page-subtitle {
+  color: var(--subtext);
+  font-size: 15px;
+}
+
+/* Card Styles */
+.card {
+  background-color: var(--surface-0);
+  border-radius: 12px;
+  box-shadow: var(--shadow-light);
+  padding: 24px;
+  margin-bottom: 24px;
+}
+
+.card-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--heading);
+  margin-bottom: 20px;
+}
+
+/* Form Styles */
+.form-section {
+  margin-bottom: 32px;
+}
+
+.form-group {
+  margin-bottom: 20px;
+}
+
+.form-label {
+  display: block;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--body);
+  margin-bottom: 6px;
+}
+
+.form-input {
+  width: 100%;
+  height: 40px;
+  padding: 0 14px;
+  border: 1.5px solid var(--border-default);
+  background-color: var(--surface-0);
+  border-radius: 8px;
+  font-size: 14px;
+  color: var(--body);
+  transition: all 0.2s ease;
+}
+
+.form-input:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px rgba(31, 123, 255, 0.1);
+}
+
+.form-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 20px;
+}
+
+/* Button Styles */
+.btn {
+  height: 40px;
+  padding: 0 20px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  border: none;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: all 0.2s ease;
+}
+
+.btn-primary {
+  background-color: var(--primary);
+  color: white;
+}
+
+.btn-primary:hover {
+  background-color: var(--primary-hover);
+}
+
+.btn-primary:active {
+  background-color: var(--primary-active);
+}
+
+.btn-secondary {
+  background-color: var(--surface-2);
+  color: var(--heading);
+  border: 1px solid var(--border-strong);
+}
+
+.btn-secondary:hover {
+  background-color: var(--surface-1);
+}
+
+.btn-ghost {
+  background-color: transparent;
+  color: var(--primary);
+  border: none;
+}
+
+.btn-ghost:hover {
+  background-color: rgba(31, 123, 255, 0.05);
+}
+
+.button-group {
+  display: flex;
+  gap: 12px;
+  margin-top: 20px;
+}
+
+/* Toggle Switch */
+.report-toggle {
+  display: flex;
+  background-color: var(--surface-2);
+  border-radius: 8px;
+  padding: 4px;
+  width: fit-content;
+  margin-bottom: 24px;
+}
+
+.toggle-option {
+  padding: 10px 20px;
+  border-radius: 6px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  color: var(--subtext);
+}
+
+.toggle-option.active {
+  background-color: var(--surface-0);
+  color: var(--primary);
+  box-shadow: var(--shadow-light);
+}
+
+/* Table Styles */
+.table-container {
+  overflow-x: auto;
+  border-radius: 8px;
+  border: 1px solid var(--border-default);
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 800px;
+}
+
+.table thead {
+  background-color: var(--surface-1);
+}
+
+.table th {
+  padding: 14px 16px;
+  text-align: left;
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--heading);
+  border-bottom: 1px solid var(--border-default);
+  white-space: nowrap;
+}
+
+.table tbody tr {
+  border-bottom: 1px solid var(--border-default);
+  transition: background-color 0.2s ease;
+}
+
+.table tbody tr:nth-child(even) {
+  background-color: var(--surface-1);
+}
+
+.table tbody tr:hover {
+  background-color: var(--surface-2);
+}
+
+.table td {
+  padding: 16px;
+  font-size: 14px;
+  color: var(--body);
+}
+
+.table .text-right {
+  text-align: right;
+}
+
+/* Status Badges */
+.badge {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.badge-success {
+  background-color: rgba(47, 191, 113, 0.1);
+  color: var(--success);
+}
+
+.badge-warning {
+  background-color: rgba(232, 178, 63, 0.1);
+  color: var(--warning);
+}
+
+/* Responsive */
+@media (max-width: 992px) {
+  .form-row {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  .container {
+    padding: 16px;
+  }
+
+  .form-row {
+    grid-template-columns: 1fr;
+  }
+
+  .card {
+    padding: 16px;
+  }
+
+  .button-group {
+    flex-direction: column;
+  }
+
+  .button-group .btn {
+    width: 100%;
+  }
+}
+
+/* Footer Actions */
+.footer-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border-default);
+}
+
+/* Pagination */
+.pagination {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.pagination button {
+  height: 32px;
+  min-width: 32px;
+  padding: 0 8px;
+  border: 1px solid var(--border-default);
+  background-color: var(--surface-0);
+  color: var(--body);
+  border-radius: 6px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.pagination button:hover:not(:disabled) {
+  background-color: var(--surface-1);
+  border-color: var(--primary);
+}
+
+.pagination button.active {
+  background-color: var(--primary);
+  color: white;
+  border-color: var(--primary);
+}
+
+.pagination button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Summary Card */
+.summary-card {
+  display: flex;
+  justify-content: space-between;
+  background-color: var(--surface-0);
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 24px;
+  border-left: 4px solid var(--primary);
+}
+
+.summary-item {
+  text-align: center;
+  flex: 1;
+}
+
+.summary-value {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--primary);
+}
+
+.summary-label {
+  font-size: 13px;
+  color: var(--subtext);
+  margin-top: 4px;
+}
+
+/* Reference Card */
+.reference-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background-color: var(--surface-0);
+  border-radius: 12px;
+  padding: 16px 20px;
+  margin-bottom: 24px;
+  border-left: 4px solid var(--success);
+}
+
+.reference-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--heading);
+}
+
+.reference-value {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--success);
+  font-family: 'Courier New', monospace;
+}
+
+/* Loading State */
+.loading {
+  display: none;
+  text-align: center;
+  padding: 40px;
+  color: var(--subtext);
+}
+
+.loading.active {
+  display: block;
+}
+
+.spinner {
+  display: inline-block;
+  width: 24px;
+  height: 24px;
+  border: 3px solid var(--border-default);
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-bottom: 12px;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ── Searchable select (ss-*) ─────────────────────────────── */
+
+/* The visible trigger — a readonly text input */
+.ss-trigger {
+  cursor: pointer;
+  caret-color: transparent;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%236b7280' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  padding-right: 32px !important;
+  user-select: none;
+}
+
+/* Dropdown panel — appended to <body>, position:fixed so it is never clipped */
+.ss-panel {
+  display: none;
+  position: fixed;
+  background: var(--surface-0);
+  border: 1.5px solid var(--primary);
+  border-radius: 8px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.12);
+  z-index: 99999;
+  overflow: hidden;
+}
+
+.ss-panel.ss-open {
+  display: block;
+}
+
+/* Search box inside panel */
+.ss-search {
+  display: block;
+  width: 100%;
+  padding: 8px 12px;
+  border: none;
+  border-bottom: 1px solid var(--border-default);
+  font-size: 13px;
+  color: var(--body);
+  background: var(--surface-1);
+  outline: none;
+  box-sizing: border-box;
+}
+
+.ss-search:focus {
+  background: var(--surface-0);
+  border-bottom-color: var(--primary);
+}
+
+/* Options list */
+.ss-list {
+  max-height: 210px;
+  overflow-y: auto;
+}
+
+/* Single option row */
+.ss-item {
+  padding: 8px 14px;
+  font-size: 13px;
+  color: var(--body);
+  cursor: pointer;
+  transition: background 0.12s;
+}
+
+.ss-item:hover,
+.ss-item:focus {
+  background: var(--surface-2);
+}
+
+.ss-selected {
+  background: rgba(31, 123, 255, 0.08);
+  color: var(--primary);
+  font-weight: 500;
+}
+
+.ss-empty {
+  padding: 12px 14px;
+  font-size: 13px;
+  color: var(--subtext);
+  text-align: center;
+}
+
+/* ── Multi-select dropdown (Sales Officer) ────────────────── */
+.multi-select-dropdown {
+  position: relative;
+  width: 100%;
+}
+
+.multi-select-trigger {
+  width: 100%;
+  height: 40px;
+  padding: 0 14px;
+  border: 1.5px solid var(--border-default);
+  background-color: var(--surface-0);
+  border-radius: 8px;
+  font-size: 14px;
+  color: var(--body);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  user-select: none;
+}
+
+.multi-select-trigger:hover,
+.multi-select-trigger.open {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px rgba(31, 123, 255, 0.1);
+}
+
+.multi-select-trigger span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+}
+
+.multi-select-options {
+  display: none;
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  background: var(--surface-0);
+  border: 1.5px solid var(--primary);
+  border-radius: 8px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.12);
+  z-index: 1000;
+  max-height: 260px;
+  overflow-y: auto;
+}
+
+.multi-select-options.open {
+  display: block;
+}
+
+/* Sticky search inside the Sales Officer panel */
+.so-search-wrap {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--surface-0);
+  padding: 8px;
+  border-bottom: 1px solid var(--border-default);
+}
+
+.so-search-input {
+  width: 100%;
+  height: 32px;
+  padding: 0 10px;
+  border: 1.5px solid var(--border-default);
+  border-radius: 6px;
+  font-size: 13px;
+  color: var(--body);
+  background: var(--surface-1);
+  outline: none;
+  box-sizing: border-box;
+  transition: border-color 0.2s ease;
+}
+
+.so-search-input:focus {
+  border-color: var(--primary);
+  background: var(--surface-0);
+}
+
+.multi-select-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.multi-select-option:hover {
+  background: var(--surface-1);
+}
+
+.multi-select-empty {
+  padding: 12px 14px;
+  font-size: 13px;
+  color: var(--subtext);
+  text-align: center;
+}
+
+.multi-select-option input[type="checkbox"] {
+  width: 14px;
+  height: 14px;
+  cursor: pointer;
+  accent-color: var(--primary);
+}
+
+.group-header-cell {
+  background: var(--surface-2);
+  font-weight: 600;
+  font-size: 13px;
+  padding: 8px 16px;
+  color: var(--primary);
+}

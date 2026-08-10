@@ -1,0 +1,1 @@
+ALTER TABLE tax_rates ADD COLUMN customer_type_id INT(11) DEFAULT   
