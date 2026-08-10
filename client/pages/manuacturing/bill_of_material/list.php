@@ -48,6 +48,11 @@ if (!$user_id) {
                         <select class="filter-select" id="fgFilter">
                             <option value="all">All finished goods</option>
                         </select>
+                        <select class="filter-select" id="bomTypeFilter">
+                            <option value="all">All BOM types</option>
+                            <option value="BOM 1">BOM 1</option>
+                            <option value="BOM 2">BOM 2</option>
+                        </select>
                         <button class="btn btn-secondary" id="resetFiltersBtn"><i class="las la-redo-alt"></i> Reset</button>
                         <button class="btn btn-primary" id="printSelectedBtn" style="display:none;">
                             <i class="las la-print"></i> Print Selected (<span id="selectedCount">0</span>)
@@ -63,6 +68,7 @@ if (!$user_id) {
                                 <th>BOM Code</th>
                                 <th>Finished good</th>
                                 <th>Version</th>
+                                <th>BOM Type</th>
                                 <th>Status</th>
                                 <th>Raw materials</th>
                                 <th>Last updated</th>
@@ -70,7 +76,7 @@ if (!$user_id) {
                             </tr>
                         </thead>
                         <tbody id="tableBody">
-                            <tr><td colspan="8" style="text-align:center; padding:32px;">Loading...</td></tr>
+                            <tr><td colspan="9" style="text-align:center; padding:32px;">Loading...</td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -113,6 +119,13 @@ if (!$user_id) {
                 <div class="field-group">
                     <label class="form-label">Version</label>
                     <input type="text" class="form-control" id="editVersion">
+                </div>
+                <div class="field-group">
+                    <label class="form-label">BOM Type</label>
+                    <select class="form-control" id="editBomType">
+                        <option value="BOM 1">BOM 1</option>
+                        <option value="BOM 2">BOM 2</option>
+                    </select>
                 </div>
                 <div class="field-group">
                     <div class="checkbox-wrapper">

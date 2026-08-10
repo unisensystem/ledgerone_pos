@@ -23,7 +23,7 @@ $initialSearch = $_GET['search'] ?? '';
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Receive Vouchers - LedgerOne ERP</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="stylesheet" href="../../../assets/css/vouchers/receive_voucher/receive-list.css">
+    <link rel="stylesheet" href="../../../assets/css/vouchers/receive_voucher/receive-list.css?v=<?php echo time(); ?>">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
 <body class="light-theme">
@@ -76,10 +76,38 @@ $initialSearch = $_GET['search'] ?? '';
                     </div>
                 </div>
                 <div class="filter-group">
+                    <label for="areaFilter">Area</label>
+                    <div class="searchable-dropdown">
+                        <input type="text" class="search-input" placeholder="Search area..." id="areaFilterSearch" autocomplete="off">
+                        <div class="dropdown-options" id="areaFilterOptions">
+                            <!-- Options loaded dynamically -->
+                        </div>
+                        <input type="hidden" id="areaFilter">
+                    </div>
+                </div>
+                <div class="filter-group">
+                    <label for="cityFilter">City</label>
+                    <div class="searchable-dropdown">
+                        <input type="text" class="search-input" placeholder="Search city..." id="cityFilterSearch" autocomplete="off">
+                        <div class="dropdown-options" id="cityFilterOptions">
+                            <!-- Options loaded dynamically -->
+                        </div>
+                        <input type="hidden" id="cityFilter">
+                    </div>
+                </div>
+                <div class="filter-group">
                     <label for="recoveryOfficerFilter">Recovery Officer</label>
-                    <select id="recoveryOfficerFilter">
-                        <option value="">All Officers</option>
-                    </select>
+                    <div class="searchable-dropdown">
+                        <input type="text" class="search-input" placeholder="Search officer..." id="recoveryOfficerFilterSearch" autocomplete="off">
+                        <div class="dropdown-options" id="recoveryOfficerFilterOptions">
+                            <!-- Options loaded dynamically -->
+                        </div>
+                        <input type="hidden" id="recoveryOfficerFilter">
+                    </div>
+                </div>
+                <div class="filter-group">
+                    <label for="voucherNumberFilter">Voucher #</label>
+                    <input type="text" id="voucherNumberFilter" placeholder="Search voucher #...">
                 </div>
                 <div class="filter-group">
                     <label for="statusFilter">Status</label>
@@ -139,6 +167,8 @@ $initialSearch = $_GET['search'] ?? '';
                         <th>Voucher #</th>
                         <th>Date</th>
                         <th>Customer</th>
+                        <th>Area</th>
+                        <th>City</th>
                         <th>Bill No</th>
                         <th>Project</th>
                         <th>Amount</th>
@@ -266,7 +296,7 @@ $initialSearch = $_GET['search'] ?? '';
         </div>
     </div>
 
-   <script src="../../../assets/js/vouchers/receive_voucher/receive-list.js"></script>
+   <script src="../../../assets/js/vouchers/receive_voucher/receive-list.js?v=<?php echo time(); ?>"></script>
 <?php if ($initialSearch): ?>
 <script>
     window.addEventListener('load', function() {

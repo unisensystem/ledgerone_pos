@@ -94,7 +94,7 @@
         updateSelectionUI();
 
         if (data.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; padding:32px; color:#6B7280;">No BOM entries found</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="9" style="text-align:center; padding:32px; color:#6B7280;">No BOM entries found</td></tr>';
             return;
         }
 
@@ -138,6 +138,7 @@
                 <td><strong>${bom.bom_code}</strong></td>
                 <td><strong>${bom.fg_code} - ${bom.fg_name}</strong></td>
                 <td><span class="version-pill">v${bom.version}</span></td>
+                <td>${bom.bom_type || 'BOM 1'}</td>
                 <td><span class="badge ${bom.is_active == 1 ? 'active' : 'inactive'}">${bom.is_active == 1 ? 'Active' : 'Inactive'}</span></td>
                 <td>${materialsHtml}</td>
                 <td>${new Date(bom.updated_at).toLocaleDateString()}</td>
@@ -157,21 +158,27 @@
         const searchTerm = document.getElementById('searchInput').value.toLowerCase();
         const status = document.getElementById('statusFilter').value;
         const fg = document.getElementById('fgFilter').value;
+        const bomType = document.getElementById('bomTypeFilter').value;
 
         const filtered = allBoms.filter(bom => {
             const fgName = `${bom.fg_code} - ${bom.fg_name}`.toLowerCase();
             const matchesSearch = searchTerm === '' || fgName.includes(searchTerm) || bom.version.includes(searchTerm);
-            
+
             let matchesStatus = true;
             if (status === '1') matchesStatus = bom.is_active == 1;
             else if (status === '0') matchesStatus = bom.is_active == 0;
-            
+
             let matchesFg = true;
             if (fg !== 'all') {
                 matchesFg = `${bom.fg_code} - ${bom.fg_name}` === fg;
             }
-            
-            return matchesSearch && matchesStatus && matchesFg;
+
+            let matchesBomType = true;
+            if (bomType !== 'all') {
+                matchesBomType = (bom.bom_type || 'BOM 1') === bomType;
+            }
+
+            return matchesSearch && matchesStatus && matchesFg && matchesBomType;
         });
         
         renderTable(filtered);
@@ -196,6 +203,10 @@
                     <div class="detail-row">
                         <div class="detail-label">Version:</div>
                         <div class="detail-value">${bom.version}</div>
+                    </div>
+                    <div class="detail-row">
+                        <div class="detail-label">BOM Type:</div>
+                        <div class="detail-value">${bom.bom_type || 'BOM 1'}</div>
                     </div>
                     <div class="detail-row">
                         <div class="detail-label">Status:</div>
@@ -263,6 +274,7 @@
                 document.getElementById('editFinishedGood').value = `${bom.fg_code} - ${bom.fg_name}`;
                 document.getElementById('editBomBaseQty').value = bom.bom_base_qty || 1;
                 document.getElementById('editVersion').value = bom.version;
+                document.getElementById('editBomType').value = bom.bom_type || 'BOM 1';
                 document.getElementById('editActive').checked = bom.is_active == 1;
                 document.getElementById('editBatchLocked').checked = bom.batch_locked == 1;
                 document.getElementById('editRemarks').value = bom.remarks || '';
@@ -432,6 +444,7 @@
         const bomId = parseInt(document.getElementById('editBomId').value);
         const bomBaseQty = parseFloat(document.getElementById('editBomBaseQty').value) || 1;
         const version = document.getElementById('editVersion').value;
+        const bomType = document.getElementById('editBomType').value;
         const isActive = document.getElementById('editActive').checked ? 1 : 0;
         const batchLocked = document.getElementById('editBatchLocked').checked ? 1 : 0;
         const remarks = document.getElementById('editRemarks').value;
@@ -476,6 +489,7 @@
                     id: bomId,
                     bom_base_qty: bomBaseQty,
                     version,
+                    bom_type: bomType,
                     is_active: isActive,
                     batch_locked: batchLocked,
                     remarks,
@@ -520,11 +534,13 @@
     document.getElementById('searchInput').addEventListener('input', filterData);
     document.getElementById('statusFilter').addEventListener('change', filterData);
     document.getElementById('fgFilter').addEventListener('change', filterData);
-    
+    document.getElementById('bomTypeFilter').addEventListener('change', filterData);
+
     document.getElementById('resetFiltersBtn').addEventListener('click', () => {
         document.getElementById('searchInput').value = '';
         document.getElementById('statusFilter').value = 'all';
         document.getElementById('fgFilter').value = 'all';
+        document.getElementById('bomTypeFilter').value = 'all';
         filterData();
     });
 

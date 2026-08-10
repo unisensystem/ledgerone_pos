@@ -315,17 +315,14 @@ textarea {
 }
 
 .dropdown-list {
-  position: absolute;
-  top: 100%;
-  left: 0;
-  right: 0;
+  position: fixed;
   background: var(--surface-0);
   border: 1px solid var(--border-default);
   border-radius: var(--radius);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  max-height: 200px;
+  max-height: 240px;
   overflow-y: auto;
-  z-index: 100;
+  z-index: 3000;
   display: none;
 }
 
@@ -335,9 +332,13 @@ textarea {
 
 .dropdown-item {
   padding: 12px 14px;
+  font-size: 14px;
   cursor: pointer;
   border-bottom: 1px solid var(--border-default);
   transition: background-color 0.2s ease;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .dropdown-item:hover,

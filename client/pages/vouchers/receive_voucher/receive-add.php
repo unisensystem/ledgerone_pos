@@ -21,7 +21,7 @@ if (!$user_id) {
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Receive Voucher - LedgerOne ERP</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="stylesheet" href="../../../assets/css/vouchers/receive_voucher/receive-add.css">
+    <link rel="stylesheet" href="../../../assets/css/vouchers/receive_voucher/receive-add.css?v=<?php echo time(); ?>">
 </head>
 <body class="light-theme">
     <div class="container">
@@ -61,6 +61,15 @@ if (!$user_id) {
                                 <option value="">Select Company</option>
                                 <!-- Options will be populated by JS -->
                             </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="recoveryOfficer">Recovery Officer</label>
+                            <div class="searchable-dropdown">
+                                <input type="text" id="recoveryOfficer" placeholder="Search employee..." autocomplete="off">
+                                <div class="dropdown-list" id="recoveryOfficerDropdown">
+                                    <!-- Options will be populated by JS -->
+                                </div>
+                            </div>
                         </div>
                         <div class="form-group">
                             <label for="customerCode" class="required">Customer Code</label>
@@ -156,15 +165,6 @@ if (!$user_id) {
                             </select>
                             <div id="pdcRemainingInfo" style="display:none; margin-top:6px; font-size:12px; color:#e8b23f; font-weight:500;"></div>
                         </div>
-                        <div class="form-group">
-                            <label for="recoveryOfficer">Recovery Officer</label>
-                            <div class="searchable-dropdown">
-                                <input type="text" id="recoveryOfficer" placeholder="Search employee..." autocomplete="off">
-                                <div class="dropdown-list" id="recoveryOfficerDropdown">
-                                    <!-- Options will be populated by JS -->
-                                </div>
-                            </div>
-                        </div>
                         <div class="form-group full-width">
                             <label for="attachment">Attachment</label>
                             <input type="file" id="attachment" accept=".png,.jpg,.jpeg,.gif,.pdf,.webp,.avif">
@@ -210,6 +210,10 @@ if (!$user_id) {
                         <select id="bulkCompany" required>
                             <option value="">Select Company</option>
                         </select>
+                    </div>
+                    <div class="form-group" style="margin: 0; min-width: 180px;">
+                        <label for="bulkJournalDate">Bulk Journal Date</label>
+                        <input type="date" id="bulkJournalDate" title="Applies this date to all rows below">
                     </div>
                     <div class="form-group" style="margin: 0; min-width: 250px;">
                         <label for="bulkRecoveryOfficer">Recovery Officer</label>
@@ -308,6 +312,6 @@ if (!$user_id) {
         </div>
     </div>
 
-    <script src="../../../assets/js/vouchers/receive_voucher/receive-add.js"></script>
+    <script src="../../../assets/js/vouchers/receive_voucher/receive-add.js?v=<?php echo time(); ?>"></script>
 </body>
 </html>

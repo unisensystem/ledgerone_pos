@@ -25,7 +25,8 @@
             document.getElementById('bomList').innerHTML = '';
             return;
         }
-        const res = await fetch(`${API_URL}?action=boms&product_id=${productId}`);
+        const bomType = document.getElementById('bomTypeFilter').value;
+        const res = await fetch(`${API_URL}?action=boms&product_id=${productId}&bom_type=${encodeURIComponent(bomType)}`);
         const data = await res.json();
         if (data.success) {
             boms = data.data;
@@ -278,6 +279,14 @@
 
     document.getElementById('productId').addEventListener('change', function() {
         const selectedProduct = products.find(p => `${p.code} - ${p.name}` === this.value);
+        if (selectedProduct) {
+            loadBOMs(selectedProduct.id);
+        }
+    });
+
+    document.getElementById('bomTypeFilter').addEventListener('change', function() {
+        const selectedProduct = products.find(p => `${p.code} - ${p.name}` === document.getElementById('productId').value);
+        document.getElementById('bomId').value = '';
         if (selectedProduct) {
             loadBOMs(selectedProduct.id);
         }

@@ -51,6 +51,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
                 p.name as product_name,
                 b.branch_name,
                 bom.bom_code,
+                bom.bom_type,
                 m.code as machine_code,
                 m.machine_name
             FROM production_orders po

@@ -17,13 +17,24 @@ if (!$user_id || !$tenant_id) {
 }
 
 try {
-    $stmt = $pdo->prepare("
+    $recovery_officer_id = $_GET['recovery_officer_id'] ?? '';
+
+    $sql = "
         SELECT customer_code, customer_name, id
         FROM customers
         WHERE tenant_id = ? AND status = 'ACTIVE'
-        ORDER BY customer_name
-    ");
-    $stmt->execute([$tenant_id]);
+    ";
+    $params = [$tenant_id];
+
+    if ($recovery_officer_id) {
+        $sql .= " AND associated_sales_officer_id = ?";
+        $params[] = $recovery_officer_id;
+    }
+
+    $sql .= " ORDER BY customer_name";
+
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute($params);
     $customers = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
     echo json_encode(['success' => true, 'data' => $customers]);

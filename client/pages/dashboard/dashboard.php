@@ -2,7 +2,6 @@
 require_once '../../../includes/dashboard.php';
 require_once '../../../includes/connection.php';
 require_once '../../../includes/permissions.php';
-$pdo = $pdoTenant; // dashboard.php pura $pdo use karta hai (tenant data ke liye)
 // Start session if not already started
 if (session_status() == PHP_SESSION_NONE) {
     session_start();

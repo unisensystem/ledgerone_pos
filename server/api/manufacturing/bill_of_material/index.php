@@ -110,24 +110,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $bom_code = $data['bom_code'] ?? null;
     $finished_good_id = $data['finished_good_id'] ?? null;
     $version = $data['version'] ?? '1.0';
+    $bom_type = $data['bom_type'] ?? 'BOM 1';
     $is_active = $data['is_active'] ?? 1;
     $bom_base_qty = $data['bom_base_qty'] ?? 1;
     $batch_locked = $data['batch_locked'] ?? 0;
     $remarks = $data['remarks'] ?? null;
     $materials = $data['materials'] ?? [];
-    
+
     if (!$bom_code || !$finished_good_id || empty($materials)) {
         http_response_code(400);
         echo json_encode(['success' => false, 'message' => 'Missing required fields']);
         exit;
     }
-    
+
     try {
         $pdo->beginTransaction();
-        
+
         // Insert BOM header
-        $stmt = $pdo->prepare("INSERT INTO bill_of_materials (tenant_id, bom_code, finished_good_id, version, is_active, bom_base_qty, batch_locked, remarks, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())");
-        $stmt->execute([$tenant_id, $bom_code, $finished_good_id, $version, $is_active, $bom_base_qty, $batch_locked, $remarks, $user_id]);
+        $stmt = $pdo->prepare("INSERT INTO bill_of_materials (tenant_id, bom_code, finished_good_id, version, bom_type, is_active, bom_base_qty, batch_locked, remarks, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())");
+        $stmt->execute([$tenant_id, $bom_code, $finished_good_id, $version, $bom_type, $is_active, $bom_base_qty, $batch_locked, $remarks, $user_id]);
         $bom_id = $pdo->lastInsertId();
         
         // Insert BOM materials

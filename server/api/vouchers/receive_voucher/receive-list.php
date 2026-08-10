@@ -65,7 +65,25 @@ try {
         $where[] = 'rv.project_id = ?';
         $params[] = $project_id;
     }
-    
+
+    $area_id = $_GET['area_id'] ?? '';
+    if ($area_id) {
+        $where[] = 'cu.area_id = ?';
+        $params[] = $area_id;
+    }
+
+    $city_id = $_GET['city_id'] ?? '';
+    if ($city_id) {
+        $where[] = 'cu.city_id = ?';
+        $params[] = $city_id;
+    }
+
+    $voucher_number = $_GET['voucher_number'] ?? '';
+    if ($voucher_number) {
+        $where[] = 'rv.voucher_number LIKE ?';
+        $params[] = '%' . $voucher_number . '%';
+    }
+
     if ($search) {
         $where[] = '(rv.voucher_number LIKE ? OR cu.customer_name LIKE ? OR rv.bill_no LIKE ?)';
         $searchTerm = '%' . $search . '%';
@@ -104,6 +122,8 @@ try {
             rv.project_id,
             cu.customer_name,
             cu.customer_code,
+            ar.area_name,
+            ci.city_name,
             a.name as payment_method,
             c.symbol as currency_symbol,
             e.full_name as recovery_officer,
@@ -111,6 +131,8 @@ try {
             p.project_name
         FROM receive_voucher rv
         LEFT JOIN customers cu ON rv.customer_id = cu.id
+        LEFT JOIN areas ar ON cu.area_id = ar.id
+        LEFT JOIN cities ci ON cu.city_id = ci.id
         LEFT JOIN accounts a ON rv.payment_method_id = a.id
         LEFT JOIN ledgerone_public.currencies c ON rv.currency_id = c.id
         LEFT JOIN employees e ON rv.recovery_officer_id = e.id

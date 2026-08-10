@@ -61,6 +61,44 @@ fetch('../../../../server/api/vouchers/receive_voucher/get-companies.php')
         }
     });
 
+// Fetch areas for filter
+fetch('../../../../server/api/vouchers/receive_voucher/get-areas.php')
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            const areaFilterOptions = document.getElementById('areaFilterOptions');
+            areaFilterOptions.innerHTML = '<div class="dropdown-option" data-value="" data-name="All Areas">All Areas</div>';
+            data.data.forEach(area => {
+                const option = document.createElement('div');
+                option.className = 'dropdown-option';
+                option.setAttribute('data-value', area.id);
+                option.setAttribute('data-name', area.area_name);
+                option.textContent = area.area_name;
+                areaFilterOptions.appendChild(option);
+            });
+            initSearchableDropdown('areaFilterSearch', 'areaFilterOptions', 'areaFilter');
+        }
+    });
+
+// Fetch cities for filter
+fetch('../../../../server/api/vouchers/receive_voucher/get-cities.php')
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            const cityFilterOptions = document.getElementById('cityFilterOptions');
+            cityFilterOptions.innerHTML = '<div class="dropdown-option" data-value="" data-name="All Cities">All Cities</div>';
+            data.data.forEach(city => {
+                const option = document.createElement('div');
+                option.className = 'dropdown-option';
+                option.setAttribute('data-value', city.id);
+                option.setAttribute('data-name', city.city_name);
+                option.textContent = city.city_name;
+                cityFilterOptions.appendChild(option);
+            });
+            initSearchableDropdown('cityFilterSearch', 'cityFilterOptions', 'cityFilter');
+        }
+    });
+
 // Fetch projects for filter
 fetch('../../../../server/api/master_setup/project_setup/get-projects-dropdown.php')
     .then(response => response.json())
@@ -87,9 +125,12 @@ function fetchVouchers(page = 1) {
     const statusFilter = document.getElementById('statusFilter').value;
     const companyFilter = document.getElementById('companyFilter').value;
     const searchTerm = document.getElementById('searchInput').value;
-    
+    const areaFilter = document.getElementById('areaFilter').value;
+    const cityFilter = document.getElementById('cityFilter').value;
+    const voucherNumberFilter = document.getElementById('voucherNumberFilter').value;
+
     let url = `../../../../server/api/vouchers/receive_voucher/receive-list.php?page=${page}&limit=${itemsPerPage}`;
-    
+
     if (dateFrom) url += `&date_from=${dateFrom}`;
     if (dateTo) url += `&date_to=${dateTo}`;
     if (customerFilter) url += `&customer_id=${customerFilter}`;
@@ -97,7 +138,10 @@ function fetchVouchers(page = 1) {
     if (statusFilter) url += `&status=${statusFilter}`;
     if (companyFilter) url += `&company_id=${companyFilter}`;
     if (searchTerm) url += `&search=${encodeURIComponent(searchTerm)}`;
-    
+    if (areaFilter) url += `&area_id=${areaFilter}`;
+    if (cityFilter) url += `&city_id=${cityFilter}`;
+    if (voucherNumberFilter) url += `&voucher_number=${encodeURIComponent(voucherNumberFilter)}`;
+
     const projectFilter = document.getElementById('projectFilter').value;
     if (projectFilter) url += `&project_id=${projectFilter}`;
     
@@ -111,6 +155,8 @@ function fetchVouchers(page = 1) {
                     date: voucher.voucher_date,
                     customer: voucher.customer_name,
                     customerCode: voucher.customer_code,
+                    area: voucher.area_name,
+                    city: voucher.city_name,
                     billNo: voucher.bill_no || 'N/A',
                     amount: parseFloat(voucher.amount),
                     currencySymbol: voucher.currency_symbol || '$',
@@ -205,13 +251,17 @@ fetch('../../../../server/api/vouchers/receive_voucher/get-employees.php')
     .then(response => response.json())
     .then(data => {
         if (data.success) {
-            const recoveryOfficerFilter = document.getElementById('recoveryOfficerFilter');
+            const recoveryOfficerFilterOptions = document.getElementById('recoveryOfficerFilterOptions');
+            recoveryOfficerFilterOptions.innerHTML = '<div class="dropdown-option" data-value="" data-name="All Officers">All Officers</div>';
             data.data.forEach(emp => {
-                const option = document.createElement('option');
-                option.value = emp.id;
+                const option = document.createElement('div');
+                option.className = 'dropdown-option';
+                option.setAttribute('data-value', emp.id);
+                option.setAttribute('data-name', emp.full_name);
                 option.textContent = emp.full_name;
-                recoveryOfficerFilter.appendChild(option);
+                recoveryOfficerFilterOptions.appendChild(option);
             });
+            initSearchableDropdown('recoveryOfficerFilterSearch', 'recoveryOfficerFilterOptions', 'recoveryOfficerFilter');
         }
     });
 
@@ -258,6 +308,8 @@ function renderVouchers(vouchersToRender) {
                     <td>${voucher.voucherNumber}</td>
                     <td>${formattedDate}</td>
                     <td>${voucher.customer}</td>
+                    <td>${voucher.area || 'N/A'}</td>
+                    <td>${voucher.city || 'N/A'}</td>
                     <td>${voucher.billNo}</td>
                     <td>${voucher.projectCode ? `${voucher.projectCode} - ${voucher.projectName}` : 'N/A'}</td>
                     <td class="amount">${formattedAmount}</td>
@@ -304,12 +356,19 @@ function resetFilters() {
     document.getElementById('dateFrom').value = '';
     document.getElementById('dateTo').value = '';
     document.getElementById('customerFilter').value = '';
+    document.getElementById('customerFilterSearch').value = '';
     document.getElementById('recoveryOfficerFilter').value = '';
+    document.getElementById('recoveryOfficerFilterSearch').value = '';
     document.getElementById('statusFilter').value = '';
     document.getElementById('companyFilter').value = '';
     document.getElementById('projectFilter').value = '';
+    document.getElementById('areaFilter').value = '';
+    document.getElementById('areaFilterSearch').value = '';
+    document.getElementById('cityFilter').value = '';
+    document.getElementById('cityFilterSearch').value = '';
+    document.getElementById('voucherNumberFilter').value = '';
     document.getElementById('searchInput').value = '';
-    
+
     fetchVouchers(1);
 }
 
@@ -680,6 +739,8 @@ function exportVouchersToExcel() {
             'Date': formattedDate,
             'Customer Code': v.customerCode || '',
             'Customer': v.customer,
+            'Area': v.area || 'N/A',
+            'City': v.city || 'N/A',
             'Bill No': v.billNo,
             'Project Code': v.projectCode || '',
             'Project Name': v.projectName || '',
@@ -696,7 +757,7 @@ function exportVouchersToExcel() {
     const worksheet = XLSX.utils.json_to_sheet(rows);
 
     worksheet['!cols'] = [
-        { wch: 14 }, { wch: 12 }, { wch: 14 }, { wch: 24 }, { wch: 12 },
+        { wch: 14 }, { wch: 12 }, { wch: 14 }, { wch: 24 }, { wch: 14 }, { wch: 14 }, { wch: 12 },
         { wch: 12 }, { wch: 22 }, { wch: 12 }, { wch: 8 }, { wch: 16 },
         { wch: 12 }, { wch: 12 }, { wch: 18 }, { wch: 10 }
     ];

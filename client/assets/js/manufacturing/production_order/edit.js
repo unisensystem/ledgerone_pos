@@ -25,7 +25,8 @@
 
     async function loadBOMs(productId) {
         if (!productId) return;
-        const res = await fetch(INDEX_API + `?action=boms&product_id=${productId}`);
+        const bomType = document.getElementById('bomTypeFilter').value;
+        const res = await fetch(INDEX_API + `?action=boms&product_id=${productId}&bom_type=${encodeURIComponent(bomType)}`);
         const data = await res.json();
         if (data.success) {
             boms = data.data;
@@ -84,7 +85,8 @@
                 document.getElementById('orderNo').value = order.order_no;
                 document.getElementById('productId').value = `${order.product_code} - ${order.product_name}`;
                 document.getElementById('productId').setAttribute('data-selected-id', order.product_id);
-                
+
+                document.getElementById('bomTypeFilter').value = order.bom_type || 'all';
                 await loadBOMs(order.product_id);
                 document.getElementById('bomId').value = `${order.bom_code} v${order.bom_version}`;
                 document.getElementById('bomId').setAttribute('data-selected-id', order.bom_id);
@@ -306,6 +308,14 @@
             document.getElementById('bomId').value = '';
             calculatedMaterials = [];
             document.getElementById('materialsTable').innerHTML = '<tr><td colspan="5" style="text-align:center; padding:32px; color:#6B7280;">Click "Recalculate Materials" after selecting BOM</td></tr>';
+        }
+    });
+
+    document.getElementById('bomTypeFilter').addEventListener('change', function() {
+        const productId = getSelectedProductId();
+        document.getElementById('bomId').value = '';
+        if (productId) {
+            loadBOMs(productId);
         }
     });
 

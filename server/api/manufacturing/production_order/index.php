@@ -31,8 +31,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     }
     
     if ($action === 'boms' && isset($_GET['product_id'])) {
-        $stmt = $pdo->prepare("SELECT id, bom_code, version FROM bill_of_materials WHERE tenant_id = ? AND finished_good_id = ? AND is_active = 1");
-        $stmt->execute([$tenant_id, $_GET['product_id']]);
+        $bomType = $_GET['bom_type'] ?? '';
+        $sql = "SELECT id, bom_code, version, bom_type FROM bill_of_materials WHERE tenant_id = ? AND finished_good_id = ? AND is_active = 1";
+        $params = [$tenant_id, $_GET['product_id']];
+        if ($bomType !== '' && $bomType !== 'all') {
+            $sql .= " AND bom_type = ?";
+            $params[] = $bomType;
+        }
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute($params);
         echo json_encode(['success' => true, 'data' => $stmt->fetchAll()]);
         exit;
     }

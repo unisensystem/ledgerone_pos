@@ -48,6 +48,15 @@ $order_id = $_GET['id'] ?? null;
                         </div>
 
                         <div class="field-group">
+                            <label class="form-label">BOM Type</label>
+                            <select class="form-control" id="bomTypeFilter">
+                                <option value="all">All BOM types</option>
+                                <option value="BOM 1">BOM 1</option>
+                                <option value="BOM 2">BOM 2</option>
+                            </select>
+                        </div>
+
+                        <div class="field-group">
                             <label class="form-label">BOM <span style="color:#E34F4F;">*</span></label>
                             <input type="text" class="form-control" id="bomId" list="bomList" placeholder="Search BOM..." required>
                             <datalist id="bomList"></datalist>

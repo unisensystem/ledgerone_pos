@@ -17,8 +17,6 @@ if (!$tenant_id || !$user_id) {
 }
 
 try {
-    $company_id = isset($_GET['company_id']) && $_GET['company_id'] !== '' ? (int)$_GET['company_id'] : null;
-
     $sql = "
         SELECT
             b.id,
@@ -34,11 +32,6 @@ try {
           AND b.is_active  = 1
     ";
     $params = [$tenant_id, $user_id];
-
-    if ($company_id) {
-        $sql .= " AND b.company_id = ?";
-        $params[] = $company_id;
-    }
 
     $sql .= " ORDER BY pb.branch_name, b.branch_name";
     $stmt = $pdo->prepare($sql);
