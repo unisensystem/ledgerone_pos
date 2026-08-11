@@ -42,58 +42,77 @@ try {
     }
     
     $pdo->beginTransaction();
-    
-    // Generate sequential bill number
-    $billStmt = $pdo->prepare("SELECT bill_no FROM purchase_order WHERE tenant_id = ? ORDER BY id DESC LIMIT 1");
-    $billStmt->execute([$tenant_id]);
-    $lastBill = $billStmt->fetchColumn();
-    
-    if ($lastBill) {
-        $lastNumber = (int)substr($lastBill, 3); // Extract number from PO-XXXX
-        $newNumber = $lastNumber + 1;
-    } else {
-        $newNumber = 1;
+
+    // Generate sequential bill number and insert. Wrapped in a retry loop because two
+    // near-simultaneous saves can both read the same "last bill_no" and try to insert the
+    // same next number — the uk_tenant_bill_no unique key then rejects the second one with
+    // a 1062 duplicate-entry error. On that specific collision we just regenerate the next
+    // number and retry, instead of failing the whole order.
+    $maxAttempts = 5;
+    $billNo = null;
+    $invoice_id = null;
+
+    for ($attempt = 1; $attempt <= $maxAttempts; $attempt++) {
+        $billStmt = $pdo->prepare("SELECT bill_no FROM purchase_order WHERE tenant_id = ? ORDER BY id DESC LIMIT 1");
+        $billStmt->execute([$tenant_id]);
+        $lastBill = $billStmt->fetchColumn();
+
+        if ($lastBill) {
+            $lastNumber = (int)substr($lastBill, 3); // Extract number from PO-XXXX
+            $newNumber = $lastNumber + 1;
+        } else {
+            $newNumber = 1;
+        }
+        $billNo = 'PO-' . str_pad($newNumber, 4, '0', STR_PAD_LEFT);
+
+        try {
+            // Insert purchase order
+            $stmt = $pdo->prepare("
+                INSERT INTO purchase_order (
+                    tenant_id, company_id, currency_id, bill_no, purchase_date, supplier_id, branch_id,
+                    project_id, previous_balance, total_bill, total_discount_percent,
+                    total_discount_amount, total_gst_percent, total_gst_amount,
+                    shipping_fees, net_amount, supplier_invoice_no, supplier_invoice_date,
+                    bilty_no, transport_name, remarks, created_by, updated_by
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ");
+
+            $stmt->execute([
+                $tenant_id,
+                $input['companyId'],
+                $input['currencyId'],
+                $billNo,
+                $input['purchaseDate'],
+                $input['supplierId'],
+                $input['branchId'],
+                $input['projectId'] ?? null,
+                extractBalanceAmount($input['previousBalance'] ?? '0.00'),
+                $input['totalBill'],
+                $input['totalDiscountPercent'] ?? 0.00,
+                $input['totalDiscountAmount'] ?? 0.00,
+                $input['totalGSTPercent'] ?? 0.00,
+                $input['totalGSTAmount'] ?? 0.00,
+                $input['shippingFees'] ?? 0.00,
+                $input['netAmount'],
+                $input['supplierInvoiceNo'],
+                $input['supplierInvoiceDate'],
+                $input['biltyNo'],
+                $input['transportName'],
+                $input['remarks'] ?? null,
+                $user_id,
+                $user_id
+            ]);
+
+            $invoice_id = $pdo->lastInsertId();
+            break; // success
+        } catch (PDOException $e) {
+            $isDuplicateBillNo = $e->getCode() == 23000 && strpos($e->getMessage(), 'uk_tenant_bill_no') !== false;
+            if ($isDuplicateBillNo && $attempt < $maxAttempts) {
+                continue; // regenerate the next number and try again
+            }
+            throw $e;
+        }
     }
-    $billNo = 'PO-' . str_pad($newNumber, 4, '0', STR_PAD_LEFT);
-    
-    // Insert purchase order
-    $stmt = $pdo->prepare("
-        INSERT INTO purchase_order (
-            tenant_id, company_id, currency_id, bill_no, purchase_date, supplier_id, branch_id,
-            project_id, previous_balance, total_bill, total_discount_percent, 
-            total_discount_amount, total_gst_percent, total_gst_amount, 
-            shipping_fees, net_amount, supplier_invoice_no, supplier_invoice_date, 
-            bilty_no, transport_name, remarks, created_by, updated_by
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    ");
-    
-    $stmt->execute([
-        $tenant_id,
-        $input['companyId'],
-        $input['currencyId'],
-        $billNo,
-        $input['purchaseDate'],
-        $input['supplierId'],
-        $input['branchId'],
-        $input['projectId'] ?? null,
-        extractBalanceAmount($input['previousBalance'] ?? '0.00'),
-        $input['totalBill'],
-        $input['totalDiscountPercent'] ?? 0.00,
-        $input['totalDiscountAmount'] ?? 0.00,
-        $input['totalGSTPercent'] ?? 0.00,
-        $input['totalGSTAmount'] ?? 0.00,
-        $input['shippingFees'] ?? 0.00,
-        $input['netAmount'],
-        $input['supplierInvoiceNo'],
-        $input['supplierInvoiceDate'],
-        $input['biltyNo'],
-        $input['transportName'],
-        $input['remarks'] ?? null,
-        $user_id,
-        $user_id
-    ]);
-    
-    $invoice_id = $pdo->lastInsertId();
     
     // Insert order items
     $item_stmt = $pdo->prepare("

@@ -43,54 +43,74 @@ try {
 
     $pdo->beginTransaction();
 
-    // Generate sequential bill number
-    $billStmt = $pdo->prepare("SELECT bill_no FROM sale_order WHERE tenant_id = ? ORDER BY id DESC LIMIT 1");
-    $billStmt->execute([$tenant_id]);
-    $lastBill = $billStmt->fetchColumn();
+    // Generate sequential bill number and insert. Wrapped in a retry loop because two
+    // near-simultaneous saves can both read the same "last bill_no" and try to insert the
+    // same next number — the uk_tenant_bill_no unique key then rejects the second one with
+    // a 1062 duplicate-entry error. On that specific collision we just regenerate the next
+    // number and retry, instead of failing the whole order.
+    $maxAttempts = 5;
+    $billNo = null;
+    $invoice_id = null;
 
-    if ($lastBill) {
-        $lastNumber = (int) substr($lastBill, 4); // Extract number from SAL-XXXX
-        $newNumber = $lastNumber + 1;
-    } else {
-        $newNumber = 1;
+    for ($attempt = 1; $attempt <= $maxAttempts; $attempt++) {
+        $billStmt = $pdo->prepare("SELECT bill_no FROM sale_order WHERE tenant_id = ? ORDER BY id DESC LIMIT 1");
+        $billStmt->execute([$tenant_id]);
+        $lastBill = $billStmt->fetchColumn();
+
+        if ($lastBill) {
+            $lastNumber = (int) substr($lastBill, 3); // Extract number from SO-XXXX
+            $newNumber = $lastNumber + 1;
+        } else {
+            $newNumber = 1;
+        }
+        $billNo = 'SO-' . str_pad($newNumber, 4, '0', STR_PAD_LEFT);
+
+        try {
+            // Insert sale order
+            $stmt = $pdo->prepare("
+                INSERT INTO sale_order (
+                    tenant_id, company_id, currency_id, bill_no, sale_date, customer_id, branch_id,
+                    previous_balance, sale_officer_id, supplier_man_id, project_id, bilty_no, transport_name, total_bill, total_discount_percent,
+                    total_discount_amount, net_amount, remarks, status,
+                    created_by, updated_by
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ");
+
+            $stmt->execute([
+                $tenant_id,
+                $input['companyId'] ?? null,
+                $input['currencyId'],
+                $billNo,
+                $input['saleDate'],
+                $input['customerId'],
+                $input['branchId'],
+                extractBalanceAmount($input['previousBalance'] ?? '0.00'),
+                $input['salesOfficerId'] ?? null,
+                $input['supplierManId'] ?? null,
+                !empty($input['projectId']) ? (int)$input['projectId'] : null,
+                $input['biltyNo'] ?? null,
+                $input['transportName'] ?? null,
+                $input['totalBill'],
+                $input['totalDiscountPercent'] ?? 0.00,
+                $input['totalDiscountAmount'] ?? 0.00,
+                $input['netAmount'],
+                $input['remarks'] ?? null,
+                $input['status'] ?? 'Posted',
+                $user_id,
+                $user_id
+            ]);
+
+            $invoice_id = $pdo->lastInsertId();
+            break; // success
+        } catch (PDOException $e) {
+            $isDuplicateBillNo = $e->getCode() == 23000 && strpos($e->getMessage(), 'uk_tenant_bill_no') !== false;
+            if ($isDuplicateBillNo && $attempt < $maxAttempts) {
+                continue; // regenerate the next number and try again
+            }
+            throw $e;
+        }
     }
-    $billNo = 'SO-' . str_pad($newNumber, 4, '0', STR_PAD_LEFT);
 
-    // Insert sale invoice
-    $stmt = $pdo->prepare("
-        INSERT INTO sale_order (
-            tenant_id, company_id, currency_id, bill_no, sale_date, customer_id, branch_id,
-            previous_balance, sale_officer_id, supplier_man_id, project_id, bilty_no, transport_name, total_bill, total_discount_percent, 
-            total_discount_amount, net_amount, remarks, status,
-            created_by, updated_by
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    ");
-
-    $stmt->execute([
-        $tenant_id,
-        $input['companyId'] ?? null,
-        $input['currencyId'],
-        $billNo,
-        $input['saleDate'],
-        $input['customerId'],
-        $input['branchId'],
-        extractBalanceAmount($input['previousBalance'] ?? '0.00'),
-        $input['salesOfficerId'] ?? null,
-        $input['supplierManId'] ?? null,
-        !empty($input['projectId']) ? (int)$input['projectId'] : null,
-        $input['biltyNo'] ?? null,
-        $input['transportName'] ?? null,
-        $input['totalBill'],
-        $input['totalDiscountPercent'] ?? 0.00,
-        $input['totalDiscountAmount'] ?? 0.00,
-        $input['netAmount'],
-        $input['remarks'] ?? null,
-        $input['status'] ?? 'Posted',
-        $user_id,
-        $user_id
-    ]);
-
-    $invoice_id = $pdo->lastInsertId();
     $status = $input['status'] ?? 'Posted';
 
     // Insert invoice items with dynamic UOM support
