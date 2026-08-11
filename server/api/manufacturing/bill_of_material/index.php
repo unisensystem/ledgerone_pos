@@ -23,7 +23,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     $action = $_GET['action'] ?? '';
     
     if ($action === 'finished_goods') {
-        $stmt = $pdo->prepare("SELECT id, code, name FROM products WHERE tenant_id = ? AND inventory_account_id = 117 AND is_active = 1");
+        $stmt = $pdo->prepare("SELECT id, code, name FROM products WHERE tenant_id = ? AND inventory_account_id IN (117, 391) AND is_active = 1");
         $stmt->execute([$tenant_id]);
         echo json_encode(['success' => true, 'data' => $stmt->fetchAll()]);
         exit;
@@ -46,7 +46,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     }
     
     if ($action === 'raw_materials') {
-        $stmt = $pdo->prepare("SELECT id, code, name, uom_type, default_unit_id, uom_group_id, product_conversion_factor FROM products WHERE tenant_id = ? AND inventory_account_id IN (115, 117) AND is_active = 1");
+        $stmt = $pdo->prepare("SELECT id, code, name, uom_type, default_unit_id, uom_group_id, product_conversion_factor FROM products WHERE tenant_id = ? AND inventory_account_id IN (115, 117, 391) AND is_active = 1");
         $stmt->execute([$tenant_id]);
         echo json_encode(['success' => true, 'data' => $stmt->fetchAll()]);
         exit;
