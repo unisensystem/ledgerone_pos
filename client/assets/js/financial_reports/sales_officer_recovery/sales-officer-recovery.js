@@ -360,6 +360,8 @@ async function fetchData() {
     const status = document.getElementById('status').value;
     const includeZeroBalance = document.getElementById('include-zero-balance').checked ? '1' : '0';
     const companyId = document.getElementById('company').value;
+    const cityId = document.getElementById('city').value;
+    const areaId = document.getElementById('area').value;
 
     const params = new URLSearchParams();
     if (dateFrom) params.append('date_from', dateFrom);
@@ -370,6 +372,8 @@ async function fetchData() {
     if (status) params.append('status', status);
     params.append('include_zero_balance', includeZeroBalance);
     if (companyId) params.append('company_id', companyId);
+    if (cityId) params.append('city_id', cityId);
+    if (areaId) params.append('area_id', areaId);
 
     try {
         const response = await fetch(`${API_URL}?${params.toString()}`);
@@ -434,6 +438,8 @@ function resetFilters() {
     document.getElementById('status').value = '';
     document.getElementById('include-zero-balance').checked = false;
     document.getElementById('company').value = '';
+    document.getElementById('city').value = '';
+    document.getElementById('area').value = '';
 
     fetchData();
 }
@@ -518,7 +524,9 @@ document.addEventListener('DOMContentLoaded', function () {
         const status = document.getElementById('status').value;
         const includeZeroBalance = document.getElementById('include-zero-balance').checked ? '1' : '0';
         const companyId = document.getElementById('company').value;
-        
+        const cityId = document.getElementById('city').value;
+        const areaId = document.getElementById('area').value;
+
         const params = new URLSearchParams();
         if (dateFrom) params.append('date_from', dateFrom);
         if (dateTo) params.append('date_to', dateTo);
@@ -528,6 +536,8 @@ document.addEventListener('DOMContentLoaded', function () {
         if (status) params.append('status', status);
         params.append('include_zero_balance', includeZeroBalance);
         if (companyId) params.append('company_id', companyId);
+        if (cityId) params.append('city_id', cityId);
+        if (areaId) params.append('area_id', areaId);
         
         window.open('print.php?' + params.toString(), '_blank');
     });

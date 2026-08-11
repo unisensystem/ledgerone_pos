@@ -27,6 +27,8 @@ $distributionId = $_GET['distribution_id'] ?? null;
 $status = $_GET['status'] ?? null;
 $includeZeroBalance = $_GET['include_zero_balance'] ?? '0';
 $companyId = $_GET['company_id'] ?? null;
+$cityId = $_GET['city_id'] ?? null;
+$areaId = $_GET['area_id'] ?? null;
 
 try {
     // Build WHERE conditions
@@ -83,13 +85,23 @@ try {
     
     if ($distributionId) {
         $siWhere .= " AND EXISTS (
-            SELECT 1 FROM sale_invoice_items sii 
-            INNER JOIN products p ON sii.product_id = p.id 
+            SELECT 1 FROM sale_invoice_items sii
+            INNER JOIN products p ON sii.product_id = p.id
             WHERE sii.sale_invoice_id = si.id AND p.vendor_id = ?
         )";
         $params[] = $distributionId;
     }
-    
+
+    if ($cityId) {
+        $siWhere .= " AND c.city_id = ?";
+        $params[] = $cityId;
+    }
+
+    if ($areaId) {
+        $siWhere .= " AND c.area_id = ?";
+        $params[] = $areaId;
+    }
+
     // 4. receive_voucher tenant_id (for opening_balance_invoices)
     $params[] = $tenant_id;
     
@@ -130,7 +142,17 @@ try {
         $obiWhere .= " AND obi.distribution_id = ?";
         $params[] = $distributionId;
     }
-    
+
+    if ($cityId) {
+        $obiWhere .= " AND c.city_id = ?";
+        $params[] = $cityId;
+    }
+
+    if ($areaId) {
+        $obiWhere .= " AND c.area_id = ?";
+        $params[] = $areaId;
+    }
+
     // Build query for sales invoices with recoveries
     $query = "(
         SELECT 

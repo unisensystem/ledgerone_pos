@@ -21,90 +21,95 @@ if (!$user_id || !$tenant_id) {
 // GET - Fetch BOM list or single BOM
 if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     $action = $_GET['action'] ?? 'list';
-    
-    if ($action === 'list') {
-        $stmt = $pdo->prepare("
-            SELECT 
-                bom.id,
-                bom.bom_code,
-                bom.version,
-                bom.bom_type,
-                bom.is_active,
-                bom.bom_base_qty,
-                bom.batch_locked,
-                bom.remarks,
-                bom.updated_at,
-                p.code as fg_code,
-                p.name as fg_name,
-                (SELECT COUNT(*) FROM bom_materials WHERE bom_id = bom.id) as material_count
-            FROM bill_of_materials bom
-            JOIN products p ON bom.finished_good_id = p.id
-            WHERE bom.tenant_id = ?
-            ORDER BY bom.updated_at DESC
-        ");
-        $stmt->execute([$tenant_id]);
-        $boms = $stmt->fetchAll();
-        
-        echo json_encode(['success' => true, 'data' => $boms]);
-        exit;
-    }
-    
-    if ($action === 'view' && isset($_GET['id'])) {
-        $stmt = $pdo->prepare("
-            SELECT 
-                bom.id,
-                bom.bom_code,
-                bom.version,
-                bom.bom_type,
-                bom.is_active,
-                bom.bom_base_qty,
-                bom.batch_locked,
-                bom.remarks,
-                bom.created_at,
-                bom.updated_at,
-                p.code as fg_code,
-                p.name as fg_name,
-                bom.finished_good_id
-            FROM bill_of_materials bom
-            JOIN products p ON bom.finished_good_id = p.id
-            WHERE bom.id = ? AND bom.tenant_id = ?
-        ");
-        $stmt->execute([$_GET['id'], $tenant_id]);
-        $bom = $stmt->fetch();
-        
-        if ($bom) {
+
+    try {
+        if ($action === 'list') {
             $stmt = $pdo->prepare("
-                SELECT 
-                    bm.id,
-                    bm.quantity,
-                    bm.raw_material_id,
-                    bm.unit_id,
-                    p.code as material_code,
-                    p.name as material_name,
-                    u.uom_name as unit_name
-                FROM bom_materials bm
-                JOIN products p ON bm.raw_material_id = p.id
-                JOIN uom u ON bm.unit_id = u.id
-                WHERE bm.bom_id = ?
+                SELECT
+                    bom.id,
+                    bom.bom_code,
+                    bom.version,
+                    bom.is_active,
+                    bom.bom_base_qty,
+                    bom.batch_locked,
+                    bom.remarks,
+                    bom.updated_at,
+                    p.code as fg_code,
+                    p.name as fg_name,
+                    (SELECT COUNT(*) FROM bom_materials WHERE bom_id = bom.id) as material_count
+                FROM bill_of_materials bom
+                JOIN products p ON bom.finished_good_id = p.id
+                WHERE bom.tenant_id = ?
+                ORDER BY bom.updated_at DESC
             ");
-            $stmt->execute([$_GET['id']]);
-            $bom['materials'] = $stmt->fetchAll();
+            $stmt->execute([$tenant_id]);
+            $boms = $stmt->fetchAll();
+
+            echo json_encode(['success' => true, 'data' => $boms]);
+            exit;
         }
-        
-        echo json_encode(['success' => true, 'data' => $bom]);
+
+        if ($action === 'view' && isset($_GET['id'])) {
+            $stmt = $pdo->prepare("
+                SELECT
+                    bom.id,
+                    bom.bom_code,
+                    bom.version,
+                    bom.is_active,
+                    bom.bom_base_qty,
+                    bom.batch_locked,
+                    bom.remarks,
+                    bom.created_at,
+                    bom.updated_at,
+                    p.code as fg_code,
+                    p.name as fg_name,
+                    bom.finished_good_id
+                FROM bill_of_materials bom
+                JOIN products p ON bom.finished_good_id = p.id
+                WHERE bom.id = ? AND bom.tenant_id = ?
+            ");
+            $stmt->execute([$_GET['id'], $tenant_id]);
+            $bom = $stmt->fetch();
+
+            if ($bom) {
+                $stmt = $pdo->prepare("
+                    SELECT
+                        bm.id,
+                        bm.quantity,
+                        bm.raw_material_id,
+                        bm.unit_id,
+                        p.code as material_code,
+                        p.name as material_name,
+                        u.uom_name as unit_name
+                    FROM bom_materials bm
+                    JOIN products p ON bm.raw_material_id = p.id
+                    JOIN uom u ON bm.unit_id = u.id
+                    WHERE bm.bom_id = ?
+                ");
+                $stmt->execute([$_GET['id']]);
+                $bom['materials'] = $stmt->fetchAll();
+            }
+
+            echo json_encode(['success' => true, 'data' => $bom]);
+            exit;
+        }
+
+        if ($action === 'finished_goods') {
+            $stmt = $pdo->prepare("SELECT id, code, name FROM products WHERE tenant_id = ? AND inventory_account_id = 117 AND is_active = 1");
+            $stmt->execute([$tenant_id]);
+            echo json_encode(['success' => true, 'data' => $stmt->fetchAll()]);
+            exit;
+        }
+
+        http_response_code(400);
+        echo json_encode(['success' => false, 'message' => 'Invalid action']);
+        exit;
+
+    } catch (Exception $e) {
+        http_response_code(500);
+        echo json_encode(['success' => false, 'message' => 'Database error: ' . $e->getMessage()]);
         exit;
     }
-    
-    if ($action === 'finished_goods') {
-        $stmt = $pdo->prepare("SELECT id, code, name FROM products WHERE tenant_id = ? AND inventory_account_id = 117 AND is_active = 1");
-        $stmt->execute([$tenant_id]);
-        echo json_encode(['success' => true, 'data' => $stmt->fetchAll()]);
-        exit;
-    }
-    
-    http_response_code(400);
-    echo json_encode(['success' => false, 'message' => 'Invalid action']);
-    exit;
 }
 
 // PUT - Update BOM
