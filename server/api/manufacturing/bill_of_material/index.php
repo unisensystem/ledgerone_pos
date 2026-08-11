@@ -110,7 +110,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $bom_code = $data['bom_code'] ?? null;
     $finished_good_id = $data['finished_good_id'] ?? null;
     $version = $data['version'] ?? '1.0';
-    $bom_type = $data['bom_type'] ?? 'BOM 1';
     $is_active = $data['is_active'] ?? 1;
     $bom_base_qty = $data['bom_base_qty'] ?? 1;
     $batch_locked = $data['batch_locked'] ?? 0;

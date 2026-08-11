@@ -66,15 +66,6 @@ if (!$user_id) {
                         <input type="text" class="form-control" id="version" value="1.0" required>
                     </div>
 
-                    <div class="field-group">
-                        <label class="form-label" for="bomType">BOM Type <span style="color:#E34F4F;">*</span></label>
-                        <select class="form-control" id="bomType" required>
-                            <option value="BOM 1">BOM 1</option>
-                            <option value="BOM 2">BOM 2</option>
-                        </select>
-                        <div class="helper-text">Used to filter BOMs in Production Order</div>
-                    </div>
-
                     <!-- Active checkbox (default checked) -->
                     <div class="field-group">
                         <div class="checkbox-wrapper">

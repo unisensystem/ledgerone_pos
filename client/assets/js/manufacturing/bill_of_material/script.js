@@ -254,7 +254,6 @@
             bom_code: document.getElementById('bomCode').value,
             finished_good_id: selectedFG.id,
             version: document.getElementById('version').value,
-            bom_type: document.getElementById('bomType').value,
             is_active: document.getElementById('active').checked ? 1 : 0,
             bom_base_qty: parseFloat(document.getElementById('bomBaseQty').value) || 1,
             batch_locked: document.getElementById('batchLocked').checked ? 1 : 0,

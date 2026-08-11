@@ -135,10 +135,6 @@ $company = $stmt->fetch(PDO::FETCH_ASSOC);
             <span class="info-value">v<?= htmlspecialchars($bom['version']) ?></span>
         </div>
         <div class="info-row">
-            <span class="info-label">BOM Type</span>
-            <span class="info-value"><?= htmlspecialchars($bom['bom_type'] ?? 'BOM 1') ?></span>
-        </div>
-        <div class="info-row">
             <span class="info-label">Finished Good</span>
             <span class="info-value"><?= htmlspecialchars($bom['fg_code'] . ' - ' . $bom['fg_name']) ?></span>
         </div>
