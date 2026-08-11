@@ -127,7 +127,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         // Insert BOM header
         $stmt = $pdo->prepare("INSERT INTO bill_of_materials (tenant_id, bom_code, finished_good_id, version, bom_type, is_active, bom_base_qty, batch_locked, remarks, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())");
-        $stmt->execute([$tenant_id, $bom_code, $finished_good_id, $version, $bom_type, $is_active, $bom_base_qty, $batch_locked, $remarks, $user_id]);
+        $stmt->execute([$tenant_id, $bom_code, $finished_good_id, $version, 'BOM 1', $is_active, $bom_base_qty, $batch_locked, $remarks, $user_id]);
         $bom_id = $pdo->lastInsertId();
         
         // Insert BOM materials

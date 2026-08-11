@@ -48,17 +48,24 @@
                 allBoms = data.data;
                 populateFGFilter();
                 filterData();
+            } else {
+                document.getElementById('tableBody').innerHTML = `<tr><td colspan="8" style="text-align:center;padding:32px;color:#E34F4F;">Failed to load BOMs: ${data.message || 'Unknown error'}</td></tr>`;
             }
         } catch (err) {
             console.error('Error loading BOMs:', err);
+            document.getElementById('tableBody').innerHTML = `<tr><td colspan="8" style="text-align:center;padding:32px;color:#E34F4F;">Error loading BOMs. Check console for details.</td></tr>`;
         }
     }
 
     async function loadRawMaterials() {
-        const res = await fetch(`${API_BASE}?action=raw_materials`);
-        const data = await res.json();
-        if (data.success) {
-            rawMaterials = data.data;
+        try {
+            const res = await fetch(`${API_BASE}?action=raw_materials`);
+            const data = await res.json();
+            if (data.success) {
+                rawMaterials = data.data;
+            }
+        } catch (err) {
+            console.error('Error loading raw materials:', err);
         }
     }
 
