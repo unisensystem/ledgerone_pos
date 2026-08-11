@@ -246,8 +246,8 @@ document.addEventListener('DOMContentLoaded', function () {
                 <th>Address</th>
                 <th>Primary Phone No</th>
                 <th>Total Balance</th>
-                <th>Bills</th>
-                <th>Oldest Invoice</th>
+                <th>Received Amount</th>
+                <th>Sales Return</th>
                 <th>Days Overdue</th>
                 <th>Signature</th>
             `;
@@ -281,6 +281,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     total_received: parseFloat(row.total_received) || 0,
                     total_returns: parseFloat(row.total_returns) || 0,
                     unallocated_received: parseFloat(row.unallocated_received) || 0,
+                    unallocated_returns: parseFloat(row.unallocated_returns) || 0,
                     bills: []
                 };
             }
@@ -370,10 +371,9 @@ document.addEventListener('DOMContentLoaded', function () {
         const grouped = groupByCustomer(rows);
 
         grouped.forEach((customer, i) => {
-            const bal      = customer.total_balance - customer.unallocated_received;
+            const bal      = customer.total_balance - customer.unallocated_received - customer.unallocated_returns;
             const balClass = bal > 0 ? 'balance-positive' : bal < 0 ? 'balance-negative' : '';
             const balText  = (bal < 0 ? '-' : '') + currencySymbol + Math.abs(bal).toFixed(2);
-            const oldestDate = customer.bills[0]?.invoice_date || '';
             const oldestDays = customer.bills[0]?.days_overdue ?? '';
 
             const tr = document.createElement('tr');
@@ -384,8 +384,8 @@ document.addEventListener('DOMContentLoaded', function () {
                 <td>${customer.address || ''}</td>
                 <td>${customer.primary_phone || ''}</td>
                 <td class="${balClass}">${balText}</td>
-                <td>${customer.bills.length}</td>
-                <td>${oldestDate}</td>
+                <td></td>
+                <td></td>
                 <td>${oldestDays}</td>
                 <td><div class="signature-cell"></div></td>
             `;
@@ -471,16 +471,17 @@ document.addEventListener('DOMContentLoaded', function () {
     function exportToCSV() {
         let rows;
         if (customerViewMode) {
-            rows = [['S#', 'Customer Name', 'Address', 'Primary Phone No', 'Total Balance', 'Bills Count', 'Oldest Invoice', 'Days Overdue']];
+            rows = [['S#', 'Customer Name', 'Address', 'Primary Phone No', 'Total Balance', 'Received Amount', 'Sales Return', 'Days Overdue']];
             groupByCustomer(lastRecoveryData).forEach((c, i) => {
+                const netBal = c.total_balance - c.unallocated_received - c.unallocated_returns;
                 rows.push([
                     i + 1,
                     c.customer_name,
                     c.address,
                     c.primary_phone,
-                    c.total_balance.toFixed(2),
-                    c.bills.length,
-                    c.bills[0]?.invoice_date || '',
+                    (netBal < 0 ? '-' : '') + Math.abs(netBal).toFixed(2),
+                    c.total_received.toFixed(2),
+                    c.total_returns.toFixed(2),
                     c.bills[0]?.days_overdue || ''
                 ]);
             });

@@ -115,6 +115,7 @@ $query = "
             SELECT SUM(rv.amount)
             FROM receive_voucher rv
             WHERE rv.bill_no = obi.invoice_number
+            AND rv.customer_id = c.id
             AND rv.tenant_id = ?
         ), 0) AS current_balance,
         COALESCE((
@@ -141,7 +142,15 @@ $query = "
             WHERE rv.customer_id = c.id
             AND rv.tenant_id = ?
             AND (rv.bill_no IS NULL OR rv.bill_no = '' OR rv.bill_no = 'null')
-        ), 0) AS unallocated_received
+        ), 0) AS unallocated_received,
+        COALESCE((
+            SELECT SUM(sr.net_amount)
+            FROM sale_return sr
+            WHERE sr.customer_id = c.id
+            AND sr.tenant_id = ?
+            AND sr.status = 'Posted'
+            AND (sr.sale_invoice_no IS NULL OR sr.sale_invoice_no = 0)
+        ), 0) AS unallocated_returns
     FROM opening_balance_invoices obi
     JOIN customers c ON obi.customer_id = c.id
     WHERE obi.tenant_id = ?
@@ -167,6 +176,7 @@ $query = "
             SELECT SUM(rv.amount)
             FROM receive_voucher rv
             WHERE rv.bill_no = si.bill_no
+            AND rv.customer_id = c.id
             AND rv.tenant_id = ?
         ), 0) - COALESCE((
             SELECT SUM(sr.net_amount)
@@ -199,7 +209,15 @@ $query = "
             WHERE rv.customer_id = c.id
             AND rv.tenant_id = ?
             AND (rv.bill_no IS NULL OR rv.bill_no = '' OR rv.bill_no = 'null')
-        ), 0) AS unallocated_received
+        ), 0) AS unallocated_received,
+        COALESCE((
+            SELECT SUM(sr.net_amount)
+            FROM sale_return sr
+            WHERE sr.customer_id = c.id
+            AND sr.tenant_id = ?
+            AND sr.status = 'Posted'
+            AND (sr.sale_invoice_no IS NULL OR sr.sale_invoice_no = 0)
+        ), 0) AS unallocated_returns
     FROM sale_invoice si
     JOIN customers c ON si.customer_id = c.id
     WHERE si.tenant_id = ?
@@ -231,6 +249,7 @@ $params[] = $tenant_id;                          // returns subquery tenant
 if ($date_from) $params[] = $date_from;
 if ($date_to)   $params[] = $date_to;
 $params[] = $tenant_id;                          // unallocated_received subquery
+$params[] = $tenant_id;                          // unallocated_returns subquery
 $params[] = $tenant_id;                          // WHERE obi.tenant_id
 if ($company_id)   $params[] = $company_id;
 if ($country_id)   $params[] = $country_id;
@@ -250,6 +269,7 @@ $params[] = $tenant_id;                          // returns subquery tenant
 if ($date_from) $params[] = $date_from;
 if ($date_to)   $params[] = $date_to;
 $params[] = $tenant_id;                          // unallocated_received subquery
+$params[] = $tenant_id;                          // unallocated_returns subquery
 $params[] = $tenant_id;                          // WHERE si.tenant_id
 if ($recovery_officer_id) $params[] = $recovery_officer_id;
 if ($date_from) $params[] = $date_from;
@@ -278,6 +298,7 @@ function groupByCustomerAndSimulate($rows) {
                 'total_received'       => floatval($row['total_received']),
                 'total_returns'        => floatval($row['total_returns']),
                 'unallocated_received' => floatval($row['unallocated_received']),
+                'unallocated_returns'  => floatval($row['unallocated_returns']),
                 'bills'                => []
             ];
         }
@@ -315,7 +336,7 @@ $total_received = 0;
 $total_returns  = 0;
 if ($view_mode === 'customer') {
     foreach ($customers_grouped as $customer) {
-        $total_balance  += $customer['total_balance'] - $customer['unallocated_received'];
+        $total_balance  += $customer['total_balance'] - $customer['unallocated_received'] - $customer['unallocated_returns'];
         $total_received += $customer['total_received'];
         $total_returns  += $customer['total_returns'];
     }
@@ -606,59 +627,33 @@ $territory_str   = implode(' > ', $territory_parts);
         <thead>
             <tr>
                 <th class="text-center" style="width:2%">S#</th>
-                <th style="width:12%">Customer Name</th>
-                <th style="width:10%">Address</th>
-                <th style="width:6%">Phone</th>
-                <th style="width:3%">Bill No</th>
-                <th style="width:5%">Date</th>
-                <th class="text-right" style="width:6%">Bill Balance</th>
-                <th class="text-right" style="width:6%">Auto-Clear</th>
-                <th class="text-right" style="width:6%">Remaining</th>
-                <th class="text-center" style="width:4%">Days</th>
-                <th class="text-center" style="width:5%">Status</th>
-                <th style="width:8%">Signature</th>
+                <th style="width:18%">Customer Name</th>
+                <th style="width:16%">Address</th>
+                <th class="text-right" style="width:10%">Balance</th>
+                <th style="width:10%">Received Amount</th>
+                <th style="width:10%">Sales Return</th>
+                <th class="text-center" style="width:8%">Days Overdue</th>
+                <th style="width:12%">Signature</th>
             </tr>
         </thead>
         <tbody>
         <?php $cIdx = 0; foreach ($customers_grouped as $customer):
             $cIdx++;
-            $net_bal = $customer['total_balance'] - $customer['unallocated_received'];
+            $net_bal  = $customer['total_balance'] - $customer['unallocated_received'] - $customer['unallocated_returns'];
+            $balClass = $net_bal < 0 ? 'color:#c00;' : '';
+            $balText  = ($net_bal < 0 ? '-' : '') . $currency_symbol . number_format(abs($net_bal), 2);
+            $oldestDays = $customer['bills'][0]['days_overdue'] ?? '';
         ?>
-            <tr class="customer-header-row">
+            <tr>
                 <td class="text-center"><?php echo $cIdx; ?></td>
                 <td><?php echo htmlspecialchars($customer['customer_name']); ?></td>
                 <td><?php echo htmlspecialchars($customer['address'] ?? ''); ?></td>
-                <td><?php echo htmlspecialchars($customer['primary_phone'] ?? ''); ?></td>
-                <td class="text-center" colspan="5">
-                    <?php echo count($customer['bills']); ?> bill(s) &nbsp;|&nbsp;
-                    Net Balance: <?php echo $currency_symbol . number_format($net_bal, 2); ?>
-                    <?php if ($customer['unallocated_received'] > 0): ?>
-                        &nbsp;<small style="font-weight:normal;color:#555">(<?php echo $currency_symbol . number_format($customer['unallocated_received'], 2); ?> unallocated)</small>
-                    <?php endif; ?>
-                </td>
+                <td class="text-right" style="<?php echo $balClass; ?>"><?php echo $balText; ?></td>
                 <td></td>
                 <td></td>
+                <td class="text-center"><?php echo $oldestDays; ?></td>
                 <td><div class="signature-cell"></div></td>
             </tr>
-            <?php foreach ($customer['bills'] as $bill):
-                $status_label = ['cleared' => 'Cleared', 'partial' => 'Partial', 'pending' => 'Pending'][$bill['sim_status']] ?? '';
-                $status_class = 'status-' . $bill['sim_status'];
-            ?>
-            <tr class="bill-sub-row">
-                <td></td>
-                <td></td>
-                <td></td>
-                <td></td>
-                <td><?php echo htmlspecialchars($bill['bill_no'] ?? ''); ?></td>
-                <td><?php echo !empty($bill['invoice_date']) ? date('d-m-y', strtotime($bill['invoice_date'])) : ''; ?></td>
-                <td class="text-right"><?php echo $currency_symbol . number_format(floatval($bill['current_balance']), 2); ?></td>
-                <td class="text-right"><?php echo $currency_symbol . number_format($bill['sim_cleared'], 2); ?></td>
-                <td class="text-right"><?php echo $currency_symbol . number_format($bill['sim_balance'], 2); ?></td>
-                <td class="text-center"><?php echo isset($bill['days_overdue']) ? (int)$bill['days_overdue'] : ''; ?></td>
-                <td class="text-center <?php echo $status_class; ?>"><?php echo $status_label; ?></td>
-                <td></td>
-            </tr>
-            <?php endforeach; ?>
         <?php endforeach; ?>
         </tbody>
     </table>

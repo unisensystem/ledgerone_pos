@@ -33,7 +33,7 @@ $currency_symbol = $currency['symbol'];
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Customer Aging Report - LedgerOne ERP</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="stylesheet" href="../../../assets/css/financial_reports/customer_aging/customer-aging.css">
+    <link rel="stylesheet" href="../../../assets/css/financial_reports/customer_aging/customer-aging.css?v=<?php echo filemtime(dirname(__FILE__) . '/../../../assets/css/financial_reports/customer_aging/customer-aging.css'); ?>">
 </head>
 <style>
     /* Append to customer-aging.css — styles for the searchable customer combobox */
@@ -239,7 +239,15 @@ select.form-select:disabled {
         <div class="card">
             <div class="card-header">
                 <h3>Aging Report Details</h3>
-                <div class="d-flex align-center">
+                <div class="d-flex align-center" style="gap: 16px;">
+                    <div class="view-toggle-wrapper">
+                        <span class="view-toggle-label">Standard</span>
+                        <label class="toggle-switch" title="Include unallocated receive vouchers distributed FIFO across oldest bills">
+                            <input type="checkbox" id="autoClearToggle">
+                            <span class="toggle-slider"></span>
+                        </label>
+                        <span class="view-toggle-label" id="autoClearLabel">Auto-Clear</span>
+                    </div>
                     <div class="pagination-info" id="paginationInfoTop">Showing 0 entries</div>
                 </div>
             </div>
@@ -276,6 +284,6 @@ select.form-select:disabled {
         </div>
     </div>
 
-    <script src="../../../assets/js/financial_reports/customer_aging/customer-aging.js"></script>
+    <script src="../../../assets/js/financial_reports/customer_aging/customer-aging.js?v=<?php echo filemtime(dirname(__FILE__) . '/../../../assets/js/financial_reports/customer_aging/customer-aging.js'); ?>"></script>
 </body>
 </html>

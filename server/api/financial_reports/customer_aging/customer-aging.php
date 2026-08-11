@@ -88,7 +88,7 @@ $zoneCondition     = $zone_id     ? ' AND c.city_zone_id = ?' : '';
     $obiCompCond = str_replace('{company_col}', 'c.company_id', $companyCondition);
 
     $sql = "
-        SELECT 
+        SELECT
             si.id,
             si.bill_no,
             si.sale_date as invoice_date,
@@ -99,7 +99,14 @@ $zoneCondition     = $zone_id     ? ' AND c.city_zone_id = ?' : '';
             COALESCE(SUM(DISTINCT rv.amount), 0) as paid_amount,
             COALESCE(SUM(DISTINCT sr.net_amount), 0) as returned_amount,
             DATEDIFF(CURDATE(), si.sale_date) as days_overdue,
-            'Sale Invoice' as invoice_type
+            'Sale Invoice' as invoice_type,
+            COALESCE((
+                SELECT SUM(rv2.amount)
+                FROM receive_voucher rv2
+                WHERE rv2.customer_id = c.id
+                AND rv2.tenant_id = ?
+                AND (rv2.bill_no IS NULL OR rv2.bill_no = '' OR rv2.bill_no = 'null')
+            ), 0) as unallocated_received
         FROM sale_invoice si
         JOIN customers c ON si.customer_id = c.id
         LEFT JOIN receive_voucher rv ON rv.bill_no = si.bill_no AND rv.tenant_id = ?
@@ -113,7 +120,7 @@ $zoneCondition     = $zone_id     ? ' AND c.city_zone_id = ?' : '';
 
         UNION ALL
 
-        SELECT 
+        SELECT
             obi.id,
             obi.invoice_number as bill_no,
             obi.invoice_date,
@@ -124,7 +131,14 @@ $zoneCondition     = $zone_id     ? ' AND c.city_zone_id = ?' : '';
             COALESCE(SUM(DISTINCT rv.amount), 0) as paid_amount,
             0 as returned_amount,
             DATEDIFF(CURDATE(), obi.invoice_date) as days_overdue,
-            'Opening Balance' as invoice_type
+            'Opening Balance' as invoice_type,
+            COALESCE((
+                SELECT SUM(rv2.amount)
+                FROM receive_voucher rv2
+                WHERE rv2.customer_id = c.id
+                AND rv2.tenant_id = ?
+                AND (rv2.bill_no IS NULL OR rv2.bill_no = '' OR rv2.bill_no = 'null')
+            ), 0) as unallocated_received
         FROM opening_balance_invoices obi
         JOIN customers c ON obi.customer_id = c.id
         LEFT JOIN receive_voucher rv ON rv.bill_no = obi.invoice_number AND rv.tenant_id = ?
@@ -139,14 +153,15 @@ $zoneCondition     = $zone_id     ? ' AND c.city_zone_id = ?' : '';
     ";
 
     // sale_invoice branch params, in exact order they appear in the query:
-    // rv.tenant_id, sr.tenant_id, si.tenant_id, [dateParams], [company_id], [sharedFilterParams]
-    $params = [$tenant_id, $tenant_id, $tenant_id];
+    // unallocated_subquery.tenant_id, rv.tenant_id, sr.tenant_id, si.tenant_id, [dateParams], [company_id], [sharedFilterParams]
+    $params = [$tenant_id, $tenant_id, $tenant_id, $tenant_id];
     $params = array_merge($params, $dateParams);
     if ($company_id) $params[] = $company_id;
     $params = array_merge($params, $sharedFilterParams);
 
     // opening_balance branch params:
-    // rv.tenant_id, obi.tenant_id, [dateParams], [company_id], [sharedFilterParams]
+    // unallocated_subquery.tenant_id, rv.tenant_id, obi.tenant_id, [dateParams], [company_id], [sharedFilterParams]
+    $params[] = $tenant_id;
     $params[] = $tenant_id;
     $params[] = $tenant_id;
     $params = array_merge($params, $dateParams);
@@ -191,16 +206,18 @@ $zoneCondition     = $zone_id     ? ' AND c.city_zone_id = ?' : '';
         }
 
         $reportData[] = [
-            'id'           => $index + 1,
-            'customerCode' => $invoice['customer_code'],
-            'customerName' => $invoice['customer_name'],
-            'address'      => $invoice['address'] ?? 'N/A',
-            'invoiceNo'    => $invoice['bill_no'],
-            'invoiceDate'  => $invoice['invoice_date'],
-            'type'         => $invoice['invoice_type'],
-            'amount'       => $currency_symbol . number_format($outstanding, 2),
-            'daysOverdue'  => $days,
-            'bucket'       => $bucket
+            'id'                  => $index + 1,
+            'customerCode'        => $invoice['customer_code'],
+            'customerName'        => $invoice['customer_name'],
+            'address'             => $invoice['address'] ?? 'N/A',
+            'invoiceNo'           => $invoice['bill_no'],
+            'invoiceDate'         => $invoice['invoice_date'],
+            'type'                => $invoice['invoice_type'],
+            'amount'              => $currency_symbol . number_format($outstanding, 2),
+            'outstandingRaw'      => $outstanding,
+            'unallocatedReceived' => (float)$invoice['unallocated_received'],
+            'daysOverdue'         => $days,
+            'bucket'              => $bucket
         ];
     }
 
