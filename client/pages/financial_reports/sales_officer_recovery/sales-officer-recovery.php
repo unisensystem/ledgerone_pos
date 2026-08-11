@@ -40,6 +40,16 @@ $customers = $stmt->fetchAll();
 $stmt = $pdo->prepare("SELECT id, supplier_name FROM suppliers WHERE tenant_id = ? ORDER BY supplier_name");
 $stmt->execute([$_SESSION['tenant_id']]);
 $distributions = $stmt->fetchAll();
+
+// Fetch cities
+$stmt = $pdo->prepare("SELECT id, city_name FROM cities WHERE tenant_id = ? ORDER BY city_name");
+$stmt->execute([$_SESSION['tenant_id']]);
+$cities = $stmt->fetchAll();
+
+// Fetch areas
+$stmt = $pdo->prepare("SELECT id, area_name FROM areas WHERE tenant_id = ? ORDER BY area_name");
+$stmt->execute([$_SESSION['tenant_id']]);
+$areas = $stmt->fetchAll();
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -148,6 +158,28 @@ $distributions = $stmt->fetchAll();
                     </div>
                 </div>
                 
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label" for="city">City</label>
+                        <select id="city" class="form-input">
+                            <option value="">All Cities</option>
+                            <?php foreach ($cities as $city): ?>
+                                <option value="<?php echo $city['id']; ?>"><?php echo htmlspecialchars($city['city_name']); ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="area">Area</label>
+                        <select id="area" class="form-input">
+                            <option value="">All Areas</option>
+                            <?php foreach ($areas as $area): ?>
+                                <option value="<?php echo $area['id']; ?>"><?php echo htmlspecialchars($area['area_name']); ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                </div>
+
                 <div class="form-row">
                     <div class="form-group">
                         <label class="form-label">
