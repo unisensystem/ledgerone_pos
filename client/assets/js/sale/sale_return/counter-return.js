@@ -78,26 +78,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     // Default to Cash Customer so the counter clerk doesn't have to pick a customer for a walk-in sale return.
     // Must run after all initDropdown(...) calls above — filterInvoicesByCustomer()/loadSubAccounts() call
     // .updateData() on the invoiceSearch/subAccountSearch inputs, which initDropdown() is what defines it.
-    if (!isEditMode) {
-        const cashCustomer = customersData.find(c => c.customer_name === 'Cash Customer');
-        if (cashCustomer) {
-            document.getElementById('customerSearch').value = `${cashCustomer.customer_code} - ${cashCustomer.customer_name}`;
-            document.getElementById('customer').value = cashCustomer.id;
-            currentReturn.customer = parseInt(cashCustomer.id);
-
-            if (cashCustomer.supplier_man_id) {
-                const supplierMan = employeesData.find(e => e.id == cashCustomer.supplier_man_id);
-                if (supplierMan) {
-                    document.getElementById('supplierManSearch').value = `${supplierMan.employee_id} - ${supplierMan.full_name}`;
-                    document.getElementById('supplierMan').value = cashCustomer.supplier_man_id;
-                    currentReturn.supplierMan = parseInt(cashCustomer.supplier_man_id);
-                }
-            }
-
-            filterInvoicesByCustomer(cashCustomer.id);
-            loadSubAccounts(cashCustomer.id);
-        }
-    }
+    if (!isEditMode) selectCashCustomerDefault();
 
 
     document.getElementById('paymentMethod').addEventListener('change', function() {
@@ -1237,6 +1218,7 @@ async function loadCompanies() {
             currentReturn.branch = null;
             await Promise.all([loadProducts(companyId), loadCustomers(companyId), loadSaleInvoices(companyId), loadBranches(companyId)]);
             loadNextReturnNo(companyId);
+            if (!isEditMode) selectCashCustomerDefault();
         });
     }
 }
@@ -1318,6 +1300,29 @@ function resetShortcuts() {
     document.getElementById('shortcutQty').value = shortcuts.qty;
     document.getElementById('shortcutSave').value = shortcuts.save;
     document.getElementById('shortcutClear').value = shortcuts.clear;
+}
+
+// Auto-selects "Cash Customer" (used at initial page load and again after a company change,
+// since the company-change handler clears the customer field before reloading the customer list).
+function selectCashCustomerDefault() {
+    const cashCustomer = customersData.find(c => c.customer_name === 'Cash Customer');
+    if (!cashCustomer) return;
+
+    document.getElementById('customerSearch').value = `${cashCustomer.customer_code} - ${cashCustomer.customer_name}`;
+    document.getElementById('customer').value = cashCustomer.id;
+    currentReturn.customer = parseInt(cashCustomer.id);
+
+    if (cashCustomer.supplier_man_id) {
+        const supplierMan = employeesData.find(e => e.id == cashCustomer.supplier_man_id);
+        if (supplierMan) {
+            document.getElementById('supplierManSearch').value = `${supplierMan.employee_id} - ${supplierMan.full_name}`;
+            document.getElementById('supplierMan').value = cashCustomer.supplier_man_id;
+            currentReturn.supplierMan = parseInt(cashCustomer.supplier_man_id);
+        }
+    }
+
+    filterInvoicesByCustomer(cashCustomer.id);
+    loadSubAccounts(cashCustomer.id);
 }
 
 function filterInvoicesByCustomer(customerId) {
