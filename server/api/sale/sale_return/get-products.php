@@ -16,11 +16,9 @@ if (!$tenant_id) {
 }
 
 try {
-    $company_id = isset($_GET['company_id']) && $_GET['company_id'] !== '' ? (int)$_GET['company_id'] : null;
-
     $sql = "
-        SELECT 
-            p.id, p.code, p.name, p.mrp as sale_price, p.trade_price, 
+        SELECT
+            p.id, p.code, p.name, p.mrp as sale_price, p.trade_price,
             p.default_unit_id, p.barcode, p.qr_code, p.photo, p.carton_conversion,
             p.uom_type, p.uom_group_id,
             u.uom_name as default_unit_name,
@@ -30,7 +28,6 @@ try {
         WHERE p.tenant_id = ? AND p.is_active = 1
     ";
     $params = [$tenant_id];
-    if ($company_id) { $sql .= " AND p.company_id = ?"; $params[] = $company_id; }
     $sql .= " ORDER BY p.name";
     $stmt = $pdo->prepare($sql);
     $stmt->execute($params);

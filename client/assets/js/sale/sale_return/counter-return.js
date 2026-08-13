@@ -74,7 +74,32 @@ document.addEventListener('DOMContentLoaded', async function() {
     
     const baseCurrency = currenciesData.find(c => c.is_base_currency == 1);
     if (baseCurrency) currentReturn.currency = baseCurrency.currency_id;
-    
+
+    // Default to Cash Customer so the counter clerk doesn't have to pick a customer for a walk-in sale return.
+    // Must run after all initDropdown(...) calls above — filterInvoicesByCustomer()/loadSubAccounts() call
+    // .updateData() on the invoiceSearch/subAccountSearch inputs, which initDropdown() is what defines it.
+    if (!isEditMode) {
+        const cashCustomer = customersData.find(c => c.customer_name === 'Cash Customer');
+        if (cashCustomer) {
+            document.getElementById('customerSearch').value = `${cashCustomer.customer_code} - ${cashCustomer.customer_name}`;
+            document.getElementById('customer').value = cashCustomer.id;
+            currentReturn.customer = parseInt(cashCustomer.id);
+
+            if (cashCustomer.supplier_man_id) {
+                const supplierMan = employeesData.find(e => e.id == cashCustomer.supplier_man_id);
+                if (supplierMan) {
+                    document.getElementById('supplierManSearch').value = `${supplierMan.employee_id} - ${supplierMan.full_name}`;
+                    document.getElementById('supplierMan').value = cashCustomer.supplier_man_id;
+                    currentReturn.supplierMan = parseInt(cashCustomer.supplier_man_id);
+                }
+            }
+
+            filterInvoicesByCustomer(cashCustomer.id);
+            loadSubAccounts(cashCustomer.id);
+        }
+    }
+
+
     document.getElementById('paymentMethod').addEventListener('change', function() {
         document.getElementById('bankAccountContainer').classList.toggle('hidden', this.value !== 'bank_transfer');
     });

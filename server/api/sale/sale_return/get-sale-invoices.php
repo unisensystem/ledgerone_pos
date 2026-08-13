@@ -16,11 +16,10 @@ if (!$tenant_id) {
 }
 
 try {
-    $company_id = isset($_GET['company_id']) && $_GET['company_id'] !== '' ? (int)$_GET['company_id'] : null;
     $customer_id = isset($_GET['customer_id']) && $_GET['customer_id'] !== '' ? (int)$_GET['customer_id'] : null;
 
     $sql = "
-        SELECT 
+        SELECT
             si.id,
             si.bill_no,
             si.sale_date,
@@ -34,7 +33,6 @@ try {
         WHERE si.tenant_id = ? AND si.status = 'Posted'
     ";
     $params = [$tenant_id];
-    if ($company_id) { $sql .= " AND si.company_id = ?"; $params[] = $company_id; }
     if ($customer_id) { $sql .= " AND si.customer_id = ?"; $params[] = $customer_id; }
     $sql .= " ORDER BY si.sale_date DESC, si.id DESC LIMIT 200";
     $stmt = $pdo->prepare($sql);
