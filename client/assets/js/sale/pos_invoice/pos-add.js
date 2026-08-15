@@ -4123,30 +4123,46 @@ function saveInvoice(status = 'Posted') {
         const scheme = schemeSelect ? schemeSelect.value : 'sale_on_tp';
         
         // Create separate item for each unit with quantity
-        unitsWithQty.forEach((unit, index) => {
-            const isFirstUnit = index === 0;
-            const item = {
-                productId: productId,
-                uomId: unit.uom_id,
-                quantity: unit.quantity,
-                piece: 0,
-                carton: 0,
-                dozen: 0,
-                salePrice: salePrice,
-                grossAmount: isFirstUnit ? grossAmount : 0,
-                discountAmount: isFirstUnit ? discountAmount : 0,
-                tradeOfferAmount: isFirstUnit ? tradeOfferAmount : 0,
-                taxPercent: taxPercent,
-                taxAmount: isFirstUnit ? taxAmount : 0,
-                focQty: isFirstUnit ? focQty : 0,
-                netAmount: isFirstUnit ? netAmount : 0,
-                parentRowId: null,
-                stockAffects: parseInt(row.dataset.stockAffects) || 1,
-                invoiceAffects: parseInt(row.dataset.invoiceAffects) || 1,
-                scheme: scheme
-            };
-            formData.items.push(item);
-        });
+       unitsWithQty.forEach((unit, index) => {
+    const isFirstUnit = index === 0;
+
+    // Map quantity to correct piece/carton/dozen field based on 
+    // actual unit id (9=Piece, 10=Dozen, 16=Carton — same IDs
+    // already used in getConversionFactor()/convertToPieces())
+    const unitIdNum = parseInt(unit.uom_id);
+    let pieceVal = 0, cartonVal = 0, dozenVal = 0;
+    if (unitIdNum === 9) {
+        pieceVal = unit.quantity;
+    } else if (unitIdNum === 10) {
+        dozenVal = unit.quantity;
+    } else if (unitIdNum === 16) {
+        cartonVal = unit.quantity;
+    } else {
+        pieceVal = unit.quantity; // custom unit fallback
+    }
+
+    const item = {
+        productId: productId,
+        uomId: unit.uom_id,
+        quantity: unit.quantity,
+        piece: pieceVal,
+        carton: cartonVal,
+        dozen: dozenVal,
+        salePrice: salePrice,
+        grossAmount: isFirstUnit ? grossAmount : 0,
+        discountAmount: isFirstUnit ? discountAmount : 0,
+        tradeOfferAmount: isFirstUnit ? tradeOfferAmount : 0,
+        taxPercent: taxPercent,
+        taxAmount: isFirstUnit ? taxAmount : 0,
+        focQty: isFirstUnit ? focQty : 0,
+        netAmount: isFirstUnit ? netAmount : 0,
+        parentRowId: null,
+        stockAffects: parseInt(row.dataset.stockAffects) || 1,
+        invoiceAffects: parseInt(row.dataset.invoiceAffects) || 1,
+        scheme: scheme
+    };
+    formData.items.push(item);
+});
 
         // Add child products from dataset
         if (row.dataset.childProducts) {
