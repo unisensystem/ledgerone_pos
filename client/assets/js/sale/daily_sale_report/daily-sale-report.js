@@ -27,6 +27,12 @@ const referenceNumber = document.getElementById('reference-number');
 const itemsSoldItem = document.getElementById('items-sold-item');
 const billsGeneratedItem = document.getElementById('bills-generated-item');
 
+// Number of columns in each table body - kept in sync with the <thead> in the page.
+// item-wise: S# | Product | Packing | PCS Total | CTN | PCS | DZN | FOC | Rate | Discount | Trader Offer | Amount | R.QTY | R.Amt | Net Amount
+const ITEM_WISE_COLS = 15;
+// bill-wise: S# | Invoice No | Customer Code | Customer Name | Address | Net Amount
+const BILL_WISE_COLS = 6;
+
 const multiSelects = {
     invoiceTypes: {
         triggerId: 'invoice-type-trigger',
@@ -537,7 +543,7 @@ async function fetchReportData() {
 function loadItemWiseData() {
     itemWiseDataContainer.innerHTML = '';
     if (itemWiseData.length === 0) {
-        itemWiseDataContainer.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:40px">No data found</td></tr>';
+        itemWiseDataContainer.innerHTML = '<tr><td colspan="' + ITEM_WISE_COLS + '" style="text-align:center;padding:40px">No data found</td></tr>';
         reportCount.textContent = '0 items found';
         paginationContainer.innerHTML = '';
         return;
@@ -558,7 +564,7 @@ function loadItemWiseData() {
         Object.entries(groups).forEach(function(entry) {
             const header = document.createElement('tr');
             const cell = document.createElement('td');
-            cell.colSpan = 6;
+            cell.colSpan = ITEM_WISE_COLS;
             cell.className = 'group-header-cell';
             cell.textContent = entry[0];
             header.appendChild(cell);
@@ -574,6 +580,10 @@ function loadItemWiseData() {
         });
     }
 
+    // Totals row - always computed from the full filtered dataset (itemWiseData),
+    // not just the current page, so it stays correct while paginating.
+    itemWiseDataContainer.appendChild(buildItemTotalsRow(itemWiseData));
+
     reportCount.textContent = itemWiseData.length + ' items found';
     renderPagination(itemWiseData.length);
 }
@@ -581,23 +591,95 @@ function loadItemWiseData() {
 function buildItemRow(item, num) {
     const row = document.createElement('tr');
     const indent = item.isChild ? 'padding-left:30px' : '';
-    const qty = item.units.map(function(unit) {
-        return unit.unit + ' ' + parseInt(unit.qty, 10);
-    }).join(', ');
+    const totalPack = Math.round(parseFloat(item.total_pack || 0));
+    const focQty = Math.round(parseFloat(item.foc_qty || 0));
+    // Packing comes from the API as 'ctn_pack_size' (the Carton unit's effective
+    // conversion factor for this product). It used to be read from a non-existent
+    // 'pcs_per_ctn' field, which is why Packing always showed "-".
+    const packing = (item.ctn_pack_size !== null && item.ctn_pack_size !== undefined && item.ctn_pack_size !== '')
+        ? parseInt(item.ctn_pack_size, 10)
+        : '-';
+
+    const ctnQty = item.ctn_qty > 0 ? parseInt(item.ctn_qty, 10) : '-';
+    const pcsQty = item.pcs_qty > 0 ? parseInt(item.pcs_qty, 10) : '-';
+    const dznQty = item.dzn_qty > 0 ? parseInt(item.dzn_qty, 10) : '-';
+
+    const discountAmt = parseFloat(item.discount_amount || 0);
+    const tradeOfferAmt = parseFloat(item.trade_offer_amount || 0);
+    const amount = parseFloat(item.amount || 0);
+
+    const rQty = parseFloat(item.r_qty || 0);
+    const rAmt = parseFloat(item.r_amt || 0);
+    const rQtyDisplay = rQty ? rQty.toFixed(2) : '';
+    const rAmtDisplay = rAmt ? (currencySymbol + rAmt.toFixed(2)) : '';
+    const netAmount = amount - rAmt;
+
     row.innerHTML =
         '<td>' + num + '</td>' +
         '<td style="' + indent + '">' + (item.isChild ? '&rarr; ' : '') + item.product + '</td>' +
-        '<td class="text-right">' + qty + '</td>' +
-        '<td class="text-right">' + parseFloat(item.foc_qty || 0).toLocaleString() + '</td>' +
+        '<td class="text-right">' + packing + '</td>' +
+        '<td class="text-right">' + totalPack.toLocaleString() + '</td>' +
+        '<td class="text-right">' + ctnQty + '</td>' +
+        '<td class="text-right">' + pcsQty + '</td>' +
+        '<td class="text-right">' + dznQty + '</td>' +
+        '<td class="text-right">' + focQty.toLocaleString() + '</td>' +
         '<td class="text-right">' + currencySymbol + parseFloat(item.rate).toFixed(2) + '</td>' +
-        '<td class="text-right">' + currencySymbol + parseFloat(item.amount).toLocaleString() + '</td>';
+        '<td class="text-right">' + currencySymbol + discountAmt.toFixed(2) + '</td>' +
+        '<td class="text-right">' + currencySymbol + tradeOfferAmt.toFixed(2) + '</td>' +
+        '<td class="text-right">' + currencySymbol + amount.toLocaleString() + '</td>' +
+        '<td class="text-right">' + rQtyDisplay + '</td>' +
+        '<td class="text-right">' + rAmtDisplay + '</td>' +
+        '<td class="text-right">' + currencySymbol + netAmount.toLocaleString() + '</td>';
+    return row;
+}
+
+// Builds the "grand totals" row shown under the item-wise table. Totals are computed
+// from the full filtered dataset (not just the visible page) and skip child rows,
+// matching the same rule used for the summary cards.
+function buildItemTotalsRow(data) {
+    const rows = data.filter(function(item) { return !item.isChild; });
+    const totals = rows.reduce(function(acc, item) {
+        acc.totalPack += parseFloat(item.total_pack || 0);
+        acc.ctnQty += parseFloat(item.ctn_qty || 0);
+        acc.pcsQty += parseFloat(item.pcs_qty || 0);
+        acc.dznQty += parseFloat(item.dzn_qty || 0);
+        acc.focQty += parseFloat(item.foc_qty || 0);
+        acc.discount += parseFloat(item.discount_amount || 0);
+        acc.tradeOffer += parseFloat(item.trade_offer_amount || 0);
+        acc.amount += parseFloat(item.amount || 0);
+        acc.rQty += parseFloat(item.r_qty || 0);
+        acc.rAmt += parseFloat(item.r_amt || 0);
+        return acc;
+    }, { totalPack: 0, ctnQty: 0, pcsQty: 0, dznQty: 0, focQty: 0, discount: 0, tradeOffer: 0, amount: 0, rQty: 0, rAmt: 0 });
+
+    const netAmount = totals.amount - totals.rAmt;
+
+    const row = document.createElement('tr');
+    row.className = 'totals-row';
+    row.style.background = '#f0f0f0';
+    row.style.fontWeight = 'bold';
+    row.innerHTML =
+        '<td colspan="2">Total (' + rows.length + ' Items)</td>' +
+        '<td class="text-right">-</td>' +
+        '<td class="text-right">' + Math.round(totals.totalPack).toLocaleString() + '</td>' +
+        '<td class="text-right">' + Math.round(totals.ctnQty).toLocaleString() + '</td>' +
+        '<td class="text-right">' + Math.round(totals.pcsQty).toLocaleString() + '</td>' +
+        '<td class="text-right">' + Math.round(totals.dznQty).toLocaleString() + '</td>' +
+        '<td class="text-right">' + Math.round(totals.focQty).toLocaleString() + '</td>' +
+        '<td class="text-right">-</td>' +
+        '<td class="text-right">' + currencySymbol + totals.discount.toFixed(2) + '</td>' +
+        '<td class="text-right">' + currencySymbol + totals.tradeOffer.toFixed(2) + '</td>' +
+        '<td class="text-right">' + currencySymbol + totals.amount.toLocaleString() + '</td>' +
+        '<td class="text-right">' + (totals.rQty ? totals.rQty.toFixed(2) : '') + '</td>' +
+        '<td class="text-right">' + (totals.rAmt ? currencySymbol + totals.rAmt.toFixed(2) : '') + '</td>' +
+        '<td class="text-right">' + currencySymbol + netAmount.toLocaleString() + '</td>';
     return row;
 }
 
 function loadBillWiseData() {
     billWiseDataContainer.innerHTML = '';
     if (billWiseData.length === 0) {
-        billWiseDataContainer.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:40px">No data found</td></tr>';
+        billWiseDataContainer.innerHTML = '<tr><td colspan="' + BILL_WISE_COLS + '" style="text-align:center;padding:40px">No data found</td></tr>';
         reportCount.textContent = '0 bills found';
         paginationContainer.innerHTML = '';
         return;
@@ -618,7 +700,7 @@ function loadBillWiseData() {
         Object.entries(groups).forEach(function(entry) {
             const header = document.createElement('tr');
             const cell = document.createElement('td');
-            cell.colSpan = 6;
+            cell.colSpan = BILL_WISE_COLS;
             cell.className = 'group-header-cell';
             cell.textContent = entry[0];
             header.appendChild(cell);
@@ -633,6 +715,9 @@ function loadBillWiseData() {
             billWiseDataContainer.appendChild(buildBillRow(item, start + index + 1));
         });
     }
+
+    // Totals row - computed from the full filtered dataset, not just the current page.
+    billWiseDataContainer.appendChild(buildBillTotalsRow(billWiseData));
 
     reportCount.textContent = billWiseData.length + ' bills found';
     renderPagination(billWiseData.length);
@@ -650,6 +735,22 @@ function buildBillRow(item, num) {
     return row;
 }
 
+// Builds the "grand totals" row shown under the bill-wise table.
+function buildBillTotalsRow(data) {
+    const totalNet = data.reduce(function(sum, item) {
+        return sum + parseFloat(item.netAmount || 0);
+    }, 0);
+
+    const row = document.createElement('tr');
+    row.className = 'totals-row';
+    row.style.background = '#f0f0f0';
+    row.style.fontWeight = 'bold';
+    row.innerHTML =
+        '<td colspan="5">Total (' + data.length + ' Bills)</td>' +
+        '<td class="text-right">' + currencySymbol + totalNet.toLocaleString() + '</td>';
+    return row;
+}
+
 function updateSummary() {
     if (itemWiseToggle.classList.contains('active')) {
         const totalQty = itemWiseData.filter(function(item) {
@@ -664,9 +765,14 @@ function updateSummary() {
         }).reduce(function(sum, item) {
             return sum + parseFloat(item.amount || 0);
         }, 0);
+        const totalRAmt = itemWiseData.filter(function(item) {
+            return !item.isChild;
+        }).reduce(function(sum, item) {
+            return sum + parseFloat(item.r_amt || 0);
+        }, 0);
         totalSalesEl.textContent = currencySymbol + totalAmt.toLocaleString();
         totalItemsEl.textContent = totalQty.toLocaleString();
-        netAmountEl.textContent = currencySymbol + totalAmt.toLocaleString();
+        netAmountEl.textContent = currencySymbol + (totalAmt - totalRAmt).toLocaleString();
         itemsSoldItem.style.display = 'block';
         billsGeneratedItem.style.display = 'none';
     } else {
