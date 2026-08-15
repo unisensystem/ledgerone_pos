@@ -35,6 +35,17 @@ $currency_symbol = $currency['symbol'];
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="../../../assets/css/sale/daily_sale_report/daily-sale-report.css">
 </head>
+<style>
+    #item-wise-table, #bill-wise-table {
+        border-collapse: collapse;
+    }
+    #item-wise-table th,
+    #item-wise-table td,
+    #bill-wise-table th,
+    #bill-wise-table td {
+        border: 1px solid #dcdcdc;
+    }
+</style>
 <body>
     <div class="container">
         <!-- Header -->
@@ -216,15 +227,24 @@ $currency_symbol = $currency['symbol'];
             <div class="table-container">
                 <table class="table" id="item-wise-table">
                     <thead>
-                        <tr>
-                            <th>S#</th>
-                            <th>Product</th>
-                            <th class="text-right">Quantity</th>
-                            <th class="text-right">FOC Qty</th>
-                            <th class="text-right">Rate</th>
-                            <th class="text-right">Amount</th>
-                        </tr>
-                    </thead>
+    <tr>
+        <th>S#</th>
+        <th>Product</th>
+        <th class="text-right">Packing</th>
+        <th class="text-right">PCS Total</th>
+        <th class="text-right">CTN</th>
+        <th class="text-right">PCS</th>
+        <th class="text-right">DZN</th>
+        <th class="text-right">FOC</th>
+        <th class="text-right">Rate</th>
+        <th class="text-right">Discount</th>
+        <th class="text-right">Trader Offer</th>
+        <th class="text-right">Amount</th>
+        <th class="text-right">R.QTY</th>
+        <th class="text-right">R.Amt</th>
+        <th class="text-right">Net Amount</th>
+    </tr>
+</thead>
                     <tbody id="item-wise-data">
                         <!-- Data will be populated by JavaScript -->
                     </tbody>
