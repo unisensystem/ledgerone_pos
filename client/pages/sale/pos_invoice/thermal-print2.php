@@ -90,19 +90,28 @@
             margin: 8px 0;
             font-size: 12px;
             font-weight: bold;
+            border-collapse: collapse;
         }
         
         .items-table th {
             border-bottom: 1px solid #000;
             padding: 4px 0;
-            text-align: left;
+            text-align: center;
             font-weight: bold;
+
         }
         
         .items-table td {
             padding: 4px 0;
             border-bottom: 1px solid #000;
             font-weight: bold;
+    text-align: center;
+
+        }
+
+        /* Gap between the Ctn/Dz/Pcs numbers and the Item name column */
+        .item-col {
+            padding-left: 10px !important;
         }
         
         .total-row {
@@ -355,17 +364,18 @@
         <table class="items-table">
             <thead>
                 <tr>
-                    <th style="width: 12%;" class="text-right">Ctn</th>
-                    <th style="width: 12%;" class="text-right">Pcs</th>
-                    <th style="width: 33%;">Item</th>
-                    <th style="width: 16%;" class="text-right">Rate</th>
-                    <th style="width: 12%;" class="text-right disc-col">Disc</th>
-                    <th style="width: 15%;" class="text-right">Amount</th>
+                    <th style="width: 10%;" class="text-right">Ctn</th>
+                    <th style="width: 10%;" class="text-right">Dz</th>
+                    <th style="width: 10%;" class="text-right">Pcs</th>
+                    <th class="item-col">Item</th>
+                    <th style="width: 15%;" class="text-right">Rate</th>
+                    <th style="width: 11%;" class="text-right disc-col">Disc</th>
+                    <th style="width: 14%;" class="text-right">Amount</th>
                 </tr>
             </thead>
             <tbody id="itemsTableBody">
                 <tr>
-                    <td colspan="6" class="text-center">Loading...</td>
+                    <td colspan="7" class="text-center">Loading...</td>
                 </tr>
             </tbody>
         </table>
@@ -425,7 +435,7 @@
             </div>
 
             <div class="terms-note" id="termsNote">
-                اس انوائس کی ادائیگی مقررہ تاریخ تک مکمل کرنا لازمی ہے، بصورت دیگر آئندہ سپلائی متاثر ہو سکتی ہے۔
+                Ø§Ø³ Ø§Ù†ÙˆØ§Ø¦Ø³ Ú©ÛŒ Ø§Ø¯Ø§Ø¦ÛŒÚ¯ÛŒ Ù…Ù‚Ø±Ø±Û ØªØ§Ø±ÛŒØ® ØªÚ© Ù…Ú©Ù…Ù„ Ú©Ø±Ù†Ø§ Ù„Ø§Ø²Ù…ÛŒ ÛÛ’ØŒ Ø¨ØµÙˆØ±Øª Ø¯ÛŒÚ¯Ø± Ø¢Ø¦Ù†Ø¯Û Ø³Ù¾Ù„Ø§Ø¦ÛŒ Ù…ØªØ§Ø«Ø± ÛÙˆ Ø³Ú©ØªÛŒ ÛÛ’Û”
             </div>
 
             <div class="signature-line">
@@ -464,13 +474,56 @@
             window.close();
         }
 
-        // Format a Ctn/Pcs cell value: show '-' when null/undefined/0
+        // Format a Ctn/Dz/Pcs cell value: show '-' when null/undefined/0
         function formatUnitCell(val) {
             const num = parseFloat(val);
             if (val === null || val === undefined || isNaN(num) || num === 0) {
                 return '-';
             }
             return (num % 1 === 0) ? num.toFixed(0) : num.toFixed(2);
+        }
+
+        // Format Rate/Amount cell: no currency symbol, no decimals
+        function formatMoneyCell(val) {
+            const num = parseFloat(val || 0);
+            return isNaN(num) ? '0' : Math.round(num).toString();
+        }
+
+        // Merge duplicate rows for the same product (e.g. one row saved for
+        // carton, one for dozen, one for pcs) into a single row so the print
+        // shows 1 Ctn / 1 Dz / 2 Pcs on one line instead of 3 separate lines.
+        // Only merges top-level rows (parent_row_id === null); child rows are
+        // left untouched and in their original order.
+        function mergeDuplicateItems(items) {
+            const merged = [];
+            const indexByKey = {};
+
+            items.forEach(item => {
+                if (item.parent_row_id !== null && item.parent_row_id !== undefined) {
+                    merged.push(item);
+                    return;
+                }
+
+                const key = item.product_id
+                    ? `id_${item.product_id}`
+                    : `name_${item.product_name}_${item.sale_price}`;
+
+                if (indexByKey[key] !== undefined) {
+                    const existing = merged[indexByKey[key]];
+                    existing.carton = parseFloat(existing.carton || 0) + parseFloat(item.carton || 0);
+                    existing.dozen = parseFloat(existing.dozen || 0) + parseFloat(item.dozen || 0);
+                    existing.piece = parseFloat(existing.piece || 0) + parseFloat(item.piece || 0);
+                    existing.net_amount = parseFloat(existing.net_amount || 0) + parseFloat(item.net_amount || 0);
+                    existing.discount_amount = parseFloat(existing.discount_amount || 0) + parseFloat(item.discount_amount || 0);
+                    existing.trade_offer_amount = parseFloat(existing.trade_offer_amount || 0) + parseFloat(item.trade_offer_amount || 0);
+                    existing.gst_amount = parseFloat(existing.gst_amount || 0) + parseFloat(item.gst_amount || 0);
+                } else {
+                    indexByKey[key] = merged.length;
+                    merged.push({ ...item });
+                }
+            });
+
+            return merged;
         }
         
         async function loadData() {
@@ -554,9 +607,12 @@
             
             // Previous balance - always shown now (even if 0), like FoxPro
             const previousBalance = parseFloat(invoice.previous_balance || 0);
-            document.getElementById('previousBalance').textContent = `${invoice.currency_symbol || ''}${previousBalance.toFixed(2)}`;
+            document.getElementById('previousBalance').textContent = formatMoneyCell(previousBalance);
             
             const currencySymbol = invoice.currency_symbol || '';
+
+            // Merge duplicate rows for the same product before rendering
+            items = mergeDuplicateItems(items);
             
             const tbody = document.getElementById('itemsTableBody');
             tbody.innerHTML = '';
@@ -604,11 +660,12 @@
                     
                     row.innerHTML = `
                         <td class="text-right">${formatUnitCell(item.carton)}</td>
+                        <td class="text-right">${formatUnitCell(item.dozen)}</td>
                         <td class="text-right">${formatUnitCell(item.piece)}</td>
-                        <td>${item.product_name}${childrenText}</td>
-                        <td class="text-right">${currencySymbol + parseFloat(item.sale_price).toFixed(2)}</td>
+                        <td class="item-col">${item.product_name}${childrenText}</td>
+                        <td class="text-right">${formatMoneyCell(item.sale_price)}</td>
                         ${discCell}
-                        <td class="text-right">${currencySymbol + parseFloat(item.net_amount).toFixed(2)}</td>
+                        <td class="text-right">${formatMoneyCell(item.net_amount)}</td>
                     `;
                 });
             } else {
@@ -628,11 +685,12 @@
                     
                     row.innerHTML = `
                         <td class="text-right">${isChild ? '-' : formatUnitCell(item.carton)}</td>
+                        <td class="text-right">${isChild ? '-' : formatUnitCell(item.dozen)}</td>
                         <td class="text-right">${isChild ? '-' : formatUnitCell(item.piece)}</td>
-                        <td style="${textStyle}">${indent}${item.product_name}</td>
-                        <td class="text-right">${isChild ? '-' : currencySymbol + parseFloat(item.sale_price).toFixed(2)}</td>
+                        <td class="item-col" style="${textStyle}">${indent}${item.product_name}</td>
+                        <td class="text-right">${isChild ? '-' : formatMoneyCell(item.sale_price)}</td>
                         ${discCell}
-                        <td class="text-right">${isChild ? '-' : currencySymbol + parseFloat(item.net_amount).toFixed(2)}</td>
+                        <td class="text-right">${isChild ? '-' : formatMoneyCell(item.net_amount)}</td>
                     `;
                 });
             }
@@ -643,13 +701,15 @@
             totalsRow.style.fontWeight = 'bold';
             
             let totalCarton = 0;
+            let totalDozen = 0;
             let totalPiece = 0;
             let totalAmount = 0;
             
             items.forEach(item => {
                 if (!item.parent_row_id) {
                     totalCarton += parseFloat(item.carton || 0);
-                    totalPiece += parseFloat(item.piece || 0);
+                    totalDozen  += parseFloat(item.dozen || 0);
+                    totalPiece  += parseFloat(item.piece || 0);
                     totalAmount += parseFloat(item.net_amount);
                 }
             });
@@ -658,18 +718,19 @@
             
             totalsRow.innerHTML = `
                 <td class="text-right">${totalCarton > 0 ? totalCarton.toFixed(0) : '-'}</td>
+                <td class="text-right">${totalDozen > 0 ? totalDozen.toFixed(0) : '-'}</td>
                 <td class="text-right">${totalPiece > 0 ? totalPiece.toFixed(0) : '-'}</td>
-                <td>TOTALS</td>
+                <td class="item-col">TOTALS</td>
                 <td class="text-right"></td>
                 ${totalsDiscCell}
-                <td class="text-right">${currencySymbol}${totalAmount.toFixed(2)}</td>
+                <td class="text-right">${formatMoneyCell(totalAmount)}</td>
             `;
             
-            document.getElementById('totalBill').textContent = `${currencySymbol}${parseFloat(invoice.total_bill).toFixed(2)}`;
+            document.getElementById('totalBill').textContent = formatMoneyCell(invoice.total_bill);
             
             // Discount - always shown now (even if 0), like FoxPro
             const discountAmt = parseFloat(invoice.total_discount_amount || 0);
-            document.getElementById('discountAmount').textContent = `${currencySymbol}${discountAmt.toFixed(2)}`;
+            document.getElementById('discountAmount').textContent = formatMoneyCell(discountAmt);
             
             // Calculate total GST from items
             let totalGst = 0;
@@ -678,14 +739,14 @@
             });
             if (totalGst > 0) {
                 document.getElementById('gstRow').style.display = 'flex';
-                document.getElementById('gstAmount').textContent = `${currencySymbol}${totalGst.toFixed(2)}`;
+                document.getElementById('gstAmount').textContent = formatMoneyCell(totalGst);
             }
 
             // Advance/Withholding Tax - always shown now (even if 0), like FoxPro
             const advTaxAmt = parseFloat(invoice.withholding_tax_amount || 0);
-            document.getElementById('advTaxAmount').textContent = `${currencySymbol}${advTaxAmt.toFixed(2)}`;
+            document.getElementById('advTaxAmount').textContent = formatMoneyCell(advTaxAmt);
             
-            document.getElementById('netAmount').textContent = `${currencySymbol}${parseFloat(invoice.net_amount).toFixed(2)}`;
+            document.getElementById('netAmount').textContent = formatMoneyCell(invoice.net_amount);
             
             // Calculate received and balance (Returned not shown/used on Sale Invoice print)
             const amountPaid = parseFloat(invoice.amount_paid) || 0;
@@ -693,9 +754,9 @@
             const remainingBalance = parseFloat(invoice.net_amount) - amountPaid + amountReturned;
             const payableAmount = previousBalance + remainingBalance;
             
-            document.getElementById('amountPaid').textContent = `${currencySymbol}${amountPaid.toFixed(2)}`;
-            document.getElementById('remainingBalance').textContent = `${currencySymbol}${remainingBalance.toFixed(2)}`;
-            document.getElementById('payableAmount').textContent = `${currencySymbol}${payableAmount.toFixed(2)}`;
+            document.getElementById('amountPaid').textContent = formatMoneyCell(amountPaid);
+            document.getElementById('remainingBalance').textContent = formatMoneyCell(remainingBalance);
+            document.getElementById('payableAmount').textContent = formatMoneyCell(payableAmount);
             
             document.getElementById('paymentMethod').textContent = invoice.payment_method || '-';
             
