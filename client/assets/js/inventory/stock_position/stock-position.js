@@ -236,13 +236,14 @@ function exportToExcel() {
         case 'item-ledger': {
             filename = `item_ledger_${today}.csv`;
             rows = allLedgerEntries.map(entry => ({
-                'Date': entry.transaction_date,
+                'Date': formatLedgerDate(entry.transaction_date),
                 'Transaction': entry.transaction_type,
-                'Qty In': entry.qty_in > 0 ? `${parseFloat(entry.qty_in).toFixed(2)} ${entry.unit_symbol || 'L'}` : '-',
-                'Qty Out': entry.qty_out > 0 ? `${parseFloat(entry.qty_out).toFixed(2)} ${entry.unit_symbol || 'L'}` : '-',
-                'Balance': `${parseFloat(entry.balance).toFixed(2)} ${entry.unit_symbol || 'L'}`,
-                'Unit Cost': parseFloat(entry.unit_cost).toFixed(2),
-                'Value': parseFloat(entry.value).toFixed(2)
+                'Reference': entry.reference_no || entry.reference_id || '-',
+                'Inventory Item': `${entry.product_code} - ${entry.product_name}`,
+                'Customer': entry.customer_name || '-',
+                'Supplier': entry.supplier_name || '-',
+                'Qty Owned': (parseFloat(entry.qty_change || 0) > 0 ? '+' : '') + parseFloat(entry.qty_change || 0).toFixed(2),
+                'Balance': `${parseFloat(entry.balance).toFixed(2)} ${entry.unit_symbol || 'L'}`
             }));
             break;
         }
@@ -533,38 +534,62 @@ function updateLedgerTable(ledger, currency = '$') {
     updateItemPaginationControls();
 }
 
+// Tenant-entered data (customer/supplier/product names) is rendered via innerHTML — escape it first.
+function escLedger(val) {
+    if (val === null || val === undefined) return '';
+    return String(val)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
+// DB date (YYYY-MM-DD) -> DD/MM/YYYY
+function formatLedgerDate(dateStr) {
+    if (!dateStr) return '';
+    const d = new Date(dateStr);
+    if (isNaN(d)) return dateStr;
+    const dd = String(d.getDate()).padStart(2, '0');
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    return `${dd}/${mm}/${d.getFullYear()}`;
+}
+
 function renderLedgerTable(currency = '$') {
     const tbody = document.querySelector('#item-ledger .table tbody');
-    
+
     // Get current page data
     const startIndex = (itemCurrentPage - 1) * itemsPerPage;
     const endIndex = startIndex + itemsPerPage;
     const pageData = allLedgerEntries.slice(startIndex, endIndex);
-    
-    // Calculate totals for all data
-    const totalQtyIn = allLedgerEntries.reduce((sum, entry) => sum + parseFloat(entry.qty_in || 0), 0);
-    const totalQtyOut = allLedgerEntries.reduce((sum, entry) => sum + parseFloat(entry.qty_out || 0), 0);
+
     const finalBalance = allLedgerEntries.length > 0 ? parseFloat(allLedgerEntries[allLedgerEntries.length - 1].balance) : 0;
-    const finalValue = allLedgerEntries.length > 0 ? parseFloat(allLedgerEntries[allLedgerEntries.length - 1].value) : 0;
-    
-    tbody.innerHTML = pageData.map(entry => `
+
+    tbody.innerHTML = pageData.map(entry => {
+        const dateLabel = formatLedgerDate(entry.transaction_date);
+        const transactionLabel = entry.reference_no
+            ? `${entry.transaction_type} — ${entry.reference_no} — ${dateLabel}`
+            : entry.transaction_type;
+        const qtyChange = parseFloat(entry.qty_change || 0);
+        const qtyLabel = (qtyChange > 0 ? '+' : '') + qtyChange.toFixed(2);
+
+        return `
         <tr>
-            <td>${entry.transaction_date}</td>
-            <td><span class="transaction-badge transaction-${entry.transaction_type.toLowerCase().replace(' ', '-')}">${entry.transaction_type}</span></td>
-            <td>${entry.qty_in > 0 ? parseFloat(entry.qty_in).toFixed(2) + ' ' + (entry.unit_symbol || 'L') : '-'}</td>
-            <td>${entry.qty_out > 0 ? parseFloat(entry.qty_out).toFixed(2) + ' ' + (entry.unit_symbol || 'L') : '-'}</td>
-            <td>${parseFloat(entry.balance).toFixed(2)} ${entry.unit_symbol || 'L'}</td>
-            <td>${currency}${parseFloat(entry.unit_cost).toFixed(2)}</td>
-            <td>${currency}${parseFloat(entry.value).toFixed(2)}</td>
+            <td>${dateLabel}</td>
+            <td><span class="transaction-badge transaction-${escLedger(entry.transaction_type.toLowerCase().replace(/\s+/g, '-'))}">${escLedger(transactionLabel)}</span></td>
+            <td>${escLedger(entry.reference_no) || (entry.reference_id ?? '-')}</td>
+            <td>${escLedger(entry.product_code)} - ${escLedger(entry.product_name)}</td>
+            <td>${escLedger(entry.customer_name) || '-'}</td>
+            <td>${escLedger(entry.supplier_name) || '-'}</td>
+            <td>${qtyLabel}</td>
+            <td>${parseFloat(entry.balance).toFixed(2)} ${escLedger(entry.unit_symbol) || 'L'}</td>
         </tr>
-    `).join('') + `
+        `;
+    }).join('') + `
         <tr style="font-weight: bold; background-color: var(--table-header);">
-            <td colspan="2">Total (${allLedgerEntries.length} transactions)</td>
-            <td>${totalQtyIn.toFixed(2)} ${allLedgerEntries[0]?.unit_symbol || 'L'}</td>
-            <td>${totalQtyOut.toFixed(2)} ${allLedgerEntries[0]?.unit_symbol || 'L'}</td>
-            <td>${finalBalance.toFixed(2)} ${allLedgerEntries[0]?.unit_symbol || 'L'}</td>
-            <td>-</td>
-            <td>${currency}${finalValue.toFixed(2)}</td>
+            <td colspan="6">Total (${allLedgerEntries.length} transactions)</td>
+            <td colspan="1"></td>
+            <td>${finalBalance.toFixed(2)} ${escLedger(allLedgerEntries[0]?.unit_symbol) || 'L'}</td>
         </tr>
     `;
 }

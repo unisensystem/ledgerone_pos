@@ -341,18 +341,20 @@ try {
                 $bbf = $bbf_stmt->fetch(PDO::FETCH_ASSOC)['bbf'];
             }
             
-            $sql = "SELECT 
+            $sql = "SELECT
                         sl.transaction_date,
                         sl.transaction_type,
+                        sl.reference_table,
+                        sl.reference_id,
                         sl.qty_in * COALESCE(CASE WHEN u.unit_scope = 'universal' THEN u.conversion_factor ELSE puc.conversion_factor END, 1) as qty_in,
                         sl.qty_out * COALESCE(CASE WHEN u.unit_scope = 'universal' THEN u.conversion_factor ELSE puc.conversion_factor END, 1) as qty_out,
                         sl.unit_cost,
                         COALESCE(base_u.uom_name, u.uom_name, 'L') as unit_symbol,
-                        CASE 
-                            WHEN sl.reference_table = 'purchase_invoice' THEN s.supplier_name
-                            WHEN sl.reference_table = 'sale_invoice' THEN c.customer_name
-                            ELSE NULL
-                        END as party_name
+                        p.code as product_code,
+                        p.name as product_name,
+                        COALESCE(pi.bill_no, si.bill_no, sr.bill_no) as reference_no,
+                        s.supplier_name,
+                        COALESCE(c1.customer_name, c2.customer_name) as customer_name
                     FROM stock_ledger sl
                     JOIN products p ON sl.product_id = p.id
                     LEFT JOIN uom u ON sl.unit_id = u.id
@@ -361,7 +363,9 @@ try {
                     LEFT JOIN purchase_invoice pi ON sl.reference_table = 'purchase_invoice' AND sl.reference_id = pi.id
                     LEFT JOIN suppliers s ON pi.supplier_id = s.id
                     LEFT JOIN sale_invoice si ON sl.reference_table = 'sale_invoice' AND sl.reference_id = si.id
-                    LEFT JOIN customers c ON si.customer_id = c.id
+                    LEFT JOIN customers c1 ON si.customer_id = c1.id
+                    LEFT JOIN sale_return sr ON sl.reference_table = 'sale_return' AND sl.reference_id = sr.id
+                    LEFT JOIN customers c2 ON sr.customer_id = c2.id
                     WHERE sl.tenant_id = ? AND sl.product_id = ?";
             
             $params = [$tenant_id, $product_id];
@@ -390,10 +394,13 @@ try {
             
             $balance = $bbf;
             foreach ($ledger as &$entry) {
-                $balance += $entry['qty_in'] - $entry['qty_out'];
+                $qtyChange = $entry['qty_in'] - $entry['qty_out'];
+                $balance += $qtyChange;
+                $entry['qty_change'] = $qtyChange;
                 $entry['balance'] = $balance;
                 $entry['value'] = $balance * $entry['unit_cost'];
             }
+            unset($entry);
             
             echo json_encode(['success' => true, 'data' => $ledger, 'bbf' => $bbf, 'currency' => $currency_symbol]);
             break;

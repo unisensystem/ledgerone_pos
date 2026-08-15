@@ -16,16 +16,94 @@ if (!$user_id) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Daily Product Sale Report - LedgerOne ERP</title>
+    <title>Sale Report - LedgerOne ERP</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <!-- Reuses the same table/card/form classes as the Stock Position module -->
+    <!-- Reuses the same card/filter/button classes as the Stock Position module -->
     <link rel="stylesheet" href="../../../assets/css/inventory/stock_position/stock-position.css">
+    <style>
+        /* Sale-register layout: one block per sale, header strip + nested item table */
+        .sale-block {
+            border: 1px solid var(--border-default);
+            border-radius: 8px;
+            margin-bottom: 16px;
+            overflow: hidden;
+        }
+        .sale-block-header {
+            display: grid;
+            grid-template-columns: repeat(6, 1fr);
+            gap: 8px 16px;
+            padding: 12px 16px;
+            background: var(--table-header);
+            border-bottom: 1px solid var(--border-default);
+        }
+        .sale-block-header .field label {
+            display: block;
+            font-size: 11px;
+            color: var(--subtext);
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+        }
+        .sale-block-header .field span {
+            font-weight: 600;
+            color: var(--heading);
+            font-size: 13px;
+        }
+        .status-pill {
+            display: inline-block;
+            padding: 2px 10px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        .status-Paid { background: rgba(47, 191, 113, 0.15); color: var(--success); }
+        .status-Partial { background: rgba(232, 178, 63, 0.18); color: var(--warning); }
+        .status-Unpaid { background: rgba(227, 79, 79, 0.15); color: var(--error); }
+        .sale-items-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .sale-items-table th, .sale-items-table td {
+            padding: 8px 12px;
+            border-bottom: 1px solid var(--border-default);
+            font-size: 13px;
+            text-align: left;
+        }
+        .sale-items-table th {
+            background: var(--surface-1);
+            color: var(--subtext);
+            font-weight: 600;
+            font-size: 11px;
+            text-transform: uppercase;
+        }
+        .sale-items-table td.num, .sale-items-table th.num { text-align: right; }
+        .sale-block-footer {
+            display: flex;
+            justify-content: flex-end;
+            gap: 32px;
+            padding: 10px 16px;
+            background: var(--surface-1);
+        }
+        .sale-block-footer .totals-line { font-size: 13px; color: var(--body); }
+        .sale-block-footer .totals-line strong { color: var(--heading); }
+        .grand-total-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 14px 16px;
+            background: var(--table-header);
+            border: 1px solid var(--border-default);
+            border-radius: 8px;
+            margin-top: 8px;
+            font-weight: 700;
+            color: var(--heading);
+        }
+    </style>
 </head>
 <body>
     <main class="container">
         <div class="card">
             <div class="card-header">
-                <h2 class="card-title">Daily Product Sale Report</h2>
+                <h2 class="card-title">Sale Report</h2>
                 <div class="action-buttons">
                     <div class="dropdown">
                         <button class="btn btn-primary dropdown-toggle" type="button" data-toggle="dropdown">
@@ -73,30 +151,22 @@ if (!$user_id) {
                 </div>
             </div>
 
-            <div class="table-container">
-                <table class="table">
-                    <thead>
-                        <tr>
-                            <th>Sr#</th>
-                            <th>Product Code</th>
-                            <th>Details</th>
-                            <!-- <th class="col-customer">Customer</th> -->
-                            <th>Price</th>
-                            <th>Qty</th>
-                            <th>Amount</th>
-                        </tr>
-                    </thead>
-                    <tbody></tbody>
-                </table>
-                <div class="pagination-container">
-                    <div class="pagination-info">
-                        <span id="pagination-info">Showing 0 - 0 of 0 entries</span>
-                    </div>
-                    <div class="pagination-controls">
-                        <button class="btn btn-secondary" id="prev-btn" disabled>Previous</button>
-                        <span id="page-info">Page 1 of 1</span>
-                        <button class="btn btn-secondary" id="next-btn" disabled>Next</button>
-                    </div>
+            <div id="reportContainer">
+                <!-- Sale blocks rendered here by JS -->
+            </div>
+
+            <div class="grand-total-bar">
+                <span id="grand-total-info">Loading...</span>
+            </div>
+
+            <div class="pagination-container">
+                <div class="pagination-info">
+                    <span id="pagination-info">Showing 0 - 0 of 0 entries</span>
+                </div>
+                <div class="pagination-controls">
+                    <button class="btn btn-secondary" id="prev-btn" disabled>Previous</button>
+                    <span id="page-info">Page 1 of 1</span>
+                    <button class="btn btn-secondary" id="next-btn" disabled>Next</button>
                 </div>
             </div>
         </div>

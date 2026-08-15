@@ -325,11 +325,12 @@ $currency_symbol = $currency['symbol'];
                             <tr>
                                 <th>Date</th>
                                 <th>Transaction</th>
-                                <th>Qty In</th>
-                                <th>Qty Out</th>
+                                <th>Reference</th>
+                                <th>Inventory Item</th>
+                                <th>Customer</th>
+                                <th>Supplier</th>
+                                <th>Qty Owned</th>
                                 <th>Balance</th>
-                                <th>Unit Cost</th>
-                                <th>Value</th>
                             </tr>
                         </thead>
                         <tbody>
