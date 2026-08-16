@@ -244,7 +244,29 @@ document.addEventListener('DOMContentLoaded', async function() {
     autoAddCheckbox.addEventListener('change', function() {
         localStorage.setItem('autoAddChildren', this.checked);
     });
-    
+
+    // "Buy by Amount" checkbox — optional feature, off by default (not every business wants it)
+    const enableAmountCheckbox = document.getElementById('enableAmountEntry');
+    const quickAmountGroup = document.getElementById('quickAmountGroup');
+    const quickAmountInput = document.getElementById('quickAmount');
+    enableAmountCheckbox.checked = localStorage.getItem('enableAmountEntry') === 'true';
+    quickAmountGroup.style.display = enableAmountCheckbox.checked ? '' : 'none';
+    enableAmountCheckbox.addEventListener('change', function() {
+        localStorage.setItem('enableAmountEntry', this.checked);
+        quickAmountGroup.style.display = this.checked ? '' : 'none';
+        quickAmountInput.value = '';
+    });
+
+    quickAmountInput.addEventListener('input', calculateQtyFromAmount);
+    quickAmountInput.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            e.stopPropagation();
+            calculateQtyFromAmount();
+            document.getElementById('quickAddBtn').click();
+        }
+    });
+
     document.getElementById('shortcutSettingsBtn').addEventListener('click', function() {
         document.getElementById('shortcutSettingsModal').style.display = 'flex';
     });
@@ -1196,6 +1218,42 @@ async function loadNextInvoiceNo() {
     }
 }
 
+// Resolves the product currently referenced by the Quick Add Product field,
+// the same matching logic used by the quickAddBtn handler (exact match, then a single partial match).
+function resolveQuickProduct() {
+    if (preSelectedProduct) return preSelectedProduct;
+
+    const productInput = document.getElementById('quickProduct').value.trim().toLowerCase();
+    if (!productInput) return null;
+
+    const exactMatch = productsData.find(p =>
+        p.name.trim().toLowerCase() === productInput ||
+        p.code.toLowerCase() === productInput ||
+        (p.barcode && p.barcode.toLowerCase() === productInput) ||
+        (p.qr_code && p.qr_code.toLowerCase() === productInput)
+    );
+    if (exactMatch) return exactMatch;
+
+    const partialMatches = productsData.filter(p => p.name.toLowerCase().includes(productInput));
+    return partialMatches.length === 1 ? partialMatches[0] : null;
+}
+
+// "Buy by Amount" — customer says "Rs 100 of Sugar", we work out the quantity from the product's price.
+// Only wired up when the "Enable Buy by Amount" setting is on; otherwise quickAmount stays hidden and unused.
+function calculateQtyFromAmount() {
+    const amount = parseFloat(document.getElementById('quickAmount').value);
+    if (!amount || amount <= 0) return;
+
+    const product = resolveQuickProduct();
+    if (!product) return;
+
+    const price = parseFloat(product.mrp);
+    if (!price || price <= 0) return;
+
+    const qty = amount / price;
+    document.getElementById('quickQty').value = qty.toFixed(3);
+}
+
 function selectProduct(product) {
     if (isAddingProduct) {
         console.log('Already adding product, skipping...');
@@ -1410,6 +1468,7 @@ function addProductWithChildren(parent, children) {
     
     document.getElementById('quickProduct').value = '';
     document.getElementById('quickQty').value = 1;
+    document.getElementById('quickAmount').value = '';
     document.getElementById('productSuggestions').style.display = 'none';
     document.getElementById('quickProduct').focus();
     isAddingProduct = false;
@@ -1442,6 +1501,7 @@ function addProductToInvoice(product) {
     
     document.getElementById('quickProduct').value = '';
     document.getElementById('quickQty').value = 1;
+    document.getElementById('quickAmount').value = '';
     document.getElementById('productSuggestions').style.display = 'none';
     document.getElementById('quickProduct').focus();
     isAddingProduct = false;

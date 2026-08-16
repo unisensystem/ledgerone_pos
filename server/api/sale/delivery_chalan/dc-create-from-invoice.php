@@ -19,6 +19,47 @@ if (!$user_id || !$tenant_id) {
     exit;
 }
 
+/**
+ * Figure out the correct value to insert into delivery_chalan.status
+ * without needing manual DB access. Works whether the column is:
+ *  - ENUM('Draft','Confirmed',...)   -> picks the enum member that matches "draft"
+ *  - VARCHAR/other                    -> falls back to a safe default
+ */
+function resolveDraftStatusValue(PDO $pdo, string $table = 'delivery_chalan', string $column = 'status'): string
+{
+    $preferred = 'draft'; // what we WANT logically, case-insensitive match
+    $fallback  = 'Draft'; // used only if we can't detect anything
+
+    try {
+        $stmt = $pdo->prepare("SHOW COLUMNS FROM `$table` LIKE ?");
+        $stmt->execute([$column]);
+        $col = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if ($col && preg_match("/^enum\((.*)\)$/i", $col['Type'], $m)) {
+            // Parse enum('Draft','Confirmed','Delivered') into an array
+            preg_match_all("/'((?:[^'\\\\]|\\\\.)*)'/", $m[1], $vals);
+            $options = $vals[1] ?? [];
+
+            foreach ($options as $opt) {
+                if (strtolower($opt) === $preferred) {
+                    return $opt; // exact matching enum value, correct case
+                }
+            }
+
+            // No exact "draft" match — just use the first defined option
+            // so the insert never fails, and log it for visibility.
+            if (!empty($options)) {
+                error_log("delivery_chalan.status has no 'draft'-like value. Options found: " . implode(', ', $options) . ". Using '{$options[0]}' instead.");
+                return $options[0];
+            }
+        }
+    } catch (Exception $e) {
+        error_log("resolveDraftStatusValue() failed: " . $e->getMessage());
+    }
+
+    return $fallback;
+}
+
 try {
     $input = json_decode(file_get_contents('php://input'), true);
 
@@ -82,12 +123,15 @@ try {
     $lastNumber = (int) $chalanStmt->fetchColumn();
     $chalanNo = 'DC-' . str_pad($lastNumber + 1, 4, '0', STR_PAD_LEFT);
 
+    // Auto-detect the correct "draft" status value instead of hardcoding it
+    $statusValue = resolveDraftStatusValue($pdo);
+
     // Insert delivery chalan header
     $dcStmt = $pdo->prepare("
         INSERT INTO delivery_chalan (
             tenant_id, chalan_no, delivery_date, customer_id, branch_id,
             sale_invoice_id, status, created_by, updated_by
-        ) VALUES (?, ?, CURDATE(), ?, ?, ?, 'Pending', ?, ?)
+        ) VALUES (?, ?, CURDATE(), ?, ?, ?, ?, ?, ?)
     ");
     $dcStmt->execute([
         $tenant_id,
@@ -95,6 +139,7 @@ try {
         $invoice['customer_id'],
         $invoice['branch_id'] ?? null,
         $invoiceId,
+        $statusValue,
         $user_id,
         $user_id
     ]);
@@ -129,7 +174,8 @@ try {
         'success'   => true,
         'message'   => 'Delivery chalan created successfully',
         'chalan_id' => $chalanId,
-        'chalan_no' => $chalanNo
+        'chalan_no' => $chalanNo,
+        'status_used' => $statusValue
     ]);
 
 } catch (Exception $e) {

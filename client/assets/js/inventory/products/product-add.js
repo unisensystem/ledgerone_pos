@@ -758,10 +758,18 @@ function addStockEntry() {
     const uomType = document.querySelector('input[name="uomType"]:checked').value;
     const groupId = document.getElementById('uomGroup').value;
     
-    console.log('Adding stock entry - UOM Type:', uomType, 'Group ID:', groupId, 'Current Units:', window.currentGroupUnits);
+    const batchFields = `
+        <div class="form-group">
+            <label>Batch No</label>
+            <input type="text" name="batchNo[]" placeholder="e.g., B-2026-001">
+        </div>
+        <div class="form-group">
+            <label>Batch Expiry Date</label>
+            <input type="date" name="batchExpiryDate[]">
+        </div>
+    `;
     
     if (uomType === 'group' && groupId && window.currentGroupUnits && window.currentGroupUnits.length > 0) {
-        // UOM Group mode - show columns for each unit
         let unitColumns = '';
         window.currentGroupUnits.forEach(unit => {
             unitColumns += `
@@ -787,13 +795,13 @@ function addStockEntry() {
                     <label>Opening Price / Unit</label>
                     <input type="number" name="openingPrice[]" step="0.01" min="0">
                 </div>
+                ${batchFields}
                 <div class="form-group">
                     <button type="button" class="btn btn-danger remove-stock-entry" style="margin-top: 24px;">Remove</button>
                 </div>
             </div>
         `;
     } else {
-        // Default Unit mode - single qty column
         newEntry.innerHTML = `
             <div class="form-row">
                 <div class="form-group">
@@ -812,6 +820,7 @@ function addStockEntry() {
                     <label>Opening Price / Unit</label>
                     <input type="number" name="openingPrice[]" step="0.01" min="0">
                 </div>
+                ${batchFields}
                 <div class="form-group">
                     <button type="button" class="btn btn-danger remove-stock-entry" style="margin-top: 24px;">Remove</button>
                 </div>
@@ -907,6 +916,9 @@ function rebuildStockEntries() {
             branchId: branchHidden ? branchHidden.value : '',
             price: priceInput ? priceInput.value : ''
         };
+        // paste yahan ↓
+data.batchNo = entry.querySelector('input[name="batchNo[]"]') ? entry.querySelector('input[name="batchNo[]"]').value : '';
+data.batchExpiryDate = entry.querySelector('input[name="batchExpiryDate[]"]') ? entry.querySelector('input[name="batchExpiryDate[]"]').value : '';
         
         // Save qty data based on current mode
         const uomType = document.querySelector('input[name="uomType"]:checked').value;
@@ -945,6 +957,11 @@ function rebuildStockEntries() {
             // Restore price
             const priceInput = entry.querySelector('input[name="openingPrice[]"]');
             if (priceInput) priceInput.value = data.price;
+
+const batchNoInput = entry.querySelector('input[name="batchNo[]"]');
+if (batchNoInput) batchNoInput.value = data.batchNo || '';
+const batchExpiryInput = entry.querySelector('input[name="batchExpiryDate[]"]');
+if (batchExpiryInput) batchExpiryInput.value = data.batchExpiryDate || '';
             
             // Restore qty data (won't work across mode changes, but preserves within same mode)
             const uomType = document.querySelector('input[name="uomType"]:checked').value;
@@ -1982,8 +1999,11 @@ function loadProductForEdit(productId) {
                     if (searchInput) searchInput.value = product.regime_name;
                     if (hiddenInput) hiddenInput.value = product.tax_regime_id;
                 }
+                    loadStockOpeningData(productId);
+
             }, 1000);
             
+
             // Set form to edit mode
             const productForm = document.getElementById('productForm');
             if (productForm) {
@@ -2022,7 +2042,6 @@ function loadProductForEdit(productId) {
             }
             
             // Load existing stock opening data
-            loadStockOpeningData(productId);
             
             // Load existing schemes
             loadExistingSchemesForEdit(productId);
@@ -2104,6 +2123,15 @@ function loadStockOpeningData(productId) {
                     if (priceInput && firstEntry.opening_price) {
                         priceInput.value = firstEntry.opening_price;
                     }
+                    // paste yahan ↓
+const batchNoInput = firstRow.querySelector('input[name="batchNo[]"]');
+if (batchNoInput && firstEntry.batch_no) {
+    batchNoInput.value = firstEntry.batch_no;
+}
+const batchExpiryInput = firstRow.querySelector('input[name="batchExpiryDate[]"]');
+if (batchExpiryInput && firstEntry.batch_expiry_date && firstEntry.batch_expiry_date !== '0000-00-00') {
+    batchExpiryInput.value = firstEntry.batch_expiry_date;
+}
                     
                     if (uomType === 'group') {
                         // For UOM groups, populate individual unit quantities
@@ -2148,6 +2176,14 @@ function loadStockOpeningData(productId) {
                     if (priceInput && branchEntries[0].opening_price) {
                         priceInput.value = branchEntries[0].opening_price;
                     }
+                    const batchNoInput = newRow.querySelector('input[name="batchNo[]"]');
+if (batchNoInput && branchEntries[0].batch_no) {
+    batchNoInput.value = branchEntries[0].batch_no;
+}
+const batchExpiryInput = newRow.querySelector('input[name="batchExpiryDate[]"]');
+if (batchExpiryInput && branchEntries[0].batch_expiry_date && branchEntries[0].batch_expiry_date !== '0000-00-00') {
+    batchExpiryInput.value = branchEntries[0].batch_expiry_date;
+}
                     
                     if (uomType === 'group') {
                         // For UOM groups, populate individual unit quantities

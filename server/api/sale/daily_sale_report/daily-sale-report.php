@@ -29,6 +29,17 @@ function getIntArrayParam($arrayName, $singleName = null) {
     return array_values(array_unique($values));
 }
 
+// Extracts a short comparable code from a unit name like "Carton (Ctn)" -> "CTN",
+// "Piece (Pc)" -> "PC". Falls back to the whole (trimmed, uppercased) name if there's
+// no parenthetical short form, so plain "CTN" / "PCS" values still match.
+function getUnitCode($unitName) {
+    if (!$unitName) return '';
+    if (preg_match('/\(([^)]+)\)/', $unitName, $m)) {
+        return strtoupper(trim($m[1]));
+    }
+    return strtoupper(trim($unitName));
+}
+
 function getStringArrayParam($arrayName, $singleName = null) {
     $values = [];
     if (isset($_GET[$arrayName])) {
@@ -80,6 +91,25 @@ function addBillVendorFilter(&$sql, &$params, $vendorIds) {
     $params = array_merge($params, $vendorIds);
 }
 
+// Resolves the correct piece-conversion-factor for a sale-invoice-item line, in priority order:
+// 1) product_uom_conversions (used when the product's UOM Type is "Group")
+// 2) products.product_conversion_factor (used when the product's UOM Type is "Default Unit"
+//    and the selected unit is a per-product-scope unit, e.g. Carton, with a manually entered factor)
+// 3) uom.conversion_factor (universal-scope units, e.g. Dozen = 12)
+// 4) 1 (no conversion info found - qty is already in base pieces)
+function resolveConversionFactor($item) {
+    if ($item['product_conversion_factor'] !== null) {
+        return (float)$item['product_conversion_factor'];
+    }
+    if ($item['p_conv_factor'] !== null) {
+        return (float)$item['p_conv_factor'];
+    }
+    if ($item['conversion_factor'] !== null) {
+        return (float)$item['conversion_factor'];
+    }
+    return 1.0;
+}
+
 try {
     $report_type = $_GET['report_type'] ?? 'item-wise';
     $invoice_types = getStringArrayParam('invoice_types', 'invoice_type');
@@ -107,11 +137,22 @@ try {
                     p.id,
                     p.name as product,
                     p.parent_product_id,
+                    p.product_conversion_factor as p_conv_factor,
                     u.uom_name as unit,
+                    u.conversion_factor as conversion_factor,
+                    puc.conversion_factor as product_conversion_factor,
                     sii.quantity as qty,
+                    sii.piece as piece_qty,
+                    sii.carton as carton_qty,
+                    sii.dozen as dozen_qty,
                     sii.foc_quantity as foc_qty,
                     sii.sale_price as rate,
                     sii.net_amount as amount,
+                    sii.discount_percent as discount_percent,
+                    sii.discount_amount as discount_amount,
+                    sii.trade_offer_percent as trade_offer_percent,
+                    sii.trade_offer_amount as trade_offer_amount,
+                    sii.tax_amount as tax_amt,
                     CASE WHEN sii.parent_row_id IS NOT NULL THEN 1 ELSE 0 END as is_child,
                     si.sale_officer_id,
                     COALESCE(e.full_name, 'Unknown') as sales_officer_name
@@ -119,6 +160,7 @@ try {
                 JOIN sale_invoice si ON sii.sale_invoice_id = si.id
                 JOIN products p ON sii.product_id = p.id
                 LEFT JOIN uom u ON sii.uom_id = u.id
+                LEFT JOIN product_uom_conversions puc ON puc.product_id = p.id AND puc.uom_id = sii.uom_id
                 LEFT JOIN customers c ON si.customer_id = c.id
                 LEFT JOIN employees e ON si.sale_officer_id = e.id
                 WHERE si.tenant_id = ? AND si.status = 'Posted'";
@@ -161,15 +203,43 @@ try {
                     'product' => $item['product'],
                     'parent_product_id' => $item['parent_product_id'],
                     'is_child' => $item['is_child'],
+                    // Packing - the carton pack size for this product (e.g. 1 Ctn = 24 pcs),
+                    // taken from the CTN unit line's effective conversion factor. Null if the
+                    // product has no Carton unit line.
+                    'ctn_pack_size' => null,
+                    // PCS Total - computed AFTER the loop from the final ctn_qty/dzn_qty/pcs_qty/foc_qty
+                    // totals below (ctn_qty*Packing + dzn_qty*12 + pcs_qty*1 + foc_qty*1), not
+                    // accumulated per-row here. Guarantees it always matches the CTN/DZN/PCS/FOC columns.
+                    'total_pack' => 0,
+                    // CTN / PCS / DZN - summed directly from sale_invoice_items.carton / .piece / .dozen,
+                    // the actual columns the POS invoice save writes to (see pos-add.php). Far more
+                    // reliable than guessing from the unit name text.
+                    'ctn_qty' => 0,
+                    'pcs_qty' => 0,
+                    'dzn_qty' => 0,
+                    // FOC (Free of Charge) quantity - shown as its own column AND counted as
+                    // 1 piece each toward total_pack (see the post-loop calc below).
                     'foc_qty' => 0,
                     'rate' => $item['rate'],
                     'amount' => 0,
+                    'discount_amount' => 0,
+                    'trade_offer_amount' => 0,
+                    'tax_amt' => 0,
+                    // Return Qty / Return Amt - not wired up yet, kept for future use.
+                    // Net Amount (amount - r_amt + tax_amt) is computed on the frontend from these.
+                    'r_qty' => 0,
+                    'r_amt' => 0,
                     'units' => [],
                     'sales_officer_name' => $has_search_filters ? $item['sales_officer_name'] : 'All Sales Officers'
                 ];
             }
             
             $unitName = $item['unit'] ?? '-';
+            $convFactor = resolveConversionFactor($item);
+            if (getUnitCode($unitName) === 'CTN') {
+                $grouped[$key]['ctn_pack_size'] = $convFactor;
+            }
+
             // Check if this unit already exists for this product
             $unitExists = false;
             foreach ($grouped[$key]['units'] as &$existingUnit) {
@@ -188,9 +258,24 @@ try {
                 ];
             }
             
+            $grouped[$key]['ctn_qty'] += (float)($item['carton_qty'] ?? 0);
+            $grouped[$key]['pcs_qty'] += (float)($item['piece_qty'] ?? 0);
+            $grouped[$key]['dzn_qty'] += (float)($item['dozen_qty'] ?? 0);
             $grouped[$key]['foc_qty'] += $item['foc_qty'];
             $grouped[$key]['amount'] += $item['amount'];
+            $grouped[$key]['discount_amount'] += $item['discount_amount'];
+            $grouped[$key]['trade_offer_amount'] += $item['trade_offer_amount'];
+            $grouped[$key]['tax_amt'] += $item['tax_amt'];
         }
+
+        // PCS Total = (CTN qty x Packing) + (DZN qty x 12) + (PCS qty x 1) + (FOC qty x 1).
+        // Computed here from the final per-product totals so it always matches
+        // the CTN/DZN/PCS/FOC columns shown in the table.
+        foreach ($grouped as &$g) {
+            $packing = $g['ctn_pack_size'] !== null ? $g['ctn_pack_size'] : 0;
+            $g['total_pack'] = ($g['ctn_qty'] * $packing) + ($g['dzn_qty'] * 12) + ($g['pcs_qty'] * 1) + ($g['foc_qty'] * 1);
+        }
+        unset($g);
         
         $data = array_values($grouped);
         

@@ -1574,7 +1574,7 @@ function initializePage(permissions) {
                     }
                 });
 
-                // Create one row per product with all units
+               // Create one row per product with all units
                 for (const productGroup of Object.values(itemsByProduct)) {
                     const item = productGroup.baseItem;
                     await addRowDynamic();
@@ -1598,6 +1598,12 @@ function initializePage(permissions) {
                             if (unitInput) unitInput.value = unit.quantity;
                         });
                     }
+
+                    // Restore saved batch no / expiry date instead of re-fetching current stock batch
+                    const batchNoInputEl = lastRow.querySelector('.batch-no-input');
+                    const batchExpiryInputEl = lastRow.querySelector('.batch-expiry-input');
+                    if (batchNoInputEl) batchNoInputEl.value = item.batch_no || '';
+                    if (batchExpiryInputEl) batchExpiryInputEl.value = item.batch_expiry_date || '';
                     
                     const priceInput = lastRow.querySelector('.price-cell input');
                     if (priceInput) priceInput.value = item.sale_price;
@@ -4120,33 +4126,52 @@ function saveInvoice(status = 'Posted') {
         const taxAmount = parseFloat(taxAmountInput.value) || 0;
         const focQty = parseFloat(focInput.value) || 0;
         const netAmount = parseFloat(netInput.value);
-        const scheme = schemeSelect ? schemeSelect.value : 'sale_on_tp';
-        
+const scheme = schemeSelect ? schemeSelect.value : 'sale_on_tp';
+        const batchNo = row.querySelector('.batch-no-input')?.value || null;
+        const batchExpiryDate = row.querySelector('.batch-expiry-input')?.value || null;        
         // Create separate item for each unit with quantity
-        unitsWithQty.forEach((unit, index) => {
-            const isFirstUnit = index === 0;
-            const item = {
-                productId: productId,
-                uomId: unit.uom_id,
-                quantity: unit.quantity,
-                piece: 0,
-                carton: 0,
-                dozen: 0,
-                salePrice: salePrice,
-                grossAmount: isFirstUnit ? grossAmount : 0,
-                discountAmount: isFirstUnit ? discountAmount : 0,
-                tradeOfferAmount: isFirstUnit ? tradeOfferAmount : 0,
-                taxPercent: taxPercent,
-                taxAmount: isFirstUnit ? taxAmount : 0,
-                focQty: isFirstUnit ? focQty : 0,
-                netAmount: isFirstUnit ? netAmount : 0,
-                parentRowId: null,
-                stockAffects: parseInt(row.dataset.stockAffects) || 1,
-                invoiceAffects: parseInt(row.dataset.invoiceAffects) || 1,
-                scheme: scheme
-            };
-            formData.items.push(item);
-        });
+       unitsWithQty.forEach((unit, index) => {
+    const isFirstUnit = index === 0;
+
+    // Map quantity to correct piece/carton/dozen field based on 
+    // actual unit id (9=Piece, 10=Dozen, 16=Carton — same IDs
+    // already used in getConversionFactor()/convertToPieces())
+    const unitIdNum = parseInt(unit.uom_id);
+    let pieceVal = 0, cartonVal = 0, dozenVal = 0;
+    if (unitIdNum === 9) {
+        pieceVal = unit.quantity;
+    } else if (unitIdNum === 10) {
+        dozenVal = unit.quantity;
+    } else if (unitIdNum === 16) {
+        cartonVal = unit.quantity;
+    } else {
+        pieceVal = unit.quantity; // custom unit fallback
+    }
+
+    const item = {
+        productId: productId,
+        uomId: unit.uom_id,
+        quantity: unit.quantity,
+        piece: pieceVal,
+        carton: cartonVal,
+        dozen: dozenVal,
+        salePrice: salePrice,
+        grossAmount: isFirstUnit ? grossAmount : 0,
+        discountAmount: isFirstUnit ? discountAmount : 0,
+        tradeOfferAmount: isFirstUnit ? tradeOfferAmount : 0,
+        taxPercent: taxPercent,
+        taxAmount: isFirstUnit ? taxAmount : 0,
+        focQty: isFirstUnit ? focQty : 0,
+        netAmount: isFirstUnit ? netAmount : 0,
+        parentRowId: null,
+        stockAffects: parseInt(row.dataset.stockAffects) || 1,
+        invoiceAffects: parseInt(row.dataset.invoiceAffects) || 1,
+        scheme: scheme,
+         batchNo: batchNo,
+        batchExpiryDate: batchExpiryDate
+    };
+    formData.items.push(item);
+});
 
         // Add child products from dataset
         if (row.dataset.childProducts) {
@@ -5756,14 +5781,47 @@ async function addRowDynamic() {
     initTableDropdownDynamic(codeContainer, row);
     
     // Scheme dropdown (inserted at fixed index 2)
+   // Scheme dropdown (inserted at fixed index 2)
     const schemeCell = row.insertCell(2);
     schemeCell.className = 'scheme-cell';
     const schemeDropdown = createSchemeCell(row);
     schemeCell.appendChild(schemeDropdown);
+
+   // Batch No (auto-filled, read-only, inserted at fixed index 3)
+    const batchNoCell = row.insertCell(3);
+    batchNoCell.className = 'batch-no-cell';
+    const batchNoInput = document.createElement('input');
+    batchNoInput.type = 'text';
+    batchNoInput.className = 'table-input batch-no-input';
+    batchNoInput.readOnly = true;
+    batchNoInput.tabIndex = -1;
+    batchNoInput.placeholder = 'No Batch';
+    batchNoInput.style.color = '#000000';
+    batchNoInput.style.fontWeight = '600';
+    batchNoInput.style.opacity = '1';
+    batchNoInput.style.webkitTextFillColor = '#000000';
+    batchNoCell.appendChild(batchNoInput);
+
+    // Expiry Date (auto-filled, read-only, inserted at fixed index 4)
+    const batchExpiryCell = row.insertCell(4);
+    batchExpiryCell.className = 'batch-expiry-cell';
+    const batchExpiryInput = document.createElement('input');
+    batchExpiryInput.type = 'text';
+    batchExpiryInput.className = 'table-input batch-expiry-input';
+    batchExpiryInput.readOnly = true;
+    batchExpiryInput.tabIndex = -1;
+    batchExpiryInput.style.color = '#000000';
+    batchExpiryInput.style.fontWeight = '600';
+    batchExpiryInput.style.opacity = '1';
+    batchExpiryInput.style.webkitTextFillColor = '#000000';
+    batchExpiryCell.appendChild(batchExpiryInput);
+
+    // Unit cells will be added dynamically (inserted starting at index 5)
+    // Price
+    const priceCell = row.insertCell(5);
     
     // Unit cells will be added dynamically (inserted starting at index 3)
     // Price
-    const priceCell = row.insertCell(3);
     priceCell.className = 'price-cell';
     const priceInput = document.createElement('input');
     priceInput.type = 'number';
@@ -5809,7 +5867,7 @@ async function addRowDynamic() {
     priceCell.appendChild(priceInput);
     
     // Gross Amount
-    const grossCell = row.insertCell(4);
+    const grossCell = row.insertCell(6);
     grossCell.className = 'gross-cell';
     const grossInput = document.createElement('input');
     grossInput.type = 'text';
@@ -5820,7 +5878,7 @@ async function addRowDynamic() {
     grossCell.appendChild(grossInput);
     
     // Discount %
-    const discPercentCell = row.insertCell(5);
+    const discPercentCell = row.insertCell(7);
     discPercentCell.className = 'disc-percent-cell';
     const discPercentInput = document.createElement('input');
     discPercentInput.type = 'number';
@@ -5843,7 +5901,7 @@ async function addRowDynamic() {
     discPercentCell.appendChild(discPercentInput);
     
     // Discount Amount
-    const discAmountCell = row.insertCell(6);
+    const discAmountCell = row.insertCell(8);
     discAmountCell.className = 'disc-amount-cell';
     const discAmountInput = document.createElement('input');
     discAmountInput.type = 'number';
@@ -5865,7 +5923,7 @@ async function addRowDynamic() {
     discAmountCell.appendChild(discAmountInput);
     
     // TO Amount
-    const toAmountCell = row.insertCell(7);
+    const toAmountCell = row.insertCell(9);
     toAmountCell.className = 'to-amount-cell';
     const toAmountInput = document.createElement('input');
     toAmountInput.type = 'number';
@@ -5876,7 +5934,7 @@ async function addRowDynamic() {
     toAmountCell.appendChild(toAmountInput);
     
     // GST %
-    const taxPercentCell = row.insertCell(8);
+    const taxPercentCell = row.insertCell(10);
     taxPercentCell.className = 'tax-percent-cell';
     const taxPercentInput = document.createElement('input');
     taxPercentInput.type = 'number';
@@ -5899,7 +5957,7 @@ async function addRowDynamic() {
     taxPercentCell.appendChild(taxPercentInput);
     
     // GST Amount
-    const taxAmountCell = row.insertCell(9);
+    const taxAmountCell = row.insertCell(11);
     taxAmountCell.className = 'tax-amount-cell';
     const taxAmountInput = document.createElement('input');
     taxAmountInput.type = 'number';
@@ -5910,7 +5968,7 @@ async function addRowDynamic() {
     taxAmountCell.appendChild(taxAmountInput);
     
     // FOC Qty
-    const focCell = row.insertCell(10);
+    const focCell = row.insertCell(12);
     focCell.className = 'foc-cell';
     const focInput = document.createElement('input');
     focInput.type = 'number';
@@ -5921,7 +5979,7 @@ async function addRowDynamic() {
     focCell.appendChild(focInput);
     
     // Net Amount
-    const netCell = row.insertCell(11);
+    const netCell = row.insertCell(13);
     netCell.className = 'net-cell';
     const netInput = document.createElement('input');
     netInput.type = 'text';
@@ -5932,7 +5990,7 @@ async function addRowDynamic() {
     netCell.appendChild(netInput);
     
     // Actions
-    const actionsCell = row.insertCell(12);
+    const actionsCell = row.insertCell(14);
     const deleteBtn = document.createElement('button');
     deleteBtn.type = 'button';
     deleteBtn.className = 'btn btn-danger btn-sm';
@@ -6082,9 +6140,14 @@ function initTableDropdownDynamic(container, row) {
             hiddenInput.value = product.id;
             
             // Get UOM details
+            // Get UOM details
             const uomDetails = await getProductUOMDetails(product);
             row.dataset.productUomData = JSON.stringify(uomDetails);
             row.dataset.productId = product.id;
+
+            // Load available batches for this product (FIFO order) — auto-fills, no dropdown
+            loadProductBatches(row, product.id);
+            
             
             // Initialize scheme dropdown with saved preference
             const schemeSelect = row.querySelector('.scheme-select');

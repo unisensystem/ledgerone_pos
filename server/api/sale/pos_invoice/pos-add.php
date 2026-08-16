@@ -133,15 +133,15 @@ try {
     }
 
     // Insert invoice items
-    $item_stmt = $pdo->prepare("
-        INSERT INTO sale_invoice_items (
-            tenant_id, sale_invoice_id, product_id, uom_id,
-            quantity, sale_price, gross_amount, discount_percent,
-            discount_amount, trade_offer_percent, trade_offer_amount,
-            tax_percent, tax_amount, foc_quantity, net_amount, parent_row_id,
-            piece, carton, dozen, scheme, created_by, updated_by
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    ");
+ $item_stmt = $pdo->prepare("
+    INSERT INTO sale_invoice_items (
+        tenant_id, sale_invoice_id, product_id, uom_id,
+        quantity, sale_price, gross_amount, discount_percent,
+        discount_amount, trade_offer_percent, trade_offer_amount,
+        tax_percent, tax_amount, foc_quantity, net_amount, parent_row_id,
+        piece, carton, dozen, scheme, batch_no, batch_expiry_date, created_by, updated_by
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+");
 
     $itemRowCounter = 0;
     $itemIdMap = [];
@@ -155,30 +155,32 @@ try {
             $parentRowId = $itemIdMap[$item['parentRowId']] ?? null;
         }
         
-        $item_stmt->execute([
-            $tenant_id,
-            $invoice_id,
-            $item['productId'],
-            $item['uomId'],
-            $item['quantity'],
-            $item['salePrice'],
-            $item['grossAmount'],
-            $item['discountPercent'] ?? 0.00,
-            $item['discountAmount'] ?? 0.00,
-            $item['tradeOfferPercent'] ?? 0.00,
-            $item['tradeOfferAmount'] ?? 0.00,
-            $item['taxPercent'] ?? 0.00,
-            $item['taxAmount'] ?? 0.00,
-            $item['focQty'] ?? 0.00,
-            $item['netAmount'],
-            $parentRowId,
-            $item['piece'] ?? null,
-            $item['carton'] ?? null,
-            $item['dozen'] ?? null,
-            $item['scheme'] ?? 'sale_on_tp',
-            $user_id,
-            $user_id
-        ]);
+      $item_stmt->execute([
+    $tenant_id,
+    $invoice_id,
+    $item['productId'],
+    $item['uomId'],
+    $item['quantity'],
+    $item['salePrice'],
+    $item['grossAmount'],
+    $item['discountPercent'] ?? 0.00,
+    $item['discountAmount'] ?? 0.00,
+    $item['tradeOfferPercent'] ?? 0.00,
+    $item['tradeOfferAmount'] ?? 0.00,
+    $item['taxPercent'] ?? 0.00,
+    $item['taxAmount'] ?? 0.00,
+    $item['focQty'] ?? 0.00,
+    $item['netAmount'],
+    $parentRowId,
+    $item['piece'] ?? null,
+    $item['carton'] ?? null,
+    $item['dozen'] ?? null,
+    $item['scheme'] ?? 'sale_on_tp',
+    !empty($item['batchNo']) ? $item['batchNo'] : null,
+    !empty($item['batchExpiryDate']) ? $item['batchExpiryDate'] : null,
+    $user_id,
+    $user_id
+]);
         
         $itemId = $pdo->lastInsertId();
         $itemIdMap[$itemRowCounter] = $itemId;

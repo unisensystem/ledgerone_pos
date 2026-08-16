@@ -1,7 +1,6 @@
 <?php
-if (session_status() == PHP_SESSION_NONE) {
-    session_start();
-}
+session_start();
+require_once '../../../../includes/connection.php';
 
 $user_id = $_SESSION['user_id'] ?? null;
 $tenant_id = $_SESSION['tenant_id'] ?? null;
@@ -10,8 +9,6 @@ if (!$user_id) {
     header('Location: ../../auth/login.html');
     exit();
 }
-
-require_once '../../../../includes/connection.php';
 
 // Get currency symbol
 $stmt = $pdo->prepare("
@@ -37,6 +34,17 @@ function getIntArrayParam($arrayName, $singleName = null) {
         $values = [intval($_GET[$singleName])];
     }
     return array_values(array_unique($values));
+}
+
+// Extracts a short comparable code from a unit name like "Carton (Ctn)" -> "CTN",
+// "Piece (Pc)" -> "PC". Falls back to the whole (trimmed, uppercased) name if there's
+// no parenthetical short form, so plain "CTN" / "PCS" values still match.
+function getUnitCode($unitName) {
+    if (!$unitName) return '';
+    if (preg_match('/\(([^)]+)\)/', $unitName, $m)) {
+        return strtoupper(trim($m[1]));
+    }
+    return strtoupper(trim($unitName));
 }
 
 function getStringArrayParam($arrayName, $singleName = null) {
@@ -99,6 +107,25 @@ function addBillVendorFilter(&$sql, &$params, $vendorIds) {
     $params = array_merge($params, $vendorIds);
 }
 
+// Resolves the correct piece-conversion-factor for a sale-invoice-item line, in priority order:
+// 1) product_uom_conversions (used when the product's UOM Type is "Group")
+// 2) products.product_conversion_factor (used when the product's UOM Type is "Default Unit"
+//    and the selected unit is a per-product-scope unit, e.g. Carton, with a manually entered factor)
+// 3) uom.conversion_factor (universal-scope units, e.g. Dozen = 12)
+// 4) 1 (no conversion info found - qty is already in base pieces)
+function resolveConversionFactor($item) {
+    if ($item['product_conversion_factor'] !== null) {
+        return (float)$item['product_conversion_factor'];
+    }
+    if ($item['p_conv_factor'] !== null) {
+        return (float)$item['p_conv_factor'];
+    }
+    if ($item['conversion_factor'] !== null) {
+        return (float)$item['conversion_factor'];
+    }
+    return 1.0;
+}
+
 // Get report parameters
 $report_type = $_GET['report_type'] ?? 'item-wise';
 $reference = $_GET['reference'] ?? null;
@@ -138,11 +165,22 @@ if ($report_type === 'item-wise') {
                 p.id,
                 p.name as product,
                 p.parent_product_id,
+                p.product_conversion_factor as p_conv_factor,
                 u.uom_name as unit,
+                u.conversion_factor as conversion_factor,
+                puc.conversion_factor as product_conversion_factor,
                 sii.quantity as qty,
+                sii.piece as piece_qty,
+                sii.carton as carton_qty,
+                sii.dozen as dozen_qty,
                 sii.foc_quantity as foc_qty,
                 sii.sale_price as rate,
                 sii.net_amount as amount,
+                sii.discount_percent as discount_percent,
+                sii.discount_amount as discount_amount,
+                sii.trade_offer_percent as trade_offer_percent,
+                sii.trade_offer_amount as trade_offer_amount,
+                sii.tax_amount as tax_amt,
                 CASE WHEN sii.parent_row_id IS NOT NULL THEN 1 ELSE 0 END as is_child,
                 si.sale_officer_id,
                 COALESCE(e.full_name, 'Unknown') as sales_officer_name
@@ -150,6 +188,7 @@ if ($report_type === 'item-wise') {
             JOIN sale_invoice si ON sii.sale_invoice_id = si.id
             JOIN products p ON sii.product_id = p.id
             LEFT JOIN uom u ON sii.uom_id = u.id
+            LEFT JOIN product_uom_conversions puc ON puc.product_id = p.id AND puc.uom_id = sii.uom_id
             LEFT JOIN customers c ON si.customer_id = c.id
             LEFT JOIN employees e ON si.sale_officer_id = e.id
             WHERE si.tenant_id = ? AND si.status = 'Posted'";
@@ -186,21 +225,62 @@ if ($report_type === 'item-wise') {
             $byOfficer[$officerName][$key] = [
                 'product' => $item['product'],
                 'is_child' => $item['is_child'],
+                // Packing - the carton pack size for this product (e.g. 1 Ctn = 24 pcs),
+                // taken from the CTN unit line's effective conversion factor. Null if the
+                // product has no Carton unit line.
+                'ctn_pack_size' => null,
+                // PCS Total - computed AFTER the loop from the final ctn_qty/dzn_qty/pcs_qty/foc_qty
+                // totals below (ctn_qty*Packing + dzn_qty*12 + pcs_qty*1 + foc_qty*1), not
+                // accumulated per-row here. Guarantees it always matches the CTN/DZN/PCS/FOC columns.
+                'total_pack' => 0,
+                // CTN / PCS / DZN - summed directly from sale_invoice_items.carton / .piece / .dozen
+                'ctn_qty' => 0,
+                'pcs_qty' => 0,
+                'dzn_qty' => 0,
                 'foc_qty' => 0,
                 'rate' => $item['rate'],
                 'amount' => 0,
+                'discount_amount' => 0,
+                'trade_offer_amount' => 0,
+                'tax_amt' => 0,
+                // Return Qty / Return Amt - not wired up yet, kept for future use
+                'r_qty' => 0,
+                'r_amt' => 0,
                 'units' => []
             ];
         }
         $unitName = $item['unit'] ?? '-';
+        $convFactor = resolveConversionFactor($item);
+        if (getUnitCode($unitName) === 'CTN') {
+            $byOfficer[$officerName][$key]['ctn_pack_size'] = $convFactor;
+        }
         $unitExists = false;
         foreach ($byOfficer[$officerName][$key]['units'] as &$eu) {
             if ($eu['unit'] === $unitName) { $eu['qty'] += $item['qty']; $unitExists = true; break; }
         }
         if (!$unitExists) $byOfficer[$officerName][$key]['units'][] = ['unit' => $unitName, 'qty' => $item['qty']];
+        $byOfficer[$officerName][$key]['ctn_qty'] += (float)($item['carton_qty'] ?? 0);
+        $byOfficer[$officerName][$key]['pcs_qty'] += (float)($item['piece_qty'] ?? 0);
+        $byOfficer[$officerName][$key]['dzn_qty'] += (float)($item['dozen_qty'] ?? 0);
         $byOfficer[$officerName][$key]['foc_qty'] += $item['foc_qty'];
         $byOfficer[$officerName][$key]['amount']  += $item['amount'];
+        $byOfficer[$officerName][$key]['discount_amount'] += $item['discount_amount'];
+        $byOfficer[$officerName][$key]['trade_offer_amount'] += $item['trade_offer_amount'];
+        $byOfficer[$officerName][$key]['tax_amt'] += $item['tax_amt'];
     }
+
+    // PCS Total = (CTN qty x Packing) + (DZN qty x 12) + (PCS qty x 1) + (FOC qty x 1).
+    // Computed here from the final per-product totals so it always matches
+    // the CTN/DZN/PCS/FOC columns printed in the table.
+    foreach ($byOfficer as &$officerItems) {
+        foreach ($officerItems as &$g) {
+            $packing = $g['ctn_pack_size'] !== null ? $g['ctn_pack_size'] : 0;
+            $g['total_pack'] = ($g['ctn_qty'] * $packing) + ($g['dzn_qty'] * 12) + ($g['pcs_qty'] * 1) + ($g['foc_qty'] * 1);
+        }
+        unset($g);
+    }
+    unset($officerItems);
+
     $multiOfficer = !empty($sales_officer_ids) && count($byOfficer) > 1;
 } else {
     $sql = "SELECT 
@@ -267,7 +347,7 @@ if ($report_type === 'item-wise') {
         }
         
         .print-container {
-            max-width: 1000px;
+            max-width: 1300px;
             margin: 0 auto;
         }
         
@@ -311,7 +391,7 @@ if ($report_type === 'item-wise') {
         
         th, td {
             border: 1px solid #000;
-            padding: 8px;
+            padding: 12px;
             text-align: left;
             font-size: 12px;
         }
@@ -409,11 +489,11 @@ if ($report_type === 'item-wise') {
                 <strong>Type:</strong> <?php echo htmlspecialchars($invoice_type_names); ?><br>
                 <strong>Sales Officer:</strong> <?php echo htmlspecialchars($sales_officer_names); ?><br>
                 <strong>Supplier Man:</strong> <?php echo htmlspecialchars($supplier_man_name); ?><br>
-                <strong>Vendor:</strong> <?php echo htmlspecialchars($vendor_name); ?><br>
+                <!-- <strong>Vendor:</strong> <?php echo htmlspecialchars($vendor_name); ?><br> -->
                 <strong>Company:</strong> <?php echo htmlspecialchars($company_name); ?><br>
-                <strong>City:</strong> <?php echo htmlspecialchars($city_name); ?><br>
+                <!-- <strong>City:</strong> <?php echo htmlspecialchars($city_name); ?><br>
                 <strong>City Zone:</strong> <?php echo htmlspecialchars($city_zone_name); ?><br>
-                <strong>Area:</strong> <?php echo htmlspecialchars($area_name); ?>
+                <strong>Area:</strong> <?php echo htmlspecialchars($area_name); ?> -->
             </div>
             <div>
                 <strong>Date Range:</strong> <?php echo $date_from ? date('d-M-Y', strtotime($date_from)) : 'N/A'; ?> to <?php echo $date_to ? date('d-M-Y', strtotime($date_to)) : 'N/A'; ?>
@@ -429,44 +509,107 @@ if ($report_type === 'item-wise') {
                     <tr>
                         <th class="text-center">S#</th>
                         <th>Product</th>
-                        <th class="text-right">Quantity</th>
-                        <th class="text-right">FOC Qty</th>
+                        <th class="text-right">Packing</th>
+                        <th class="text-right">PCS Total</th>
+                        <th class="text-right">CTN</th>
+                        <th class="text-right">PCS</th>
+                        <th class="text-right">DZN</th>
+                        <th class="text-right">FOC</th>
                         <th class="text-right">Rate</th>
+                        <th class="text-right">Discount</th>
+                        <th class="text-right">Trader Offer</th>
                         <th class="text-right">Amount</th>
+                        <th class="text-right">R.QTY</th>
+                        <th class="text-right">R.Amt</th>
+                        <th class="text-right">Net Amount</th>
                     </tr>
                 </thead>
                 <tbody>
                     <?php 
                     $totalAmount = 0;
+                    $totalDiscount = 0;
+                    $totalTradeOffer = 0;
+                    $totalItems = 0;
+                    $totalPack = 0;
+                    $totalFocQty = 0;
+                    $totalRAmt = 0;
+                    $totalTaxAmt = 0;
                     $sNo = 0;
                     foreach ($byOfficer as $officerName => $items):
                         if ($multiOfficer): ?>
                         <tr>
-                            <td colspan="6" style="background:#f0f0f0; font-weight:bold; padding:6px 8px;"><?php echo htmlspecialchars($officerName); ?></td>
+                            <td colspan="15" style="background:#f0f0f0; font-weight:bold; padding:6px 8px;"><?php echo htmlspecialchars($officerName); ?></td>
                         </tr>
                         <?php endif;
                         foreach ($items as $item):
                             $sNo++;
-                            if (!$item['is_child']) $totalAmount += $item['amount'];
+                            if (!$item['is_child']) {
+                                $totalAmount += $item['amount'];
+                                $totalDiscount += $item['discount_amount'];
+                                $totalTradeOffer += $item['trade_offer_amount'];
+                                $totalItems++;
+                                $totalPack += $item['total_pack'];
+                                $totalFocQty += $item['foc_qty'];
+                                $totalRAmt += $item['r_amt'];
+                                $totalTaxAmt += $item['tax_amt'];
+                            }
                             $indent = $item['is_child'] ? 'padding-left: 30px;' : '';
                             $arrow  = $item['is_child'] ? '&rarr; ' : '';
+                            // Taken directly from sale_invoice_items.carton / .piece / .dozen -
+                            // no more guessing from the unit name text.
+                            $ctnQty = $item['ctn_qty'] > 0 ? intval($item['ctn_qty']) : '-';
+                            $pcsQty = $item['pcs_qty'] > 0 ? intval($item['pcs_qty']) : '-';
+                            $dznQty = $item['dzn_qty'] > 0 ? intval($item['dzn_qty']) : '-';
+                            // Net Amount = Amount (already post-discount) minus returns, plus tax
+                            $netAmount = $item['amount'] - $item['r_amt'] + $item['tax_amt'];
                     ?>
                         <tr>
                             <td class="text-center"><?php echo $sNo; ?></td>
                             <td style="<?php echo $indent; ?>"><?php echo $arrow . htmlspecialchars($item['product']); ?></td>
-                            <td class="text-right"><?php echo implode(', ', array_map(function($u) { return $u['unit'] . ' ' . intval($u['qty']); }, $item['units'])); ?></td>
-                            <td class="text-right"><?php echo number_format($item['foc_qty'], 2); ?></td>
+                            <td class="text-right"><?php echo $item['ctn_pack_size'] !== null ? number_format($item['ctn_pack_size'], 0) : '-'; ?></td>
+                            <td class="text-right"><?php echo number_format($item['total_pack'], 0); ?></td>
+                            <td class="text-right"><?php echo $ctnQty; ?></td>
+                            <td class="text-right"><?php echo $pcsQty; ?></td>
+                            <td class="text-right"><?php echo $dznQty; ?></td>
+                            <td class="text-right"><?php echo number_format($item['foc_qty'], 0); ?></td>
                             <td class="text-right"><?php echo $currency_symbol . number_format($item['rate'], 2); ?></td>
+                            <td class="text-right"><?php echo $currency_symbol . number_format($item['discount_amount'], 2); ?></td>
+                            <td class="text-right"><?php echo $currency_symbol . number_format($item['trade_offer_amount'], 2); ?></td>
                             <td class="text-right"><?php echo $currency_symbol . number_format($item['amount'], 2); ?></td>
+                            <td class="text-right"></td>
+                            <td class="text-right"></td>
+                            <td class="text-right"><?php echo $currency_symbol . number_format($netAmount, 2); ?></td>
                         </tr>
                     <?php endforeach; endforeach; ?>
                 </tbody>
+                <tfoot>
+                    <tr style="font-weight:bold; background:#f0f0f0;">
+                        <td class="text-center" colspan="2">Total (<?php echo $totalItems; ?> Items)</td>
+                        <td class="text-right"></td>
+                        <td class="text-right"><?php echo number_format($totalPack, 0); ?></td>
+                        <td class="text-right"></td>
+                        <td class="text-right"></td>
+                        <td class="text-right"></td>
+                        <td class="text-right"><?php echo number_format($totalFocQty, 0); ?></td>
+                        <td class="text-right"></td>
+                        <td class="text-right"><?php echo $currency_symbol . number_format($totalDiscount, 2); ?></td>
+                        <td class="text-right"><?php echo $currency_symbol . number_format($totalTradeOffer, 2); ?></td>
+                        <td class="text-right"><?php echo $currency_symbol . number_format($totalAmount, 2); ?></td>
+                        <td class="text-right"></td>
+                        <td class="text-right"></td>
+                        <td class="text-right"><?php echo $currency_symbol . number_format($totalAmount - $totalRAmt + $totalTaxAmt, 2); ?></td>
+                    </tr>
+                </tfoot>
             </table>
             
             <div class="summary">
                 <div class="summary-row">
                     <div class="summary-label">Total Amount:</div>
                     <div class="summary-value"><?php echo $currency_symbol . number_format($totalAmount, 2); ?></div>
+                </div>
+                <div class="summary-row">
+                    <div class="summary-label">Net Amount:</div>
+                    <div class="summary-value"><?php echo $currency_symbol . number_format($totalAmount - $totalRAmt + $totalTaxAmt, 2); ?></div>
                 </div>
             </div>
         <?php else: ?>

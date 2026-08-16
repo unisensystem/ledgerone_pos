@@ -30,9 +30,9 @@ try {
     $currency_stmt->execute([$tenant_id]);
     $currency = $currency_stmt->fetch(PDO::FETCH_ASSOC);
     $currency_symbol = $currency['symbol'] ?? '$';
-    
+
     $action = $_GET['action'] ?? 'position';
-    
+
     switch ($action) {
         case 'position':
             $branch_id = $_GET['branch_id'] ?? null;
@@ -45,29 +45,29 @@ try {
             $to_date = $_GET['to_date'] ?? null;
             $valuation_method = $_GET['valuation_method'] ?? 'AVCO';
             $show_base_units = isset($_GET['show_base_units']) && $_GET['show_base_units'] === 'true';
-            
+
             // Debug log
             error_log('=== Stock Position Debug ===');
             error_log('show_base_units parameter: ' . ($_GET['show_base_units'] ?? 'NOT SET'));
             error_log('show_base_units boolean: ' . ($show_base_units ? 'TRUE' : 'FALSE'));
             error_log('branch_id: ' . ($branch_id ?? 'NOT SET'));
             error_log('product_id: ' . ($product_id ?? 'NOT SET'));
-            
+
             $allowed_methods = ['AVCO', 'FIFO', 'LIFO', 'TRADE_PRICE'];
             if (!in_array($valuation_method, $allowed_methods, true)) {
                 $valuation_method = 'AVCO';
             }
-            
+
             error_log('Query path: ' . ($show_base_units ? 'BASE UNITS' : 'ORIGINAL UNITS'));
-            
+
             // Unit conversion factor - only apply if unit has a base_unit_id or product-specific conversion
             $conversionFactor = "COALESCE(CASE WHEN u.base_unit_id IS NOT NULL AND u.unit_scope = 'universal' THEN u.conversion_factor WHEN puc.conversion_factor IS NOT NULL THEN puc.conversion_factor ELSE 1 END, 1)";
-            
+
             // Unit cost calculation based on valuation method
-            $unitCostCalc = $valuation_method === 'TRADE_PRICE' 
-                ? "COALESCE(p.trade_price, 0)" 
+            $unitCostCalc = $valuation_method === 'TRADE_PRICE'
+                ? "COALESCE(p.trade_price, 0)"
                 : "COALESCE(AVG(CASE WHEN sl.qty_in > 0 THEN sl.unit_cost ELSE NULL END), 0)";
-            
+
             if ($show_base_units) {
                 // Convert to base units and group by product/branch/account/base_unit
                 $sql = "SELECT
@@ -111,14 +111,28 @@ try {
 
                 $params = [$from_date, $from_date, $from_date, $from_date, $to_date, $to_date, $from_date, $from_date, $to_date, $to_date, $tenant_id];
 
-                if ($branch_id) { $sql .= " AND sl.branch_id = ?"; $params[] = $branch_id; }
-                if ($product_id) { $sql .= " AND p.id = ?"; $params[] = $product_id; }
-                if ($vendor_id) { $sql .= " AND p.vendor_id = ?"; $params[] = $vendor_id; }
-                if ($stock_status) { $sql .= " AND sl.stock_status = ?"; $params[] = $stock_status; }
-                if ($inventory_type_id) { $sql .= " AND sl.account_id = ?"; $params[] = $inventory_type_id; }
+                if ($branch_id) {
+                    $sql .= " AND sl.branch_id = ?";
+                    $params[] = $branch_id;
+                }
+                if ($product_id) {
+                    $sql .= " AND p.id = ?";
+                    $params[] = $product_id;
+                }
+                if ($vendor_id) {
+                    $sql .= " AND p.vendor_id = ?";
+                    $params[] = $vendor_id;
+                }
+                if ($stock_status) {
+                    $sql .= " AND sl.stock_status = ?";
+                    $params[] = $stock_status;
+                }
+                if ($inventory_type_id) {
+                    $sql .= " AND sl.account_id = ?";
+                    $params[] = $inventory_type_id;
+                }
 
                 $sql .= " GROUP BY p.id, sl.branch_id, sl.account_id, COALESCE(u.base_unit_id, u.id) ORDER BY COALESCE(p.parent_product_id, p.id), p.parent_product_id IS NULL DESC, p.name";
-
             } else {
                 // Show in original units with proportional distribution across unit types.
                 // Deductions recorded in base units (e.g. FOC in Pieces) are distributed across all
@@ -126,28 +140,40 @@ try {
                 // May produce fractional quantities (e.g. 1.5 Cartons) and negative values are allowed.
                 $conversionFactor2 = "COALESCE(CASE WHEN u2.base_unit_id IS NOT NULL AND u2.unit_scope = 'universal' THEN u2.conversion_factor WHEN puc2.conversion_factor IS NOT NULL THEN puc2.conversion_factor ELSE 1 END, 1)";
 
-                $filterSub = ""; $filterAgg = "";
-                $filterParamsSub = []; $filterParamsAgg = [];
+                $filterSub = "";
+                $filterAgg = "";
+                $filterParamsSub = [];
+                $filterParamsAgg = [];
 
                 if ($branch_id) {
-                    $filterSub .= " AND sl.branch_id = ?"; $filterAgg .= " AND sl2.branch_id = ?";
-                    $filterParamsSub[] = $branch_id; $filterParamsAgg[] = $branch_id;
+                    $filterSub .= " AND sl.branch_id = ?";
+                    $filterAgg .= " AND sl2.branch_id = ?";
+                    $filterParamsSub[] = $branch_id;
+                    $filterParamsAgg[] = $branch_id;
                 }
                 if ($product_id) {
-                    $filterSub .= " AND p.id = ?"; $filterAgg .= " AND p2.id = ?";
-                    $filterParamsSub[] = $product_id; $filterParamsAgg[] = $product_id;
+                    $filterSub .= " AND p.id = ?";
+                    $filterAgg .= " AND p2.id = ?";
+                    $filterParamsSub[] = $product_id;
+                    $filterParamsAgg[] = $product_id;
                 }
                 if ($vendor_id) {
-                    $filterSub .= " AND p.vendor_id = ?"; $filterAgg .= " AND p2.vendor_id = ?";
-                    $filterParamsSub[] = $vendor_id; $filterParamsAgg[] = $vendor_id;
+                    $filterSub .= " AND p.vendor_id = ?";
+                    $filterAgg .= " AND p2.vendor_id = ?";
+                    $filterParamsSub[] = $vendor_id;
+                    $filterParamsAgg[] = $vendor_id;
                 }
                 if ($stock_status) {
-                    $filterSub .= " AND sl.stock_status = ?"; $filterAgg .= " AND sl2.stock_status = ?";
-                    $filterParamsSub[] = $stock_status; $filterParamsAgg[] = $stock_status;
+                    $filterSub .= " AND sl.stock_status = ?";
+                    $filterAgg .= " AND sl2.stock_status = ?";
+                    $filterParamsSub[] = $stock_status;
+                    $filterParamsAgg[] = $stock_status;
                 }
                 if ($inventory_type_id) {
-                    $filterSub .= " AND sl.account_id = ?"; $filterAgg .= " AND sl2.account_id = ?";
-                    $filterParamsSub[] = $inventory_type_id; $filterParamsAgg[] = $inventory_type_id;
+                    $filterSub .= " AND sl.account_id = ?";
+                    $filterAgg .= " AND sl2.account_id = ?";
+                    $filterParamsSub[] = $inventory_type_id;
+                    $filterParamsAgg[] = $inventory_type_id;
                 }
 
                 $sql = "SELECT
@@ -233,24 +259,31 @@ try {
 
                 $params = [
                     // sub: total_qty_in period filter
-                    $from_date, $from_date, $to_date, $to_date,
+                    $from_date,
+                    $from_date,
+                    $to_date,
+                    $to_date,
                     // sub: total_qty_out period filter
-                    $from_date, $from_date, $to_date, $to_date,
+                    $from_date,
+                    $from_date,
+                    $to_date,
+                    $to_date,
                     // sub: WHERE tenant_id
                     $tenant_id,
                 ];
                 $params = array_merge($params, $filterParamsSub, [
                     // agg: opening balance date filter
-                    $from_date, $from_date,
+                    $from_date,
+                    $from_date,
                     // agg: WHERE tenant_id
                     $tenant_id,
                 ], $filterParamsAgg);
             }
-            
+
             $stmt = $pdo->prepare($sql);
             $stmt->execute($params);
             $positions = $stmt->fetchAll(PDO::FETCH_ASSOC);
-            
+
             // Debug info
             $debug = [
                 'query' => $sql,
@@ -259,18 +292,18 @@ try {
                 'valuation_method' => $valuation_method,
                 'first_record' => count($positions) > 0 ? $positions[0] : null
             ];
-            
+
             foreach ($positions as &$position) {
                 // Calculate stock value
                 $position['stock_value'] = $position['current_stock'] * $position['unit_cost'];
-                
+
                 $stock = $position['current_stock'];
                 $min_level = $position['min_stock_level'] ?? 0;
                 $max_level = $position['max_stock_level'] ?? 0;
-                
+
                 $type_map = [
                     'head_office' => 'Head Office',
-                    'petrol_station' => 'Petrol Station', 
+                    'petrol_station' => 'Petrol Station',
                     'convenience_store' => 'Convenience Store',
                     'car_wash' => 'Car Wash',
                     'fuel_tank' => 'Fuel Tank',
@@ -284,7 +317,7 @@ try {
                 }
                 $position['branch_display'] = $branch_display;
                 $position['inventory_type'] = $position['account_name'];
-                
+
                 if ($stock <= 0) {
                     $position['status'] = 'out-of-stock';
                 } elseif ($stock < $min_level) {
@@ -295,28 +328,28 @@ try {
                     $position['status'] = 'in-stock';
                 }
             }
-            
+
             if ($status) {
-                $positions = array_filter($positions, function($pos) use ($status) {
+                $positions = array_filter($positions, function ($pos) use ($status) {
                     return $pos['status'] === $status;
                 });
                 $positions = array_values($positions);
             }
-            
+
             echo json_encode(['success' => true, 'data' => $positions, 'currency' => $currency_symbol, 'debug' => $debug]);
             break;
-            
+
         case 'ledger':
             $product_id = $_GET['product_id'] ?? null;
             $company_id = $_GET['company_id'] ?? null;
             $from_date = $_GET['from_date'] ?? null;
             $to_date = $_GET['to_date'] ?? null;
-            
+
             if (!$product_id) {
                 echo json_encode(['success' => false, 'message' => 'Product ID required']);
                 exit;
             }
-            
+
             $bbf = 0;
             if ($from_date) {
                 $bbf_sql = "SELECT COALESCE(SUM(
@@ -340,7 +373,7 @@ try {
                 $bbf_stmt->execute($bbf_params);
                 $bbf = $bbf_stmt->fetch(PDO::FETCH_ASSOC)['bbf'];
             }
-            
+
             $sql = "SELECT 
                         sl.transaction_date,
                         sl.transaction_type,
@@ -363,52 +396,52 @@ try {
                     LEFT JOIN sale_invoice si ON sl.reference_table = 'sale_invoice' AND sl.reference_id = si.id
                     LEFT JOIN customers c ON si.customer_id = c.id
                     WHERE sl.tenant_id = ? AND sl.product_id = ?";
-            
+
             $params = [$tenant_id, $product_id];
-            
+
             if ($from_date) {
                 $sql .= " AND sl.transaction_date >= ?";
                 $params[] = $from_date;
             }
-            
+
             if ($to_date) {
                 $sql .= " AND sl.transaction_date <= ?";
                 $params[] = $to_date;
             }
-            
+
             if ($company_id) {
                 $sql .= " AND (pi.company_id = ? OR si.company_id = ?)";
                 $params[] = $company_id;
                 $params[] = $company_id;
             }
-            
+
             $sql .= " ORDER BY sl.transaction_date ASC, sl.id ASC";
-            
+
             $stmt = $pdo->prepare($sql);
             $stmt->execute($params);
             $ledger = $stmt->fetchAll(PDO::FETCH_ASSOC);
-            
+
             $balance = $bbf;
             foreach ($ledger as &$entry) {
                 $balance += $entry['qty_in'] - $entry['qty_out'];
                 $entry['balance'] = $balance;
                 $entry['value'] = $balance * $entry['unit_cost'];
             }
-            
+
             echo json_encode(['success' => true, 'data' => $ledger, 'bbf' => $bbf, 'currency' => $currency_symbol]);
             break;
-            
+
         case 'branch-ledger':
             $branch_id = $_GET['branch_id'] ?? null;
             $company_id = $_GET['company_id'] ?? null;
             $from_date = $_GET['from_date'] ?? null;
             $to_date = $_GET['to_date'] ?? null;
-            
+
             if (!$branch_id) {
                 echo json_encode(['success' => false, 'message' => 'Branch ID required']);
                 exit;
             }
-            
+
             $sql = "SELECT 
                         sl.transaction_date,
                         p.name as product_name,
@@ -425,12 +458,12 @@ try {
                     LEFT JOIN purchase_invoice pi ON sl.reference_table = 'purchase_invoice' AND sl.reference_id = pi.id
                     LEFT JOIN sale_invoice si ON sl.reference_table = 'sale_invoice' AND sl.reference_id = si.id
                     WHERE sl.tenant_id = ? AND sl.branch_id = ? AND p.product_type = 'physical'";
-            
+
             $child_sql = "SELECT id FROM branches WHERE (id = ? OR parent_branch_id = ?) AND tenant_id = ?";
             $child_stmt = $pdo->prepare($child_sql);
             $child_stmt->execute([$branch_id, $branch_id, $tenant_id]);
             $branch_ids = $child_stmt->fetchAll(PDO::FETCH_COLUMN);
-            
+
             if (!empty($branch_ids)) {
                 $placeholders = str_repeat('?,', count($branch_ids) - 1) . '?';
                 $sql = str_replace('sl.branch_id = ?', "sl.branch_id IN ($placeholders)", $sql);
@@ -438,49 +471,49 @@ try {
             } else {
                 $params = [$tenant_id, $branch_id];
             }
-            
+
             if ($from_date) {
                 $sql .= " AND sl.transaction_date >= ?";
                 $params[] = $from_date;
             }
-            
+
             if ($to_date) {
                 $sql .= " AND sl.transaction_date <= ?";
                 $params[] = $to_date;
             }
-            
+
             if ($company_id) {
                 $sql .= " AND (pi.company_id = ? OR si.company_id = ?)";
                 $params[] = $company_id;
                 $params[] = $company_id;
             }
-            
+
             $sql .= " ORDER BY sl.transaction_date DESC, sl.id DESC";
-            
+
             $stmt = $pdo->prepare($sql);
             $stmt->execute($params);
             $ledger = $stmt->fetchAll(PDO::FETCH_ASSOC);
-            
+
             echo json_encode(['success' => true, 'data' => $ledger, 'currency' => $currency_symbol]);
             break;
-            
+
         case 'stats':
             $company_id = $_GET['company_id'] ?? null;
             $valuation_method = $_GET['valuation_method'] ?? 'AVCO';
-            
+
             $allowed_methods = ['AVCO', 'FIFO', 'LIFO', 'TRADE_PRICE'];
             if (!in_array($valuation_method, $allowed_methods, true)) {
                 $valuation_method = 'AVCO';
             }
-            
+
             // Conversion factor for base units
             $conversionFactor = "COALESCE(CASE WHEN u.unit_scope = 'universal' THEN u.conversion_factor ELSE puc.conversion_factor END, 1)";
-            
+
             // Unit cost calculation based on valuation method
-            $unitCostCalc = $valuation_method === 'TRADE_PRICE' 
-                ? "COALESCE(p.trade_price, 0)" 
+            $unitCostCalc = $valuation_method === 'TRADE_PRICE'
+                ? "COALESCE(p.trade_price, 0)"
                 : "COALESCE(AVG(CASE WHEN sl.qty_in > 0 THEN sl.unit_cost ELSE NULL END), 0)";
-            
+
             $stats_sql = "SELECT 
                             SUM(COALESCE(stock_data.stock_value, 0)) as total_value,
                             SUM(CASE WHEN stock_data.status = 'in-stock' THEN 1 ELSE 0 END) as in_stock,
@@ -524,7 +557,7 @@ try {
                             WHERE sl.tenant_id = ?" . ($company_id ? " AND (pi.company_id = ? OR si.company_id = ?)" : "") . " AND p.product_type = 'physical'
                             GROUP BY p.id, sl.branch_id, sl.account_id
                         ) as stock_data";
-            
+
             $stats_stmt = $pdo->prepare($stats_sql);
             $stats_params = [$tenant_id];
             if ($company_id) {
@@ -533,22 +566,24 @@ try {
             }
             $stats_stmt->execute($stats_params);
             $stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
-            
+
             echo json_encode(['success' => true, 'data' => $stats, 'currency' => $currency_symbol]);
             break;
 
-            case 'customer-ledger':
+        case 'customer-ledger':
             $customer_id = $_GET['customer_id'] ?? null;
+            $product_id = $_GET['product_id'] ?? null;
             $from_date = $_GET['from_date'] ?? null;
             $to_date = $_GET['to_date'] ?? null;
 
-            if (!$customer_id) {
-                echo json_encode(['success' => false, 'message' => 'Customer ID required']);
+            if (!$customer_id && !$product_id) {
+                echo json_encode(['success' => false, 'message' => 'Customer or Product required']);
                 exit;
             }
 
             $sql = "SELECT 
                         sl.transaction_date,
+                        si.bill_no as invoice_number,
                         p.name as product_name,
                         COALESCE(b.branch_name, 'No Branch') as branch_name,
                         sl.transaction_type,
@@ -563,9 +598,19 @@ try {
                     LEFT JOIN uom base_u ON COALESCE(u.base_unit_id, u.id) = base_u.id
                     LEFT JOIN product_uom_conversions puc ON p.id = puc.product_id AND sl.unit_id = puc.uom_id
                     JOIN sale_invoice si ON sl.reference_table = 'sale_invoice' AND sl.reference_id = si.id
-                    WHERE sl.tenant_id = ? AND p.product_type = 'physical' AND si.customer_id = ?";
+                    WHERE sl.tenant_id = ? AND p.product_type = 'physical'";
 
-            $params = [$tenant_id, $customer_id];
+            $params = [$tenant_id];
+
+            if ($customer_id) {
+                $sql .= " AND si.customer_id = ?";
+                $params[] = $customer_id;
+            }
+
+            if ($product_id) {
+                $sql .= " AND p.id = ?";
+                $params[] = $product_id;
+            }
 
             if ($from_date) {
                 $sql .= " AND sl.transaction_date >= ?";
@@ -594,7 +639,7 @@ try {
 
             echo json_encode(['success' => true, 'data' => $customers]);
             break;
-            
+
         case 'branches':
             $branches_sql = "
                 SELECT
@@ -614,11 +659,11 @@ try {
             $branches_stmt = $pdo->prepare($branches_sql);
             $branches_stmt->execute([$tenant_id, $user_id]);
             $branches = $branches_stmt->fetchAll(PDO::FETCH_ASSOC);
-            
+
             foreach ($branches as &$branch) {
                 $type_map = [
                     'head_office' => 'Head Office',
-                    'petrol_station' => 'Petrol Station', 
+                    'petrol_station' => 'Petrol Station',
                     'convenience_store' => 'Convenience Store',
                     'car_wash' => 'Car Wash',
                     'fuel_tank' => 'Fuel Tank',
@@ -631,52 +676,52 @@ try {
                     $branch['display_name'] = $branch['parent_name'] . ' > ' . $branch['display_name'];
                 }
             }
-            
+
             echo json_encode(['success' => true, 'data' => $branches]);
             break;
-            
+
         case 'products':
             $products_sql = "SELECT id, name FROM products WHERE tenant_id = ? AND is_active = 1 AND product_type = 'physical'";
             $products_stmt = $pdo->prepare($products_sql);
             $products_stmt->execute([$tenant_id]);
             $products = $products_stmt->fetchAll(PDO::FETCH_ASSOC);
-            
+
             echo json_encode(['success' => true, 'data' => $products]);
             break;
-            
+
         case 'inventory-types':
             $types_sql = "SELECT DISTINCT a.id, a.name FROM accounts a JOIN stock_ledger sl ON a.id = sl.account_id WHERE sl.tenant_id = ? ORDER BY a.name";
             $types_stmt = $pdo->prepare($types_sql);
             $types_stmt->execute([$tenant_id]);
             $types = $types_stmt->fetchAll(PDO::FETCH_ASSOC);
-            
+
             echo json_encode(['success' => true, 'data' => $types]);
             break;
-            
+
         case 'distributions':
             $dist_sql = "SELECT DISTINCT s.id, s.supplier_name FROM suppliers s JOIN products p ON s.id = p.vendor_id WHERE s.tenant_id = ? AND s.status = 'ACTIVE' ORDER BY s.supplier_name";
             $dist_stmt = $pdo->prepare($dist_sql);
             $dist_stmt->execute([$tenant_id]);
             $distributions = $dist_stmt->fetchAll(PDO::FETCH_ASSOC);
-            
+
             echo json_encode(['success' => true, 'data' => $distributions]);
             break;
-            
+
         case 'companies':
             $companies_sql = "SELECT id, company_name FROM companies WHERE tenant_id = ? AND is_active = 1 ORDER BY company_name";
             $companies_stmt = $pdo->prepare($companies_sql);
             $companies_stmt->execute([$tenant_id]);
             $companies = $companies_stmt->fetchAll(PDO::FETCH_ASSOC);
-            
+
             echo json_encode(['success' => true, 'data' => $companies]);
             break;
-            
+
         case 'detailed-ledger':
             $branchId = $_GET['branch_id'] ?? null;
             $productId = $_GET['product_id'] ?? null;
             $fromDate = $_GET['from_date'] ?? null;
             $toDate = $_GET['to_date'] ?? null;
-            
+
             $sql = "SELECT 
                         sl.id,
                         sl.transaction_date,
@@ -694,39 +739,43 @@ try {
                     LEFT JOIN purchase_invoice pi ON sl.reference_table = 'purchase_invoice' AND sl.reference_id = pi.id
                     LEFT JOIN sale_invoice si ON sl.reference_table = 'sale_invoice' AND sl.reference_id = si.id
                     WHERE sl.tenant_id = ? AND p.product_type = 'physical'";
-            
+
             $params = [$tenant_id];
-            
+
             if ($branchId) {
                 $sql .= " AND sl.branch_id = ?";
                 $params[] = $branchId;
             }
-            
+
             if ($productId) {
                 $sql .= " AND sl.product_id = ?";
                 $params[] = $productId;
             }
-            
+
             if ($fromDate) {
                 $sql .= " AND sl.transaction_date >= ?";
                 $params[] = $fromDate;
             }
-            
+
             if ($toDate) {
                 $sql .= " AND sl.transaction_date <= ?";
                 $params[] = $toDate;
             }
-            
+
             $sql .= " ORDER BY sl.transaction_date ASC, sl.id ASC";
-            
+
             $stmt = $pdo->prepare($sql);
             $stmt->execute($params);
             $ledger = $stmt->fetchAll(PDO::FETCH_ASSOC);
-            
+
             // Debug tracking
-            $focCount = count(array_filter($ledger, function($row) { return strpos($row['transaction_type'], 'FOC') !== false; }));
-            $focTransactions = array_filter($ledger, function($row) { return strpos($row['transaction_type'], 'FOC') !== false; });
-            
+            $focCount = count(array_filter($ledger, function ($row) {
+                return strpos($row['transaction_type'], 'FOC') !== false;
+            }));
+            $focTransactions = array_filter($ledger, function ($row) {
+                return strpos($row['transaction_type'], 'FOC') !== false;
+            });
+
             // Error log for debugging
             error_log('=== Detailed Ledger Query Debug ===');
             error_log('Tenant: ' . $tenant_id . ', Branch: ' . ($branchId ?? 'ALL') . ', Product: ' . ($productId ?? 'ALL'));
@@ -737,10 +786,10 @@ try {
             if (!empty($focTransactions)) {
                 error_log('FOC Details: ' . json_encode(array_values($focTransactions)));
             }
-            
+
             echo json_encode([
-                'success' => true, 
-                'data' => $ledger, 
+                'success' => true,
+                'data' => $ledger,
                 'currency' => $currency_symbol,
                 'debug' => [
                     'total_rows' => count($ledger),
@@ -750,11 +799,10 @@ try {
                 ]
             ]);
             break;
-            
+
         default:
             echo json_encode(['success' => false, 'message' => 'Invalid action']);
     }
-    
 } catch (Exception $e) {
     error_log('Stock Position API Error: ' . $e->getMessage());
     http_response_code(500);

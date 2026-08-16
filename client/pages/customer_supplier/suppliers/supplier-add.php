@@ -166,12 +166,28 @@ if (!$user_id) {
                                 <i class="fas fa-user"></i>
                                 Brand Name - Company
                             </label>
+                            
                             <input type="text" id="supplierName" required placeholder="Enter Brand Name - Company">
                             <div class="error-text" id="supplierNameError">
                                 <i class="fas fa-exclamation-circle"></i>
                                 <span>Brand Name is required</span>
                             </div>
                         </div>
+
+                        <div class="form-group col-4">
+    <label for="supplierCategory">
+        <i class="fas fa-folder"></i>
+        Supplier Category
+    </label>
+    <div style="display: flex; gap: 8px;">
+        <select id="supplierCategory" style="flex: 1;">
+            <option value="">Select Supplier Category</option>
+        </select>
+        <button type="button" class="btn btn-secondary btn-sm" id="manageCategoriesBtn" style="padding: 0 16px;">
+            <i class="fas fa-cog"></i>
+        </button>
+    </div>
+</div>
                     </div>
 
                     <!-- Contact Information Section -->
@@ -456,6 +472,65 @@ if (!$user_id) {
             </div>
         </div>
     </div>
+
+    <!-- Supplier Categories Modal -->
+<div class="modal" id="categoriesModal">
+    <div class="modal-content" style="max-width: 700px;">
+        <div class="modal-header">
+            <h3><i class="fas fa-folder-open"></i> Manage Supplier Categories</h3>
+            <button class="modal-close" id="categoriesModalClose">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="modal-body">
+            <div style="margin-bottom: 20px;">
+                <button type="button" class="btn btn-primary btn-sm" id="addCategoryBtn">
+                    <i class="fas fa-plus"></i> Add New Category
+                </button>
+            </div>
+            <div class="table-container" style="border-radius: 12px; border: 1px solid var(--border-default);">
+                <table style="width: 100%; border-collapse: collapse;">
+                    <thead style="background: var(--surface-2);">
+                        <tr>
+                            <th style="padding: 12px; text-align: left; border-bottom: 1px solid var(--border-default);">Category Name</th>
+                            <th style="padding: 12px; text-align: center; width: 100px; border-bottom: 1px solid var(--border-default);">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="categoriesTableBody"></tbody>
+                </table>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" id="categoriesCloseBtn">Close</button>
+        </div>
+    </div>
+</div>
+
+<!-- Add/Edit Category Modal -->
+<div class="modal" id="categoryFormModal">
+    <div class="modal-content" style="max-width: 400px;">
+        <div class="modal-header">
+            <h3 id="categoryFormTitle"><i class="fas fa-plus"></i> Add Supplier Category</h3>
+            <button class="modal-close" id="categoryFormModalClose">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <form id="categoryForm">
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="categoryName" class="required">Category Name</label>
+                    <input type="text" id="categoryName" required placeholder="Enter category name">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" id="categoryFormCancelBtn">Cancel</button>
+                <button type="submit" class="btn btn-primary" id="categoryFormSaveBtn">
+                    <i class="fas fa-save"></i> Save
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
 
     <script src="../../../assets/js/customer_supplier/suppliers/supplier-add.js?v=<?php echo time(); ?>"></script>
 </body>

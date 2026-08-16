@@ -90,6 +90,7 @@
             margin: 8px 0;
             font-size: 12px;
             font-weight: bold;
+            border-collapse: collapse;
         }
         
         .items-table th {
@@ -103,6 +104,11 @@
             padding: 4px 0;
             border-bottom: 1px solid #000;
             font-weight: bold;
+        }
+
+        /* Gap between the Ctn/Dz/Pcs numbers and the Item name column */
+        .item-col {
+            padding-left: 10px !important;
         }
         
         .total-row {
@@ -355,17 +361,18 @@
         <table class="items-table">
             <thead>
                 <tr>
-                    <th style="width: 12%;" class="text-right">Ctn</th>
-                    <th style="width: 12%;" class="text-right">Pcs</th>
-                    <th style="width: 33%;">Item</th>
-                    <th style="width: 16%;" class="text-right">Rate</th>
-                    <th style="width: 12%;" class="text-right disc-col">Disc</th>
-                    <th style="width: 15%;" class="text-right">Amount</th>
+                    <th style="width: 10%;" class="text-right">Ctn</th>
+                    <th style="width: 10%;" class="text-right">Dz</th>
+                    <th style="width: 10%;" class="text-right">Pcs</th>
+                    <th class="item-col">Item</th>
+                    <th style="width: 15%;" class="text-right">Rate</th>
+                    <th style="width: 11%;" class="text-right disc-col">Disc</th>
+                    <th style="width: 14%;" class="text-right">Amount</th>
                 </tr>
             </thead>
             <tbody id="itemsTableBody">
                 <tr>
-                    <td colspan="6" class="text-center">Loading...</td>
+                    <td colspan="7" class="text-center">Loading...</td>
                 </tr>
             </tbody>
         </table>
@@ -464,7 +471,7 @@
             window.close();
         }
 
-        // Format a Ctn/Pcs cell value: show '-' when null/undefined/0
+        // Format a Ctn/Dz/Pcs cell value: show '-' when null/undefined/0
         function formatUnitCell(val) {
             const num = parseFloat(val);
             if (val === null || val === undefined || isNaN(num) || num === 0) {
@@ -604,8 +611,9 @@
                     
                     row.innerHTML = `
                         <td class="text-right">${formatUnitCell(item.carton)}</td>
+                        <td class="text-right">${formatUnitCell(item.dozen)}</td>
                         <td class="text-right">${formatUnitCell(item.piece)}</td>
-                        <td>${item.product_name}${childrenText}</td>
+                        <td class="item-col">${item.product_name}${childrenText}</td>
                         <td class="text-right">${currencySymbol + parseFloat(item.sale_price).toFixed(2)}</td>
                         ${discCell}
                         <td class="text-right">${currencySymbol + parseFloat(item.net_amount).toFixed(2)}</td>
@@ -628,8 +636,9 @@
                     
                     row.innerHTML = `
                         <td class="text-right">${isChild ? '-' : formatUnitCell(item.carton)}</td>
+                        <td class="text-right">${isChild ? '-' : formatUnitCell(item.dozen)}</td>
                         <td class="text-right">${isChild ? '-' : formatUnitCell(item.piece)}</td>
-                        <td style="${textStyle}">${indent}${item.product_name}</td>
+                        <td class="item-col" style="${textStyle}">${indent}${item.product_name}</td>
                         <td class="text-right">${isChild ? '-' : currencySymbol + parseFloat(item.sale_price).toFixed(2)}</td>
                         ${discCell}
                         <td class="text-right">${isChild ? '-' : currencySymbol + parseFloat(item.net_amount).toFixed(2)}</td>
@@ -643,13 +652,15 @@
             totalsRow.style.fontWeight = 'bold';
             
             let totalCarton = 0;
+            let totalDozen = 0;
             let totalPiece = 0;
             let totalAmount = 0;
             
             items.forEach(item => {
                 if (!item.parent_row_id) {
                     totalCarton += parseFloat(item.carton || 0);
-                    totalPiece += parseFloat(item.piece || 0);
+                    totalDozen  += parseFloat(item.dozen || 0);
+                    totalPiece  += parseFloat(item.piece || 0);
                     totalAmount += parseFloat(item.net_amount);
                 }
             });
@@ -658,8 +669,9 @@
             
             totalsRow.innerHTML = `
                 <td class="text-right">${totalCarton > 0 ? totalCarton.toFixed(0) : '-'}</td>
+                <td class="text-right">${totalDozen > 0 ? totalDozen.toFixed(0) : '-'}</td>
                 <td class="text-right">${totalPiece > 0 ? totalPiece.toFixed(0) : '-'}</td>
-                <td>TOTALS</td>
+                <td class="item-col">TOTALS</td>
                 <td class="text-right"></td>
                 ${totalsDiscCell}
                 <td class="text-right">${currencySymbol}${totalAmount.toFixed(2)}</td>

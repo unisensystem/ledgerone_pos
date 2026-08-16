@@ -27,6 +27,7 @@ try {
     $search = $_GET['search'] ?? '';
     $status = $_GET['status'] ?? '';
     $company = $_GET['company'] ?? '';
+    $category = $_GET['category'] ?? '';
     $balance = $_GET['balance'] ?? '';
     // "Show All" mode — bypasses pagination entirely
     $showAll = isset($_GET['show_all']) && ($_GET['show_all'] === '1' || $_GET['show_all'] === 'true');
@@ -34,49 +35,58 @@ try {
     $limit = min(100, max(10, (int) ($_GET['limit'] ?? 10)));
     $offset = ($page - 1) * $limit;
 
-    // Build WHERE clause
-    $where = ['tenant_id = ?'];
+    // Build WHERE clause (aliased for the join with supplier_categories)
+    $where = ['s.tenant_id = ?'];
     $params = [$tenant_id];
 
     // Broadened global search — matches against every relevant text field
     if ($search) {
-        $where[] = '(supplier_name LIKE ? OR supplier_code LIKE ? OR brand_name LIKE ? OR email LIKE ? OR primary_phone LIKE ? OR secondary_phone LIKE ? OR address LIKE ? OR city LIKE ? OR identity_card_no LIKE ?)';
+        $where[] = '(s.supplier_name LIKE ? OR s.supplier_code LIKE ? OR s.brand_name LIKE ? OR s.email LIKE ? OR s.primary_phone LIKE ? OR s.secondary_phone LIKE ? OR s.address LIKE ? OR s.city LIKE ? OR s.identity_card_no LIKE ?)';
         $searchTerm = '%' . $search . '%';
         $params = array_merge($params, array_fill(0, 9, $searchTerm));
     }
 
     if ($status === 'active') {
-        $where[] = 'is_blacklisted = FALSE';
+        $where[] = 's.is_blacklisted = FALSE';
     } elseif ($status === 'blacklisted') {
-        $where[] = 'is_blacklisted = TRUE';
+        $where[] = 's.is_blacklisted = TRUE';
     }
-    
+
     if ($company) {
-        $where[] = 'company_id = ?';
+        $where[] = 's.company_id = ?';
         $params[] = (int)$company;
     }
 
+    if ($category) {
+        $where[] = 's.supplier_category_id = ?';
+        $params[] = (int)$category;
+    }
+
     if ($balance === 'positive') {
-        $where[] = 'current_balance > 0';
+        $where[] = 's.current_balance > 0';
     } elseif ($balance === 'negative') {
-        $where[] = 'current_balance < 0';
+        $where[] = 's.current_balance < 0';
     } elseif ($balance === 'zero') {
-        $where[] = 'current_balance = 0';
+        $where[] = 's.current_balance = 0';
     }
 
     $whereClause = 'WHERE ' . implode(' AND ', $where);
 
     // Get total count
-    $countSql = "SELECT COUNT(*) as total FROM suppliers $whereClause";
+    $countSql = "SELECT COUNT(*) as total FROM suppliers s $whereClause";
     $stmt = $pdo->prepare($countSql);
     $stmt->execute($params);
     $total = $stmt->fetch()['total'];
 
-    // Get suppliers — includes address, city, credit_days, salesman_id for the list table
+    // Get suppliers — includes category_name via LEFT JOIN for the list table
     $limitClause = $showAll ? '' : "LIMIT $limit OFFSET $offset";
-    $sql = "SELECT id, supplier_code, supplier_name, brand_name, address, city, credit_days, salesman_id, primary_phone, email, current_balance, is_blacklisted, created_at 
-            FROM suppliers $whereClause 
-            ORDER BY created_at DESC 
+    $sql = "SELECT s.id, s.supplier_code, s.supplier_name, s.brand_name, s.address, s.city, s.credit_days,
+                   s.salesman_id, s.primary_phone, s.email, s.current_balance, s.is_blacklisted, s.created_at,
+                   s.supplier_category_id, sc.category_name
+            FROM suppliers s
+            LEFT JOIN supplier_categories sc ON sc.id = s.supplier_category_id
+            $whereClause
+            ORDER BY s.created_at DESC
             $limitClause";
 
     $stmt = $pdo->prepare($sql);
@@ -125,4 +135,5 @@ try {
         'message' => $e->getMessage()
     ]);
 }
+
 ?>

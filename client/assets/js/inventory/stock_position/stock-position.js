@@ -285,32 +285,51 @@ function exportToExcel() {
 // Customer-wise Ledger ke liye print preview page kholta hai (CSV direct download ki jagah)
 function openCustomerLedgerPreview() {
     const customerName = document.getElementById('customer-ledger-input').value;
+    const productName = document.getElementById('customer-product-input').value;
 
-    if (!customerName || customerName.trim() === '') {
-        alert('Please select a customer and apply filters first.');
+    if ((!customerName || customerName.trim() === '') && (!productName || productName.trim() === '')) {
+        alert('Please select a Customer or a Product');
         return;
     }
 
-    const options = document.querySelectorAll('#customer-ledger-list option');
     let customerId = null;
-    for (let option of options) {
-        if (option.value === customerName) {
-            customerId = option.getAttribute('data-id');
-            break;
+    if (customerName) {
+        const options = document.querySelectorAll('#customer-ledger-list option');
+        for (let option of options) {
+            if (option.value === customerName) {
+                customerId = option.getAttribute('data-id');
+                break;
+            }
+        }
+        if (!customerId) {
+            alert('Invalid customer selected. Please pick a customer from the list.');
+            return;
         }
     }
 
-    if (!customerId) {
-        alert('Invalid customer selected. Please pick a customer from the list.');
-        return;
+    let productId = null;
+    if (productName) {
+        const productOptions = document.querySelectorAll('#customer-product-list option');
+        for (let option of productOptions) {
+            if (option.value === productName) {
+                productId = option.getAttribute('data-id');
+                break;
+            }
+        }
+        if (!productId) {
+            alert('Invalid product selected. Please pick a product from the list.');
+            return;
+        }
     }
 
     const fromDate = document.getElementById('from-date-customer').value;
     const toDate = document.getElementById('to-date-customer').value;
 
-    let url = `print_customer_ledger.php?customer_id=${customerId}`;
-    if (fromDate) url += `&from_date=${fromDate}`;
-    if (toDate) url += `&to_date=${toDate}`;
+    let url = `print_customer_ledger.php?`;
+    if (customerId) url += `customer_id=${customerId}&`;
+    if (productId) url += `product_id=${productId}&`;
+    if (fromDate) url += `from_date=${fromDate}&`;
+    if (toDate) url += `to_date=${toDate}&`;
 
     window.open(url, '_blank');
 }
@@ -443,6 +462,16 @@ async function loadStockPosition() {
     } catch (error) {
         console.error('Error loading stock position:', error);
     }
+}
+
+function populateProductDropdowns(products) {
+    const productLists = ['#product-list', '#item-list', '#detailed-product-list', '#customer-product-list'];
+    productLists.forEach(selector => {
+        const datalist = document.querySelector(selector);
+        if (datalist) {
+            datalist.innerHTML = products.map(product => `<option value="${product.name}" data-id="${product.id}">`).join('');
+        }
+    });
 }
 
 function updatePositionTable(currency = '$') {
@@ -821,28 +850,29 @@ function renderCustomerLedgerTable(currency = '$') {
     const totalQtyOut = processedLedger.reduce((sum, e) => sum + parseFloat(e.qty_out || 0), 0);
     const totalValue = processedLedger.reduce((sum, e) => sum + parseFloat(e.value || 0), 0);
 
-    tbody.innerHTML = pageData.map(entry => `
-        <tr>
-            <td>${entry.transaction_date}</td>
-            <td>${entry.product_name}</td>
-            <td>${entry.branch_name}</td>
-            <td><span class="transaction-badge transaction-${entry.transaction_type.toLowerCase().replace(' ', '-')}">${entry.transaction_type}</span></td>
-            <td>${entry.qty_in > 0 ? parseFloat(entry.qty_in).toFixed(2) + ' ' + (entry.unit_symbol || 'L') : '-'}</td>
-            <td>${entry.qty_out > 0 ? parseFloat(entry.qty_out).toFixed(2) + ' ' + (entry.unit_symbol || 'L') : '-'}</td>
-            <td>${parseFloat(entry.balance).toFixed(2)} ${entry.unit_symbol || 'L'}</td>
-            <td>${currency}${parseFloat(entry.unit_cost).toFixed(2)}</td>
-            <td>${currency}${parseFloat(entry.value).toFixed(2)}</td>
-        </tr>
-    `).join('') + `
-        <tr style="font-weight: bold; background-color: var(--table-header);">
-            <td colspan="4">Total (${allCustomerEntries.length} transactions)</td>
-            <td>${totalQtyIn.toFixed(2)} ${allCustomerEntries[0]?.unit_symbol || 'L'}</td>
-            <td>${totalQtyOut.toFixed(2)} ${allCustomerEntries[0]?.unit_symbol || 'L'}</td>
-            <td>-</td>
-            <td>-</td>
-            <td>${currency}${totalValue.toFixed(2)}</td>
-        </tr>
-    `;
+  tbody.innerHTML = pageData.map(entry => `
+    <tr>
+        <td>${entry.transaction_date}</td>
+        <td>${entry.invoice_number || '-'}</td>
+        <td>${entry.product_name}</td>
+        <td>${entry.branch_name}</td>
+        <td><span class="transaction-badge transaction-${entry.transaction_type.toLowerCase().replace(' ', '-')}">${entry.transaction_type}</span></td>
+        <td>${entry.qty_in > 0 ? parseFloat(entry.qty_in).toFixed(2) + ' ' + (entry.unit_symbol || 'L') : '-'}</td>
+        <td>${entry.qty_out > 0 ? parseFloat(entry.qty_out).toFixed(2) + ' ' + (entry.unit_symbol || 'L') : '-'}</td>
+        <td>${parseFloat(entry.balance).toFixed(2)} ${entry.unit_symbol || 'L'}</td>
+        <td>${currency}${parseFloat(entry.unit_cost).toFixed(2)}</td>
+        <td>${currency}${parseFloat(entry.value).toFixed(2)}</td>
+    </tr>
+`).join('') + `
+    <tr style="font-weight: bold; background-color: var(--table-header);">
+        <td colspan="5">Total (${allCustomerEntries.length} transactions)</td>
+        <td>${totalQtyIn.toFixed(2)} ${allCustomerEntries[0]?.unit_symbol || 'L'}</td>
+        <td>${totalQtyOut.toFixed(2)} ${allCustomerEntries[0]?.unit_symbol || 'L'}</td>
+        <td>-</td>
+        <td>-</td>
+        <td>${currency}${totalValue.toFixed(2)}</td>
+    </tr>
+`;
 }
 
 function updateCustomerPaginationControls() {
@@ -935,15 +965,6 @@ async function loadProducts() {
     }
 }
 
-function populateProductDropdowns(products) {
-    const productLists = ['#product-list', '#item-list', '#detailed-product-list'];
-    productLists.forEach(selector => {
-        const datalist = document.querySelector(selector);
-        if (datalist) {
-            datalist.innerHTML = products.map(product => `<option value="${product.name}" data-id="${product.id}">`).join('');
-        }
-    });
-}
 
 // Load Inventory Types
 async function loadInventoryTypes() {
@@ -1022,57 +1043,80 @@ document.addEventListener('DOMContentLoaded', () => {
         loadDashboardStats();
     });
 // Clear Customer Filters
-    document.getElementById('clearCustomerFilters').addEventListener('click', () => {
-        document.getElementById('customer-ledger-input').value = '';
-        document.getElementById('from-date-customer').value = '';
-        document.getElementById('to-date-customer').value = '';
-        const tbody = document.querySelector('#customer-ledger .table tbody');
-        tbody.innerHTML = '';
-        document.getElementById('customer-pagination-info').textContent = 'Showing 0 - 0 of 0 entries';
-        document.getElementById('customer-page-info').textContent = 'Page 1 of 1';
-    });
+  document.getElementById('clearCustomerFilters').addEventListener('click', () => {
+    document.getElementById('customer-ledger-input').value = '';
+    document.getElementById('customer-product-input').value = '';
+    document.getElementById('from-date-customer').value = '';
+    document.getElementById('to-date-customer').value = '';
+    const tbody = document.querySelector('#customer-ledger .table tbody');
+    tbody.innerHTML = '';
+    document.getElementById('customer-pagination-info').textContent = 'Showing 0 - 0 of 0 entries';
+    document.getElementById('customer-page-info').textContent = 'Page 1 of 1';
+});
 
     // Apply Customer Filters
-    document.getElementById('applyCustomerFilters').addEventListener('click', async () => {
-        const customerName = document.getElementById('customer-ledger-input').value;
-        const fromDate = document.getElementById('from-date-customer').value;
-        const toDate = document.getElementById('to-date-customer').value;
+ document.getElementById('applyCustomerFilters').addEventListener('click', async () => {
+    const customerName = document.getElementById('customer-ledger-input').value;
+    const productName = document.getElementById('customer-product-input').value;
+    const fromDate = document.getElementById('from-date-customer').value;
+    const toDate = document.getElementById('to-date-customer').value;
 
-        if (!customerName || customerName.trim() === '') {
-            alert('Please select a customer');
-            return;
-        }
+    if ((!customerName || customerName.trim() === '') && (!productName || productName.trim() === '')) {
+        alert('Please select a Customer or a Product');
+        return;
+    }
 
+    // Resolve customer id (optional)
+    let customerId = null;
+    if (customerName) {
         const options = document.querySelectorAll('#customer-ledger-list option');
-        let customerId = null;
         for (let option of options) {
             if (option.value === customerName) {
                 customerId = option.getAttribute('data-id');
                 break;
             }
         }
-
         if (!customerId) {
-            alert('Invalid customer selected');
+            alert('Invalid customer selected. Please pick from the list.');
             return;
         }
+    }
 
-        try {
-            let url = `${API_BASE}?action=customer-ledger&customer_id=${customerId}`;
-            if (fromDate) url += `&from_date=${fromDate}`;
-            if (toDate) url += `&to_date=${toDate}`;
-
-            const response = await fetch(url);
-            const data = await response.json();
-
-            if (data.success) {
-                updateCustomerLedgerTable(data.data, data.currency);
+    // Resolve product id (optional)
+    let productId = null;
+    if (productName) {
+        const productOptions = document.querySelectorAll('#customer-product-list option');
+        for (let option of productOptions) {
+            if (option.value === productName) {
+                productId = option.getAttribute('data-id');
+                break;
             }
-        } catch (error) {
-            console.error('Error loading customer ledger:', error);
         }
-    });
+        if (!productId) {
+            alert('Invalid product selected. Please pick from the list.');
+            return;
+        }
+    }
 
+    try {
+        let url = `${API_BASE}?action=customer-ledger`;
+        if (customerId) url += `&customer_id=${customerId}`;
+        if (productId) url += `&product_id=${productId}`;
+        if (fromDate) url += `&from_date=${fromDate}`;
+        if (toDate) url += `&to_date=${toDate}`;
+
+        const response = await fetch(url);
+        const data = await response.json();
+
+        if (data.success) {
+            updateCustomerLedgerTable(data.data, data.currency);
+        } else {
+            alert(data.message || 'Failed to load ledger');
+        }
+    } catch (error) {
+        console.error('Error loading customer ledger:', error);
+    }
+});
     // Customer-wise Ledger pagination event listeners
     document.getElementById('customer-prev-btn').addEventListener('click', () => {
         if (customerCurrentPage > 1) {

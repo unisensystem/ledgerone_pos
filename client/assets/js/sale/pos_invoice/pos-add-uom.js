@@ -115,8 +115,8 @@ function updateTableHeaders() {
     const headerRow = thead.rows[0];
     
     let safetyCounter = 0;
-    while (headerRow.cells.length > 3 && safetyCounter < 20) {
-        const cell = headerRow.cells[3];
+    while (headerRow.cells.length > 5 && safetyCounter < 20) {
+        const cell = headerRow.cells[5];
         const cellText = cell.textContent.trim();
         // Stop if we reach Price or any of the fixed columns
         if (cellText.includes('Sale Price') || cellText.includes('Gross Amount') || 
@@ -125,13 +125,14 @@ function updateTableHeaders() {
             cellText.includes('Net Amount') || cellText.includes('Actions')) {
             break;
         }
-        headerRow.deleteCell(3);
+        headerRow.deleteCell(5);
         safetyCounter++;
     }
     
-    // Insert generic unit headers (Unit 1, Unit 2, Unit 3, etc.) starting at index 3
+    // Insert generic unit headers (Unit 1, Unit 2, Unit 3, etc.) starting at index 5
+    // (index 0=S#, 1=Product, 2=Scheme, 3=Batch No, 4=Expiry Date)
     for (let i = 0; i < maxUnitColumns; i++) {
-        const th = headerRow.insertCell(3 + i);
+        const th = headerRow.insertCell(5 + i);
         th.width = '8%';
         th.style.fontWeight = '600';
         th.style.fontSize = '12px';
@@ -155,15 +156,16 @@ function updateRowUnitCells(row) {
         }
     });
     
-    // Remove old unit cells (between Scheme and Price)
-    // Keep removing cells at index 3 until we find a cell with price-cell or scheme-cell class
-    while (row.cells.length > 3 && !row.cells[3].classList.contains('price-cell')) {
-        row.deleteCell(3);
+    // Remove old unit cells (between Expiry Date and Price)
+    // Keep removing cells at index 5 until we find a cell with price-cell class
+    // (index 0=S#, 1=Product, 2=Scheme, 3=Batch No, 4=Expiry Date)
+    while (row.cells.length > 5 && !row.cells[5].classList.contains('price-cell')) {
+        row.deleteCell(5);
     }
     
-    // Insert unit cells starting at index 3 (after Scheme cell at index 2)
+    // Insert unit cells starting at index 5 (after Batch No / Expiry Date cells)
     for (let i = 0; i < maxUnitColumns; i++) {
-        const cell = row.insertCell(3 + i);
+        const cell = row.insertCell(5 + i);
         
         // Check if this product has a unit at this position
         if (i < productUomDetails.length) {
@@ -379,24 +381,25 @@ function updateFooterTotals() {
     const footerRow = tfoot.rows[0];
     
     // Remove old unit total cells that were dynamically inserted
-    // Keep removing cells at index 3 until we reach the known fixed column IDs
+    // Keep removing cells at index 5 until we reach the known fixed column IDs
+    // (index 0=Totals label, 1=Product, 2=Scheme, 3=Batch No, 4=Expiry Date)
     let safetyCounter = 0;
     const knownIds = ['totalSalePrice', 'totalGrossAmount', 'totalDiscountAmountItems', 
                       'totalTradeOfferAmount', 'totalGstAmount', 'totalFocQty', 'totalNetAmountItems'];
     
-    while (footerRow.cells.length > 3 && safetyCounter < 20) {
-        const cell = footerRow.cells[3];
+    while (footerRow.cells.length > 5 && safetyCounter < 20) {
+        const cell = footerRow.cells[5];
         // Stop if we reach a cell with a known fixed id
         if (cell && cell.id && knownIds.includes(cell.id)) {
             break;
         }
-        footerRow.deleteCell(3);
+        footerRow.deleteCell(5);
         safetyCounter++;
     }
     
-    // Insert empty cells for dynamic unit columns at index 3
+    // Insert empty cells for dynamic unit columns at index 5
     for (let i = 0; i < maxUnitColumns; i++) {
-        const cell = footerRow.insertCell(3 + i);
+        const cell = footerRow.insertCell(5 + i);
         cell.textContent = '';
         cell.style.textAlign = 'center';
         cell.style.padding = '8px 4px';
@@ -513,6 +516,50 @@ function updateInvoiceSummaryDynamic() {
     // Calculate invoice-level taxes
     if (typeof calculateInvoiceLevelTaxes === 'function') {
         calculateInvoiceLevelTaxes();
+    }
+}
+
+// Auto-fill the Batch No / Expiry Date columns for a product row.
+// No dropdown, no manual selection — the system reads the available
+// batches for this product (remaining qty > 0), sorted oldest-first
+// (FIFO), and fills in the first one automatically. Once that batch
+// (e.g. P1) is fully consumed it stops being returned by the API, so
+// the very next invoice for this product will auto-fill the next one
+// (e.g. P2) with zero manual work.
+async function loadProductBatches(row, productId) {
+    const batchNoInput = row.querySelector('.batch-no-input');
+    const batchExpiryInput = row.querySelector('.batch-expiry-input');
+    if (!batchNoInput || !batchExpiryInput || !productId) return;
+
+    const branchId = document.getElementById('branch')?.value || '';
+
+    batchNoInput.value = '...';
+    batchExpiryInput.value = '...';
+    row.dataset.batchQtyAvailable = '';
+
+    try {
+        let url = `../../../../server/api/sale/pos_invoice/get-product-batches.php?product_id=${productId}`;
+        if (branchId) url += `&branch_id=${branchId}`;
+
+        const response = await fetch(url);
+        const data = await response.json();
+
+        if (data.success && data.batches && data.batches.length > 0) {
+            // First batch = oldest available (FIFO) - auto-filled, read-only
+            const batch = data.batches[0];
+            batchNoInput.value = batch.batch_no;
+            batchExpiryInput.value = batch.batch_expiry_date || '';
+            row.dataset.batchQtyAvailable = batch.remaining_qty;
+            batchNoInput.title = `Available: ${batch.remaining_qty}`;
+        } else {
+            batchNoInput.value = '';
+            batchExpiryInput.value = '';
+            batchNoInput.title = 'No batch available for this product';
+        }
+    } catch (error) {
+        console.error('Error loading product batches:', error);
+        batchNoInput.value = '';
+        batchExpiryInput.value = '';
     }
 }
 

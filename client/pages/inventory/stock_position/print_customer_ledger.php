@@ -24,21 +24,32 @@ $user = $user_stmt->fetch(PDO::FETCH_ASSOC);
 
 // Get filters from URL
 $customer_id = $_GET['customer_id'] ?? null;
+$product_id = $_GET['product_id'] ?? null;
 $from_date = $_GET['from_date'] ?? null;
 $to_date = $_GET['to_date'] ?? null;
 
-if (!$customer_id) {
-    die('Customer is required to generate this report.');
+if (!$customer_id && !$product_id) {
+    die('A customer or a product is required to generate this report.');
 }
 
 // Look up customer name from DB (never trust a name passed via query string)
-$customer_name = 'Unknown Customer';
-$customer_sql = "SELECT customer_name FROM customers WHERE id = ? AND tenant_id = ?";
-$customer_stmt = $pdo->prepare($customer_sql);
-$customer_stmt->execute([$customer_id, $tenant_id]);
-$customer_result = $customer_stmt->fetch(PDO::FETCH_ASSOC);
-if ($customer_result) {
-    $customer_name = $customer_result['customer_name'];
+$customer_name = null;
+if ($customer_id) {
+    $customer_sql = "SELECT customer_name FROM customers WHERE id = ? AND tenant_id = ?";
+    $customer_stmt = $pdo->prepare($customer_sql);
+    $customer_stmt->execute([$customer_id, $tenant_id]);
+    $customer_result = $customer_stmt->fetch(PDO::FETCH_ASSOC);
+    $customer_name = $customer_result['customer_name'] ?? 'Unknown Customer';
+}
+
+// Look up product name from DB (never trust a name passed via query string)
+$product_name = null;
+if ($product_id) {
+    $product_sql = "SELECT name FROM products WHERE id = ? AND tenant_id = ?";
+    $product_stmt = $pdo->prepare($product_sql);
+    $product_stmt->execute([$product_id, $tenant_id]);
+    $product_result = $product_stmt->fetch(PDO::FETCH_ASSOC);
+    $product_name = $product_result['name'] ?? 'Unknown Product';
 }
 ?>
 <!DOCTYPE html>
@@ -197,7 +208,12 @@ if ($customer_result) {
 
     <div class="filters">
         <strong>Filters Applied:</strong>
-        Customer: <?= htmlspecialchars($customer_name) ?> |
+        <?php if ($customer_name): ?>
+            Customer: <?= htmlspecialchars($customer_name) ?> |
+        <?php endif; ?>
+        <?php if ($product_name): ?>
+            Product: <?= htmlspecialchars($product_name) ?> |
+        <?php endif; ?>
         Period: <?= ($from_date && $to_date) ? date('M d, Y', strtotime($from_date)) . ' to ' . date('M d, Y', strtotime($to_date)) : 'All Dates' ?>
     </div>
 
@@ -245,14 +261,17 @@ if ($customer_result) {
             try {
                 const urlParams = new URLSearchParams(window.location.search);
                 const customerId = urlParams.get('customer_id');
+                const productId = urlParams.get('product_id');
 
-                if (!customerId) {
+                if (!customerId && !productId) {
                     document.querySelector('#reportTable tbody').innerHTML =
-                        '<tr><td colspan="9" class="no-data">No customer specified.</td></tr>';
+                        '<tr><td colspan="9" class="no-data">No customer or product specified.</td></tr>';
                     return;
                 }
 
-                let url = `${API_BASE}?action=customer-ledger&customer_id=${customerId}`;
+                let url = `${API_BASE}?action=customer-ledger`;
+                if (customerId) url += `&customer_id=${customerId}`;
+                if (productId) url += `&product_id=${productId}`;
                 if (urlParams.get('from_date')) url += `&from_date=${urlParams.get('from_date')}`;
                 if (urlParams.get('to_date')) url += `&to_date=${urlParams.get('to_date')}`;
 
@@ -293,7 +312,7 @@ if ($customer_result) {
             const tbody = document.querySelector('#reportTable tbody');
 
             if (!entries || entries.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="9" class="no-data">No transactions found for this customer.</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="9" class="no-data">No transactions found for the selected filters.</td></tr>';
                 return;
             }
 

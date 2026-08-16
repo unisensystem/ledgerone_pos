@@ -9,7 +9,10 @@ const PAGE_SIZE = 10;
 
 const state = {
     page: 1,
-    allRows: [],       // full filtered dataset returned by the API
+    rawRows: [],       // raw API response rows
+    allRows: [],       // displayed rows (raw or auto-cleared)
+    autoClearMode: false,
+    currencySymbol: '',
     filters: {
         company_id: '',
         customer_id: '',
@@ -27,6 +30,7 @@ document.addEventListener('DOMContentLoaded', () => {
     setupCascadingFilters();
     setupCustomerCombo();
     setupButtons();
+    setupAutoClearToggle();
     loadReportData();
 
     // Bucket cards: click to filter by that bucket
@@ -40,6 +44,22 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 });
+
+function setupAutoClearToggle() {
+    const toggle = document.getElementById('autoClearToggle');
+    const label  = document.getElementById('autoClearLabel');
+    if (!toggle) return;
+    toggle.addEventListener('change', function () {
+        state.autoClearMode = this.checked;
+        if (label) {
+            label.style.opacity = state.autoClearMode ? '1' : '0.5';
+            label.style.color   = state.autoClearMode ? 'var(--primary)' : '';
+            label.style.fontWeight = state.autoClearMode ? '600' : '';
+        }
+        applyAndRender();
+    });
+    if (label) label.style.opacity = '0.5';
+}
 
 // ---------- Lookup loaders ----------
 
@@ -265,12 +285,77 @@ async function loadReportData() {
             console.error(json.message);
             return;
         }
-        state.allRows = json.data;
-        renderSummary(json.summary);
-        renderPage();
+        state.rawRows = json.data;
+        state.currencySymbol = json.currency_symbol || '';
+        applyAndRender(json.summary);
     } catch (err) {
         console.error('Failed to load aging report:', err);
     }
+}
+
+function applyAndRender(rawSummary) {
+    if (state.autoClearMode) {
+        state.allRows = simulateAutoClear(state.rawRows);
+        renderSummary(buildSummaryFromRows(state.allRows));
+    } else {
+        state.allRows = state.rawRows;
+        if (rawSummary) renderSummary(rawSummary);
+        else renderSummary(buildSummaryFromRows(state.allRows));
+    }
+    state.page = 1;
+    renderPage();
+}
+
+function simulateAutoClear(rows) {
+    const customerMap = {};
+    rows.forEach(row => {
+        const key = row.customerName;
+        if (!customerMap[key]) {
+            customerMap[key] = { unallocated: row.unallocatedReceived || 0, bills: [] };
+        }
+        customerMap[key].bills.push(Object.assign({}, row));
+    });
+
+    const result = [];
+    Object.values(customerMap).forEach(customer => {
+        customer.bills.sort((a, b) => new Date(a.invoiceDate) - new Date(b.invoiceDate));
+        let remaining = customer.unallocated;
+        customer.bills.forEach(bill => {
+            const balance = bill.outstandingRaw;
+            const cleared = Math.min(remaining, balance);
+            remaining -= cleared;
+            const simBalance = balance - cleared;
+            bill.simBalance  = simBalance;
+            bill.simCleared  = cleared;
+            bill.simStatus   = simBalance <= 0 ? 'cleared' : (cleared > 0 ? 'partial' : 'pending');
+            if (simBalance > 0) {
+                result.push(bill);
+            }
+        });
+    });
+
+    result.sort((a, b) => b.daysOverdue - a.daysOverdue);
+    return result;
+}
+
+function buildSummaryFromRows(rows) {
+    let total = 0, b15 = 0, b25 = 0, b45 = 0, c15 = 0, c25 = 0, c45 = 0;
+    rows.forEach(row => {
+        const amount = state.autoClearMode ? (row.simBalance ?? row.outstandingRaw) : row.outstandingRaw;
+        const days   = row.daysOverdue;
+        total += amount;
+        if (days >= 45)      { b45 += amount; c45++; }
+        else if (days >= 25) { b25 += amount; c25++; }
+        else if (days >= 15) { b15 += amount; c15++; }
+    });
+    const sym = state.currencySymbol;
+    const fmt = v => sym + v.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+    return {
+        total_overdue: fmt(total),
+        bucket_15: fmt(b15), count_15: c15,
+        bucket_25: fmt(b25), count_25: c25,
+        bucket_45: fmt(b45), count_45: c45,
+    };
 }
 
 function renderSummary(summary) {
@@ -295,9 +380,19 @@ function renderPage() {
     tbody.innerHTML = '';
 
     if (total === 0) {
-        tbody.innerHTML = '<tr><td colspan="10" style="text-align: center; padding: 20px;">No overdue invoices found</td></tr>';
+        const msg = state.autoClearMode
+            ? 'No outstanding invoices after auto-clear simulation'
+            : 'No overdue invoices found';
+        tbody.innerHTML = `<tr><td colspan="10" style="text-align: center; padding: 20px;">${msg}</td></tr>`;
     } else {
         pageRows.forEach((row, i) => {
+            const sym    = state.currencySymbol;
+            const amount = state.autoClearMode
+                ? sym + (row.simBalance ?? row.outstandingRaw).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',')
+                : row.amount;
+            const statusBadge = state.autoClearMode && row.simStatus
+                ? `<span class="status-${row.simStatus}">${row.simStatus === 'partial' ? 'Partial' : 'Pending'}</span>`
+                : '';
             const tr = document.createElement('tr');
             tr.innerHTML = `
                 <td>${start + i + 1}</td>
@@ -307,7 +402,7 @@ function renderPage() {
                 <td>${escapeHtml(row.invoiceNo)}</td>
                 <td>${escapeHtml(row.invoiceDate)}</td>
                 <td>${escapeHtml(row.type)}</td>
-                <td>${escapeHtml(row.amount)}</td>
+                <td>${escapeHtml(amount)} ${statusBadge}</td>
                 <td>${row.daysOverdue}</td>
                 <td>${escapeHtml(row.bucket)}</td>
             `;
@@ -361,7 +456,12 @@ function renderPaginationControls(totalPages) {
 // ---------- Exports ----------
 
 function printReport() {
-    window.print();
+    const params = new URLSearchParams();
+    Object.entries(state.filters).forEach(([key, val]) => {
+        if (val) params.append(key, val);
+    });
+    if (state.autoClearMode) params.append('auto_clear', '1');
+    window.open(`print.php?${params.toString()}`, '_blank');
 }
 
 function exportToJSON() {
