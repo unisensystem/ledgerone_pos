@@ -1,0 +1,225 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Inter', -apple-system, system-ui, sans-serif;
+    background: #F7F9FC;
+    color: #2F3B4C;
+}
+
+.po-container {
+    max-width: 1140px;
+    width: 100%;
+    margin: 0 auto;
+}
+
+.card {
+    background: #FFFFFF;
+    padding: 24px;
+    border-radius: 12px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.06);
+    width: 100%;
+}
+
+.card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 24px;
+}
+
+.card-header h2 {
+    font-size: 18px;
+    font-weight: 600;
+    color: #0E1A2B;
+}
+
+.form-section {
+    margin-bottom: 32px;
+}
+
+.form-label {
+    font-size: 13px;
+    font-weight: 500;
+    color: #2F3B4C;
+    margin-bottom: 6px;
+    display: inline-block;
+}
+
+.form-control, select {
+    height: 40px;
+    padding: 0 14px;
+    border: 1.5px solid #D6DBE4;
+    background: #FFFFFF;
+    border-radius: 8px;
+    font-family: 'Inter', sans-serif;
+    font-size: 0.95rem;
+    color: #2F3B4C;
+    width: 100%;
+    outline: none;
+    transition: border 0.15s, box-shadow 0.15s;
+}
+
+.form-control:focus, select:focus {
+    border: 2px solid #1F7BFF;
+    box-shadow: 0 0 0 2px rgba(31, 123, 255, 0.15);
+    outline: none;
+}
+
+.form-control:disabled {
+    background: #F2F4F8;
+    color: #9AA1AE;
+}
+
+.helper-text {
+    font-size: 12px;
+    color: #6B7280;
+    margin-top: 4px;
+}
+
+.field-group {
+    display: flex;
+    flex-direction: column;
+}
+
+.header-fields {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 24px;
+    margin-bottom: 8px;
+}
+
+.raw-title {
+    font-size: 18px;
+    font-weight: 600;
+    color: #0E1A2B;
+    margin: 24px 0 20px 0;
+}
+
+.btn {
+    height: 40px;
+    padding: 0 20px;
+    border-radius: 8px;
+    font-weight: 500;
+    font-size: 14px;
+    font-family: 'Inter', sans-serif;
+    cursor: pointer;
+    border: none;
+    background: transparent;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    transition: background 0.1s, border 0.1s;
+    line-height: 1;
+    white-space: nowrap;
+}
+
+.btn-primary {
+    background: #1F7BFF;
+    color: #FFFFFF;
+}
+
+.btn-primary:hover {
+    background: #1A6CDC;
+}
+
+.btn-secondary {
+    background: #EFF2F7;
+    border: 1px solid #C9CFDA;
+    color: #1F1F1F;
+}
+
+.btn-secondary:hover {
+    background: #E4E8EF;
+}
+
+.form-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 16px;
+    margin-top: 32px;
+    padding-top: 16px;
+    border-top: 1.5px solid #E1E6EE;
+}
+
+select {
+    appearance: none;
+    background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="%232F3B4C" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>');
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+    background-size: 14px;
+}
+
+.table-responsive {
+    overflow-x: auto;
+    margin: 16px 0 24px;
+    border-radius: 12px;
+    border: 1px solid #E1E6EE;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.95rem;
+}
+
+th {
+    background: #F7F9FC;
+    color: #0E1A2B;
+    font-weight: 600;
+    font-size: 13px;
+    text-transform: uppercase;
+    padding: 0 16px;
+    height: 44px;
+    text-align: left;
+    border-bottom: 1px solid #E1E6EE;
+}
+
+td {
+    padding: 0 16px;
+    height: 44px;
+    border-bottom: 1px solid #E1E6EE;
+    color: #2F3B4C;
+}
+
+tbody tr:hover {
+    background: #F0F6FF;
+}
+
+tbody tr:nth-child(even) {
+    background: #FAFBFD;
+}
+
+.badge {
+    display: inline-block;
+    padding: 4px 10px;
+    border-radius: 30px;
+    font-size: 12px;
+    font-weight: 500;
+}
+
+.badge.available {
+    background: #E3F5EB;
+    color: #0B5A2E;
+}
+
+.badge.short {
+    background: #FEF1F1;
+    color: #B12B2B;
+}
+
+@media (max-width: 900px) {
+    .header-fields {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (max-width: 640px) {
+    .header-fields {
+        grid-template-columns: 1fr;
+    }
+}

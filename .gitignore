@@ -1,0 +1,12 @@
+# Sensitive / environment-specific files
+includes/connection.php
+includes/dashboard.php
+client/assets/js/dashboard/dashboard-core.js
+server/api/auth/login.php
+server/api/auth/register.php
+server/api/auth/checkout.php
+client/assets/js/dashboard/dashboard-loader.js
+.env
+
+# Local browser-automation test artifacts
+.playwright-mcp/

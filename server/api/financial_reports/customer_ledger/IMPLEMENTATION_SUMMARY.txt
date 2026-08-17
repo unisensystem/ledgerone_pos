@@ -1,0 +1,64 @@
+CUSTOMER LEDGER CURRENCY CONVERSION - IMPLEMENTATION SUMMARY
+============================================================
+
+## Changes Made:
+
+### 1. Backend API (customer-ledger.php)
+- Added currency converter integration
+- Added currency_id parameter support
+- Added currencies endpoint to load tenant currencies
+- Updated all transaction queries to include currency_id field:
+  * sale_invoice - has currency_id
+  * receive_voucher - has currency_id  
+  * payment_voucher - has currency_id
+  * sale_return - has currency_id
+  * post_dated_cheques - JOIN with receive_voucher to get currency_id
+  * accounting_ledger - JOIN with rent_management to get currency_id
+  * rent_management - has currency_id
+
+- Added currency conversion logic for:
+  * Opening balance calculations (all transaction types)
+  * Summary ledger totals
+  * Detailed ledger transactions
+  * Sub-account transactions
+
+### 2. Frontend PHP (customer-ledger.php)
+- Added currency filter dropdown in filters section
+
+### 3. Frontend JavaScript (customer-ledger.js)
+- Added currentCurrencySymbol variable
+- Added loadCurrencies() function
+- Added currency change event handler
+- Updated all currency symbol references to use currentCurrencySymbol
+- Added currency_id to API requests
+- Added currency_id to print parameters
+
+### 4. Currency Converter (currency-converter.php)
+- Created CurrencyConverter class
+- Uses ExchangeRate API (https://v6.exchangerate-api.com)
+- Handles null currency IDs gracefully
+- Caches exchange rates for performance
+
+## How It Works:
+
+1. User selects currency from dropdown
+2. All amounts are converted using live exchange rates
+3. Currency symbol updates throughout the interface
+4. Calculations remain accurate in target currency
+5. Print function preserves selected currency
+
+## Database Schema:
+
+Tables with currency_id:
+- sale_invoice.currency_id
+- receive_voucher.currency_id
+- payment_voucher.currency_id
+- sale_return.currency_id
+- rent_management.currency_id
+
+Tables without currency_id (use JOIN):
+- post_dated_cheques → JOIN receive_voucher
+- accounting_ledger → JOIN rent_management
+
+## NO DATABASE MIGRATION REQUIRED
+All currency information is obtained via existing columns or JOINs.

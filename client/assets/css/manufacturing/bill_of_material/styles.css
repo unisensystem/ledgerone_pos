@@ -1,0 +1,352 @@
+   /* LIGHT THEME — strict adherence to DS light tokens */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, system-ui, sans-serif;
+            background: #F7F9FC; /* Surface-1 */
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            min-height: 100vh;
+            padding: 2rem 1rem;
+            color: #2F3B4C; /* Body text */
+        }
+
+        .bom-container {
+            max-width: 1140px;
+            width: 100%;
+            margin: 0 auto;
+        }
+
+        /* Card styles (exactly from DS) */
+        .card {
+            background: #FFFFFF;
+            padding: 24px; /* 20–24px, using 24 */
+            border-radius: 12px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.06);
+            border: none;
+            width: 100%;
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+        }
+        .card-header h2 {
+            font-size: 18px; /* section title 18px/600 */
+            font-weight: 600;
+            color: #0E1A2B; /* heading */
+            letter-spacing: -0.01em;
+        }
+
+        /* Form layout – 12‑column grid with 24px gutters */
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(12, 1fr);
+            gap: 24px; /* gutters 24px */
+        }
+
+        .form-section {
+            margin-bottom: 32px; /* section spacing 32px */
+        }
+
+        .form-label {
+            font-size: 13px;
+            font-weight: 500;
+            color: #2F3B4C;
+            margin-bottom: 6px;
+            display: inline-block;
+        }
+
+        /* base input / dropdown styling */
+        .form-control, select, input[type="text"], input[type="number"], input[type="search"] {
+            height: 40px;
+            padding: 0 14px;
+            border: 1.5px solid #D6DBE4;
+            background: #FFFFFF;
+            border-radius: 8px;
+            font-family: 'Inter', sans-serif;
+            font-size: 0.95rem;
+            color: #2F3B4C;
+            width: 100%;
+            outline: none;
+            transition: border 0.15s, box-shadow 0.15s;
+        }
+
+        /* focus state: border 2px + 2px glow (simulated with box-shadow) */
+        .form-control:focus, select:focus, input:focus {
+            border: 2px solid #1F7BFF;
+            box-shadow: 0 0 0 2px rgba(31, 123, 255, 0.15); /* 2px glow effect */
+            outline: none;
+        }
+
+        /* checkbox styling (aligned with Active toggle) */
+        .checkbox-wrapper {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            height: 40px; /* align with other fields */
+        }
+        .checkbox-wrapper input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            accent-color: #1F7BFF;
+            border-radius: 4px;
+            margin: 0;
+        }
+        .checkbox-wrapper label {
+            font-size: 13px;
+            font-weight: 500;
+            color: #2F3B4C;
+        }
+
+        /* helper/error text (not used heavily but style ready) */
+        .helper-text {
+            font-size: 12px;
+            color: #6B7280; /* subtext */
+            margin-top: 4px;
+        }
+        .error-text {
+            color: #E34F4F;
+        }
+
+        /* row of fields: within grid, we control per row */
+        .field-group {
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* raw material row — special flex layout inside card (tablet/mobile adapt) */
+        .material-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 16px;
+            margin-bottom: 16px;
+            align-items: flex-end;
+            background: #FFFFFF;
+            border-radius: 8px;
+        }
+        .material-row .field-group {
+            flex: 1 1 180px;
+            min-width: 140px;
+        }
+        .material-row .action-group {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            padding-bottom: 2px; /* visual alignment */
+        }
+
+        /* Buttons — exactly as light DS */
+        .btn {
+            height: 40px;
+            padding: 0 20px;
+            border-radius: 8px;
+            font-weight: 500;
+            font-size: 14px;
+            font-family: 'Inter', sans-serif;
+            cursor: pointer;
+            border: none;
+            background: transparent;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.1s, border 0.1s;
+            line-height: 1;
+            white-space: nowrap;
+        }
+        .btn-primary {
+            background: #1F7BFF;
+            color: #FFFFFF;
+        }
+        .btn-primary:hover {
+            background: #1A6CDC;
+        }
+        .btn-primary:active {
+            background: #1559B8;
+        }
+
+        .btn-secondary {
+            background: #EFF2F7;
+            border: 1px solid #C9CFDA;
+            color: #1F1F1F;
+        }
+        .btn-secondary:hover {
+            background: #E4E8EF;
+        }
+        .btn-secondary:active {
+            background: #D9DEE7;
+        }
+
+        .btn-ghost {
+            background: transparent;
+            color: #1F7BFF;
+            border: none;
+            padding: 0 12px;
+        }
+        .btn-ghost:hover {
+            background: #F0F6FF;
+        }
+
+        /* Icon only buttons (for + / - ) */
+        .btn-icon {
+            width: 40px;
+            padding: 0;
+            font-size: 1.4rem;
+            background: #FFFFFF;
+            border: 1.5px solid #D6DBE4;
+            color: #2F3B4C;
+            border-radius: 8px;
+            line-height: 1;
+        }
+        .btn-icon:hover {
+            background: #F0F6FF;
+            border-color: #1F7BFF;
+            color: #1F7BFF;
+        }
+        .btn-icon.danger:hover {
+            border-color: #E34F4F;
+            color: #E34F4F;
+            background: #FFF5F5;
+        }
+
+        /* sticky action footer simulation */
+        .form-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 16px;
+            margin-top: 32px;
+            padding-top: 16px;
+            border-top: 1.5px solid #E1E6EE;
+        }
+
+        /* spacing for BOM header — 3 fields max per row */
+        .header-fields {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 24px;
+            margin-bottom: 8px;
+        }
+
+        /* raw materials section title with left alignment (section title) */
+        .raw-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: #0E1A2B;
+            margin: 24px 0 20px 0; /* left-aligned title */
+        }
+
+        /* alternating row for raw list? not strictly table, but we use light separation */
+        .material-row {
+            background: #FFFFFF;
+            padding: 12px 0;
+            border-bottom: 1px solid #E1E6EE;
+        }
+        .material-row:first-of-type {
+            border-top: 1px solid #E1E6EE;
+        }
+
+        /* ensure dropdowns look consistent */
+        select {
+            appearance: none;
+            background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="%232F3B4C" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>');
+            background-repeat: no-repeat;
+            background-position: right 12px center;
+            background-size: 14px;
+        }
+
+        /* responsiveness: tablet 2, mobile 1 */
+        @media (max-width: 900px) {
+            .header-fields {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+        @media (max-width: 640px) {
+            .header-fields {
+                grid-template-columns: 1fr;
+            }
+            .material-row {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            .material-row .action-group {
+                justify-content: flex-end;
+            }
+        }
+
+        /* small adjustments for unit dropdown */
+        .unit-field {
+            min-width: 100px;
+        }
+
+        /* disabled not used but style present */
+        :disabled {
+            background: #F2F4F8;
+            border-color: #E1E4EA;
+            color: #9AA1AE;
+        }
+
+        /* dummy searchable product styling: we simulate with datalist (or just select) 
+           To keep it realistic: finished good uses <select> with search via datalist? 
+           For demo purpose we use select with grouped feel + datalist for "searchable" */
+        .searchable-select {
+            position: relative;
+        }
+        input[list].form-control {
+            background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="%236B7280"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>');
+            background-repeat: no-repeat;
+            background-position: right 12px center;
+            background-size: 16px;
+        }
+           /* table-like hover on rows */
+        .material-row:hover {
+            background: #F0F6FF; /* hover row */
+            border-radius: 8px;
+            padding-left: 8px;
+            padding-right: 8px;
+            transition: background 0.1s;
+        }
+        /* additional DS details: header color same as table header */
+        .raw-title {
+            color: #0E1A2B;
+        }
+        /* alternating row background for visual clarity? we can do via nth-child */
+        .material-row:nth-child(even) {
+            background: #FAFBFD;
+        }
+        /* ensure border strong for row separation */
+        .material-row {
+            border-bottom: 1px solid #E1E6EE;
+            padding: 12px 0;
+            margin: 0;
+        }
+        /* last row border none? keep consistency */
+        .material-list .material-row:last-child {
+            border-bottom: none;
+        }
+
+textarea {
+    min-height: 80px;
+    padding: 10px 14px;
+    border: 1.5px solid #D6DBE4;
+    background: #FFFFFF;
+    border-radius: 8px;
+    font-family: 'Inter', sans-serif;
+    font-size: 0.95rem;
+    color: #2F3B4C;
+    width: 100%;
+    outline: none;
+    resize: vertical;
+    transition: border 0.15s, box-shadow 0.15s;
+}
+
+textarea:focus {
+    border: 2px solid #1F7BFF;
+    box-shadow: 0 0 0 2px rgba(31, 123, 255, 0.15);
+}

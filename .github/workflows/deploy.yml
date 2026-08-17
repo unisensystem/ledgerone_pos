@@ -1,0 +1,26 @@
+name: Deploy to Oracle Sandbox
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    name: Deploy via SSH
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Deploy to Oracle VM
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.ORACLE_HOST }}
+          username: opc
+          key: ${{ secrets.ORACLE_SSH_KEY }}
+          port: 22
+          script: |
+            cd /var/www/ledgerone_erp
+            git fetch origin
+            git reset --hard origin/main
+            git clean -fd
+            sudo systemctl restart php-fpm

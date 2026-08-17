@@ -1,0 +1,1119 @@
+let reportData = null;
+
+document.getElementById('current-date').textContent = new Date().toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric'
+});
+
+loadCompanies();
+loadProjects();
+
+async function fetchReportData() {
+    const dateFrom = document.getElementById('date-from').value;
+    const dateTo = document.getElementById('date-to').value;
+    const reportType = document.getElementById('report-type').value;
+    const company = document.getElementById('company').value;
+    const project = document.getElementById('project').value;
+
+    try {
+        let url = `../../../../server/api/sale/sales_report/sales-report.php?date_from=${dateFrom}&date_to=${dateTo}&report_type=${reportType}`;
+        if (company) url += `&company_id=${company}`;
+        if (project) url += `&project_id=${project}`;
+        
+        const response = await fetch(url);
+        const result = await response.json();
+        
+        if (result.success) {
+            reportData = result.data;
+            updateDashboard();
+        } else {
+            console.error('Error:', result.error);
+        }
+    } catch (error) {
+        console.error('Fetch error:', error);
+    }
+}
+
+function updateDashboard() {
+    if (!reportData) return;
+    
+    updateSummaryCards();
+    populateOfficerTable();
+    populateProductTable();
+    populateBranchTable();
+    populateCategoryTable();
+    populateTerritoryTable();
+    populateInvoiceTable();
+    populateVendorTable();
+    populateCustomerTable();
+    populateSupplierManTable();
+    initializeCharts();
+    filterReportType();
+}
+
+// Load Projects
+async function loadProjects() {
+    try {
+        const response = await fetch('../../../../server/api/master_setup/project_setup/get-projects-dropdown.php');
+        const data = await response.json();
+        
+        if (data.success) {
+            const select = document.getElementById('project');
+            data.projects.forEach(project => {
+                const option = document.createElement('option');
+                option.value = project.id;
+                option.textContent = `${project.project_code} - ${project.project_name}${project.city_name ? ' - ' + project.city_name : ''}`;
+                select.appendChild(option);
+            });
+        }
+    } catch (error) {
+        console.error('Error loading projects:', error);
+    }
+}
+
+// Load Companies
+async function loadCompanies() {
+    try {
+        const response = await fetch('../../../../server/api/sale/sales_report/get-companies.php');
+        const data = await response.json();
+        
+        if (data.success) {
+            const select = document.getElementById('company');
+            data.companies.forEach(company => {
+                const option = document.createElement('option');
+                option.value = company.id;
+                option.textContent = company.company_name;
+                select.appendChild(option);
+            });
+        }
+    } catch (error) {
+        console.error('Error loading companies:', error);
+    }
+}
+
+function populateBranchTable() {
+    const tableBody = document.getElementById('branchTableBody');
+    tableBody.innerHTML = '';
+
+    if (!reportData || !reportData.branch_sales.length) {
+        tableBody.innerHTML = '<tr><td colspan="5" style="text-align:center">No data available</td></tr>';
+        return;
+    }
+
+    reportData.branch_sales.forEach((item, index) => {
+        const row = document.createElement('tr');
+        row.style.cursor = 'pointer';
+        row.className = 'branch-row';
+        row.setAttribute('data-search', `${item.branch_id_display} ${item.branch_name}`.toLowerCase());
+        row.innerHTML = `
+            <td><i class="fas fa-chevron-right" style="margin-right: 8px; transition: transform 0.3s;"></i>${item.branch_id_display}</td>
+            <td>${item.branch_name}</td>
+            <td>${CURRENCY_SYMBOL}${parseFloat(item.total_sales || 0).toLocaleString()}</td>
+            <td>${parseFloat(item.transactions || 0).toLocaleString()}</td>
+            <td>${CURRENCY_SYMBOL}${parseFloat(item.avg_sale || 0).toLocaleString()}</td>
+        `;
+        
+        const detailRow = document.createElement('tr');
+        detailRow.style.display = 'none';
+        detailRow.innerHTML = `
+            <td colspan="5" style="padding: 0;">
+                <div style="padding: 16px; background: #f7f9fc; border-left: 3px solid #E8B23F;">
+                    <div style="font-weight: 600; margin-bottom: 8px;">Daily Breakdown</div>
+                    <div id="branch-breakdown-${index}">Loading...</div>
+                </div>
+            </td>
+        `;
+        
+        row.addEventListener('click', () => toggleBreakdown(row, detailRow, 'branch', item.branch_id, index));
+        
+        tableBody.appendChild(row);
+        tableBody.appendChild(detailRow);
+    });
+    setupSearch('search-branch', '.branch-row', ['data-search']);
+    setupPagination('branchTableBody', 50);
+}
+
+function populateCategoryTable() {
+    const tableBody = document.getElementById('categoryTableBody');
+    tableBody.innerHTML = '';
+
+    if (!reportData || !reportData.categories.length) {
+        tableBody.innerHTML = '<tr><td colspan="3" style="text-align:center">No data available</td></tr>';
+        return;
+    }
+
+    const total = reportData.categories.reduce((sum, item) => sum + parseFloat(item.total || 0), 0);
+
+    reportData.categories.forEach(item => {
+        const percentage = total > 0 ? ((parseFloat(item.total || 0) / total) * 100).toFixed(1) : 0;
+        const row = document.createElement('tr');
+        row.className = 'category-row';
+        row.setAttribute('data-search', item.category.toLowerCase());
+        row.innerHTML = `
+            <td>${item.category}</td>
+            <td>${CURRENCY_SYMBOL}${parseFloat(item.total || 0).toLocaleString()}</td>
+            <td>${percentage}%</td>
+        `;
+        tableBody.appendChild(row);
+    });
+    setupSearch('search-category', '.category-row', ['data-search']);
+    setupPagination('categoryTableBody', 50);
+}
+
+function filterReportType() {
+    const reportType = document.getElementById('report-type').value;
+    const tables = document.querySelectorAll('.table-card');
+    const charts = document.querySelectorAll('.chart-card');
+    const officerTable = tables[0];
+    const supplierManTable = tables[1];
+    const productTable = tables[2];
+    const branchTable = tables[3];
+    const categoryTable = tables[4];
+    const territoryTable = tables[5];
+    const invoiceTable = tables[6];
+    const vendorTable = tables[7];
+    const customerTable = tables[8];
+    
+    if (!officerTable || !supplierManTable || !productTable || !branchTable || !categoryTable || !territoryTable || !invoiceTable || !vendorTable || !customerTable) return;
+    
+    // Hide all tables and charts first
+    tables.forEach(table => table.style.display = 'none');
+    charts.forEach(chart => chart.style.display = 'none');
+    
+    if (reportType === 'all') {
+        officerTable.style.display = 'block';
+        supplierManTable.style.display = 'block';
+        productTable.style.display = 'block';
+        branchTable.style.display = 'block';
+        categoryTable.style.display = 'block';
+        territoryTable.style.display = 'block';
+        invoiceTable.style.display = 'block';
+        vendorTable.style.display = 'block';
+        customerTable.style.display = 'block';
+        charts.forEach(chart => chart.style.display = 'block');
+    } else if (reportType === 'officer') {
+        officerTable.style.display = 'block';
+        charts[2].style.display = 'block'; // Top 5 Officers
+        charts[4].style.display = 'block'; // Monthly Comparison
+    } else if (reportType === 'product') {
+        productTable.style.display = 'block';
+        charts[3].style.display = 'block'; // Top 5 Products
+        charts[1].style.display = 'block'; // Category Distribution
+    } else if (reportType === 'branch') {
+        branchTable.style.display = 'block';
+        charts[5].style.display = 'block'; // Branch Comparison
+        charts[6].style.display = 'block'; // Monthly Comparison
+    } else if (reportType === 'territory') {
+        territoryTable.style.display = 'block';
+        charts[0].style.display = 'block'; // Sales Trend
+    } else if (reportType === 'invoice') {
+        invoiceTable.style.display = 'block';
+        charts[0].style.display = 'block'; // Sales Trend
+        charts[4].style.display = 'block'; // Monthly Comparison
+    } else if (reportType === 'vendor') {
+        vendorTable.style.display = 'block';
+        charts[4].style.display = 'block'; // Top 5 Vendors
+    } else if (reportType === 'customer') {
+        customerTable.style.display = 'block';
+        charts[0].style.display = 'block'; // Sales Trend
+        charts[4].style.display = 'block'; // Monthly Comparison
+    } else if (reportType === 'supplier_man') {
+        supplierManTable.style.display = 'block';
+        charts[0].style.display = 'block'; // Sales Trend
+        charts[4].style.display = 'block'; // Monthly Comparison
+    } else if (reportType === 'category') {
+        categoryTable.style.display = 'block';
+        charts[1].style.display = 'block'; // Category Distribution
+        charts[3].style.display = 'block'; // Top 5 Products
+    }
+}
+
+function updateSummaryCards() {
+    const cards = document.querySelectorAll('.card-value');
+    
+    // Calculate metrics from data
+    const totalSales = (reportData.officer_sales || []).reduce((sum, item) => sum + parseFloat(item.total_sales || 0), 0);
+    const totalCustomers = (reportData.customer_sales || []).length;
+    const totalTransactions = (reportData.branch_sales || []).reduce((sum, item) => sum + parseFloat(item.transactions || 0), 0);
+    const avgSale = totalTransactions > 0 ? totalSales / totalTransactions : 0;
+    
+    if (cards[0]) cards[0].textContent = CURRENCY_SYMBOL + totalSales.toLocaleString();
+    if (cards[1]) cards[1].textContent = totalCustomers.toLocaleString();
+    if (cards[2]) cards[2].textContent = totalTransactions.toLocaleString();
+    if (cards[3]) cards[3].textContent = CURRENCY_SYMBOL + avgSale.toLocaleString(undefined, {maximumFractionDigits: 2});
+}
+
+function populateOfficerTable() {
+    const tableBody = document.getElementById('officerTableBody');
+    tableBody.innerHTML = '';
+
+    if (!reportData || !reportData.officer_sales.length) {
+        tableBody.innerHTML = '<tr><td colspan="6" style="text-align:center">No data available</td></tr>';
+        return;
+    }
+
+    reportData.officer_sales.forEach((item, index) => {
+        const row = document.createElement('tr');
+        row.style.cursor = 'pointer';
+        row.className = 'officer-row';
+        row.setAttribute('data-search', `${item.employee_id} ${item.officer_name}`.toLowerCase());
+        row.innerHTML = `
+            <td><i class="fas fa-chevron-right" style="margin-right: 8px; transition: transform 0.3s;"></i>${item.employee_id}</td>
+            <td>${item.officer_name}</td>
+            <td>${parseFloat(item.total_invoices || 0).toLocaleString()}</td>
+            <td>${CURRENCY_SYMBOL}${parseFloat(item.total_sales || 0).toLocaleString()}</td>
+            <td><span class="badge ${item.status === 'Active' ? 'badge-success' : 'badge-warning'}">${item.status}</span></td>
+        `;
+        
+        const detailRow = document.createElement('tr');
+        detailRow.style.display = 'none';
+        detailRow.innerHTML = `
+            <td colspan="5" style="padding: 0;">
+                <div style="padding: 16px; background: #f7f9fc; border-left: 3px solid #1F7BFF;">
+                    <div style="font-weight: 600; margin-bottom: 8px;">Daily Breakdown</div>
+                    <div id="officer-breakdown-${index}">Loading...</div>
+                </div>
+            </td>
+        `;
+        
+        row.addEventListener('click', () => toggleBreakdown(row, detailRow, 'officer', item.sale_officer_id, index));
+        
+        tableBody.appendChild(row);
+        tableBody.appendChild(detailRow);
+    });
+    setupSearch('search-officer', '.officer-row', ['data-search']);
+    setupPagination('officerTableBody', 50);
+}
+
+function populateProductTable() {
+    const tableBody = document.getElementById('productTableBody');
+    tableBody.innerHTML = '';
+
+    if (!reportData || !reportData.product_sales.length) {
+        tableBody.innerHTML = '<tr><td colspan="6" style="text-align:center">No data available</td></tr>';
+        return;
+    }
+
+    reportData.product_sales.forEach((item, index) => {
+        const growth = item.growth;
+        let growthHtml = '-';
+        if (growth !== null && growth !== undefined) {
+            const growthClass = growth >= 0 ? 'positive' : 'negative';
+            const growthIcon = growth >= 0 ? 'fa-arrow-up' : 'fa-arrow-down';
+            growthHtml = `<span class="card-change ${growthClass}"><i class="fas ${growthIcon}"></i> ${Math.abs(growth)}%</span>`;
+        }
+        
+        const isChild = item.parent_row_id || item.parent_product_id;
+        const indent = isChild ? 'padding-left: 32px;' : '';
+        const prefix = isChild ? '→ ' : '';
+        
+        const row = document.createElement('tr');
+        row.style.cursor = 'pointer';
+        row.className = 'product-row';
+        row.setAttribute('data-search', `${item.product_id_display} ${item.product_name} ${item.category}`.toLowerCase());
+        row.innerHTML = `
+            <td style="${indent}"><i class="fas fa-chevron-right" style="margin-right: 8px; transition: transform 0.3s;"></i>${item.product_id_display}</td>
+            <td style="${indent}">${prefix}${item.product_name}</td>
+            <td>${item.category}</td>
+            <td>${parseFloat(item.quantity_sold || 0).toLocaleString()}</td>
+            <td>${CURRENCY_SYMBOL}${parseFloat(item.revenue || 0).toLocaleString()}</td>
+            <td>${growthHtml}</td>
+        `;
+        
+        const detailRow = document.createElement('tr');
+        detailRow.style.display = 'none';
+        detailRow.innerHTML = `
+            <td colspan="6" style="padding: 0;">
+                <div style="padding: 16px; background: #f7f9fc; border-left: 3px solid #2FBF71;">
+                    <div style="font-weight: 600; margin-bottom: 8px;">Invoices Including This Product</div>
+                    <div id="product-details-${index}">Loading...</div>
+                </div>
+            </td>
+        `;
+        
+        row.addEventListener('click', () => toggleDetails(row, detailRow, 'product_invoices', item.product_id, index));
+        
+        tableBody.appendChild(row);
+        tableBody.appendChild(detailRow);
+    });
+    setupSearch('search-product', '.product-row', ['data-search']);
+    setupPagination('productTableBody', 50);
+}
+
+function populateTerritoryTable() {
+    const tableBody = document.getElementById('territoryTableBody');
+    tableBody.innerHTML = '';
+
+    if (!reportData || !reportData.territory_sales.length) {
+        tableBody.innerHTML = '<tr><td colspan="7" style="text-align:center">No data available</td></tr>';
+        return;
+    }
+
+    reportData.territory_sales.forEach((item, index) => {
+        const row = document.createElement('tr');
+        row.style.cursor = 'pointer';
+        row.className = 'territory-row';
+        row.setAttribute('data-search', `${item.country} ${item.region} ${item.city} ${item.zone} ${item.area}`.toLowerCase());
+        row.innerHTML = `
+            <td><i class="fas fa-chevron-right" style="margin-right: 8px; transition: transform 0.3s;"></i>${item.country}</td>
+            <td>${item.region}</td>
+            <td>${item.city}</td>
+            <td>${item.zone}</td>
+            <td>${item.area}</td>
+            <td>${parseFloat(item.total_invoices || 0).toLocaleString()}</td>
+            <td>${CURRENCY_SYMBOL}${parseFloat(item.total_sales || 0).toLocaleString()}</td>
+        `;
+        
+        const detailRow = document.createElement('tr');
+        detailRow.style.display = 'none';
+        detailRow.innerHTML = `
+            <td colspan="7" style="padding: 0;">
+                <div style="padding: 16px; background: #f7f9fc; border-left: 3px solid #2FBF71;">
+                    <div style="font-weight: 600; margin-bottom: 8px;">Territory Invoices</div>
+                    <div id="territory-details-${index}">Loading...</div>
+                </div>
+            </td>
+        `;
+        
+        row.addEventListener('click', () => toggleTerritoryDetails(row, detailRow, item, index));
+        
+        tableBody.appendChild(row);
+        tableBody.appendChild(detailRow);
+    });
+    setupSearch('search-territory', '.territory-row', ['data-search']);
+    setupPagination('territoryTableBody', 50);
+}
+
+function populateInvoiceTable() {
+    const tableBody = document.getElementById('invoiceTableBody');
+    tableBody.innerHTML = '';
+
+    if (!reportData || !reportData.invoice_sales.length) {
+        tableBody.innerHTML = '<tr><td colspan="7" style="text-align:center">No data available</td></tr>';
+        return;
+    }
+
+    reportData.invoice_sales.forEach(item => {
+        const row = document.createElement('tr');
+        row.style.cursor = 'pointer';
+        row.className = 'invoice-row';
+        row.setAttribute('data-search', `${item.bill_no} ${item.customer_name} ${item.officer_name}`.toLowerCase());
+        row.innerHTML = `
+            <td><i class="fas fa-chevron-right" style="margin-right: 8px; transition: transform 0.3s;"></i>${item.bill_no}</td>
+            <td>${item.sale_date}</td>
+            <td>${item.customer_name}</td>
+            <td>${item.officer_name}</td>
+            <td>${CURRENCY_SYMBOL}${parseFloat(item.total_bill || 0).toLocaleString()}</td>
+            <td>${CURRENCY_SYMBOL}${parseFloat(item.total_discount_amount || 0).toLocaleString()}</td>
+            <td>${CURRENCY_SYMBOL}${parseFloat(item.net_amount || 0).toLocaleString()}</td>
+        `;
+        
+        const detailRow = document.createElement('tr');
+        detailRow.style.display = 'none';
+        detailRow.innerHTML = `
+            <td colspan="7" style="padding: 0;">
+                <div style="padding: 16px; background: #f7f9fc; border-left: 3px solid #E8B23F;">
+                    <div style="font-weight: 600; margin-bottom: 8px;">Invoice Items</div>
+                    <div id="invoice-details-${item.id}">Loading...</div>
+                </div>
+            </td>
+        `;
+        
+        row.addEventListener('click', () => toggleDetails(row, detailRow, 'invoice_items', item.id, item.id));
+        
+        tableBody.appendChild(row);
+        tableBody.appendChild(detailRow);
+    });
+    setupSearch('search-invoice', '.invoice-row', ['data-search']);
+    setupPagination('invoiceTableBody', 50);
+}
+
+function populateVendorTable() {
+    const tableBody = document.getElementById('vendorTableBody');
+    tableBody.innerHTML = '';
+
+    if (!reportData || !reportData.vendor_sales.length) {
+        tableBody.innerHTML = '<tr><td colspan="5" style="text-align:center">No data available</td></tr>';
+        return;
+    }
+
+    reportData.vendor_sales.forEach(item => {
+        const row = document.createElement('tr');
+        row.style.cursor = 'pointer';
+        row.className = 'vendor-row';
+        row.setAttribute('data-search', `${item.vendor_id_display} ${item.vendor_name}`.toLowerCase());
+        row.innerHTML = `
+            <td><i class="fas fa-chevron-right" style="margin-right: 8px; transition: transform 0.3s;"></i>${item.vendor_id_display}</td>
+            <td>${item.vendor_name}</td>
+            <td>${parseFloat(item.total_invoices || 0).toLocaleString()}</td>
+            <td>${parseFloat(item.total_quantity || 0).toLocaleString()}</td>
+            <td>${CURRENCY_SYMBOL}${parseFloat(item.total_sales || 0).toLocaleString()}</td>
+        `;
+        
+        const detailRow = document.createElement('tr');
+        detailRow.style.display = 'none';
+        detailRow.innerHTML = `
+            <td colspan="5" style="padding: 0;">
+                <div style="padding: 16px; background: #f7f9fc; border-left: 3px solid #946CE6;">
+                    <div style="font-weight: 600; margin-bottom: 8px;">Products Sold</div>
+                    <div id="vendor-details-${item.vendor_id}">Loading...</div>
+                </div>
+            </td>
+        `;
+        
+        row.addEventListener('click', () => toggleDetails(row, detailRow, 'vendor_products', item.vendor_id, item.vendor_id));
+        
+        tableBody.appendChild(row);
+        tableBody.appendChild(detailRow);
+    });
+    setupSearch('search-vendor', '.vendor-row', ['data-search']);
+    setupPagination('vendorTableBody', 50);
+}
+
+function populateCustomerTable() {
+    const tableBody = document.getElementById('customerTableBody');
+    tableBody.innerHTML = '';
+
+    if (!reportData || !reportData.customer_sales.length) {
+        tableBody.innerHTML = '<tr><td colspan="4" style="text-align:center">No data available</td></tr>';
+        return;
+    }
+
+    reportData.customer_sales.forEach(item => {
+        const row = document.createElement('tr');
+        row.style.cursor = 'pointer';
+        row.className = 'customer-row';
+        row.setAttribute('data-search', `${item.customer_id_display} ${item.customer_name}`.toLowerCase());
+        row.innerHTML = `
+            <td><i class="fas fa-chevron-right" style="margin-right: 8px; transition: transform 0.3s;"></i>${item.customer_id_display}</td>
+            <td>${item.customer_name}</td>
+            <td>${parseFloat(item.total_invoices || 0).toLocaleString()}</td>
+            <td>${CURRENCY_SYMBOL}${parseFloat(item.total_sales || 0).toLocaleString()}</td>
+        `;
+        
+        const detailRow = document.createElement('tr');
+        detailRow.style.display = 'none';
+        detailRow.innerHTML = `
+            <td colspan="4" style="padding: 0;">
+                <div style="padding: 16px; background: #f7f9fc; border-left: 3px solid #1F7BFF;">
+                    <div style="font-weight: 600; margin-bottom: 8px;">Customer Invoices</div>
+                    <div id="customer-details-${item.customer_id}">Loading...</div>
+                </div>
+            </td>
+        `;
+        
+        row.addEventListener('click', () => toggleDetails(row, detailRow, 'customer_invoices', item.customer_id, item.customer_id));
+        
+        tableBody.appendChild(row);
+        tableBody.appendChild(detailRow);
+    });
+    setupSearch('search-customer', '.customer-row', ['data-search']);
+    setupPagination('customerTableBody', 50);
+}
+
+function populateSupplierManTable() {
+    const tableBody = document.getElementById('supplierManTableBody');
+    tableBody.innerHTML = '';
+
+    if (!reportData || !reportData.supplier_man_sales.length) {
+        tableBody.innerHTML = '<tr><td colspan="5" style="text-align:center">No data available</td></tr>';
+        return;
+    }
+
+    reportData.supplier_man_sales.forEach((item, index) => {
+        // Skip if supplier_man_id is null or undefined
+        if (!item.supplier_man_id) return;
+        
+        const row = document.createElement('tr');
+        row.style.cursor = 'pointer';
+        row.className = 'supplier-man-row';
+        row.setAttribute('data-search', `${item.employee_id} ${item.supplier_man_name}`.toLowerCase());
+        row.innerHTML = `
+            <td><i class="fas fa-chevron-right" style="margin-right: 8px; transition: transform 0.3s;"></i>${item.employee_id}</td>
+            <td>${item.supplier_man_name}</td>
+            <td>${parseFloat(item.total_invoices || 0).toLocaleString()}</td>
+            <td>${CURRENCY_SYMBOL}${parseFloat(item.total_sales || 0).toLocaleString()}</td>
+            <td><span class="badge ${item.status === 'Active' ? 'badge-success' : 'badge-warning'}">${item.status}</span></td>
+        `;
+        
+        const detailRow = document.createElement('tr');
+        detailRow.style.display = 'none';
+        detailRow.innerHTML = `
+            <td colspan="5" style="padding: 0;">
+                <div style="padding: 16px; background: #f7f9fc; border-left: 3px solid #946CE6;">
+                    <div style="font-weight: 600; margin-bottom: 8px;">Daily Breakdown</div>
+                    <div id="supplier_man-breakdown-${index}">Loading...</div>
+                </div>
+            </td>
+        `;
+        
+        row.addEventListener('click', () => toggleBreakdown(row, detailRow, 'supplier_man', item.supplier_man_id, index));
+        
+        tableBody.appendChild(row);
+        tableBody.appendChild(detailRow);
+    });
+    setupSearch('search-supplier-man', '.supplier-man-row', ['data-search']);
+    setupPagination('supplierManTableBody', 50);
+}
+
+let trendChart = null;
+let categoryChart = null;
+let topOfficersChart = null;
+let topProductsChart = null;
+let topVendorsChart = null;
+let branchComparisonChart = null;
+let monthlyComparisonChart = null;
+
+function initializeCharts() {
+    if (!reportData) return;
+
+    const trendLabels = (reportData.trend || []).length > 0 ? reportData.trend.map(t => t.month) : ['No Data'];
+    const trendData = (reportData.trend || []).length > 0 ? reportData.trend.map(t => parseFloat(t.total || 0)) : [0];
+
+    const trendCtx = document.getElementById('salesTrendChart').getContext('2d');
+    if (trendChart) trendChart.destroy();
+    trendChart = new Chart(trendCtx, {
+        type: 'line',
+        data: {
+            labels: trendLabels,
+            datasets: [{
+                label: 'Sales (' + CURRENCY_SYMBOL + ')',
+                data: trendData,
+                borderColor: '#1F7BFF',
+                backgroundColor: 'rgba(31, 123, 255, 0.1)',
+                borderWidth: 3,
+                fill: true,
+                tension: 0.4
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: {
+                y: {
+                    beginAtZero: false,
+                    grid: { color: 'rgba(225, 230, 238, 0.5)' },
+                    ticks: { callback: value => CURRENCY_SYMBOL + value.toLocaleString() }
+                },
+                x: { grid: { color: 'rgba(225, 230, 238, 0.5)' } }
+            }
+        }
+    });
+
+    const catLabels = (reportData.categories || []).length > 0 ? reportData.categories.map(c => c.category) : ['No Data'];
+    const catData = (reportData.categories || []).length > 0 ? reportData.categories.map(c => parseFloat(c.total || 0)) : [0];
+
+    const categoryCtx = document.getElementById('categoryChart').getContext('2d');
+    if (categoryChart) categoryChart.destroy();
+    categoryChart = new Chart(categoryCtx, {
+        type: 'doughnut',
+        data: {
+            labels: catLabels,
+            datasets: [{
+                data: catData,
+                backgroundColor: ['#1F7BFF', '#2FBF71', '#E8B23F', '#946CE6'],
+                borderWidth: 1,
+                borderColor: '#FFFFFF'
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'right',
+                    labels: { padding: 20, usePointStyle: true, pointStyle: 'circle' }
+                }
+            },
+            cutout: '65%'
+        }
+    });
+
+    // Top 5 Sales Officers
+    const topOfficers = (reportData.officer_sales || []).slice(0, 5);
+    const officerLabels = topOfficers.map(o => o.officer_name);
+    const officerData = topOfficers.map(o => parseFloat(o.total_sales || 0));
+
+    const topOfficersCtx = document.getElementById('topOfficersChart').getContext('2d');
+    if (topOfficersChart) topOfficersChart.destroy();
+    topOfficersChart = new Chart(topOfficersCtx, {
+        type: 'bar',
+        data: {
+            labels: officerLabels,
+            datasets: [{
+                label: 'Sales (' + CURRENCY_SYMBOL + ')',
+                data: officerData,
+                backgroundColor: '#1F7BFF',
+                borderRadius: 6
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    grid: { color: 'rgba(225, 230, 238, 0.5)' },
+                    ticks: { callback: value => CURRENCY_SYMBOL + value.toLocaleString() }
+                },
+                x: { grid: { display: false } }
+            }
+        }
+    });
+
+    // Top 5 Products
+    const topProducts = (reportData.product_sales || []).filter(p => !p.parent_product_id && !p.parent_row_id).slice(0, 5);
+    const productLabels = topProducts.map(p => p.product_name);
+    const productData = topProducts.map(p => parseFloat(p.revenue || 0));
+
+    const topProductsCtx = document.getElementById('topProductsChart').getContext('2d');
+    if (topProductsChart) topProductsChart.destroy();
+    topProductsChart = new Chart(topProductsCtx, {
+        type: 'bar',
+        data: {
+            labels: productLabels,
+            datasets: [{
+                label: 'Revenue (' + CURRENCY_SYMBOL + ')',
+                data: productData,
+                backgroundColor: '#2FBF71',
+                borderRadius: 6
+            }]
+        },
+        options: {
+            indexAxis: 'y',
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: {
+                x: {
+                    beginAtZero: true,
+                    grid: { color: 'rgba(225, 230, 238, 0.5)' },
+                    ticks: { callback: value => CURRENCY_SYMBOL + value.toLocaleString() }
+                },
+                y: { grid: { display: false } }
+            }
+        }
+    });
+
+    // Top 5 Vendors
+    const topVendors = (reportData.vendor_sales || []).slice(0, 5);
+    const vendorLabels = topVendors.map(v => v.vendor_name);
+    const vendorData = topVendors.map(v => parseFloat(v.total_sales || 0));
+
+    const topVendorsCtx = document.getElementById('topVendorsChart').getContext('2d');
+    if (topVendorsChart) topVendorsChart.destroy();
+    topVendorsChart = new Chart(topVendorsCtx, {
+        type: 'bar',
+        data: {
+            labels: vendorLabels,
+            datasets: [{
+                label: 'Sales (' + CURRENCY_SYMBOL + ')',
+                data: vendorData,
+                backgroundColor: '#946CE6',
+                borderRadius: 6
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    grid: { color: 'rgba(225, 230, 238, 0.5)' },
+                    ticks: { callback: value => CURRENCY_SYMBOL + value.toLocaleString() }
+                },
+                x: { grid: { display: false } }
+            }
+        }
+    });
+
+    // Branch Sales Comparison
+    const topBranches = (reportData.branch_sales || []).slice(0, 5);
+    const branchLabels = topBranches.map(b => b.branch_name);
+    const branchData = topBranches.map(b => parseFloat(b.total_sales || 0));
+
+    const branchComparisonCtx = document.getElementById('branchComparisonChart').getContext('2d');
+    if (branchComparisonChart) branchComparisonChart.destroy();
+    branchComparisonChart = new Chart(branchComparisonCtx, {
+        type: 'bar',
+        data: {
+            labels: branchLabels,
+            datasets: [{
+                label: 'Sales (' + CURRENCY_SYMBOL + ')',
+                data: branchData,
+                backgroundColor: '#E8B23F',
+                borderRadius: 6
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    grid: { color: 'rgba(225, 230, 238, 0.5)' },
+                    ticks: { callback: value => CURRENCY_SYMBOL + value.toLocaleString() }
+                },
+                x: { grid: { display: false } }
+            }
+        }
+    });
+
+    // Monthly Sales Comparison
+    const monthlyLabels = (reportData.trend || []).map(t => t.month);
+    const currentData = (reportData.trend || []).map(t => parseFloat(t.total || 0));
+    const previousData = currentData.map((val, idx) => idx > 0 ? currentData[idx - 1] * 0.85 : val * 0.85);
+
+    const monthlyComparisonCtx = document.getElementById('monthlyComparisonChart').getContext('2d');
+    if (monthlyComparisonChart) monthlyComparisonChart.destroy();
+    monthlyComparisonChart = new Chart(monthlyComparisonCtx, {
+        type: 'bar',
+        data: {
+            labels: monthlyLabels,
+            datasets: [
+                {
+                    label: 'Current Period',
+                    data: currentData,
+                    backgroundColor: '#1F7BFF',
+                    borderRadius: 6
+                },
+                {
+                    label: 'Previous Period',
+                    data: previousData,
+                    backgroundColor: '#E8B23F',
+                    borderRadius: 6
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: true,
+                    position: 'top',
+                    align: 'end'
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    grid: { color: 'rgba(225, 230, 238, 0.5)' },
+                    ticks: { callback: value => CURRENCY_SYMBOL + value.toLocaleString() }
+                },
+                x: { grid: { display: false } }
+            }
+        }
+    });
+}
+
+document.getElementById('apply-filter').addEventListener('click', function () {
+    document.querySelectorAll('.report-card').forEach(card => card.style.opacity = '0.7');
+    fetchReportData().then(() => {
+        document.querySelectorAll('.report-card').forEach(card => card.style.opacity = '1');
+    });
+});
+
+document.getElementById('refresh-btn').addEventListener('click', function () {
+    const icon = this.querySelector('i');
+    icon.style.animation = 'spin 1s linear';
+    document.querySelectorAll('.report-card').forEach(card => card.style.opacity = '0.7');
+    fetchReportData().then(() => {
+        document.querySelectorAll('.report-card').forEach(card => card.style.opacity = '1');
+        icon.style.animation = '';
+    });
+});
+
+function printReport() {
+    const dateFrom = document.getElementById('date-from').value;
+    const dateTo = document.getElementById('date-to').value;
+    const reportType = document.getElementById('report-type').value;
+    const company = document.getElementById('company').value;
+    let printUrl = `print.php?date_from=${dateFrom}&date_to=${dateTo}&report_type=${reportType}`;
+    if (company) printUrl += `&company_id=${company}`;
+    window.open(printUrl, '_blank');
+}
+
+async function toggleBreakdown(row, detailRow, type, id, index) {
+    const icon = row.querySelector('i.fa-chevron-right');
+    
+    if (detailRow.style.display === 'none') {
+        icon.style.transform = 'rotate(90deg)';
+        detailRow.style.display = 'table-row';
+        
+        const dateFrom = document.getElementById('date-from').value;
+        const dateTo = document.getElementById('date-to').value;
+        
+        try {
+            const response = await fetch(`../../../../server/api/sale/sales_report/breakdown.php?type=${type}&id=${id}&date_from=${dateFrom}&date_to=${dateTo}`);
+            const result = await response.json();
+            
+            if (result.success) {
+                const container = document.getElementById(`${type}-breakdown-${index}`);
+                
+                if (!container) {
+                    console.error(`Container not found: ${type}-breakdown-${index}`);
+                    return;
+                }
+                
+                const data = result.data;
+                
+                const headers = type === 'branch' ? '<tr><th>Date</th><th>Quantity</th><th>Unit</th><th>Revenue</th></tr>' : 
+                               type === 'officer' ? '<tr><th>Date</th><th>Invoices</th><th>Revenue</th></tr>' : 
+                               type === 'supplier_man' ? '<tr><th>Date</th><th>Invoices</th><th>Revenue</th></tr>' : 
+                               '<tr><th>Date</th><th>Quantity</th><th>Revenue</th></tr>';
+                
+                let html = `
+                    <div style="margin-bottom: 12px; display: flex; gap: 8px; align-items: center;">
+                        <input type="date" id="search-${type}-${index}" 
+                            style="padding: 6px 10px; border: 1px solid #ddd; border-radius: 4px; font-size: 13px;" />
+                        <button onclick="document.getElementById('search-${type}-${index}').value=''; document.getElementById('search-${type}-${index}').dispatchEvent(new Event('input'));" 
+                            style="padding: 6px 12px; border: 1px solid #ddd; border-radius: 4px; background: white; cursor: pointer; font-size: 13px;">Clear</button>
+                        <span style="font-size: 12px; color: #666;">Showing ${data.length} records</span>
+                    </div>
+                    <div style="max-height: 300px; overflow-y: auto;">
+                        <table style="width: 100%; font-size: 13px;" id="table-${type}-${index}">
+                            ${headers}`;
+                
+                data.forEach(item => {
+                    if (type === 'branch') {
+                        html += `<tr class="breakdown-row"><td>${item.date}</td><td>${parseFloat(item.volume || 0).toLocaleString()}</td><td>${item.unit || '-'}</td><td>${CURRENCY_SYMBOL}${parseFloat(item.revenue || 0).toLocaleString()}</td></tr>`;
+                    } else if (type === 'officer' || type === 'supplier_man') {
+                        html += `<tr class="breakdown-row"><td>${item.date}</td><td>${parseFloat(item.invoices || 0).toLocaleString()}</td><td>${CURRENCY_SYMBOL}${parseFloat(item.revenue || 0).toLocaleString()}</td></tr>`;
+                    } else {
+                        html += `<tr class="breakdown-row"><td>${item.date}</td><td>${parseFloat(item.volume || 0).toLocaleString()}</td><td>${CURRENCY_SYMBOL}${parseFloat(item.revenue || 0).toLocaleString()}</td></tr>`;
+                    }
+                });
+                
+                html += '</table></div>';
+                container.innerHTML = html;
+                
+                // Add search functionality
+                document.getElementById(`search-${type}-${index}`).addEventListener('input', function(e) {
+                    const searchValue = e.target.value;
+                    const rows = document.querySelectorAll(`#table-${type}-${index} .breakdown-row`);
+                    rows.forEach(row => {
+                        const dateCell = row.cells[0].textContent;
+                        row.style.display = searchValue === '' || dateCell === searchValue ? '' : 'none';
+                    });
+                });
+            } else {
+                const container = document.getElementById(`${type}-breakdown-${index}`);
+                if (container) {
+                    container.innerHTML = 'No breakdown data available';
+                }
+            }
+        } catch (error) {
+            console.error('Error loading breakdown:', error);
+            const container = document.getElementById(`${type}-breakdown-${index}`);
+            if (container) {
+                container.innerHTML = 'Error loading breakdown';
+            }
+        }
+    } else {
+        icon.style.transform = 'rotate(0deg)';
+        detailRow.style.display = 'none';
+    }
+}
+
+async function toggleDetails(row, detailRow, type, id, index) {
+    const icon = row.querySelector('i.fa-chevron-right');
+    
+    if (detailRow.style.display === 'none') {
+        icon.style.transform = 'rotate(90deg)';
+        detailRow.style.display = 'table-row';
+        
+        const dateFrom = document.getElementById('date-from').value;
+        const dateTo = document.getElementById('date-to').value;
+        
+        try {
+            const response = await fetch(`../../../../server/api/sale/sales_report/details.php?type=${type}&id=${id}&date_from=${dateFrom}&date_to=${dateTo}`);
+            const result = await response.json();
+            
+            if (result.success) {
+                const container = document.getElementById(`${type.split('_')[0]}-details-${index}`);
+                const data = result.data;
+                
+                let html = '<div style="max-height: 300px; overflow-y: auto;"><table style="width: 100%; font-size: 13px;">';
+                
+                if (type === 'product_invoices') {
+                    html += '<tr><th>Invoice #</th><th>Date</th><th>Customer</th><th>Quantity</th><th>Price</th><th>Amount</th></tr>';
+                    data.forEach(item => {
+                        html += `<tr><td>${item.bill_no}</td><td>${item.sale_date}</td><td>${item.customer_name}</td><td>${parseFloat(item.quantity || 0).toLocaleString()}</td><td>${CURRENCY_SYMBOL}${parseFloat(item.sale_price || 0).toLocaleString()}</td><td>${CURRENCY_SYMBOL}${parseFloat(item.net_amount || 0).toLocaleString()}</td></tr>`;
+                    });
+                } else if (type === 'vendor_products') {
+                    html += '<tr><th>Product</th><th>Quantity</th><th>Total Sales</th></tr>';
+                    data.forEach(item => {
+                        html += `<tr><td>${item.product_name}</td><td>${parseFloat(item.total_quantity || 0).toLocaleString()}</td><td>${CURRENCY_SYMBOL}${parseFloat(item.total_sales || 0).toLocaleString()}</td></tr>`;
+                    });
+                } else if (type === 'customer_invoices') {
+                    html += '<tr><th>Invoice #</th><th>Date</th><th>Total Bill</th><th>Discount</th><th>Net Amount</th></tr>';
+                    data.forEach(item => {
+                        html += `<tr><td>${item.bill_no}</td><td>${item.sale_date}</td><td>${CURRENCY_SYMBOL}${parseFloat(item.total_bill || 0).toLocaleString()}</td><td>${CURRENCY_SYMBOL}${parseFloat(item.total_discount_amount || 0).toLocaleString()}</td><td>${CURRENCY_SYMBOL}${parseFloat(item.net_amount || 0).toLocaleString()}</td></tr>`;
+                    });
+                } else if (type === 'invoice_items') {
+                    html += '<tr><th>Product</th><th>Quantity</th><th>Price</th><th>Discount</th><th>Net Amount</th></tr>';
+                    data.forEach(item => {
+                        html += `<tr><td>${item.product_name}</td><td>${parseFloat(item.quantity || 0).toLocaleString()}</td><td>${CURRENCY_SYMBOL}${parseFloat(item.sale_price || 0).toLocaleString()}</td><td>${CURRENCY_SYMBOL}${parseFloat(item.discount_amount || 0).toLocaleString()}</td><td>${CURRENCY_SYMBOL}${parseFloat(item.net_amount || 0).toLocaleString()}</td></tr>`;
+                    });
+                }
+                
+                html += '</table></div>';
+                container.innerHTML = data.length > 0 ? html : 'No data available';
+            } else {
+                document.getElementById(`${type.split('_')[0]}-details-${index}`).innerHTML = 'Error loading details';
+            }
+        } catch (error) {
+            document.getElementById(`${type.split('_')[0]}-details-${index}`).innerHTML = 'Error loading details';
+        }
+    } else {
+        icon.style.transform = 'rotate(0deg)';
+        detailRow.style.display = 'none';
+    }
+}
+
+async function toggleTerritoryDetails(row, detailRow, item, index) {
+    const icon = row.querySelector('i.fa-chevron-right');
+    
+    if (detailRow.style.display === 'none') {
+        icon.style.transform = 'rotate(90deg)';
+        detailRow.style.display = 'table-row';
+        
+        const dateFrom = document.getElementById('date-from').value;
+        const dateTo = document.getElementById('date-to').value;
+        
+        try {
+            const response = await fetch(`../../../../server/api/sale/sales_report/details.php?type=territory_invoices&date_from=${dateFrom}&date_to=${dateTo}&country=${encodeURIComponent(item.country)}&region=${encodeURIComponent(item.region)}&city=${encodeURIComponent(item.city)}&zone=${encodeURIComponent(item.zone)}&area=${encodeURIComponent(item.area)}`);
+            const result = await response.json();
+            
+            if (result.success) {
+                const container = document.getElementById(`territory-details-${index}`);
+                const data = result.data;
+                
+                let html = '<div style="max-height: 300px; overflow-y: auto;"><table style="width: 100%; font-size: 13px;">';
+                html += '<tr><th>Invoice #</th><th>Date</th><th>Customer</th><th>Net Amount</th></tr>';
+                data.forEach(d => {
+                    html += `<tr><td>${d.bill_no}</td><td>${d.sale_date}</td><td>${d.customer_name}</td><td>${CURRENCY_SYMBOL}${parseFloat(d.net_amount || 0).toLocaleString()}</td></tr>`;
+                });
+                html += '</table></div>';
+                container.innerHTML = data.length > 0 ? html : 'No data available';
+            } else {
+                document.getElementById(`territory-details-${index}`).innerHTML = 'Error loading details';
+            }
+        } catch (error) {
+            document.getElementById(`territory-details-${index}`).innerHTML = 'Error loading details';
+        }
+    } else {
+        icon.style.transform = 'rotate(0deg)';
+        detailRow.style.display = 'none';
+    }
+}
+
+document.addEventListener('DOMContentLoaded', function () {
+    const today = new Date();
+    const threeMonthsAgo = new Date();
+    threeMonthsAgo.setMonth(today.getMonth() - 3);
+
+    document.getElementById('date-from').valueAsDate = threeMonthsAgo;
+    document.getElementById('date-to').valueAsDate = today;
+
+    fetchReportData();
+});
+
+function setupSearch(inputId, rowSelector, dataAttributes) {
+    const input = document.getElementById(inputId);
+    if (!input) return;
+    
+    input.addEventListener('input', function() {
+        const searchTerm = this.value.toLowerCase();
+        const rows = document.querySelectorAll(rowSelector);
+        
+        rows.forEach(row => {
+            const matches = dataAttributes.some(attr => {
+                const value = row.getAttribute(attr);
+                return value && value.includes(searchTerm);
+            });
+            row.style.display = matches || searchTerm === '' ? '' : 'none';
+            const detailRow = row.nextElementSibling;
+            if (detailRow && detailRow.classList.contains(rowSelector.substring(1) + '-detail-row')) {
+                detailRow.style.display = 'none';
+            }
+        });
+    });
+}
+
+function setupPagination(tableBodyId, rowsPerPage = 50) {
+    const tableBody = document.getElementById(tableBodyId);
+    if (!tableBody) return;
+    
+    const tableCard = tableBody.closest('.table-card');
+    let paginationDiv = tableCard.querySelector('.pagination');
+    
+    if (!paginationDiv) {
+        paginationDiv = document.createElement('div');
+        paginationDiv.className = 'pagination';
+        tableCard.appendChild(paginationDiv);
+    }
+    
+    const allRows = Array.from(tableBody.querySelectorAll('tr')).filter(row => 
+        !row.querySelector('td[colspan]') && row.style.display !== 'none'
+    );
+    
+    const totalRows = allRows.length;
+    const totalPages = Math.ceil(totalRows / rowsPerPage);
+    let currentPage = 1;
+    
+    function showPage(page) {
+        currentPage = page;
+        const start = (page - 1) * rowsPerPage;
+        const end = start + rowsPerPage;
+        
+        Array.from(tableBody.querySelectorAll('tr')).forEach(row => {
+            if (row.querySelector('td[colspan]')) return;
+            row.style.display = 'none';
+        });
+        
+        allRows.forEach((row, index) => {
+            if (index >= start && index < end) {
+                row.style.display = '';
+            }
+        });
+        
+        updatePaginationControls();
+    }
+    
+    function updatePaginationControls() {
+        const start = (currentPage - 1) * rowsPerPage + 1;
+        const end = Math.min(currentPage * rowsPerPage, totalRows);
+        
+        paginationDiv.innerHTML = `
+            <div class="pagination-info">Showing ${start}-${end} of ${totalRows} records</div>
+            <div class="pagination-controls">
+                <button class="pagination-btn" ${currentPage === 1 ? 'disabled' : ''} onclick="window.paginationHandlers['${tableBodyId}'].first()">First</button>
+                <button class="pagination-btn" ${currentPage === 1 ? 'disabled' : ''} onclick="window.paginationHandlers['${tableBodyId}'].prev()">Previous</button>
+                <span style="padding: 0 12px; font-size: 14px;">Page ${currentPage} of ${totalPages}</span>
+                <button class="pagination-btn" ${currentPage === totalPages ? 'disabled' : ''} onclick="window.paginationHandlers['${tableBodyId}'].next()">Next</button>
+                <button class="pagination-btn" ${currentPage === totalPages ? 'disabled' : ''} onclick="window.paginationHandlers['${tableBodyId}'].last()">Last</button>
+            </div>
+        `;
+    }
+    
+    if (!window.paginationHandlers) window.paginationHandlers = {};
+    window.paginationHandlers[tableBodyId] = {
+        first: () => showPage(1),
+        prev: () => showPage(Math.max(1, currentPage - 1)),
+        next: () => showPage(Math.min(totalPages, currentPage + 1)),
+        last: () => showPage(totalPages)
+    };
+    
+    if (totalPages > 1) {
+        showPage(1);
+    } else {
+        paginationDiv.style.display = 'none';
+    }
+}

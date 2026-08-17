@@ -1,0 +1,2 @@
+ALTER TABLE sale_invoice
+    ADD COLUMN IF NOT EXISTS amount_returned DECIMAL(10,2) DEFAULT 0.00;
