@@ -343,8 +343,15 @@ function calculateRowAmounts(row, totalQty, price, source) {
         const formulaTemplate = row.dataset.formulaTemplate;
         const basePrice = parseFloat(row.dataset.basePrice);
         const taxBase = row.dataset.taxBase;
-        
-        if (formulaTemplate && !isNaN(basePrice) && basePrice > 0) {
+        const isTaxInclusive = row.dataset.isTaxInclusive === '1';
+
+        if (isTaxInclusive) {
+            // Tax is embedded in the price — extract it via back-calculation per unit,
+            // same formula used on initial product selection (loadTaxForNewProduct).
+            // Re-derived here too since this function re-runs on every qty/price edit.
+            const taxPerUnit = taxPercent > 0 ? basePrice * taxPercent / (100 + taxPercent) : 0;
+            taxAmt = taxPerUnit * totalQty;
+        } else if (formulaTemplate && !isNaN(basePrice) && basePrice > 0) {
             // For MRP-based formulas (Third Schedule), formula calculates base price
             // Tax = MRP - base_price
             if (taxBase === 'mrp') {
@@ -480,23 +487,39 @@ function updateInvoiceSummaryDynamic() {
     
     if (totalDiscountAmountEl) totalDiscountAmountEl.value = discountAmount.toFixed(3);
     if (netAmountEl) netAmountEl.textContent = netAmount.toFixed(3);
-    
+
+    // Expose totals for invoice-level tax base resolution
+    window.currentTotalBill = totalBill;
+    window.currentValueExclSalesTax = afterDiscount;
+    window.currentNetAmount = netAmount;
+
     // Calculate withholding tax
     const withholdingTaxPercentEl = document.getElementById('withholdingTaxPercent');
     const withholdingTaxPercent = parseFloat(withholdingTaxPercentEl?.value) || 0;
     const withholdingTaxAmount = netAmount * (withholdingTaxPercent / 100);
-    const netReceivable = netAmount - withholdingTaxAmount;
-    
+    let netReceivable = netAmount - withholdingTaxAmount;
+
     const withholdingTaxAmountEl = document.getElementById('withholdingTaxAmount');
     const netReceivableEl = document.getElementById('netReceivable');
-    
+
     if (withholdingTaxAmountEl) {
         withholdingTaxAmountEl.textContent = withholdingTaxAmount.toFixed(3);
     }
+
+    // Apply invoice-level taxes and factor exclusive tax into net receivable
+    // BEFORE computing remaining balance — otherwise remainingBalance would be
+    // derived from the pre-tax netReceivable while the displayed netReceivable
+    // (overwritten inside calculateInvoiceLevelTaxes) already includes tax,
+    // leaving the two fields inconsistent with each other.
+    if (typeof calculateInvoiceLevelTaxes === 'function') {
+        const exclusiveTax = calculateInvoiceLevelTaxes() || 0;
+        netReceivable = netAmount - withholdingTaxAmount + exclusiveTax;
+    }
+
     if (netReceivableEl) {
         netReceivableEl.textContent = netReceivable.toFixed(3);
     }
-    
+
     // Auto-fill Amount Paid when Invoice Type is Cash
     const amountPaidEl = document.getElementById('amountPaid');
     const invoiceTypeEl = document.getElementById('invoiceType');
@@ -512,30 +535,30 @@ function updateInvoiceSummaryDynamic() {
     if (remainingBalanceEl) {
         remainingBalanceEl.value = remainingBalance.toFixed(3);
     }
-
-    // Calculate invoice-level taxes
-    if (typeof calculateInvoiceLevelTaxes === 'function') {
-        calculateInvoiceLevelTaxes();
-    }
 }
 
-// Auto-fill the Batch No / Expiry Date columns for a product row.
-// No dropdown, no manual selection — the system reads the available
-// batches for this product (remaining qty > 0), sorted oldest-first
-// (FIFO), and fills in the first one automatically. Once that batch
-// (e.g. P1) is fully consumed it stops being returned by the API, so
-// the very next invoice for this product will auto-fill the next one
-// (e.g. P2) with zero manual work.
+function escBatchHtml(value) {
+    return String(value ?? '').replace(/[&<>"']/g, function (ch) {
+        return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch];
+    });
+}
+
+// Load the Batch No dropdown / Expiry Date column for a product row.
+// Batches are fetched sorted soonest-expiry-first (FEFO) and the dropdown
+// auto-selects the first (soonest-expiry) one, but the user can pick a
+// different batch manually (e.g. if the FEFO batch doesn't have enough
+// remaining qty for this sale) — see applySelectedBatch().
 async function loadProductBatches(row, productId) {
-    const batchNoInput = row.querySelector('.batch-no-input');
+    const batchNoSelect = row.querySelector('.batch-no-input');
     const batchExpiryInput = row.querySelector('.batch-expiry-input');
-    if (!batchNoInput || !batchExpiryInput || !productId) return;
+    if (!batchNoSelect || !batchExpiryInput || !productId) return;
 
     const branchId = document.getElementById('branch')?.value || '';
 
-    batchNoInput.value = '...';
+    batchNoSelect.innerHTML = '<option value="">Loading...</option>';
     batchExpiryInput.value = '...';
     row.dataset.batchQtyAvailable = '';
+    row.dataset.productBatches = '[]';
 
     try {
         let url = `../../../../server/api/sale/pos_invoice/get-product-batches.php?product_id=${productId}`;
@@ -545,21 +568,56 @@ async function loadProductBatches(row, productId) {
         const data = await response.json();
 
         if (data.success && data.batches && data.batches.length > 0) {
-            // First batch = oldest available (FIFO) - auto-filled, read-only
-            const batch = data.batches[0];
-            batchNoInput.value = batch.batch_no;
-            batchExpiryInput.value = batch.batch_expiry_date || '';
-            row.dataset.batchQtyAvailable = batch.remaining_qty;
-            batchNoInput.title = `Available: ${batch.remaining_qty}`;
+            row.dataset.productBatches = JSON.stringify(data.batches);
+
+            batchNoSelect.innerHTML = data.batches.map(function (b) {
+                const expiryText = b.batch_expiry_date ? ` - Exp: ${escBatchHtml(b.batch_expiry_date)}` : '';
+                return `<option value="${escBatchHtml(b.batch_no)}">${escBatchHtml(b.batch_no)}${expiryText} (Qty: ${escBatchHtml(b.remaining_qty)})</option>`;
+            }).join('');
+
+            batchNoSelect.selectedIndex = 0;
+            applySelectedBatch(row, data.batches[0]);
         } else {
-            batchNoInput.value = '';
+            batchNoSelect.innerHTML = '<option value="">No Batch</option>';
             batchExpiryInput.value = '';
-            batchNoInput.title = 'No batch available for this product';
+            batchNoSelect.title = 'No batch available for this product';
+            row.dataset.batchQtyAvailable = '';
         }
     } catch (error) {
         console.error('Error loading product batches:', error);
-        batchNoInput.value = '';
+        batchNoSelect.innerHTML = '<option value="">No Batch</option>';
         batchExpiryInput.value = '';
+        row.dataset.batchQtyAvailable = '';
+    }
+
+    // Wire the manual-selection handler once per row
+    if (!batchNoSelect.dataset.changeWired) {
+        batchNoSelect.dataset.changeWired = '1';
+        batchNoSelect.addEventListener('change', function () {
+            let batches = [];
+            try { batches = JSON.parse(row.dataset.productBatches || '[]'); } catch (e) { batches = []; }
+            const selected = batches.find(function (b) { return b.batch_no === batchNoSelect.value; });
+            applySelectedBatch(row, selected || null);
+        });
+    }
+}
+
+// Apply a chosen batch (from the FEFO auto-select or a manual dropdown change):
+// fills the Expiry Date field, stores the batch's remaining qty for stock
+// validation, and immediately re-runs stock validation for this row.
+function applySelectedBatch(row, batch) {
+    const batchExpiryInput = row.querySelector('.batch-expiry-input');
+    if (batch) {
+        if (batchExpiryInput) batchExpiryInput.value = batch.batch_expiry_date || '';
+        row.dataset.batchQtyAvailable = batch.remaining_qty;
+        row.dataset.batchNo = batch.batch_no;
+    } else {
+        if (batchExpiryInput) batchExpiryInput.value = '';
+        row.dataset.batchQtyAvailable = '';
+        row.dataset.batchNo = '';
+    }
+    if (typeof validateStockForRow === 'function') {
+        validateStockForRow(row);
     }
 }
 

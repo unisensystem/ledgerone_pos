@@ -63,9 +63,10 @@ try {
             tr.formula_template,
             tr.is_tax_inclusive,
             COALESCE(
-                (SELECT tr_rate.rate_percentage 
-                 FROM tax_rates tr_rate 
+                (SELECT tr_rate.rate_percentage
+                 FROM tax_rates tr_rate
                  WHERE tr_rate.tax_regime_id = tr.id
+                   AND tr_rate.tenant_id = ?
                    AND tr_rate.transaction_type = 'sale'
                    AND tr_rate.is_active = 1
                    AND (tr_rate.effective_from IS NULL OR tr_rate.effective_from <= NOW())
@@ -79,22 +80,23 @@ try {
                 0
             ) as rate_percentage
         FROM tax_regimes tr
-        WHERE tr.application_level = 'invoice'
+        WHERE tr.tenant_id = ?
+            AND tr.application_level = 'invoice'
             AND tr.is_active = 1
             AND (tr.effective_from IS NULL OR tr.effective_from <= NOW())
             AND (tr.effective_to IS NULL OR tr.effective_to >= NOW())
     ";
-    
+
     // Add country filter if company_id is provided
     if ($company_country_id) {
         $baseQuery .= " AND tr.country_id = ?";
     }
-    
+
     $baseQuery .= " ORDER BY tr.regime_name";
-    
+
     $stmt = $pdo->prepare($baseQuery);
-    
-    $params = [$customer_type_id, $party_type, $is_filer, $customer_type_id];
+
+    $params = [$tenant_id, $customer_type_id, $party_type, $is_filer, $customer_type_id, $tenant_id];
     if ($company_country_id) {
         $params[] = $company_country_id;
     }

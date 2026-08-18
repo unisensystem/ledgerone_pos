@@ -25,8 +25,10 @@ if (empty($product_id)) {
 }
 
 try {
-    // Remaining qty per batch = SUM(qty_in) - SUM(qty_out), FIFO ordered by
-    // earliest transaction date/id first (oldest batch consumed first).
+    // Remaining qty per batch = SUM(qty_in) - SUM(qty_out), FEFO ordered by
+    // earliest expiry date first (soonest-to-expire batch consumed first;
+    // batches with no expiry date sort last). Transaction date/id is only
+    // a tiebreaker for batches sharing the same expiry date.
     // Only batches with remaining qty > 0 are returned, so once a batch
     // (e.g. P1) is fully consumed it stops appearing and the next one
     // (e.g. P2) becomes the first option automatically.
@@ -53,7 +55,7 @@ try {
     $sql .= "
         GROUP BY batch_no, batch_expiry_date
         HAVING remaining_qty > 0
-        ORDER BY first_transaction_date ASC, first_id ASC
+        ORDER BY (batch_expiry_date IS NULL) ASC, batch_expiry_date ASC, first_transaction_date ASC, first_id ASC
     ";
 
     $stmt = $pdo->prepare($sql);

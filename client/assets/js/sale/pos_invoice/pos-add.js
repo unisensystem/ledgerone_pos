@@ -7,6 +7,7 @@
     const originalRemoveItem = localStorage.removeItem.bind(localStorage);
 
     const sharedKeys = new Set([
+        'enableTaxation',
         'enableBatchNo','enableExpiryDate','enableFOC','enableTradeOfferAmount',
         'enableCashDiscountPercent','enableCashDiscountAmount',
         'enableInvoiceCashDiscountPercent','enableInvoiceCashDiscountAmount',
@@ -43,6 +44,20 @@
     };
 })();
 
+
+// Item/invoice-level taxation is opt-in per page: ON by default on the medical
+// POS invoice (med_pos_invoice), OFF by default on the regular POS invoice —
+// this preserves existing pos_invoice behavior (tax columns/regimes stay hidden
+// and inert there) while giving med_pos_invoice full tax functionality. Users
+// can still flip it either way via Invoice Settings if the "Taxation" checkbox
+// exists on the page.
+const isMedInvoicePage = window.location.pathname.includes('med_pos_invoice');
+function isTaxationEnabled() {
+    const stored = localStorage.getItem('enableTaxation');
+    if (stored === 'true') return true;
+    if (stored === 'false') return false;
+    return isMedInvoicePage;
+}
 
 // Global variables for products and UOM data
 let uomData = [];
@@ -221,7 +236,8 @@ const invoiceSettingCheckboxes = [
     'enableShippingFees',
     'enableAmountPaidPaymentMethod',
     'enableBatchNo',        // NEW
-    'enableExpiryDate'      // NEW
+    'enableExpiryDate',     // NEW
+    'enableTaxation'        // NEW — only exists on med_pos_invoice's settings modal
 ];
 
     invoiceSettingCheckboxes.forEach(checkboxId => {
@@ -3245,18 +3261,32 @@ const invoiceSettingCheckboxes = [
 
     // Update remaining balance
     function updateRemainingBalance() {
-        const netAmount = parseFloat(document.getElementById('netAmount').textContent) || 0;
+        const hasRemainingBalanceTax = window.invoiceLevelTaxRegimes?.some(r => r.tax_base === 'remaining_balance');
         const amountPaid = parseFloat(document.getElementById('amountPaid').value) || 0;
+
+        if (hasRemainingBalanceTax && typeof calculateInvoiceLevelTaxes === 'function') {
+            // Re-run taxes so phase-2 uses the updated amountPaid as its base input.
+            calculateInvoiceLevelTaxes();
+            // The remaining balance field must show the pre-remaining-balance-tax outstanding
+            // amount (interimNetReceivable − amountPaid), not the post-tax final receivable.
+            // Using the post-tax value would silently inflate the displayed balance by the tax
+            // itself, making the field inconsistent with what the user sees as "owed before tax".
+            const interim = window.invoiceLevelInterimNetReceivable
+                ?? parseFloat(document.getElementById('netReceivable').textContent)
+                ?? 0;
+            document.getElementById('remainingBalance').value = Math.max(0, interim - amountPaid).toFixed(3);
+            return;
+        }
+
+        const netAmount = parseFloat(document.getElementById('netAmount').textContent) || 0;
         const remainingBalance = netAmount - amountPaid;
         document.getElementById('remainingBalance').value = remainingBalance.toFixed(3);
     }
 
-    // Invoice-level taxes disabled — no-op
-    async function loadInvoiceLevelTaxRegimes(customerId, companyId = null) {
-        window.invoiceLevelTaxRegimes = [];
-        const container = document.getElementById('invoiceLevelTaxesContainer');
-        if (container) container.innerHTML = '';
-    }
+    // loadInvoiceLevelTaxRegimes intentionally NOT redeclared here — removing this
+    // local stub lets calls made from within initializePage() fall through the
+    // scope chain to the real global implementation in invoice-level-taxes-dynamic.js,
+    // which is gated by isTaxationEnabled() (stays a no-op on the regular POS page).
 
     // Add event listener for total discount percent
     const totalDiscountPercent = document.getElementById('totalDiscountPercent');
@@ -4426,6 +4456,10 @@ function loadInvoiceSettings() {
     document.getElementById('enableExtraDiscount2').checked = localStorage.getItem('enableExtraDiscount2') === 'true';
     document.getElementById('enableBatchNo').checked = localStorage.getItem('enableBatchNo') !== 'false';
 document.getElementById('enableExpiryDate').checked = localStorage.getItem('enableExpiryDate') !== 'false';
+    // Taxation checkbox only exists on med_pos_invoice's settings modal — guard its absence
+    // on the regular POS invoice page, which doesn't have this control.
+    const enableTaxationCheckbox = document.getElementById('enableTaxation');
+    if (enableTaxationCheckbox) enableTaxationCheckbox.checked = isTaxationEnabled();
 }
 
 // Save invoice settings to localStorage
@@ -4466,8 +4500,12 @@ function saveInvoiceSettings() {
     localStorage.setItem('enableBatchNo', document.getElementById('enableBatchNo').checked);
 localStorage.setItem('enableExpiryDate', document.getElementById('enableExpiryDate').checked);
     localStorage.setItem('enableAmountPaidPaymentMethod', document.getElementById('enableAmountPaidPaymentMethod').checked);
+    // Taxation checkbox only exists on med_pos_invoice's settings modal — guard its absence
+    // on the regular POS invoice page, which doesn't have this control.
+    const enableTaxationCheckbox = document.getElementById('enableTaxation');
+    if (enableTaxationCheckbox) localStorage.setItem('enableTaxation', enableTaxationCheckbox.checked);
     alert('Invoice settings saved successfully!');
-    
+
     // Refresh product dropdowns if display mode changed
     if (previousDisplayMode !== selectedDisplayMode) {
         refreshProductDisplayInDropdowns();
@@ -4551,7 +4589,7 @@ function applyInvoiceSettings() {
     const enableCashDiscountAmount = localStorage.getItem('enableCashDiscountAmount') === 'true';
     const enableTradeOfferAmount = localStorage.getItem('enableTradeOfferAmount') === 'true';
     const enableFOC = localStorage.getItem('enableFOC') === 'true';
-    const enableTaxation = false;
+    const enableTaxation = isTaxationEnabled();
     const enableInvoiceCashDiscountPercent = localStorage.getItem('enableInvoiceCashDiscountPercent') === 'true';
     const enableInvoiceCashDiscountAmount = localStorage.getItem('enableInvoiceCashDiscountAmount') === 'true';
     const enableExtraDiscount1 = localStorage.getItem('enableExtraDiscount1') === 'true';
@@ -5080,7 +5118,7 @@ async function loadProductStock(productId) {
             const stockColor = stock > 0 ? 'var(--success)' : 'var(--error)';
             
             document.getElementById('stockContent').innerHTML = `
-                <div style="color: ${stockColor}; font-weight: 600;">
+                <div id="availableStockLine" style="color: ${stockColor}; font-weight: 600;">
                     Available Stock: ${stockDisplay}
                 </div>
                 <div id="requiredQtyDisplay" style="margin-top: 8px; color: var(--body); font-size: 12px;"></div>
@@ -5113,11 +5151,31 @@ async function loadProductStock(productId) {
     }
 }
 
-// Validate stock for a row
+// Validate stock for a row. When the product has batch tracking (a batch
+// is selected in the Batch No dropdown), validation and the "Available
+// Stock" display use that specific batch's remaining qty instead of the
+// product's total stock across all batches — selling more than one batch
+// has left should fail even if other batches of the same product have
+// plenty of stock; the user must switch batches instead.
 function validateStockForRow(row) {
-    const availableStock = parseFloat(row.dataset.availableStock) || 0;
+    const totalProductStock = parseFloat(row.dataset.availableStock) || 0;
     const unitName = row.dataset.stockUnitName || '';
-    
+    const batchQtyRaw = row.dataset.batchQtyAvailable;
+    const hasBatchQty = batchQtyRaw !== undefined && batchQtyRaw !== '';
+    const batchNo = row.dataset.batchNo || '';
+    const availableStock = hasBatchQty ? (parseFloat(batchQtyRaw) || 0) : totalProductStock;
+
+    // Keep the shared "Available Stock" panel in sync with whichever batch
+    // is currently selected for this row (falls back to total stock when
+    // the product has no batch tracking).
+    const availableStockLine = document.getElementById('availableStockLine');
+    if (availableStockLine) {
+        const stockDisplay = unitName ? `${availableStock.toFixed(3)} ${unitName}` : `${availableStock.toFixed(3)} units`;
+        const label = hasBatchQty && batchNo ? `Available Stock (Batch ${batchNo}): ` : 'Available Stock: ';
+        availableStockLine.textContent = `${label}${stockDisplay}`;
+        availableStockLine.style.color = availableStock > 0 ? 'var(--success)' : 'var(--error)';
+    }
+
     // Calculate total required quantity
     const unitInputs = row.querySelectorAll('.unit-input');
     let totalQty = 0;
@@ -5126,18 +5184,24 @@ function validateStockForRow(row) {
         const cf = parseFloat(input.dataset.conversionFactor) || 1;
         totalQty += qty * cf;
     });
-    
+
     // Update required qty display
     const requiredDisplay = document.getElementById('requiredQtyDisplay');
     if (requiredDisplay) {
         const requiredQtyText = unitName ? `Required: ${totalQty.toFixed(3)} ${unitName}` : `Required: ${totalQty.toFixed(3)} units`;
         requiredDisplay.innerHTML = requiredQtyText;
-        
+
         if (totalQty > availableStock) {
             requiredDisplay.style.color = 'var(--error)';
             requiredDisplay.style.fontWeight = '600';
-            requiredDisplay.innerHTML += ` <span style="color: var(--error);">?? Exceeds available stock!</span>`;
-            
+            const safeBatchNo = String(batchNo).replace(/[&<>"']/g, function (ch) {
+                return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch];
+            });
+            const exceedsMsg = hasBatchQty && batchNo
+                ? ` <span style="color: var(--error);">?? Exceeds available stock in batch ${safeBatchNo}! Select another batch.</span>`
+                : ` <span style="color: var(--error);">?? Exceeds available stock!</span>`;
+            requiredDisplay.innerHTML += exceedsMsg;
+
             // Highlight the row
             row.style.backgroundColor = 'rgba(227, 79, 79, 0.1)';
             row.style.borderLeft = '4px solid var(--error)';
@@ -5854,19 +5918,14 @@ async function addRowDynamic() {
     const schemeDropdown = createSchemeCell(row);
     schemeCell.appendChild(schemeDropdown);
 
-   // Batch No (auto-filled, read-only, inserted at fixed index 3)
+   // Batch No (dropdown — auto-selects FEFO batch, user can pick another; inserted at fixed index 3)
     const batchNoCell = row.insertCell(3);
     batchNoCell.className = 'batch-no-cell';
-    const batchNoInput = document.createElement('input');
-    batchNoInput.type = 'text';
+    const batchNoInput = document.createElement('select');
     batchNoInput.className = 'table-input batch-no-input';
-    batchNoInput.readOnly = true;
-    batchNoInput.tabIndex = -1;
-    batchNoInput.placeholder = 'No Batch';
+    batchNoInput.innerHTML = '<option value="">No Batch</option>';
     batchNoInput.style.color = '#000000';
     batchNoInput.style.fontWeight = '600';
-    batchNoInput.style.opacity = '1';
-    batchNoInput.style.webkitTextFillColor = '#000000';
     batchNoCell.appendChild(batchNoInput);
 
     // Expiry Date (auto-filled, read-only, inserted at fixed index 4)
@@ -6093,7 +6152,7 @@ function applyInvoiceSettingsToRow(row) {
     const enableCashDiscountAmount = localStorage.getItem('enableCashDiscountAmount') === 'true';
     const enableTradeOfferAmount = localStorage.getItem('enableTradeOfferAmount') === 'true';
     const enableFOC = localStorage.getItem('enableFOC') === 'true';
-    const enableTaxation = false;
+    const enableTaxation = isTaxationEnabled();
     const enableBatchNo = localStorage.getItem('enableBatchNo') !== 'false';       // NEW
     const enableExpiryDate = localStorage.getItem('enableExpiryDate') !== 'false'; // NEW
 
