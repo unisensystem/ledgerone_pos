@@ -1102,10 +1102,45 @@ td:has(.unit-label) .unit-input {
   .summary-grid {
     grid-template-columns: 1fr;
   }
-  
+
   .summary-item {
     padding: 10px;
   }
+}
+
+/* med_pos_invoice only (.med-invoice-page on <body>): Invoice Summary boxes were
+   reported too large by the client — shrink padding/font/input height, leaving
+   the regular Sale Invoice page's sizing untouched. */
+.med-invoice-page .summary-grid {
+  gap: 8px;
+}
+
+.med-invoice-page .summary-item {
+  padding: 8px;
+  gap: 3px;
+  border-width: 1px;
+  border-radius: 5px;
+}
+
+.med-invoice-page .summary-label {
+  font-size: 9px;
+}
+
+.med-invoice-page .summary-value {
+  font-size: 14px;
+}
+
+.med-invoice-page .summary-item.summary-display .summary-value {
+  font-size: 15px;
+}
+
+.med-invoice-page .summary-item input.table-input,
+.med-invoice-page .summary-item select.table-input {
+  height: 32px;
+  padding: 6px 10px;
+  font-size: 12px;
+  border-width: 1px;
+  border-radius: 4px;
 }
 
 /* ===== SUCCESS MODAL ===== */

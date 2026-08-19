@@ -59,9 +59,9 @@ try {
     $stmt = $pdo->prepare("
         SELECT id, tax_base, formula_template, application_level, is_tax_inclusive
         FROM tax_regimes
-        WHERE id = ? AND is_active = 1
+        WHERE id = ? AND tenant_id = ? AND is_active = 1
     ");
-    $stmt->execute([$product['tax_regime_id']]);
+    $stmt->execute([$product['tax_regime_id'], $tenant_id]);
     $taxRegime = $stmt->fetch(PDO::FETCH_ASSOC);
     
     if (!$taxRegime) {
@@ -114,8 +114,9 @@ try {
             tr.tax_name,
             tr.tax_type
         FROM tax_rates tr
-        WHERE 
-            tr.tax_regime_id = ? 
+        WHERE
+            tr.tax_regime_id = ?
+            AND tr.tenant_id = ?
             AND tr.is_active = 1
             AND tr.transaction_type = 'sale'
             AND (
@@ -144,6 +145,7 @@ try {
     
     $stmt->execute([
         $product['tax_regime_id'],
+        $tenant_id,
         $customer['customer_type_id'],
         $is_registered,
         $customer['customer_type_id'],

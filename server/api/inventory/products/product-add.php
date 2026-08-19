@@ -146,19 +146,21 @@ try {
         error_log('Processing ' . count($_POST['branch']) . ' stock opening entries');
         $stockOpeningCount = 0;
         $stockOpeningStmt = $pdo->prepare("
-            INSERT INTO stock_opening (product_id, tenant_id, branch_id, opening_qty, opening_price, unit_id)
-            VALUES (?, ?, ?, ?, ?, ?)
+            INSERT INTO stock_opening (product_id, tenant_id, branch_id, opening_qty, opening_price, batch_no, batch_expiry_date, unit_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         ");
         
         $stockLedgerStmt = $pdo->prepare("
-            INSERT INTO stock_ledger (tenant_id, account_id, branch_id, product_id, reference_table, reference_id, qty_in, unit_cost, unit_id, transaction_type, transaction_date)
-            VALUES (?, ?, ?, ?, 'stock_opening', ?, ?, ?, ?, 'Opening Stock', CURDATE())
+            INSERT INTO stock_ledger (tenant_id, account_id, branch_id, product_id, reference_table, reference_id, qty_in, unit_cost, batch_no, batch_expiry_date, unit_id, transaction_type, transaction_date)
+            VALUES (?, ?, ?, ?, 'stock_opening', ?, ?, ?, ?, ?, ?, 'Opening Stock', CURDATE())
         ");
         
         for ($i = 0; $i < count($_POST['branch']); $i++) {
             if (!empty($_POST['branch'][$i])) {
                 $branchId = $_POST['branch'][$i];
                 $openingPrice = $_POST['openingPrice'][$i] ?? 0;
+                $batchNo = !empty($_POST['batchNo'][$i]) ? $_POST['batchNo'][$i] : null;
+                $batchExpiryDate = !empty($_POST['batchExpiryDate'][$i]) ? $_POST['batchExpiryDate'][$i] : null;
                 
                 // Calculate total quantity in base units for stock_opening
                 $totalQtyInBaseUnits = 0;
@@ -185,6 +187,8 @@ try {
                                         $branchId,
                                         $unitQty,  // Original quantity for this unit
                                         $openingPrice,
+                                        $batchNo,
+                                        $batchExpiryDate,
                                         $unit_id   // Store the specific unit
                                     ]);
                                     $stockOpeningCount++;
@@ -200,6 +204,8 @@ try {
                                         $stockOpeningId,
                                         $unitQty,  // Store original quantity
                                         $openingPrice,
+                                        $batchNo,
+                                        $batchExpiryDate,
                                         $unit_id   // Store the actual unit used
                                     ]);
                                     error_log("Stock ledger entry created for unit {$unit_id}, referencing stock_opening {$stockOpeningId}");
@@ -236,6 +242,8 @@ try {
                             $branchId,
                             $originalQty,  // Store ORIGINAL quantity (e.g., 150 for Grams)
                             $openingPrice,
+                            $batchNo,
+                            $batchExpiryDate,
                             $unitIdForStock  // Store the unit used
                         ]);
                         $stockOpeningCount++;
@@ -256,6 +264,8 @@ try {
                         $stockOpeningId,
                         $originalQty,  // Store original quantity (e.g., 150 Grams)
                         $openingPrice,
+                        $batchNo,
+                        $batchExpiryDate,
                         $default_unit  // Store the actual unit used (e.g., Gram)
                     ]);
                 }
