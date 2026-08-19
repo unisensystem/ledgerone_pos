@@ -70,9 +70,10 @@ document.addEventListener('DOMContentLoaded', function () {
             row.dataset.id = customer.id;
             row.innerHTML = `
                         <td>${startSr + index}</td>
+                        <td>${customer.company_name || '-'}</td>
                         <td><span class="customer-code">${customer.customer_code}</span></td>
-                        <td><span class="customer-name">${customer.customer_name}</span></td>
                         <td>${customer.shop_name || '-'}</td>
+                        <td><span class="customer-name">${customer.customer_name}</span></td>
                         <td>${customer.address || '-'}</td>
                         <td>${customer.customer_group_name || '-'}</td>
                         <td>${customer.customer_category_name || '-'}</td>

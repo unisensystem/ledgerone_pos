@@ -630,15 +630,8 @@ document.addEventListener('DOMContentLoaded', function () {
                     items.forEach((item, idx) => {
                         const row = itemsTable.rows[idx];
 
-                                               const sizeCellInput = row.querySelector('.size-cell input');
+                        const sizeCellInput = row.querySelector('.size-cell input');
                         if (sizeCellInput) sizeCellInput.value = item.size || '';
-
-                        const batchNoCellInput = row.querySelector('.batch-no-input');
-                        if (batchNoCellInput) batchNoCellInput.value = item.batch_no || '';
-
-                        const batchExpiryCellInput = row.querySelector('.batch-expiry-input');
-                        if (batchExpiryCellInput) batchExpiryCellInput.value = item.batch_expiry_date || '';
-                        
 
                         const priceCell = row.querySelector('.price-cell input');
                         if (priceCell) priceCell.value = item.purchase_price || 0;
@@ -1302,7 +1295,7 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
-       // Add row with dynamic UOM columns
+    // Add row with dynamic UOM columns
     function addRowDynamic() {
         const rowCount = itemsTable.rows.length;
         const row = itemsTable.insertRow();
@@ -1349,28 +1342,10 @@ document.addEventListener('DOMContentLoaded', function () {
         sizeInput.className = 'table-input';
         sizeInput.placeholder = 'Size';
         sizeCell.appendChild(sizeInput);
-
-        // Batch No (editable - new batch being received)
-        const batchNoCell = row.insertCell(3);
-        batchNoCell.className = 'batch-no-cell';
-        const batchNoInput = document.createElement('input');
-        batchNoInput.type = 'text';
-        batchNoInput.className = 'table-input batch-no-input';
-        batchNoInput.placeholder = 'e.g. P1';
-        batchNoCell.appendChild(batchNoInput);
-
-        // Expiry Date (editable, defaults to today)
-        const batchExpiryCell = row.insertCell(4);
-        batchExpiryCell.className = 'batch-expiry-cell';
-        const batchExpiryInput = document.createElement('input');
-        batchExpiryInput.type = 'date';
-        batchExpiryInput.className = 'table-input batch-expiry-input';
-        batchExpiryInput.value = new Date().toISOString().split('T')[0];
-        batchExpiryCell.appendChild(batchExpiryInput);
         
-        // Unit cells will be added dynamically (right before .price-cell)
+        // Unit cells will be added dynamically
         // Price
-        const priceCell = row.insertCell(5);
+        const priceCell = row.insertCell(3);
         priceCell.className = 'price-cell';
         const priceInput = document.createElement('input');
         priceInput.type = 'number';
@@ -1391,7 +1366,7 @@ document.addEventListener('DOMContentLoaded', function () {
         priceCell.appendChild(priceInput);
         
         // Gross Amount
-        const grossCell = row.insertCell(6);
+        const grossCell = row.insertCell(4);
         grossCell.className = 'gross-cell';
         const grossInput = document.createElement('input');
         grossInput.type = 'text';
@@ -1402,7 +1377,7 @@ document.addEventListener('DOMContentLoaded', function () {
         grossCell.appendChild(grossInput);
         
         // Discount %
-        const discPercentCell = row.insertCell(7);
+        const discPercentCell = row.insertCell(5);
         discPercentCell.className = 'disc-percent-cell';
         const discPercentInput = document.createElement('input');
         discPercentInput.type = 'number';
@@ -1425,7 +1400,7 @@ document.addEventListener('DOMContentLoaded', function () {
         discPercentCell.appendChild(discPercentInput);
         
         // Discount Amount
-        const discAmountCell = row.insertCell(8);
+        const discAmountCell = row.insertCell(6);
         discAmountCell.className = 'disc-amount-cell';
         const discAmountInput = document.createElement('input');
         discAmountInput.type = 'number';
@@ -1436,7 +1411,7 @@ document.addEventListener('DOMContentLoaded', function () {
         discAmountCell.appendChild(discAmountInput);
         
         // TO %
-        const toPercentCell = row.insertCell(9);
+        const toPercentCell = row.insertCell(7);
         toPercentCell.className = 'to-percent-cell';
         const toPercentInput = document.createElement('input');
         toPercentInput.type = 'number';
@@ -1459,7 +1434,7 @@ document.addEventListener('DOMContentLoaded', function () {
         toPercentCell.appendChild(toPercentInput);
         
         // TO Amount
-        const toAmountCell = row.insertCell(10);
+        const toAmountCell = row.insertCell(8);
         toAmountCell.className = 'to-amount-cell';
         const toAmountInput = document.createElement('input');
         toAmountInput.type = 'number';
@@ -1470,7 +1445,7 @@ document.addEventListener('DOMContentLoaded', function () {
         toAmountCell.appendChild(toAmountInput);
         
         // Tax %
-        const taxPercentCell = row.insertCell(11);
+        const taxPercentCell = row.insertCell(9);
         taxPercentCell.className = 'tax-percent-cell';
         const taxPercentInput = document.createElement('input');
         taxPercentInput.type = 'number';
@@ -1494,7 +1469,7 @@ document.addEventListener('DOMContentLoaded', function () {
         taxPercentCell.appendChild(taxPercentInput);
         
         // Tax Amount
-        const taxAmountCell = row.insertCell(12);
+        const taxAmountCell = row.insertCell(10);
         taxAmountCell.className = 'tax-amount-cell';
         const taxAmountInput = document.createElement('input');
         taxAmountInput.type = 'number';
@@ -1506,7 +1481,7 @@ document.addEventListener('DOMContentLoaded', function () {
         taxAmountCell.appendChild(taxAmountInput);
         
         // FOC Qty
-        const focCell = row.insertCell(13);
+        const focCell = row.insertCell(11);
         focCell.className = 'foc-cell';
         const focInput = document.createElement('input');
         focInput.type = 'number';
@@ -1517,7 +1492,7 @@ document.addEventListener('DOMContentLoaded', function () {
         focCell.appendChild(focInput);
         
         // Net Amount
-        const netCell = row.insertCell(14);
+        const netCell = row.insertCell(12);
         netCell.className = 'net-cell';
         const netInput = document.createElement('input');
         netInput.type = 'text';
@@ -1528,7 +1503,7 @@ document.addEventListener('DOMContentLoaded', function () {
         netCell.appendChild(netInput);
         
         // Actions
-        const actionsCell = row.insertCell(15);
+        const actionsCell = row.insertCell(13);
         const deleteBtn = document.createElement('button');
         deleteBtn.type = 'button';
         deleteBtn.className = 'btn btn-danger btn-sm';
@@ -1554,8 +1529,6 @@ document.addEventListener('DOMContentLoaded', function () {
         // Apply current settings to this new row
         applySettingsToRow(row, {
             enableSize: localStorage.getItem('enableSize') === 'true',
-            enableBatchNo: localStorage.getItem('enableBatchNo') === 'true',
-            enableBatchExpiry: localStorage.getItem('enableBatchExpiry') === 'true',
             enableTradeOffer: localStorage.getItem('enableTradeOffer') === 'true',
             enableTradeOfferAmount: localStorage.getItem('enableTradeOfferAmount') === 'true',
             enableFOC: localStorage.getItem('enableFOC') === 'true',
@@ -2139,11 +2112,9 @@ document.addEventListener('DOMContentLoaded', function () {
             });
             
             if (unitEntries.length > 0) {
-                               const item = {
+                const item = {
                     productId: row.cells[1].querySelector('.item-code').value,
                     size: row.querySelector('.size-cell input')?.value || '',
-                    batchNo: row.querySelector('.batch-no-input')?.value || null,
-                    batchExpiryDate: row.querySelector('.batch-expiry-input')?.value || null,
                     unitEntries: unitEntries,
                     purchasePrice: parseFloat(row.querySelector('.price-cell input').value),
                     grossAmount: parseFloat(row.querySelector('.gross-cell input').value),
@@ -2306,15 +2277,6 @@ document.addEventListener('DOMContentLoaded', function () {
         isEditMode ? window.location.href = 'purchase-list.php' : performReset();
     });
 
-    // Med Print button — opens the medical-format print for this invoice
-    document.getElementById('medPrintInvoiceBtn')?.addEventListener('click', function () {
-        window.purchaseStopCountdown();
-        document.getElementById('successModal').style.display = 'none';
-        const invoiceId = isEditMode ? editId : window.lastInvoiceId;
-        if (invoiceId) window.open(`med-invoice-print.php?id=${invoiceId}`, '_blank');
-        isEditMode ? window.location.href = 'purchase-list.php' : performReset();
-    });
-
     document.addEventListener('keydown', function(e) {
         const modal = document.getElementById('successModal');
         if (!modal || modal.style.display !== 'flex') return;
@@ -2328,9 +2290,6 @@ document.addEventListener('DOMContentLoaded', function () {
         } else if (e.key === 'p' || e.key === 'P') {
             e.preventDefault();
             document.getElementById('printInvoiceBtn')?.click();
-        } else if (e.key === 'm' || e.key === 'M') {
-            e.preventDefault();
-            document.getElementById('medPrintInvoiceBtn')?.click();
         }
     });
 
@@ -2338,9 +2297,7 @@ document.addEventListener('DOMContentLoaded', function () {
     document.getElementById('invoiceSettingsBtn').addEventListener('click', function () {
         // Load settings from localStorage
         document.getElementById('enableSize').checked = localStorage.getItem('enableSize') === 'true';
-        document.getElementById('enableBatchNo').checked = localStorage.getItem('enableBatchNo') === 'true';
-        document.getElementById('enableBatchExpiry').checked = localStorage.getItem('enableBatchExpiry') === 'true';
-                document.getElementById('enableTradeOffer').checked = localStorage.getItem('enableTradeOffer') === 'true';
+        document.getElementById('enableTradeOffer').checked = localStorage.getItem('enableTradeOffer') === 'true';
         document.getElementById('enableTradeOfferAmount').checked = localStorage.getItem('enableTradeOfferAmount') === 'true';
         document.getElementById('enableFOC').checked = localStorage.getItem('enableFOC') === 'true';
         document.getElementById('enableTaxation').checked = localStorage.getItem('enableTaxation') === 'true';
@@ -2371,9 +2328,7 @@ document.addEventListener('DOMContentLoaded', function () {
     document.getElementById('saveSettingsBtn').addEventListener('click', function () {
         // Save settings to localStorage
         localStorage.setItem('enableSize', document.getElementById('enableSize').checked);
-        localStorage.setItem('enableBatchNo', document.getElementById('enableBatchNo').checked);
-        localStorage.setItem('enableBatchExpiry', document.getElementById('enableBatchExpiry').checked);
-                localStorage.setItem('enableTradeOffer', document.getElementById('enableTradeOffer').checked);
+        localStorage.setItem('enableTradeOffer', document.getElementById('enableTradeOffer').checked);
         localStorage.setItem('enableTradeOfferAmount', document.getElementById('enableTradeOfferAmount').checked);
         localStorage.setItem('enableFOC', document.getElementById('enableFOC').checked);
         localStorage.setItem('enableTaxation', document.getElementById('enableTaxation').checked);
@@ -2417,9 +2372,7 @@ document.addEventListener('DOMContentLoaded', function () {
         const enableInvoiceCashDiscount = localStorage.getItem('enableInvoiceCashDiscount') === 'true';
         const enableInvoiceCashDiscountAmount = localStorage.getItem('enableInvoiceCashDiscountAmount') === 'true';
         const enableShippingFees = localStorage.getItem('enableShippingFees') === 'true';
-               const enableSize = localStorage.getItem('enableSize') === 'true';
-        const enableBatchNo = localStorage.getItem('enableBatchNo') === 'true';
-        const enableBatchExpiry = localStorage.getItem('enableBatchExpiry') === 'true';
+        const enableSize = localStorage.getItem('enableSize') === 'true';
 
         // Invoice Details fields (default true if never set)
         const invoiceDetailFields = [
@@ -2445,10 +2398,8 @@ document.addEventListener('DOMContentLoaded', function () {
         });
 
         // Show/hide thead and tfoot columns via data-col
-               const colMap = [
+        const colMap = [
             { col: 'size',          show: enableSize },
-            { col: 'batch-no',      show: enableBatchNo },
-            { col: 'batch-expiry',  show: enableBatchExpiry },
             { col: 'disc-percent',  show: enableInlineCashDiscount },
             { col: 'disc-amount',   show: enableInlineCashDiscountAmount },
             { col: 'to-percent',    show: enableTradeOffer },
@@ -2464,9 +2415,9 @@ document.addEventListener('DOMContentLoaded', function () {
         });
 
         // Show/hide cells in all existing rows
-                const rows = document.getElementById('itemsTable').getElementsByTagName('tbody')[0].rows;
+        const rows = document.getElementById('itemsTable').getElementsByTagName('tbody')[0].rows;
         for (let row of rows) {
-            applySettingsToRow(row, { enableSize, enableBatchNo, enableBatchExpiry, enableTradeOffer, enableTradeOfferAmount, enableFOC, enableTaxation, enableInlineCashDiscount, enableInlineCashDiscountAmount });
+            applySettingsToRow(row, { enableSize, enableTradeOffer, enableTradeOfferAmount, enableFOC, enableTaxation, enableInlineCashDiscount, enableInlineCashDiscountAmount });
         }
 
         // Hide/show invoice summary fields
@@ -2483,14 +2434,10 @@ document.addEventListener('DOMContentLoaded', function () {
         if (shippingFeesItem) shippingFeesItem.style.display = enableShippingFees ? '' : 'none';
     }
 
-       function applySettingsToRow(row, settings) {
-        const { enableSize, enableBatchNo, enableBatchExpiry, enableTradeOffer, enableTradeOfferAmount, enableFOC, enableTaxation, enableInlineCashDiscount, enableInlineCashDiscountAmount } = settings;
+    function applySettingsToRow(row, settings) {
+        const { enableSize, enableTradeOffer, enableTradeOfferAmount, enableFOC, enableTaxation, enableInlineCashDiscount, enableInlineCashDiscountAmount } = settings;
         const sizeCell = row.querySelector('.size-cell');
         if (sizeCell) sizeCell.style.display = enableSize ? '' : 'none';
-        const batchNoCell = row.querySelector('.batch-no-cell');
-        if (batchNoCell) batchNoCell.style.display = enableBatchNo ? '' : 'none';
-        const batchExpiryCell = row.querySelector('.batch-expiry-cell');
-        if (batchExpiryCell) batchExpiryCell.style.display = enableBatchExpiry ? '' : 'none';
         const toPercentCell = row.querySelector('.to-percent-cell');
         const toAmountCell = row.querySelector('.to-amount-cell');
         const focCell = row.querySelector('.foc-cell');
@@ -2698,3 +2645,4 @@ function addChildProducts(parentRow, children) {
     }));
     parentRow.dataset.childProducts = JSON.stringify(childProducts);
 }
+

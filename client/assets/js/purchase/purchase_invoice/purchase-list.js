@@ -5,127 +5,6 @@ document.addEventListener('DOMContentLoaded', function () {
     const invoicesTable = document.getElementById('invoicesTable').getElementsByTagName('tbody')[0];
     let duplicateInvoiceId = null;
 
-    // ===================== Action Buttons Visibility (Show/Hide) =====================
-    const ACTION_VISIBILITY_KEY = 'purchaseInvoiceActionVisibility';
-
-    const actionDefs = [
-        { key: 'print',    label: 'Print' },
-        { key: 'medPrint', label: 'Med Print' }
-    ];
-
-    function getActionVisibility() {
-        let saved = {};
-        try {
-            saved = JSON.parse(localStorage.getItem(ACTION_VISIBILITY_KEY)) || {};
-        } catch (e) {
-            saved = {};
-        }
-        const config = {};
-        actionDefs.forEach(def => {
-            config[def.key] = saved.hasOwnProperty(def.key) ? !!saved[def.key] : true;
-        });
-        return config;
-    }
-
-    function saveActionVisibility(config) {
-        try {
-            localStorage.setItem(ACTION_VISIBILITY_KEY, JSON.stringify(config));
-        } catch (e) {
-            console.error('Error saving action visibility:', e);
-        }
-    }
-
-    let actionVisibility = getActionVisibility();
-
-    function injectActionVisibilityStyles() {
-        if (document.getElementById('actionVisibilityStyles')) return;
-        const style = document.createElement('style');
-        style.id = 'actionVisibilityStyles';
-        style.textContent = `
-            .action-visibility-bar {
-                display: flex;
-                align-items: center;
-                flex-wrap: wrap;
-                gap: 14px;
-                padding: 8px 14px;
-                border-top: 1px solid #e5e7eb;
-                background: #fafafa;
-                font-size: 12px;
-            }
-            .action-visibility-bar .avb-label {
-                font-size: 11px;
-                font-weight: 600;
-                color: #9ca3af;
-                text-transform: uppercase;
-                letter-spacing: 0.03em;
-                margin-right: 2px;
-            }
-            .action-visibility-bar .avb-item {
-                display: inline-flex;
-                align-items: center;
-                gap: 5px;
-                cursor: pointer;
-                user-select: none;
-                color: #4b5563;
-                line-height: 1;
-            }
-            .action-visibility-bar .avb-item input {
-                width: 13px;
-                height: 13px;
-                margin: 0;
-                cursor: pointer;
-                accent-color: #2563eb;
-            }
-            .action-visibility-bar .avb-item span {
-                font-size: 12px;
-            }
-        `;
-        document.head.appendChild(style);
-    }
-
-    function createActionVisibilityControl() {
-        injectActionVisibilityStyles();
-
-        const table = document.getElementById('invoicesTable');
-        if (!table || document.getElementById('actionVisibilityBar')) return;
-
-        const bar = document.createElement('div');
-        bar.className = 'action-visibility-bar';
-        bar.id = 'actionVisibilityBar';
-
-        const label = document.createElement('span');
-        label.className = 'avb-label';
-        label.textContent = 'Show/Hide:';
-        bar.appendChild(label);
-
-        actionDefs.forEach(def => {
-            const item = document.createElement('label');
-            item.className = 'avb-item';
-
-            const checkbox = document.createElement('input');
-            checkbox.type = 'checkbox';
-            checkbox.checked = actionVisibility[def.key];
-            checkbox.dataset.actionKey = def.key;
-            checkbox.addEventListener('change', function () {
-                actionVisibility[def.key] = this.checked;
-                saveActionVisibility(actionVisibility);
-                populateTable(invoices);
-            });
-
-            const span = document.createElement('span');
-            span.textContent = def.label;
-
-            item.appendChild(checkbox);
-            item.appendChild(span);
-            bar.appendChild(item);
-        });
-
-        // Place the bar directly below the table
-        const tableParent = table.closest('.table-responsive') || table.parentElement;
-        tableParent.insertAdjacentElement('afterend', bar);
-    }
-    // =================== End Action Buttons Visibility ===================
-
     // Load companies for filter
     async function loadCompanies() {
         try {
@@ -367,7 +246,6 @@ document.addEventListener('DOMContentLoaded', function () {
             editBtn.innerHTML = '<i class="fas fa-edit"></i>';
             editBtn.title = 'Edit Invoice';
             editBtn.addEventListener('click', () => editInvoice(invoice.id));
-            actionButtons.appendChild(editBtn);
 
             // Duplicate button
             const dupBtn = document.createElement('button');
@@ -375,27 +253,13 @@ document.addEventListener('DOMContentLoaded', function () {
             dupBtn.innerHTML = '<i class="fas fa-copy"></i>';
             dupBtn.title = 'Duplicate Invoice';
             dupBtn.addEventListener('click', () => openDuplicateModal(invoice.id, invoice.invoiceNo, invoice.supplierId, invoice.companyId));
-            actionButtons.appendChild(dupBtn);
 
             // Print button
-            if (actionVisibility.print) {
-                const printBtn = document.createElement('button');
-                printBtn.className = 'btn btn-success btn-sm';
-                printBtn.innerHTML = '<i class="fas fa-print"></i>';
-                printBtn.title = 'Print Invoice';
-                printBtn.addEventListener('click', () => printInvoice(invoice.id));
-                actionButtons.appendChild(printBtn);
-            }
-
-            // Med Print button
-            if (actionVisibility.medPrint) {
-                const medPrintBtn = document.createElement('button');
-                medPrintBtn.className = 'btn btn-info btn-sm';
-                medPrintBtn.innerHTML = '<i class="fas fa-file-medical-alt"></i>';
-                medPrintBtn.title = 'Med Print';
-                medPrintBtn.addEventListener('click', () => medPrintInvoice(invoice.id));
-                actionButtons.appendChild(medPrintBtn);
-            }
+            const printBtn = document.createElement('button');
+            printBtn.className = 'btn btn-success btn-sm';
+            printBtn.innerHTML = '<i class="fas fa-print"></i>';
+            printBtn.title = 'Print Invoice';
+            printBtn.addEventListener('click', () => printInvoice(invoice.id));
 
             // PDF button
             const pdfBtn = document.createElement('button');
@@ -403,7 +267,6 @@ document.addEventListener('DOMContentLoaded', function () {
             pdfBtn.innerHTML = '<i class="fas fa-file-pdf"></i>';
             pdfBtn.title = 'Download PDF';
             pdfBtn.addEventListener('click', () => window.open(`invoice-print.php?id=${invoice.id}&pdf=1`, '_blank'));
-            actionButtons.appendChild(pdfBtn);
 
             // Delete button
             const deleteBtn = document.createElement('button');
@@ -411,6 +274,11 @@ document.addEventListener('DOMContentLoaded', function () {
             deleteBtn.innerHTML = '<i class="fas fa-trash"></i>';
             deleteBtn.title = 'Delete Invoice';
             deleteBtn.addEventListener('click', () => deleteInvoice(invoice.id));
+
+            actionButtons.appendChild(editBtn);
+            actionButtons.appendChild(dupBtn);
+            actionButtons.appendChild(printBtn);
+            actionButtons.appendChild(pdfBtn);
             actionButtons.appendChild(deleteBtn);
 
             actionsCell.appendChild(actionButtons);
@@ -429,7 +297,6 @@ document.addEventListener('DOMContentLoaded', function () {
     function applyFilters() { loadInvoices(1); }
 
     // Initial load
-    createActionVisibilityControl();
     loadCompanies();
     loadSuppliers();
     loadInvoices();
@@ -510,10 +377,6 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function printInvoice(id) {
         window.open(`invoice-print.php?id=${id}`, '_blank');
-    }
-
-    function medPrintInvoice(id) {
-        window.open(`med-invoice-print.php?id=${id}`, '_blank');
     }
 
     let deleteInvoiceId = null;

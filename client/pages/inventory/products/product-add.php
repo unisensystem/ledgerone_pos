@@ -328,39 +328,31 @@ if (!$user_id) {
                 
                 <div class="stock-opening-section">
                     <h3 class="subsection-title">Branch-wise Opening Stock</h3>
-                  <div class="stock-entries" id="stockEntries">
-    <div class="stock-entry">
-        <div class="form-row">
-            <div class="form-group">
-                <label>Branch</label>
-                <div class="custom-dropdown">
-                    <input type="text" class="branch-search" placeholder="Search branches..." autocomplete="off">
-                    <input type="hidden" name="branch[]">
-                    <div class="dropdown-list" style="display: none;"></div>
-                </div>
-            </div>
-            <div class="form-group">
-                <label>Opening Qty</label>
-                <input type="number" name="openingQty[]" step="0.01" min="0">
-            </div>
-            <div class="form-group">
-                <label>Opening Price / Unit</label>
-                <input type="number" name="openingPrice[]" step="0.01" min="0">
-            </div>
-            <div class="form-group">
-                <label>Batch No</label>
-                <input type="text" name="batchNo[]" placeholder="e.g., B-2026-001">
-            </div>
-            <div class="form-group">
-                <label>Batch Expiry Date</label>
-                <input type="date" name="batchExpiryDate[]">
-            </div>
-            <div class="form-group">
-                <button type="button" class="btn btn-danger remove-stock-entry" style="margin-top: 24px;">Remove</button>
-            </div>
-        </div>
-    </div>
-</div>
+                    <div class="stock-entries" id="stockEntries">
+                        <div class="stock-entry">
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>Branch</label>
+                                    <div class="custom-dropdown">
+                                        <input type="text" class="branch-search" placeholder="Search branches..." autocomplete="off">
+                                        <input type="hidden" name="branch[]">
+                                        <div class="dropdown-list" style="display: none;"></div>
+                                    </div>
+                                </div>
+                                <div class="form-group">
+                                    <label>Opening Qty</label>
+                                    <input type="number" name="openingQty[]" step="0.01" min="0">
+                                </div>
+                                <div class="form-group">
+                                    <label>Opening Price / Unit</label>
+                                    <input type="number" name="openingPrice[]" step="0.01" min="0">
+                                </div>
+                                <div class="form-group">
+                                    <button type="button" class="btn btn-danger remove-stock-entry" style="margin-top: 24px;">Remove</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                     <button type="button" class="btn btn-secondary" id="addStockEntry">Add Another Branch</button>
                     
                     <div class="total-stock-summary">

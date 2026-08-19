@@ -115,8 +115,8 @@ function updateTableHeaders() {
     const headerRow = thead.rows[0];
     
     let safetyCounter = 0;
-    while (headerRow.cells.length > 5 && safetyCounter < 20) {
-        const cell = headerRow.cells[5];
+    while (headerRow.cells.length > 3 && safetyCounter < 20) {
+        const cell = headerRow.cells[3];
         const cellText = cell.textContent.trim();
         // Stop if we reach Price or any of the fixed columns
         if (cellText.includes('Sale Price') || cellText.includes('Gross Amount') || 
@@ -125,14 +125,13 @@ function updateTableHeaders() {
             cellText.includes('Net Amount') || cellText.includes('Actions')) {
             break;
         }
-        headerRow.deleteCell(5);
+        headerRow.deleteCell(3);
         safetyCounter++;
     }
     
-    // Insert generic unit headers (Unit 1, Unit 2, Unit 3, etc.) starting at index 5
-    // (index 0=S#, 1=Product, 2=Scheme, 3=Batch No, 4=Expiry Date)
+    // Insert generic unit headers (Unit 1, Unit 2, Unit 3, etc.) starting at index 3
     for (let i = 0; i < maxUnitColumns; i++) {
-        const th = headerRow.insertCell(5 + i);
+        const th = headerRow.insertCell(3 + i);
         th.width = '8%';
         th.style.fontWeight = '600';
         th.style.fontSize = '12px';
@@ -156,16 +155,15 @@ function updateRowUnitCells(row) {
         }
     });
     
-    // Remove old unit cells (between Expiry Date and Price)
-    // Keep removing cells at index 5 until we find a cell with price-cell class
-    // (index 0=S#, 1=Product, 2=Scheme, 3=Batch No, 4=Expiry Date)
-    while (row.cells.length > 5 && !row.cells[5].classList.contains('price-cell')) {
-        row.deleteCell(5);
+    // Remove old unit cells (between Scheme and Price)
+    // Keep removing cells at index 3 until we find a cell with price-cell or scheme-cell class
+    while (row.cells.length > 3 && !row.cells[3].classList.contains('price-cell')) {
+        row.deleteCell(3);
     }
     
-    // Insert unit cells starting at index 5 (after Batch No / Expiry Date cells)
+    // Insert unit cells starting at index 3 (after Scheme cell at index 2)
     for (let i = 0; i < maxUnitColumns; i++) {
-        const cell = row.insertCell(5 + i);
+        const cell = row.insertCell(3 + i);
         
         // Check if this product has a unit at this position
         if (i < productUomDetails.length) {
@@ -323,13 +321,7 @@ function calculateRowAmounts(row, totalQty, price, source) {
     
     // After discount
     const afterDiscount = gross - discountAmt;
-
-    // Extra Discount (med_pos_invoice only — column doesn't exist elsewhere,
-    // so the selector simply finds nothing and extraDiscAmt stays 0)
-    const extraDiscInput = row.querySelector('.extra-disc-cell input');
-    const extraDiscAmt = extraDiscInput ? (parseFloat(extraDiscInput.value) || 0) : 0;
-    const afterExtraDiscount = afterDiscount - extraDiscAmt;
-
+    
     // Trade offer amount - read from input (NOT percentage-based)
     const toAmountInput = row.querySelector('.to-amount-cell input');
     let tradeOfferAmt = 0;
@@ -338,7 +330,7 @@ function calculateRowAmounts(row, totalQty, price, source) {
     }
     
     // After trade offer
-    const afterTradeOffer = afterExtraDiscount - tradeOfferAmt;
+    const afterTradeOffer = afterDiscount - tradeOfferAmt;
     
     // Check application level - only apply tax at item level if application_level is 'item'
     const applicationLevel = row.dataset.applicationLevel || 'item';
@@ -349,15 +341,8 @@ function calculateRowAmounts(row, totalQty, price, source) {
         const formulaTemplate = row.dataset.formulaTemplate;
         const basePrice = parseFloat(row.dataset.basePrice);
         const taxBase = row.dataset.taxBase;
-        const isTaxInclusive = row.dataset.isTaxInclusive === '1';
-
-        if (isTaxInclusive) {
-            // Tax is embedded in the price — extract it via back-calculation per unit,
-            // same formula used on initial product selection (loadTaxForNewProduct).
-            // Re-derived here too since this function re-runs on every qty/price edit.
-            const taxPerUnit = taxPercent > 0 ? basePrice * taxPercent / (100 + taxPercent) : 0;
-            taxAmt = taxPerUnit * totalQty;
-        } else if (formulaTemplate && !isNaN(basePrice) && basePrice > 0) {
+        
+        if (formulaTemplate && !isNaN(basePrice) && basePrice > 0) {
             // For MRP-based formulas (Third Schedule), formula calculates base price
             // Tax = MRP - base_price
             if (taxBase === 'mrp') {
@@ -376,17 +361,9 @@ function calculateRowAmounts(row, totalQty, price, source) {
     // If application_level is 'invoice', tax is NOT applied here (will be applied at invoice level)
     
     row.querySelector('.tax-amount-cell input').value = taxAmt.toFixed(3);
-
-    // Net amount: exclusive item-level tax must be added on top (it isn't embedded
-    // in salePrice); inclusive tax is already embedded in salePrice so stays
-    // excluded here to avoid double-counting. Gated to med_pos_invoice via
-    // isTaxationEnabled() — the regular POS invoice keeps its historical "tax
-    // computed but excluded from net" behavior unchanged (enableTaxation is
-    // always false there, so this stays off regardless of any tax data present).
-    const includeTaxInNet = applicationLevel === 'item'
-        && row.dataset.isTaxInclusive !== '1'
-        && (typeof isTaxationEnabled === 'function' ? isTaxationEnabled() : false);
-    const net = includeTaxInNet ? (afterTradeOffer + taxAmt) : afterTradeOffer;
+    
+    // Net amount (tax excluded)
+    const net = afterTradeOffer;
     row.querySelector('.net-cell input').value = net.toFixed(3);
     
     // Update summary
@@ -402,25 +379,24 @@ function updateFooterTotals() {
     const footerRow = tfoot.rows[0];
     
     // Remove old unit total cells that were dynamically inserted
-    // Keep removing cells at index 5 until we reach the known fixed column IDs
-    // (index 0=Totals label, 1=Product, 2=Scheme, 3=Batch No, 4=Expiry Date)
+    // Keep removing cells at index 3 until we reach the known fixed column IDs
     let safetyCounter = 0;
     const knownIds = ['totalSalePrice', 'totalGrossAmount', 'totalDiscountAmountItems', 
                       'totalTradeOfferAmount', 'totalGstAmount', 'totalFocQty', 'totalNetAmountItems'];
     
-    while (footerRow.cells.length > 5 && safetyCounter < 20) {
-        const cell = footerRow.cells[5];
+    while (footerRow.cells.length > 3 && safetyCounter < 20) {
+        const cell = footerRow.cells[3];
         // Stop if we reach a cell with a known fixed id
         if (cell && cell.id && knownIds.includes(cell.id)) {
             break;
         }
-        footerRow.deleteCell(5);
+        footerRow.deleteCell(3);
         safetyCounter++;
     }
     
-    // Insert empty cells for dynamic unit columns at index 5
+    // Insert empty cells for dynamic unit columns at index 3
     for (let i = 0; i < maxUnitColumns; i++) {
-        const cell = footerRow.insertCell(5 + i);
+        const cell = footerRow.insertCell(3 + i);
         cell.textContent = '';
         cell.style.textAlign = 'center';
         cell.style.padding = '8px 4px';
@@ -438,7 +414,6 @@ function updateInvoiceSummaryDynamic() {
     let totalPurchasePrice = 0;
     let totalGrossAmount = 0;
     let totalDiscountAmountItems = 0;
-    let totalExtraDiscountAmountItems = 0;
     let totalTradeOfferAmountItems = 0;
     let totalTaxAmountItems = 0;
     let totalFOCQty = 0;
@@ -450,7 +425,6 @@ function updateInvoiceSummaryDynamic() {
         const priceInput = row.querySelector('.price-cell input');
         const grossInput = row.querySelector('.gross-cell input');
         const discAmtInput = row.querySelector('.disc-amount-cell input');
-        const extraDiscAmtInput = row.querySelector('.extra-disc-cell input');
         const toAmtInput = row.querySelector('.to-amount-cell input');
         const taxAmtInput = row.querySelector('.tax-amount-cell input');
         const focInput = row.querySelector('.foc-cell input');
@@ -460,7 +434,6 @@ function updateInvoiceSummaryDynamic() {
             totalPurchasePrice += parseFloat(priceInput?.value) || 0;
             totalGrossAmount += parseFloat(grossInput?.value) || 0;
             totalDiscountAmountItems += parseFloat(discAmtInput?.value) || 0;
-            totalExtraDiscountAmountItems += parseFloat(extraDiscAmtInput?.value) || 0;
             totalTradeOfferAmountItems += parseFloat(toAmtInput?.value) || 0;
             totalTaxAmountItems += parseFloat(taxAmtInput?.value) || 0;
             totalFOCQty += parseFloat(focInput?.value) || 0;
@@ -473,20 +446,16 @@ function updateInvoiceSummaryDynamic() {
     const totalSalePriceEl = document.getElementById('totalSalePrice');
     const totalGrossAmountEl = document.getElementById('totalGrossAmount');
     const totalDiscountAmountItemsEl = document.getElementById('totalDiscountAmountItems');
-    const totalExtraDiscountAmountEl = document.getElementById('totalExtraDiscountAmount');
     const totalTradeOfferAmountEl = document.getElementById('totalTradeOfferAmount');
     const totalTaxAmountEl = document.getElementById('totalTaxAmount');
-    const itemTaxAmountSummaryEl = document.getElementById('itemTaxAmountSummary'); // NEW — med_pos_invoice only
     const totalFocQtyEl = document.getElementById('totalFocQty');
     const totalNetAmountItemsEl = document.getElementById('totalNetAmountItems');
     
     if (totalSalePriceEl) totalSalePriceEl.textContent = totalPurchasePrice.toFixed(3);
     if (totalGrossAmountEl) totalGrossAmountEl.textContent = totalGrossAmount.toFixed(3);
     if (totalDiscountAmountItemsEl) totalDiscountAmountItemsEl.textContent = totalDiscountAmountItems.toFixed(3);
-    if (totalExtraDiscountAmountEl) totalExtraDiscountAmountEl.textContent = totalExtraDiscountAmountItems.toFixed(3);
     if (totalTradeOfferAmountEl) totalTradeOfferAmountEl.textContent = totalTradeOfferAmountItems.toFixed(3);
     if (totalTaxAmountEl) totalTaxAmountEl.textContent = totalTaxAmountItems.toFixed(3);
-    if (itemTaxAmountSummaryEl) itemTaxAmountSummaryEl.textContent = totalTaxAmountItems.toFixed(3); // NEW
     if (totalFocQtyEl) totalFocQtyEl.textContent = totalFOCQty.toFixed(3);
     if (totalNetAmountItemsEl) totalNetAmountItemsEl.textContent = totalNetAmountItems.toFixed(3);
     
@@ -508,39 +477,23 @@ function updateInvoiceSummaryDynamic() {
     
     if (totalDiscountAmountEl) totalDiscountAmountEl.value = discountAmount.toFixed(3);
     if (netAmountEl) netAmountEl.textContent = netAmount.toFixed(3);
-
-    // Expose totals for invoice-level tax base resolution
-    window.currentTotalBill = totalBill;
-    window.currentValueExclSalesTax = afterDiscount;
-    window.currentNetAmount = netAmount;
-
+    
     // Calculate withholding tax
     const withholdingTaxPercentEl = document.getElementById('withholdingTaxPercent');
     const withholdingTaxPercent = parseFloat(withholdingTaxPercentEl?.value) || 0;
     const withholdingTaxAmount = netAmount * (withholdingTaxPercent / 100);
-    let netReceivable = netAmount - withholdingTaxAmount;
-
+    const netReceivable = netAmount - withholdingTaxAmount;
+    
     const withholdingTaxAmountEl = document.getElementById('withholdingTaxAmount');
     const netReceivableEl = document.getElementById('netReceivable');
-
+    
     if (withholdingTaxAmountEl) {
         withholdingTaxAmountEl.textContent = withholdingTaxAmount.toFixed(3);
     }
-
-    // Apply invoice-level taxes and factor exclusive tax into net receivable
-    // BEFORE computing remaining balance — otherwise remainingBalance would be
-    // derived from the pre-tax netReceivable while the displayed netReceivable
-    // (overwritten inside calculateInvoiceLevelTaxes) already includes tax,
-    // leaving the two fields inconsistent with each other.
-    if (typeof calculateInvoiceLevelTaxes === 'function') {
-        const exclusiveTax = calculateInvoiceLevelTaxes() || 0;
-        netReceivable = netAmount - withholdingTaxAmount + exclusiveTax;
-    }
-
     if (netReceivableEl) {
         netReceivableEl.textContent = netReceivable.toFixed(3);
     }
-
+    
     // Auto-fill Amount Paid when Invoice Type is Cash
     const amountPaidEl = document.getElementById('amountPaid');
     const invoiceTypeEl = document.getElementById('invoiceType');
@@ -556,89 +509,10 @@ function updateInvoiceSummaryDynamic() {
     if (remainingBalanceEl) {
         remainingBalanceEl.value = remainingBalance.toFixed(3);
     }
-}
 
-function escBatchHtml(value) {
-    return String(value ?? '').replace(/[&<>"']/g, function (ch) {
-        return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch];
-    });
-}
-
-// Load the Batch No dropdown / Expiry Date column for a product row.
-// Batches are fetched sorted soonest-expiry-first (FEFO) and the dropdown
-// auto-selects the first (soonest-expiry) one, but the user can pick a
-// different batch manually (e.g. if the FEFO batch doesn't have enough
-// remaining qty for this sale) — see applySelectedBatch().
-async function loadProductBatches(row, productId) {
-    const batchNoSelect = row.querySelector('.batch-no-input');
-    const batchExpiryInput = row.querySelector('.batch-expiry-input');
-    if (!batchNoSelect || !batchExpiryInput || !productId) return;
-
-    const branchId = document.getElementById('branch')?.value || '';
-
-    batchNoSelect.innerHTML = '<option value="">Loading...</option>';
-    batchExpiryInput.value = '...';
-    row.dataset.batchQtyAvailable = '';
-    row.dataset.productBatches = '[]';
-
-    try {
-        let url = `../../../../server/api/sale/pos_invoice/get-product-batches.php?product_id=${productId}`;
-        if (branchId) url += `&branch_id=${branchId}`;
-
-        const response = await fetch(url);
-        const data = await response.json();
-
-        if (data.success && data.batches && data.batches.length > 0) {
-            row.dataset.productBatches = JSON.stringify(data.batches);
-
-            batchNoSelect.innerHTML = data.batches.map(function (b) {
-                const expiryText = b.batch_expiry_date ? ` - Exp: ${escBatchHtml(b.batch_expiry_date)}` : '';
-                return `<option value="${escBatchHtml(b.batch_no)}">${escBatchHtml(b.batch_no)}${expiryText} (Qty: ${escBatchHtml(b.remaining_qty)})</option>`;
-            }).join('');
-
-            batchNoSelect.selectedIndex = 0;
-            applySelectedBatch(row, data.batches[0]);
-        } else {
-            batchNoSelect.innerHTML = '<option value="">No Batch</option>';
-            batchExpiryInput.value = '';
-            batchNoSelect.title = 'No batch available for this product';
-            row.dataset.batchQtyAvailable = '';
-        }
-    } catch (error) {
-        console.error('Error loading product batches:', error);
-        batchNoSelect.innerHTML = '<option value="">No Batch</option>';
-        batchExpiryInput.value = '';
-        row.dataset.batchQtyAvailable = '';
-    }
-
-    // Wire the manual-selection handler once per row
-    if (!batchNoSelect.dataset.changeWired) {
-        batchNoSelect.dataset.changeWired = '1';
-        batchNoSelect.addEventListener('change', function () {
-            let batches = [];
-            try { batches = JSON.parse(row.dataset.productBatches || '[]'); } catch (e) { batches = []; }
-            const selected = batches.find(function (b) { return b.batch_no === batchNoSelect.value; });
-            applySelectedBatch(row, selected || null);
-        });
-    }
-}
-
-// Apply a chosen batch (from the FEFO auto-select or a manual dropdown change):
-// fills the Expiry Date field, stores the batch's remaining qty for stock
-// validation, and immediately re-runs stock validation for this row.
-function applySelectedBatch(row, batch) {
-    const batchExpiryInput = row.querySelector('.batch-expiry-input');
-    if (batch) {
-        if (batchExpiryInput) batchExpiryInput.value = batch.batch_expiry_date || '';
-        row.dataset.batchQtyAvailable = batch.remaining_qty;
-        row.dataset.batchNo = batch.batch_no;
-    } else {
-        if (batchExpiryInput) batchExpiryInput.value = '';
-        row.dataset.batchQtyAvailable = '';
-        row.dataset.batchNo = '';
-    }
-    if (typeof validateStockForRow === 'function') {
-        validateStockForRow(row);
+    // Calculate invoice-level taxes
+    if (typeof calculateInvoiceLevelTaxes === 'function') {
+        calculateInvoiceLevelTaxes();
     }
 }
 

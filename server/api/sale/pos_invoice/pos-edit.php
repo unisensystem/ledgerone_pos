@@ -31,21 +31,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
         $stmt = $pdo->prepare("
             SELECT 
                 si.*,
-                si.ship_to,
                 c.customer_name,
                 c.customer_code,
                 c.address as customer_address,
                 c.primary_phone as customer_phone,
                 c.email as customer_email,
-                c.ntn as customer_ntn,
-                c.strn as customer_gst,
-                c.identity_card_no as customer_cnic,
-                c.license_no as customer_license_no,
                 a.area_name,
                 csa.sub_account_name,
                 co.company_name,
-                co.address as company_address,
-                so.bill_no as sale_order_no,
                 b.branch_name,
                 b.branch_code,
                 b.branch_type,
@@ -70,7 +63,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
             LEFT JOIN areas a ON c.area_id = a.id
             LEFT JOIN customer_sub_accounts csa ON si.sub_account_id = csa.id
             LEFT JOIN companies co ON si.company_id = co.id
-            LEFT JOIN sale_order so ON si.sale_order_id = so.id
             LEFT JOIN branches b ON si.branch_id = b.id
             LEFT JOIN branches pb ON b.parent_branch_id = pb.id
             LEFT JOIN ledgerone_public.currencies cur ON si.currency_id = cur.id
@@ -148,7 +140,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
                 currency_id = ?, sale_date = ?, customer_id = ?, sub_account_id = ?, company_id = ?, branch_id = ?,
                 previous_balance = ?, sale_officer_id = ?, supplier_man_id = ?, brand_id = ?, sale_order_id = ?, bilty_no = ?, transport_name = ?, total_bill = ?, total_discount_percent = ?,
                 total_discount_amount = ?, extra_discount_1_percent = ?, extra_discount_1_amount = ?, extra_discount_2_percent = ?, extra_discount_2_amount = ?,
-                net_amount = ?, withholding_tax_percent = ?, withholding_tax_amount = ?, amount_paid_auto_fill = ?, remarks = ?, ship_to = ?, status = ?, project_id = ?, container_id = ?, updated_by = ?
+                net_amount = ?, withholding_tax_percent = ?, withholding_tax_amount = ?, amount_paid_auto_fill = ?, remarks = ?, status = ?, project_id = ?, container_id = ?, updated_by = ?
             WHERE id = ? AND tenant_id = ?
         ");
         $stmt->execute([
@@ -177,7 +169,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
             $withholdingTaxAmount,
             $input['amountPaidAutoFill'] ?? 'yes',
             $input['remarks'] ?? null,
-            $input['shipTo'] ?? null,
             $input['status'] ?? 'Posted',
             $input['projectId'] ?? null,
             (!empty($input['containerId']) && $input['containerId'] !== null && intval($input['containerId']) > 0) ? intval($input['containerId']) : null,
@@ -224,15 +215,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
         }
 
         // Insert new items
-       $item_stmt = $pdo->prepare("
-    INSERT INTO sale_invoice_items (
-        tenant_id, sale_invoice_id, product_id, uom_id,
-        quantity, sale_price, gross_amount, discount_percent,
-        discount_amount, extra_discount_amount, trade_offer_percent, trade_offer_amount,
-        tax_percent, tax_amount, foc_quantity, net_amount, parent_row_id,
-        piece, carton, dozen, scheme, batch_no, expiry_date, created_by, updated_by
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-");
+        $item_stmt = $pdo->prepare("
+            INSERT INTO sale_invoice_items (
+                tenant_id, sale_invoice_id, product_id, uom_id,
+                quantity, sale_price, gross_amount, discount_percent,
+                discount_amount, trade_offer_percent, trade_offer_amount,
+                tax_percent, tax_amount, foc_quantity, net_amount, parent_row_id,
+                piece, carton, dozen, scheme, created_by, updated_by
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ");
+
         $itemIdMap = [];
         foreach ($input['items'] as $index => $item) {
             $parentRowId = null;
@@ -240,33 +232,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
                 $parentRowId = $itemIdMap[$item['parentRowId']] ?? null;
             }
             
-           $item_stmt->execute([
-    $tenant_id,
-    $invoice_id,
-    $item['productId'],
-    $item['uomId'],
-    $item['quantity'],
-    $item['salePrice'],
-    $item['grossAmount'],
-    $item['discountPercent'] ?? 0.00,
-    $item['discountAmount'] ?? 0.00,
-    $item['extraDiscountAmount'] ?? 0.00,
-    $item['tradeOfferPercent'] ?? 0.00,
-    $item['tradeOfferAmount'] ?? 0.00,
-    $item['taxPercent'] ?? 0.00,
-    $item['taxAmount'] ?? 0.00,
-    $item['focQty'] ?? 0.00,
-    $item['netAmount'],
-    $parentRowId,
-    $item['piece'] ?? null,
-    $item['carton'] ?? null,
-    $item['dozen'] ?? null,
-    $item['scheme'] ?? 'sale_on_tp',
-    !empty($item['batchNo']) ? $item['batchNo'] : null,
-    !empty($item['batchExpiryDate']) ? $item['batchExpiryDate'] : null,
-    $user_id,
-    $user_id
-]);
+            $item_stmt->execute([
+                $tenant_id,
+                $invoice_id,
+                $item['productId'],
+                $item['uomId'],
+                $item['quantity'],
+                $item['salePrice'],
+                $item['grossAmount'],
+                $item['discountPercent'] ?? 0.00,
+                $item['discountAmount'] ?? 0.00,
+                $item['tradeOfferPercent'] ?? 0.00,
+                $item['tradeOfferAmount'] ?? 0.00,
+                $item['taxPercent'] ?? 0.00,
+                $item['taxAmount'] ?? 0.00,
+                $item['focQty'] ?? 0.00,
+                $item['netAmount'],
+                $parentRowId,
+                $item['piece'] ?? null,
+                $item['carton'] ?? null,
+                $item['dozen'] ?? null,
+                $item['scheme'] ?? 'sale_on_tp',
+                $user_id,
+                $user_id
+            ]);
+            
             $itemIdMap[$index + 1] = $pdo->lastInsertId();
 
             // Skip stock ledger for Draft status
@@ -281,8 +271,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
                 $stock_stmt = $pdo->prepare("
                         INSERT INTO stock_ledger (
                             tenant_id, branch_id, product_id, reference_table, reference_id,
-                            qty_out, unit_cost, unit_id, batch_no, batch_expiry_date, transaction_type, transaction_date
-                        ) VALUES (?, ?, ?, 'sale_invoice', ?, ?, ?, ?, ?, ?, 'Sale Invoice', ?)
+                            qty_out, unit_cost, unit_id, transaction_type, transaction_date
+                        ) VALUES (?, ?, ?, 'sale_invoice', ?, ?, ?, ?, 'Sale Invoice', ?)
                     ");
                 $stock_stmt->execute([
                     $tenant_id,
@@ -292,8 +282,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
                     $qtyInPieces,
                     $costPrice,
                     $item['uomId'],
-                    !empty($item['batchNo']) ? $item['batchNo'] : null,
-                    !empty($item['batchExpiryDate']) ? $item['batchExpiryDate'] : null,
                     $input['saleDate']
                 ]);
                 
@@ -304,8 +292,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
                     $foc_stmt = $pdo->prepare("
                         INSERT INTO stock_ledger (
                             tenant_id, branch_id, product_id, reference_table, reference_id,
-                            qty_out, unit_cost, unit_id, batch_no, batch_expiry_date, transaction_type, transaction_date
-                        ) VALUES (?, ?, ?, 'sale_invoice', ?, ?, ?, ?, ?, ?, 'Sale Invoice - FOC', ?)
+                            qty_out, unit_cost, unit_id, transaction_type, transaction_date
+                        ) VALUES (?, ?, ?, 'sale_invoice', ?, ?, ?, ?, 'Sale Invoice - FOC', ?)
                     ");
                     $foc_stmt->execute([
                         $tenant_id,
@@ -315,8 +303,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
                         $focQtyInPieces,
                         0,
                         $item['uomId'],
-                        !empty($item['batchNo']) ? $item['batchNo'] : null,
-                        !empty($item['batchExpiryDate']) ? $item['batchExpiryDate'] : null,
                         $input['saleDate']
                     ]);
                 }
