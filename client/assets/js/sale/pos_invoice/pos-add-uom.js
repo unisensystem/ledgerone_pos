@@ -325,9 +325,14 @@ function calculateRowAmounts(row, totalQty, price, source) {
     const afterDiscount = gross - discountAmt;
 
     // Extra Discount (med_pos_invoice only — column doesn't exist elsewhere,
-    // so the selector simply finds nothing and extraDiscAmt stays 0)
+    // so the selector simply finds nothing and extraDiscAmt stays 0).
+    // The field holds a PERCENTAGE (e.g. "2" = 2%), applied on the amount
+    // after the main discount; the computed amount is cached on the row's
+    // dataset so save/footer-total code can read it without re-deriving it.
     const extraDiscInput = row.querySelector('.extra-disc-cell input');
-    const extraDiscAmt = extraDiscInput ? (parseFloat(extraDiscInput.value) || 0) : 0;
+    const extraDiscPercent = extraDiscInput ? (parseFloat(extraDiscInput.value) || 0) : 0;
+    const extraDiscAmt = afterDiscount * (extraDiscPercent / 100);
+    row.dataset.extraDiscountAmount = extraDiscAmt.toFixed(3);
     const afterExtraDiscount = afterDiscount - extraDiscAmt;
 
     // Trade offer amount - read from input (NOT percentage-based)
@@ -450,7 +455,6 @@ function updateInvoiceSummaryDynamic() {
         const priceInput = row.querySelector('.price-cell input');
         const grossInput = row.querySelector('.gross-cell input');
         const discAmtInput = row.querySelector('.disc-amount-cell input');
-        const extraDiscAmtInput = row.querySelector('.extra-disc-cell input');
         const toAmtInput = row.querySelector('.to-amount-cell input');
         const taxAmtInput = row.querySelector('.tax-amount-cell input');
         const focInput = row.querySelector('.foc-cell input');
@@ -460,7 +464,7 @@ function updateInvoiceSummaryDynamic() {
             totalPurchasePrice += parseFloat(priceInput?.value) || 0;
             totalGrossAmount += parseFloat(grossInput?.value) || 0;
             totalDiscountAmountItems += parseFloat(discAmtInput?.value) || 0;
-            totalExtraDiscountAmountItems += parseFloat(extraDiscAmtInput?.value) || 0;
+            totalExtraDiscountAmountItems += parseFloat(row.dataset.extraDiscountAmount) || 0;
             totalTradeOfferAmountItems += parseFloat(toAmtInput?.value) || 0;
             totalTaxAmountItems += parseFloat(taxAmtInput?.value) || 0;
             totalFOCQty += parseFloat(focInput?.value) || 0;

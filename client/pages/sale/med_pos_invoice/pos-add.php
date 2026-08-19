@@ -253,7 +253,7 @@ if (!$user_id) {
                                 <th width="8%" class="gross-cell"><span id="grossAmountLabel">Gross Amount</span></th>
                                 <th width="5%" class="disc-percent-cell">Disc %</th>
                                 <th width="8%" class="disc-amount-cell"><span id="discountAmountLabel">Disc Amt</span></th>
-                                <th width="8%" class="extra-disc-cell">Extra Discount</th>
+                                <th width="8%" class="extra-disc-cell">Extra Disc %</th>
                                 <th width="8%" class="to-amount-cell">T.O Amt</th>
                                 <th width="5%" class="tax-percent-cell">Tax %</th>
                                 <th width="8%" class="tax-amount-cell">Tax Amt</th>
@@ -683,7 +683,7 @@ if (!$user_id) {
                         </label>
                         <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 8px; background: var(--surface-1); border-radius: 6px; transition: all 0.2s;" onmouseover="this.style.background='var(--surface-0)'" onmouseout="this.style.background='var(--surface-1)'">
                             <input type="checkbox" id="enableExtraDiscountItem" style="width: auto;">
-                            <span style="font-size: 13px;">Extra Discount</span>
+                            <span style="font-size: 13px;">Extra Discount %</span>
                         </label>
                     </div>
                 </div>

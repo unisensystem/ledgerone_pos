@@ -1693,8 +1693,14 @@ const invoiceSettingCheckboxes = [
                     if (discPercentInput) discPercentInput.value = item.discount_percent;
                     const discAmountInput = lastRow.querySelector('.disc-amount-cell input');
                     if (discAmountInput) discAmountInput.value = item.discount_amount;
+                    // Extra Discount field holds a %, but what's saved is the amount —
+                    // back-derive the percent from the amount that was actually invoiced.
                     const extraDiscAmountInput = lastRow.querySelector('.extra-disc-cell input');
-                    if (extraDiscAmountInput) extraDiscAmountInput.value = item.extra_discount_amount || 0;
+                    if (extraDiscAmountInput) {
+                        const afterMainDiscount = (parseFloat(item.gross_amount) || 0) - (parseFloat(item.discount_amount) || 0);
+                        const extraDiscPercent = afterMainDiscount > 0 ? ((parseFloat(item.extra_discount_amount) || 0) / afterMainDiscount * 100) : 0;
+                        extraDiscAmountInput.value = extraDiscPercent.toFixed(3);
+                    }
                     const toAmountInput = lastRow.querySelector('.to-amount-cell input');
                     if (toAmountInput) toAmountInput.value = item.trade_offer_amount || 0;
 
@@ -1729,7 +1735,11 @@ const invoiceSettingCheckboxes = [
                         }
                     }
                     if (discAmountInput) discAmountInput.value = item.discount_amount;
-                    if (extraDiscAmountInput) extraDiscAmountInput.value = item.extra_discount_amount || 0;
+                    if (extraDiscAmountInput) {
+                        const afterMainDiscount = (parseFloat(item.gross_amount) || 0) - (parseFloat(item.discount_amount) || 0);
+                        const extraDiscPercent = afterMainDiscount > 0 ? ((parseFloat(item.extra_discount_amount) || 0) / afterMainDiscount * 100) : 0;
+                        extraDiscAmountInput.value = extraDiscPercent.toFixed(3);
+                    }
                     if (toAmountInput) toAmountInput.value = item.trade_offer_amount || 0;
                     if (taxPercentInput) taxPercentInput.value = item.tax_percent || 0;
                     if (taxAmountInput) taxAmountInput.value = item.tax_amount || 0;
@@ -1937,7 +1947,11 @@ const invoiceSettingCheckboxes = [
                     const discAmountInput = lastRow.querySelector('.disc-amount-cell input');
                     if (discAmountInput) discAmountInput.value = item.discount_amount || 0;
                     const extraDiscAmountInput = lastRow.querySelector('.extra-disc-cell input');
-                    if (extraDiscAmountInput) extraDiscAmountInput.value = item.extra_discount_amount || 0;
+                    if (extraDiscAmountInput) {
+                        const afterMainDiscount = (parseFloat(item.gross_amount) || 0) - (parseFloat(item.discount_amount) || 0);
+                        const extraDiscPercent = afterMainDiscount > 0 ? ((parseFloat(item.extra_discount_amount) || 0) / afterMainDiscount * 100) : 0;
+                        extraDiscAmountInput.value = extraDiscPercent.toFixed(3);
+                    }
                     const toAmountInput = lastRow.querySelector('.to-amount-cell input');
                     if (toAmountInput) toAmountInput.value = item.trade_offer_amount || 0;
                     const taxPercentInput = lastRow.querySelector('.tax-percent-cell input');
@@ -4231,19 +4245,20 @@ function saveInvoice(status = 'Posted') {
         const grossInput = row.querySelector('.gross-cell input');
         const discPercentInput = row.querySelector('.disc-percent-cell input');
         const discAmountInput = row.querySelector('.disc-amount-cell input');
-        const extraDiscAmountInput = row.querySelector('.extra-disc-cell input');
         const toAmountInput = row.querySelector('.to-amount-cell input');
         const taxPercentInput = row.querySelector('.tax-percent-cell input');
         const taxAmountInput = row.querySelector('.tax-amount-cell input');
         const focInput = row.querySelector('.foc-cell input');
         const netInput = row.querySelector('.net-cell input');
         const schemeSelect = row.querySelector('.scheme-select');
-        
+
         const salePrice = parseFloat(priceInput.value);
         const grossAmount = parseFloat(grossInput.value);
         const discountPercent = parseFloat(discPercentInput.value) || 0;
         const discountAmount = parseFloat(discAmountInput.value);
-        const extraDiscountAmount = parseFloat(extraDiscAmountInput?.value) || 0;
+        // Extra Discount is entered as a % (see calculateRowAmounts) — the computed
+        // amount is cached on the row's dataset, not read straight from the input.
+        const extraDiscountAmount = parseFloat(row.dataset.extraDiscountAmount) || 0;
         const tradeOfferAmount = parseFloat(toAmountInput.value) || 0;
         const taxPercent = parseFloat(taxPercentInput.value) || 0;
         const taxAmount = parseFloat(taxAmountInput.value) || 0;
@@ -6126,8 +6141,10 @@ async function addRowDynamic() {
         extraDiscInput.type = 'number';
         extraDiscInput.className = 'table-input';
         extraDiscInput.min = '0';
+        extraDiscInput.max = '100';
         extraDiscInput.step = '0.001';
         extraDiscInput.value = '0.00';
+        extraDiscInput.title = 'Extra Discount %';
         extraDiscInput.addEventListener('input', function() {
             const unitInputs = row.querySelectorAll('.unit-input');
             let totalQty = 0;
