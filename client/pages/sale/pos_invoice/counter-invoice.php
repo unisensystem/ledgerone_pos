@@ -1025,6 +1025,13 @@ $user_employee_id = $user['employee_id'] ?? null;
                     </label>
                 </div>
 
+                <div class="form-group-micro">
+                    <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; margin-top: 8px;" title="Lets you type an amount (e.g. Rs 100 of Sugar) instead of a quantity — the quantity is calculated automatically from the product's price.">
+                        <input type="checkbox" id="enableAmountEntry" style="width: auto;">
+                        <span style="font-size: 11px;">Enable "Buy by Amount" entry</span>
+                    </label>
+                </div>
+
                 <div class="form-group-micro" id="bankAccountContainer" style="display: none;">
                     <div class="form-label">BANK ACCOUNT</div>
                     <select id="bankAccount">
@@ -1059,9 +1066,13 @@ $user_employee_id = $user['employee_id'] ?? null;
                     </div>
                     <div id="productSuggestions" style="display: none; position: absolute; top: 100%; left: 0; right: 0; background: white; border: 1px solid var(--border-default); border-radius: 4px; max-height: 200px; overflow-y: auto; z-index: 1000; box-shadow: 0 4px 8px rgba(0,0,0,0.1);"></div>
                 </div>
+                <div class="form-group-micro" id="quickAmountGroup" style="display: none;">
+                    <div class="form-label">AMOUNT (<?= htmlspecialchars($currency_symbol) ?>)</div>
+                    <input type="number" id="quickAmount" placeholder="e.g. 100" min="0" step="0.01" title="Type the amount the customer wants to pay for this product — quantity is calculated automatically.">
+                </div>
                 <div class="form-group-micro">
                     <div class="form-label">QTY</div>
-                    <input type="number" id="quickQty" value="1" min="1" step="1">
+                    <input type="number" id="quickQty" value="1" min="0.001" step="any">
                 </div>
                 <button class="btn btn-primary btn-micro" id="quickAddBtn" title="Add Item (ENTER)">
                     <i class="fas fa-plus"></i>

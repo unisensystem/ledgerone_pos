@@ -1,14 +1,8 @@
-/**
- * Bulk Branch-wise Opening Stock - Row Management
- */
-
 let rowCounter = 0;
 let allBranches = [];
-let allVendors = [];
 
 document.addEventListener('DOMContentLoaded', function() {
     loadBranches();
-    loadVendors();
     attachEventListeners();
     addRow();
 });
@@ -22,17 +16,6 @@ function loadBranches() {
             }
         })
         .catch(error => console.error('Error loading branches:', error));
-}
-
-function loadVendors() {
-    fetch('../../../../server/api/inventory/products/supplier-list.php')
-        .then(response => response.json())
-        .then(data => {
-            if (data.success && data.suppliers) {
-                allVendors = data.suppliers;
-            }
-        })
-        .catch(error => console.error('Error loading vendors:', error));
 }
 
 function attachEventListeners() {
@@ -87,22 +70,6 @@ function addRow() {
                 <input type="number" name="openingPrice[]" class="opening-price" step="0.01" min="0" value="">
             </div>
             <div class="form-group">
-                <label>Vendor</label>
-                <div class="custom-dropdown">
-                    <input type="text" class="vendor-search" placeholder="Search vendor..." autocomplete="off">
-                    <input type="hidden" name="vendor[]" class="vendor-id">
-                    <div class="dropdown-list" style="display: none;"></div>
-                </div>
-            </div>
-            <div class="form-group">
-                <label>Batch No</label>
-                <input type="text" name="batchNo[]" class="batch-no" placeholder="e.g., B-2026-001">
-            </div>
-            <div class="form-group">
-                <label>Expiry Date</label>
-                <input type="date" name="expiryDate[]" class="expiry-date">
-            </div>
-            <div class="form-group">
                 <button type="button" class="btn btn-danger remove-stock-entry" style="margin-top: 24px;">Remove</button>
             </div>
         </div>
@@ -117,11 +84,6 @@ function initializeRowControls(row) {
     const branchDropdown = row.querySelector('.custom-dropdown:has(.branch-search)');
     if (branchDropdown) {
         initBranchDropdown(branchDropdown);
-    }
-
-    const vendorDropdown = row.querySelector('.custom-dropdown:has(.vendor-search)');
-    if (vendorDropdown) {
-        initVendorDropdown(vendorDropdown);
     }
     
     const productSearch = row.querySelector('.product-search');
@@ -289,95 +251,6 @@ function renderBranchList(query, dropdownList, searchInput, hiddenInput) {
     });
 }
 
-function initVendorDropdown(container) {
-    const searchInput = container.querySelector('.vendor-search');
-    const hiddenInput = container.querySelector('.vendor-id');
-    const dropdownList = container.querySelector('.dropdown-list');
-
-    if (!searchInput || !hiddenInput || !dropdownList) return;
-
-    let selectedIndex = -1;
-
-    searchInput.addEventListener('focus', () => {
-        renderVendorList(searchInput.value.toLowerCase(), dropdownList, searchInput, hiddenInput);
-        dropdownList.style.display = 'block';
-    });
-
-    searchInput.addEventListener('input', () => {
-        selectedIndex = -1;
-        renderVendorList(searchInput.value.toLowerCase(), dropdownList, searchInput, hiddenInput);
-        dropdownList.style.display = 'block';
-        if (searchInput.value.trim() === '') {
-            hiddenInput.value = '';
-        }
-    });
-
-    searchInput.addEventListener('keydown', function(e) {
-        const items = dropdownList.querySelectorAll('.dropdown-item:not([style*="cursor: default"])');
-        if (!items.length) return;
-
-        if (e.key === 'ArrowDown') {
-            e.preventDefault();
-            selectedIndex = Math.min(selectedIndex + 1, items.length - 1);
-            updateDropdownSelection(items, selectedIndex);
-        } else if (e.key === 'ArrowUp') {
-            e.preventDefault();
-            selectedIndex = Math.max(selectedIndex - 1, 0);
-            updateDropdownSelection(items, selectedIndex);
-        } else if (e.key === 'Enter') {
-            e.preventDefault();
-            if (selectedIndex >= 0 && items[selectedIndex]) {
-                items[selectedIndex].dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
-            }
-        } else if (e.key === 'Escape') {
-            dropdownList.style.display = 'none';
-            selectedIndex = -1;
-        }
-    });
-
-    document.addEventListener('click', (e) => {
-        if (!container.contains(e.target)) {
-            dropdownList.style.display = 'none';
-            selectedIndex = -1;
-        }
-    });
-}
-
-function renderVendorList(query, dropdownList, searchInput, hiddenInput) {
-    dropdownList.innerHTML = '';
-
-    if (!allVendors || allVendors.length === 0) {
-        dropdownList.innerHTML = '<div class="dropdown-item" style="color: var(--subtext); cursor: default;">Loading vendors...</div>';
-        return;
-    }
-
-    const filtered = allVendors.filter(v =>
-        query === '' || v.supplier_name.toLowerCase().includes(query)
-    );
-
-    if (filtered.length === 0) {
-        dropdownList.innerHTML = '<div class="dropdown-item" style="color: var(--subtext); cursor: default;">No vendors found</div>';
-        return;
-    }
-
-    filtered.forEach(vendor => {
-        const item = document.createElement('div');
-        item.className = 'dropdown-item';
-        item.textContent = vendor.supplier_name;
-        item.dataset.id = vendor.id;
-
-        item.addEventListener('mousedown', (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            searchInput.value = vendor.supplier_name;
-            hiddenInput.value = vendor.id;
-            dropdownList.style.display = 'none';
-        });
-
-        dropdownList.appendChild(item);
-    });
-}
-
 function clearProductData(row) {
     row.querySelector('.product-id').value = '';
     row.querySelector('.uom-type').value = '';
@@ -457,6 +330,7 @@ function selectProduct(row, product) {
     qtyColumnsContainer.innerHTML = '';
     
     if (product.uom_type === 'unit') {
+        // Single unit - create Opening Qty column
         const formGroup = document.createElement('div');
         formGroup.className = 'form-group';
         formGroup.innerHTML = `
@@ -469,6 +343,7 @@ function selectProduct(row, product) {
         input.addEventListener('change', updateSummary);
         input.addEventListener('input', updateSummary);
     } else if (product.uom_type === 'group' && product.uom_group_id) {
+        // Multiple units - fetch and create columns
         fetchUomGroupUnits(product.uom_group_id, row);
     }
     
@@ -515,6 +390,7 @@ function updateSummary() {
         if (productId && productId.trim() !== '' && branchId && branchId.trim() !== '') {
             const price = parseFloat(priceInput.value) || 0;
             
+            // Sum all qty inputs in this row
             const qtyInputs = row.querySelectorAll('input[name^="openingQty"]');
             let rowQty = 0;
             qtyInputs.forEach(input => {
@@ -546,9 +422,6 @@ function saveOpeningStock() {
         const branchId = row.querySelector('.branch-id').value;
         const uomType = row.querySelector('.uom-type').value;
         const price = parseFloat(row.querySelector('.opening-price').value) || 0;
-        const vendorId = row.querySelector('.vendor-id').value || null;
-        const batchNo = row.querySelector('.batch-no').value || null;
-        const expiryDate = row.querySelector('.expiry-date').value || null;
         
         rowIndex++;
         
@@ -563,6 +436,7 @@ function saveOpeningStock() {
         }
         
         if (uomType === 'group') {
+            // Group mode - collect qty for each unit
             const qtyInputs = row.querySelectorAll('input[name^="openingQty"]');
             qtyInputs.forEach(input => {
                 const qty = parseFloat(input.value) || 0;
@@ -573,14 +447,12 @@ function saveOpeningStock() {
                         branch_id: branchId,
                         unit_id: unitId,
                         opening_qty: qty,
-                        opening_price: price,
-                        vendor_id: vendorId,
-                        batch_no: batchNo,
-                        expiry_date: expiryDate
+                        opening_price: price
                     });
                 }
             });
         } else {
+            // Single unit mode
             const qtyInput = row.querySelector('input[name="openingQty[]"]');
             const qty = qtyInput ? parseFloat(qtyInput.value) || 0 : 0;
             
@@ -590,10 +462,7 @@ function saveOpeningStock() {
                     branch_id: branchId,
                     unit_id: row.querySelector('.default-unit-id').value,
                     opening_qty: qty,
-                    opening_price: price,
-                    vendor_id: vendorId,
-                    batch_no: batchNo,
-                    expiry_date: expiryDate
+                    opening_price: price
                 });
             }
         }

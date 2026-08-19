@@ -16,38 +16,15 @@ if (!$tenant_id) {
 }
 
 try {
-    // NOTE: the `companies` table does not have columns literally named
-    // stn_number / ntn_number / nic_number. They are aliased here from
-    // the actual columns so the print template (which expects those
-    // exact keys) receives real data instead of falling back to '-'.
-    $stmt = $pdo->prepare("
-        SELECT
-            company_name,
-            legal_name,
-            email,
-            phone,
-            website,
-            address,
-            city,
-            state,
-            zipcode,
-            country,
-            logo_url,
-            sales_tax_number        AS stn_number,
-            tax_identification_number AS ntn_number,
-            registration_number     AS nic_number
-        FROM companies
-        WHERE tenant_id = ? AND is_active = 1
-        LIMIT 1
-    ");
+    $stmt = $pdo->prepare("SELECT company_name, legal_name, email, phone, website, address, city, state, zipcode, country, logo_url FROM companies WHERE tenant_id = ? AND is_active = 1 LIMIT 1");
     $stmt->execute([$tenant_id]);
     $company = $stmt->fetch(PDO::FETCH_ASSOC);
-
+    
     if (!$company) {
         echo json_encode(['success' => false, 'message' => 'Company not found']);
         exit;
     }
-
+    
     echo json_encode(['success' => true, 'company' => $company]);
 } catch (Exception $e) {
     http_response_code(500);

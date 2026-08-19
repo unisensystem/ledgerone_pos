@@ -158,8 +158,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
                         'foc_quantity' => $totalFoc,
                         'net_amount' => $totalNet,
                         'size' => $firstItem['size'] ?? '',
-                        'batch_no' => $firstItem['batch_no'] ?? '',
-                        'batch_expiry_date' => $firstItem['batch_expiry_date'] ?? '',
                         'unit_entries' => array_values($uomMap)
                     ];
                 }
@@ -248,9 +246,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
                 quantity, purchase_price, gross_amount, discount_percent,
                 discount_amount, trade_offer_percent, trade_offer_amount,
                 tax_percent, tax_amount, foc_quantity, net_amount, size,
-                batch_no, batch_expiry_date,
                 created_by, updated_by
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ");
         
         foreach ($input['items'] as $item) {
@@ -273,8 +270,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
                     $item['focQty'] ?? 0,
                     $isFirstEntry ? $item['netAmount'] : 0,
                     $item['size'] ?? null,
-                    $item['batchNo'] ?? null,
-                    $item['batchExpiryDate'] ?? null,
                     $user_id,
                     $user_id
                 ]);
@@ -288,8 +283,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
                     $stock_stmt = $pdo->prepare("
                         INSERT INTO stock_ledger (
                             tenant_id, account_id, branch_id, product_id, reference_table, reference_id,
-                            qty_in, unit_cost, unit_id, batch_no, batch_expiry_date, transaction_type, transaction_date
-                        ) VALUES (?, ?, ?, ?, 'purchase_invoice', ?, ?, ?, ?, ?, ?, 'Purchase Invoice', ?)
+                            qty_in, unit_cost, unit_id, transaction_type, transaction_date
+                        ) VALUES (?, ?, ?, ?, 'purchase_invoice', ?, ?, ?, ?, 'Purchase Invoice', ?)
                     ");
                     $stock_stmt->execute([
                         $tenant_id,
@@ -300,8 +295,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
                         $unitEntry['quantity'],
                         $item['purchasePrice'],
                         $unitEntry['uomId'],
-                        $item['batchNo'] ?? null,
-                        $item['batchExpiryDate'] ?? null,
                         $input['purchaseDate']
                     ]);
                 }

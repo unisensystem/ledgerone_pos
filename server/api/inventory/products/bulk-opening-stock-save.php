@@ -44,13 +44,13 @@ try {
 
     // Prepare statements
     $stockOpeningStmt = $pdo->prepare("
-        INSERT INTO stock_opening (product_id, tenant_id, branch_id, opening_qty, opening_price, unit_id, vendor_id, batch_no, expiry_date)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO stock_opening (product_id, tenant_id, branch_id, opening_qty, opening_price, unit_id)
+        VALUES (?, ?, ?, ?, ?, ?)
     ");
 
     $stockLedgerStmt = $pdo->prepare("
-        INSERT INTO stock_ledger (tenant_id, account_id, branch_id, product_id, reference_table, reference_id, stock_status, qty_in, qty_out, unit_cost, unit_id, vendor_id, batch_no, expiry_date, transaction_type, transaction_date)
-        VALUES (?, ?, ?, ?, 'stock_opening', ?, 'sellable', ?, 0, ?, ?, ?, ?, ?, 'Opening Stock', CURDATE())
+        INSERT INTO stock_ledger (tenant_id, account_id, branch_id, product_id, reference_table, reference_id, stock_status, qty_in, qty_out, unit_cost, unit_id, transaction_type, transaction_date)
+        VALUES (?, ?, ?, ?, 'stock_opening', ?, 'sellable', ?, 0, ?, ?, 'Opening Stock', CURDATE())
     ");
 
     $saveCount = 0;
@@ -68,9 +68,6 @@ try {
             $opening_qty = floatval($entry['opening_qty'] ?? 0);
             $opening_price = floatval($entry['opening_price'] ?? 0);
             $unit_id = $entry['unit_id'] ?? null;
-            $vendor_id = !empty($entry['vendor_id']) ? $entry['vendor_id'] : null;
-            $batch_no = !empty($entry['batch_no']) ? $entry['batch_no'] : null;
-            $expiry_date = !empty($entry['expiry_date']) ? $entry['expiry_date'] : null;
 
             if (!$product_id || !$branch_id) {
                 $errors[] = "Entry $index: Missing product_id or branch_id";
@@ -93,10 +90,7 @@ try {
                 $branch_id,
                 $opening_qty,
                 $opening_price,
-                $unit_id,
-                $vendor_id,
-                $batch_no,
-                $expiry_date
+                $unit_id
             ]);
 
             // Get the stock_opening ID immediately after insert
@@ -112,10 +106,7 @@ try {
                 $stock_opening_id,
                 $opening_qty,
                 $opening_price,
-                $unit_id,
-                $vendor_id,
-                $batch_no,
-                $expiry_date
+                $unit_id
             ]);
 
             $saveCount++;

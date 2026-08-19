@@ -101,9 +101,8 @@ try {
             quantity, purchase_price, gross_amount, discount_percent,
             discount_amount, trade_offer_percent, trade_offer_amount,
             tax_percent, tax_amount, foc_quantity, net_amount, size,
-            batch_no, batch_expiry_date,
             created_by, updated_by
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ");
     
     foreach ($input['items'] as $item) {
@@ -127,8 +126,6 @@ try {
                 $item['focQty'] ?? 0,
                 $isFirstEntry ? $item['netAmount'] : 0,
                 $item['size'] ?? null,
-                $item['batchNo'] ?? null,
-                $item['batchExpiryDate'] ?? null,
                 $user_id,
                 $user_id
             ]);
@@ -140,11 +137,11 @@ try {
                 $product_stmt->execute([$item['productId']]);
                 $account_id = $product_stmt->fetchColumn();
                 
-                              $stock_stmt = $pdo->prepare("
+                $stock_stmt = $pdo->prepare("
                     INSERT INTO stock_ledger (
                         tenant_id, account_id, branch_id, product_id, reference_table, reference_id,
-                        qty_in, unit_cost, unit_id, batch_no, batch_expiry_date, transaction_type, transaction_date
-                    ) VALUES (?, ?, ?, ?, 'purchase_invoice', ?, ?, ?, ?, ?, ?, 'Purchase Invoice', ?)
+                        qty_in, unit_cost, unit_id, transaction_type, transaction_date
+                    ) VALUES (?, ?, ?, ?, 'purchase_invoice', ?, ?, ?, ?, 'Purchase Invoice', ?)
                 ");
                 $stock_stmt->execute([
                     $tenant_id,
@@ -155,8 +152,6 @@ try {
                     $unitEntry['quantity'],
                     $item['purchasePrice'],
                     $unitEntry['uomId'],
-                    $item['batchNo'] ?? null,
-                    $item['batchExpiryDate'] ?? null,
                     $input['purchaseDate']
                 ]);
             }
@@ -237,9 +232,3 @@ function extractBalanceAmount($balanceString) {
     $amount = floatval($amount);
     return $isCr ? -$amount : $amount;
 }
-
-
-
-// ALTER TABLE purchase_invoice_items 
-// ADD COLUMN batch_no VARCHAR(100) NULL AFTER size,
-// ADD COLUMN batch_expiry_date DATE NULL AFTER batch_no;
