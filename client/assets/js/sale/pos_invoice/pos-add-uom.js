@@ -323,7 +323,13 @@ function calculateRowAmounts(row, totalQty, price, source) {
     
     // After discount
     const afterDiscount = gross - discountAmt;
-    
+
+    // Extra Discount (med_pos_invoice only — column doesn't exist elsewhere,
+    // so the selector simply finds nothing and extraDiscAmt stays 0)
+    const extraDiscInput = row.querySelector('.extra-disc-cell input');
+    const extraDiscAmt = extraDiscInput ? (parseFloat(extraDiscInput.value) || 0) : 0;
+    const afterExtraDiscount = afterDiscount - extraDiscAmt;
+
     // Trade offer amount - read from input (NOT percentage-based)
     const toAmountInput = row.querySelector('.to-amount-cell input');
     let tradeOfferAmt = 0;
@@ -332,7 +338,7 @@ function calculateRowAmounts(row, totalQty, price, source) {
     }
     
     // After trade offer
-    const afterTradeOffer = afterDiscount - tradeOfferAmt;
+    const afterTradeOffer = afterExtraDiscount - tradeOfferAmt;
     
     // Check application level - only apply tax at item level if application_level is 'item'
     const applicationLevel = row.dataset.applicationLevel || 'item';
@@ -370,9 +376,17 @@ function calculateRowAmounts(row, totalQty, price, source) {
     // If application_level is 'invoice', tax is NOT applied here (will be applied at invoice level)
     
     row.querySelector('.tax-amount-cell input').value = taxAmt.toFixed(3);
-    
-    // Net amount (tax excluded)
-    const net = afterTradeOffer;
+
+    // Net amount: exclusive item-level tax must be added on top (it isn't embedded
+    // in salePrice); inclusive tax is already embedded in salePrice so stays
+    // excluded here to avoid double-counting. Gated to med_pos_invoice via
+    // isTaxationEnabled() — the regular POS invoice keeps its historical "tax
+    // computed but excluded from net" behavior unchanged (enableTaxation is
+    // always false there, so this stays off regardless of any tax data present).
+    const includeTaxInNet = applicationLevel === 'item'
+        && row.dataset.isTaxInclusive !== '1'
+        && (typeof isTaxationEnabled === 'function' ? isTaxationEnabled() : false);
+    const net = includeTaxInNet ? (afterTradeOffer + taxAmt) : afterTradeOffer;
     row.querySelector('.net-cell input').value = net.toFixed(3);
     
     // Update summary
@@ -424,6 +438,7 @@ function updateInvoiceSummaryDynamic() {
     let totalPurchasePrice = 0;
     let totalGrossAmount = 0;
     let totalDiscountAmountItems = 0;
+    let totalExtraDiscountAmountItems = 0;
     let totalTradeOfferAmountItems = 0;
     let totalTaxAmountItems = 0;
     let totalFOCQty = 0;
@@ -435,6 +450,7 @@ function updateInvoiceSummaryDynamic() {
         const priceInput = row.querySelector('.price-cell input');
         const grossInput = row.querySelector('.gross-cell input');
         const discAmtInput = row.querySelector('.disc-amount-cell input');
+        const extraDiscAmtInput = row.querySelector('.extra-disc-cell input');
         const toAmtInput = row.querySelector('.to-amount-cell input');
         const taxAmtInput = row.querySelector('.tax-amount-cell input');
         const focInput = row.querySelector('.foc-cell input');
@@ -444,6 +460,7 @@ function updateInvoiceSummaryDynamic() {
             totalPurchasePrice += parseFloat(priceInput?.value) || 0;
             totalGrossAmount += parseFloat(grossInput?.value) || 0;
             totalDiscountAmountItems += parseFloat(discAmtInput?.value) || 0;
+            totalExtraDiscountAmountItems += parseFloat(extraDiscAmtInput?.value) || 0;
             totalTradeOfferAmountItems += parseFloat(toAmtInput?.value) || 0;
             totalTaxAmountItems += parseFloat(taxAmtInput?.value) || 0;
             totalFOCQty += parseFloat(focInput?.value) || 0;
@@ -456,16 +473,20 @@ function updateInvoiceSummaryDynamic() {
     const totalSalePriceEl = document.getElementById('totalSalePrice');
     const totalGrossAmountEl = document.getElementById('totalGrossAmount');
     const totalDiscountAmountItemsEl = document.getElementById('totalDiscountAmountItems');
+    const totalExtraDiscountAmountEl = document.getElementById('totalExtraDiscountAmount');
     const totalTradeOfferAmountEl = document.getElementById('totalTradeOfferAmount');
     const totalTaxAmountEl = document.getElementById('totalTaxAmount');
+    const itemTaxAmountSummaryEl = document.getElementById('itemTaxAmountSummary'); // NEW — med_pos_invoice only
     const totalFocQtyEl = document.getElementById('totalFocQty');
     const totalNetAmountItemsEl = document.getElementById('totalNetAmountItems');
     
     if (totalSalePriceEl) totalSalePriceEl.textContent = totalPurchasePrice.toFixed(3);
     if (totalGrossAmountEl) totalGrossAmountEl.textContent = totalGrossAmount.toFixed(3);
     if (totalDiscountAmountItemsEl) totalDiscountAmountItemsEl.textContent = totalDiscountAmountItems.toFixed(3);
+    if (totalExtraDiscountAmountEl) totalExtraDiscountAmountEl.textContent = totalExtraDiscountAmountItems.toFixed(3);
     if (totalTradeOfferAmountEl) totalTradeOfferAmountEl.textContent = totalTradeOfferAmountItems.toFixed(3);
     if (totalTaxAmountEl) totalTaxAmountEl.textContent = totalTaxAmountItems.toFixed(3);
+    if (itemTaxAmountSummaryEl) itemTaxAmountSummaryEl.textContent = totalTaxAmountItems.toFixed(3); // NEW
     if (totalFocQtyEl) totalFocQtyEl.textContent = totalFOCQty.toFixed(3);
     if (totalNetAmountItemsEl) totalNetAmountItemsEl.textContent = totalNetAmountItems.toFixed(3);
     

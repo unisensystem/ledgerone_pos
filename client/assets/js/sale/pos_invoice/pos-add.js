@@ -7,7 +7,7 @@
     const originalRemoveItem = localStorage.removeItem.bind(localStorage);
 
     const sharedKeys = new Set([
-        'enableTaxation',
+        'enableTaxation', 'enableExtraDiscountItem',
         'enableBatchNo','enableExpiryDate','enableFOC','enableTradeOfferAmount',
         'enableCashDiscountPercent','enableCashDiscountAmount',
         'enableInvoiceCashDiscountPercent','enableInvoiceCashDiscountAmount',
@@ -237,7 +237,8 @@ const invoiceSettingCheckboxes = [
     'enableAmountPaidPaymentMethod',
     'enableBatchNo',        // NEW
     'enableExpiryDate',     // NEW
-    'enableTaxation'        // NEW — only exists on med_pos_invoice's settings modal
+    'enableTaxation',       // NEW — only exists on med_pos_invoice's settings modal
+    'enableExtraDiscountItem' // NEW — only exists on med_pos_invoice's settings modal
 ];
 
     invoiceSettingCheckboxes.forEach(checkboxId => {
@@ -1663,12 +1664,27 @@ const invoiceSettingCheckboxes = [
                         });
                     }
 
-                    // Restore saved batch no / expiry date instead of re-fetching current stock batch
-                    const batchNoInputEl = lastRow.querySelector('.batch-no-input');
+                    // Restore saved batch no / expiry date instead of re-fetching current stock batch.
+                    // The dropdown must actually be populated first (loadProductBatches) — just setting
+                    // .value on an empty <select> silently no-ops since there's no matching <option>.
+                    // The saved batch may no longer appear in the "available" list (e.g. fully consumed
+                    // since this sale), so add it as a fallback option to guarantee it stays selectable.
+                    const batchNoSelectEl = lastRow.querySelector('.batch-no-input');
                     const batchExpiryInputEl = lastRow.querySelector('.batch-expiry-input');
-                    if (batchNoInputEl) batchNoInputEl.value = item.batch_no || '';
-                    if (batchExpiryInputEl) batchExpiryInputEl.value = item.batch_expiry_date || '';
-                    
+                    if (batchNoSelectEl && item.batch_no) {
+                        await loadProductBatches(lastRow, item.product_id);
+                        let matchingOption = Array.from(batchNoSelectEl.options).find(o => o.value === item.batch_no);
+                        if (!matchingOption) {
+                            matchingOption = document.createElement('option');
+                            matchingOption.value = item.batch_no;
+                            matchingOption.textContent = item.batch_no + (item.expiry_date ? ` - Exp: ${item.expiry_date}` : '') + ' (as invoiced)';
+                            batchNoSelectEl.appendChild(matchingOption);
+                        }
+                        batchNoSelectEl.value = item.batch_no;
+                        lastRow.dataset.batchNo = item.batch_no;
+                    }
+                    if (batchExpiryInputEl) batchExpiryInputEl.value = item.expiry_date || '';
+
                     const priceInput = lastRow.querySelector('.price-cell input');
                     if (priceInput) priceInput.value = item.sale_price;
                     const grossInput = lastRow.querySelector('.gross-cell input');
@@ -1677,8 +1693,18 @@ const invoiceSettingCheckboxes = [
                     if (discPercentInput) discPercentInput.value = item.discount_percent;
                     const discAmountInput = lastRow.querySelector('.disc-amount-cell input');
                     if (discAmountInput) discAmountInput.value = item.discount_amount;
+                    const extraDiscAmountInput = lastRow.querySelector('.extra-disc-cell input');
+                    if (extraDiscAmountInput) extraDiscAmountInput.value = item.extra_discount_amount || 0;
                     const toAmountInput = lastRow.querySelector('.to-amount-cell input');
                     if (toAmountInput) toAmountInput.value = item.trade_offer_amount || 0;
+
+                    // Restore the tax dataset (formula/base/inclusive flag) via a fresh lookup so any
+                    // FUTURE recalculation (qty/price edited later) uses the correct regime — then
+                    // overwrite the visible tax_percent/tax_amount with the SAVED historical values,
+                    // since a fresh lookup can legitimately differ from what was actually invoiced.
+                    if (typeof loadTaxForNewProduct === 'function' && invoice.customer_id) {
+                        await loadTaxForNewProduct(lastRow, invoice.customer_id, item.product_id);
+                    }
                     const taxPercentInput = lastRow.querySelector('.tax-percent-cell input');
                     if (taxPercentInput) taxPercentInput.value = item.tax_percent || 0;
                     const taxAmountInput = lastRow.querySelector('.tax-amount-cell input');
@@ -1687,15 +1713,28 @@ const invoiceSettingCheckboxes = [
                     if (focInput) focInput.value = item.foc_quantity || 0;
                     const netInput = lastRow.querySelector('.net-cell input');
                     if (netInput) netInput.value = item.net_amount;
-                    
-                    // Set scheme and trigger scheme change
+
+                    // Set scheme — this recalculates the row from current inputs/dataset (to correctly
+                    // toggle T.O Amt/FOC readonly state for the scheme), which would clobber the
+                    // historical values just restored above. Re-apply them afterward so the row
+                    // displays exactly what was invoiced, not a fresh recalculation. Called directly
+                    // (not via dispatchEvent) and awaited so this ordering is guaranteed even for the
+                    // async Less/Less Special/Given scheme handlers.
                     const schemeSelect = lastRow.querySelector('.scheme-select');
                     if (schemeSelect) {
                         const itemScheme = item.scheme || 'sale_on_tp';
                         schemeSelect.value = itemScheme;
-                        // Trigger scheme change event to apply correct calculations
-                        schemeSelect.dispatchEvent(new Event('change'));
+                        if (typeof onSchemeChange === 'function') {
+                            await onSchemeChange(lastRow, itemScheme);
+                        }
                     }
+                    if (discAmountInput) discAmountInput.value = item.discount_amount;
+                    if (extraDiscAmountInput) extraDiscAmountInput.value = item.extra_discount_amount || 0;
+                    if (toAmountInput) toAmountInput.value = item.trade_offer_amount || 0;
+                    if (taxPercentInput) taxPercentInput.value = item.tax_percent || 0;
+                    if (taxAmountInput) taxAmountInput.value = item.tax_amount || 0;
+                    if (focInput) focInput.value = item.foc_quantity || 0;
+                    if (netInput) netInput.value = item.net_amount;
                 }
 
                 // Load child items
@@ -1897,6 +1936,8 @@ const invoiceSettingCheckboxes = [
                     if (discPercentInput) discPercentInput.value = item.discount_percent || 0;
                     const discAmountInput = lastRow.querySelector('.disc-amount-cell input');
                     if (discAmountInput) discAmountInput.value = item.discount_amount || 0;
+                    const extraDiscAmountInput = lastRow.querySelector('.extra-disc-cell input');
+                    if (extraDiscAmountInput) extraDiscAmountInput.value = item.extra_discount_amount || 0;
                     const toAmountInput = lastRow.querySelector('.to-amount-cell input');
                     if (toAmountInput) toAmountInput.value = item.trade_offer_amount || 0;
                     const taxPercentInput = lastRow.querySelector('.tax-percent-cell input');
@@ -3157,6 +3198,8 @@ const invoiceSettingCheckboxes = [
             document.getElementById('totalDiscountAmountItems').textContent = totalDiscountAmountItems.toFixed(3);
             document.getElementById('totalTradeOfferAmount').textContent = totalTradeOfferAmount.toFixed(3);
             document.getElementById('totalTaxAmount').textContent = totalTaxAmount.toFixed(3);
+            const itemTaxAmountSummaryEl = document.getElementById('itemTaxAmountSummary'); // NEW — med_pos_invoice only
+            if (itemTaxAmountSummaryEl) itemTaxAmountSummaryEl.textContent = totalTaxAmount.toFixed(3);
             document.getElementById('totalFocQty').textContent = totalFocQty.toFixed(3);
             document.getElementById('totalNetAmountItems').textContent = totalNetAmountItems.toFixed(3);
             document.getElementById('totalBill').textContent = totalNetAmountItems.toFixed(3);
@@ -3857,7 +3900,7 @@ const defaultColumns = [
     { id: 'to_amt', label: 'T.O Amt', fixed: false },
     { id: 'gst_pct', label: 'GST %', fixed: false },
     { id: 'gst_amt', label: 'GST Amt', fixed: false },
-    { id: 'foc', label: 'FOC Qty', fixed: false },
+    { id: 'foc', label: isMedInvoicePage ? 'Bonus' : 'FOC Qty', fixed: false },
     { id: 'net', label: 'Net Amt', fixed: false }
 ];
 
@@ -4188,6 +4231,7 @@ function saveInvoice(status = 'Posted') {
         const grossInput = row.querySelector('.gross-cell input');
         const discPercentInput = row.querySelector('.disc-percent-cell input');
         const discAmountInput = row.querySelector('.disc-amount-cell input');
+        const extraDiscAmountInput = row.querySelector('.extra-disc-cell input');
         const toAmountInput = row.querySelector('.to-amount-cell input');
         const taxPercentInput = row.querySelector('.tax-percent-cell input');
         const taxAmountInput = row.querySelector('.tax-amount-cell input');
@@ -4199,6 +4243,7 @@ function saveInvoice(status = 'Posted') {
         const grossAmount = parseFloat(grossInput.value);
         const discountPercent = parseFloat(discPercentInput.value) || 0;
         const discountAmount = parseFloat(discAmountInput.value);
+        const extraDiscountAmount = parseFloat(extraDiscAmountInput?.value) || 0;
         const tradeOfferAmount = parseFloat(toAmountInput.value) || 0;
         const taxPercent = parseFloat(taxPercentInput.value) || 0;
         const taxAmount = parseFloat(taxAmountInput.value) || 0;
@@ -4236,6 +4281,7 @@ const scheme = schemeSelect ? schemeSelect.value : 'sale_on_tp';
         salePrice: salePrice,
         grossAmount: isFirstUnit ? grossAmount : 0,
         discountAmount: isFirstUnit ? discountAmount : 0,
+        extraDiscountAmount: isFirstUnit ? extraDiscountAmount : 0,
         tradeOfferAmount: isFirstUnit ? tradeOfferAmount : 0,
         taxPercent: taxPercent,
         taxAmount: isFirstUnit ? taxAmount : 0,
@@ -4456,10 +4502,13 @@ function loadInvoiceSettings() {
     document.getElementById('enableExtraDiscount2').checked = localStorage.getItem('enableExtraDiscount2') === 'true';
     document.getElementById('enableBatchNo').checked = localStorage.getItem('enableBatchNo') !== 'false';
 document.getElementById('enableExpiryDate').checked = localStorage.getItem('enableExpiryDate') !== 'false';
-    // Taxation checkbox only exists on med_pos_invoice's settings modal — guard its absence
-    // on the regular POS invoice page, which doesn't have this control.
+    // Taxation / Extra Discount checkboxes only exist on med_pos_invoice's settings
+    // modal — guard their absence on the regular POS invoice page, which doesn't
+    // have these controls.
     const enableTaxationCheckbox = document.getElementById('enableTaxation');
     if (enableTaxationCheckbox) enableTaxationCheckbox.checked = isTaxationEnabled();
+    const enableExtraDiscountItemCheckbox = document.getElementById('enableExtraDiscountItem');
+    if (enableExtraDiscountItemCheckbox) enableExtraDiscountItemCheckbox.checked = localStorage.getItem('enableExtraDiscountItem') !== 'false';
 }
 
 // Save invoice settings to localStorage
@@ -4500,10 +4549,13 @@ function saveInvoiceSettings() {
     localStorage.setItem('enableBatchNo', document.getElementById('enableBatchNo').checked);
 localStorage.setItem('enableExpiryDate', document.getElementById('enableExpiryDate').checked);
     localStorage.setItem('enableAmountPaidPaymentMethod', document.getElementById('enableAmountPaidPaymentMethod').checked);
-    // Taxation checkbox only exists on med_pos_invoice's settings modal — guard its absence
-    // on the regular POS invoice page, which doesn't have this control.
+    // Taxation / Extra Discount checkboxes only exist on med_pos_invoice's settings
+    // modal — guard their absence on the regular POS invoice page, which doesn't
+    // have these controls.
     const enableTaxationCheckbox = document.getElementById('enableTaxation');
     if (enableTaxationCheckbox) localStorage.setItem('enableTaxation', enableTaxationCheckbox.checked);
+    const enableExtraDiscountItemCheckbox = document.getElementById('enableExtraDiscountItem');
+    if (enableExtraDiscountItemCheckbox) localStorage.setItem('enableExtraDiscountItem', enableExtraDiscountItemCheckbox.checked);
     alert('Invoice settings saved successfully!');
 
     // Refresh product dropdowns if display mode changed
@@ -4598,6 +4650,7 @@ function applyInvoiceSettings() {
     // top of applyInvoiceSettings(), with the other enable* consts
 const enableBatchNo = localStorage.getItem('enableBatchNo') !== 'false';
 const enableExpiryDate = localStorage.getItem('enableExpiryDate') !== 'false';
+const enableExtraDiscountItem = localStorage.getItem('enableExtraDiscountItem') !== 'false';
 
     // Hide/show table columns by class name (works with dynamic unit columns)
     const itemsTable = document.getElementById('itemsTable');
@@ -4616,6 +4669,7 @@ const enableExpiryDate = localStorage.getItem('enableExpiryDate') !== 'false';
     const focHeaders = thead.querySelectorAll('.foc-cell');
     const batchNoHeaders = thead.querySelectorAll('.batch-no-cell');           // NEW
     const batchExpiryHeaders = thead.querySelectorAll('.batch-expiry-cell');   // NEW
+    const extraDiscHeaders = thead.querySelectorAll('.extra-disc-cell');       // NEW
 
     discPercentHeaders.forEach(cell => cell.style.display = enableCashDiscountPercent ? '' : 'none');
     discAmountHeaders.forEach(cell => cell.style.display = enableCashDiscountAmount ? '' : 'none');
@@ -4625,6 +4679,7 @@ const enableExpiryDate = localStorage.getItem('enableExpiryDate') !== 'false';
     focHeaders.forEach(cell => cell.style.display = enableFOC ? '' : 'none');
     batchNoHeaders.forEach(cell => cell.style.display = enableBatchNo ? '' : 'none');           // NEW
     batchExpiryHeaders.forEach(cell => cell.style.display = enableExpiryDate ? '' : 'none');     // NEW
+    extraDiscHeaders.forEach(cell => cell.style.display = enableExtraDiscountItem ? '' : 'none'); // NEW
 }
         
         // Apply visibility to body rows AND disable/enable inputs
@@ -4637,7 +4692,8 @@ const enableExpiryDate = localStorage.getItem('enableExpiryDate') !== 'false';
             const focCells = tbody.querySelectorAll('.foc-cell');
             const batchNoCells = tbody.querySelectorAll('.batch-no-cell');           // NEW
             const batchExpiryCells = tbody.querySelectorAll('.batch-expiry-cell');   // NEW
-            
+            const extraDiscCells = tbody.querySelectorAll('.extra-disc-cell');       // NEW
+
             discPercentCells.forEach(cell => {
                 cell.style.display = enableCashDiscountPercent ? '' : 'none';
                 const input = cell.querySelector('input');
@@ -4688,8 +4744,16 @@ const enableExpiryDate = localStorage.getItem('enableExpiryDate') !== 'false';
             });
             batchNoCells.forEach(cell => cell.style.display = enableBatchNo ? '' : 'none');           // NEW
             batchExpiryCells.forEach(cell => cell.style.display = enableExpiryDate ? '' : 'none');     // NEW
+            extraDiscCells.forEach(cell => {                                                          // NEW
+                cell.style.display = enableExtraDiscountItem ? '' : 'none';
+                const input = cell.querySelector('input');
+                if (input) {
+                    input.disabled = !enableExtraDiscountItem;
+                    if (!enableExtraDiscountItem) input.value = '0.00';
+                }
+            });
         }
-        
+
         // Apply visibility to footer
        if (tfoot) {
     const discPercentFooters = tfoot.querySelectorAll('.disc-percent-cell');
@@ -4700,7 +4764,8 @@ const enableExpiryDate = localStorage.getItem('enableExpiryDate') !== 'false';
     const focFooters = tfoot.querySelectorAll('.foc-cell');
     const batchNoFooters = tfoot.querySelectorAll('.batch-no-cell');          // NEW
     const batchExpiryFooters = tfoot.querySelectorAll('.batch-expiry-cell');  // NEW
-    
+    const extraDiscFooters = tfoot.querySelectorAll('.extra-disc-cell');      // NEW
+
     discPercentFooters.forEach(cell => cell.style.display = enableCashDiscountPercent ? '' : 'none');
     discAmountFooters.forEach(cell => cell.style.display = enableCashDiscountAmount ? '' : 'none');
     toAmountFooters.forEach(cell => cell.style.display = enableTradeOfferAmount ? '' : 'none');
@@ -4709,6 +4774,7 @@ const enableExpiryDate = localStorage.getItem('enableExpiryDate') !== 'false';
     focFooters.forEach(cell => cell.style.display = enableFOC ? '' : 'none');
     batchNoFooters.forEach(cell => cell.style.display = enableBatchNo ? '' : 'none');           // NEW
     batchExpiryFooters.forEach(cell => cell.style.display = enableExpiryDate ? '' : 'none');     // NEW
+    extraDiscFooters.forEach(cell => cell.style.display = enableExtraDiscountItem ? '' : 'none'); // NEW
 }
     }
 
@@ -6047,9 +6113,37 @@ async function addRowDynamic() {
         calculateRowAmounts(row, totalQty, price, 'amount');
     });
     discAmountCell.appendChild(discAmountInput);
-    
+
+    // Extra Discount — item-row-level, applied after the normal discount and
+    // before trade offer/tax (see calculateRowAmounts). med_pos_invoice only:
+    // the column doesn't exist in the regular POS invoice's table markup, so
+    // inserting it there would leave a headerless/footerless cell.
+    const extraDiscOffset = isMedInvoicePage ? 1 : 0;
+    if (isMedInvoicePage) {
+        const extraDiscCell = row.insertCell(9);
+        extraDiscCell.className = 'extra-disc-cell';
+        const extraDiscInput = document.createElement('input');
+        extraDiscInput.type = 'number';
+        extraDiscInput.className = 'table-input';
+        extraDiscInput.min = '0';
+        extraDiscInput.step = '0.001';
+        extraDiscInput.value = '0.00';
+        extraDiscInput.addEventListener('input', function() {
+            const unitInputs = row.querySelectorAll('.unit-input');
+            let totalQty = 0;
+            unitInputs.forEach(input => {
+                const qty = parseFloat(input.value) || 0;
+                const cf = parseFloat(input.dataset.conversionFactor) || 1;
+                totalQty = totalQty + (qty * cf);
+            });
+            const price = parseFloat(row.querySelector('.price-cell input').value) || 0;
+            calculateRowAmounts(row, totalQty, price);
+        });
+        extraDiscCell.appendChild(extraDiscInput);
+    }
+
     // TO Amount
-    const toAmountCell = row.insertCell(9);
+    const toAmountCell = row.insertCell(9 + extraDiscOffset);
     toAmountCell.className = 'to-amount-cell';
     const toAmountInput = document.createElement('input');
     toAmountInput.type = 'number';
@@ -6060,7 +6154,7 @@ async function addRowDynamic() {
     toAmountCell.appendChild(toAmountInput);
     
     // GST %
-    const taxPercentCell = row.insertCell(10);
+    const taxPercentCell = row.insertCell(10 + extraDiscOffset);
     taxPercentCell.className = 'tax-percent-cell';
     const taxPercentInput = document.createElement('input');
     taxPercentInput.type = 'number';
@@ -6083,7 +6177,7 @@ async function addRowDynamic() {
     taxPercentCell.appendChild(taxPercentInput);
     
     // GST Amount
-    const taxAmountCell = row.insertCell(11);
+    const taxAmountCell = row.insertCell(11 + extraDiscOffset);
     taxAmountCell.className = 'tax-amount-cell';
     const taxAmountInput = document.createElement('input');
     taxAmountInput.type = 'number';
@@ -6094,7 +6188,7 @@ async function addRowDynamic() {
     taxAmountCell.appendChild(taxAmountInput);
     
     // FOC Qty
-    const focCell = row.insertCell(12);
+    const focCell = row.insertCell(12 + extraDiscOffset);
     focCell.className = 'foc-cell';
     const focInput = document.createElement('input');
     focInput.type = 'number';
@@ -6105,7 +6199,7 @@ async function addRowDynamic() {
     focCell.appendChild(focInput);
     
     // Net Amount
-    const netCell = row.insertCell(13);
+    const netCell = row.insertCell(13 + extraDiscOffset);
     netCell.className = 'net-cell';
     const netInput = document.createElement('input');
     netInput.type = 'text';
@@ -6116,7 +6210,7 @@ async function addRowDynamic() {
     netCell.appendChild(netInput);
     
     // Actions
-    const actionsCell = row.insertCell(14);
+    const actionsCell = row.insertCell(14 + extraDiscOffset);
     const deleteBtn = document.createElement('button');
     deleteBtn.type = 'button';
     deleteBtn.className = 'btn btn-danger btn-sm';
@@ -6155,19 +6249,22 @@ function applyInvoiceSettingsToRow(row) {
     const enableTaxation = isTaxationEnabled();
     const enableBatchNo = localStorage.getItem('enableBatchNo') !== 'false';       // NEW
     const enableExpiryDate = localStorage.getItem('enableExpiryDate') !== 'false'; // NEW
+    const enableExtraDiscountItem = localStorage.getItem('enableExtraDiscountItem') !== 'false'; // NEW
 
     // Apply visibility to cells in this row
     const discPercentCell = row.querySelector('.disc-percent-cell');
     const discAmountCell = row.querySelector('.disc-amount-cell');
+    const extraDiscCell = row.querySelector('.extra-disc-cell');       // NEW
     const toAmountCell = row.querySelector('.to-amount-cell');
     const taxPercentCell = row.querySelector('.tax-percent-cell');
     const taxAmountCell = row.querySelector('.tax-amount-cell');
     const focCell = row.querySelector('.foc-cell');
     const batchNoCell = row.querySelector('.batch-no-cell');           // NEW
     const batchExpiryCell = row.querySelector('.batch-expiry-cell');   // NEW
-    
+
     if (discPercentCell) discPercentCell.style.display = enableCashDiscountPercent ? '' : 'none';
     if (discAmountCell) discAmountCell.style.display = enableCashDiscountAmount ? '' : 'none';
+    if (extraDiscCell) extraDiscCell.style.display = enableExtraDiscountItem ? '' : 'none'; // NEW
     if (toAmountCell) toAmountCell.style.display = enableTradeOfferAmount ? '' : 'none';
     if (taxPercentCell) taxPercentCell.style.display = enableTaxation ? '' : 'none';
     if (taxAmountCell) taxAmountCell.style.display = enableTaxation ? '' : 'none';

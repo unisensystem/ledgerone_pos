@@ -137,10 +137,10 @@ try {
     INSERT INTO sale_invoice_items (
         tenant_id, sale_invoice_id, product_id, uom_id,
         quantity, sale_price, gross_amount, discount_percent,
-        discount_amount, trade_offer_percent, trade_offer_amount,
+        discount_amount, extra_discount_amount, trade_offer_percent, trade_offer_amount,
         tax_percent, tax_amount, foc_quantity, net_amount, parent_row_id,
         piece, carton, dozen, scheme, batch_no, expiry_date, created_by, updated_by
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 ");
 
     $itemRowCounter = 0;
@@ -165,6 +165,7 @@ try {
     $item['grossAmount'],
     $item['discountPercent'] ?? 0.00,
     $item['discountAmount'] ?? 0.00,
+    $item['extraDiscountAmount'] ?? 0.00,
     $item['tradeOfferPercent'] ?? 0.00,
     $item['tradeOfferAmount'] ?? 0.00,
     $item['taxPercent'] ?? 0.00,

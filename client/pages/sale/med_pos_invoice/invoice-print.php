@@ -485,8 +485,7 @@
                 const gross = parseFloat(item.gross_amount || 0);
                 const discPct = parseFloat(item.discount_percent || 0);
                 const discAmt = parseFloat(item.discount_amount || 0);
-                // "Extra Disc" = per-item trade offer amount (previously hardcoded '-')
-                const extraDisc = parseFloat(item.trade_offer_amount || 0);
+                const extraDisc = parseFloat(item.extra_discount_amount || 0);
                 const tax = parseFloat(item.tax_amount || 0);
                 // "Add Tax" = per-item GST amount, separate from Sale Tax (previously hardcoded '-')
                 const addTax = parseFloat(item.gst_amount || 0);
@@ -497,7 +496,7 @@
                     <td class="text-center">${serialNumber}</td>
                     <td style="text-align:left;">${item.product_code ? item.product_code + '/' : ''}${item.product_name}</td>
                     <td class="text-center">${item.batch_no || '-'}</td>
-                    <td class="text-center">${item.batch_expiry_date ? fmtDate(item.batch_expiry_date) : '-'}</td>
+                    <td class="text-center">${item.expiry_date ? fmtDate(item.expiry_date) : '-'}</td>
                     <td class="text-right">${qty ? qty.toFixed(0) : '-'}</td>
                     <td class="text-right">${bonus ? bonus.toFixed(0) : '-'}</td>
                     <td class="text-right">${rate ? fmt(rate) : '-'}</td>

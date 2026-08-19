@@ -21,9 +21,9 @@ if (!$user_id) {
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>LedgerOne ERP - Sale Invoice</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="stylesheet" href="../../../assets/css/sale/pos_invoice/pos-add.css">
+    <link rel="stylesheet" href="../../../assets/css/sale/pos_invoice/pos-add.css?v=<?php echo time(); ?>">
 </head>
-<body class="light-theme">
+<body class="light-theme med-invoice-page">
     <div class="container">
         <form id="invoiceForm">
             <div class="actions" id="settingsButtons" style="margin-bottom: 20px; display: none;">
@@ -253,10 +253,11 @@ if (!$user_id) {
                                 <th width="8%" class="gross-cell"><span id="grossAmountLabel">Gross Amount</span></th>
                                 <th width="5%" class="disc-percent-cell">Disc %</th>
                                 <th width="8%" class="disc-amount-cell"><span id="discountAmountLabel">Disc Amt</span></th>
+                                <th width="8%" class="extra-disc-cell">Extra Discount</th>
                                 <th width="8%" class="to-amount-cell">T.O Amt</th>
                                 <th width="5%" class="tax-percent-cell">Tax %</th>
                                 <th width="8%" class="tax-amount-cell">Tax Amt</th>
-                                <th width="8%" class="foc-cell">FOC Qty</th>
+                                <th width="8%" class="foc-cell">Bonus</th>
                                 <th width="8%" class="net-cell"><span id="netAmountLabel">Net Amount</span></th>
                                 <th width="3%">Actions</th>
                             </tr>
@@ -276,6 +277,7 @@ if (!$user_id) {
                                 <th id="totalGrossAmount" class="gross-cell">0.00</th>
                                 <th class="disc-percent-cell"></th>
                                 <th id="totalDiscountAmountItems" class="disc-amount-cell">0.00</th>
+                                <th id="totalExtraDiscountAmount" class="extra-disc-cell">0.00</th>
                                 <th id="totalTradeOfferAmount" class="to-amount-cell">0.00</th>
                                 <th class="tax-percent-cell"></th>
                                 <th id="totalTaxAmount" class="tax-amount-cell">0.00</th>
@@ -327,6 +329,10 @@ if (!$user_id) {
                     <div class="summary-item">
                         <span class="summary-label" id="shippingFeesLabel">Shipping Fees</span>
                         <input type="number" id="shippingFees" class="table-input" min="0" step="0.001" value="0">
+                    </div>
+                    <div class="summary-item">
+                        <span class="summary-label">Tax Amt</span>
+                        <span class="summary-value" id="itemTaxAmountSummary">0.00</span>
                     </div>
                     <div class="summary-item">
                         <span class="summary-label" id="netAmountSummaryLabel">Net Amount</span>
@@ -665,7 +671,7 @@ if (!$user_id) {
 </label>
                         <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 8px; background: var(--surface-1); border-radius: 6px; transition: all 0.2s;" onmouseover="this.style.background='var(--surface-0)'" onmouseout="this.style.background='var(--surface-1)'">
                             <input type="checkbox" id="enableFOC" style="width: auto;">
-                            <span style="font-size: 13px;">FOC Quantity</span>
+                            <span style="font-size: 13px;">Bonus</span>
                         </label>
                         <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 8px; background: var(--surface-1); border-radius: 6px; transition: all 0.2s;" onmouseover="this.style.background='var(--surface-0)'" onmouseout="this.style.background='var(--surface-1)'">
                             <input type="checkbox" id="enableCashDiscountPercent" style="width: auto;">
@@ -674,6 +680,10 @@ if (!$user_id) {
                         <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 8px; background: var(--surface-1); border-radius: 6px; transition: all 0.2s;" onmouseover="this.style.background='var(--surface-0)'" onmouseout="this.style.background='var(--surface-1)'">
                             <input type="checkbox" id="enableCashDiscountAmount" style="width: auto;">
                             <span style="font-size: 13px;">Cash Discount Amt</span>
+                        </label>
+                        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 8px; background: var(--surface-1); border-radius: 6px; transition: all 0.2s;" onmouseover="this.style.background='var(--surface-0)'" onmouseout="this.style.background='var(--surface-1)'">
+                            <input type="checkbox" id="enableExtraDiscountItem" style="width: auto;">
+                            <span style="font-size: 13px;">Extra Discount</span>
                         </label>
                     </div>
                 </div>
