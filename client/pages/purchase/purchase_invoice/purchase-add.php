@@ -164,7 +164,9 @@ if (!$user_id) {
                                 <th width="4%">S#</th>
                                     <th width="20%">Product Code / Name</th>
                                 <th width="8%" data-col="size">Size</th>
-                                <!-- Dynamic unit columns will be inserted here -->
+<th width="8%" data-col="batch-no">Batch No</th>
+<th width="8%" data-col="batch-expiry">Expiry Date</th>
+<!-- Dynamic unit columns will be inserted here -->
                                 <th width="8%"><span id="purchasePriceLabel">Trade Price (TP)</span></th>
                                 <th width="8%"><span id="grossAmountLabel">Gross Amount</span></th>
                                 <th width="5%" data-col="disc-percent">Disc %</th>
@@ -184,7 +186,9 @@ if (!$user_id) {
                         <tfoot>
                             <tr class="totals-row">
                                 <th colspan="2">Totals</th>
-                                <th data-col="size"></th>
+<th data-col="size"></th>
+<th data-col="batch-no"></th>
+<th data-col="batch-expiry"></th>
                                 <!-- Dynamic unit totals will be inserted here -->
                                 <th id="totalPurchasePrice">0.000</th>
                                 <th id="totalGrossAmount">0.000</th>
@@ -321,7 +325,9 @@ if (!$user_id) {
             <div class="settings-section">
                 <div class="settings-section-title">Items Table Columns</div>
                 <div class="settings-grid">
-                    <div class="settings-item"><input type="checkbox" id="enableSize"><label for="enableSize">Enable Size Column</label></div>
+<div class="settings-item"><input type="checkbox" id="enableSize"><label for="enableSize">Enable Size Column</label></div>
+<div class="settings-item"><input type="checkbox" id="enableBatchNo"><label for="enableBatchNo">Enable Batch No Column</label></div>
+<div class="settings-item"><input type="checkbox" id="enableBatchExpiry"><label for="enableBatchExpiry">Enable Expiry Date Column</label></div>
                     <div class="settings-item"><input type="checkbox" id="enableTradeOffer"><label for="enableTradeOffer">Inline Trade Offer Discount %</label></div>
                     <div class="settings-item"><input type="checkbox" id="enableTradeOfferAmount"><label for="enableTradeOfferAmount">Inline Trade Offer Amount</label></div>
                     <div class="settings-item"><input type="checkbox" id="enableFOC"><label for="enableFOC">Free Of Cost (FOC) Quantity</label></div>
