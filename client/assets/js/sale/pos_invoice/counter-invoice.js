@@ -849,17 +849,12 @@ window.loadDraft = async function(draftId) {
 };
 
 async function loadProducts() {
-    try {
-        const response = await fetch('../../../../server/api/sale/pos_invoice/get-products.php');
-        const data = await response.json();
-        if (data.success) productsData = data.products;
-    } catch (error) {
-        console.error('Error loading products:', error);
-    }
+    const response = await fetch('../../../../server/api/sale/pos_invoice/get-products.php');
+    const data = await response.json();
+    if (data.success) productsData = data.products;
 }
 
 async function loadCustomers() {
-  try {
     const response = await fetch('../../../../server/api/sale/pos_invoice/get-customers.php');
     const data = await response.json();
     if (data.success) {
@@ -889,9 +884,6 @@ async function loadCustomers() {
             await fetchCustomerBalance(cashCustomer.id);
         }
     }
-  } catch (error) {
-    console.error('Error loading customers:', error);
-  }
 }
 
 function selectCustomer(id, text) {
@@ -1005,7 +997,6 @@ async function fetchCustomerBalance(customerId) {
 }
 
 async function loadBranches() {
-  try {
     const response = await fetch('../../../../server/api/sale/pos_invoice/get-branches.php');
     const data = await response.json();
     if (data.success) {
@@ -1055,20 +1046,14 @@ async function loadBranches() {
             currentInvoice.branch = firstBranch.id;
         }
     }
-  } catch (error) {
-    // Never let a branch-loading hiccup take down the rest of page init (Company, Customer,
-    // Quick Add, shortcuts, etc. are all registered after this call in the same async chain).
-    console.error('Error loading branches:', error);
-  }
 }
 
 async function loadCompanies() {
-  try {
     const response = await fetch('../../../../server/api/sale/pos_invoice/get-companies.php');
     const data = await response.json();
     if (data.success) {
         companiesData = data.companies;
-
+        
         const savedCompanyId = localStorage.getItem('lastSelectedCompany');
         if (savedCompanyId && data.companies.find(c => c.id == savedCompanyId)) {
             const savedCompany = data.companies.find(c => c.id == savedCompanyId);
@@ -1082,14 +1067,9 @@ async function loadCompanies() {
             currentInvoice.company = firstCompany.id;
         }
     }
-  } catch (error) {
-    // Same reasoning as loadBranches() — must not block the rest of page init.
-    console.error('Error loading companies:', error);
-  }
 }
 
 async function loadCurrencies() {
-  try {
     const response = await fetch('../../../../server/api/sale/pos_invoice/get-currencies.php');
     const data = await response.json();
     if (data.success) {
@@ -1108,13 +1088,9 @@ async function loadCurrencies() {
             currencySelect.appendChild(option);
         });
     }
-  } catch (error) {
-    console.error('Error loading currencies:', error);
-  }
 }
 
 async function loadBankAccounts() {
-  try {
     const response = await fetch('../../../../server/api/sale/pos_invoice/get-bank-accounts.php');
     const data = await response.json();
     if (data.success) {
@@ -1128,21 +1104,14 @@ async function loadBankAccounts() {
             bankSelect.appendChild(option);
         });
     }
-  } catch (error) {
-    console.error('Error loading bank accounts:', error);
-  }
 }
 
 async function loadUOM() {
-  try {
     const response = await fetch('../../../../server/api/sale/pos_invoice/get-uom.php');
     const data = await response.json();
     if (data.success) {
         uomData = data.uoms;
     }
-  } catch (error) {
-    console.error('Error loading UOM:', error);
-  }
 }
 
 function updateDateTime() {
@@ -1186,7 +1155,6 @@ function updateStockDisplay() {
 }
 
 async function loadCurrencies() {
-  try {
     const response = await fetch('../../../../server/api/sale/pos_invoice/get-currencies.php');
     const data = await response.json();
     if (data.success) {
@@ -1205,13 +1173,9 @@ async function loadCurrencies() {
             currencySelect.appendChild(option);
         });
     }
-  } catch (error) {
-    console.error('Error loading currencies:', error);
-  }
 }
 
 async function loadBankAccounts() {
-  try {
     const response = await fetch('../../../../server/api/sale/pos_invoice/get-bank-accounts.php');
     const data = await response.json();
     if (data.success) {
@@ -1225,21 +1189,14 @@ async function loadBankAccounts() {
             bankSelect.appendChild(option);
         });
     }
-  } catch (error) {
-    console.error('Error loading bank accounts:', error);
-  }
 }
 
 async function loadUOM() {
-  try {
     const response = await fetch('../../../../server/api/sale/pos_invoice/get-uom.php');
     const data = await response.json();
     if (data.success) {
         uomData = data.uoms;
     }
-  } catch (error) {
-    console.error('Error loading UOM:', error);
-  }
 }
 
 function updateDateTime() {
@@ -2013,7 +1970,6 @@ function showNotification(message) {
 }
 
 async function loadSupplierMen() {
-  try {
     const response = await fetch('../../../../server/api/sale/pos_invoice/get-supplier-men.php');
     const data = await response.json();
     if (data.success) {
@@ -2027,9 +1983,6 @@ async function loadSupplierMen() {
             supplierManSelect.appendChild(option);
         });
     }
-  } catch (error) {
-    console.error('Error loading supplier men:', error);
-  }
 }
 
 async function loadProjects() {
@@ -2037,19 +1990,19 @@ async function loadProjects() {
         const response = await fetch('../../../../server/api/master_setup/project_setup/get-projects-dropdown.php');
         const data = await response.json();
         if (data.success) {
-            projectsData = data.projects;
+            projectsData = data.data;
             const projectSelect = document.getElementById('project');
             projectSelect.innerHTML = '<option value="">Select Project</option>';
-            data.projects.forEach(project => {
+            data.data.forEach(project => {
                 const option = document.createElement('option');
                 option.value = project.id;
                 const label = `${project.project_code} - ${project.project_name}${project.city_name ? ' - ' + project.city_name : ''}`;
                 option.textContent = label;
                 projectSelect.appendChild(option);
             });
-
+            
             const savedProjectId = localStorage.getItem('lastSelectedProject');
-            if (savedProjectId && data.projects.find(p => p.id == savedProjectId)) {
+            if (savedProjectId && data.data.find(p => p.id == savedProjectId)) {
                 projectSelect.value = savedProjectId;
                 currentInvoice.project = parseInt(savedProjectId);
             }

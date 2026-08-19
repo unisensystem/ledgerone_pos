@@ -1,0 +1,3 @@
+ALTER TABLE suppliers
+ADD COLUMN city VARCHAR(255) NULL AFTER address,
+ADD COLUMN credit_days INT NULL DEFAULT 0 AFTER ait_percent;
