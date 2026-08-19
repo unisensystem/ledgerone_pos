@@ -368,14 +368,13 @@
                     <th style="width: 10%;" class="text-right">Dz</th>
                     <th style="width: 10%;" class="text-right">Pcs</th>
                     <th class="item-col">Item</th>
-                    <th style="width: 15%;" class="text-right">Rate</th>
-                    <th style="width: 11%;" class="text-right disc-col">Disc</th>
-                    <th style="width: 14%;" class="text-right">Amount</th>
+                    <th style="width: 18%;" class="text-right">Rate</th>
+                    <th style="width: 17%;" class="text-right">Amount</th>
                 </tr>
             </thead>
             <tbody id="itemsTableBody">
                 <tr>
-                    <td colspan="7" class="text-center">Loading...</td>
+                    <td colspan="6" class="text-center">Loading...</td>
                 </tr>
             </tbody>
         </table>
@@ -384,39 +383,39 @@
         
         <div class="total-row">
             <span>Subtotal:</span>
-            <span id="totalBill">0.00</span>
+            <span id="totalBill">0</span>
         </div>
         <div class="total-row" id="discountRow">
             <span>Discount:</span>
-            <span id="discountAmount">0.00</span>
+            <span id="discountAmount">0</span>
         </div>
         <div class="total-row" style="display: none;" id="gstRow">
             <span>GST:</span>
-            <span id="gstAmount">0.00</span>
+            <span id="gstAmount">0</span>
         </div>
         <div class="total-row" id="advTaxRow">
             <span>Adv. Tax:</span>
-            <span id="advTaxAmount">0.00</span>
+            <span id="advTaxAmount">0</span>
         </div>
         <div class="total-row grand-total">
             <span>Net Bill:</span>
-            <span id="netAmount">0.00</span>
+            <span id="netAmount">0</span>
         </div>
         <div class="total-row">
             <span>Cash Received:</span>
-            <span id="amountPaid">0.00</span>
+            <span id="amountPaid">0</span>
         </div>
         <div class="total-row">
             <span>Balance:</span>
-            <span id="remainingBalance">0.00</span>
+            <span id="remainingBalance">0</span>
         </div>
         <div class="total-row" id="previousBalanceRow">
             <span>Prv. Balance:</span>
-            <span id="previousBalance">0.00</span>
+            <span id="previousBalance">0</span>
         </div>
         <div class="total-row grand-total">
             <span>Payable Amount:</span>
-            <span id="payableAmount">0.00</span>
+            <span id="payableAmount">0</span>
         </div>
         
         <div id="notesSection" class="notes-section">
@@ -435,7 +434,7 @@
             </div>
 
             <div class="terms-note" id="termsNote">
-                Ø§Ø³ Ø§Ù†ÙˆØ§Ø¦Ø³ Ú©ÛŒ Ø§Ø¯Ø§Ø¦ÛŒÚ¯ÛŒ Ù…Ù‚Ø±Ø±Û ØªØ§Ø±ÛŒØ® ØªÚ© Ù…Ú©Ù…Ù„ Ú©Ø±Ù†Ø§ Ù„Ø§Ø²Ù…ÛŒ ÛÛ’ØŒ Ø¨ØµÙˆØ±Øª Ø¯ÛŒÚ¯Ø± Ø¢Ø¦Ù†Ø¯Û Ø³Ù¾Ù„Ø§Ø¦ÛŒ Ù…ØªØ§Ø«Ø± ÛÙˆ Ø³Ú©ØªÛŒ ÛÛ’Û”
+                اس انوائس کی ادائیگی مقرر� تاریخ تک مکمل کرنا لازمی �ے، بصورت دیگر آئند� سپلائی متاثر �و سکتی �ے۔
             </div>
 
             <div class="signature-line">
@@ -456,14 +455,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
     <script>
         // Apply invoice settings
-        const enableCashDiscountAmount = localStorage.getItem('enableCashDiscountAmount') === 'true';
-        const enableTradeOfferAmount = localStorage.getItem('enableTradeOfferAmount') === 'true';
         const childDisplayMode = localStorage.getItem('childDisplayMode') || 'separate';
-        
-        // Hide discount column if both are disabled
-        if (!enableCashDiscountAmount && !enableTradeOfferAmount) {
-            document.querySelectorAll('.disc-col').forEach(el => el.style.display = 'none');
-        }
         
         const urlParams = new URLSearchParams(window.location.search);
         const invoiceId = urlParams.get('id');
@@ -609,8 +601,6 @@
             const previousBalance = parseFloat(invoice.previous_balance || 0);
             document.getElementById('previousBalance').textContent = formatMoneyCell(previousBalance);
             
-            const currencySymbol = invoice.currency_symbol || '';
-
             // Merge duplicate rows for the same product before rendering
             items = mergeDuplicateItems(items);
             
@@ -652,19 +642,12 @@
                             ')</span>';
                     }
                     
-                    const discountAmt = parseFloat(item.discount_amount || 0);
-                    const tradeOfferAmt = parseFloat(item.trade_offer_amount || 0);
-                    const totalDisc = discountAmt + tradeOfferAmt;
-                    
-                    const discCell = (!enableCashDiscountAmount && !enableTradeOfferAmount) ? '' : `<td class="text-right disc-col">${currencySymbol + totalDisc.toFixed(2)}</td>`;
-                    
                     row.innerHTML = `
                         <td class="text-right">${formatUnitCell(item.carton)}</td>
                         <td class="text-right">${formatUnitCell(item.dozen)}</td>
                         <td class="text-right">${formatUnitCell(item.piece)}</td>
                         <td class="item-col">${item.product_name}${childrenText}</td>
                         <td class="text-right">${formatMoneyCell(item.sale_price)}</td>
-                        ${discCell}
                         <td class="text-right">${formatMoneyCell(item.net_amount)}</td>
                     `;
                 });
@@ -677,19 +660,12 @@
                     const indent = isChild ? '<span style="margin-left: 15px; font-size: 11px;">? </span>' : '';
                     const textStyle = isChild ? 'font-size: 11px; color: #666;' : '';
                     
-                    const discountAmt = parseFloat(item.discount_amount || 0);
-                    const tradeOfferAmt = parseFloat(item.trade_offer_amount || 0);
-                    const totalDisc = discountAmt + tradeOfferAmt;
-                    
-                    const discCell = (!enableCashDiscountAmount && !enableTradeOfferAmount) ? '' : `<td class="text-right disc-col">${isChild ? '-' : currencySymbol + totalDisc.toFixed(2)}</td>`;
-                    
                     row.innerHTML = `
                         <td class="text-right">${isChild ? '-' : formatUnitCell(item.carton)}</td>
                         <td class="text-right">${isChild ? '-' : formatUnitCell(item.dozen)}</td>
                         <td class="text-right">${isChild ? '-' : formatUnitCell(item.piece)}</td>
                         <td class="item-col" style="${textStyle}">${indent}${item.product_name}</td>
                         <td class="text-right">${isChild ? '-' : formatMoneyCell(item.sale_price)}</td>
-                        ${discCell}
                         <td class="text-right">${isChild ? '-' : formatMoneyCell(item.net_amount)}</td>
                     `;
                 });
@@ -704,6 +680,7 @@
             let totalDozen = 0;
             let totalPiece = 0;
             let totalAmount = 0;
+            let totalDiscount = 0;
             
             items.forEach(item => {
                 if (!item.parent_row_id) {
@@ -711,10 +688,9 @@
                     totalDozen  += parseFloat(item.dozen || 0);
                     totalPiece  += parseFloat(item.piece || 0);
                     totalAmount += parseFloat(item.net_amount);
+                    totalDiscount += parseFloat(item.discount_amount || 0) + parseFloat(item.trade_offer_amount || 0);
                 }
             });
-            
-            const totalsDiscCell = (!enableCashDiscountAmount && !enableTradeOfferAmount) ? '' : `<td class="text-right disc-col"></td>`;
             
             totalsRow.innerHTML = `
                 <td class="text-right">${totalCarton > 0 ? totalCarton.toFixed(0) : '-'}</td>
@@ -722,15 +698,13 @@
                 <td class="text-right">${totalPiece > 0 ? totalPiece.toFixed(0) : '-'}</td>
                 <td class="item-col">TOTALS</td>
                 <td class="text-right"></td>
-                ${totalsDiscCell}
                 <td class="text-right">${formatMoneyCell(totalAmount)}</td>
             `;
             
             document.getElementById('totalBill').textContent = formatMoneyCell(invoice.total_bill);
             
-            // Discount - always shown now (even if 0), like FoxPro
-            const discountAmt = parseFloat(invoice.total_discount_amount || 0);
-            document.getElementById('discountAmount').textContent = formatMoneyCell(discountAmt);
+            // Discount - sum of per-item discount + trade offer, shown below in totals section
+            document.getElementById('discountAmount').textContent = formatMoneyCell(totalDiscount);
             
             // Calculate total GST from items
             let totalGst = 0;
