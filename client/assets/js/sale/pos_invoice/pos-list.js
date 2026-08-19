@@ -734,18 +734,32 @@ function initializeListPage(permissions) {
     }
     
     // Print options modal
+    // "Print 2" (invoice-print2.php) only exists in the med_pos_invoice folder —
+    // gated by page so the regular Sale Invoice list (which shares this same
+    // pos-list.js) never tries to open a file that isn't there for it.
+    const isMedInvoicePageForPrint = window.location.pathname.includes('med_pos_invoice');
+
+    function resolveSavedPrintUrl(choice, invoiceId) {
+        if (choice === 'full') return `invoice-print.php?id=${invoiceId}`;
+        if (choice === 'thermal') return `thermal-print.php?id=${invoiceId}`;
+        if (choice === 'thermal2') return `thermal-print2.php?id=${invoiceId}`;
+        if (choice === 'full2' && isMedInvoicePageForPrint) return `invoice-print2.php?id=${invoiceId}`;
+        return null; // unknown, or a med-only choice remembered on a page it doesn't apply to
+    }
+
     function showPrintOptions(invoiceId) {
         const savedChoice = localStorage.getItem('pos_print_preference');
-        if (savedChoice) {
-            const url = savedChoice === 'full'
-                ? `invoice-print.php?id=${invoiceId}`
-                : savedChoice === 'thermal'
-                    ? `thermal-print.php?id=${invoiceId}`
-                    : `thermal-print2.php?id=${invoiceId}`;
-            window.open(url, '_blank');
+        const savedUrl = savedChoice ? resolveSavedPrintUrl(savedChoice, invoiceId) : null;
+        if (savedUrl) {
+            window.open(savedUrl, '_blank');
             return;
         }
-        
+
+        const print2ButtonHtml = isMedInvoicePageForPrint ? `
+                    <button class="btn btn-secondary" id="printFull2BtnList" style="width: 100%;">
+                        <i class="fas fa-file-invoice"></i> Print 2
+                    </button>` : '';
+
         const modal = document.createElement('div');
         modal.className = 'modal';
         modal.style.display = 'flex';
@@ -756,7 +770,7 @@ function initializeListPage(permissions) {
                 <div class="modal-actions" style="flex-direction: column; gap: 10px;">
                     <button class="btn btn-primary" id="printFullBtnList" style="width: 100%;">
                         <i class="fas fa-file-invoice"></i> Print Full Invoice
-                    </button>
+                    </button>${print2ButtonHtml}
                     <button class="btn btn-secondary" id="printThermalBtnList" style="width: 100%;">
                         <i class="fas fa-receipt"></i> Print Thermal Invoice
                     </button>
@@ -771,7 +785,7 @@ function initializeListPage(permissions) {
             </div>
         `;
         document.body.appendChild(modal);
-        
+
         document.getElementById('printFullBtnList').onclick = function() {
             if (document.getElementById('rememberPrintChoiceList').checked) {
                 localStorage.setItem('pos_print_preference', 'full');
@@ -779,7 +793,17 @@ function initializeListPage(permissions) {
             window.open(`invoice-print.php?id=${invoiceId}`, '_blank');
             modal.remove();
         };
-        
+
+        if (isMedInvoicePageForPrint) {
+            document.getElementById('printFull2BtnList').onclick = function() {
+                if (document.getElementById('rememberPrintChoiceList').checked) {
+                    localStorage.setItem('pos_print_preference', 'full2');
+                }
+                window.open(`invoice-print2.php?id=${invoiceId}`, '_blank');
+                modal.remove();
+            };
+        }
+
         document.getElementById('printThermalBtnList').onclick = function() {
             if (document.getElementById('rememberPrintChoiceList').checked) {
                 localStorage.setItem('pos_print_preference', 'thermal');
@@ -795,7 +819,7 @@ function initializeListPage(permissions) {
             window.open(`thermal-print2.php?id=${invoiceId}`, '_blank');
             modal.remove();
         };
-        
+
         modal.addEventListener('click', function(e) {
             if (e.target === modal) {
                 modal.remove();
