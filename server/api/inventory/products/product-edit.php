@@ -177,12 +177,12 @@ try {
         
         // Insert new stock opening entries
         $stockOpeningStmt = $pdo->prepare("
-            INSERT INTO stock_opening (product_id, tenant_id, branch_id, opening_qty, opening_price, batch_no, batch_expiry_date, unit_id)
+            INSERT INTO stock_opening (product_id, tenant_id, branch_id, opening_qty, opening_price, batch_no, expiry_date, unit_id)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         ");
-        
+
         $stockLedgerStmt = $pdo->prepare("
-            INSERT INTO stock_ledger (tenant_id, account_id, branch_id, product_id, reference_table, reference_id, qty_in, unit_cost, batch_no, batch_expiry_date, unit_id, transaction_type, transaction_date)
+            INSERT INTO stock_ledger (tenant_id, account_id, branch_id, product_id, reference_table, reference_id, qty_in, unit_cost, batch_no, expiry_date, unit_id, transaction_type, transaction_date)
             VALUES (?, ?, ?, ?, 'stock_opening', ?, ?, ?, ?, ?, ?, 'Opening Stock', CURDATE())
         ");
         

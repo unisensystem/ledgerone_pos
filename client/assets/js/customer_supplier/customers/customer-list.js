@@ -15,7 +15,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const companyFilter = document.getElementById('companyFilter');
     
     let userPermissions = [];
-    
+
     // Check permissions first
     checkPermissions().then(() => {
         loadCompanyFilter();
@@ -107,7 +107,7 @@ document.addEventListener('DOMContentLoaded', function () {
             customersTable.appendChild(row);
         });
     }
-    
+
     function updateStats(stats) {
         document.querySelector('.stat-card:nth-child(1) .stat-value').textContent = stats.total_customers;
         document.querySelector('.stat-card:nth-child(2) .stat-value').textContent = stats.active_customers;
@@ -191,6 +191,7 @@ document.addEventListener('DOMContentLoaded', function () {
             loadCustomers();
         });
     }
+
 
     // Delete Modal Elements
     const deleteModal = document.getElementById('deleteModal');
@@ -329,6 +330,7 @@ document.addEventListener('DOMContentLoaded', function () {
         document.getElementById('viewSecondaryPhone').textContent = customer.secondary_phone || '';
         document.getElementById('viewEmail').textContent = customer.email || '';
         document.getElementById('viewIdentityCard').textContent = customer.identity_card_no || '';
+        document.getElementById('viewLicenseNo').textContent = customer.license_no || '';
         
         // Fetch and display related data
         if (customer.associated_sales_officer_id) {
@@ -881,6 +883,7 @@ document.addEventListener('DOMContentLoaded', function () {
         document.getElementById('editSecondaryPhone').value = customer.secondary_phone || '';
         document.getElementById('editEmail').value = customer.email || '';
         document.getElementById('editIdentityCard').value = customer.identity_card_no || '';
+        document.getElementById('editLicenseNo').value = customer.license_no || '';
         
         // Set company (after options are loaded)
         setTimeout(() => {
@@ -1291,6 +1294,7 @@ document.addEventListener('DOMContentLoaded', function () {
             secondaryPhone: document.getElementById('editSecondaryPhone').value.trim(),
             email: document.getElementById('editEmail').value.trim(),
             identityCard: document.getElementById('editIdentityCard').value.trim(),
+            licenseNo: document.getElementById('editLicenseNo').value.trim(),
             salesOfficerId: $('#editSalesOfficer').val() || null,
             supplierManId: $('#editSupplierMan').val() || null,
             projectId: $('#editProject').val() || null,

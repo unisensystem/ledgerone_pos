@@ -2087,13 +2087,20 @@ function loadStockOpeningData(productId) {
                     const stockEntries = data.stock_entries;
                     console.log('Loaded stock entries:', stockEntries);
                     
-                    // Group entries by branch
+                    // Group entries by branch. For 'group' UOM products, several
+                    // stock_opening rows (one per unit) together represent ONE opening
+                    // stock event for that branch, so they belong in the same row. For
+                    // 'unit' products, each row is an independent historical entry
+                    // (different batch/date) — grouping those by branch_id alone would
+                    // only ever render the first one and silently hide the rest, so key
+                    // each one uniquely instead.
                     const entriesByBranch = {};
                 stockEntries.forEach(entry => {
-                    if (!entriesByBranch[entry.branch_id]) {
-                        entriesByBranch[entry.branch_id] = [];
+                    const groupKey = uomType === 'group' ? entry.branch_id : `${entry.branch_id}_${entry.id}`;
+                    if (!entriesByBranch[groupKey]) {
+                        entriesByBranch[groupKey] = [];
                     }
-                    entriesByBranch[entry.branch_id].push(entry);
+                    entriesByBranch[groupKey].push(entry);
                 });
                 
                 // Clear existing stock entry rows (except first empty template)
@@ -2129,8 +2136,8 @@ if (batchNoInput && firstEntry.batch_no) {
     batchNoInput.value = firstEntry.batch_no;
 }
 const batchExpiryInput = firstRow.querySelector('input[name="batchExpiryDate[]"]');
-if (batchExpiryInput && firstEntry.batch_expiry_date && firstEntry.batch_expiry_date !== '0000-00-00') {
-    batchExpiryInput.value = firstEntry.batch_expiry_date;
+if (batchExpiryInput && firstEntry.expiry_date && firstEntry.expiry_date !== '0000-00-00') {
+    batchExpiryInput.value = firstEntry.expiry_date;
 }
                     
                     if (uomType === 'group') {
@@ -2181,8 +2188,8 @@ if (batchNoInput && branchEntries[0].batch_no) {
     batchNoInput.value = branchEntries[0].batch_no;
 }
 const batchExpiryInput = newRow.querySelector('input[name="batchExpiryDate[]"]');
-if (batchExpiryInput && branchEntries[0].batch_expiry_date && branchEntries[0].batch_expiry_date !== '0000-00-00') {
-    batchExpiryInput.value = branchEntries[0].batch_expiry_date;
+if (batchExpiryInput && branchEntries[0].expiry_date && branchEntries[0].expiry_date !== '0000-00-00') {
+    batchExpiryInput.value = branchEntries[0].expiry_date;
 }
                     
                     if (uomType === 'group') {

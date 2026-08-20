@@ -35,7 +35,7 @@ try {
     $sql = "
         SELECT
             batch_no,
-            batch_expiry_date,
+            expiry_date AS batch_expiry_date,
             SUM(COALESCE(qty_in, 0)) - SUM(COALESCE(qty_out, 0)) AS remaining_qty,
             MIN(transaction_date) AS first_transaction_date,
             MIN(id) AS first_id
@@ -53,9 +53,9 @@ try {
     }
 
     $sql .= "
-        GROUP BY batch_no, batch_expiry_date
+        GROUP BY batch_no, expiry_date
         HAVING remaining_qty > 0
-        ORDER BY (batch_expiry_date IS NULL) ASC, batch_expiry_date ASC, first_transaction_date ASC, first_id ASC
+        ORDER BY (expiry_date IS NULL) ASC, expiry_date ASC, first_transaction_date ASC, first_id ASC
     ";
 
     $stmt = $pdo->prepare($sql);

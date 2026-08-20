@@ -18,6 +18,7 @@ document.addEventListener('DOMContentLoaded', function () {
         { id: 'secondaryPhone', label: 'Secondary Phone', visible: false },
         { id: 'email', label: 'Email Address', visible: false },
         { id: 'identityCard', label: 'Identity Card No', visible: false },
+        { id: 'licenseNo', label: 'License #', visible: false },
         { id: 'salesOfficer', label: 'Associated Sales Officer', visible: false },
         { id: 'supplierMan', label: 'Supplier Man', visible: false },
         { id: 'project', label: 'Project', visible: false },
@@ -431,8 +432,9 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function validateIdentityCard(card) {
         if (!card) return true; // Identity card is optional
-        const regex = /^[0-9]*$/;
-        return regex.test(card) && card.length <= 15;
+        // Lenient on purpose: digit count doesn't have to be exactly 13 (5-7-1) —
+        // only reject if it has characters other than digits/dashes.
+        return /^[0-9-]*$/.test(card);
     }
 
     function validateEmail(email) {
@@ -477,6 +479,19 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 
     identityCard.addEventListener('input', function () {
+        const prevCursor = this.selectionStart;
+        const digitsBeforeCursor = this.value.substring(0, prevCursor).replace(/\D/g, '').length;
+        this.value = formatIdentityCard(this.value);
+
+        // Re-position cursor after the same number of digits, accounting for
+        // auto-inserted hyphens shifting everything after them.
+        let newPos = 0, digitCount = 0;
+        while (newPos < this.value.length && digitCount < digitsBeforeCursor) {
+            if (/\d/.test(this.value[newPos])) digitCount++;
+            newPos++;
+        }
+        this.setSelectionRange(newPos, newPos);
+
         const errorElement = document.getElementById('identityCardError');
         if (this.value && !validateIdentityCard(this.value)) {
             this.classList.add('error');
@@ -1120,6 +1135,7 @@ document.addEventListener('DOMContentLoaded', function () {
             primaryPhone: primaryPhone.value.trim(),
             secondaryPhone: secondaryPhone.value.trim(),
             identityCard: identityCard.value.trim(),
+            licenseNo: document.getElementById('licenseNo').value.trim(),
             email: email.value.trim(),
             countryId: countrySelect.value || null,
             regionId: regionSelect.value || null,

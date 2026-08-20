@@ -61,7 +61,7 @@
         /* Hidden meta-grid rows (Print 2 only): visibility:hidden (not display:none)
            so the 3-column grid cell is still reserved — removing them outright would
            reflow every field after into the wrong row/column. */
-        .meta-grid .row.meta-hidden { visibility: hidden; }
+        .meta-grid .row.meta-hidden { display: none; }
 
         .invoice-title-bar {
             text-align: center;
@@ -242,29 +242,29 @@
             <div class="row"><span class="lbl">Invoice Date:</span> <span id="invoiceDate">Loading...</span></div>
             <div class="filer-badge" id="filerBadge"></div>
 
-            <div class="row"><span class="lbl">Sale Order #:</span> <span id="saleOrderNo">-</span></div>
+            <div class="row meta-hidden"><span class="lbl">Sale Order #:</span> <span id="saleOrderNo">-</span></div>
             <div class="row"><span class="lbl">Customer:</span> <span id="customerName">Loading...</span></div>
-            <div class="row"><span class="lbl">License #:</span> <span id="customerLicense">-</span></div>
+            <div class="row meta-hidden"><span class="lbl">License #:</span> <span id="customerLicense">-</span></div>
 
-            <div class="row"><span class="lbl">Due Date:</span> <span id="dueDateVal">-</span></div>
-            <div class="row"><span class="lbl">Region:</span> <span id="customerArea">-</span></div>
+            <div class="row meta-hidden"><span class="lbl">Due Date:</span> <span id="dueDateVal">-</span></div>
+            <div class="row meta-hidden"><span class="lbl">Region:</span> <span id="customerArea">-</span></div>
             <div class="row meta-hidden"><span class="lbl">NTN #:</span> <span id="customerNtn">-</span></div>
 
             <div class="row meta-hidden"><span class="lbl">Booking Man:</span> <span id="supplierMan">-</span></div>
-            <div class="row"><span class="lbl">Address:</span> <span id="customerAddress">Loading...</span></div>
+            <div class="row meta-hidden"><span class="lbl">Address:</span> <span id="customerAddress">Loading...</span></div>
             <div class="row meta-hidden"><span class="lbl">GST #:</span> <span id="customerGst">-</span></div>
 
             <div class="row meta-hidden"><span class="lbl">Delivery Man:</span> <span id="salesOfficer">-</span></div>
-            <div class="row"><span class="lbl">Phone:</span> <span id="customerPhone">-</span></div>
+            <div class="row meta-hidden"><span class="lbl">Phone:</span> <span id="customerPhone">-</span></div>
             <div class="row meta-hidden"><span class="lbl">CNIC #:</span> <span id="customerCnic">-</span></div>
 
-            <div class="row"><span class="lbl">Remarks:</span> <span id="remarks">-</span></div>
-            <div class="row"><span class="lbl">Ship To:</span> <span id="shipTo">-</span></div>
-            <div class="row"><span class="lbl">User:</span> <span id="generatedBy">-</span></div>
+            <div class="row meta-hidden"><span class="lbl">Remarks:</span> <span id="remarks">-</span></div>
+            <div class="row meta-hidden"><span class="lbl">Ship To:</span> <span id="shipTo">-</span></div>
+            <div class="row meta-hidden"><span class="lbl">User:</span> <span id="generatedBy">-</span></div>
 
             <div class="row"></div>
             <div class="row"></div>
-            <div class="row"><span class="lbl">Gen. Date:</span> <span id="generatedOn"></span></div>
+            <div class="row meta-hidden"><span class="lbl">Gen. Date:</span> <span id="generatedOn"></span></div>
         </div>
 
         <!-- Items table -->

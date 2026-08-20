@@ -210,11 +210,19 @@ if (!$user_id) {
                                 <i class="fas fa-id-card"></i>
                                 Identity Card No
                             </label>
-                            <input type="text" id="identityCard" maxlength="15" placeholder="Numbers only">
+                            <input type="text" id="identityCard" maxlength="15" placeholder="XXXXX-YYYYYYY-Z">
                             <div class="error-text" id="identityCardError">
                                 <i class="fas fa-exclamation-circle"></i>
-                                <span>Identity card can only contain numbers</span>
+                                <span>Identity card must be in the format XXXXX-YYYYYYY-Z</span>
                             </div>
+                        </div>
+
+                        <div class="form-group col-6">
+                            <label for="licenseNo">
+                                <i class="fas fa-certificate"></i>
+                                License #
+                            </label>
+                            <input type="text" id="licenseNo" maxlength="100" placeholder="Enter license number">
                         </div>
                     </div>
 

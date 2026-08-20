@@ -247,7 +247,11 @@ $currency_symbol = $currency['symbol'] ?? '$';
                         </div>
                         <div class="form-group col-6">
                             <label>Identity Card</label>
-                            <input type="text" id="editIdentityCard" maxlength="15">
+                            <input type="text" id="editIdentityCard" maxlength="15" placeholder="XXXXX-YYYYYYY-Z">
+                        </div>
+                        <div class="form-group col-6">
+                            <label>License #</label>
+                            <input type="text" id="editLicenseNo" maxlength="100">
                         </div>
                         <div class="form-group col-6">
                             <label>Sales Officer</label>
@@ -524,6 +528,10 @@ $currency_symbol = $currency['symbol'] ?? '$';
                     <div class="form-group col-6">
                         <label>Identity Card</label>
                         <div class="view-field" id="viewIdentityCard"></div>
+                    </div>
+                    <div class="form-group col-6">
+                        <label>License #</label>
+                        <div class="view-field" id="viewLicenseNo"></div>
                     </div>
                     <div class="form-group col-6">
                         <label>Sales Officer</label>

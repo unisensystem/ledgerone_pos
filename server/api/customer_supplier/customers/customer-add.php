@@ -65,6 +65,7 @@ try {
         'primary_phone' => !empty($input['primaryPhone']) ? trim($input['primaryPhone']) : null,
         'secondary_phone' => !empty($input['secondaryPhone']) ? trim($input['secondaryPhone']) : null,
         'identity_card_no' => !empty($input['identityCard']) ? trim($input['identityCard']) : null,
+        'license_no' => !empty($input['licenseNo']) ? trim($input['licenseNo']) : null,
         'email' => !empty($input['email']) ? trim($input['email']) : null,
         'country_id' => !empty($input['countryId']) ? (int)$input['countryId'] : null,
         'region_id' => !empty($input['regionId']) ? (int)$input['regionId'] : null,
@@ -98,8 +99,8 @@ try {
     $data['id'] = $new_id;
     
     // Insert customer
-    $sql = "INSERT INTO customers (id, tenant_id, company_id, customer_type_id, customer_category_id, brand_id, customer_code, customer_name, shop_name, address, po_box_no, primary_phone, secondary_phone, identity_card_no, email, country_id, region_id, city_id, city_zone_id, area_id, associated_sales_officer_id, supplier_man_id, project_id, is_sales_tax_registered, strn, is_filer, ntn, advance_income_tax_percentage, default_discount_percentage, opening_debit_amount, opening_credit_amount, credit_limit, credit_period_limit_days, is_wholesaler, is_blacklisted, is_out_station, created_by, updated_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
-    
+    $sql = "INSERT INTO customers (id, tenant_id, company_id, customer_type_id, customer_category_id, brand_id, customer_code, customer_name, shop_name, address, po_box_no, primary_phone, secondary_phone, identity_card_no, license_no, email, country_id, region_id, city_id, city_zone_id, area_id, associated_sales_officer_id, supplier_man_id, project_id, is_sales_tax_registered, strn, is_filer, ntn, advance_income_tax_percentage, default_discount_percentage, opening_debit_amount, opening_credit_amount, credit_limit, credit_period_limit_days, is_wholesaler, is_blacklisted, is_out_station, created_by, updated_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+
     $stmt = $pdo->prepare($sql);
     $stmt->execute([
         $data['id'],
@@ -116,6 +117,7 @@ try {
         $data['primary_phone'],
         $data['secondary_phone'],
         $data['identity_card_no'],
+        $data['license_no'],
         $data['email'],
         $data['country_id'],
         $data['region_id'],

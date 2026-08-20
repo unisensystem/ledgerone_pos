@@ -199,7 +199,7 @@ try {
             $stock_stmt = $pdo->prepare("
                 INSERT INTO stock_ledger (
                     tenant_id, account_id, branch_id, product_id, reference_table, reference_id,
-                    qty_out, unit_cost, unit_id, batch_no, batch_expiry_date, transaction_type, transaction_date
+                    qty_out, unit_cost, unit_id, batch_no, expiry_date, transaction_type, transaction_date
                 ) VALUES (?, ?, ?, ?, 'sale_invoice', ?, ?, ?, ?, ?, ?, 'Sale Invoice', ?)
             ");
             $stock_stmt->execute([
@@ -239,7 +239,7 @@ try {
                 $foc_stmt = $pdo->prepare("
                     INSERT INTO stock_ledger (
                         tenant_id, account_id, branch_id, product_id, reference_table, reference_id,
-                        qty_out, unit_cost, unit_id, batch_no, batch_expiry_date, transaction_type, transaction_date
+                        qty_out, unit_cost, unit_id, batch_no, expiry_date, transaction_type, transaction_date
                     ) VALUES (?, ?, ?, ?, 'sale_invoice', ?, ?, ?, ?, ?, ?, 'Sale Invoice - FOC', ?)
                 ");
                 $foc_stmt->execute([
