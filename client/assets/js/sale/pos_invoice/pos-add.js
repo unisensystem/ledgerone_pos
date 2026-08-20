@@ -4295,6 +4295,7 @@ const scheme = schemeSelect ? schemeSelect.value : 'sale_on_tp';
         dozen: dozenVal,
         salePrice: salePrice,
         grossAmount: isFirstUnit ? grossAmount : 0,
+        discountPercent: isFirstUnit ? discountPercent : 0,
         discountAmount: isFirstUnit ? discountAmount : 0,
         extraDiscountAmount: isFirstUnit ? extraDiscountAmount : 0,
         tradeOfferAmount: isFirstUnit ? tradeOfferAmount : 0,

@@ -370,8 +370,15 @@ function calculateRowAmounts(row, totalQty, price, source) {
                 const basePriceTotal = evaluateFormula(formulaTemplate, basePrice, taxPercent) * totalQty;
                 taxAmt = totalMrp - basePriceTotal;
             } else {
-                // For trade_price formulas (Standard GST), formula calculates tax directly
-                const taxPerUnit = evaluateFormula(formulaTemplate, basePrice, taxPercent);
+                // For trade_price formulas (Standard GST), formula calculates tax directly.
+                // med_pos_invoice: tax is charged on the amount left after ALL discounts
+                // (main + extra + trade offer), not the raw statutory trade_price — swap
+                // in the discounted per-unit price before running the formula. Regular
+                // pos_invoice keeps the original statutory-value behavior unchanged since
+                // isTaxationEnabled() is always false there.
+                const taxEnabled = typeof isTaxationEnabled === 'function' ? isTaxationEnabled() : false;
+                const effectivePrice = (taxEnabled && totalQty > 0) ? (afterTradeOffer / totalQty) : basePrice;
+                const taxPerUnit = evaluateFormula(formulaTemplate, effectivePrice, taxPercent);
                 taxAmt = taxPerUnit * totalQty;
             }
         } else {

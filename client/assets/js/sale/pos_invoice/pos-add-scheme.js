@@ -316,8 +316,8 @@ async function calculateLessSchemeAmounts(row, product) {
     
     const priceInput = row.querySelector('.price-cell input');
     const price = priceInput ? (parseFloat(priceInput.value) || 0) : 0;
-    
-    calculateRowAmountsWithScheme(row, totalQty, price);
+
+    calculateRowAmounts(row, totalQty, price);
 }
 
 /**
@@ -401,84 +401,7 @@ async function calculateLessSpecialSchemeAmounts(row, product) {
     row.dataset.schemeToAmount = totalTOAmount.toFixed(3);
     
     // Recalculate row amounts with updated T.O
-    calculateRowAmountsWithScheme(row, totalQty, salePrice);
-}
-
-/**
- * Calculate row amounts with scheme T.O support
- * Preserves scheme-calculated T.O Amt instead of overwriting with percentage
- * @param {HTMLTableRowElement} row - The table row
- * @param {number} totalQty - Total quantity
- * @param {number} price - Sale price
- */
-function calculateRowAmountsWithScheme(row, totalQty, price) {
-    totalQty = Number(totalQty) || 0;
-    price = Number(price) || 0;
-    
-    const discountPercentInput = row.querySelector('.disc-percent-cell input');
-    const gstPercentInput = row.querySelector('.tax-percent-cell input');
-    
-    if (!discountPercentInput || !gstPercentInput) {
-        console.warn('Missing discount or tax input elements in row');
-        return;
-    }
-    
-    const discountPercent = parseFloat(discountPercentInput.value) || 0;
-    const gstPercent = parseFloat(gstPercentInput.value) || 0;
-    
-    const gross = Number(totalQty) * Number(price);
-    const grossInput = row.querySelector('.gross-cell input');
-    if (grossInput) {
-        grossInput.value = gross.toFixed(3);
-    }
-    
-    // Discount amount (percentage-based) - only if enabled
-    const enableCashDiscountAmount = localStorage.getItem('enableCashDiscountAmount') === 'true';
-    let discountAmt = 0;
-    if (enableCashDiscountAmount) {
-        discountAmt = gross * (discountPercent / 100);
-    }
-    const discAmountInput = row.querySelector('.disc-amount-cell input');
-    if (discAmountInput) {
-        discAmountInput.value = discountAmt.toFixed(3);
-    }
-    
-    // After discount
-    const afterDiscount = gross - discountAmt;
-    
-    // Trade offer amount (from scheme, not percentage) - only if enabled
-    const enableTradeOfferAmount = localStorage.getItem('enableTradeOfferAmount') === 'true';
-    const toAmountInput = row.querySelector('.to-amount-cell input');
-    let schemeToAmount = 0;
-    if (enableTradeOfferAmount && toAmountInput) {
-        schemeToAmount = parseFloat(toAmountInput.value) || 0;
-    } else if (toAmountInput) {
-        toAmountInput.value = '0.00';
-    }
-    
-    // After trade offer
-    const afterTradeOffer = afterDiscount - schemeToAmount;
-    
-    // GST amount - only if enabled
-    const enableTaxation = localStorage.getItem('enableTaxation') === 'true';
-    let gstAmt = 0;
-    if (enableTaxation) {
-        gstAmt = afterTradeOffer * (gstPercent / 100);
-    }
-    const gstAmountInput = row.querySelector('.tax-amount-cell input');
-    if (gstAmountInput) {
-        gstAmountInput.value = gstAmt.toFixed(3);
-    }
-    
-    // Net amount (tax excluded)
-    const net = afterTradeOffer;
-    const netInput = row.querySelector('.net-cell input');
-    if (netInput) {
-        netInput.value = net.toFixed(3);
-    }
-    
-    // Update summary
-    updateInvoiceSummaryDynamic();
+    calculateRowAmounts(row, totalQty, salePrice);
 }
 
 /**
@@ -605,9 +528,7 @@ async function calculateGivenSchemeAmounts(row, product) {
     const priceInput = row.querySelector('.price-cell input');
     const price = priceInput ? (parseFloat(priceInput.value) || 0) : 0;
     
-    console.log('calculateGivenSchemeAmounts: totalQty=', totalQty, 'price=', price, 'totalFOCQty=', totalFOCQty);
-    calculateRowAmountsWithScheme(row, totalQty, price);
-    console.log('After calculateRowAmountsWithScheme - Net Amount:', row.querySelector('.net-cell input')?.value);
+    calculateRowAmounts(row, totalQty, price);
 }
 
 /**

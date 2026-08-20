@@ -276,7 +276,7 @@
                     <th style="width:8%;">Gross</th>
                     <th style="width:5%;">Disc %</th>
                     <th style="width:7%;">Disc Amount</th>
-                    <th style="width:6%;">Extra Disc</th>
+                    <th style="width:6%;">Extra Disc %</th>
                     <th style="width:6%;">Sale Tax</th>
                     <th style="width:6%;">Add Tax</th>
                     <th style="width:8%;">Net Amount</th>
@@ -412,7 +412,7 @@
         }
 
         function fmt(n) {
-            return parseFloat(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            return parseFloat(n || 0).toLocaleString('en-US', { minimumFractionDigits: 3, maximumFractionDigits: 3 });
         }
         function fmtDate(d) {
             if (!d) return '-';
@@ -486,6 +486,11 @@
                 const discPct = parseFloat(item.discount_percent || 0);
                 const discAmt = parseFloat(item.discount_amount || 0);
                 const extraDisc = parseFloat(item.extra_discount_amount || 0);
+                // Extra Disc is entered as a % on the invoice screen — only the resulting
+                // amount is saved, so back-derive the % (on the post-main-discount amount)
+                // purely for display here; the amount itself still feeds the totals below.
+                const afterMainDiscount = gross - discAmt;
+                const extraDiscPct = afterMainDiscount > 0 ? (extraDisc / afterMainDiscount * 100) : 0;
                 const tax = parseFloat(item.tax_amount || 0);
                 // "Add Tax" = per-item GST amount, separate from Sale Tax (previously hardcoded '-')
                 const addTax = parseFloat(item.gst_amount || 0);
@@ -503,7 +508,7 @@
                     <td class="text-right">${gross ? fmt(gross) : '-'}</td>
                     <td class="text-right">${discPct ? discPct.toFixed(2) : '0.00'}</td>
                     <td class="text-right">${discAmt ? fmt(discAmt) : '-'}</td>
-                    <td class="text-right">${extraDisc ? fmt(extraDisc) : '-'}</td>
+                    <td class="text-right">${extraDiscPct ? extraDiscPct.toFixed(2) : '0.00'}</td>
                     <td class="text-right">${tax ? fmt(tax) : '0'}</td>
                     <td class="text-right">${addTax ? fmt(addTax) : '-'}</td>
                     <td class="text-right">${fmt(net)}</td>
@@ -525,7 +530,7 @@
                     <td class="text-right">${fmt(grpGross)}</td>
                     <td></td>
                     <td class="text-right">${fmt(grpDiscAmt)}</td>
-                    <td class="text-right">${fmt(grpExtraDisc)}</td>
+                    <td></td>
                     <td class="text-right">${fmt(grpTax)}</td>
                     <td class="text-right">${fmt(grpAddTax)}</td>
                     <td class="text-right">${fmt(grpNet)}</td>
@@ -543,7 +548,7 @@
                 <td class="text-right">${fmt(grandGross)}</td>
                 <td></td>
                 <td class="text-right">${fmt(grandDiscAmt)}</td>
-                <td class="text-right">${fmt(grandExtraDisc)}</td>
+                <td></td>
                 <td class="text-right">${fmt(grandTax)}</td>
                 <td class="text-right">${fmt(grandAddTax)}</td>
                 <td class="text-right">${fmt(grandNet)}</td>
@@ -551,26 +556,19 @@
 
             // ===== Summary box =====
             const grossAmount = grandGross;
-            const discountAmount = grandDiscAmt; // item-level discount total (matches sample's "Discount Amount")
-            const whTaxAmount = parseFloat(invoice.withholding_tax_amount || 0);
-            const whTaxPercent = parseFloat(invoice.withholding_tax_percent || 0);
+            // Discount Amount = main item discount + extra discount, combined
+            const discountAmount = grandDiscAmt + grandExtraDisc;
+            // "Advance WHTax" box shows the Sale Tax column's total (not actual
+            // withholding tax) per business requirement for this print layout.
+            const whTaxAmount = grandTax;
 
-            // NOTE: Sample invoice ADDS advance withholding tax to net total
-            // (Advance Income Tax collected FROM buyer under Sec 236H).
-            // This differs from this system's internal accounting, which currently
-            // SUBTRACTS withholding tax from net receivable. Confirm with your
-            // accountant which treatment is correct for your business before relying
-            // on this for tax filing - this print view intentionally mirrors the
-            // sample's "add" behavior for display purposes only.
             const afterDiscount = grossAmount - discountAmount;
             const netTotalDisplay = afterDiscount + whTaxAmount;
 
             document.getElementById('thisPageTotal').textContent = `${currencySymbol} ${fmt(grandNet)}`;
             document.getElementById('summaryGrossAmount').textContent = `${currencySymbol} ${fmt(grossAmount)}`;
             document.getElementById('summaryDiscountAmount').textContent = `${currencySymbol} ${fmt(discountAmount)}`;
-            document.getElementById('whTaxLabel').textContent = whTaxPercent
-                ? `Advance WHTax @${whTaxPercent}%:`
-                : 'Advance WHTax:';
+            document.getElementById('whTaxLabel').textContent = 'Advance WHTax:';
             document.getElementById('summaryWhTax').textContent = `${currencySymbol} ${fmt(whTaxAmount)}`;
             document.getElementById('summaryNetTotal').textContent = `${currencySymbol} ${fmt(netTotalDisplay)}`;
 
