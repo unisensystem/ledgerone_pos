@@ -270,10 +270,15 @@ $currency_symbol = $currency['symbol'];
 
         <!-- Detailed Report Table -->
         <section class="report-table-container" id="detailedTable">
-            <div class="table-header">
-                <h3 id="tableTitle">Item-wise Purchase Details</h3>
-            </div>
-            <table>
+    <div class="table-header" style="display:flex; justify-content:space-between; align-items:center; position:relative;">
+        <h3 id="tableTitle">Item-wise Purchase Details</h3>
+        <div style="position:relative;">
+            <button class="btn btn-ghost btn-sm" id="columns-btn"><i class="fas fa-columns"></i> Columns</button>
+            <div id="columns-menu" style="display:none; position:absolute; right:0; top:110%; background:white; border:1px solid #e1e6ee; border-radius:6px; padding:8px; box-shadow:0 4px 12px rgba(0,0,0,0.1); z-index:10; min-width:180px;"></div>
+        </div>
+    </div>
+    <table>
+        
                 <thead>
                     <tr>
                         <th>Invoice ID</th>
