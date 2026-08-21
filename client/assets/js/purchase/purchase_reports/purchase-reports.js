@@ -5,10 +5,17 @@ let currentSearchTerm = '';
 
 // Column headers for each report type
 const tableHeaders = {
-    item: ["Item ID", "Item Name", "Category", "Quantity", "Unit Price", "Total Value", "Supplier", "Actions"],
+    item: ["Item ID", "Item Name", "Category", "Batch No", "Expiry Date", "Quantity", "Unit Price", "Total Value", "Supplier", "Actions"],
     invoice: ["Invoice ID", "Invoice Name", "Category", "Items", "Due Date", "Total Value", "Supplier", "Actions"],
     category: ["Category ID", "Category Name", "Type", "Items", "Avg. Price", "Total Value", "Suppliers", "Actions"],
     supplier: ["Supplier ID", "Supplier Name", "Items", "Avg. Price", "Total Value", "Primary Contact", "Actions"]
+};
+
+const colKeys = {
+    item: ["id","name","category","batchNo","expiryDate","quantity","unitPrice","total","supplier","actions"],
+    invoice: ["id","name","category","quantity","dueDate","total","supplier","actions"],
+    category: ["id","name","category","quantity","unitPrice","total","supplier","actions"],
+    supplier: ["id","name","quantity","unitPrice","total","contact","actions"]
 };
 
 // Initialize with item-wise report
@@ -249,11 +256,12 @@ function loadReportData(reportType) {
     
     // Update table headers
     tableHead.innerHTML = '';
-    tableHeaders[reportType].forEach(header => {
-        const th = document.createElement('th');
-        th.textContent = header;
-        tableHead.appendChild(th);
-    });
+tableHeaders[reportType].forEach((header, idx) => {
+    const th = document.createElement('th');
+    th.textContent = header;
+    th.setAttribute('data-col', colKeys[reportType][idx]);
+    tableHead.appendChild(th);
+});
 
     if (data.length === 0) {
         tableBody.innerHTML = '<tr><td colspan="8" style="text-align: center; padding: 20px;">No data available</td></tr>';
@@ -269,6 +277,7 @@ function loadReportData(reportType) {
     }
 
     renderTableRows(filteredData, reportType, tableBody);
+setupColumnToggle(reportType);
 }
 
 // Filter data based on search term
@@ -311,28 +320,35 @@ function renderTableRows(data, reportType, tableBody) {
         const row = document.createElement('tr');
         let cells = [];
         
-        if (reportType === 'item') {
-            cells = [item.id, item.name, item.category, item.quantity, item.unitPrice, item.total, item.supplier];
-            
-            cells.forEach(cellContent => {
-                const cell = document.createElement('td');
-                cell.innerHTML = cellContent;
-                row.appendChild(cell);
-            });
-            
-            // Add expand button
-            const actionCell = document.createElement('td');
-            actionCell.innerHTML = '<button class="btn-ghost btn-sm expand-btn" style="padding: 4px 8px;"><i class="fas fa-chevron-down"></i></button>';
-            row.appendChild(actionCell);
-            
-            // Add click event to expand button
-            actionCell.querySelector('.expand-btn').addEventListener('click', function() {
-                toggleInvoicesBreakdown(row, item.invoices, this);
-            });
-            
-            tableBody.appendChild(row);
-            return;
-        } else if (reportType === 'invoice') {
+       if (reportType === 'item') {
+    const isExpiringSoon = item.expiryDate && item.expiryDate !== '-' &&
+        (new Date(item.expiryDate) - new Date()) / (1000*60*60*24) <= 30;
+    const expiryHtml = isExpiringSoon
+        ? `<span style="color:#d64545; font-weight:600;">${item.expiryDate}</span>`
+        : (item.expiryDate || '-');
+
+    cells = [item.id, item.name, item.category, item.batchNo || '-', expiryHtml, item.quantity, item.unitPrice, item.total, item.supplier];
+
+    cells.forEach((cellContent, idx) => {
+        const cell = document.createElement('td');
+        cell.innerHTML = cellContent;
+        cell.setAttribute('data-col', colKeys.item[idx]);
+        row.appendChild(cell);
+    });
+
+    const actionCell = document.createElement('td');
+    actionCell.setAttribute('data-col', 'actions');
+    actionCell.innerHTML = '<button class="btn-ghost btn-sm expand-btn" style="padding: 4px 8px;"><i class="fas fa-chevron-down"></i></button>';
+    row.appendChild(actionCell);
+
+    actionCell.querySelector('.expand-btn').addEventListener('click', function() {
+        toggleInvoicesBreakdown(row, item.invoices, this);
+    });
+
+    tableBody.appendChild(row);
+    return;
+}
+         else if (reportType === 'invoice') {
             cells = [item.id, item.name, item.category, item.quantity, item.dueDate, item.total, item.supplier];
             
             cells.forEach(cellContent => {
@@ -708,6 +724,45 @@ function applyCustomDateRange() {
         fetchReportData(currentReportType, currentDateRange);
     }
 }
+function setupColumnToggle(reportType) {
+    const btn = document.getElementById('columns-btn');
+    const menu = document.getElementById('columns-menu');
+    if (!btn || !menu) return;
+
+    const table = document.querySelector('#detailedTable table');
+    const headers = table.querySelectorAll('thead th[data-col]');
+
+    let html = '';
+    headers.forEach(th => {
+        const col = th.getAttribute('data-col');
+        html += `
+            <label style="display:flex; align-items:center; gap:8px; padding:4px 2px; font-size:13px; cursor:pointer;">
+                <input type="checkbox" checked data-toggle-col="${col}"> ${th.textContent}
+            </label>`;
+    });
+    menu.innerHTML = html;
+
+    menu.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+        cb.addEventListener('change', () => {
+            const col = cb.getAttribute('data-toggle-col');
+            const cells = table.querySelectorAll(`[data-col="${col}"]`);
+            cells.forEach(c => c.style.display = cb.checked ? '' : 'none');
+        });
+    });
+
+    btn.onclick = (e) => {
+        e.stopPropagation();
+        menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
+    };
+}
+
+document.addEventListener('click', (e) => {
+    const menu = document.getElementById('columns-menu');
+    const btn = document.getElementById('columns-btn');
+    if (menu && btn && !menu.contains(e.target) && e.target !== btn) {
+        menu.style.display = 'none';
+    }
+});
 
 function getDateRangeText(range) {
     const ranges = {
