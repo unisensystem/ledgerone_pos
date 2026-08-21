@@ -174,10 +174,14 @@ try {
             // IMPORTANT:
             // batch_no and batch_expiry_date are in sale_invoice_items.
             //
+            // FOC:
+            // sii.foc_quantity is also directly in sale_invoice_items.
+            //
             // Therefore:
             //
             // sii.batch_no
             // sii.batch_expiry_date
+            // sii.foc_quantity
             //
             // NO stock_ledger JOIN is required.
             //
@@ -230,6 +234,8 @@ try {
                     */
 
                     sii.quantity,
+
+                    sii.foc_quantity,
 
                     COALESCE(
                         u.uom_name,
@@ -486,8 +492,9 @@ try {
             // TOTALS
             // -----------------------------------------------------------------
 
-            $total_qty    = 0;
-            $total_amount = 0;
+            $total_qty      = 0;
+            $total_foc_qty  = 0;
+            $total_amount   = 0;
             $total_discount = 0;
 
 
@@ -495,6 +502,9 @@ try {
 
                 $row['quantity'] =
                     (float)($row['quantity'] ?? 0);
+
+                $row['foc_quantity'] =
+                    (float)($row['foc_quantity'] ?? 0);
 
                 $row['sale_price'] =
                     (float)($row['sale_price'] ?? 0);
@@ -508,6 +518,9 @@ try {
 
                 $total_qty +=
                     $row['quantity'];
+
+                $total_foc_qty +=
+                    $row['foc_quantity'];
 
                 $total_amount +=
                     $row['net_amount'];
@@ -585,6 +598,7 @@ try {
                 'summary' => [
                     'total_rows'     => count($rows),
                     'total_qty'      => $total_qty,
+                    'total_foc_qty'  => $total_foc_qty,
                     'total_discount' => $total_discount,
                     'total_amount'   => $total_amount
                 ]
@@ -989,4 +1003,3 @@ try {
         'error' => $e->getMessage()
     ]);
 }
-?>
