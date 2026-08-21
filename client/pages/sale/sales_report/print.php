@@ -160,16 +160,18 @@ $company_id = $_GET['company_id'] ?? null;
                 html += '</tbody></table>';
             }
             
-            // Product Sales
-            if (reportType === 'all' || reportType === 'product') {
-                html += '<table><caption>Product Wise Sales</caption><thead><tr><th>Product ID</th><th>Product Name</th><th>Category</th><th>Quantity Sold</th><th>Revenue</th></tr></thead><tbody>';
-                (data.product_sales || []).forEach(item => {
-                    const indent = (item.parent_row_id || item.parent_product_id) ? 'padding-left: 20px;' : '';
-                    const prefix = (item.parent_row_id || item.parent_product_id) ? '→ ' : '';
-                    html += `<tr><td>${item.product_id_display}</td><td style="${indent}">${prefix}${item.product_name}</td><td>${item.category}</td><td>${parseFloat(item.quantity_sold || 0).toLocaleString()}</td><td>${CURRENCY_SYMBOL}${parseFloat(item.revenue || 0).toLocaleString()}</td></tr>`;
-                });
-                html += '</tbody></table>';
-            }
+           // Product Sales
+if (reportType === 'all' || reportType === 'product') {
+    html += '<table><caption>Product Wise Sales</caption><thead><tr><th>Product ID</th><th>Product Name</th><th>Category</th><th>Batch No</th><th>Expiry Date</th><th>Quantity Sold</th><th>Revenue</th></tr></thead><tbody>';
+    (data.product_sales || []).forEach(item => {
+        const indent = (item.parent_row_id || item.parent_product_id) ? 'padding-left: 20px;' : '';
+        const prefix = (item.parent_row_id || item.parent_product_id) ? '→ ' : '';
+        const batchNo = item.batch_no || '-';
+        const expiryDate = item.nearest_expiry || '-';
+        html += `<tr><td>${item.product_id_display}</td><td style="${indent}">${prefix}${item.product_name}</td><td>${item.category}</td><td>${batchNo}</td><td>${expiryDate}</td><td>${parseFloat(item.quantity_sold || 0).toLocaleString()}</td><td>${CURRENCY_SYMBOL}${parseFloat(item.revenue || 0).toLocaleString()}</td></tr>`;
+    });
+    html += '</tbody></table>';
+}
             
             // Branch Sales
             if (reportType === 'all' || reportType === 'branch') {
