@@ -255,19 +255,19 @@ if ($company_id) {
         }
 
         // Running balance per product-branch, same logic as the main page's company-ledger table
-        function computeRunningBalances(entries) {
-            const balances = {};
-            return entries.map(entry => {
-                const key = `${entry.product_name}-${entry.branch_name}`;
-                if (!balances[key]) balances[key] = 0;
-                balances[key] += parseFloat(entry.qty_in || 0) - parseFloat(entry.qty_out || 0);
-                return {
-                    ...entry,
-                    balance: balances[key],
-                    value: balances[key] * parseFloat(entry.unit_cost || 0)
-                };
-            });
-        }
+       function computeRunningBalances(entries) {
+    const balances = {};
+    return entries.map(entry => {
+        const key = `${entry.product_name}-${entry.branch_name}`;
+        if (!balances[key]) balances[key] = 0;
+        balances[key] += parseFloat(entry.qty_in || 0) - parseFloat(entry.qty_out || 0) - parseFloat(entry.qty_foc || 0);
+        return {
+            ...entry,
+            balance: balances[key],
+            value: balances[key] * parseFloat(entry.unit_cost || 0)
+        };
+    });
+}
 
         function fmtQty(val, unit) {
             return `${parseFloat(val || 0).toFixed(2)} ${unit || 'L'}`;
@@ -304,73 +304,76 @@ if ($company_id) {
             }
         }
 
-        function renderPrintTable(rows, currency = '$') {
-            const tbody = document.querySelector('#reportTable tbody');
+       function renderPrintTable(rows, currency = '$') {
+    const tbody = document.querySelector('#reportTable tbody');
 
-            const bodyHtml = rows.map(entry => `
-                <tr>
-                    <td>${entry.transaction_date}</td>
-                    <td>${entry.invoice_number || '-'}</td>
-                    <td>${entry.product_name}</td>
-                    <td>${entry.batch_no || '-'}</td>
-                    <td>${entry.batch_expiry_date || '-'}</td>
-                    <td>${entry.branch_name}</td>
-                    <td>${entry.transaction_type}</td>
-                    <td>${entry.qty_in > 0 ? fmtQty(entry.qty_in, entry.unit_symbol) : '-'}</td>
-                    <td>${entry.qty_out > 0 ? fmtQty(entry.qty_out, entry.unit_symbol) : '-'}</td>
-                    <td>${fmtQty(entry.balance, entry.unit_symbol)}</td>
-                    <td>${currency}${parseFloat(entry.unit_cost).toFixed(2)}</td>
-                    <td>${currency}${parseFloat(entry.value).toFixed(2)}</td>
-                </tr>`).join('');
+    const bodyHtml = rows.map(entry => `
+        <tr>
+            <td>${entry.transaction_date}</td>
+            <td>${entry.invoice_number || '-'}</td>
+            <td>${entry.product_name}</td>
+            <td>${entry.batch_no || '-'}</td>
+            <td>${entry.batch_expiry_date || '-'}</td>
+            <td>${entry.branch_name}</td>
+            <td>${entry.transaction_type}</td>
+            <td>${entry.qty_in > 0 ? fmtQty(entry.qty_in, entry.unit_symbol) : '-'}</td>
+            <td>${entry.qty_out > 0 ? fmtQty(entry.qty_out, entry.unit_symbol) : '-'}</td>
+            <td>${entry.qty_foc > 0 ? fmtQty(entry.qty_foc, entry.unit_symbol) : '-'}</td>
+            <td>${fmtQty(entry.balance, entry.unit_symbol)}</td>
+            <td>${currency}${parseFloat(entry.unit_cost).toFixed(2)}</td>
+            <td>${currency}${parseFloat(entry.value).toFixed(2)}</td>
+        </tr>`).join('');
 
-            const totalQtyIn = rows.reduce((s, e) => s + parseFloat(e.qty_in || 0), 0);
-            const totalQtyOut = rows.reduce((s, e) => s + parseFloat(e.qty_out || 0), 0);
-            const totalValue = rows.reduce((s, e) => s + parseFloat(e.value || 0), 0);
+    const totalQtyIn = rows.reduce((s, e) => s + parseFloat(e.qty_in || 0), 0);
+    const totalQtyOut = rows.reduce((s, e) => s + parseFloat(e.qty_out || 0), 0);
+    const totalFoc = rows.reduce((s, e) => s + parseFloat(e.qty_foc || 0), 0);
+    const totalValue = rows.reduce((s, e) => s + parseFloat(e.value || 0), 0);
 
-            const totalsHtml = `
-                <tr class="totals-row">
-                    <td colspan="7">Total (${rows.length} transactions)</td>
-                    <td>${totalQtyIn.toFixed(2)} ${rows[0]?.unit_symbol || 'L'}</td>
-                    <td>${totalQtyOut.toFixed(2)} ${rows[0]?.unit_symbol || 'L'}</td>
-                    <td>-</td>
-                    <td>-</td>
-                    <td>${currency}${totalValue.toFixed(2)}</td>
-                </tr>`;
+    const totalsHtml = `
+        <tr class="totals-row">
+            <td colspan="7">Total (${rows.length} transactions)</td>
+            <td>${totalQtyIn.toFixed(2)} ${rows[0]?.unit_symbol || 'L'}</td>
+            <td>${totalQtyOut.toFixed(2)} ${rows[0]?.unit_symbol || 'L'}</td>
+            <td>${totalFoc.toFixed(2)} ${rows[0]?.unit_symbol || 'L'}</td>
+            <td>-</td>
+            <td>-</td>
+            <td>${currency}${totalValue.toFixed(2)}</td>
+        </tr>`;
 
-            tbody.innerHTML = bodyHtml + totalsHtml;
-        }
+    tbody.innerHTML = bodyHtml + totalsHtml;
+}
 
         function exportToExcel() {
-            if (typeof XLSX === 'undefined') {
-                alert('Excel export library failed to load. Please check your internet connection and reload the page.');
-                return;
-            }
-            if (!currentRows || currentRows.length === 0) {
-                alert('No data available to export.');
-                return;
-            }
+    if (typeof XLSX === 'undefined') {
+        alert('Excel export library failed to load. Please check your internet connection and reload the page.');
+        return;
+    }
+    if (!currentRows || currentRows.length === 0) {
+        alert('No data available to export.');
+        return;
+    }
 
-            const rows = currentRows.map(e => ({
-                'Date': e.transaction_date,
-                'Invoice #': e.invoice_number || '-',
-                'Product': e.product_name,
-                'Batch No': e.batch_no || '-',
-                'Expiry Date': e.batch_expiry_date || '-',
-                'Branch': e.branch_name,
-                'Transaction': e.transaction_type,
-                'Qty In': e.qty_in > 0 ? fmtQty(e.qty_in, e.unit_symbol) : '-',
-                'Qty Out': e.qty_out > 0 ? fmtQty(e.qty_out, e.unit_symbol) : '-',
-                'Balance': fmtQty(e.balance, e.unit_symbol),
-                'Unit Cost': parseFloat(e.unit_cost).toFixed(2),
-                'Value': parseFloat(e.value).toFixed(2)
-            }));
+    const rows = currentRows.map(e => ({
+        'Date': e.transaction_date,
+        'Invoice #': e.invoice_number || '-',
+        'Product': e.product_name,
+        'Batch No': e.batch_no || '-',
+        'Expiry Date': e.batch_expiry_date || '-',
+        'Branch': e.branch_name,
+        'Transaction': e.transaction_type,
+        'Qty In': e.qty_in > 0 ? fmtQty(e.qty_in, e.unit_symbol) : '-',
+        'Qty Out': e.qty_out > 0 ? fmtQty(e.qty_out, e.unit_symbol) : '-',
+        'FOC': e.qty_foc > 0 ? fmtQty(e.qty_foc, e.unit_symbol) : '-',
+        'Balance': fmtQty(e.balance, e.unit_symbol),
+        'Unit Cost': parseFloat(e.unit_cost).toFixed(2),
+        'Value': parseFloat(e.value).toFixed(2)
+    }));
 
-            const worksheet = XLSX.utils.json_to_sheet(rows);
-            const workbook = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(workbook, worksheet, 'Company Ledger');
-            XLSX.writeFile(workbook, `supplier_ledger_${new Date().toISOString().slice(0, 10)}.xlsx`);
-        }
-
+    const worksheet = XLSX.utils.json_to_sheet(rows);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Company Ledger');
+    XLSX.writeFile(workbook, `supplier_ledger_${new Date().toISOString().slice(0, 10)}.xlsx`);
+}
         document.addEventListener('DOMContentLoaded', () => {
             loadPrintData();
         });
