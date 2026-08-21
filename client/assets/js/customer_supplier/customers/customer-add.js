@@ -18,14 +18,13 @@ document.addEventListener('DOMContentLoaded', function () {
         { id: 'secondaryPhone', label: 'Secondary Phone', visible: false },
         { id: 'email', label: 'Email Address', visible: false },
         { id: 'identityCard', label: 'Identity Card No', visible: false },
-        { id: 'licenseNo', label: 'License #', visible: false },
         { id: 'salesOfficer', label: 'Associated Sales Officer', visible: false },
         { id: 'supplierMan', label: 'Supplier Man', visible: false },
         { id: 'project', label: 'Project', visible: false },
-        { id: 'country', label: 'Country', visible: false },
-        { id: 'region', label: 'Region', visible: false },
-        { id: 'city', label: 'City', visible: false },
-        { id: 'cityZone', label: 'City Zone', visible: false },
+       { id: 'country', label: 'Country', visible: true },
+{ id: 'region', label: 'Region', visible: true },
+{ id: 'city', label: 'City', visible: true },
+{ id: 'cityZone', label: 'City Zone', visible: true },
         { id: 'area', label: 'Area', visible: true },
         { id: 'isSalesTaxRegistered', label: 'Is Sales Tax Registered?', visible: false },
         { id: 'strn', label: 'STRN', visible: false },
@@ -372,6 +371,12 @@ document.addEventListener('DOMContentLoaded', function () {
     const supplierManSelect = document.getElementById('supplierMan');
     const companySelect = document.getElementById('company');
 
+    // Flag used to prevent the cascading "on change" handlers below from
+    // firing (and resetting child dropdowns) while we are programmatically
+    // setting values as part of an auto-fill hierarchy lookup
+    // (loadCityHierarchy / loadCityZoneHierarchy / loadFullHierarchyFromArea).
+    let isHierarchyLoading = false;
+
     // Taxation fields
     const isSalesTaxRegistered = document.getElementById('isSalesTaxRegistered');
     const strnGroup = document.getElementById('strnGroup');
@@ -432,9 +437,8 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function validateIdentityCard(card) {
         if (!card) return true; // Identity card is optional
-        // Lenient on purpose: digit count doesn't have to be exactly 13 (5-7-1) —
-        // only reject if it has characters other than digits/dashes.
-        return /^[0-9-]*$/.test(card);
+        const regex = /^[0-9]*$/;
+        return regex.test(card) && card.length <= 15;
     }
 
     function validateEmail(email) {
@@ -479,19 +483,6 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 
     identityCard.addEventListener('input', function () {
-        const prevCursor = this.selectionStart;
-        const digitsBeforeCursor = this.value.substring(0, prevCursor).replace(/\D/g, '').length;
-        this.value = formatIdentityCard(this.value);
-
-        // Re-position cursor after the same number of digits, accounting for
-        // auto-inserted hyphens shifting everything after them.
-        let newPos = 0, digitCount = 0;
-        while (newPos < this.value.length && digitCount < digitsBeforeCursor) {
-            if (/\d/.test(this.value[newPos])) digitCount++;
-            newPos++;
-        }
-        this.setSelectionRange(newPos, newPos);
-
         const errorElement = document.getElementById('identityCardError');
         if (this.value && !validateIdentityCard(this.value)) {
             this.classList.add('error');
@@ -552,6 +543,7 @@ document.addEventListener('DOMContentLoaded', function () {
     loadProjects();
 
     $('#country').on('change', function() {
+        if (isHierarchyLoading) return;
         const countryId = this.value;
         if (countryId) {
             loadRegions(countryId);
@@ -561,6 +553,7 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 
     $('#region').on('change', function() {
+        if (isHierarchyLoading) return;
         const regionId = this.value;
         if (regionId) {
             loadRegionHierarchy(regionId);
@@ -571,6 +564,7 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 
     $('#city').on('change', function() {
+        if (isHierarchyLoading) return;
         const cityId = this.value;
         if (cityId) {
             loadCityHierarchy(cityId);
@@ -581,6 +575,7 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 
     $('#cityZone').on('change', function() {
+        if (isHierarchyLoading) return;
         const cityZoneId = this.value;
         if (cityZoneId) {
             loadCityZoneHierarchy(cityZoneId);
@@ -719,35 +714,58 @@ document.addEventListener('DOMContentLoaded', function () {
             });
     }
 
+    // Region selected -> auto-select Country.
+    // Loads the country list into #country first (in case it isn't there
+    // yet) then sets the value while isHierarchyLoading is true so the
+    // #country change handler above does not reset/reload #region.
     function loadRegionHierarchy(regionId) {
         fetch(`../../../../server/api/customer_supplier/customers/get-region-hierarchy.php?region_id=${regionId}`)
             .then(response => response.json())
             .then(data => {
                 if (data.success && data.hierarchy) {
+                    isHierarchyLoading = true;
                     $('#country').val(data.hierarchy.country_id).trigger('change.select2');
+                    isHierarchyLoading = false;
                 }
             });
     }
 
-    function loadCityHierarchy(regionId) {
-        fetch(`../../../../server/api/customer_supplier/customers/get-city-hierarchy.php?region_id=${regionId}`)
+    // City selected -> auto-select Region and Country.
+    // We must repopulate #region with the options belonging to the
+    // resolved country BEFORE setting its value, otherwise the value
+    // won't exist in the dropdown and the select will stay blank.
+    function loadCityHierarchy(cityId) {
+        fetch(`../../../../server/api/customer_supplier/customers/get-city-hierarchy.php?city_id=${cityId}`)
             .then(response => response.json())
             .then(data => {
                 if (data.success && data.hierarchy) {
-                    $('#country').val(data.hierarchy.country_id).trigger('change.select2');
-                    $('#region').val(data.hierarchy.region_id).trigger('change.select2');
+                    isHierarchyLoading = true;
+                    loadRegions(data.hierarchy.country_id).then(function() {
+                        $('#country').val(data.hierarchy.country_id).trigger('change.select2');
+                        $('#region').val(data.hierarchy.region_id).trigger('change.select2');
+                        isHierarchyLoading = false;
+                    });
                 }
             });
     }
 
-    function loadCityZoneHierarchy(cityId) {
-        fetch(`../../../../server/api/customer_supplier/customers/get-city-zone-hierarchy.php?city_id=${cityId}`)
+    // City Zone selected -> auto-select City, Region and Country.
+    // Repopulate #region (for the country) and #city (for the region)
+    // before setting their values.
+    function loadCityZoneHierarchy(cityZoneId) {
+        fetch(`../../../../server/api/customer_supplier/customers/get-city-zone-hierarchy.php?city_zone_id=${cityZoneId}`)
             .then(response => response.json())
             .then(data => {
                 if (data.success && data.hierarchy) {
-                    $('#country').val(data.hierarchy.country_id).trigger('change.select2');
-                    $('#region').val(data.hierarchy.region_id).trigger('change.select2');
-                    $('#city').val(data.hierarchy.city_id).trigger('change.select2');
+                    isHierarchyLoading = true;
+                    loadRegions(data.hierarchy.country_id).then(function() {
+                        return loadCities(data.hierarchy.region_id);
+                    }).then(function() {
+                        $('#country').val(data.hierarchy.country_id).trigger('change.select2');
+                        $('#region').val(data.hierarchy.region_id).trigger('change.select2');
+                        $('#city').val(data.hierarchy.city_id).trigger('change.select2');
+                        isHierarchyLoading = false;
+                    });
                 }
             });
     }
@@ -757,23 +775,41 @@ document.addEventListener('DOMContentLoaded', function () {
             .then(response => response.json())
             .then(data => {
                 if (data.success && data.hierarchy) {
-                    $('#country').val(data.hierarchy.country_id).trigger('change.select2');
-                    $('#region').val(data.hierarchy.region_id).trigger('change.select2');
-                    $('#city').val(data.hierarchy.city_id).trigger('change.select2');
-                    $('#cityZone').val(data.hierarchy.city_zone_id).trigger('change.select2');
+                    isHierarchyLoading = true;
+                    loadRegions(data.hierarchy.country_id).then(function() {
+                        return loadCities(data.hierarchy.region_id);
+                    }).then(function() {
+                        return loadCityZones(data.hierarchy.city_id);
+                    }).then(function() {
+                        $('#country').val(data.hierarchy.country_id).trigger('change.select2');
+                        $('#region').val(data.hierarchy.region_id).trigger('change.select2');
+                        $('#city').val(data.hierarchy.city_id).trigger('change.select2');
+                        $('#cityZone').val(data.hierarchy.city_zone_id).trigger('change.select2');
+                        isHierarchyLoading = false;
+                    });
                 }
             });
     }
 
+    // Area selected -> auto-select City Zone, City, Region and Country.
+    // Repopulate every parent dropdown in order before setting values.
     function loadFullHierarchyFromArea(areaId) {
         fetch(`../../../../server/api/customer_supplier/customers/get-area-hierarchy.php?area_id=${areaId}`)
             .then(response => response.json())
             .then(data => {
                 if (data.success && data.hierarchy) {
-                    $('#country').val(data.hierarchy.country_id).trigger('change.select2');
-                    $('#region').val(data.hierarchy.region_id).trigger('change.select2');
-                    $('#city').val(data.hierarchy.city_id).trigger('change.select2');
-                    $('#cityZone').val(data.hierarchy.city_zone_id).trigger('change.select2');
+                    isHierarchyLoading = true;
+                    loadRegions(data.hierarchy.country_id).then(function() {
+                        return loadCities(data.hierarchy.region_id);
+                    }).then(function() {
+                        return loadCityZones(data.hierarchy.city_id);
+                    }).then(function() {
+                        $('#country').val(data.hierarchy.country_id).trigger('change.select2');
+                        $('#region').val(data.hierarchy.region_id).trigger('change.select2');
+                        $('#city').val(data.hierarchy.city_id).trigger('change.select2');
+                        $('#cityZone').val(data.hierarchy.city_zone_id).trigger('change.select2');
+                        isHierarchyLoading = false;
+                    });
                 }
             });
     }
@@ -1135,7 +1171,6 @@ document.addEventListener('DOMContentLoaded', function () {
             primaryPhone: primaryPhone.value.trim(),
             secondaryPhone: secondaryPhone.value.trim(),
             identityCard: identityCard.value.trim(),
-            licenseNo: document.getElementById('licenseNo').value.trim(),
             email: email.value.trim(),
             countryId: countrySelect.value || null,
             regionId: regionSelect.value || null,
