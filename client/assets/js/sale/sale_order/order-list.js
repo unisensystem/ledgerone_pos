@@ -31,12 +31,23 @@ function initializeListPage(permissions) {
     async function loadInvoices(page = 1) {
         try {
             const companyFilter = document.getElementById('companyFilter').value;
+            const dateFromVal = document.getElementById('dateFrom').value;
+            const dateToVal = document.getElementById('dateTo').value;
+            const customerVal = document.getElementById('customerFilter').value;
+            const statusVal = document.getElementById('statusFilter').value;
+            const searchVal = document.getElementById('searchInput').value.trim();
+
             let url = `../../../../server/api/sale/sale_order/order-list.php?page=${page}&limit=10`;
-            if (companyFilter) url += `&company_id=${companyFilter}`;
-            
+            if (companyFilter) url += `&company_id=${encodeURIComponent(companyFilter)}`;
+            if (dateFromVal) url += `&date_from=${encodeURIComponent(dateFromVal)}`;
+            if (dateToVal) url += `&date_to=${encodeURIComponent(dateToVal)}`;
+            if (customerVal) url += `&customer_id=${encodeURIComponent(customerVal)}`;
+            if (statusVal) url += `&status=${encodeURIComponent(statusVal)}`;
+            if (searchVal) url += `&search=${encodeURIComponent(searchVal)}`;
+
             const response = await fetch(url);
             const data = await response.json();
-            
+
             if (data.success) {
                 invoices = data.invoices.map(invoice => ({
                     id: invoice.id,
@@ -82,7 +93,7 @@ function initializeListPage(permissions) {
             row.insertCell(2).textContent = invoice.customer || 'N/A';
             row.insertCell(3).textContent = invoice.items;
             row.insertCell(4).textContent = formattedAmount;
-            
+
             // Status cell
             const statusCell = row.insertCell(5);
             const statusBadge = document.createElement('span');
@@ -120,7 +131,7 @@ function initializeListPage(permissions) {
             printBtn.innerHTML = '<i class="fas fa-print"></i>';
             printBtn.title = 'Print Order';
             printBtn.addEventListener('click', () => printInvoice(invoice.id));
-            
+
             // View Fulfillment button
             const fulfillmentBtn = document.createElement('button');
             fulfillmentBtn.className = 'btn btn-warning btn-sm';
@@ -174,7 +185,7 @@ function initializeListPage(permissions) {
         }
     }
 
-    // Filter functionality
+    // Filter elements
     const dateFrom = document.getElementById('dateFrom');
     const dateTo = document.getElementById('dateTo');
     const companyFilterEl = document.getElementById('companyFilter');
@@ -182,68 +193,39 @@ function initializeListPage(permissions) {
     const statusFilter = document.getElementById('statusFilter');
     const searchInput = document.getElementById('searchInput');
 
-    function applyFilters() {
-        let filteredInvoices = [...invoices];
-
-        // Date filter
-        if (dateFrom.value) {
-            filteredInvoices = filteredInvoices.filter(invoice =>
-                new Date(invoice.date) >= new Date(dateFrom.value)
-            );
-        }
-
-        if (dateTo.value) {
-            filteredInvoices = filteredInvoices.filter(invoice =>
-                new Date(invoice.date) <= new Date(dateTo.value)
-            );
-        }
-
-        // Customer filter
-        if (customerFilter.value) {
-            filteredInvoices = filteredInvoices.filter(invoice =>
-                invoice.customer === customerFilter.value
-            );
-        }
-
-
-
-        // Search filter
-        if (searchInput.value) {
-            const searchTerm = searchInput.value.toLowerCase();
-            filteredInvoices = filteredInvoices.filter(invoice =>
-                invoice.invoiceNo.toLowerCase().includes(searchTerm) ||
-                invoice.customer.toLowerCase().includes(searchTerm)
-            );
-        }
-
-        populateTable(filteredInvoices);
+    // Server-side filtering: every filter change triggers a fresh page-1 fetch
+    let searchDebounce;
+    function reload() {
+        loadInvoices(1);
     }
 
-    // Add event listeners for filters
-    dateFrom.addEventListener('change', applyFilters);
-    dateTo.addEventListener('change', applyFilters);
-    companyFilterEl.addEventListener('change', () => loadInvoices(1));
-    customerFilter.addEventListener('change', applyFilters);
-    statusFilter.addEventListener('change', applyFilters);
-    searchInput.addEventListener('input', applyFilters);
+    dateFrom.addEventListener('change', reload);
+    dateTo.addEventListener('change', reload);
+    companyFilterEl.addEventListener('change', reload);
+    customerFilter.addEventListener('change', reload);
+    statusFilter.addEventListener('change', reload);
+    searchInput.addEventListener('input', function () {
+        clearTimeout(searchDebounce);
+        searchDebounce = setTimeout(reload, 300); // debounce so typing doesn't spam the API
+    });
 
     // Update pagination
     function updatePagination(pagination) {
         const { page, limit, total, pages } = pagination;
         const start = (page - 1) * limit + 1;
         const end = Math.min(page * limit, total);
-        
-        document.getElementById('paginationInfo').textContent = 
+
+        document.getElementById('paginationInfo').textContent =
             `Showing ${start} to ${end} of ${total} entries`;
-            
+
         generatePaginationButtons(page, pages);
     }
-    
+
     // Generate dynamic pagination buttons
     function generatePaginationButtons(currentPage, totalPages) {
         const container = document.getElementById('paginationControls');
         container.innerHTML = '';
-        
+
         // Previous button
         const prevBtn = document.createElement('button');
         prevBtn.className = 'pagination-btn';
@@ -253,7 +235,7 @@ function initializeListPage(permissions) {
             if (currentPage > 1) loadInvoices(currentPage - 1);
         });
         container.appendChild(prevBtn);
-        
+
         // Page number buttons
         for (let i = 1; i <= totalPages; i++) {
             const pageBtn = document.createElement('button');
@@ -264,7 +246,7 @@ function initializeListPage(permissions) {
             });
             container.appendChild(pageBtn);
         }
-        
+
         // Next button
         const nextBtn = document.createElement('button');
         nextBtn.className = 'pagination-btn';
@@ -319,7 +301,7 @@ function initializeListPage(permissions) {
     function printInvoice(id) {
         showPrintOptions(id);
     }
-    
+
     // Print options modal
     function showPrintOptions(invoiceId) {
         const savedChoice = localStorage.getItem('pos_print_preference');
@@ -328,7 +310,7 @@ function initializeListPage(permissions) {
             window.open(url, '_blank');
             return;
         }
-        
+
         const modal = document.createElement('div');
         modal.className = 'modal';
         modal.style.display = 'flex';
@@ -351,7 +333,7 @@ function initializeListPage(permissions) {
             </div>
         `;
         document.body.appendChild(modal);
-        
+
         document.getElementById('printFullBtnList').onclick = function() {
             if (document.getElementById('rememberPrintChoiceList').checked) {
                 localStorage.setItem('pos_print_preference', 'full');
@@ -359,7 +341,7 @@ function initializeListPage(permissions) {
             window.open(`invoice-print.php?id=${invoiceId}`, '_blank');
             modal.remove();
         };
-        
+
         document.getElementById('printThermalBtnList').onclick = function() {
             if (document.getElementById('rememberPrintChoiceList').checked) {
                 localStorage.setItem('pos_print_preference', 'thermal');
@@ -367,7 +349,7 @@ function initializeListPage(permissions) {
             window.open(`thermal-print.php?id=${invoiceId}`, '_blank');
             modal.remove();
         };
-        
+
         modal.addEventListener('click', function(e) {
             if (e.target === modal) {
                 modal.remove();
@@ -376,7 +358,7 @@ function initializeListPage(permissions) {
     }
 
     let deleteInvoiceId = null;
-    
+
     function deleteInvoice(id) {
         if (!permissions.includes('Delete')) {
             alert('You do not have permission to delete orders.');
@@ -385,27 +367,27 @@ function initializeListPage(permissions) {
         deleteInvoiceId = id;
         document.getElementById('deleteModal').style.display = 'flex';
     }
-    
+
     // Modal event listeners
     document.getElementById('cancelDeleteBtn').addEventListener('click', function() {
         document.getElementById('deleteModal').style.display = 'none';
         deleteInvoiceId = null;
     });
-    
+
     document.getElementById('closeFulfillmentBtn').addEventListener('click', function() {
         document.getElementById('fulfillmentModal').style.display = 'none';
     });
-    
+
     // View fulfillment function
     async function viewFulfillment(orderId) {
         document.getElementById('fulfillmentModal').style.display = 'flex';
         const tbody = document.getElementById('fulfillmentTableBody');
         tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 20px;">Loading...</td></tr>';
-        
+
         try {
             const response = await fetch(`../../../../server/api/sale/sale_order/get-order-fulfillment.php?order_id=${orderId}`);
             const data = await response.json();
-            
+
             if (data.success && data.fulfillment.length > 0) {
                 tbody.innerHTML = '';
                 data.fulfillment.forEach(item => {
@@ -427,7 +409,7 @@ function initializeListPage(permissions) {
             tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 20px; color: var(--error);">Error loading fulfillment data</td></tr>';
         }
     }
-    
+
     document.getElementById('confirmDeleteBtn').addEventListener('click', async function() {
         if (deleteInvoiceId) {
             try {
@@ -435,7 +417,7 @@ function initializeListPage(permissions) {
                     method: 'DELETE'
                 });
                 const data = await response.json();
-                
+
                 if (data.success) {
                     document.getElementById('deleteModal').style.display = 'none';
                     loadInvoices(currentPage);
@@ -448,7 +430,7 @@ function initializeListPage(permissions) {
             deleteInvoiceId = null;
         }
     });
-    
+
     // Hide modal when clicking outside
     document.getElementById('deleteModal').addEventListener('click', function(e) {
         if (e.target === this) {
@@ -456,7 +438,7 @@ function initializeListPage(permissions) {
             deleteInvoiceId = null;
         }
     });
-    
+
     document.getElementById('fulfillmentModal').addEventListener('click', function(e) {
         if (e.target === this) {
             this.style.display = 'none';
