@@ -89,38 +89,12 @@ try {
 
     /*
     |--------------------------------------------------------------------------
-    | CURRENCY
-    |--------------------------------------------------------------------------
-    */
-
-    $currency_sql = "
-        SELECT c.symbol
-        FROM tenant_currencies tc
-
-        JOIN ledgerone_public.currencies c
-            ON tc.currency_id = c.id
-
-        WHERE tc.tenant_id = ?
-          AND tc.is_base_currency = 1
-
-        LIMIT 1
-    ";
-
-    $currency_stmt = $pdo->prepare($currency_sql);
-    $currency_stmt->execute([$tenant_id]);
-
-    $currency = $currency_stmt->fetch(PDO::FETCH_ASSOC);
-
-    $currency_symbol = $currency['symbol'] ?? '$';
-
-
-    /*
-    |--------------------------------------------------------------------------
     | REPORT QUERY
     |--------------------------------------------------------------------------
     |
     | IMPORTANT:
-    | batch_no and foc_quantity are directly inside sale_invoice_items (sii).
+    | batch_no, foc_quantity and tax_amount are directly inside
+    | sale_invoice_items (sii).
     |
     | NO stock_ledger JOIN is required.
     |
@@ -203,6 +177,8 @@ try {
             sii.sale_price,
 
             sii.discount_amount,
+
+            sii.tax_amount,
 
             sii.net_amount
 
@@ -629,6 +605,9 @@ foreach ($rows as $row) {
                 [],
 
             'total_amount' =>
+                0,
+
+            'total_tax' =>
                 0
 
         ];
@@ -657,6 +636,16 @@ foreach ($rows as $row) {
 
     $groups[$groupIndex]['total_amount'] +=
         (float)($row['net_amount'] ?? 0);
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | INVOICE TAX (sum of item tax_amount)
+    |--------------------------------------------------------------------------
+    */
+
+    $groups[$groupIndex]['total_tax'] +=
+        (float)($row['tax_amount'] ?? 0);
 }
 
 
@@ -672,6 +661,8 @@ $grand_foc_qty = 0;
 
 $grand_amount = 0;
 
+$grand_tax = 0;
+
 
 foreach ($rows as $row) {
 
@@ -683,6 +674,9 @@ foreach ($rows as $row) {
 
     $grand_amount +=
         (float)($row['net_amount'] ?? 0);
+
+    $grand_tax +=
+        (float)($row['tax_amount'] ?? 0);
 }
 
 
@@ -1046,7 +1040,7 @@ tr.invoice-header td.bill-no {
 
 /*
 |--------------------------------------------------------------------------
-| TOTAL
+| TOTAL / TAX
 |--------------------------------------------------------------------------
 */
 
@@ -1564,12 +1558,6 @@ $locationLabel = buildLocationLabel(
 
     <td class="bill-no col-amount">
 
-        <?= htmlspecialchars(
-            $currency_symbol,
-            ENT_QUOTES,
-            'UTF-8'
-        ) ?>
-
         <?= number_format(
             $group['invoice_net_amount'],
             2
@@ -1650,12 +1638,6 @@ $locationLabel = buildLocationLabel(
 
     <td class="num col-price">
 
-        <?= htmlspecialchars(
-            $currency_symbol,
-            ENT_QUOTES,
-            'UTF-8'
-        ) ?>
-
         <?= number_format(
             (float)(
                 $row['sale_price'] ?? 0
@@ -1716,12 +1698,6 @@ $locationLabel = buildLocationLabel(
 
     <td class="num col-amount">
 
-        <?= htmlspecialchars(
-            $currency_symbol,
-            ENT_QUOTES,
-            'UTF-8'
-        ) ?>
-
         <?= number_format(
             (float)(
                 $row['net_amount'] ?? 0
@@ -1756,14 +1732,37 @@ $locationLabel = buildLocationLabel(
 
     <td class="num col-amount">
 
-        <?= htmlspecialchars(
-            $currency_symbol,
-            ENT_QUOTES,
-            'UTF-8'
-        ) ?>
-
         <?= number_format(
             $group['total_amount'],
+            2
+        ) ?>
+
+    </td>
+
+</tr>
+
+
+<!-- =========================================================
+     INVOICE TAX (right under Total)
+========================================================= -->
+
+<tr class="total-row">
+
+    <td colspan="6" class="col-sno col-code col-detail col-batch col-price col-qty"></td>
+
+
+    <td class="num col-disc"></td>
+
+
+    <td class="num col-foc">
+        Tax
+    </td>
+
+
+    <td class="num col-amount">
+
+        <?= number_format(
+            $group['total_tax'],
             2
         ) ?>
 
@@ -1810,13 +1809,14 @@ $locationLabel = buildLocationLabel(
         2
     ) ?>,
 
-    Amount
+    Tax
 
-    <?= htmlspecialchars(
-        $currency_symbol,
-        ENT_QUOTES,
-        'UTF-8'
-    ) ?>
+    <?= number_format(
+        $grand_tax,
+        2
+    ) ?>,
+
+    Amount
 
     <?= number_format(
         $grand_amount,
@@ -1870,6 +1870,9 @@ const reportGroups = <?= json_encode(
 
                 'total' =>
                     (float)$g['total_amount'],
+
+                'tax' =>
+                    (float)$g['total_tax'],
 
                 'items' =>
                     array_map(
@@ -2118,6 +2121,36 @@ function exportToExcel()
 
                 'Amount':
                     group.total.toFixed(2)
+
+            });
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | INVOICE TAX (right under Total)
+            |--------------------------------------------------------------------------
+            */
+
+            rows.push({
+
+                'S.No': '',
+
+                'Code': '',
+
+                'Detail': '',
+
+                'Batch No.': '',
+
+                'Price': '',
+
+                'Qty': '',
+
+                'Disc %': '',
+
+                'FOC': 'Tax',
+
+                'Amount':
+                    group.tax.toFixed(2)
 
             });
 

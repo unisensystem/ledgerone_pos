@@ -161,13 +161,15 @@ function groupByInvoice(rows) {
                 invoice_net_amount: parseFloat(row.invoice_net_amount || 0),
                 invoice_disc_percent: parseFloat(row.invoice_disc_percent || 0),
                 items: [],
-                total_amount: 0
+                total_amount: 0,
+                total_tax: 0
             });
         }
 
         const group = groups[indexByInvoice[key]];
         group.items.push(row);
         group.total_amount += parseFloat(row.net_amount || 0);
+        group.total_tax += parseFloat(row.tax_amount || 0);
     });
 
     return groups;
@@ -341,7 +343,7 @@ function renderTable() {
         ? ` (${locationParts.map(esc).join(', ')})`
         : '';
 
-    // Invoice header — net_amount ab bill_no se PEHLE aaye ga
+    // Invoice header
     html += `
         <tr style="background-color:var(--table-header);">
             <td colspan="8">
@@ -353,7 +355,7 @@ function renderTable() {
             </td>
             <td style="text-align:right;" class="col-amount">
                 <strong>
-                    ${currentCurrency}${group.invoice_net_amount.toFixed(2)}
+                    ${group.invoice_net_amount.toFixed(2)}
                     &nbsp;&nbsp;
                     ${esc(group.bill_no || '')}
                 </strong>
@@ -376,20 +378,28 @@ function renderTable() {
                 <td class="col-code">${esc(row.product_code || '-')}</td>
                 <td class="col-detail">${esc(row.product_name || '-')}</td>
                 <td class="col-batch">${esc(batchNo)}</td>
-                <td class="col-price">${currentCurrency}${salePrice.toFixed(2)}</td>
+                <td class="col-price">${salePrice.toFixed(2)}</td>
                 <td class="col-qty">${quantity.toFixed(2)} ${esc(row.unit_symbol || '')}</td>
                 <td class="col-disc">${discPercent.toFixed(2)}%</td>
                 <td class="col-foc">${focQty.toFixed(2)}</td>
-                <td class="col-amount">${currentCurrency}${netAmount.toFixed(2)}</td>
+                <td class="col-amount">${netAmount.toFixed(2)}</td>
             </tr>
         `;
     });
 
-    // invoice total row same rehta hai (colspan 8)
+    // Invoice total row
     html += `
         <tr style="font-weight:bold;">
             <td colspan="8" style="text-align:right;">Total</td>
-            <td class="col-amount">${currentCurrency}${group.total_amount.toFixed(2)}</td>
+            <td class="col-amount">${group.total_amount.toFixed(2)}</td>
+        </tr>
+    `;
+
+    // Invoice tax row — right under Total
+    html += `
+        <tr style="font-weight:bold;">
+            <td colspan="8" style="text-align:right;">Tax</td>
+            <td class="col-amount">${group.total_tax.toFixed(2)}</td>
         </tr>
     `;
 });
@@ -413,6 +423,13 @@ function renderGrandTotal() {
             0
         );
 
+    const grandTotalTax =
+        allRows.reduce(
+            (sum, r) =>
+                sum + parseFloat(r.tax_amount || 0),
+            0
+        );
+
     const grandTotalAmount =
         allRows.reduce(
             (sum, r) =>
@@ -428,7 +445,8 @@ function renderGrandTotal() {
             `Grand Total: ${groupedInvoices.length} invoice(s), ` +
             `Qty ${grandTotalQty.toFixed(2)}, ` +
             `FOC ${grandTotalFoc.toFixed(2)}, ` +
-            `Amount ${currentCurrency}${grandTotalAmount.toFixed(2)}`;
+            `Tax ${grandTotalTax.toFixed(2)}, ` +
+            `Amount ${grandTotalAmount.toFixed(2)}`;
     }
 }
 
@@ -571,6 +589,20 @@ function exportToExcel() {
             'FOC': 'Total',
             'Amount':
                 group.total_amount.toFixed(2)
+        });
+
+        // Tax — right under Total
+        rows.push({
+            'S.No': '',
+            'Code': '',
+            'Detail': '',
+            'Batch No': '',
+            'Expiry Date': '',
+            'Price': '',
+            'Qty': '',
+            'FOC': 'Tax',
+            'Amount':
+                group.total_tax.toFixed(2)
         });
     });
 

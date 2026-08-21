@@ -177,11 +177,16 @@ try {
             // FOC:
             // sii.foc_quantity is also directly in sale_invoice_items.
             //
+            // TAX:
+            // sii.tax_amount is also directly in sale_invoice_items
+            // (same place pos-add.php writes the per-item tax to).
+            //
             // Therefore:
             //
             // sii.batch_no
             // sii.batch_expiry_date
             // sii.foc_quantity
+            // sii.tax_amount
             //
             // NO stock_ledger JOIN is required.
             //
@@ -227,6 +232,7 @@ try {
 
         sii.sale_price,
         sii.discount_amount,
+        sii.tax_amount,
         sii.net_amount
 
     FROM sale_invoice_items sii
@@ -486,6 +492,7 @@ try {
             $total_foc_qty  = 0;
             $total_amount   = 0;
             $total_discount = 0;
+            $total_tax      = 0;
 
 
             foreach ($rows as &$row) {
@@ -501,6 +508,9 @@ try {
 
                 $row['discount_amount'] =
                     (float)($row['discount_amount'] ?? 0);
+
+                $row['tax_amount'] =
+                    (float)($row['tax_amount'] ?? 0);
 
                 $row['net_amount'] =
                     (float)($row['net_amount'] ?? 0);
@@ -519,6 +529,9 @@ $row['invoice_disc_percent'] = (float)($row['invoice_disc_percent'] ?? 0);
 
                 $total_discount +=
                     $row['discount_amount'];
+
+                $total_tax +=
+                    $row['tax_amount'];
 
 
                 // -------------------------------------------------------------
@@ -592,6 +605,7 @@ $row['invoice_disc_percent'] = (float)($row['invoice_disc_percent'] ?? 0);
                     'total_qty'      => $total_qty,
                     'total_foc_qty'  => $total_foc_qty,
                     'total_discount' => $total_discount,
+                    'total_tax'      => $total_tax,
                     'total_amount'   => $total_amount
                 ]
             ]);
