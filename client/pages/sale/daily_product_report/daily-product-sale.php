@@ -20,6 +20,119 @@ if (!$user_id) {
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <!-- Reuses the same table/card/form classes as the Stock Position module -->
     <link rel="stylesheet" href="../../../assets/css/inventory/stock_position/stock-position.css">
+    <style>
+        /*
+        |--------------------------------------------------------------------------
+        | COLUMN VISIBILITY (toggled by JS via body classes)
+        | Example: body.hide-col-foc .col-foc { display: none; }
+        |--------------------------------------------------------------------------
+        */
+        body.hide-col-sno    .col-sno,
+        body.hide-col-code   .col-code,
+        body.hide-col-detail .col-detail,
+        body.hide-col-batch  .col-batch,
+        body.hide-col-expiry .col-expiry,
+        body.hide-col-price  .col-price,
+        body.hide-col-qty    .col-qty,
+        body.hide-col-foc    .col-foc,
+        body.hide-col-amount .col-amount {
+            display: none !important;
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | COLUMNS MODAL
+        |--------------------------------------------------------------------------
+        */
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.45);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            font-family: Arial, sans-serif;
+        }
+
+        .modal-overlay.open {
+            display: flex;
+        }
+
+        .modal-box {
+            background: #fff;
+            width: 320px;
+            max-width: 90vw;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.25);
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 16px;
+            background: #6f42c1;
+            color: #fff;
+        }
+
+        .modal-header h3 {
+            margin: 0;
+            font-size: 15px;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            color: #fff;
+            font-size: 20px;
+            line-height: 1;
+            cursor: pointer;
+        }
+
+        .modal-body {
+            padding: 14px 16px;
+            max-height: 320px;
+            overflow-y: auto;
+        }
+
+        .modal-body label {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 0;
+            font-size: 13px;
+            color: #222;
+            cursor: pointer;
+        }
+
+        .modal-footer {
+            display: flex;
+            justify-content: flex-end;
+            gap: 8px;
+            padding: 12px 16px;
+            border-top: 1px solid #eee;
+        }
+
+        .modal-footer button {
+            font-size: 13px;
+            padding: 7px 14px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        .modal-btn-reset {
+            background: #e9ecef;
+            color: #333;
+        }
+
+        .modal-btn-apply {
+            background: #6f42c1;
+            color: #fff;
+        }
+    </style>
 </head>
 <body>
     <main class="container">
@@ -27,6 +140,9 @@ if (!$user_id) {
             <div class="card-header">
                 <h2 class="card-title">Daily Product Sale Report</h2>
                 <div class="action-buttons">
+                    <button class="btn btn-secondary" id="columns-btn" type="button">
+                        <i class="fas fa-columns"></i> Columns
+                    </button>
                     <div class="dropdown">
                         <button class="btn btn-primary dropdown-toggle" type="button" data-toggle="dropdown">
                             <i class="fas fa-file-export"></i> Export
@@ -108,15 +224,16 @@ if (!$user_id) {
                 <table class="table">
                     <thead>
                         <tr>
-                            <th>Sr#</th>
-                            <th>Product Code</th>
-                            <th>Details</th>
+                            <th class="col-sno">Sr#</th>
+                            <th class="col-code">Product Code</th>
+                            <th class="col-detail">Details</th>
                             <!-- <th class="col-customer">Customer</th> -->
-                             <th>Batch No</th>
-<th>Expiry Date</th>
-                            <th>Price</th>
-                            <th>Qty</th>
-                            <th>Amount</th>
+                             <th class="col-batch">Batch No</th>
+<th class="col-expiry">Expiry Date</th>
+                            <th class="col-price">Price</th>
+                            <th class="col-qty">Qty</th>
+                            <th class="col-foc">FOC</th>
+                            <th class="col-amount">Amount</th>
                         </tr>
                     </thead>
                     <tbody></tbody>
@@ -134,6 +251,26 @@ if (!$user_id) {
             </div>
         </div>
     </main>
+
+    <!-- =========================================================
+         COLUMNS MODAL
+    ========================================================= -->
+
+    <div class="modal-overlay" id="columns-modal-overlay">
+        <div class="modal-box">
+            <div class="modal-header">
+                <h3>Show / Hide Columns</h3>
+                <button class="modal-close" id="columns-modal-close" type="button">&times;</button>
+            </div>
+            <div class="modal-body" id="columns-modal-body">
+                <!-- checkboxes injected by JS -->
+            </div>
+            <div class="modal-footer">
+                <button class="modal-btn-reset" id="columns-reset-btn" type="button">Reset</button>
+                <button class="modal-btn-apply" id="columns-apply-btn" type="button">Apply</button>
+            </div>
+        </div>
+    </div>
 
 <script src="../../../assets/js/sale/daily_product_sale_report/daily-product-sale-report.js?v=<?= time() ?>"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
