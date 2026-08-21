@@ -73,6 +73,54 @@ async function loadProducts() {
     }
 }
 
+async function loadSalesmen() {
+    try {
+        const res = await fetch(`${API_BASE}?action=salesmen`);
+        const data = await res.json();
+
+        if (data.success) {
+            document.getElementById('salesman-list').innerHTML =
+                data.data.map(s =>
+                    `<option value="${s.full_name}" data-id="${s.id}">`
+                ).join('');
+        }
+    } catch (e) {
+        console.error('Error loading salesmen:', e);
+    }
+}
+
+async function loadCities() {
+    try {
+        const res = await fetch(`${API_BASE}?action=cities`);
+        const data = await res.json();
+
+        if (data.success) {
+            document.getElementById('city-list').innerHTML =
+                data.data.map(c =>
+                    `<option value="${c.city_name}" data-id="${c.id}">`
+                ).join('');
+        }
+    } catch (e) {
+        console.error('Error loading cities:', e);
+    }
+}
+
+async function loadAreas() {
+    try {
+        const res = await fetch(`${API_BASE}?action=areas`);
+        const data = await res.json();
+
+        if (data.success) {
+            document.getElementById('area-list').innerHTML =
+                data.data.map(a =>
+                    `<option value="${a.area_name}" data-id="${a.id}">`
+                ).join('');
+        }
+    } catch (e) {
+        console.error('Error loading areas:', e);
+    }
+}
+
 function findIdFromDatalist(inputVal, datalistSelector) {
     if (!inputVal) return null;
 
@@ -122,6 +170,9 @@ async function loadReport() {
         const customerInput = document.getElementById('customer').value;
         const branchInput = document.getElementById('branch').value;
         const productInput = document.getElementById('product').value;
+        const salesmanInput = document.getElementById('salesman').value;
+        const cityInput = document.getElementById('city').value;
+        const areaInput = document.getElementById('area').value;
 
         const fromDate = document.getElementById('from-date').value;
         const toDate = document.getElementById('to-date').value;
@@ -143,6 +194,21 @@ async function loadReport() {
         const productId = findIdFromDatalist(
             productInput,
             '#product-list'
+        );
+
+        const salesmanId = findIdFromDatalist(
+            salesmanInput,
+            '#salesman-list'
+        );
+
+        const cityId = findIdFromDatalist(
+            cityInput,
+            '#city-list'
+        );
+
+        const areaId = findIdFromDatalist(
+            areaInput,
+            '#area-list'
         );
 
         let url = `${API_BASE}?action=report`;
@@ -175,6 +241,21 @@ async function loadReport() {
         // Expiry Date filter
         if (expiryDate) {
             url += `&expiry_date=${encodeURIComponent(expiryDate)}`;
+        }
+
+        // Salesman filter
+        if (salesmanId) {
+            url += `&sale_officer_id=${encodeURIComponent(salesmanId)}`;
+        }
+
+        // City filter
+        if (cityId) {
+            url += `&city_id=${encodeURIComponent(cityId)}`;
+        }
+
+        // Area filter
+        if (areaId) {
+            url += `&area_id=${encodeURIComponent(areaId)}`;
         }
 
         console.log('Daily Sale Report URL:', url);
@@ -579,6 +660,15 @@ function printReport() {
     const productInput =
         document.getElementById('product').value;
 
+    const salesmanInput =
+        document.getElementById('salesman').value;
+
+    const cityInput =
+        document.getElementById('city').value;
+
+    const areaInput =
+        document.getElementById('area').value;
+
     const fromDate =
         document.getElementById('from-date').value;
 
@@ -607,6 +697,24 @@ function printReport() {
         findIdFromDatalist(
             productInput,
             '#product-list'
+        );
+
+    const salesmanId =
+        findIdFromDatalist(
+            salesmanInput,
+            '#salesman-list'
+        );
+
+    const cityId =
+        findIdFromDatalist(
+            cityInput,
+            '#city-list'
+        );
+
+    const areaId =
+        findIdFromDatalist(
+            areaInput,
+            '#area-list'
         );
 
     let params = [];
@@ -653,6 +761,24 @@ function printReport() {
         );
     }
 
+    if (salesmanId) {
+        params.push(
+            `sale_officer_id=${encodeURIComponent(salesmanId)}`
+        );
+    }
+
+    if (cityId) {
+        params.push(
+            `city_id=${encodeURIComponent(cityId)}`
+        );
+    }
+
+    if (areaId) {
+        params.push(
+            `area_id=${encodeURIComponent(areaId)}`
+        );
+    }
+
     const url =
         `print.php?${params.join('&')}`;
 
@@ -693,6 +819,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 document.getElementById('branch').value = '';
 
                 document.getElementById('product').value = '';
+
+                document.getElementById('salesman').value = '';
+
+                document.getElementById('city').value = '';
+
+                document.getElementById('area').value = '';
 
                 document.getElementById('batch-no').value = '';
 
@@ -755,5 +887,8 @@ document.addEventListener('DOMContentLoaded', () => {
     loadCustomers();
     loadBranches();
     loadProducts();
+    loadSalesmen();
+    loadCities();
+    loadAreas();
     loadReport();
 });
