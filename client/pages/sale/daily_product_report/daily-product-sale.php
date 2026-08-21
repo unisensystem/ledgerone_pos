@@ -27,17 +27,17 @@ if (!$user_id) {
         | Example: body.hide-col-foc .col-foc { display: none; }
         |--------------------------------------------------------------------------
         */
-        body.hide-col-sno    .col-sno,
-        body.hide-col-code   .col-code,
-        body.hide-col-detail .col-detail,
-        body.hide-col-batch  .col-batch,
-        body.hide-col-expiry .col-expiry,
-        body.hide-col-price  .col-price,
-        body.hide-col-qty    .col-qty,
-        body.hide-col-foc    .col-foc,
-        body.hide-col-amount .col-amount {
-            display: none !important;
-        }
+       body.hide-col-sno    .col-sno,
+body.hide-col-code   .col-code,
+body.hide-col-detail .col-detail,
+body.hide-col-batch  .col-batch,
+body.hide-col-price  .col-price,
+body.hide-col-qty    .col-qty,
+body.hide-col-disc   .col-disc,
+body.hide-col-foc    .col-foc,
+body.hide-col-amount .col-amount {
+    display: none !important;
+}
 
         /*
         |--------------------------------------------------------------------------
@@ -223,18 +223,17 @@ if (!$user_id) {
             <div class="table-container">
                 <table class="table">
                     <thead>
-                        <tr>
-                            <th class="col-sno">Sr#</th>
-                            <th class="col-code">Product Code</th>
-                            <th class="col-detail">Details</th>
-                            <!-- <th class="col-customer">Customer</th> -->
-                             <th class="col-batch">Batch No</th>
-<th class="col-expiry">Expiry Date</th>
-                            <th class="col-price">Price</th>
-                            <th class="col-qty">Qty</th>
-                            <th class="col-foc">FOC</th>
-                            <th class="col-amount">Amount</th>
-                        </tr>
+                       <tr>
+    <th class="col-sno">Sr#</th>
+    <th class="col-code">Product Code</th>
+    <th class="col-detail">Details</th>
+    <th class="col-batch">Batch No</th>
+    <th class="col-price">Price</th>
+    <th class="col-qty">Qty</th>
+    <th class="col-disc">Disc %</th>
+    <th class="col-foc">FOC</th>
+    <th class="col-amount">Amount</th>
+</tr>
                     </thead>
                     <tbody></tbody>
                 </table>

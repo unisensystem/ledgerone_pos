@@ -120,15 +120,29 @@ try {
     |--------------------------------------------------------------------------
     |
     | IMPORTANT:
-    | batch_no, batch_expiry_date and foc_quantity are directly inside
-    | sale_invoice_items (sii).
+    | batch_no and foc_quantity are directly inside sale_invoice_items (sii).
     |
     | NO stock_ledger JOIN is required.
     |
     | Salesman filter uses si.sale_officer_id directly.
     | City / Area filters use c.city_id / c.area_id directly,
     | since customers already carries those columns.
-    | NO extra JOIN is required for filtering.
+    |
+    | CITY / AREA / ZONE DISPLAY:
+    | customers.city_id      -> cities.city_name
+    | customers.area_id      -> areas.area_name
+    | customers.city_zone_id -> city_zones.city_zone_name
+    |
+    | INVOICE-LEVEL AMOUNT / DISCOUNT:
+    | si.net_amount is the invoice's own net amount (may include
+    | shipping/other charges, so it can differ from the sum of the
+    | item net_amounts shown in the "Total" row).
+    |
+    | invoice_disc_percent combines:
+    | si.total_discount_percent + si.extra_discount_1_percent
+    | + si.extra_discount_2_percent
+    | (this is an invoice-level figure, so it is the same for
+    | every item row belonging to that invoice).
     |
     */
 
@@ -141,7 +155,28 @@ try {
 
             si.sale_date,
 
+            si.net_amount AS invoice_net_amount,
+
+            (si.total_discount_percent
+                + si.extra_discount_1_percent
+                + si.extra_discount_2_percent) AS invoice_disc_percent,
+
             c.customer_name,
+
+            COALESCE(
+                ci.city_name,
+                ''
+            ) AS city_name,
+
+            COALESCE(
+                ar.area_name,
+                ''
+            ) AS area_name,
+
+            COALESCE(
+                cz.city_zone_name,
+                ''
+            ) AS zone_name,
 
             COALESCE(
                 b.branch_name,
@@ -186,6 +221,21 @@ try {
 
         JOIN customers c
             ON si.customer_id = c.id
+
+
+        LEFT JOIN cities ci
+            ON c.city_id = ci.id
+            AND ci.tenant_id = c.tenant_id
+
+
+        LEFT JOIN areas ar
+            ON c.area_id = ar.id
+            AND ar.tenant_id = c.tenant_id
+
+
+        LEFT JOIN city_zones cz
+            ON c.city_zone_id = cz.id
+            AND cz.tenant_id = c.tenant_id
 
 
         LEFT JOIN branches b
@@ -307,6 +357,11 @@ try {
     |--------------------------------------------------------------------------
     | EXPIRY DATE
     |--------------------------------------------------------------------------
+    |
+    | NOTE: the Expiry Date column has been removed from the printed
+    | table, but the filter itself still works if a caller passes
+    | expiry_date in the query string (kept for compatibility with
+    | index.php's filter panel).
     |
     | Expiry date is directly from sii.batch_expiry_date
     |
@@ -491,6 +546,33 @@ function fmtDateShort($dateStr)
 
 /*
 |--------------------------------------------------------------------------
+| BUILD "City, Area, Zone" LABEL
+|--------------------------------------------------------------------------
+*/
+
+function buildLocationLabel($cityName, $areaName, $zoneName)
+{
+    $parts = [];
+
+    foreach ([$cityName, $areaName, $zoneName] as $part) {
+
+        $part = trim((string)$part);
+
+        if ($part !== '') {
+            $parts[] = $part;
+        }
+    }
+
+    if (empty($parts)) {
+        return '';
+    }
+
+    return ' (' . implode(', ', $parts) . ')';
+}
+
+
+/*
+|--------------------------------------------------------------------------
 | GROUP BY INVOICE
 |--------------------------------------------------------------------------
 */
@@ -528,6 +610,21 @@ foreach ($rows as $row) {
             'customer_name' =>
                 $row['customer_name'],
 
+            'city_name' =>
+                $row['city_name'] ?? '',
+
+            'area_name' =>
+                $row['area_name'] ?? '',
+
+            'zone_name' =>
+                $row['zone_name'] ?? '',
+
+            'invoice_net_amount' =>
+                (float)($row['invoice_net_amount'] ?? 0),
+
+            'invoice_disc_percent' =>
+                (float)($row['invoice_disc_percent'] ?? 0),
+
             'items' =>
                 [],
 
@@ -554,7 +651,7 @@ foreach ($rows as $row) {
 
     /*
     |--------------------------------------------------------------------------
-    | INVOICE TOTAL
+    | INVOICE TOTAL (sum of item net_amount)
     |--------------------------------------------------------------------------
     */
 
@@ -848,16 +945,11 @@ col.c-code {
 
 
 col.c-detail {
-    width: 21%;
+    width: 22%;
 }
 
 
 col.c-batch {
-    width: 10%;
-}
-
-
-col.c-expiry {
     width: 10%;
 }
 
@@ -872,13 +964,18 @@ col.c-qty {
 }
 
 
+col.c-disc {
+    width: 8%;
+}
+
+
 col.c-foc {
     width: 8%;
 }
 
 
 col.c-amount {
-    width: 13%;
+    width: 18%;
 }
 
 
@@ -994,14 +1091,14 @@ tr.total-row td {
 |--------------------------------------------------------------------------
 */
 
-body.hide-col-sno   .col-sno,
-body.hide-col-code  .col-code,
+body.hide-col-sno    .col-sno,
+body.hide-col-code   .col-code,
 body.hide-col-detail .col-detail,
-body.hide-col-batch .col-batch,
-body.hide-col-expiry .col-expiry,
-body.hide-col-price .col-price,
-body.hide-col-qty   .col-qty,
-body.hide-col-foc   .col-foc,
+body.hide-col-batch  .col-batch,
+body.hide-col-price  .col-price,
+body.hide-col-qty    .col-qty,
+body.hide-col-disc   .col-disc,
+body.hide-col-foc    .col-foc,
 body.hide-col-amount .col-amount {
     display: none !important;
 }
@@ -1327,11 +1424,11 @@ body.hide-col-amount .col-amount {
 
     <col class="c-batch">
 
-    <col class="c-expiry">
-
     <col class="c-price">
 
     <col class="c-qty">
+
+    <col class="c-disc">
 
     <col class="c-foc">
 
@@ -1360,16 +1457,16 @@ body.hide-col-amount .col-amount {
         Batch No.
     </th>
 
-    <th class="col-expiry">
-        Expiry Date
-    </th>
-
     <th class="num col-price">
         Price
     </th>
 
     <th class="num col-qty">
         Qty
+    </th>
+
+    <th class="num col-disc">
+        Disc %
     </th>
 
     <th class="num col-foc">
@@ -1407,6 +1504,15 @@ body.hide-col-amount .col-amount {
 
 <?php foreach ($groups as $group): ?>
 
+<?php
+
+$locationLabel = buildLocationLabel(
+    $group['city_name'],
+    $group['area_name'],
+    $group['zone_name']
+);
+
+?>
 
 <!-- =========================================================
      INVOICE HEADER
@@ -1417,7 +1523,7 @@ body.hide-col-amount .col-amount {
     <td class="col-sno"></td>
 
 
-    <td colspan="6" class="col-code col-detail col-batch col-expiry col-price col-qty">
+    <td colspan="5" class="col-code col-detail col-batch col-price col-qty">
 
         <?= htmlspecialchars(
             fmtDateShort(
@@ -1439,13 +1545,37 @@ body.hide-col-amount .col-amount {
 
         </strong>
 
+        <?= htmlspecialchars(
+            $locationLabel,
+            ENT_QUOTES,
+            'UTF-8'
+        ) ?>
+
     </td>
+
+
+    <td class="col-disc"></td>
 
 
     <td class="col-foc"></td>
 
 
+    <!-- Invoice net amount, then bill number -->
+
     <td class="bill-no col-amount">
+
+        <?= htmlspecialchars(
+            $currency_symbol,
+            ENT_QUOTES,
+            'UTF-8'
+        ) ?>
+
+        <?= number_format(
+            $group['invoice_net_amount'],
+            2
+        ) ?>
+
+        &nbsp;&nbsp;
 
         <?= htmlspecialchars(
             $group['bill_no'],
@@ -1516,33 +1646,6 @@ body.hide-col-amount .col-amount {
     </td>
 
 
-    <!-- EXPIRY -->
-
-    <td class="col-expiry">
-
-        <?php if (
-            !empty(
-                $row['batch_expiry_date']
-            )
-        ): ?>
-
-            <?= htmlspecialchars(
-                fmtDateShort(
-                    $row['batch_expiry_date']
-                ),
-                ENT_QUOTES,
-                'UTF-8'
-            ) ?>
-
-        <?php else: ?>
-
-            -
-
-        <?php endif; ?>
-
-    </td>
-
-
     <!-- PRICE -->
 
     <td class="num col-price">
@@ -1579,6 +1682,18 @@ body.hide-col-amount .col-amount {
             ENT_QUOTES,
             'UTF-8'
         ) ?>
+
+    </td>
+
+
+    <!-- DISC % (invoice-level: Disc % + Extra Disc % combined) -->
+
+    <td class="num col-disc">
+
+        <?= number_format(
+            $group['invoice_disc_percent'],
+            2
+        ) ?>%
 
     </td>
 
@@ -1628,7 +1743,10 @@ body.hide-col-amount .col-amount {
 
 <tr class="total-row">
 
-    <td colspan="6" class="col-sno col-code col-detail col-batch col-expiry col-price col-qty"></td>
+    <td colspan="6" class="col-sno col-code col-detail col-batch col-price col-qty"></td>
+
+
+    <td class="num col-disc"></td>
 
 
     <td class="num col-foc">
@@ -1725,6 +1843,12 @@ const reportGroups = <?= json_encode(
     array_map(
         function ($g) {
 
+            $locationLabel = buildLocationLabel(
+                $g['city_name'],
+                $g['area_name'],
+                $g['zone_name']
+            );
+
             return [
 
                 'date' =>
@@ -1733,10 +1857,16 @@ const reportGroups = <?= json_encode(
                     ),
 
                 'customer' =>
-                    $g['customer_name'],
+                    $g['customer_name'] . $locationLabel,
 
                 'bill_no' =>
                     $g['bill_no'],
+
+                'invoice_net_amount' =>
+                    (float)$g['invoice_net_amount'],
+
+                'disc_percent' =>
+                    (float)$g['invoice_disc_percent'],
 
                 'total' =>
                     (float)$g['total_amount'],
@@ -1758,15 +1888,6 @@ const reportGroups = <?= json_encode(
                                 'batch' =>
                                     $r['batch_no']
                                     ?? '-',
-
-                                'expiry' =>
-                                    !empty(
-                                        $r['batch_expiry_date']
-                                    )
-                                    ? fmtDateShort(
-                                        $r['batch_expiry_date']
-                                    )
-                                    : '-',
 
                                 'price' =>
                                     (float)(
@@ -1912,16 +2033,16 @@ function exportToExcel()
 
                 'Batch No.': '',
 
-                'Expiry Date': '',
-
                 'Price': '',
 
                 'Qty': '',
 
+                'Disc %': '',
+
                 'FOC': '',
 
                 'Amount':
-                    group.bill_no
+                    `${group.invoice_net_amount.toFixed(2)}  ${group.bill_no}`
             });
 
 
@@ -1948,9 +2069,6 @@ function exportToExcel()
                         'Batch No.':
                             item.batch,
 
-                        'Expiry Date':
-                            item.expiry,
-
                         'Price':
                             item.price.toFixed(2),
 
@@ -1958,6 +2076,9 @@ function exportToExcel()
                             `${item.qty.toFixed(2)} ${
                                 item.unit || ''
                             }`.trim(),
+
+                        'Disc %':
+                            group.disc_percent.toFixed(2),
 
                         'FOC':
                             item.foc.toFixed(2),
@@ -1987,11 +2108,11 @@ function exportToExcel()
 
                 'Batch No.': '',
 
-                'Expiry Date': '',
-
                 'Price': '',
 
                 'Qty': '',
+
+                'Disc %': '',
 
                 'FOC': 'Total',
 
@@ -2032,15 +2153,15 @@ function exportToExcel()
 
         { wch: 18 },
 
-        { wch: 16 },
-
         { wch: 15 },
 
         { wch: 15 },
 
         { wch: 10 },
 
-        { wch: 18 }
+        { wch: 10 },
+
+        { wch: 20 }
 
     ];
 
@@ -2105,9 +2226,9 @@ const COLUMN_CONFIG = [
     { key: 'code',   label: 'Product Code' },
     { key: 'detail', label: 'Details' },
     { key: 'batch',  label: 'Batch No' },
-    { key: 'expiry', label: 'Expiry Date' },
     { key: 'price',  label: 'Price' },
     { key: 'qty',    label: 'Qty' },
+    { key: 'disc',   label: 'Disc %' },
     { key: 'foc',    label: 'FOC' },
     { key: 'amount', label: 'Amount' }
 ];

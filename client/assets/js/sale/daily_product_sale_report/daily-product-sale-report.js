@@ -155,13 +155,17 @@ function groupByInvoice(rows) {
                 bill_no: row.bill_no,
                 sale_date: row.sale_date,
                 customer_name: row.customer_name,
+                city_name: row.city_name,
+                area_name: row.area_name,
+                zone_name: row.zone_name,
+                invoice_net_amount: parseFloat(row.invoice_net_amount || 0),
+                invoice_disc_percent: parseFloat(row.invoice_disc_percent || 0),
                 items: [],
                 total_amount: 0
             });
         }
 
         const group = groups[indexByInvoice[key]];
-
         group.items.push(row);
         group.total_amount += parseFloat(row.net_amount || 0);
     });
@@ -329,111 +333,66 @@ function renderTable() {
 
     let html = '';
 
-    pageGroups.forEach(group => {
+   pageGroups.forEach(group => {
 
-        // Invoice header
+    const locationParts = [group.city_name, group.area_name, group.zone_name]
+        .filter(v => v && v.trim() !== '');
+    const locationText = locationParts.length
+        ? ` (${locationParts.map(esc).join(', ')})`
+        : '';
+
+    // Invoice header — net_amount ab bill_no se PEHLE aaye ga
+    html += `
+        <tr style="background-color:var(--table-header);">
+            <td colspan="8">
+                <strong>
+                    ${formatDateShort(group.sale_date)}
+                    &nbsp;&nbsp;
+                    ${esc(group.customer_name || '')}${locationText}
+                </strong>
+            </td>
+            <td style="text-align:right;" class="col-amount">
+                <strong>
+                    ${currentCurrency}${group.invoice_net_amount.toFixed(2)}
+                    &nbsp;&nbsp;
+                    ${esc(group.bill_no || '')}
+                </strong>
+            </td>
+        </tr>
+    `;
+
+    group.items.forEach((row, idx) => {
+
+        const salePrice   = parseFloat(row.sale_price || 0);
+        const quantity    = parseFloat(row.quantity || 0);
+        const focQty      = parseFloat(row.foc_quantity || 0);
+        const netAmount   = parseFloat(row.net_amount || 0);
+        const batchNo     = row.batch_no || '-';
+        const discPercent = group.invoice_disc_percent || 0; // invoice-level, har row me same
+
         html += `
-            <tr style="background-color:var(--table-header);">
-
-                <td colspan="8">
-                    <strong>
-                        ${formatDateShort(group.sale_date)}
-                        &nbsp;&nbsp;
-                        ${esc(group.customer_name || '')}
-                    </strong>
-                </td>
-
-                <td style="text-align:right;" class="col-amount">
-                    <strong>
-                        ${esc(group.bill_no || '')}
-                    </strong>
-                </td>
-
-            </tr>
-        `;
-
-        // Item rows
-        group.items.forEach((row, idx) => {
-
-            const salePrice =
-                parseFloat(row.sale_price || 0);
-
-            const quantity =
-                parseFloat(row.quantity || 0);
-
-            const focQty =
-                parseFloat(row.foc_quantity || 0);
-
-            const netAmount =
-                parseFloat(row.net_amount || 0);
-
-            const batchNo =
-                row.batch_no || '-';
-
-            const expiryDate =
-                formatDateShort(row.batch_expiry_date) || '-';
-
-            html += `
-                <tr>
-
-                    <td class="col-sno">
-                        ${idx + 1}
-                    </td>
-
-                    <td class="col-code">
-                        ${esc(row.product_code || '-')}
-                    </td>
-
-                    <td class="col-detail">
-                        ${esc(row.product_name || '-')}
-                    </td>
-
-                    <td class="col-batch">
-                        ${esc(batchNo)}
-                    </td>
-
-                    <td class="col-expiry">
-                        ${esc(expiryDate)}
-                    </td>
-
-                    <td class="col-price">
-                        ${currentCurrency}${salePrice.toFixed(2)}
-                    </td>
-
-                    <td class="col-qty">
-                        ${quantity.toFixed(2)}
-                        ${esc(row.unit_symbol || '')}
-                    </td>
-
-                    <td class="col-foc">
-                        ${focQty.toFixed(2)}
-                    </td>
-
-                    <td class="col-amount">
-                        ${currentCurrency}${netAmount.toFixed(2)}
-                    </td>
-
-                </tr>
-            `;
-        });
-
-        // Invoice total
-        html += `
-            <tr style="font-weight:bold;">
-
-                <td colspan="8"
-                    style="text-align:right;">
-                    Total
-                </td>
-
-                <td class="col-amount">
-                    ${currentCurrency}${group.total_amount.toFixed(2)}
-                </td>
-
+            <tr>
+                <td class="col-sno">${idx + 1}</td>
+                <td class="col-code">${esc(row.product_code || '-')}</td>
+                <td class="col-detail">${esc(row.product_name || '-')}</td>
+                <td class="col-batch">${esc(batchNo)}</td>
+                <td class="col-price">${currentCurrency}${salePrice.toFixed(2)}</td>
+                <td class="col-qty">${quantity.toFixed(2)} ${esc(row.unit_symbol || '')}</td>
+                <td class="col-disc">${discPercent.toFixed(2)}%</td>
+                <td class="col-foc">${focQty.toFixed(2)}</td>
+                <td class="col-amount">${currentCurrency}${netAmount.toFixed(2)}</td>
             </tr>
         `;
     });
 
+    // invoice total row same rehta hai (colspan 8)
+    html += `
+        <tr style="font-weight:bold;">
+            <td colspan="8" style="text-align:right;">Total</td>
+            <td class="col-amount">${currentCurrency}${group.total_amount.toFixed(2)}</td>
+        </tr>
+    `;
+});
     tbody.innerHTML = html;
 
     renderGrandTotal();
@@ -827,9 +786,9 @@ const COLUMN_CONFIG = [
     { key: 'code',   label: 'Product Code' },
     { key: 'detail', label: 'Details' },
     { key: 'batch',  label: 'Batch No' },
-    { key: 'expiry', label: 'Expiry Date' },
     { key: 'price',  label: 'Price' },
     { key: 'qty',    label: 'Qty' },
+    { key: 'disc',   label: 'Disc %' },
     { key: 'foc',    label: 'FOC' },
     { key: 'amount', label: 'Amount' }
 ];

@@ -192,90 +192,80 @@ try {
             // -----------------------------------------------------------------
 
             $sql = "
-                SELECT
+    SELECT
 
-                    si.id AS invoice_id,
+        si.id AS invoice_id,
+        si.bill_no,
+        si.sale_date,
+        si.customer_id,
+        si.branch_id,
 
-                    si.bill_no,
+        si.net_amount AS invoice_net_amount,
+        (si.total_discount_percent
+            + si.extra_discount_1_percent
+            + si.extra_discount_2_percent) AS invoice_disc_percent,
 
-                    si.sale_date,
+        c.customer_name,
 
-                    si.customer_id,
+        COALESCE(ci.city_name, '')       AS city_name,
+        COALESCE(ar.area_name, '')       AS area_name,
+        COALESCE(cz.city_zone_name, '')  AS zone_name,
 
-                    si.branch_id,
+        COALESCE(b.branch_name, 'No Branch') AS branch_name,
 
-                    c.customer_name,
+        p.id AS product_id,
+        p.code AS product_code,
+        p.name AS product_name,
 
-                    COALESCE(
-                        b.branch_name,
-                        'No Branch'
-                    ) AS branch_name,
+        sii.batch_no,
+        sii.batch_expiry_date,
 
-                    p.id AS product_id,
+        sii.quantity,
+        sii.foc_quantity,
 
-                    p.code AS product_code,
+        COALESCE(u.uom_name, '') AS unit_symbol,
 
-                    p.name AS product_name,
+        sii.sale_price,
+        sii.discount_amount,
+        sii.net_amount
 
-                    /*
-                    |--------------------------------------------------------------------------
-                    | BATCH INFORMATION
-                    |--------------------------------------------------------------------------
-                    */
+    FROM sale_invoice_items sii
 
-                    sii.batch_no,
+    INNER JOIN sale_invoice si
+        ON sii.sale_invoice_id = si.id
+        AND sii.tenant_id = si.tenant_id
 
-                    sii.batch_expiry_date,
+    INNER JOIN products p
+        ON sii.product_id = p.id
+        AND sii.tenant_id = p.tenant_id
 
-                    /*
-                    |--------------------------------------------------------------------------
-                    | SALE ITEM INFORMATION
-                    |--------------------------------------------------------------------------
-                    */
+    INNER JOIN customers c
+        ON si.customer_id = c.id
+        AND c.tenant_id = si.tenant_id
 
-                    sii.quantity,
+    LEFT JOIN cities ci
+        ON c.city_id = ci.id
+        AND ci.tenant_id = c.tenant_id
 
-                    sii.foc_quantity,
+    LEFT JOIN areas ar
+        ON c.area_id = ar.id
+        AND ar.tenant_id = c.tenant_id
 
-                    COALESCE(
-                        u.uom_name,
-                        ''
-                    ) AS unit_symbol,
+    LEFT JOIN city_zones cz
+        ON c.city_zone_id = cz.id
+        AND cz.tenant_id = c.tenant_id
 
-                    sii.sale_price,
+    LEFT JOIN branches b
+        ON si.branch_id = b.id
+        AND b.tenant_id = si.tenant_id
 
-                    sii.discount_amount,
+    LEFT JOIN uom u
+        ON sii.uom_id = u.id
 
-                    sii.net_amount
-
-                FROM sale_invoice_items sii
-
-                INNER JOIN sale_invoice si
-                    ON sii.sale_invoice_id = si.id
-                    AND sii.tenant_id = si.tenant_id
-
-                INNER JOIN products p
-                    ON sii.product_id = p.id
-                    AND sii.tenant_id = p.tenant_id
-
-                INNER JOIN customers c
-                    ON si.customer_id = c.id
-                    AND c.tenant_id = si.tenant_id
-
-                LEFT JOIN branches b
-                    ON si.branch_id = b.id
-                    AND b.tenant_id = si.tenant_id
-
-                LEFT JOIN uom u
-                    ON sii.uom_id = u.id
-
-                WHERE sii.tenant_id = ?
-
-                  AND si.status = 'Posted'
-
-                  AND p.product_type = 'physical'
-            ";
-
+    WHERE sii.tenant_id = ?
+      AND si.status = 'Posted'
+      AND p.product_type = 'physical'
+";
 
             $params = [
                 $tenant_id
@@ -514,6 +504,8 @@ try {
 
                 $row['net_amount'] =
                     (float)($row['net_amount'] ?? 0);
+                    $row['invoice_net_amount']   = (float)($row['invoice_net_amount'] ?? 0);
+$row['invoice_disc_percent'] = (float)($row['invoice_disc_percent'] ?? 0);
 
 
                 $total_qty +=
