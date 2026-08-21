@@ -40,6 +40,13 @@ try {
     if (empty($input['items']) || !is_array($input['items'])) {
         throw new Exception('At least one item is required');
     }
+
+    // Validate that every item has a batch selected (batch_no required for return)
+    foreach ($input['items'] as $item) {
+        if (empty($item['batchNo'])) {
+            throw new Exception('Please select a batch for every item — a product with no available stock cannot be returned');
+        }
+    }
     
     $pdo->beginTransaction();
     
@@ -94,14 +101,14 @@ try {
     
     $invoice_id = $pdo->lastInsertId();
     
-    // Insert return items
+    // Insert return items — batch_no and batch_expiry_date added
     $item_stmt = $pdo->prepare("
         INSERT INTO purchase_return_items (
             tenant_id, purchase_invoice_id, product_id, uom_id,
             quantity, purchase_price, gross_amount, discount_percent,
             discount_amount, net_amount, vehicle_no, trade_offer_percent, trade_offer_amount,
-            tax_percent, tax_amount, foc_quantity, created_by, updated_by
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            tax_percent, tax_amount, foc_quantity, batch_no, batch_expiry_date, created_by, updated_by
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ");
     
     foreach ($input['items'] as $item) {
@@ -125,6 +132,8 @@ try {
                 $item['gstPercent'] ?? 0.00,
                 $isFirstEntry ? $item['gstAmount'] : 0,
                 $item['focQty'] ?? 0,
+                $item['batchNo'],
+                $item['batchExpiryDate'] ?? null,
                 $user_id,
                 $user_id
             ]);
@@ -141,13 +150,27 @@ try {
         foreach ($item['unitEntries'] as $unitEntry) {
             $totalQty += $unitEntry['quantity'];
         }
+
+        // Safety check: don't let qty_out exceed what's actually available in this batch.
+        // (Frontend already restricts this via get-product-batches.php, this is a server-side guard.)
+        $avail_stmt = $pdo->prepare("
+            SELECT COALESCE(SUM(qty_in),0) - COALESCE(SUM(qty_out),0) AS available_qty
+            FROM stock_ledger
+            WHERE tenant_id = ? AND product_id = ? AND branch_id = ? AND batch_no = ?
+        ");
+        $avail_stmt->execute([$tenant_id, $item['productId'], $input['branchId'], $item['batchNo']]);
+        $availableQty = (float) $avail_stmt->fetchColumn();
+
+        if ($totalQty > $availableQty) {
+            throw new Exception("Return quantity for batch '{$item['batchNo']}' exceeds available stock ({$availableQty})");
+        }
         
-        // Insert into stock_ledger - qty_out for returns (reducing inventory)
+        // Insert into stock_ledger - qty_out for returns (reducing inventory), batch_no/expiry recorded
         $stock_stmt = $pdo->prepare("
             INSERT INTO stock_ledger (
                 tenant_id, account_id, branch_id, product_id, reference_table, reference_id,
-                qty_out, unit_cost, unit_id, transaction_type, transaction_date
-            ) VALUES (?, ?, ?, ?, 'purchase_return', ?, ?, ?, ?, 'Purchase Return', ?)
+                qty_out, unit_cost, unit_id, batch_no, batch_expiry_date, transaction_type, transaction_date
+            ) VALUES (?, ?, ?, ?, 'purchase_return', ?, ?, ?, ?, ?, ?, 'Purchase Return', ?)
         ");
         $stock_stmt->execute([
             $tenant_id,
@@ -158,6 +181,8 @@ try {
             $totalQty,
             $item['purchasePrice'],
             $item['unitEntries'][0]['uomId'],
+            $item['batchNo'],
+            $item['batchExpiryDate'] ?? null,
             $input['purchaseDate']
         ]);
     }
@@ -225,3 +250,7 @@ function extractBalanceAmount($balanceString) {
     $amount = preg_replace('/^(Dr|Cr)\s*/', '', $balanceString);
     return floatval($amount);
 }
+
+// ALTER TABLE purchase_return_items
+// ADD COLUMN batch_no VARCHAR(100) NULL AFTER uom_id,
+// ADD COLUMN batch_expiry_date DATE NULL AFTER batch_no;
