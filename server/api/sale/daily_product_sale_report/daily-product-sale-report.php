@@ -152,6 +152,21 @@ try {
                 ? trim($_GET['expiry_date'])
                 : null;
 
+            // Salesman (sale officer) filter
+            $sale_officer_id = !empty($_GET['sale_officer_id'])
+                ? trim($_GET['sale_officer_id'])
+                : null;
+
+            // City filter (from customer's city_id)
+            $city_id = !empty($_GET['city_id'])
+                ? trim($_GET['city_id'])
+                : null;
+
+            // Area filter (from customer's area_id)
+            $area_id = !empty($_GET['area_id'])
+                ? trim($_GET['area_id'])
+                : null;
+
 
             // -----------------------------------------------------------------
             // MAIN QUERY
@@ -165,6 +180,11 @@ try {
             // sii.batch_expiry_date
             //
             // NO stock_ledger JOIN is required.
+            //
+            // Salesman filter uses si.sale_officer_id directly.
+            // City / Area filters use c.city_id / c.area_id directly,
+            // since customers already carries those columns.
+            // NO extra JOIN is required for filtering.
             // -----------------------------------------------------------------
 
             $sql = "
@@ -389,6 +409,57 @@ try {
 
 
             // -----------------------------------------------------------------
+            // SALESMAN (SALE OFFICER)
+            //
+            // IMPORTANT:
+            // sale_officer_id is directly in sale_invoice (si).
+            // -----------------------------------------------------------------
+
+            if ($sale_officer_id !== null) {
+
+                $sql .= "
+                    AND si.sale_officer_id = ?
+                ";
+
+                $params[] = $sale_officer_id;
+            }
+
+
+            // -----------------------------------------------------------------
+            // CITY
+            //
+            // IMPORTANT:
+            // city_id is directly in customers (c).
+            // -----------------------------------------------------------------
+
+            if ($city_id !== null) {
+
+                $sql .= "
+                    AND c.city_id = ?
+                ";
+
+                $params[] = $city_id;
+            }
+
+
+            // -----------------------------------------------------------------
+            // AREA
+            //
+            // IMPORTANT:
+            // area_id is directly in customers (c).
+            // -----------------------------------------------------------------
+
+            if ($area_id !== null) {
+
+                $sql .= "
+                    AND c.area_id = ?
+                ";
+
+                $params[] = $area_id;
+            }
+
+
+            // -----------------------------------------------------------------
             // ORDER
             // -----------------------------------------------------------------
 
@@ -499,13 +570,16 @@ try {
                 'currency' => $currency_symbol,
 
                 'filters' => [
-                    'from_date'   => $from_date,
-                    'to_date'     => $to_date,
-                    'customer_id' => $customer_id,
-                    'branch_id'   => $branch_id,
-                    'product_id'  => $product_id,
-                    'batch_no'    => $batch_no,
-                    'expiry_date' => $expiry_date
+                    'from_date'        => $from_date,
+                    'to_date'          => $to_date,
+                    'customer_id'      => $customer_id,
+                    'branch_id'        => $branch_id,
+                    'product_id'       => $product_id,
+                    'batch_no'         => $batch_no,
+                    'expiry_date'      => $expiry_date,
+                    'sale_officer_id'  => $sale_officer_id,
+                    'city_id'          => $city_id,
+                    'area_id'          => $area_id
                 ],
 
                 'summary' => [
@@ -734,6 +808,119 @@ try {
 
 
         // =====================================================================
+        // SALESMEN (SALE OFFICERS)
+        //
+        // IMPORTANT:
+        // sale_invoice.sale_officer_id references users.id.
+        // =====================================================================
+
+        case 'salesmen':
+
+            $sql = "
+                SELECT
+
+                    id,
+
+                    full_name
+
+                FROM users
+
+                WHERE tenant_id = ?
+
+                  AND is_active = 1
+
+                ORDER BY full_name ASC
+            ";
+
+
+            $stmt = $pdo->prepare($sql);
+
+            $stmt->execute([
+                $tenant_id
+            ]);
+
+
+            echo json_encode([
+                'success' => true,
+                'data' => $stmt->fetchAll(PDO::FETCH_ASSOC)
+            ]);
+
+            break;
+
+
+        // =====================================================================
+        // CITIES
+        // =====================================================================
+
+        case 'cities':
+
+            $sql = "
+                SELECT
+
+                    id,
+
+                    city_name
+
+                FROM cities
+
+                WHERE tenant_id = ?
+
+                ORDER BY city_name ASC
+            ";
+
+
+            $stmt = $pdo->prepare($sql);
+
+            $stmt->execute([
+                $tenant_id
+            ]);
+
+
+            echo json_encode([
+                'success' => true,
+                'data' => $stmt->fetchAll(PDO::FETCH_ASSOC)
+            ]);
+
+            break;
+
+
+        // =====================================================================
+        // AREAS
+        // =====================================================================
+
+        case 'areas':
+
+            $sql = "
+                SELECT
+
+                    id,
+
+                    area_name
+
+                FROM areas
+
+                WHERE tenant_id = ?
+
+                ORDER BY area_name ASC
+            ";
+
+
+            $stmt = $pdo->prepare($sql);
+
+            $stmt->execute([
+                $tenant_id
+            ]);
+
+
+            echo json_encode([
+                'success' => true,
+                'data' => $stmt->fetchAll(PDO::FETCH_ASSOC)
+            ]);
+
+            break;
+
+
+        // =====================================================================
         // INVALID ACTION
         // =====================================================================
 
@@ -748,7 +935,10 @@ try {
                     'report',
                     'customers',
                     'branches',
-                    'products'
+                    'products',
+                    'salesmen',
+                    'cities',
+                    'areas'
                 ]
             ]);
 
