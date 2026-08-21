@@ -169,24 +169,26 @@ try {
     switch ($report_type) {
         case 'item':
             $stmt = $pdo->prepare("
-                SELECT 
-                    p.id as product_id,
-                    p.code as id,
-                    p.name,
-                    COALESCE(c.category_name, 'Uncategorized') as category,
-                    SUM(pii.quantity) as quantity,
-                    AVG(pii.purchase_price) as unit_price,
-                    SUM(pii.net_amount) as total,
-                    s.supplier_name as supplier
-                FROM purchase_invoice_items pii
-                JOIN purchase_invoice pi ON pii.purchase_invoice_id = pi.id
-                JOIN products p ON pii.product_id = p.id
-                LEFT JOIN categories c ON p.category_id = c.id
-                JOIN suppliers s ON pi.supplier_id = s.id
-                WHERE pi.tenant_id = ? AND pi.purchase_date BETWEEN ? AND ?{$company_filter}{$project_filter}{$supplier_filter}
-                GROUP BY p.id, p.code, p.name, c.category_name, s.supplier_name
-                ORDER BY total DESC
-            ");
+    SELECT 
+        p.id as product_id,
+        p.code as id,
+        p.name,
+        COALESCE(c.category_name, 'Uncategorized') as category,
+        GROUP_CONCAT(DISTINCT NULLIF(pii.batch_no,'') SEPARATOR ', ') as batch_no,
+        MIN(CASE WHEN pii.batch_expiry_date >= CURDATE() THEN pii.batch_expiry_date END) as nearest_expiry,
+        SUM(pii.quantity) as quantity,
+        AVG(pii.purchase_price) as unit_price,
+        SUM(pii.net_amount) as total,
+        s.supplier_name as supplier
+    FROM purchase_invoice_items pii
+    JOIN purchase_invoice pi ON pii.purchase_invoice_id = pi.id
+    JOIN products p ON pii.product_id = p.id
+    LEFT JOIN categories c ON p.category_id = c.id
+    JOIN suppliers s ON pi.supplier_id = s.id
+    WHERE pi.tenant_id = ? AND pi.purchase_date BETWEEN ? AND ?{$company_filter}{$project_filter}{$supplier_filter}
+    GROUP BY p.id, p.code, p.name, c.category_name, s.supplier_name
+    ORDER BY total DESC
+");
             $params = [$tenant_id, $start_date, $end_date];
             if ($company_id) $params[] = $company_id;
             if ($project_id) $params[] = $project_id;
@@ -225,16 +227,18 @@ try {
                     ];
                 }
                 
-                $data[] = [
-                    'id' => $row['id'],
-                    'name' => $row['name'],
-                    'category' => $row['category'],
-                    'quantity' => number_format($row['quantity'], 2),
-                    'unitPrice' => $currency_symbol . number_format($row['unit_price'], 2),
-                    'total' => $currency_symbol . number_format($row['total'], 2),
-                    'supplier' => $row['supplier'],
-                    'invoices' => $invoicesBreakdown
-                ];
+              $data[] = [
+    'id' => $row['id'],
+    'name' => $row['name'],
+    'category' => $row['category'],
+    'batchNo' => $row['batch_no'] ?: '-',
+    'expiryDate' => $row['nearest_expiry'] ? date('Y-m-d', strtotime($row['nearest_expiry'])) : '-',
+    'quantity' => number_format($row['quantity'], 2),
+    'unitPrice' => $currency_symbol . number_format($row['unit_price'], 2),
+    'total' => $currency_symbol . number_format($row['total'], 2),
+    'supplier' => $row['supplier'],
+    'invoices' => $invoicesBreakdown
+];
             }
             break;
             
