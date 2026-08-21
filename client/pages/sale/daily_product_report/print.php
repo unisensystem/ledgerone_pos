@@ -33,6 +33,15 @@ $batch_no = trim($_GET['batch_no'] ?? '');
 
 $expiry_date = $_GET['expiry_date'] ?? null;
 
+// Salesman (sale officer) filter
+$sale_officer_id = $_GET['sale_officer_id'] ?? null;
+
+// City filter (customer's city_id)
+$city_id = $_GET['city_id'] ?? null;
+
+// Area filter (customer's area_id)
+$area_id = $_GET['area_id'] ?? null;
+
 
 /*
 |--------------------------------------------------------------------------
@@ -115,6 +124,11 @@ try {
     | sale_invoice_items (sii).
     |
     | NO stock_ledger JOIN is required.
+    |
+    | Salesman filter uses si.sale_officer_id directly.
+    | City / Area filters use c.city_id / c.area_id directly,
+    | since customers already carries those columns.
+    | NO extra JOIN is required for filtering.
     |
     */
 
@@ -303,6 +317,63 @@ try {
         ";
 
         $params[] = $expiry_date;
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | SALESMAN (SALE OFFICER)
+    |--------------------------------------------------------------------------
+    |
+    | sale_officer_id is directly on sale_invoice (si).
+    |
+    */
+
+    if (!empty($sale_officer_id)) {
+
+        $sql .= "
+            AND si.sale_officer_id = ?
+        ";
+
+        $params[] = $sale_officer_id;
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | CITY
+    |--------------------------------------------------------------------------
+    |
+    | city_id is directly on customers (c).
+    |
+    */
+
+    if (!empty($city_id)) {
+
+        $sql .= "
+            AND c.city_id = ?
+        ";
+
+        $params[] = $city_id;
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | AREA
+    |--------------------------------------------------------------------------
+    |
+    | area_id is directly on customers (c).
+    |
+    */
+
+    if (!empty($area_id)) {
+
+        $sql .= "
+            AND c.area_id = ?
+        ";
+
+        $params[] = $area_id;
     }
 
 
