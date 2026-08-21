@@ -291,7 +291,7 @@ function populateProductTable() {
     tableBody.innerHTML = '';
 
     if (!reportData || !reportData.product_sales.length) {
-        tableBody.innerHTML = '<tr><td colspan="6" style="text-align:center">No data available</td></tr>';
+        tableBody.innerHTML = '<tr><td colspan="8" style="text-align:center">No data available</td></tr>';
         return;
     }
 
@@ -303,42 +303,52 @@ function populateProductTable() {
             const growthIcon = growth >= 0 ? 'fa-arrow-up' : 'fa-arrow-down';
             growthHtml = `<span class="card-change ${growthClass}"><i class="fas ${growthIcon}"></i> ${Math.abs(growth)}%</span>`;
         }
-        
+
         const isChild = item.parent_row_id || item.parent_product_id;
         const indent = isChild ? 'padding-left: 32px;' : '';
         const prefix = isChild ? '→ ' : '';
-        
+
+        const batchNo = item.batch_no || '-';
+        const expiryDate = item.nearest_expiry || '-';
+        const isExpiringSoon = item.nearest_expiry && (new Date(item.nearest_expiry) - new Date()) / (1000*60*60*24) <= 30;
+        const expiryHtml = isExpiringSoon
+            ? `<span style="color:#d64545; font-weight:600;">${expiryDate}</span>`
+            : expiryDate;
+
         const row = document.createElement('tr');
         row.style.cursor = 'pointer';
         row.className = 'product-row';
         row.setAttribute('data-search', `${item.product_id_display} ${item.product_name} ${item.category}`.toLowerCase());
         row.innerHTML = `
-            <td style="${indent}"><i class="fas fa-chevron-right" style="margin-right: 8px; transition: transform 0.3s;"></i>${item.product_id_display}</td>
-            <td style="${indent}">${prefix}${item.product_name}</td>
-            <td>${item.category}</td>
-            <td>${parseFloat(item.quantity_sold || 0).toLocaleString()}</td>
-            <td>${CURRENCY_SYMBOL}${parseFloat(item.revenue || 0).toLocaleString()}</td>
-            <td>${growthHtml}</td>
+            <td data-col="product_id" style="${indent}"><i class="fas fa-chevron-right" style="margin-right: 8px; transition: transform 0.3s;"></i>${item.product_id_display}</td>
+            <td data-col="product_name" style="${indent}">${prefix}${item.product_name}</td>
+            <td data-col="category">${item.category}</td>
+            <td data-col="batch_no">${batchNo}</td>
+            <td data-col="expiry_date">${expiryHtml}</td>
+            <td data-col="quantity_sold">${parseFloat(item.quantity_sold || 0).toLocaleString()}</td>
+            <td data-col="revenue">${CURRENCY_SYMBOL}${parseFloat(item.revenue || 0).toLocaleString()}</td>
+            <td data-col="growth">${growthHtml}</td>
         `;
-        
+
         const detailRow = document.createElement('tr');
         detailRow.style.display = 'none';
         detailRow.innerHTML = `
-            <td colspan="6" style="padding: 0;">
+            <td colspan="8" style="padding: 0;">
                 <div style="padding: 16px; background: #f7f9fc; border-left: 3px solid #2FBF71;">
                     <div style="font-weight: 600; margin-bottom: 8px;">Invoices Including This Product</div>
                     <div id="product-details-${index}">Loading...</div>
                 </div>
             </td>
         `;
-        
+
         row.addEventListener('click', () => toggleDetails(row, detailRow, 'product_invoices', item.product_id, index));
-        
+
         tableBody.appendChild(row);
         tableBody.appendChild(detailRow);
     });
     setupSearch('search-product', '.product-row', ['data-search']);
     setupPagination('productTableBody', 50);
+    setupColumnToggle('product');
 }
 
 function populateTerritoryTable() {
@@ -1044,6 +1054,42 @@ function setupSearch(inputId, rowSelector, dataAttributes) {
                 detailRow.style.display = 'none';
             }
         });
+    });
+}
+
+function setupColumnToggle(prefix) {
+    const btn = document.getElementById(`${prefix}-columns-btn`);
+    const menu = document.getElementById(`${prefix}-columns-menu`);
+    if (!btn || !menu || menu.dataset.built) return; // build only once
+
+    const table = btn.closest('.table-card').querySelector('table');
+    const headers = table.querySelectorAll('thead th[data-col]');
+
+    let html = '';
+    headers.forEach(th => {
+        const col = th.getAttribute('data-col');
+        html += `
+            <label style="display:flex; align-items:center; gap:8px; padding:4px 2px; font-size:13px; cursor:pointer;">
+                <input type="checkbox" checked data-toggle-col="${col}"> ${th.textContent}
+            </label>`;
+    });
+    menu.innerHTML = html;
+    menu.dataset.built = '1';
+
+    menu.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+        cb.addEventListener('change', () => {
+            const col = cb.getAttribute('data-toggle-col');
+            const cells = table.querySelectorAll(`[data-col="${col}"]`);
+            cells.forEach(c => c.style.display = cb.checked ? '' : 'none');
+        });
+    });
+
+    btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
+    });
+    document.addEventListener('click', (e) => {
+        if (!menu.contains(e.target) && e.target !== btn) menu.style.display = 'none';
     });
 }
 
