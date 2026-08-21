@@ -637,69 +637,111 @@ try {
             echo json_encode(['success' => true, 'data' => $ledger, 'currency' => $currency_symbol]);
             break;
 
-        case 'company-ledger':
-            // NOTE: despite the historical name "company", this report is Supplier/Vendor-wise.
-            // The $company_id GET param (kept for URL/JS backward-compatibility) now holds a
-            // suppliers.id value, and rows are matched against purchase_invoice.supplier_id.
-            $company_id = $_GET['company_id'] ?? null;
-            $branch_id = $_GET['branch_id'] ?? null;
-            $product_id = $_GET['product_id'] ?? null;
-            $from_date = $_GET['from_date'] ?? null;
-            $to_date = $_GET['to_date'] ?? null;
+    case 'company-ledger':
+    $company_id = $_GET['company_id'] ?? null;
+    $branch_id = $_GET['branch_id'] ?? null;
+    $product_id = $_GET['product_id'] ?? null;
+    $from_date = $_GET['from_date'] ?? null;
+    $to_date = $_GET['to_date'] ?? null;
 
-            if (!$company_id) {
-                echo json_encode(['success' => false, 'message' => 'Supplier required']);
-                exit;
-            }
+    if (!$company_id) {
+        echo json_encode(['success' => false, 'message' => 'Supplier required']);
+        exit;
+    }
 
-            $sql = "SELECT 
-                        sl.transaction_date,
-                        pi.bill_no as invoice_number,
-                        p.name as product_name,
-                        COALESCE(b.branch_name, 'No Branch') as branch_name,
-                        sl.transaction_type,
-                        sl.batch_no,
-                        sl.batch_expiry_date,
-                        sl.qty_in * COALESCE(CASE WHEN u.unit_scope = 'universal' THEN u.conversion_factor ELSE puc.conversion_factor END, 1) as qty_in,
-                        sl.qty_out * COALESCE(CASE WHEN u.unit_scope = 'universal' THEN u.conversion_factor ELSE puc.conversion_factor END, 1) as qty_out,
-                        sl.unit_cost,
-                        COALESCE(base_u.uom_name, u.uom_name, 'L') as unit_symbol
-                    FROM stock_ledger sl
-                    JOIN products p ON sl.product_id = p.id
-                    LEFT JOIN branches b ON sl.branch_id = b.id
-                    LEFT JOIN uom u ON sl.unit_id = u.id
-                    LEFT JOIN uom base_u ON COALESCE(u.base_unit_id, u.id) = base_u.id
-                    LEFT JOIN product_uom_conversions puc ON p.id = puc.product_id AND sl.unit_id = puc.uom_id
-                    JOIN purchase_invoice pi ON sl.reference_table = 'purchase_invoice' AND sl.reference_id = pi.id
-                    WHERE sl.tenant_id = ? AND p.product_type = 'physical' AND pi.supplier_id = ?";
+    $convFactor = "COALESCE(CASE WHEN u.unit_scope = 'universal' THEN u.conversion_factor ELSE puc.conversion_factor END, 1)";
 
-            $params = [$tenant_id, $company_id];
+    // ---- Purchase side: this supplier's Purchase Invoice + Purchase Return ----
+    $purchaseSql = "SELECT 
+                sl.transaction_date,
+                COALESCE(pi.bill_no, pr.bill_no) as invoice_number,
+                p.name as product_name,
+                COALESCE(b.branch_name, 'No Branch') as branch_name,
+                sl.transaction_type,
+                sl.batch_no,
+                sl.batch_expiry_date,
+                CASE WHEN sl.transaction_type LIKE '%FOC%' THEN 0 ELSE sl.qty_in * {$convFactor} END as qty_in,
+                CASE WHEN sl.transaction_type LIKE '%FOC%' THEN 0 ELSE sl.qty_out * {$convFactor} END as qty_out,
+                CASE WHEN sl.transaction_type LIKE '%FOC%' THEN sl.qty_out * {$convFactor} ELSE 0 END as qty_foc,
+                sl.unit_cost,
+                COALESCE(base_u.uom_name, u.uom_name, 'L') as unit_symbol
+            FROM stock_ledger sl
+            JOIN products p ON sl.product_id = p.id
+            LEFT JOIN branches b ON sl.branch_id = b.id
+            LEFT JOIN uom u ON sl.unit_id = u.id
+            LEFT JOIN uom base_u ON COALESCE(u.base_unit_id, u.id) = base_u.id
+            LEFT JOIN product_uom_conversions puc ON p.id = puc.product_id AND sl.unit_id = puc.uom_id
+            LEFT JOIN purchase_invoice pi ON sl.reference_table = 'purchase_invoice' AND sl.reference_id = pi.id
+            LEFT JOIN purchase_return pr ON sl.reference_table = 'purchase_return' AND sl.reference_id = pr.id
+            WHERE sl.tenant_id = ? AND p.product_type = 'physical'
+              AND COALESCE(pi.supplier_id, pr.supplier_id) = ?";
 
-            if ($branch_id) {
-                $sql .= " AND sl.branch_id = ?";
-                $params[] = $branch_id;
-            }
-            if ($product_id) {
-                $sql .= " AND p.id = ?";
-                $params[] = $product_id;
-            }
-            if ($from_date) {
-                $sql .= " AND sl.transaction_date >= ?";
-                $params[] = $from_date;
-            }
-            if ($to_date) {
-                $sql .= " AND sl.transaction_date <= ?";
-                $params[] = $to_date;
-            }
+    $purchaseParams = [$tenant_id, $company_id];
 
-            $sql .= " ORDER BY sl.transaction_date ASC, sl.id ASC";
+    if ($branch_id)  { $purchaseSql .= " AND sl.branch_id = ?"; $purchaseParams[] = $branch_id; }
+    if ($product_id) { $purchaseSql .= " AND p.id = ?"; $purchaseParams[] = $product_id; }
+    if ($from_date)  { $purchaseSql .= " AND sl.transaction_date >= ?"; $purchaseParams[] = $from_date; }
+    if ($to_date)    { $purchaseSql .= " AND sl.transaction_date <= ?"; $purchaseParams[] = $to_date; }
 
-            $stmt = $pdo->prepare($sql);
-            $stmt->execute($params);
-            $ledger = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    // ---- Sale side: sales of products bought from this supplier ----
+    $saleSql = "SELECT 
+                sl.transaction_date,
+                COALESCE(si.bill_no, srt.bill_no) as invoice_number,
+                p.name as product_name,
+                COALESCE(b.branch_name, 'No Branch') as branch_name,
+                sl.transaction_type,
+                sl.batch_no,
+                sl.batch_expiry_date,
+                CASE WHEN sl.transaction_type LIKE '%FOC%' THEN 0 ELSE sl.qty_in * {$convFactor} END as qty_in,
+                CASE WHEN sl.transaction_type LIKE '%FOC%' THEN 0 ELSE sl.qty_out * {$convFactor} END as qty_out,
+                CASE WHEN sl.transaction_type LIKE '%FOC%' THEN sl.qty_out * {$convFactor} ELSE 0 END as qty_foc,
+                sl.unit_cost,
+                COALESCE(base_u.uom_name, u.uom_name, 'L') as unit_symbol
+            FROM stock_ledger sl
+            JOIN products p ON sl.product_id = p.id
+            LEFT JOIN branches b ON sl.branch_id = b.id
+            LEFT JOIN uom u ON sl.unit_id = u.id
+            LEFT JOIN uom base_u ON COALESCE(u.base_unit_id, u.id) = base_u.id
+            LEFT JOIN product_uom_conversions puc ON p.id = puc.product_id AND sl.unit_id = puc.uom_id
+            LEFT JOIN sale_invoice si ON sl.reference_table = 'sale_invoice' AND sl.reference_id = si.id
+            LEFT JOIN sale_return srt ON sl.reference_table = 'sale_return' AND sl.reference_id = srt.id
+            WHERE sl.tenant_id = ? AND p.product_type = 'physical'
+              AND sl.reference_table IN ('sale_invoice','sale_return')";
 
-            echo json_encode(['success' => true, 'data' => $ledger, 'currency' => $currency_symbol]);
-            break;
+    $saleParams = [$tenant_id];
+
+    if ($product_id) {
+        // narrowed to one product — simple direct match
+        $saleSql .= " AND p.id = ?";
+        $saleParams[] = $product_id;
+    } else {
+        // no product picked — match any product this supplier has supplied
+        $saleSql .= " AND p.id IN (
+            SELECT DISTINCT sl2.product_id
+            FROM stock_ledger sl2
+            LEFT JOIN purchase_invoice pi2 ON sl2.reference_table = 'purchase_invoice' AND sl2.reference_id = pi2.id
+            LEFT JOIN purchase_return pr2 ON sl2.reference_table = 'purchase_return' AND sl2.reference_id = pr2.id
+            WHERE sl2.tenant_id = ? AND COALESCE(pi2.supplier_id, pr2.supplier_id) = ?
+        )";
+        $saleParams[] = $tenant_id;
+        $saleParams[] = $company_id;
+    }
+
+    if ($branch_id) { $saleSql .= " AND sl.branch_id = ?"; $saleParams[] = $branch_id; }
+    if ($from_date) { $saleSql .= " AND sl.transaction_date >= ?"; $saleParams[] = $from_date; }
+    if ($to_date)   { $saleSql .= " AND sl.transaction_date <= ?"; $saleParams[] = $to_date; }
+
+    $sql = "({$purchaseSql}) UNION ALL ({$saleSql})";
+    $params = array_merge($purchaseParams, $saleParams);
+
+    $sql = "SELECT * FROM ({$sql}) combined ORDER BY transaction_date ASC";
+
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute($params);
+    $ledger = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    echo json_encode(['success' => true, 'data' => $ledger, 'currency' => $currency_symbol]);
+    break;
 
         case 'customers':
             $customers_sql = "SELECT id, customer_name FROM customers WHERE tenant_id = ? AND status = 'ACTIVE' ORDER BY customer_name";
