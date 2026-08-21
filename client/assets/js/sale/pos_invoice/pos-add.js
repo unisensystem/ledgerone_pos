@@ -4516,15 +4516,17 @@ function loadInvoiceSettings() {
     document.getElementById('enableAmountPaidPaymentMethod').checked = localStorage.getItem('enableAmountPaidPaymentMethod') === 'true';
     document.getElementById('enableExtraDiscount1').checked = localStorage.getItem('enableExtraDiscount1') === 'true';
     document.getElementById('enableExtraDiscount2').checked = localStorage.getItem('enableExtraDiscount2') === 'true';
-    document.getElementById('enableBatchNo').checked = localStorage.getItem('enableBatchNo') !== 'false';
-document.getElementById('enableExpiryDate').checked = localStorage.getItem('enableExpiryDate') !== 'false';
-    // Taxation / Extra Discount checkboxes only exist on med_pos_invoice's settings
-    // modal — guard their absence on the regular POS invoice page, which doesn't
-    // have these controls.
+    // Taxation / Extra Discount / Batch No / Expiry Date checkboxes only exist on
+    // med_pos_invoice's settings modal — guard their absence on the regular POS
+    // invoice page, which doesn't have these controls.
     const enableTaxationCheckbox = document.getElementById('enableTaxation');
     if (enableTaxationCheckbox) enableTaxationCheckbox.checked = isTaxationEnabled();
     const enableExtraDiscountItemCheckbox = document.getElementById('enableExtraDiscountItem');
     if (enableExtraDiscountItemCheckbox) enableExtraDiscountItemCheckbox.checked = localStorage.getItem('enableExtraDiscountItem') !== 'false';
+    const enableBatchNoCheckbox = document.getElementById('enableBatchNo');
+    if (enableBatchNoCheckbox) enableBatchNoCheckbox.checked = localStorage.getItem('enableBatchNo') !== 'false';
+    const enableExpiryDateCheckbox = document.getElementById('enableExpiryDate');
+    if (enableExpiryDateCheckbox) enableExpiryDateCheckbox.checked = localStorage.getItem('enableExpiryDate') !== 'false';
 }
 
 // Save invoice settings to localStorage
@@ -4562,16 +4564,18 @@ function saveInvoiceSettings() {
     localStorage.setItem('enableExtraDiscount2', document.getElementById('enableExtraDiscount2').checked);
     localStorage.setItem('enableShippingFees', document.getElementById('enableShippingFees').checked);
     localStorage.setItem('enablePrintQRCode', document.getElementById('enablePrintQRCode').checked);
-    localStorage.setItem('enableBatchNo', document.getElementById('enableBatchNo').checked);
-localStorage.setItem('enableExpiryDate', document.getElementById('enableExpiryDate').checked);
     localStorage.setItem('enableAmountPaidPaymentMethod', document.getElementById('enableAmountPaidPaymentMethod').checked);
-    // Taxation / Extra Discount checkboxes only exist on med_pos_invoice's settings
-    // modal — guard their absence on the regular POS invoice page, which doesn't
-    // have these controls.
+    // Taxation / Extra Discount / Batch No / Expiry Date checkboxes only exist on
+    // med_pos_invoice's settings modal — guard their absence on the regular POS
+    // invoice page, which doesn't have these controls.
     const enableTaxationCheckbox = document.getElementById('enableTaxation');
     if (enableTaxationCheckbox) localStorage.setItem('enableTaxation', enableTaxationCheckbox.checked);
     const enableExtraDiscountItemCheckbox = document.getElementById('enableExtraDiscountItem');
     if (enableExtraDiscountItemCheckbox) localStorage.setItem('enableExtraDiscountItem', enableExtraDiscountItemCheckbox.checked);
+    const enableBatchNoCheckbox = document.getElementById('enableBatchNo');
+    if (enableBatchNoCheckbox) localStorage.setItem('enableBatchNo', enableBatchNoCheckbox.checked);
+    const enableExpiryDateCheckbox = document.getElementById('enableExpiryDate');
+    if (enableExpiryDateCheckbox) localStorage.setItem('enableExpiryDate', enableExpiryDateCheckbox.checked);
     alert('Invoice settings saved successfully!');
 
     // Refresh product dropdowns if display mode changed
@@ -6000,33 +6004,38 @@ async function addRowDynamic() {
     const schemeDropdown = createSchemeCell(row);
     schemeCell.appendChild(schemeDropdown);
 
-   // Batch No (dropdown — auto-selects FEFO batch, user can pick another; inserted at fixed index 3)
-    const batchNoCell = row.insertCell(3);
-    batchNoCell.className = 'batch-no-cell';
-    const batchNoInput = document.createElement('select');
-    batchNoInput.className = 'table-input batch-no-input';
-    batchNoInput.innerHTML = '<option value="">No Batch</option>';
-    batchNoInput.style.color = '#000000';
-    batchNoInput.style.fontWeight = '600';
-    batchNoCell.appendChild(batchNoInput);
+   // Batch No / Expiry Date — med_pos_invoice only: the column doesn't exist
+    // in the regular POS invoice's table markup, so inserting it there would
+    // leave headerless/footerless cells (same pattern as Extra Discount below).
+    const batchOffset = isMedInvoicePage ? 2 : 0;
+    if (isMedInvoicePage) {
+        // Batch No (dropdown — auto-selects FEFO batch, user can pick another; inserted at fixed index 3)
+        const batchNoCell = row.insertCell(3);
+        batchNoCell.className = 'batch-no-cell';
+        const batchNoInput = document.createElement('select');
+        batchNoInput.className = 'table-input batch-no-input';
+        batchNoInput.innerHTML = '<option value="">No Batch</option>';
+        batchNoInput.style.color = '#000000';
+        batchNoInput.style.fontWeight = '600';
+        batchNoCell.appendChild(batchNoInput);
 
-    // Expiry Date (auto-filled, read-only, inserted at fixed index 4)
-    const batchExpiryCell = row.insertCell(4);
-    batchExpiryCell.className = 'batch-expiry-cell';
-    const batchExpiryInput = document.createElement('input');
-    batchExpiryInput.type = 'text';
-    batchExpiryInput.className = 'table-input batch-expiry-input';
-    batchExpiryInput.readOnly = true;
-    batchExpiryInput.tabIndex = -1;
-    batchExpiryInput.style.color = '#000000';
-    batchExpiryInput.style.fontWeight = '600';
-    batchExpiryInput.style.opacity = '1';
-    batchExpiryInput.style.webkitTextFillColor = '#000000';
-    batchExpiryCell.appendChild(batchExpiryInput);
+        // Expiry Date (auto-filled, read-only, inserted at fixed index 4)
+        const batchExpiryCell = row.insertCell(4);
+        batchExpiryCell.className = 'batch-expiry-cell';
+        const batchExpiryInput = document.createElement('input');
+        batchExpiryInput.type = 'text';
+        batchExpiryInput.className = 'table-input batch-expiry-input';
+        batchExpiryInput.readOnly = true;
+        batchExpiryInput.tabIndex = -1;
+        batchExpiryInput.style.color = '#000000';
+        batchExpiryInput.style.fontWeight = '600';
+        batchExpiryInput.style.opacity = '1';
+        batchExpiryInput.style.webkitTextFillColor = '#000000';
+        batchExpiryCell.appendChild(batchExpiryInput);
+    }
 
-    // Unit cells will be added dynamically (inserted starting at index 5)
     // Price
-    const priceCell = row.insertCell(5);
+    const priceCell = row.insertCell(3 + batchOffset);
     
     // Unit cells will be added dynamically (inserted starting at index 3)
     // Price
@@ -6075,7 +6084,7 @@ async function addRowDynamic() {
     priceCell.appendChild(priceInput);
     
     // Gross Amount
-    const grossCell = row.insertCell(6);
+    const grossCell = row.insertCell(4 + batchOffset);
     grossCell.className = 'gross-cell';
     const grossInput = document.createElement('input');
     grossInput.type = 'text';
@@ -6086,7 +6095,7 @@ async function addRowDynamic() {
     grossCell.appendChild(grossInput);
     
     // Discount %
-    const discPercentCell = row.insertCell(7);
+    const discPercentCell = row.insertCell(5 + batchOffset);
     discPercentCell.className = 'disc-percent-cell';
     const discPercentInput = document.createElement('input');
     discPercentInput.type = 'number';
@@ -6109,7 +6118,7 @@ async function addRowDynamic() {
     discPercentCell.appendChild(discPercentInput);
     
     // Discount Amount
-    const discAmountCell = row.insertCell(8);
+    const discAmountCell = row.insertCell(6 + batchOffset);
     discAmountCell.className = 'disc-amount-cell';
     const discAmountInput = document.createElement('input');
     discAmountInput.type = 'number';
@@ -6136,7 +6145,7 @@ async function addRowDynamic() {
     // inserting it there would leave a headerless/footerless cell.
     const extraDiscOffset = isMedInvoicePage ? 1 : 0;
     if (isMedInvoicePage) {
-        const extraDiscCell = row.insertCell(9);
+        const extraDiscCell = row.insertCell(7 + batchOffset);
         extraDiscCell.className = 'extra-disc-cell';
         const extraDiscInput = document.createElement('input');
         extraDiscInput.type = 'number';
@@ -6161,7 +6170,7 @@ async function addRowDynamic() {
     }
 
     // TO Amount
-    const toAmountCell = row.insertCell(9 + extraDiscOffset);
+    const toAmountCell = row.insertCell(7 + batchOffset + extraDiscOffset);
     toAmountCell.className = 'to-amount-cell';
     const toAmountInput = document.createElement('input');
     toAmountInput.type = 'number';
@@ -6172,7 +6181,7 @@ async function addRowDynamic() {
     toAmountCell.appendChild(toAmountInput);
     
     // GST %
-    const taxPercentCell = row.insertCell(10 + extraDiscOffset);
+    const taxPercentCell = row.insertCell(8 + batchOffset + extraDiscOffset);
     taxPercentCell.className = 'tax-percent-cell';
     const taxPercentInput = document.createElement('input');
     taxPercentInput.type = 'number';
@@ -6195,7 +6204,7 @@ async function addRowDynamic() {
     taxPercentCell.appendChild(taxPercentInput);
     
     // GST Amount
-    const taxAmountCell = row.insertCell(11 + extraDiscOffset);
+    const taxAmountCell = row.insertCell(9 + batchOffset + extraDiscOffset);
     taxAmountCell.className = 'tax-amount-cell';
     const taxAmountInput = document.createElement('input');
     taxAmountInput.type = 'number';
@@ -6206,7 +6215,7 @@ async function addRowDynamic() {
     taxAmountCell.appendChild(taxAmountInput);
     
     // FOC Qty
-    const focCell = row.insertCell(12 + extraDiscOffset);
+    const focCell = row.insertCell(10 + batchOffset + extraDiscOffset);
     focCell.className = 'foc-cell';
     const focInput = document.createElement('input');
     focInput.type = 'number';
@@ -6217,7 +6226,7 @@ async function addRowDynamic() {
     focCell.appendChild(focInput);
     
     // Net Amount
-    const netCell = row.insertCell(13 + extraDiscOffset);
+    const netCell = row.insertCell(11 + batchOffset + extraDiscOffset);
     netCell.className = 'net-cell';
     const netInput = document.createElement('input');
     netInput.type = 'text';
@@ -6228,7 +6237,7 @@ async function addRowDynamic() {
     netCell.appendChild(netInput);
     
     // Actions
-    const actionsCell = row.insertCell(14 + extraDiscOffset);
+    const actionsCell = row.insertCell(12 + batchOffset + extraDiscOffset);
     const deleteBtn = document.createElement('button');
     deleteBtn.type = 'button';
     deleteBtn.className = 'btn btn-danger btn-sm';

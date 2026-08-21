@@ -1,5 +1,9 @@
 const API_BASE = '../../../../server/api/inventory/stock_position/stock-position.php';
 
+function escLedger(v) {
+    return String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
 // Pagination variables
 let currentPage = 1;
 const itemsPerPage = 20;  // Increased from 10 to show more rows per page (fixes FOC pagination issue)
@@ -659,17 +663,17 @@ function updatePositionTable(currency = '$') {
         const isChild = pos.parent_product_id;
         const hasChildren = !isChild && pageData.some(p => p.parent_product_id === pos.product_id);
         const toggleBtn = hasChildren ? `<i class="fas fa-chevron-down" style="cursor: pointer; margin-right: 8px;" onclick="toggleChildren(${pos.product_id})"></i>` : '';
-        const productDisplay = isChild ? `<span style="margin-left: 28px; color: var(--subtext);">↳ ${pos.product_name}</span>` : `${toggleBtn}${pos.product_name}`;
-        
+        const productDisplay = isChild ? `<span style="margin-left: 28px; color: var(--subtext);">↳ ${escLedger(pos.product_name)}</span>` : `${toggleBtn}${escLedger(pos.product_name)}`;
+
         return `
         <tr class="${isChild ? 'child-row' : 'parent-row'}" data-product-id="${pos.product_id}" data-parent-id="${pos.parent_product_id || ''}" style="${isChild ? 'background-color: var(--table-row-alt);' : ''}">
             <td>${productDisplay}</td>
-            <td class="col-branch">${pos.branch_display}</td>
-            <td class="col-inventory-type">${pos.inventory_type || '-'}</td>
-            <td class="col-opening-balance">${parseFloat(pos.opening_balance || 0).toFixed(2)} ${pos.unit_symbol || 'L'}</td>
-            <td class="col-qty-in">${parseFloat(pos.total_qty_in || 0).toFixed(2)} ${pos.unit_symbol || 'L'}</td>
-            <td class="col-qty-out">${parseFloat(pos.total_qty_out || 0).toFixed(2)} ${pos.unit_symbol || 'L'}</td>
-            <td class="col-current-stock">${parseFloat(pos.current_stock).toFixed(2)} ${pos.unit_symbol || 'L'}</td>
+            <td class="col-branch">${escLedger(pos.branch_display)}</td>
+            <td class="col-inventory-type">${escLedger(pos.inventory_type || '-')}</td>
+            <td class="col-opening-balance">${parseFloat(pos.opening_balance || 0).toFixed(2)} ${escLedger(pos.unit_symbol || 'L')}</td>
+            <td class="col-qty-in">${parseFloat(pos.total_qty_in || 0).toFixed(2)} ${escLedger(pos.unit_symbol || 'L')}</td>
+            <td class="col-qty-out">${parseFloat(pos.total_qty_out || 0).toFixed(2)} ${escLedger(pos.unit_symbol || 'L')}</td>
+            <td class="col-current-stock">${parseFloat(pos.current_stock).toFixed(2)} ${escLedger(pos.unit_symbol || 'L')}</td>
             <td class="col-unit-cost">${currency}${parseFloat(pos.unit_cost).toFixed(2)}</td>
             <td class="col-stock-value">${currency}${parseFloat(pos.stock_value).toFixed(2)}</td>
             <td class="col-status"><span class="status-badge status-${pos.status}">${pos.status.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase())}</span></td>
@@ -754,21 +758,21 @@ function renderLedgerTable(currency = '$') {
 tbody.innerHTML = pageData.map(entry => `
     <tr>
         <td>${entry.transaction_date}</td>
-        <td><span class="transaction-badge transaction-${entry.transaction_type.toLowerCase().replace(' ', '-')}">${entry.transaction_type}</span></td>
-        <td>${entry.batch_no || '-'}</td>
-        <td>${entry.batch_expiry_date || '-'}</td>
-        <td>${entry.qty_in > 0 ? parseFloat(entry.qty_in).toFixed(2) + ' ' + (entry.unit_symbol || 'L') : '-'}</td>
-        <td>${entry.qty_out > 0 ? parseFloat(entry.qty_out).toFixed(2) + ' ' + (entry.unit_symbol || 'L') : '-'}</td>
-        <td>${parseFloat(entry.balance).toFixed(2)} ${entry.unit_symbol || 'L'}</td>
+        <td><span class="transaction-badge transaction-${entry.transaction_type.toLowerCase().replace(' ', '-')}">${escLedger(entry.transaction_type)}</span></td>
+        <td>${escLedger(entry.batch_no || '-')}</td>
+        <td>${escLedger(entry.batch_expiry_date || '-')}</td>
+        <td>${entry.qty_in > 0 ? parseFloat(entry.qty_in).toFixed(2) + ' ' + escLedger(entry.unit_symbol || 'L') : '-'}</td>
+        <td>${entry.qty_out > 0 ? parseFloat(entry.qty_out).toFixed(2) + ' ' + escLedger(entry.unit_symbol || 'L') : '-'}</td>
+        <td>${parseFloat(entry.balance).toFixed(2)} ${escLedger(entry.unit_symbol || 'L')}</td>
         <td>${currency}${parseFloat(entry.unit_cost).toFixed(2)}</td>
         <td>${currency}${parseFloat(entry.value).toFixed(2)}</td>
     </tr>
 `).join('') + `
     <tr style="font-weight: bold; background-color: var(--table-header);">
         <td colspan="4">Total (${allLedgerEntries.length} transactions)</td>
-        <td>${totalQtyIn.toFixed(2)} ${allLedgerEntries[0]?.unit_symbol || 'L'}</td>
-        <td>${totalQtyOut.toFixed(2)} ${allLedgerEntries[0]?.unit_symbol || 'L'}</td>
-        <td>${finalBalance.toFixed(2)} ${allLedgerEntries[0]?.unit_symbol || 'L'}</td>
+        <td>${totalQtyIn.toFixed(2)} ${escLedger(allLedgerEntries[0]?.unit_symbol || 'L')}</td>
+        <td>${totalQtyOut.toFixed(2)} ${escLedger(allLedgerEntries[0]?.unit_symbol || 'L')}</td>
+        <td>${finalBalance.toFixed(2)} ${escLedger(allLedgerEntries[0]?.unit_symbol || 'L')}</td>
         <td>-</td>
         <td>${currency}${finalValue.toFixed(2)}</td>
     </tr>
@@ -898,23 +902,23 @@ function renderDetailedLedgerTable(currency = '$') {
    tbody.innerHTML = pageData.map(entry => `
     <tr>
         <td>${entry.transaction_date}</td>
-        <td>${entry.product_name}</td>
-        <td>${entry.branch_name}</td>
-        <td><span class="transaction-badge transaction-${entry.transaction_type.toLowerCase().replace(' ', '-')}">${entry.transaction_type}</span></td>
-        <td>${entry.batch_no || '-'}</td>
-        <td>${entry.batch_expiry_date || '-'}</td>
-        <td>${entry.qty_in > 0 ? parseFloat(entry.qty_in).toFixed(2) + ' ' + (entry.unit_symbol || 'L') : '-'}</td>
-        <td>${entry.qty_out > 0 ? parseFloat(entry.qty_out).toFixed(2) + ' ' + (entry.unit_symbol || 'L') : '-'}</td>
-        <td>${parseFloat(entry.balance).toFixed(2)} ${entry.unit_symbol || 'L'}</td>
+        <td>${escLedger(entry.product_name)}</td>
+        <td>${escLedger(entry.branch_name)}</td>
+        <td><span class="transaction-badge transaction-${entry.transaction_type.toLowerCase().replace(' ', '-')}">${escLedger(entry.transaction_type)}</span></td>
+        <td>${escLedger(entry.batch_no || '-')}</td>
+        <td>${escLedger(entry.batch_expiry_date || '-')}</td>
+        <td>${entry.qty_in > 0 ? parseFloat(entry.qty_in).toFixed(2) + ' ' + escLedger(entry.unit_symbol || 'L') : '-'}</td>
+        <td>${entry.qty_out > 0 ? parseFloat(entry.qty_out).toFixed(2) + ' ' + escLedger(entry.unit_symbol || 'L') : '-'}</td>
+        <td>${parseFloat(entry.balance).toFixed(2)} ${escLedger(entry.unit_symbol || 'L')}</td>
         <td>${currency}${parseFloat(entry.unit_cost).toFixed(2)}</td>
         <td>${currency}${parseFloat(entry.value).toFixed(2)}</td>
     </tr>
 `).join('') + `
     <tr style="font-weight: bold; background-color: var(--table-header);">
         <td colspan="6">Total (${allDetailedEntries.length} transactions)</td>
-        <td>${totalQtyIn.toFixed(2)} ${allDetailedEntries[0]?.unit_symbol || 'L'}</td>
-        <td>${totalQtyOut.toFixed(2)} ${allDetailedEntries[0]?.unit_symbol || 'L'}</td>
-        <td>${totalBalance.toFixed(2)} ${allDetailedEntries[0]?.unit_symbol || 'L'}</td>
+        <td>${totalQtyIn.toFixed(2)} ${escLedger(allDetailedEntries[0]?.unit_symbol || 'L')}</td>
+        <td>${totalQtyOut.toFixed(2)} ${escLedger(allDetailedEntries[0]?.unit_symbol || 'L')}</td>
+        <td>${totalBalance.toFixed(2)} ${escLedger(allDetailedEntries[0]?.unit_symbol || 'L')}</td>
         <td>-</td>
         <td>${currency}${totalValue.toFixed(2)}</td>
     </tr>
@@ -960,10 +964,10 @@ function renderBranchLedgerTable(currency = '$') {
     tbody.innerHTML = pageData.map(entry => `
         <tr>
             <td>${entry.transaction_date}</td>
-            <td>${entry.product_name}</td>
-            <td><span class="transaction-badge transaction-${entry.transaction_type.toLowerCase().replace(' ', '-')}">${entry.transaction_type}</span></td>
-            <td>${entry.qty_in > 0 ? parseFloat(entry.qty_in).toFixed(2) + ' ' + (entry.unit_symbol || 'L') : '-'}</td>
-            <td>${entry.qty_out > 0 ? parseFloat(entry.qty_out).toFixed(2) + ' ' + (entry.unit_symbol || 'L') : '-'}</td>
+            <td>${escLedger(entry.product_name)}</td>
+            <td><span class="transaction-badge transaction-${entry.transaction_type.toLowerCase().replace(' ', '-')}">${escLedger(entry.transaction_type)}</span></td>
+            <td>${entry.qty_in > 0 ? parseFloat(entry.qty_in).toFixed(2) + ' ' + escLedger(entry.unit_symbol || 'L') : '-'}</td>
+            <td>${entry.qty_out > 0 ? parseFloat(entry.qty_out).toFixed(2) + ' ' + escLedger(entry.unit_symbol || 'L') : '-'}</td>
             <td>-</td>
             <td>${currency}${parseFloat(entry.unit_cost).toFixed(2)}</td>
             <td>${currency}${((parseFloat(entry.qty_in || 0) - parseFloat(entry.qty_out || 0)) * parseFloat(entry.unit_cost)).toFixed(2)}</td>
@@ -971,8 +975,8 @@ function renderBranchLedgerTable(currency = '$') {
     `).join('') + `
         <tr style="font-weight: bold; background-color: var(--table-header);">
             <td colspan="3">Total (${allBranchEntries.length} transactions)</td>
-            <td>${totalQtyIn.toFixed(2)} ${allBranchEntries[0]?.unit_symbol || 'L'}</td>
-            <td>${totalQtyOut.toFixed(2)} ${allBranchEntries[0]?.unit_symbol || 'L'}</td>
+            <td>${totalQtyIn.toFixed(2)} ${escLedger(allBranchEntries[0]?.unit_symbol || 'L')}</td>
+            <td>${totalQtyOut.toFixed(2)} ${escLedger(allBranchEntries[0]?.unit_symbol || 'L')}</td>
             <td>${totalBalance.toFixed(2)} ${allBranchEntries[0]?.unit_symbol || 'L'}</td>
             <td>-</td>
             <td>${currency}${totalValue.toFixed(2)}</td>
@@ -1025,23 +1029,23 @@ function renderCustomerLedgerTable(currency = '$') {
 tbody.innerHTML = pageData.map(entry => `
     <tr>
         <td>${entry.transaction_date}</td>
-        <td>${entry.invoice_number || '-'}</td>
-        <td>${entry.product_name}</td>
-        <td>${entry.branch_name}</td>
-        <td><span class="transaction-badge transaction-${entry.transaction_type.toLowerCase().replace(' ', '-')}">${entry.transaction_type}</span></td>
-        <td>${entry.batch_no || '-'}</td>
-        <td>${entry.batch_expiry_date || '-'}</td>
-        <td>${entry.qty_in > 0 ? parseFloat(entry.qty_in).toFixed(2) + ' ' + (entry.unit_symbol || 'L') : '-'}</td>
-        <td>${entry.qty_out > 0 ? parseFloat(entry.qty_out).toFixed(2) + ' ' + (entry.unit_symbol || 'L') : '-'}</td>
-        <td>${parseFloat(entry.balance).toFixed(2)} ${entry.unit_symbol || 'L'}</td>
+        <td>${escLedger(entry.invoice_number || '-')}</td>
+        <td>${escLedger(entry.product_name)}</td>
+        <td>${escLedger(entry.branch_name)}</td>
+        <td><span class="transaction-badge transaction-${entry.transaction_type.toLowerCase().replace(' ', '-')}">${escLedger(entry.transaction_type)}</span></td>
+        <td>${escLedger(entry.batch_no || '-')}</td>
+        <td>${escLedger(entry.batch_expiry_date || '-')}</td>
+        <td>${entry.qty_in > 0 ? parseFloat(entry.qty_in).toFixed(2) + ' ' + escLedger(entry.unit_symbol || 'L') : '-'}</td>
+        <td>${entry.qty_out > 0 ? parseFloat(entry.qty_out).toFixed(2) + ' ' + escLedger(entry.unit_symbol || 'L') : '-'}</td>
+        <td>${parseFloat(entry.balance).toFixed(2)} ${escLedger(entry.unit_symbol || 'L')}</td>
         <td>${currency}${parseFloat(entry.unit_cost).toFixed(2)}</td>
         <td>${currency}${parseFloat(entry.value).toFixed(2)}</td>
     </tr>
 `).join('') + `
     <tr style="font-weight: bold; background-color: var(--table-header);">
         <td colspan="7">Total (${allCustomerEntries.length} transactions)</td>
-        <td>${totalQtyIn.toFixed(2)} ${allCustomerEntries[0]?.unit_symbol || 'L'}</td>
-        <td>${totalQtyOut.toFixed(2)} ${allCustomerEntries[0]?.unit_symbol || 'L'}</td>
+        <td>${totalQtyIn.toFixed(2)} ${escLedger(allCustomerEntries[0]?.unit_symbol || 'L')}</td>
+        <td>${totalQtyOut.toFixed(2)} ${escLedger(allCustomerEntries[0]?.unit_symbol || 'L')}</td>
         <td>-</td>
         <td>-</td>
         <td>${currency}${totalValue.toFixed(2)}</td>
@@ -1095,25 +1099,25 @@ function renderCompanyLedgerTable(currency = '$') {
     tbody.innerHTML = pageData.map(entry => `
         <tr>
             <td>${entry.transaction_date}</td>
-            <td>${entry.invoice_number || '-'}</td>
-            <td>${entry.product_name}</td>
-            <td>${entry.batch_no || '-'}</td>
-            <td>${entry.batch_expiry_date || '-'}</td>
-            <td>${entry.branch_name}</td>
-            <td><span class="transaction-badge transaction-${entry.transaction_type.toLowerCase().replace(' ', '-')}">${entry.transaction_type}</span></td>
-            <td>${entry.qty_in > 0 ? parseFloat(entry.qty_in).toFixed(2) + ' ' + (entry.unit_symbol || 'L') : '-'}</td>
-            <td>${entry.qty_out > 0 ? parseFloat(entry.qty_out).toFixed(2) + ' ' + (entry.unit_symbol || 'L') : '-'}</td>
-            <td>${entry.qty_foc > 0 ? parseFloat(entry.qty_foc).toFixed(2) + ' ' + (entry.unit_symbol || 'L') : '-'}</td>
-            <td>${parseFloat(entry.balance).toFixed(2)} ${entry.unit_symbol || 'L'}</td>
+            <td>${escLedger(entry.invoice_number || '-')}</td>
+            <td>${escLedger(entry.product_name)}</td>
+            <td>${escLedger(entry.batch_no || '-')}</td>
+            <td>${escLedger(entry.batch_expiry_date || '-')}</td>
+            <td>${escLedger(entry.branch_name)}</td>
+            <td><span class="transaction-badge transaction-${entry.transaction_type.toLowerCase().replace(' ', '-')}">${escLedger(entry.transaction_type)}</span></td>
+            <td>${entry.qty_in > 0 ? parseFloat(entry.qty_in).toFixed(2) + ' ' + escLedger(entry.unit_symbol || 'L') : '-'}</td>
+            <td>${entry.qty_out > 0 ? parseFloat(entry.qty_out).toFixed(2) + ' ' + escLedger(entry.unit_symbol || 'L') : '-'}</td>
+            <td>${entry.qty_foc > 0 ? parseFloat(entry.qty_foc).toFixed(2) + ' ' + escLedger(entry.unit_symbol || 'L') : '-'}</td>
+            <td>${parseFloat(entry.balance).toFixed(2)} ${escLedger(entry.unit_symbol || 'L')}</td>
             <td>${currency}${parseFloat(entry.unit_cost).toFixed(2)}</td>
             <td>${currency}${parseFloat(entry.value).toFixed(2)}</td>
         </tr>
     `).join('') + `
         <tr style="font-weight: bold; background-color: var(--table-header);">
             <td colspan="7">Total (${allCompanyEntries.length} transactions)</td>
-            <td>${totalQtyIn.toFixed(2)} ${allCompanyEntries[0]?.unit_symbol || 'L'}</td>
-            <td>${totalQtyOut.toFixed(2)} ${allCompanyEntries[0]?.unit_symbol || 'L'}</td>
-            <td>${totalFoc.toFixed(2)} ${allCompanyEntries[0]?.unit_symbol || 'L'}</td>
+            <td>${totalQtyIn.toFixed(2)} ${escLedger(allCompanyEntries[0]?.unit_symbol || 'L')}</td>
+            <td>${totalQtyOut.toFixed(2)} ${escLedger(allCompanyEntries[0]?.unit_symbol || 'L')}</td>
+            <td>${totalFoc.toFixed(2)} ${escLedger(allCompanyEntries[0]?.unit_symbol || 'L')}</td>
             <td>-</td>
             <td>-</td>
             <td>${currency}${totalValue.toFixed(2)}</td>

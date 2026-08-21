@@ -131,11 +131,11 @@ try {
     // Insert return items - one record per unit entry
     $item_stmt = $pdo->prepare("
         INSERT INTO sale_return_items (
-            tenant_id, sale_invoice_id, product_id, uom_id,
+            tenant_id, sale_invoice_id, product_id, uom_id, batch_no, expiry_date,
             quantity, sale_price, gross_amount, discount_percent,
             discount_amount, trade_offer_percent, trade_offer_amount,
             tax_percent, tax_amount, foc_quantity, net_amount, created_by, updated_by
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ");
 
     foreach ($input['items'] as $item) {
@@ -159,6 +159,8 @@ try {
                         $invoice_id,
                         $item['productId'],
                         $entry['uomId'],
+                        $item['batchNo'] ?? null,
+                        $item['expiryDate'] ?? null,
                         $entry['quantity'],  // Original quantity (e.g., 2 for 2 Dozen)
                         $item['salePrice'],
                         $item['grossAmount'] * $proportionOfTotal,
@@ -191,8 +193,8 @@ try {
                         $stock_stmt = $pdo->prepare("
                             INSERT INTO stock_ledger (
                                 tenant_id, account_id, branch_id, product_id, reference_table, reference_id,
-                                qty_in, unit_cost, unit_id, stock_status, transaction_type, transaction_date
-                            ) VALUES (?, ?, ?, ?, 'sale_return', ?, ?, ?, ?, ?, 'Sale Return', ?)
+                                qty_in, unit_cost, unit_id, batch_no, expiry_date, stock_status, transaction_type, transaction_date
+                            ) VALUES (?, ?, ?, ?, 'sale_return', ?, ?, ?, ?, ?, ?, ?, 'Sale Return', ?)
                         ");
                         $stock_stmt->execute([
                             $tenant_id,
@@ -203,6 +205,8 @@ try {
                             $entry['quantity'],  // ORIGINAL quantity (e.g., 2 for 2 Dozen)
                             $item['salePrice'],
                             $entry['uomId'],     // Original unit (e.g., Dozen)
+                            $item['batchNo'] ?? null,
+                            $item['expiryDate'] ?? null,
                             $item['stockStatus'] ?? 'sellable',
                             $input['saleDate']
                         ]);
@@ -221,8 +225,8 @@ try {
                 $foc_stmt = $pdo->prepare("
                     INSERT INTO stock_ledger (
                         tenant_id, account_id, branch_id, product_id, reference_table, reference_id,
-                        qty_in, unit_cost, unit_id, stock_status, transaction_type, transaction_date
-                    ) VALUES (?, ?, ?, ?, 'sale_return', ?, ?, ?, ?, ?, 'Sale Return - FOC', ?)
+                        qty_in, unit_cost, unit_id, batch_no, expiry_date, stock_status, transaction_type, transaction_date
+                    ) VALUES (?, ?, ?, ?, 'sale_return', ?, ?, ?, ?, ?, ?, ?, 'Sale Return - FOC', ?)
                 ");
                 $foc_stmt->execute([
                     $tenant_id,
@@ -233,6 +237,8 @@ try {
                     $item['focQuantity'],
                     0,
                     $focUomId,
+                    $item['batchNo'] ?? null,
+                    $item['expiryDate'] ?? null,
                     $item['stockStatus'] ?? 'sellable',
                     $input['saleDate']
                 ]);

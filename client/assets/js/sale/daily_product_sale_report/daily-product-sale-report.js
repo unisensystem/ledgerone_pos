@@ -10,6 +10,10 @@ function todayStr() {
     return new Date().toISOString().slice(0, 10);
 }
 
+function esc(v) {
+    return String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
 // DB date (YYYY-MM-DD) -> DD/MM/YY
 function formatDateShort(dateStr) {
     if (!dateStr) return '';
@@ -335,13 +339,13 @@ function renderTable() {
                     <strong>
                         ${formatDateShort(group.sale_date)}
                         &nbsp;&nbsp;
-                        ${group.customer_name || ''}
+                        ${esc(group.customer_name || '')}
                     </strong>
                 </td>
 
                 <td style="text-align:right;" class="col-amount">
                     <strong>
-                        ${group.bill_no || ''}
+                        ${esc(group.bill_no || '')}
                     </strong>
                 </td>
 
@@ -377,19 +381,19 @@ function renderTable() {
                     </td>
 
                     <td class="col-code">
-                        ${row.product_code || '-'}
+                        ${esc(row.product_code || '-')}
                     </td>
 
                     <td class="col-detail">
-                        ${row.product_name || '-'}
+                        ${esc(row.product_name || '-')}
                     </td>
 
                     <td class="col-batch">
-                        ${batchNo}
+                        ${esc(batchNo)}
                     </td>
 
                     <td class="col-expiry">
-                        ${expiryDate}
+                        ${esc(expiryDate)}
                     </td>
 
                     <td class="col-price">
@@ -398,7 +402,7 @@ function renderTable() {
 
                     <td class="col-qty">
                         ${quantity.toFixed(2)}
-                        ${row.unit_symbol || ''}
+                        ${esc(row.unit_symbol || '')}
                     </td>
 
                     <td class="col-foc">

@@ -1,4 +1,12 @@
 let currentReturn = { items: [], customer: null, branch: null, currency: null, salesOfficer: null, supplierMan: null, subAccount: null, company: null, project: null, invoiceLevelTaxes: [], invoiceTotalBill: null, invoiceDiscountAmount: 0, extraDiscount1Amount: 0, extraDiscount2Amount: 0, shippingFees: 0 };
+let showBatchColumns = localStorage.getItem('saleReturnShowBatchColumns') === 'true';
+
+// HTML-escape untrusted values before interpolating into innerHTML — batchNo is
+// free-typed user input, so an unescaped value here can break out of the
+// surrounding attribute (e.g. a `"` in the batch number) and inject markup.
+function escAttr(value) {
+    return String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
 let productsData = [], customersData = [], branchesData = [], currenciesData = [], bankAccountsData = [], uomData = [], invoicesData = [], employeesData = [], subAccountsData = [], companiesData = [], projectsData = [];
 
 const defaultShortcuts = { product: 'F1', customer: 'F2', branch: 'F3', qty: 'F4', save: 'F10', clear: 'F12' };
@@ -90,6 +98,14 @@ document.addEventListener('DOMContentLoaded', async function() {
     document.getElementById('quickQty').addEventListener('keypress', (e) => { if (e.key === 'Enter') { e.preventDefault(); document.getElementById('quickAddBtn').click(); } });
     document.getElementById('quickAddBtn').addEventListener('click', addProductFromQuick);
     
+    const toggleBatchColumnsInput = document.getElementById('toggleBatchColumns');
+    toggleBatchColumnsInput.checked = showBatchColumns;
+    toggleBatchColumnsInput.addEventListener('change', function() {
+        showBatchColumns = this.checked;
+        localStorage.setItem('saleReturnShowBatchColumns', showBatchColumns);
+        renderItems();
+    });
+
     document.getElementById('amountRefunded').addEventListener('input', updateSummary);
     document.getElementById('returnDiscountPercent').addEventListener('input', updateReturnDiscount);
     document.getElementById('returnDiscountAmount').addEventListener('input', updateReturnDiscount);
@@ -338,7 +354,9 @@ function addProductFromQuick() {
             taxPercent: 0,
             status: 'sellable',
             tradeOfferAmount: 0,
-            focQuantity: 0
+            focQuantity: 0,
+            batchNo: '',
+            expiryDate: ''
         };
         
         item.qty = calculateTotalQty(item);
@@ -395,7 +413,14 @@ function renderItems() {
                 html += `<div class="text-center" style="color: var(--subtext); font-size: 11px;">-</div>`;
             }
         }
-        
+
+        if (showBatchColumns) {
+            html += `
+                <input type="text" value="${escAttr(item.batchNo)}" placeholder="Batch No" style="font-size: 11px;" oninput="updateItemBatchNo(${item.id}, this.value)">
+                <input type="date" value="${escAttr(item.expiryDate)}" style="font-size: 11px;" oninput="updateItemExpiryDate(${item.id}, this.value)">
+            `;
+        }
+
         html += `
             <input type="number" value="${item.price.toFixed(2)}" step="0.01" class="text-right" oninput="updateItemPrice(${item.id}, this.value)">
             <div class="readonly">${formatCurrency(item.gross)}</div>
@@ -453,6 +478,16 @@ window.updateItemDiscount = function(itemId, newPercent) {
 window.updateItemTaxPercent = function(itemId, newPercent) {
     const item = currentReturn.items.find(i => i.id === itemId);
     if (item) { item.taxPercent = parseFloat(newPercent) || 0; currentReturn.invoiceTotalBill = null; recalculateItem(item); updateFooterTotals(); updateSummary(); }
+};
+
+window.updateItemBatchNo = function(itemId, newBatchNo) {
+    const item = currentReturn.items.find(i => i.id === itemId);
+    if (item) item.batchNo = newBatchNo || null;
+};
+
+window.updateItemExpiryDate = function(itemId, newExpiryDate) {
+    const item = currentReturn.items.find(i => i.id === itemId);
+    if (item) item.expiryDate = newExpiryDate || null;
 };
 
 window.updateItemStatus = function(itemId, newStatus) {
@@ -573,7 +608,14 @@ function updateTableHeaders() {
     for (let i = 0; i < maxUnitColumns; i++) {
         html += `<div class="col-header text-center">UNIT ${i + 1}</div>`;
     }
-    
+
+    if (showBatchColumns) {
+        html += `
+            <div class="col-header text-center">BATCH NO</div>
+            <div class="col-header text-center">EXP DATE</div>
+        `;
+    }
+
     html += `
         <div class="col-header text-right">PRICE</div>
         <div class="col-header text-right">GROSS</div>
@@ -610,7 +652,11 @@ function updateFooterTotals() {
         });
         html += `<div class="text-right">${total.toFixed(2)}</div>`;
     }
-    
+
+    if (showBatchColumns) {
+        html += `<div></div><div></div>`;
+    }
+
     html += `
         <div></div>
         <div class="text-right" id="totalGross">0.00</div>
@@ -641,8 +687,9 @@ function updateFooterTotals() {
 function getGridTemplate() {
     const baseColumns = '30px 120px';
     const unitColumns = ' 70px'.repeat(maxUnitColumns);
+    const batchColumns = showBatchColumns ? ' 90px 90px' : '';
     const endColumns = ' 70px 70px 70px 70px 70px 60px 70px 70px 80px 40px';
-    return baseColumns + unitColumns + endColumns;
+    return baseColumns + unitColumns + batchColumns + endColumns;
 }
 
 function updateReturnDiscount() {
@@ -716,7 +763,9 @@ async function saveReturn() {
             netAmount: item.net,
             stockStatus: item.status,
             tradeOfferAmount: item.tradeOfferAmount || 0,
-            focQuantity: item.focQuantity || 0
+            focQuantity: item.focQuantity || 0,
+            batchNo: item.batchNo || null,
+            expiryDate: item.expiryDate || null
         })),
         status: 'Posted'
     };
@@ -876,7 +925,9 @@ async function loadInvoiceData(invoiceId) {
                         taxPercent: parseFloat(firstItem.tax_percent || 0),
                         status: 'sellable',
                         tradeOfferAmount: parseFloat(firstItem.trade_offer_amount || 0),
-                        focQuantity: parseFloat(firstItem.foc_quantity || 0)
+                        focQuantity: parseFloat(firstItem.foc_quantity || 0),
+                        batchNo: firstItem.batch_no || '',
+                        expiryDate: firstItem.expiry_date || ''
                     };
                     
                     returnItem.qty = calculateTotalQty(returnItem);
@@ -1081,7 +1132,9 @@ async function loadEditData(returnId) {
                 taxPercent: parseFloat(item.tax_percent || 0),
                 status: 'sellable',
                 tradeOfferAmount: parseFloat(item.trade_offer_amount || 0),
-                focQuantity: parseFloat(item.foc_quantity || 0)
+                focQuantity: parseFloat(item.foc_quantity || 0),
+                batchNo: item.batch_no || '',
+                expiryDate: item.expiry_date || ''
             };
             returnItem.qty = calculateTotalQty(returnItem);
             recalculateItem(returnItem);
@@ -1321,7 +1374,11 @@ function selectCashCustomerDefault() {
         }
     }
 
-    filterInvoicesByCustomer(cashCustomer.id);
+    // NOTE: deliberately NOT calling filterInvoicesByCustomer() here — the Sale
+    // Invoice search is meant to find ANY invoice (the customer then gets
+    // auto-filled FROM that invoice via loadInvoiceData). Narrowing it to
+    // Cash Customer's invoices by default would hide every invoice billed to
+    // a real customer until the user manually re-picks that exact customer.
     loadSubAccounts(cashCustomer.id);
 }
 

@@ -1,3 +1,10 @@
+// HTML-escape untrusted values before interpolating into innerHTML strings —
+// lead/follow-up fields are free-text user input stored and re-rendered for
+// every viewer, so an unescaped value here is a stored-XSS vector.
+function esc(value) {
+    return String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
 document.addEventListener('DOMContentLoaded', function() {
     // Set current date with Karachi timezone
     const now = new Date();
@@ -472,14 +479,14 @@ document.addEventListener('DOMContentLoaded', function() {
             const row = document.createElement('tr');
             row.innerHTML = `
                 <td>
-                    <a href="#" class="lead-code-clickable" data-id="${lead.id}">${lead.lead_code}</a>
+                    <a href="#" class="lead-code-clickable" data-id="${lead.id}">${esc(lead.lead_code)}</a>
                     <i class="fas fa-chevron-down collapse-arrow" data-id="${lead.id}" style="margin-left: 10px;"></i>
                 </td>
-                <td>${lead.contact_name || '-'}</td>
-                <td>${lead.company_name}</td>
-                <td>${lead.service_type || '-'}</td>
-                <td><span class="status-badge status-${(lead.lead_status || '').toLowerCase().replace(' ', '-')}">${lead.lead_status || '-'}</span></td>
-                <td class="priority-${(lead.priority || '').toLowerCase()}">${lead.priority || '-'}</td>
+                <td>${esc(lead.contact_name) || '-'}</td>
+                <td>${esc(lead.company_name)}</td>
+                <td>${esc(lead.service_type) || '-'}</td>
+                <td><span class="status-badge status-${esc((lead.lead_status || '').toLowerCase().replace(' ', '-'))}">${esc(lead.lead_status) || '-'}</span></td>
+                <td class="priority-${esc((lead.priority || '').toLowerCase())}">${esc(lead.priority) || '-'}</td>
                 <td>
                     <div class="action-buttons">
                      <button class="btn btn-info btn-sm view-lead" data-id="${lead.id}">
@@ -558,9 +565,9 @@ document.addEventListener('DOMContentLoaded', function() {
             html += `
                 <div class="followup-item">
                     <div class="followup-details">
-                        <strong>${followup.event_type}</strong> - ${followup.followup_date} <br>
-                        <span style="color: #666;">Manager: ${followup.account_manager} | Job: ${followup.job_no}</span><br>
-                        <span style="color: #888;">${followup.remarks || 'No remarks'}</span>
+                        <strong>${esc(followup.event_type)}</strong> - ${esc(followup.followup_date)} <br>
+                        <span style="color: #666;">Manager: ${esc(followup.account_manager)} | Job: ${esc(followup.job_no)}</span><br>
+                        <span style="color: #888;">${esc(followup.remarks) || 'No remarks'}</span>
                     </div>
                     <div class="followup-actions">
                         <button class="btn btn-warning btn-sm edit-followup" data-id="${followup.id}">

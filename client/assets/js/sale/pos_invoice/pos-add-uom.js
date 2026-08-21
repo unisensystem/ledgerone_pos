@@ -115,24 +115,24 @@ function updateTableHeaders() {
     const headerRow = thead.rows[0];
     
     let safetyCounter = 0;
-    while (headerRow.cells.length > 5 && safetyCounter < 20) {
-        const cell = headerRow.cells[5];
+    while (headerRow.cells.length > 3 && safetyCounter < 20) {
+        const cell = headerRow.cells[3];
         const cellText = cell.textContent.trim();
         // Stop if we reach Price or any of the fixed columns
-        if (cellText.includes('Sale Price') || cellText.includes('Gross Amount') || 
-            cellText.includes('Disc') || cellText.includes('T.O') || 
-            cellText.includes('GST') || cellText.includes('FOC') || 
+        if (cellText.includes('Sale Price') || cellText.includes('Gross Amount') ||
+            cellText.includes('Disc') || cellText.includes('T.O') ||
+            cellText.includes('GST') || cellText.includes('FOC') ||
             cellText.includes('Net Amount') || cellText.includes('Actions')) {
             break;
         }
-        headerRow.deleteCell(5);
+        headerRow.deleteCell(3);
         safetyCounter++;
     }
-    
-    // Insert generic unit headers (Unit 1, Unit 2, Unit 3, etc.) starting at index 5
-    // (index 0=S#, 1=Product, 2=Scheme, 3=Batch No, 4=Expiry Date)
+
+    // Insert generic unit headers (Unit 1, Unit 2, Unit 3, etc.) starting at index 3
+    // (index 0=S#, 1=Product, 2=Scheme; this page has no Batch No/Expiry Date columns)
     for (let i = 0; i < maxUnitColumns; i++) {
-        const th = headerRow.insertCell(5 + i);
+        const th = headerRow.insertCell(3 + i);
         th.width = '8%';
         th.style.fontWeight = '600';
         th.style.fontSize = '12px';
@@ -156,16 +156,16 @@ function updateRowUnitCells(row) {
         }
     });
     
-    // Remove old unit cells (between Expiry Date and Price)
-    // Keep removing cells at index 5 until we find a cell with price-cell class
-    // (index 0=S#, 1=Product, 2=Scheme, 3=Batch No, 4=Expiry Date)
-    while (row.cells.length > 5 && !row.cells[5].classList.contains('price-cell')) {
-        row.deleteCell(5);
+    // Remove old unit cells (between Scheme and Price)
+    // Keep removing cells at index 3 until we find a cell with price-cell class
+    // (index 0=S#, 1=Product, 2=Scheme; this page has no Batch No/Expiry Date columns)
+    while (row.cells.length > 3 && !row.cells[3].classList.contains('price-cell')) {
+        row.deleteCell(3);
     }
-    
-    // Insert unit cells starting at index 5 (after Batch No / Expiry Date cells)
+
+    // Insert unit cells starting at index 3 (after Scheme cell)
     for (let i = 0; i < maxUnitColumns; i++) {
-        const cell = row.insertCell(5 + i);
+        const cell = row.insertCell(3 + i);
         
         // Check if this product has a unit at this position
         if (i < productUomDetails.length) {
@@ -414,25 +414,25 @@ function updateFooterTotals() {
     const footerRow = tfoot.rows[0];
     
     // Remove old unit total cells that were dynamically inserted
-    // Keep removing cells at index 5 until we reach the known fixed column IDs
-    // (index 0=Totals label, 1=Product, 2=Scheme, 3=Batch No, 4=Expiry Date)
+    // Keep removing cells at index 3 until we reach the known fixed column IDs
+    // (index 0=Totals label, 1=Product, 2=Scheme; this page has no Batch No/Expiry Date columns)
     let safetyCounter = 0;
-    const knownIds = ['totalSalePrice', 'totalGrossAmount', 'totalDiscountAmountItems', 
+    const knownIds = ['totalSalePrice', 'totalGrossAmount', 'totalDiscountAmountItems',
                       'totalTradeOfferAmount', 'totalGstAmount', 'totalFocQty', 'totalNetAmountItems'];
-    
-    while (footerRow.cells.length > 5 && safetyCounter < 20) {
-        const cell = footerRow.cells[5];
+
+    while (footerRow.cells.length > 3 && safetyCounter < 20) {
+        const cell = footerRow.cells[3];
         // Stop if we reach a cell with a known fixed id
         if (cell && cell.id && knownIds.includes(cell.id)) {
             break;
         }
-        footerRow.deleteCell(5);
+        footerRow.deleteCell(3);
         safetyCounter++;
     }
-    
-    // Insert empty cells for dynamic unit columns at index 5
+
+    // Insert empty cells for dynamic unit columns at index 3
     for (let i = 0; i < maxUnitColumns; i++) {
-        const cell = footerRow.insertCell(5 + i);
+        const cell = footerRow.insertCell(3 + i);
         cell.textContent = '';
         cell.style.textAlign = 'center';
         cell.style.padding = '8px 4px';

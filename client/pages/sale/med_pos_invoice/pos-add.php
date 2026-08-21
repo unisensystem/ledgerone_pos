@@ -21,7 +21,7 @@ if (!$user_id) {
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>LedgerOne ERP - Sale Invoice</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="stylesheet" href="../../../assets/css/sale/pos_invoice/pos-add.css?v=<?php echo time(); ?>">
+    <link rel="stylesheet" href="../../../assets/css/sale/med_pos_invoice/pos-add.css?v=<?php echo time(); ?>">
 </head>
 <body class="light-theme med-invoice-page">
     <div class="container">
@@ -1306,19 +1306,19 @@ if (!$user_id) {
         window._toggleCreditFields = toggleCreditFields;
     })();
     </script>
-    <script src="../../../assets/js/sale/pos_invoice/pos-add-uom.js?v=<?php echo time(); ?>&debug=1"></script>
-    <script src="../../../assets/js/sale/pos_invoice/brand-autofill.js?v=<?php echo time(); ?>"></script>
-    <script src="../../../assets/js/sale/pos_invoice/pos-add-scheme.js?v=<?php echo time(); ?>"></script>
-    <script src="../../../assets/js/sale/pos_invoice/invoice-level-taxes-dynamic.js?v=<?php echo time(); ?>"></script>
-    <script src="../../../assets/js/sale/pos_invoice/pos-tax-calculation.js?v=<?php echo time(); ?>"></script>
-    <script src="../../../assets/js/sale/pos_invoice/withholding-tax.js?v=<?php echo time(); ?>"></script>
-    <script src="../../../assets/js/sale/pos_invoice/stock-validation.js?v=<?php echo time(); ?>"></script>
-    <script src="../../../assets/js/sale/pos_invoice/default-fields-autofill.js?v=<?php echo time(); ?>"></script>
-    <script src="../../../assets/js/sale/pos_invoice/default-fields-autofill-settings.js?v=<?php echo time(); ?>"></script>
-    <script src="../../../assets/js/sale/pos_invoice/autofill-debug.js?v=<?php echo time(); ?>"></script>
-    <script src="../../../assets/js/sale/pos_invoice/pos-add.js?v=<?php echo time(); ?>"></script>
-    <script src="../../../assets/js/sale/pos_invoice/tax-integration.js?v=<?php echo time(); ?>"></script>
-    <script src="../../../assets/js/sale/pos_invoice/supplier-product-filter.js?v=<?php echo time(); ?>"></script>
+    <script src="../../../assets/js/sale/med_pos_invoice/pos-add-uom.js?v=<?php echo time(); ?>&debug=1"></script>
+    <script src="../../../assets/js/sale/med_pos_invoice/brand-autofill.js?v=<?php echo time(); ?>"></script>
+    <script src="../../../assets/js/sale/med_pos_invoice/pos-add-scheme.js?v=<?php echo time(); ?>"></script>
+    <script src="../../../assets/js/sale/med_pos_invoice/invoice-level-taxes-dynamic.js?v=<?php echo time(); ?>"></script>
+    <script src="../../../assets/js/sale/med_pos_invoice/pos-tax-calculation.js?v=<?php echo time(); ?>"></script>
+    <script src="../../../assets/js/sale/med_pos_invoice/withholding-tax.js?v=<?php echo time(); ?>"></script>
+    <script src="../../../assets/js/sale/med_pos_invoice/stock-validation.js?v=<?php echo time(); ?>"></script>
+    <script src="../../../assets/js/sale/med_pos_invoice/default-fields-autofill.js?v=<?php echo time(); ?>"></script>
+    <script src="../../../assets/js/sale/med_pos_invoice/default-fields-autofill-settings.js?v=<?php echo time(); ?>"></script>
+    <script src="../../../assets/js/sale/med_pos_invoice/autofill-debug.js?v=<?php echo time(); ?>"></script>
+    <script src="../../../assets/js/sale/med_pos_invoice/pos-add.js?v=<?php echo time(); ?>"></script>
+    <script src="../../../assets/js/sale/med_pos_invoice/tax-integration.js?v=<?php echo time(); ?>"></script>
+    <script src="../../../assets/js/sale/med_pos_invoice/supplier-product-filter.js?v=<?php echo time(); ?>"></script>
 
     <!-- Stock Violation Modal -->
     <div class="modal" id="stockViolationModal" style="display:none;">

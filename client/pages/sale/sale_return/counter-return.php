@@ -217,6 +217,10 @@ $user_employee_id = $user['employee_id'] ?? null;
                 <button class="btn btn-primary btn-micro" id="quickAddBtn" title="Add Item (ENTER)">
                     <i class="fas fa-plus"></i>
                 </button>
+                <label style="display: flex; align-items: center; gap: 4px; cursor: pointer; margin: 0; grid-column: 1 / -1; font-size: 11px; color: var(--subtext);">
+                    <input type="checkbox" id="toggleBatchColumns" style="width: auto;">
+                    Show Batch No / Expiry Date columns
+                </label>
             </div>
 
             <div class="items-container">

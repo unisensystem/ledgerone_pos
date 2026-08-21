@@ -99,6 +99,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
                     'product_id' => $item['product_id'],
                     'product_name' => $item['product_name'],
                     'product_code' => $item['product_code'],
+                    'batch_no' => $item['batch_no'],
+                    'expiry_date' => $item['expiry_date'],
                     'sale_price' => $item['sale_price'],
                     'discount_percent' => $item['discount_percent'],
                     'discount_amount' => 0,
@@ -204,11 +206,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
         // Insert new items - one record per unit entry
         $item_stmt = $pdo->prepare("
             INSERT INTO sale_return_items (
-                tenant_id, sale_invoice_id, product_id, uom_id,
+                tenant_id, sale_invoice_id, product_id, uom_id, batch_no, expiry_date,
                 quantity, sale_price, gross_amount, discount_percent,
                 discount_amount, trade_offer_percent, trade_offer_amount,
                 tax_percent, tax_amount, foc_quantity, net_amount, created_by, updated_by
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ");
 
         foreach ($input['items'] as $item) {
@@ -232,6 +234,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
                             $invoice_id,
                             $item['productId'],
                             $entry['uomId'],
+                            $item['batchNo'] ?? null,
+                            $item['expiryDate'] ?? null,
                             $entry['quantity'],
                             $item['salePrice'],
                             $item['grossAmount'] * $proportionOfTotal,
@@ -264,8 +268,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
                             $stock_stmt = $pdo->prepare("
                                 INSERT INTO stock_ledger (
                                     tenant_id, account_id, branch_id, product_id, reference_table, reference_id,
-                                    qty_in, unit_cost, unit_id, stock_status, transaction_type, transaction_date
-                                ) VALUES (?, ?, ?, ?, 'sale_return', ?, ?, ?, ?, ?, 'Sale Return', ?)
+                                    qty_in, unit_cost, unit_id, batch_no, expiry_date, stock_status, transaction_type, transaction_date
+                                ) VALUES (?, ?, ?, ?, 'sale_return', ?, ?, ?, ?, ?, ?, ?, 'Sale Return', ?)
                             ");
                             $stock_stmt->execute([
                                 $tenant_id,
@@ -276,6 +280,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
                                 $entry['quantity'],
                                 $item['salePrice'],
                                 $entry['uomId'],
+                                $item['batchNo'] ?? null,
+                                $item['expiryDate'] ?? null,
                                 $item['stockStatus'] ?? 'sellable',
                                 $input['saleDate']
                             ]);
@@ -293,8 +299,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
                     $foc_stmt = $pdo->prepare("
                         INSERT INTO stock_ledger (
                             tenant_id, account_id, branch_id, product_id, reference_table, reference_id,
-                            qty_in, unit_cost, unit_id, stock_status, transaction_type, transaction_date
-                        ) VALUES (?, ?, ?, ?, 'sale_return', ?, ?, ?, ?, ?, 'Sale Return - FOC', ?)
+                            qty_in, unit_cost, unit_id, batch_no, expiry_date, stock_status, transaction_type, transaction_date
+                        ) VALUES (?, ?, ?, ?, 'sale_return', ?, ?, ?, ?, ?, ?, ?, 'Sale Return - FOC', ?)
                     ");
                     $foc_stmt->execute([
                         $tenant_id,
@@ -305,6 +311,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
                         $item['focQty'],
                         0,
                         $focUomId,
+                        $item['batchNo'] ?? null,
+                        $item['expiryDate'] ?? null,
                         $item['stockStatus'] ?? 'sellable',
                         $input['saleDate']
                     ]);

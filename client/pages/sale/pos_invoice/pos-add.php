@@ -245,9 +245,6 @@ if (!$user_id) {
                                 <th width="3%">S#</th>
                                 <th width="15%">Product Code / Name</th>
                                 <th width="10%">Scheme</th>
-                             <!-- AFTER -->
-<th width="8%" class="batch-no-cell">Batch No</th>
-<th width="8%" class="batch-expiry-cell">Expiry Date</th>
                                 <!-- Dynamic unit columns will be inserted here -->
                                 <th width="8%" class="price-cell"><span id="salePriceLabel">Sale Price</span></th>
                                 <th width="8%" class="gross-cell"><span id="grossAmountLabel">Gross Amount</span></th>
@@ -269,8 +266,6 @@ if (!$user_id) {
     <th style="text-align: left;">Totals</th>
 <th style="text-align: left;"></th>
 <th style="text-align: left;"></th>
-<th style="text-align: left;" class="batch-no-cell"></th>
-<th style="text-align: left;" class="batch-expiry-cell"></th>
     <!-- Dynamic unit totals will be inserted here -->
                                 <th id="totalSalePrice" class="price-cell">0.00</th>
                                 <th id="totalGrossAmount" class="gross-cell">0.00</th>
@@ -651,14 +646,6 @@ if (!$user_id) {
                             <input type="checkbox" id="enableTradeOfferAmount" style="width: auto;">
                             <span style="font-size: 13px;">Trade Offer Amount</span>
                         </label>
-                        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 8px; background: var(--surface-1); border-radius: 6px; transition: all 0.2s;" onmouseover="this.style.background='var(--surface-0)'" onmouseout="this.style.background='var(--surface-1)'">
-    <input type="checkbox" id="enableBatchNo" style="width: auto;">
-    <span style="font-size: 13px;">Batch No</span>
-</label>
-<label style="display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 8px; background: var(--surface-1); border-radius: 6px; transition: all 0.2s;" onmouseover="this.style.background='var(--surface-0)'" onmouseout="this.style.background='var(--surface-1)'">
-    <input type="checkbox" id="enableExpiryDate" style="width: auto;">
-    <span style="font-size: 13px;">Expiry Date</span>
-</label>
                         <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 8px; background: var(--surface-1); border-radius: 6px; transition: all 0.2s;" onmouseover="this.style.background='var(--surface-0)'" onmouseout="this.style.background='var(--surface-1)'">
                             <input type="checkbox" id="enableFOC" style="width: auto;">
                             <span style="font-size: 13px;">FOC Quantity</span>
