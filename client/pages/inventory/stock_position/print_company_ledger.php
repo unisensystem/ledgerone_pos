@@ -198,25 +198,26 @@ if ($company_id) {
     </div>
 
     <table id="reportTable">
-        <thead>
-            <tr>
-                <th>Date</th>
-                <th>Invoice #</th>
-                <th>Product</th>
-                <th>Batch No</th>
-                <th>Expiry Date</th>
-                <th>Branch</th>
-                <th>Transaction</th>
-                <th>Qty In</th>
-                <th>Qty Out</th>
-                <th>Balance</th>
-                <th>Unit Cost</th>
-                <th>Value</th>
-            </tr>
-        </thead>
-        <tbody>
-        </tbody>
-    </table>
+    <thead>
+        <tr>
+            <th>Date</th>
+            <th>Invoice #</th>
+            <th>Product</th>
+            <th>Batch No</th>
+            <th>Expiry Date</th>
+            <th>Branch</th>
+            <th>Transaction</th>
+            <th>Qty In</th>
+            <th>Qty Out</th>
+            <th>FOC</th>
+            <th>Balance</th>
+            <th>Unit Cost</th>
+            <th>Value</th>
+        </tr>
+    </thead>
+    <tbody>
+    </tbody>
+</table>
 
     <div class="signature-section">
         <div class="signature-box">
