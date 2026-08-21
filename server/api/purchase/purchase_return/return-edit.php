@@ -131,25 +131,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
             }
             
             $itemIndex++;
-            $groupedItems[$itemIndex] = [
-                'product_id' => $productId,
-                'product_name' => $firstItem['product_name'],
-                'product_code' => $firstItem['product_code'],
-                'uom_type' => $firstItem['uom_type'],
-                'uom_group_id' => $firstItem['uom_group_id'],
-                'default_unit_id' => $firstItem['default_unit_id'],
-                'purchase_price' => $firstItem['purchase_price'],
-                'gross_amount' => $totalGross,
-                'discount_percent' => $firstItem['discount_percent'],
-                'discount_amount' => $totalDiscount,
-                'trade_offer_percent' => $firstItem['trade_offer_percent'],
-                'trade_offer_amount' => $totalTradeOffer,
-                'tax_percent' => $firstItem['tax_percent'],
-                'tax_amount' => $totalTax,
-                'foc_quantity' => $totalFoc,
-                'net_amount' => $totalNet,
-                'unit_entries' => array_values($uomMap)
-            ];
+           $groupedItems[$itemIndex] = [
+    'product_id' => $productId,
+    'product_name' => $firstItem['product_name'],
+    'product_code' => $firstItem['product_code'],
+    'uom_type' => $firstItem['uom_type'],
+    'uom_group_id' => $firstItem['uom_group_id'],
+    'default_unit_id' => $firstItem['default_unit_id'],
+    'purchase_price' => $firstItem['purchase_price'],
+    'batch_no' => $firstItem['batch_no'],
+    'batch_expiry_date' => $firstItem['batch_expiry_date'],
+    'gross_amount' => $totalGross,
+    'discount_percent' => $firstItem['discount_percent'],
+    'discount_amount' => $totalDiscount,
+    'trade_offer_percent' => $firstItem['trade_offer_percent'],
+    'trade_offer_amount' => $totalTradeOffer,
+    'tax_percent' => $firstItem['tax_percent'],
+    'tax_amount' => $totalTax,
+    'foc_quantity' => $totalFoc,
+    'net_amount' => $totalNet,
+    'unit_entries' => array_values($uomMap)
+];
         }
         
         $items = array_values($groupedItems);
@@ -220,35 +222,37 @@ if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
         $pdo->prepare("DELETE FROM accounting_ledger WHERE reference_table = 'purchase_return' AND reference_id = ? AND tenant_id = ?")->execute([$invoice_id, $tenant_id]);
         
         // Insert new items
-        $item_stmt = $pdo->prepare("
-            INSERT INTO purchase_return_items (
-                tenant_id, purchase_invoice_id, product_id, uom_id,
-                quantity, purchase_price, gross_amount, discount_percent,
-                discount_amount, net_amount, vehicle_no, trade_offer_percent, trade_offer_amount,
-                tax_percent, tax_amount, foc_quantity, created_by, updated_by
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ");
-        
-        foreach ($input['items'] as $item) {
-            // Each item can have multiple unit entries
-            $isFirstEntry = true;
-            foreach ($item['unitEntries'] as $unitEntry) {
-                $item_stmt->execute([
-                    $tenant_id, $invoice_id, $item['productId'], $unitEntry['uomId'],
-                    $unitEntry['quantity'], $item['purchasePrice'], 
-                    $isFirstEntry ? $item['grossAmount'] : 0,
-                    $item['discountPercent'] ?? 0.00, 
-                    $isFirstEntry ? $item['discountAmount'] : 0,
-                    $isFirstEntry ? $item['netAmount'] : 0, 
-                    $item['vehicleNo'] ?? null,
-                    $item['tradeOfferPercent'] ?? 0.00, 
-                    $isFirstEntry ? $item['tradeOfferAmount'] : 0,
-                    $item['gstPercent'] ?? 0.00, 
-                    $isFirstEntry ? $item['gstAmount'] : 0,
-                    $item['focQty'] ?? 0, $user_id, $user_id
-                ]);
-                $isFirstEntry = false;
-            }
+     $item_stmt = $pdo->prepare("
+    INSERT INTO purchase_return_items (
+        tenant_id, purchase_invoice_id, product_id, uom_id,
+        quantity, purchase_price, gross_amount, discount_percent,
+        discount_amount, net_amount, vehicle_no, trade_offer_percent, trade_offer_amount,
+        tax_percent, tax_amount, foc_quantity, batch_no, batch_expiry_date, created_by, updated_by
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+");
+
+foreach ($input['items'] as $item) {
+    $isFirstEntry = true;
+    foreach ($item['unitEntries'] as $unitEntry) {
+        $item_stmt->execute([
+            $tenant_id, $invoice_id, $item['productId'], $unitEntry['uomId'],
+            $unitEntry['quantity'], $item['purchasePrice'], 
+            $isFirstEntry ? $item['grossAmount'] : 0,
+            $item['discountPercent'] ?? 0.00, 
+            $isFirstEntry ? $item['discountAmount'] : 0,
+            $isFirstEntry ? $item['netAmount'] : 0, 
+            $item['vehicleNo'] ?? null,
+            $item['tradeOfferPercent'] ?? 0.00, 
+            $isFirstEntry ? $item['tradeOfferAmount'] : 0,
+            $item['gstPercent'] ?? 0.00, 
+            $isFirstEntry ? $item['gstAmount'] : 0,
+            $item['focQty'] ?? 0,
+            $item['batchNo'],
+            $item['batchExpiryDate'] ?? null,
+            $user_id, $user_id
+        ]);
+        $isFirstEntry = false;
+    }
             
             // Get product's inventory_account_id
             $product_stmt = $pdo->prepare("SELECT inventory_account_id FROM products WHERE id = ?");
@@ -262,16 +266,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
             }
             
             // Insert stock ledger - qty_out for returns (reducing inventory)
-            $stock_stmt = $pdo->prepare("
-                INSERT INTO stock_ledger (
-                    tenant_id, account_id, branch_id, product_id, reference_table, reference_id,
-                    qty_out, unit_cost, unit_id, transaction_type, transaction_date
-                ) VALUES (?, ?, ?, ?, 'purchase_return', ?, ?, ?, ?, 'Purchase Return', ?)
-            ");
-            $stock_stmt->execute([
-                $tenant_id, $account_id, $input['branchId'], $item['productId'], $invoice_id,
-                $totalQty, $item['purchasePrice'], $item['unitEntries'][0]['uomId'], $input['purchaseDate']
-            ]);
+           $stock_stmt = $pdo->prepare("
+    INSERT INTO stock_ledger (
+        tenant_id, account_id, branch_id, product_id, reference_table, reference_id,
+        qty_out, unit_cost, unit_id, batch_no, batch_expiry_date, transaction_type, transaction_date
+    ) VALUES (?, ?, ?, ?, 'purchase_return', ?, ?, ?, ?, ?, ?, 'Purchase Return', ?)
+");
+$stock_stmt->execute([
+    $tenant_id, $account_id, $input['branchId'], $item['productId'], $invoice_id,
+    $totalQty, $item['purchasePrice'], $item['unitEntries'][0]['uomId'],
+    $item['batchNo'], $item['batchExpiryDate'] ?? null,
+    $input['purchaseDate']
+]);
         }
         
         // Get bill number
