@@ -56,6 +56,21 @@ if (!$user_id) {
                     <datalist id="product-list"></datalist>
                 </div>
                 <div class="form-group">
+                    <label class="form-label" for="salesman">Salesman</label>
+                    <input type="text" class="form-control" id="salesman" list="salesman-list" placeholder="All Salesmen">
+                    <datalist id="salesman-list"></datalist>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="city">City</label>
+                    <input type="text" class="form-control" id="city" list="city-list" placeholder="All Cities">
+                    <datalist id="city-list"></datalist>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="area">Area</label>
+                    <input type="text" class="form-control" id="area" list="area-list" placeholder="All Areas">
+                    <datalist id="area-list"></datalist>
+                </div>
+                <div class="form-group">
     <label class="form-label" for="batch-no">Batch No</label>
     <input
         type="text"
