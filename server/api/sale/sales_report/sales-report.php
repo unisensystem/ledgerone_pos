@@ -51,40 +51,46 @@ try {
     $officer_sales = $stmt->fetchAll();
 
     // Product Wise Sales
-    $stmt = $pdo->prepare("
-        SELECT 
-            current.product_id,
-            CONCAT('PROD-', LPAD(current.product_id, 3, '0')) as product_id_display,
-            COALESCE(p.name, 'Unknown') as product_name,
-            COALESCE(pc.category_name, ppc.category_name, 'Uncategorized') as category,
-            current.quantity_sold,
-            current.revenue,
-            CASE 
-                WHEN previous.revenue > 0 THEN ROUND(((current.revenue - previous.revenue) / previous.revenue) * 100, 1)
-                ELSE NULL
-            END as growth,
-            p.parent_product_id,
-            current.parent_row_id
-        FROM (
-            SELECT sii.product_id, sii.parent_row_id, SUM(sii.quantity) as quantity_sold, SUM(sii.net_amount) as revenue
-            FROM sale_invoice_items sii
-            JOIN sale_invoice si ON sii.sale_invoice_id = si.id AND si.tenant_id = ?
-            WHERE sii.tenant_id = ? AND si.sale_date BETWEEN ? AND ? AND si.status = 'Posted'" . ($company_id ? " AND si.company_id = ?" : "") . "
-            GROUP BY sii.product_id, sii.parent_row_id
-        ) current
-        LEFT JOIN products p ON current.product_id = p.id
-        LEFT JOIN categories pc ON p.category_id = pc.id
-        LEFT JOIN products pp ON p.parent_product_id = pp.id
-        LEFT JOIN categories ppc ON pp.category_id = ppc.id
-        LEFT JOIN (
-            SELECT sii.product_id, SUM(sii.net_amount) as revenue
-            FROM sale_invoice_items sii
-            JOIN sale_invoice si ON sii.sale_invoice_id = si.id AND si.tenant_id = ?
-            WHERE sii.tenant_id = ? AND si.sale_date BETWEEN DATE_SUB(?, INTERVAL DATEDIFF(?, ?) DAY) AND DATE_SUB(?, INTERVAL 1 DAY) AND si.status = 'Posted'" . ($company_id ? " AND si.company_id = ?" : "") . "
-            GROUP BY sii.product_id
-        ) previous ON current.product_id = previous.product_id
-        ORDER BY COALESCE(p.parent_product_id, current.product_id), p.parent_product_id IS NULL DESC, current.revenue DESC
-    ");
+$stmt = $pdo->prepare("
+    SELECT 
+        current.product_id,
+        CONCAT('PROD-', LPAD(current.product_id, 3, '0')) as product_id_display,
+        COALESCE(p.name, 'Unknown') as product_name,
+        COALESCE(pc.category_name, ppc.category_name, 'Uncategorized') as category,
+        current.batch_no,
+        current.nearest_expiry,
+        current.quantity_sold,
+        current.revenue,
+        CASE 
+            WHEN previous.revenue > 0 THEN ROUND(((current.revenue - previous.revenue) / previous.revenue) * 100, 1)
+            ELSE NULL
+        END as growth,
+        p.parent_product_id,
+        current.parent_row_id
+    FROM (
+        SELECT sii.product_id, sii.parent_row_id,
+               SUM(sii.quantity) as quantity_sold, 
+               SUM(sii.net_amount) as revenue,
+               GROUP_CONCAT(DISTINCT NULLIF(sii.batch_no,'') SEPARATOR ', ') as batch_no,
+               MIN(CASE WHEN sii.batch_expiry_date >= CURDATE() THEN sii.batch_expiry_date END) as nearest_expiry
+        FROM sale_invoice_items sii
+        JOIN sale_invoice si ON sii.sale_invoice_id = si.id AND si.tenant_id = ?
+        WHERE sii.tenant_id = ? AND si.sale_date BETWEEN ? AND ? AND si.status = 'Posted'" . ($company_id ? " AND si.company_id = ?" : "") . "
+        GROUP BY sii.product_id, sii.parent_row_id
+    ) current
+    LEFT JOIN products p ON current.product_id = p.id
+    LEFT JOIN categories pc ON p.category_id = pc.id
+    LEFT JOIN products pp ON p.parent_product_id = pp.id
+    LEFT JOIN categories ppc ON pp.category_id = ppc.id
+    LEFT JOIN (
+        SELECT sii.product_id, SUM(sii.net_amount) as revenue
+        FROM sale_invoice_items sii
+        JOIN sale_invoice si ON sii.sale_invoice_id = si.id AND si.tenant_id = ?
+        WHERE sii.tenant_id = ? AND si.sale_date BETWEEN DATE_SUB(?, INTERVAL DATEDIFF(?, ?) DAY) AND DATE_SUB(?, INTERVAL 1 DAY) AND si.status = 'Posted'" . ($company_id ? " AND si.company_id = ?" : "") . "
+        GROUP BY sii.product_id
+    ) previous ON current.product_id = previous.product_id
+    ORDER BY COALESCE(p.parent_product_id, current.product_id), p.parent_product_id IS NULL DESC, current.revenue DESC
+");
     $params = [$tenant_id, $tenant_id, $date_from, $date_to];
     if ($company_id) $params[] = $company_id;
     $params = array_merge($params, [$tenant_id, $tenant_id, $date_from, $date_to, $date_from, $date_from]);
