@@ -282,29 +282,33 @@ $currency_symbol = $currency['symbol'];
         </div>
         
         <!-- Product Wise Sales Table -->
-        <div class="table-card">
-            <div class="table-title">Product Wise Sales Details</div>
-            <div style="margin-bottom: 16px;">
-                <input type="text" id="search-product" class="form-input" placeholder="Search by Product ID, Name or Category..." style="max-width: 400px;">
-            </div>
-            <div class="table-responsive">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Product ID</th>
-                            <th>Product Name</th>
-                            <th>Category</th>
-                            <th>Quantity Sold</th>
-                            <th>Revenue (<?php echo $currency_symbol; ?>)</th>
-                            <th>Growth</th>
-                        </tr>
-                    </thead>
-                    <tbody id="productTableBody">
-                        <!-- Data will be populated by JavaScript -->
-                    </tbody>
-                </table>
-            </div>
+      <div class="table-card">
+    <div class="table-title">Product Wise Sales Details</div>
+    <div style="margin-bottom: 16px; display:flex; gap:12px; align-items:center; flex-wrap:wrap;">
+        <input type="text" id="search-product" class="form-input" placeholder="Search by Product ID, Name or Category..." style="max-width: 400px;">
+        <div style="position:relative;">
+            <button type="button" class="btn btn-secondary" id="product-columns-btn"><i class="fas fa-columns"></i> Columns</button>
+            <div id="product-columns-menu" style="display:none; position:absolute; top:110%; left:0; background:#fff; border:1px solid #e1e6ee; border-radius:8px; padding:10px; box-shadow:0 4px 14px rgba(0,0,0,0.1); z-index:20; min-width:190px;"></div>
         </div>
+    </div>
+    <div class="table-responsive">
+        <table>
+            <thead>
+                <tr>
+                    <th data-col="product_id">Product ID</th>
+                    <th data-col="product_name">Product Name</th>
+                    <th data-col="category">Category</th>
+                    <th data-col="batch_no">Batch No</th>
+                    <th data-col="expiry_date">Expiry Date</th>
+                    <th data-col="quantity_sold">Quantity Sold</th>
+                    <th data-col="revenue">Revenue (<?php echo $currency_symbol; ?>)</th>
+                    <th data-col="growth">Growth</th>
+                </tr>
+            </thead>
+            <tbody id="productTableBody"></tbody>
+        </table>
+    </div>
+</div>
         
         <!-- Branch Wise Sales Table -->
         <div class="table-card">
