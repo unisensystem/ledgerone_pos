@@ -5,31 +5,32 @@ header('Content-Type: application/json');
 
 session_start();
 $tenant_id = $_SESSION['tenant_id'] ?? null;
-$region_id = $_GET['region_id'] ?? null;
+$city_id = $_GET['city_id'] ?? null;
 
-if (!$tenant_id || !$region_id) {
+if (!$tenant_id || !$city_id) {
     echo json_encode(['success' => false, 'message' => 'Invalid request']);
     exit;
 }
 
 try {
     $stmt = $pdo->prepare("
-        SELECT r.country_id
-        FROM regions r
-        WHERE r.id = ? AND r.tenant_id = ?
+        SELECT c.region_id, r.country_id
+        FROM cities c
+        JOIN regions r ON c.region_id = r.id
+        WHERE c.id = ? AND c.tenant_id = ?
     ");
-    $stmt->execute([$region_id, $tenant_id]);
-    $region = $stmt->fetch(PDO::FETCH_ASSOC);
+    $stmt->execute([$city_id, $tenant_id]);
+    $city = $stmt->fetch(PDO::FETCH_ASSOC);
     
-    if ($region) {
+    if ($city) {
         echo json_encode(['success' => true, 'hierarchy' => [
-            'country_id' => $region['country_id'],
-            'region_id' => $region_id
+            'country_id' => $city['country_id'],
+            'region_id' => $city['region_id'],
+            'city_id' => $city_id
         ]]);
     } else {
-        echo json_encode(['success' => false, 'message' => 'Region not found']);
+        echo json_encode(['success' => false, 'message' => 'City not found']);
     }
 } catch (Exception $e) {
     echo json_encode(['success' => false, 'message' => $e->getMessage()]);
 }
-?>
