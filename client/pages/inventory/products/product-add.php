@@ -13,6 +13,18 @@ if (!$user_id) {
     header('Location: ../../auth/login.html');
     exit();
 }
+
+// Tenant-scoped feature flag: "Enter Trade Price / MRP By [unit]" — only enabled
+// for the one client that needs Carton-based price entry, everyone else keeps
+// the original Piece-only Financial Details form untouched.
+$enableCartonPriceEntry = false;
+$tenant_id = $_SESSION['tenant_id'] ?? null;
+if ($tenant_id) {
+    require_once '../../../../includes/connection.php';
+    $flagStmt = $pdo->prepare("SELECT enabled FROM tenant_feature_flags WHERE tenant_id = ? AND feature_key = 'carton_price_entry'");
+    $flagStmt->execute([$tenant_id]);
+    $enableCartonPriceEntry = (bool) $flagStmt->fetchColumn();
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -20,7 +32,7 @@ if (!$user_id) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>LedgerOne ERP - Products Entry</title>
-    <link rel="stylesheet" href="../../../assets/css/inventory/products/product-add.css">
+    <link rel="stylesheet" href="../../../assets/css/inventory/products/product-add.css?v=<?= filemtime(__DIR__ . '/../../../assets/css/inventory/products/product-add.css') ?>">
     <link rel="stylesheet" href="../../../assets/css/inventory/products/unit-modal.css">
     <script src="https://cdn.jsdelivr.net/npm/qrious@4.0.2/dist/qrious.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jsbarcode/3.11.5/JsBarcode.all.min.js"></script>
@@ -269,18 +281,26 @@ if (!$user_id) {
                         <input type="number" id="purchasePrice" name="purchasePrice" step="0.001" min="0">
                     </div>
                     
+                    <div class="form-group" id="priceEntryUnitGroup" style="display: none;">
+                        <label>Enter Trade Price / MRP By</label>
+                        <select id="priceEntryUnit">
+                            <option value="">Select Unit</option>
+                        </select>
+                        <div class="helper-text">System will store the equivalent Piece rate automatically.</div>
+                    </div>
+
                     <div class="form-group">
-                        <label>Trade Price (TP) / Selected Unit</label>
+                        <label id="tradePriceLabel">Trade Price (TP) / Selected Unit</label>
                         <input type="number" id="tradePrice" name="tradePrice" step="0.001" min="0">
                     </div>
-                    
+
                     <div class="form-group optional-field" data-field="wholesalePrice">
                         <label>Wholesale Price / Selected Unit</label>
                         <input type="number" id="wholesalePrice" name="wholesalePrice" step="0.001" min="0">
                     </div>
-                    
+
                     <div class="form-group">
-                        <label>Maximum Retail Price (MRP) / Selected Unit</label>
+                        <label id="mrpLabel">Maximum Retail Price (MRP) / Selected Unit</label>
                         <input type="number" id="mrp" name="mrp" step="0.001" min="0">
                     </div>
                     
@@ -417,6 +437,7 @@ if (!$user_id) {
     <?php include 'customize-fields-modal.php'; ?>
     <?php include 'scheme-modal.php'; ?>
 
+    <script>window.ENABLE_CARTON_PRICE_ENTRY = <?= $enableCartonPriceEntry ? 'true' : 'false' ?>;</script>
     <script src="../../../assets/js/inventory/products/scheme-functions.js"></script>
     <script src="../../../assets/js/inventory/products/product-add.js?v=<?= filemtime(__DIR__ . '/../../../assets/js/inventory/products/product-add.js') ?>"></script>
 </body>

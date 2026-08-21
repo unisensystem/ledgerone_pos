@@ -112,6 +112,24 @@ function getCustomerDisplayText(customer) {
     return `${customer.customer_code} | ${customer.customer_name} | ${customer.address || 'N/A'}`;
 }
 
+// Effective per-Piece sale price for a product. Products entered via a non-Piece
+// unit (e.g. Carton, via the "Enter Trade Price / MRP By" product-form feature)
+// store a rounded-to-3-decimals per-Piece rate for general use, PLUS the exact
+// originally-typed value and unit. Recomputing live here (full floating-point
+// precision, only rounded at the final Gross/Net amount) avoids a whole-Carton
+// sale totalling 1999.992 instead of 2000 — see calculateRowAmounts's
+// gross.toFixed(3), which absorbs the tiny float epsilon correctly.
+function getEffectivePriceValue(product, salePriceSetting) {
+    const flatPrice = salePriceSetting === 'mrp' ? (product.mrp || 0) : (product.trade_price || 0);
+    if (!product.price_entry_unit_id || !product.price_entry_unit_factor) return flatPrice;
+
+    const factor = parseFloat(product.price_entry_unit_factor);
+    const entryValue = salePriceSetting === 'mrp' ? product.mrp_entry_value : product.trade_price_entry_value;
+    if (!factor || factor <= 0 || !entryValue) return flatPrice;
+
+    return (parseFloat(entryValue) / factor).toFixed(6);
+}
+
 // Function to get product display text based on display mode setting
 function getProductDisplayText(product) {
     const displayMode = localStorage.getItem('productDisplayMode') || 'code_and_name';
@@ -6044,7 +6062,10 @@ async function addRowDynamic() {
     priceInput.type = 'number';
     priceInput.className = 'table-input';
     priceInput.min = '0';
-    priceInput.step = '0.001';
+    // 'any' (not '0.001') — a product priced via a non-Piece entry unit (see
+    // getEffectivePriceValue) can auto-fill a 6-decimal per-Piece rate here;
+    // a stricter step would fail native validation and block Save.
+    priceInput.step = 'any';
     priceInput.required = true;
     priceInput.addEventListener('input', function() {
         const unitInputs = row.querySelectorAll('.unit-input');
@@ -6416,7 +6437,7 @@ function initTableDropdownDynamic(container, row) {
             
             // Set price based on saved setting
             const salePriceSetting = localStorage.getItem('salePriceSetting') || 'trade_price';
-            const priceValue = salePriceSetting === 'mrp' ? (product.mrp || 0) : (product.trade_price || 0);
+            const priceValue = getEffectivePriceValue(product, salePriceSetting);
             row.querySelector('.price-cell input').value = priceValue;
             
             // Set default values

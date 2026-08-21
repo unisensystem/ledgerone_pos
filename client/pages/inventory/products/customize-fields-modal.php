@@ -6,6 +6,13 @@
             <button type="button" class="modal-close" id="closeCustomizeModal">&times;</button>
         </div>
         <div class="modal-body" style="max-height: 60vh; overflow-y: auto;">
+            <div style="margin-bottom: 16px; padding-bottom: 16px; border-bottom: 1px solid var(--border, #dee2e6);">
+                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                    <input type="checkbox" id="enableCartonPriceEntryToggle" <?= $enableCartonPriceEntry ? 'checked' : '' ?>>
+                    Enter Trade Price / MRP by Carton/Dozen (instead of Piece)
+                </label>
+                <div class="helper-text" style="margin-top: 4px; margin-left: 24px;">Business-wide setting — applies to every product added by this account, not just this browser.</div>
+            </div>
             <div style="margin-bottom: 16px;">
                 <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
                     <input type="checkbox" id="selectAllFields">
