@@ -243,7 +243,7 @@ function computeRunningBalances(entries) {
     return entries.map(entry => {
         const key = `${entry.product_name}-${entry.branch_name}`;
         if (!balances[key]) balances[key] = 0;
-        balances[key] += parseFloat(entry.qty_in || 0) - parseFloat(entry.qty_out || 0);
+        balances[key] += parseFloat(entry.qty_in || 0) - parseFloat(entry.qty_out || 0) - parseFloat(entry.qty_foc || 0);
         return {
             ...entry,
             balance: balances[key],
@@ -251,7 +251,6 @@ function computeRunningBalances(entries) {
         };
     });
 }
-
 // Builds a CSV file from an array of plain objects and triggers a download.
 // No external library needed — Excel opens CSV files natively.
 function downloadAsExcelCSV(rows, filename) {
