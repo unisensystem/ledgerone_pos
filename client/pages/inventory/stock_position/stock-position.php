@@ -589,6 +589,7 @@ $currency_symbol = $currency['symbol'];
                                 <th>Transaction</th>
                                 <th>Qty In</th>
                                 <th>Qty Out</th>
+                                <th>FOC</th>
                                 <th>Balance</th>
                                 <th>Unit Cost</th>
                                 <th>Value</th>
