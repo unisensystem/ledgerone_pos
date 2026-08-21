@@ -312,7 +312,7 @@ function renderTable() {
 
         tbody.innerHTML = `
             <tr>
-                <td colspan="8"
+                <td colspan="9"
                     style="text-align:center; padding:24px; color:var(--subtext);">
                     No records found
                 </td>
@@ -331,7 +331,7 @@ function renderTable() {
         html += `
             <tr style="background-color:var(--table-header);">
 
-                <td colspan="7">
+                <td colspan="8">
                     <strong>
                         ${formatDateShort(group.sale_date)}
                         &nbsp;&nbsp;
@@ -339,7 +339,7 @@ function renderTable() {
                     </strong>
                 </td>
 
-                <td style="text-align:right;">
+                <td style="text-align:right;" class="col-amount">
                     <strong>
                         ${group.bill_no || ''}
                     </strong>
@@ -357,6 +357,9 @@ function renderTable() {
             const quantity =
                 parseFloat(row.quantity || 0);
 
+            const focQty =
+                parseFloat(row.foc_quantity || 0);
+
             const netAmount =
                 parseFloat(row.net_amount || 0);
 
@@ -369,36 +372,40 @@ function renderTable() {
             html += `
                 <tr>
 
-                    <td>
+                    <td class="col-sno">
                         ${idx + 1}
                     </td>
 
-                    <td>
+                    <td class="col-code">
                         ${row.product_code || '-'}
                     </td>
 
-                    <td>
+                    <td class="col-detail">
                         ${row.product_name || '-'}
                     </td>
 
-                    <td>
+                    <td class="col-batch">
                         ${batchNo}
                     </td>
 
-                    <td>
+                    <td class="col-expiry">
                         ${expiryDate}
                     </td>
 
-                    <td>
+                    <td class="col-price">
                         ${currentCurrency}${salePrice.toFixed(2)}
                     </td>
 
-                    <td>
+                    <td class="col-qty">
                         ${quantity.toFixed(2)}
                         ${row.unit_symbol || ''}
                     </td>
 
-                    <td>
+                    <td class="col-foc">
+                        ${focQty.toFixed(2)}
+                    </td>
+
+                    <td class="col-amount">
                         ${currentCurrency}${netAmount.toFixed(2)}
                     </td>
 
@@ -410,12 +417,12 @@ function renderTable() {
         html += `
             <tr style="font-weight:bold;">
 
-                <td colspan="7"
+                <td colspan="8"
                     style="text-align:right;">
                     Total
                 </td>
 
-                <td>
+                <td class="col-amount">
                     ${currentCurrency}${group.total_amount.toFixed(2)}
                 </td>
 
@@ -436,6 +443,13 @@ function renderGrandTotal() {
             0
         );
 
+    const grandTotalFoc =
+        allRows.reduce(
+            (sum, r) =>
+                sum + parseFloat(r.foc_quantity || 0),
+            0
+        );
+
     const grandTotalAmount =
         allRows.reduce(
             (sum, r) =>
@@ -450,6 +464,7 @@ function renderGrandTotal() {
         el.textContent =
             `Grand Total: ${groupedInvoices.length} invoice(s), ` +
             `Qty ${grandTotalQty.toFixed(2)}, ` +
+            `FOC ${grandTotalFoc.toFixed(2)}, ` +
             `Amount ${currentCurrency}${grandTotalAmount.toFixed(2)}`;
     }
 }
@@ -542,6 +557,7 @@ function exportToExcel() {
             'Expiry Date': '',
             'Price': '',
             'Qty': '',
+            'FOC': '',
             'Amount': group.bill_no
         });
 
@@ -570,6 +586,10 @@ function exportToExcel() {
                 'Qty':
                     `${parseFloat(row.quantity || 0).toFixed(2)} ${row.unit_symbol || ''}`,
 
+                'FOC':
+                    parseFloat(row.foc_quantity || 0)
+                        .toFixed(2),
+
                 'Amount':
                     parseFloat(row.net_amount || 0)
                         .toFixed(2)
@@ -584,7 +604,8 @@ function exportToExcel() {
             'Batch No': '',
             'Expiry Date': '',
             'Price': '',
-            'Qty': 'Total',
+            'Qty': '',
+            'FOC': 'Total',
             'Amount':
                 group.total_amount.toFixed(2)
         });
@@ -785,7 +806,89 @@ function printReport() {
     window.open(url, '_blank');
 }
 
+/*
+|--------------------------------------------------------------------------
+| COLUMN SHOW / HIDE
+|
+| Preferences are stored in localStorage under a key shared with
+| print.php (same origin), so toggling columns here also affects
+| the print page, and vice versa.
+|--------------------------------------------------------------------------
+*/
+
+const COLUMN_STORAGE_KEY = 'dpsr_column_visibility';
+
+const COLUMN_CONFIG = [
+    { key: 'sno',    label: 'Sr#' },
+    { key: 'code',   label: 'Product Code' },
+    { key: 'detail', label: 'Details' },
+    { key: 'batch',  label: 'Batch No' },
+    { key: 'expiry', label: 'Expiry Date' },
+    { key: 'price',  label: 'Price' },
+    { key: 'qty',    label: 'Qty' },
+    { key: 'foc',    label: 'FOC' },
+    { key: 'amount', label: 'Amount' }
+];
+
+function getColumnPrefs() {
+    try {
+        const raw = localStorage.getItem(COLUMN_STORAGE_KEY);
+        if (!raw) return {};
+        return JSON.parse(raw);
+    } catch (e) {
+        return {};
+    }
+}
+
+function saveColumnPrefs(prefs) {
+    try {
+        localStorage.setItem(COLUMN_STORAGE_KEY, JSON.stringify(prefs));
+    } catch (e) {
+        console.error('Could not save column preferences:', e);
+    }
+}
+
+function applyColumnVisibility() {
+    const prefs = getColumnPrefs();
+    const body = document.body;
+
+    COLUMN_CONFIG.forEach(col => {
+        const isHidden = prefs[col.key] === false;
+        body.classList.toggle(`hide-col-${col.key}`, isHidden);
+    });
+}
+
+function buildColumnsModalBody() {
+    const prefs = getColumnPrefs();
+    const container = document.getElementById('columns-modal-body');
+    if (!container) return;
+
+    container.innerHTML = COLUMN_CONFIG.map(col => {
+        const checked = prefs[col.key] === false ? '' : 'checked';
+        return `
+            <label>
+                <input type="checkbox" data-col-key="${col.key}" ${checked}>
+                ${col.label}
+            </label>
+        `;
+    }).join('');
+}
+
+function openColumnsModal() {
+    buildColumnsModalBody();
+    const overlay = document.getElementById('columns-modal-overlay');
+    if (overlay) overlay.classList.add('open');
+}
+
+function closeColumnsModal() {
+    const overlay = document.getElementById('columns-modal-overlay');
+    if (overlay) overlay.classList.remove('open');
+}
+
 document.addEventListener('DOMContentLoaded', () => {
+
+    // Apply saved column preferences on load
+    applyColumnVisibility();
 
     const applyFilters =
         document.getElementById('applyFilters');
@@ -798,6 +901,21 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const nextBtn =
         document.getElementById('next-btn');
+
+    const columnsBtn =
+        document.getElementById('columns-btn');
+
+    const columnsModalClose =
+        document.getElementById('columns-modal-close');
+
+    const columnsApplyBtn =
+        document.getElementById('columns-apply-btn');
+
+    const columnsResetBtn =
+        document.getElementById('columns-reset-btn');
+
+    const columnsOverlay =
+        document.getElementById('columns-modal-overlay');
 
     // Apply filters
     if (applyFilters) {
@@ -881,6 +999,45 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
         );
+    }
+
+    // Columns modal open
+    if (columnsBtn) {
+        columnsBtn.addEventListener('click', openColumnsModal);
+    }
+
+    // Columns modal close (X button)
+    if (columnsModalClose) {
+        columnsModalClose.addEventListener('click', closeColumnsModal);
+    }
+
+    // Columns modal close (click outside box)
+    if (columnsOverlay) {
+        columnsOverlay.addEventListener('click', (e) => {
+            if (e.target === columnsOverlay) closeColumnsModal();
+        });
+    }
+
+    // Columns modal apply
+    if (columnsApplyBtn) {
+        columnsApplyBtn.addEventListener('click', () => {
+            const prefs = {};
+            document.querySelectorAll('#columns-modal-body input[type="checkbox"]').forEach(cb => {
+                prefs[cb.getAttribute('data-col-key')] = cb.checked;
+            });
+            saveColumnPrefs(prefs);
+            applyColumnVisibility();
+            closeColumnsModal();
+        });
+    }
+
+    // Columns modal reset (show all columns)
+    if (columnsResetBtn) {
+        columnsResetBtn.addEventListener('click', () => {
+            saveColumnPrefs({});
+            applyColumnVisibility();
+            buildColumnsModalBody();
+        });
     }
 
     // Initial loading
