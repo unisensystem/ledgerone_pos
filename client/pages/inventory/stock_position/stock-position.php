@@ -517,7 +517,7 @@ $currency_symbol = $currency['symbol'];
                 </div>
             </div>
 
-            <!-- Company-wise Ledger Tab -->
+            <!-- Supplier-wise Ledger Tab -->
             <div class="tab-content" id="company-ledger">
                 <div class="card-header">
                     <h2 class="card-title">Company-wise Stock Ledger</h2>
@@ -527,6 +527,7 @@ $currency_symbol = $currency['symbol'];
                                 <i class="fas fa-file-export"></i> Export
                             </button>
                             <div class="dropdown-menu">
+                                <a class="dropdown-item" href="#" onclick="printList()"><i class="fas fa-print"></i> Print List</a>
                                 <a class="dropdown-item" href="#" onclick="exportToExcel()"><i class="fas fa-file-excel"></i> Export To Excel</a>
                                 <a class="dropdown-item" href="#" onclick="exportToJSON()"><i class="fas fa-file-code"></i> Export JSON</a>
                             </div>
@@ -535,8 +536,8 @@ $currency_symbol = $currency['symbol'];
                 </div>
                 <div class="form-row">
                     <div class="form-group">
-                        <label class="form-label" for="company-ledger-input">Company</label>
-                        <input type="text" class="form-control" id="company-ledger-input" list="company-ledger-list" placeholder="Select Company">
+                        <label class="form-label" for="company-ledger-input">Supplier</label>
+                        <input type="text" class="form-control" id="company-ledger-input" list="company-ledger-list" placeholder="Select Supplier">
                         <datalist id="company-ledger-list"></datalist>
                     </div>
                     <div class="form-group">
