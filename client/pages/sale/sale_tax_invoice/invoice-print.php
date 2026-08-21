@@ -563,16 +563,7 @@ $currencyCode = $invoice['currency_code'] ?? 'PKR';
                     <?php endif; ?>
 
 
-                    <?php if (!empty($invoice['company_registration_no'])): ?>
-
-                        <div>
-                            <strong>Registration No:</strong>
-                            <?php echo htmlspecialchars(
-                                $invoice['company_registration_no']
-                            ); ?>
-                        </div>
-
-                    <?php endif; ?>
+                   
 
                 </div>
 
