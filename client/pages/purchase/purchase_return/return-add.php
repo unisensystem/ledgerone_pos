@@ -148,7 +148,9 @@ if (!$user_id) {
                         <thead>
                             <tr>
                                 <th width="4%">S#</th>
-                                <th width="20%">Product Code / Name</th>
+                                <th width="18%">Product Code / Name</th>
+                                <th width="10%" data-col="batch-no">Batch No</th>
+                                <th width="8%" data-col="batch-expiry">Expiry Date</th>
                                 <!-- Dynamic unit columns will be inserted here -->
                                 <th width="8%"><span id="purchasePriceLabel">Purchase Price</span></th>
                                 <th width="8%"><span id="grossAmountLabel">Gross Amount</span></th>
@@ -169,6 +171,8 @@ if (!$user_id) {
                         <tfoot>
                             <tr class="totals-row">
                                 <th colspan="2">Totals</th>
+                                <th data-col="batch-no"></th>
+                                <th data-col="batch-expiry"></th>
                                 <!-- Dynamic unit totals will be inserted here -->
                                 <th id="totalPurchasePrice">0.00</th>
                                 <th id="totalGrossAmount">0.00</th>
@@ -249,6 +253,16 @@ if (!$user_id) {
     <div class="modal" id="settingsModal">
         <div class="modal-content">
             <h3 class="modal-title">Return Settings</h3>
+            <div class="form-group">
+                <label>
+                    <input type="checkbox" id="enableBatchNo"> Enable Batch No Column
+                </label>
+            </div>
+            <div class="form-group">
+                <label>
+                    <input type="checkbox" id="enableBatchExpiry"> Enable Expiry Date Column
+                </label>
+            </div>
             <div class="form-group">
                 <label>
                     <input type="checkbox" id="enableTradeOffer"> Enable Inline Trade Offer Discount %
