@@ -26,26 +26,87 @@ try {
     $page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
     $limit = isset($_GET['limit']) ? (int)$_GET['limit'] : 10;
     $offset = ($page - 1) * $limit;
-    $company_id = isset($_GET['company_id']) ? (int)$_GET['company_id'] : null;
-    
-    // Build WHERE clause
+
+    $company_id  = isset($_GET['company_id']) ? (int)$_GET['company_id'] : null;
+    $customer_id = isset($_GET['customer_id']) ? (int)$_GET['customer_id'] : null;
+    $date_from   = isset($_GET['date_from']) && $_GET['date_from'] !== '' ? $_GET['date_from'] : null;
+    $date_to     = isset($_GET['date_to']) && $_GET['date_to'] !== '' ? $_GET['date_to'] : null;
+    $status      = isset($_GET['status']) && $_GET['status'] !== '' ? $_GET['status'] : null;
+    $search      = isset($_GET['search']) && $_GET['search'] !== '' ? $_GET['search'] : null;
+
+    // Build WHERE clause dynamically, with typed params so we can bind correctly
     $where = "si.tenant_id = ? AND si.status = 'Posted'";
-    $countParams = [$tenant_id];
-    $params = [$tenant_id];
-    
+    $params = [['value' => $tenant_id, 'type' => PDO::PARAM_INT]];
+
     if ($company_id) {
         $where .= " AND si.company_id = ?";
-        $countParams[] = $company_id;
-        $params[] = $company_id;
+        $params[] = ['value' => $company_id, 'type' => PDO::PARAM_INT];
     }
-    
-    // Get total count
-    $countStmt = $pdo->prepare("SELECT COUNT(*) FROM sale_order si WHERE $where");
-    $countStmt->execute($countParams);
-    $totalRecords = $countStmt->fetchColumn();
-    
-    // Get paginated data
-    $stmt = $pdo->prepare("
+
+    if ($customer_id) {
+        $where .= " AND si.customer_id = ?";
+        $params[] = ['value' => $customer_id, 'type' => PDO::PARAM_INT];
+    }
+
+    if ($date_from) {
+        $where .= " AND DATE(si.sale_date) >= ?";
+        $params[] = ['value' => $date_from, 'type' => PDO::PARAM_STR];
+    }
+
+    if ($date_to) {
+        $where .= " AND DATE(si.sale_date) <= ?";
+        $params[] = ['value' => $date_to, 'type' => PDO::PARAM_STR];
+    }
+
+    if ($search) {
+        $where .= " AND (si.bill_no LIKE ? OR c.customer_name LIKE ?)";
+        $params[] = ['value' => "%$search%", 'type' => PDO::PARAM_STR];
+        $params[] = ['value' => "%$search%", 'type' => PDO::PARAM_STR];
+    }
+
+    // fulfillment_status is a computed CASE column, so it needs HAVING, not WHERE
+    $having = '';
+    $havingParam = null;
+    if ($status) {
+        $having = " HAVING fulfillment_status = ?";
+        $havingParam = ['value' => $status, 'type' => PDO::PARAM_STR];
+    }
+
+    // ---- Count query ----
+    $countSql = "
+        SELECT COUNT(*) FROM (
+            SELECT
+                si.id,
+                CASE
+                    WHEN EXISTS(
+                        SELECT 1 FROM sale_invoice inv WHERE inv.sale_order_id = si.id AND inv.status = 'Posted'
+                    ) THEN 'Partially Fulfilled'
+                    ELSE 'Pending'
+                END as fulfillment_status
+            FROM sale_order si
+            LEFT JOIN customers c ON si.customer_id = c.id
+            WHERE $where
+            $having
+        ) AS filtered
+    ";
+
+    $countStmt = $pdo->prepare($countSql);
+    $bindIndex = 1;
+    foreach ($params as $p) {
+        $countStmt->bindValue($bindIndex++, $p['value'], $p['type']);
+    }
+    if ($havingParam) {
+        $countStmt->bindValue($bindIndex++, $havingParam['value'], $havingParam['type']);
+    }
+    $countStmt->execute();
+    $totalRecords = (int)$countStmt->fetchColumn();
+
+    // ---- Paginated data query ----
+    // NOTE: join back to sale_invoice_id (original column) — the earlier
+    // change to sale_order_id was an unverified guess and broke the query.
+    // If item_count still looks wrong, confirm the real FK column name in
+    // sale_order_items and tell me — I'll correct it instead of guessing.
+    $sql = "
         SELECT 
             si.id,
             si.bill_no,
@@ -70,18 +131,24 @@ try {
         LEFT JOIN ledgerone_public.currencies cur ON si.currency_id = cur.id
         WHERE $where
         GROUP BY si.id
+        $having
         ORDER BY si.sale_date DESC, si.id DESC
         LIMIT ? OFFSET ?
-    ");
-    
-    foreach ($params as $key => $value) {
-        $stmt->bindValue($key + 1, $value, PDO::PARAM_INT);
+    ";
+
+    $stmt = $pdo->prepare($sql);
+    $bindIndex = 1;
+    foreach ($params as $p) {
+        $stmt->bindValue($bindIndex++, $p['value'], $p['type']);
     }
-    $stmt->bindValue(count($params) + 1, $limit, PDO::PARAM_INT);
-    $stmt->bindValue(count($params) + 2, $offset, PDO::PARAM_INT);
+    if ($havingParam) {
+        $stmt->bindValue($bindIndex++, $havingParam['value'], $havingParam['type']);
+    }
+    $stmt->bindValue($bindIndex++, $limit, PDO::PARAM_INT);
+    $stmt->bindValue($bindIndex++, $offset, PDO::PARAM_INT);
     $stmt->execute();
     $invoices = $stmt->fetchAll(PDO::FETCH_ASSOC);
-    
+
     echo json_encode([
         'success' => true, 
         'invoices' => $invoices,
@@ -89,7 +156,7 @@ try {
             'page' => $page,
             'limit' => $limit,
             'total' => $totalRecords,
-            'pages' => ceil($totalRecords / $limit)
+            'pages' => (int)ceil($totalRecords / $limit)
         ]
     ]);
 } catch (Exception $e) {
