@@ -126,6 +126,54 @@ function resolveConversionFactor($item) {
     return 1.0;
 }
 
+// Builds the "how much of this product was returned" totals for the print report.
+// Mirrors the same filter set as the main item-wise query and the identical function
+// in daily-sale-report.php, but also resolves the return's sales officer NAME (via
+// employees), since $byOfficer here is keyed by officer name rather than officer id.
+function fetchSaleReturnTotals($pdo, $tenant_id, $date_from, $date_to, $sales_officer_ids,
+    $supplier_man_ids, $vendor_ids, $company_ids, $invoice_types, $city_ids, $city_zone_ids,
+    $area_ids, $group_by_officer) {
+
+    $sql = "SELECT
+                sri.product_id,
+                sr.sale_officer_id,
+                COALESCE(e.full_name, 'Unknown') as sale_officer_name,
+                SUM(sri.quantity) as r_qty,
+                SUM(sri.net_amount) as r_amt
+            FROM sale_return_items sri
+            JOIN sale_return sr ON sri.sale_invoice_id = sr.id
+            JOIN products p ON sri.product_id = p.id
+            LEFT JOIN customers c ON sr.customer_id = c.id
+            LEFT JOIN sale_invoice si ON sr.sale_invoice_no = si.id
+            LEFT JOIN employees e ON sr.sale_officer_id = e.id
+            WHERE sr.tenant_id = ? AND sr.status = 'Posted'";
+    $params = [$tenant_id];
+
+    if ($date_from) {
+        $sql .= " AND sr.sale_date >= ?";
+        $params[] = $date_from;
+    }
+    if ($date_to) {
+        $sql .= " AND sr.sale_date <= ?";
+        $params[] = $date_to;
+    }
+
+    addInFilter($sql, $params, 'sr.sale_officer_id', $sales_officer_ids);
+    addInFilter($sql, $params, 'sr.supplier_man_id', $supplier_man_ids);
+    addInFilter($sql, $params, 'p.vendor_id', $vendor_ids);
+    addInFilter($sql, $params, 'sr.company_id', $company_ids);
+    addInvoiceTypeFilter($sql, $params, $invoice_types);
+    addInFilter($sql, $params, 'c.city_id', $city_ids);
+    addInFilter($sql, $params, 'c.city_zone_id', $city_zone_ids);
+    addInFilter($sql, $params, 'c.area_id', $area_ids);
+
+    $sql .= " GROUP BY sri.product_id" . ($group_by_officer ? ", sr.sale_officer_id, e.full_name" : "");
+
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute($params);
+    return $stmt->fetchAll(PDO::FETCH_ASSOC);
+}
+
 // Get report parameters
 $report_type = $_GET['report_type'] ?? 'item-wise';
 $reference = $_GET['reference'] ?? null;
@@ -139,6 +187,10 @@ $city_zone_ids = getIntArrayParam('city_zone_ids', 'city_zone_id');
 $area_ids = getIntArrayParam('area_ids', 'area_id');
 $date_from = $_GET['date_from'] ?? null;
 $date_to = $_GET['date_to'] ?? null;
+// Sale Return toggle - mirrors daily-sale-report.php. The frontend's handlePrint()
+// forwards buildReportParams(true), which already includes include_sale_return=1
+// whenever the toggle is on, so this just needs to be read and acted on here too.
+$include_sale_return = !empty($_GET['include_sale_return']);
 $has_search_filters = !empty($invoice_types)
     || !empty($sales_officer_ids)
     || !empty($supplier_man_ids)
@@ -243,7 +295,8 @@ if ($report_type === 'item-wise') {
                 'discount_amount' => 0,
                 'trade_offer_amount' => 0,
                 'tax_amt' => 0,
-                // Return Qty / Return Amt - not wired up yet, kept for future use
+                // Return Qty / Return Amt - populated below from sale_return_items,
+                // only when the Sale Return toggle is on (see fetchSaleReturnTotals).
                 'r_qty' => 0,
                 'r_amt' => 0,
                 'units' => []
@@ -280,6 +333,25 @@ if ($report_type === 'item-wise') {
         unset($g);
     }
     unset($officerItems);
+
+    // Merge in Sale Return totals, if the toggle is on. Only products that already have
+    // a row in $byOfficer (i.e. matched the sale filters above) get their r_qty/r_amt
+    // filled in - same scoping rule as daily-sale-report.php.
+    if ($include_sale_return) {
+        $returnRows = fetchSaleReturnTotals(
+            $pdo, $tenant_id, $date_from, $date_to, $sales_officer_ids,
+            $supplier_man_ids, $vendor_ids, $company_ids, $invoice_types,
+            $city_ids, $city_zone_ids, $area_ids, $has_search_filters
+        );
+        foreach ($returnRows as $r) {
+            $officerName = $has_search_filters ? $r['sale_officer_name'] : 'All Sales Officers';
+            $key = $has_search_filters ? $r['sale_officer_id'] . '_' . $r['product_id'] : $r['product_id'];
+            if (isset($byOfficer[$officerName][$key])) {
+                $byOfficer[$officerName][$key]['r_qty'] += (float)$r['r_qty'];
+                $byOfficer[$officerName][$key]['r_amt'] += (float)$r['r_amt'];
+            }
+        }
+    }
 
     $multiOfficer = !empty($sales_officer_ids) && count($byOfficer) > 1;
 } else {
@@ -532,6 +604,7 @@ if ($report_type === 'item-wise') {
                     $totalItems = 0;
                     $totalPack = 0;
                     $totalFocQty = 0;
+                    $totalRQty = 0;
                     $totalRAmt = 0;
                     $totalTaxAmt = 0;
                     $sNo = 0;
@@ -550,6 +623,7 @@ if ($report_type === 'item-wise') {
                                 $totalItems++;
                                 $totalPack += $item['total_pack'];
                                 $totalFocQty += $item['foc_qty'];
+                                $totalRQty += $item['r_qty'];
                                 $totalRAmt += $item['r_amt'];
                                 $totalTaxAmt += $item['tax_amt'];
                             }
@@ -560,6 +634,10 @@ if ($report_type === 'item-wise') {
                             $ctnQty = $item['ctn_qty'] > 0 ? intval($item['ctn_qty']) : '-';
                             $pcsQty = $item['pcs_qty'] > 0 ? intval($item['pcs_qty']) : '-';
                             $dznQty = $item['dzn_qty'] > 0 ? intval($item['dzn_qty']) : '-';
+                            // R.QTY / R.Amt only render when the Sale Return toggle put non-zero
+                            // values into $item - blank otherwise, same rule as the on-screen report.
+                            $rQtyDisplay = $item['r_qty'] ? number_format($item['r_qty'], 2) : '';
+                            $rAmtDisplay = $item['r_amt'] ? $currency_symbol . number_format($item['r_amt'], 2) : '';
                             // Net Amount = Amount (already post-discount) minus returns, plus tax
                             $netAmount = $item['amount'] - $item['r_amt'] + $item['tax_amt'];
                     ?>
@@ -576,8 +654,8 @@ if ($report_type === 'item-wise') {
                             <td class="text-right"><?php echo $currency_symbol . number_format($item['discount_amount'], 2); ?></td>
                             <td class="text-right"><?php echo $currency_symbol . number_format($item['trade_offer_amount'], 2); ?></td>
                             <td class="text-right"><?php echo $currency_symbol . number_format($item['amount'], 2); ?></td>
-                            <td class="text-right"></td>
-                            <td class="text-right"></td>
+                            <td class="text-right"><?php echo $rQtyDisplay; ?></td>
+                            <td class="text-right"><?php echo $rAmtDisplay; ?></td>
                             <td class="text-right"><?php echo $currency_symbol . number_format($netAmount, 2); ?></td>
                         </tr>
                     <?php endforeach; endforeach; ?>
@@ -595,8 +673,8 @@ if ($report_type === 'item-wise') {
                         <td class="text-right"><?php echo $currency_symbol . number_format($totalDiscount, 2); ?></td>
                         <td class="text-right"><?php echo $currency_symbol . number_format($totalTradeOffer, 2); ?></td>
                         <td class="text-right"><?php echo $currency_symbol . number_format($totalAmount, 2); ?></td>
-                        <td class="text-right"></td>
-                        <td class="text-right"></td>
+                        <td class="text-right"><?php echo $totalRQty ? number_format($totalRQty, 2) : ''; ?></td>
+                        <td class="text-right"><?php echo $totalRAmt ? $currency_symbol . number_format($totalRAmt, 2) : ''; ?></td>
                         <td class="text-right"><?php echo $currency_symbol . number_format($totalAmount - $totalRAmt + $totalTaxAmt, 2); ?></td>
                     </tr>
                 </tfoot>
