@@ -637,7 +637,10 @@ try {
             echo json_encode(['success' => true, 'data' => $ledger, 'currency' => $currency_symbol]);
             break;
 
-                    case 'company-ledger':
+        case 'company-ledger':
+            // NOTE: despite the historical name "company", this report is Supplier/Vendor-wise.
+            // The $company_id GET param (kept for URL/JS backward-compatibility) now holds a
+            // suppliers.id value, and rows are matched against purchase_invoice.supplier_id.
             $company_id = $_GET['company_id'] ?? null;
             $branch_id = $_GET['branch_id'] ?? null;
             $product_id = $_GET['product_id'] ?? null;
@@ -645,13 +648,13 @@ try {
             $to_date = $_GET['to_date'] ?? null;
 
             if (!$company_id) {
-                echo json_encode(['success' => false, 'message' => 'Company required']);
+                echo json_encode(['success' => false, 'message' => 'Supplier required']);
                 exit;
             }
 
             $sql = "SELECT 
                         sl.transaction_date,
-                        COALESCE(pi.bill_no, si.bill_no) as invoice_number,
+                        pi.bill_no as invoice_number,
                         p.name as product_name,
                         COALESCE(b.branch_name, 'No Branch') as branch_name,
                         sl.transaction_type,
@@ -667,11 +670,10 @@ try {
                     LEFT JOIN uom u ON sl.unit_id = u.id
                     LEFT JOIN uom base_u ON COALESCE(u.base_unit_id, u.id) = base_u.id
                     LEFT JOIN product_uom_conversions puc ON p.id = puc.product_id AND sl.unit_id = puc.uom_id
-                    LEFT JOIN purchase_invoice pi ON sl.reference_table = 'purchase_invoice' AND sl.reference_id = pi.id
-                    LEFT JOIN sale_invoice si ON sl.reference_table = 'sale_invoice' AND sl.reference_id = si.id
-                    WHERE sl.tenant_id = ? AND p.product_type = 'physical' AND (pi.company_id = ? OR si.company_id = ?)";
+                    JOIN purchase_invoice pi ON sl.reference_table = 'purchase_invoice' AND sl.reference_id = pi.id
+                    WHERE sl.tenant_id = ? AND p.product_type = 'physical' AND pi.supplier_id = ?";
 
-            $params = [$tenant_id, $company_id, $company_id];
+            $params = [$tenant_id, $company_id];
 
             if ($branch_id) {
                 $sql .= " AND sl.branch_id = ?";
@@ -776,7 +778,10 @@ try {
             break;
 
         case 'companies':
-            $companies_sql = "SELECT id, company_name FROM companies WHERE tenant_id = ? AND is_active = 1 ORDER BY company_name";
+            // NOTE: this action actually backs the Supplier/Vendor picker on the
+            // "Company-wise Ledger" tab, so it returns Suppliers (not the `companies` table).
+            // 'company_name' key kept for frontend/JS compatibility.
+            $companies_sql = "SELECT id, supplier_name as company_name FROM suppliers WHERE tenant_id = ? AND status = 'ACTIVE' ORDER BY supplier_name";
             $companies_stmt = $pdo->prepare($companies_sql);
             $companies_stmt->execute([$tenant_id]);
             $companies = $companies_stmt->fetchAll(PDO::FETCH_ASSOC);
