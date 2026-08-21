@@ -186,33 +186,35 @@
         </div>
         
         <table class="items-table">
-            <thead>
-                <tr>
-                    <th width="5%">#</th>
-                    <th width="25%">Product</th>
-                    <th width="15%">Quantities</th>
-                    <th width="10%" class="text-right">Unit Price</th>
-                    <th width="10%" class="text-right">Gross Amt</th>
-                    <th width="7%" class="text-right">Disc %</th>
-                    <th width="10%" class="text-right">Disc Amt</th>
-                    <th width="7%" class="text-right">TO %</th>
-                    <th width="10%" class="text-right">TO Amt</th>
-                    <th width="7%" class="text-right">Tax %</th>
-                    <th width="10%" class="text-right">Tax Amt</th>
-                    <th width="7%" class="text-right">FOC Qty</th>
-                    <th width="12%" class="text-right">Net Amt</th>
-                </tr>
-            </thead>
-            <tbody id="itemsTableBody">
-                <tr>
-                    <td colspan="13" class="text-center">Loading items...</td>
-                </tr>
-            </tbody>
-            <tfoot>
-                <tr style="background-color: #f5f5f5; font-weight: bold;">
-                    <th colspan="3">Totals</th>
-                    <th class="text-right" id="totalUnitPrice">0.00</th>
-                    <th class="text-right" id="totalGrossAmount">0.00</th>
+           <thead>
+    <tr>
+        <th width="5%">#</th>
+        <th width="18%">Product</th>
+        <th width="10%">Batch No</th>
+        <th width="8%">Expiry</th>
+        <th width="13%">Quantities</th>
+        <th width="9%" class="text-right">Unit Price</th>
+        <th width="9%" class="text-right">Gross Amt</th>
+        <th width="6%" class="text-right">Disc %</th>
+        <th width="9%" class="text-right">Disc Amt</th>
+        <th width="6%" class="text-right">TO %</th>
+        <th width="9%" class="text-right">TO Amt</th>
+        <th width="6%" class="text-right">Tax %</th>
+        <th width="9%" class="text-right">Tax Amt</th>
+        <th width="6%" class="text-right">FOC Qty</th>
+        <th width="11%" class="text-right">Net Amt</th>
+    </tr>
+</thead>
+<tbody id="itemsTableBody">
+    <tr>
+        <td colspan="15" class="text-center">Loading items...</td>
+    </tr>
+</tbody>
+<tfoot>
+    <tr style="background-color: #f5f5f5; font-weight: bold;">
+        <th colspan="5">Totals</th>
+        <th class="text-right" id="totalUnitPrice">0.00</th>
+                            <th class="text-right" id="totalGrossAmount">0.00</th>
                     <th></th>
                     <th class="text-right" id="totalDiscountAmountItems">0.00</th>
                     <th></th>
@@ -384,10 +386,17 @@
                 let unitQtyDisplay = Object.keys(unitMap).map(name => `${unitMap[name].toFixed(2)} ${name}`).join(', ');
                 if (!unitQtyDisplay) unitQtyDisplay = '-';
 
-                const row = tbody.insertRow();
-                row.innerHTML = `
-                    <td class="text-center">${index + 1}</td>
-                    <td>${item.product_name}</td>
+            const batchNo = item.batch_no || '-';
+    const batchExpiry = item.batch_expiry_date 
+        ? new Date(item.batch_expiry_date).toLocaleDateString() 
+        : '-';
+
+    const row = tbody.insertRow();
+    row.innerHTML = `
+        <td class="text-center">${index + 1}</td>
+        <td>${item.product_name}</td>
+        <td class="text-center">${batchNo}</td>
+        <td class="text-center">${batchExpiry}</td>
                     <td>${unitQtyDisplay}</td>
                     <td class="text-right">${currencySymbol} ${parseFloat(item.purchase_price).toFixed(2)}</td>
                     <td class="text-right">${currencySymbol} ${parseFloat(item.gross_amount).toFixed(2)}</td>
