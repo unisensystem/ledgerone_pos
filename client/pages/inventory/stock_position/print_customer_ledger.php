@@ -9,35 +9,47 @@ if (!$user_id || !$tenant_id) {
     exit();
 }
 
+// Get company data
 require_once '../../../../includes/connection.php';
 $company_sql = "SELECT company_name, address, phone, email, logo_url FROM companies WHERE tenant_id = ? AND is_active = 1 LIMIT 1";
 $company_stmt = $pdo->prepare($company_sql);
 $company_stmt->execute([$tenant_id]);
 $company = $company_stmt->fetch(PDO::FETCH_ASSOC);
 
+// Get user data
 $user_sql = "SELECT full_name FROM users WHERE id = ?";
 $user_stmt = $pdo->prepare($user_sql);
 $user_stmt->execute([$user_id]);
 $user = $user_stmt->fetch(PDO::FETCH_ASSOC);
 
-$company_id = $_GET['company_id'] ?? null;
-$branch_id = $_GET['branch_id'] ?? null;
+// Get filters from URL
+$customer_id = $_GET['customer_id'] ?? null;
 $product_id = $_GET['product_id'] ?? null;
 $from_date = $_GET['from_date'] ?? null;
 $to_date = $_GET['to_date'] ?? null;
-$batch_no = $_GET['batch_no'] ?? null;
-$expiry_date = $_GET['expiry_date'] ?? null;
 
-// Resolve supplier name for the header
-$supplier_name = 'Selected Supplier';
-if ($company_id) {
-    $sup_sql = "SELECT company_name FROM companies WHERE id = ? AND tenant_id = ?";
-    $sup_stmt = $pdo->prepare($sup_sql);
-    $sup_stmt->execute([$company_id, $tenant_id]);
-    $sup_result = $sup_stmt->fetch(PDO::FETCH_ASSOC);
-    if ($sup_result) {
-        $supplier_name = $sup_result['company_name'];
-    }
+if (!$customer_id && !$product_id) {
+    die('A customer or a product is required to generate this report.');
+}
+
+// Look up customer name from DB (never trust a name passed via query string)
+$customer_name = null;
+if ($customer_id) {
+    $customer_sql = "SELECT customer_name FROM customers WHERE id = ? AND tenant_id = ?";
+    $customer_stmt = $pdo->prepare($customer_sql);
+    $customer_stmt->execute([$customer_id, $tenant_id]);
+    $customer_result = $customer_stmt->fetch(PDO::FETCH_ASSOC);
+    $customer_name = $customer_result['customer_name'] ?? 'Unknown Customer';
+}
+
+// Look up product name from DB (never trust a name passed via query string)
+$product_name = null;
+if ($product_id) {
+    $product_sql = "SELECT name FROM products WHERE id = ? AND tenant_id = ?";
+    $product_stmt = $pdo->prepare($product_sql);
+    $product_stmt->execute([$product_id, $tenant_id]);
+    $product_result = $product_stmt->fetch(PDO::FETCH_ASSOC);
+    $product_name = $product_result['name'] ?? 'Unknown Product';
 }
 ?>
 <!DOCTYPE html>
@@ -45,7 +57,7 @@ if ($company_id) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Company-wise Stock Ledger - Print View</title>
+    <title>Customer-wise Stock Ledger - Print View</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
         @media print {
@@ -135,7 +147,7 @@ if ($company_id) {
         }
 
         .signature-section {
-            margin-top: 0%;
+            margin-top: 40px;
             display: flex;
             justify-content: space-between;
             page-break-inside: avoid;
@@ -159,6 +171,13 @@ if ($company_id) {
             font-weight: bold;
             margin-top: 5px;
         }
+
+        .no-data {
+            text-align: center;
+            padding: 30px;
+            color: #888;
+            font-style: italic;
+        }
     </style>
 </head>
 <body>
@@ -168,43 +187,41 @@ if ($company_id) {
     </div>
 
     <div class="header">
-        <?php if ($company['logo_url']): ?>
+        <?php if (!empty($company['logo_url'])): ?>
             <img src="../../../assets/uploads/company_logo/<?= htmlspecialchars($company['logo_url']) ?>" alt="Company Logo" style="max-height: 60px; margin-bottom: 10px;">
         <?php endif; ?>
-        <div class="company-name"><?= $company['company_name'] ?? 'LedgerOne ERP' ?></div>
-        <?php if ($company['address']): ?>
+        <div class="company-name"><?= htmlspecialchars($company['company_name'] ?? 'LedgerOne ERP') ?></div>
+        <?php if (!empty($company['address'])): ?>
             <div style="font-size: 12px; margin-bottom: 5px;"><?= htmlspecialchars($company['address']) ?></div>
         <?php endif; ?>
-        <?php if ($company['phone'] || $company['email']): ?>
+        <?php if (!empty($company['phone']) || !empty($company['email'])): ?>
             <div style="font-size: 12px; margin-bottom: 10px;">
                 <?= $company['phone'] ? 'Phone: ' . htmlspecialchars($company['phone']) : '' ?>
-                <?= $company['phone'] && $company['email'] ? ' | ' : '' ?>
+                <?= ($company['phone'] && $company['email']) ? ' | ' : '' ?>
                 <?= $company['email'] ? 'Email: ' . htmlspecialchars($company['email']) : '' ?>
             </div>
         <?php endif; ?>
-        <div class="report-title">Company-wise Stock Ledger Report</div>
+        <div class="report-title">Customer-wise Stock Ledger</div>
         <div class="report-date">Generated on: <?= date('Y-m-d H:i:s') ?></div>
-        <div class="report-date">Generated by: <?= $user['full_name'] ?? 'System User' ?></div>
+        <div class="report-date">Generated by: <?= htmlspecialchars($user['full_name'] ?? 'System User') ?></div>
     </div>
 
     <div class="filters">
         <strong>Filters Applied:</strong>
-        Supplier: <?= htmlspecialchars($supplier_name) ?> |
-        Branch: <?= $branch_id ? 'Selected' : 'All Branches' ?> |
-        Product: <?= $product_id ? 'Selected' : 'All Products' ?> |
-        Batch No: <?= $batch_no ? htmlspecialchars($batch_no) : 'All' ?> |
-        Expiry Date: <?= $expiry_date ? htmlspecialchars($expiry_date) : 'All' ?> |
-        Period: <?= $from_date && $to_date ? date('M d, Y', strtotime($from_date)) . ' to ' . date('M d, Y', strtotime($to_date)) : 'All Dates' ?>
+        <?php if ($customer_name): ?>
+            Customer: <?= htmlspecialchars($customer_name) ?> |
+        <?php endif; ?>
+        <?php if ($product_name): ?>
+            Product: <?= htmlspecialchars($product_name) ?> |
+        <?php endif; ?>
+        Period: <?= ($from_date && $to_date) ? date('M d, Y', strtotime($from_date)) . ' to ' . date('M d, Y', strtotime($to_date)) : 'All Dates' ?>
     </div>
 
     <table id="reportTable">
         <thead>
             <tr>
                 <th>Date</th>
-                <th>Invoice #</th>
                 <th>Product</th>
-                <th>Batch No</th>
-                <th>Expiry Date</th>
                 <th>Branch</th>
                 <th>Transaction</th>
                 <th>Qty In</th>
@@ -235,25 +252,48 @@ if ($company_id) {
 
     <script>
         const API_BASE = '../../../../server/api/inventory/stock_position/stock-position.php';
-        let currentRows = [];
+
+        // Holds exactly what's rendered on screen, so Export to Excel matches the preview
+        let currentEntries = [];
         let currentCurrency = '$';
 
-        function filterByBatchExpiry(entries, batchFilter, expiryFilter) {
-            const batch = (batchFilter || '').trim().toLowerCase();
-            return entries.filter(entry => {
-                if (batch) {
-                    const entryBatch = String(entry.batch_no || '').toLowerCase();
-                    if (!entryBatch.includes(batch)) return false;
+        async function loadPrintData() {
+            try {
+                const urlParams = new URLSearchParams(window.location.search);
+                const customerId = urlParams.get('customer_id');
+                const productId = urlParams.get('product_id');
+
+                if (!customerId && !productId) {
+                    document.querySelector('#reportTable tbody').innerHTML =
+                        '<tr><td colspan="9" class="no-data">No customer or product specified.</td></tr>';
+                    return;
                 }
-                if (expiryFilter) {
-                    const entryExpiry = String(entry.batch_expiry_date || '').slice(0, 10);
-                    if (entryExpiry !== expiryFilter) return false;
+
+                let url = `${API_BASE}?action=customer-ledger`;
+                if (customerId) url += `&customer_id=${customerId}`;
+                if (productId) url += `&product_id=${productId}`;
+                if (urlParams.get('from_date')) url += `&from_date=${urlParams.get('from_date')}`;
+                if (urlParams.get('to_date')) url += `&to_date=${urlParams.get('to_date')}`;
+
+                const response = await fetch(url);
+                const data = await response.json();
+
+                if (data.success) {
+                    currentCurrency = data.currency || '$';
+                    currentEntries = computeRunningBalances(data.data || []);
+                    updatePrintTable(currentEntries, currentCurrency);
+                } else {
+                    document.querySelector('#reportTable tbody').innerHTML =
+                        `<tr><td colspan="9" class="no-data">${data.message || 'Failed to load data.'}</td></tr>`;
                 }
-                return true;
-            });
+            } catch (error) {
+                console.error('Error loading print data:', error);
+                document.querySelector('#reportTable tbody').innerHTML =
+                    '<tr><td colspan="9" class="no-data">Error loading data.</td></tr>';
+            }
         }
 
-        // Running balance per product-branch, same logic as the main page's company-ledger table
+        // Running balance per product-branch combination (same logic used on the main dashboard)
         function computeRunningBalances(entries) {
             const balances = {};
             return entries.map(entry => {
@@ -268,111 +308,74 @@ if ($company_id) {
             });
         }
 
-        function fmtQty(val, unit) {
-            return `${parseFloat(val || 0).toFixed(2)} ${unit || 'L'}`;
-        }
-
-        async function loadPrintData() {
-            try {
-                const urlParams = new URLSearchParams(window.location.search);
-                const companyId = urlParams.get('company_id');
-                if (!companyId) {
-                    document.querySelector('#reportTable tbody').innerHTML =
-                        '<tr><td colspan="12" style="text-align:center;">No supplier selected.</td></tr>';
-                    return;
-                }
-
-                let url = `${API_BASE}?action=company-ledger&company_id=${companyId}`;
-                if (urlParams.get('branch_id')) url += `&branch_id=${urlParams.get('branch_id')}`;
-                if (urlParams.get('product_id')) url += `&product_id=${urlParams.get('product_id')}`;
-                if (urlParams.get('from_date')) url += `&from_date=${urlParams.get('from_date')}`;
-                if (urlParams.get('to_date')) url += `&to_date=${urlParams.get('to_date')}`;
-
-                const response = await fetch(url);
-                const data = await response.json();
-                if (!data.success) return;
-
-                const batchFilter = urlParams.get('batch_no');
-                const expiryFilter = urlParams.get('expiry_date');
-                const filtered = filterByBatchExpiry(data.data, batchFilter, expiryFilter);
-                currentRows = computeRunningBalances(filtered);
-                currentCurrency = data.currency || '$';
-                renderPrintTable(currentRows, currentCurrency);
-            } catch (error) {
-                console.error('Error loading company ledger print data:', error);
-            }
-        }
-
-        function renderPrintTable(rows, currency = '$') {
+        function updatePrintTable(entries, currency = '$') {
             const tbody = document.querySelector('#reportTable tbody');
 
-            const bodyHtml = rows.map(entry => `
+            if (!entries || entries.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="9" class="no-data">No transactions found for the selected filters.</td></tr>';
+                return;
+            }
+
+            const totalQtyIn = entries.reduce((sum, e) => sum + parseFloat(e.qty_in || 0), 0);
+            const totalQtyOut = entries.reduce((sum, e) => sum + parseFloat(e.qty_out || 0), 0);
+            const totalValue = entries.reduce((sum, e) => sum + parseFloat(e.value || 0), 0);
+            const unit = entries[0]?.unit_symbol || 'L';
+
+            tbody.innerHTML = entries.map(entry => `
                 <tr>
                     <td>${entry.transaction_date}</td>
-                    <td>${entry.invoice_number || '-'}</td>
                     <td>${entry.product_name}</td>
-                    <td>${entry.batch_no || '-'}</td>
-                    <td>${entry.batch_expiry_date || '-'}</td>
                     <td>${entry.branch_name}</td>
                     <td>${entry.transaction_type}</td>
-                    <td>${entry.qty_in > 0 ? fmtQty(entry.qty_in, entry.unit_symbol) : '-'}</td>
-                    <td>${entry.qty_out > 0 ? fmtQty(entry.qty_out, entry.unit_symbol) : '-'}</td>
-                    <td>${fmtQty(entry.balance, entry.unit_symbol)}</td>
+                    <td>${entry.qty_in > 0 ? parseFloat(entry.qty_in).toFixed(2) + ' ' + (entry.unit_symbol || 'L') : '-'}</td>
+                    <td>${entry.qty_out > 0 ? parseFloat(entry.qty_out).toFixed(2) + ' ' + (entry.unit_symbol || 'L') : '-'}</td>
+                    <td>${parseFloat(entry.balance).toFixed(2)} ${entry.unit_symbol || 'L'}</td>
                     <td>${currency}${parseFloat(entry.unit_cost).toFixed(2)}</td>
                     <td>${currency}${parseFloat(entry.value).toFixed(2)}</td>
-                </tr>`).join('');
-
-            const totalQtyIn = rows.reduce((s, e) => s + parseFloat(e.qty_in || 0), 0);
-            const totalQtyOut = rows.reduce((s, e) => s + parseFloat(e.qty_out || 0), 0);
-            const totalValue = rows.reduce((s, e) => s + parseFloat(e.value || 0), 0);
-
-            const totalsHtml = `
+                </tr>
+            `).join('') + `
                 <tr class="totals-row">
-                    <td colspan="7">Total (${rows.length} transactions)</td>
-                    <td>${totalQtyIn.toFixed(2)} ${rows[0]?.unit_symbol || 'L'}</td>
-                    <td>${totalQtyOut.toFixed(2)} ${rows[0]?.unit_symbol || 'L'}</td>
+                    <td colspan="4">Total (${entries.length} transactions)</td>
+                    <td>${totalQtyIn.toFixed(2)} ${unit}</td>
+                    <td>${totalQtyOut.toFixed(2)} ${unit}</td>
                     <td>-</td>
                     <td>-</td>
                     <td>${currency}${totalValue.toFixed(2)}</td>
-                </tr>`;
-
-            tbody.innerHTML = bodyHtml + totalsHtml;
+                </tr>
+            `;
         }
 
+        // Export to Excel — mirrors exactly what's shown in the preview (SheetJS)
         function exportToExcel() {
             if (typeof XLSX === 'undefined') {
                 alert('Excel export library failed to load. Please check your internet connection and reload the page.');
                 return;
             }
-            if (!currentRows || currentRows.length === 0) {
+
+            if (!currentEntries || currentEntries.length === 0) {
                 alert('No data available to export.');
                 return;
             }
 
-            const rows = currentRows.map(e => ({
-                'Date': e.transaction_date,
-                'Invoice #': e.invoice_number || '-',
-                'Product': e.product_name,
-                'Batch No': e.batch_no || '-',
-                'Expiry Date': e.batch_expiry_date || '-',
-                'Branch': e.branch_name,
-                'Transaction': e.transaction_type,
-                'Qty In': e.qty_in > 0 ? fmtQty(e.qty_in, e.unit_symbol) : '-',
-                'Qty Out': e.qty_out > 0 ? fmtQty(e.qty_out, e.unit_symbol) : '-',
-                'Balance': fmtQty(e.balance, e.unit_symbol),
-                'Unit Cost': parseFloat(e.unit_cost).toFixed(2),
-                'Value': parseFloat(e.value).toFixed(2)
+            const rows = currentEntries.map(entry => ({
+                'Date': entry.transaction_date,
+                'Product': entry.product_name,
+                'Branch': entry.branch_name,
+                'Transaction': entry.transaction_type,
+                'Qty In': entry.qty_in > 0 ? `${parseFloat(entry.qty_in).toFixed(2)} ${entry.unit_symbol || 'L'}` : '-',
+                'Qty Out': entry.qty_out > 0 ? `${parseFloat(entry.qty_out).toFixed(2)} ${entry.unit_symbol || 'L'}` : '-',
+                'Balance': `${parseFloat(entry.balance).toFixed(2)} ${entry.unit_symbol || 'L'}`,
+                'Unit Cost': parseFloat(entry.unit_cost).toFixed(2),
+                'Value': parseFloat(entry.value).toFixed(2)
             }));
 
             const worksheet = XLSX.utils.json_to_sheet(rows);
             const workbook = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(workbook, worksheet, 'Company Ledger');
-            XLSX.writeFile(workbook, `supplier_ledger_${new Date().toISOString().slice(0, 10)}.xlsx`);
+            XLSX.utils.book_append_sheet(workbook, worksheet, 'Customer Ledger');
+            XLSX.writeFile(workbook, `customer_ledger_${new Date().toISOString().slice(0, 10)}.xlsx`);
         }
 
-        document.addEventListener('DOMContentLoaded', () => {
-            loadPrintData();
-        });
+        document.addEventListener('DOMContentLoaded', loadPrintData);
     </script>
 </body>
 </html>
