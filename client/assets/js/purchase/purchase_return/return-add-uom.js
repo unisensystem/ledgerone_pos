@@ -29,27 +29,33 @@ function getProductUOMDetails(product) {
 // Update table headers based on max units
 function updateTableHeaders() {
     const headerRow = document.querySelector('#itemsTable thead tr');
-    const productHeader = headerRow.cells[1]; // Product Code / Name column
-    
+
     // Clear existing dynamic headers
     const existingHeaders = headerRow.querySelectorAll('.unit-header');
     existingHeaders.forEach(header => header.remove());
 
-    // Add unit headers after product column (in reverse order for correct display)
+    // FIX: unit cells are inserted right before .price-cell (after Product, Batch No,
+    // and Expiry Date columns) — so unit headers must be anchored to the same spot,
+    // i.e. right after the "Expiry Date" header (data-col="batch-expiry"), NOT right
+    // after the Product column. This is what was causing every label to appear
+    // one column to the left of its actual data.
+    const anchorHeader = headerRow.querySelector('[data-col="batch-expiry"]') || headerRow.cells[1];
+
+    // Add unit headers after the anchor (in reverse order for correct display)
     for (let i = maxUnitColumns - 1; i >= 0; i--) {
         const th = document.createElement('th');
         th.width = '8%';
         th.className = 'unit-header';
         th.textContent = `Unit ${i + 1}`;
-        productHeader.insertAdjacentElement('afterend', th);
+        anchorHeader.insertAdjacentElement('afterend', th);
     }
 }
 
 // Update footer totals
 function updateFooterTotals() {
     const footerRow = document.querySelector('#itemsTable tfoot tr');
-    const totalsLabel = footerRow.cells[0]; // "Totals" cell
-    
+    const totalsLabel = footerRow.cells[0]; // "Totals" cell (colspan=2)
+
     // Clear existing unit totals
     const existingTotals = footerRow.querySelectorAll('.unit-total');
     existingTotals.forEach(total => total.remove());
@@ -68,12 +74,16 @@ function updateFooterTotals() {
         });
     }
 
-    // Add total cells after "Totals" label (in reverse order for correct display)
+    // FIX: same anchor fix as the header — insert unit totals right after the
+    // "Expiry Date" footer cell (data-col="batch-expiry"), not right after "Totals".
+    const anchorCell = footerRow.querySelector('[data-col="batch-expiry"]') || totalsLabel;
+
+    // Add total cells after the anchor (in reverse order for correct display)
     for (let i = maxUnitColumns - 1; i >= 0; i--) {
         const th = document.createElement('th');
         th.className = 'unit-total';
         th.textContent = unitTotals[i].toFixed(2);
-        totalsLabel.insertAdjacentElement('afterend', th);
+        anchorCell.insertAdjacentElement('afterend', th);
     }
     
     // Update other totals
@@ -169,7 +179,8 @@ function updateRowUnitCells(row) {
     const existingUnitCells = row.querySelectorAll('.unit-cell');
     existingUnitCells.forEach(cell => cell.remove());
     
-    // Find insertion point (after product column, before price column)
+    // Find insertion point (after Batch No / Expiry Date, before price column)
+    // This already matches where addRowDynamic() places batch-no/batch-expiry cells.
     const priceCell = row.querySelector('.price-cell');
     if (!priceCell) return; // Safety check
     const priceCellIndex = Array.from(row.cells).indexOf(priceCell);
@@ -322,4 +333,3 @@ function updateReturnSummaryDynamic() {
     
     updateFooterTotals();
 }
-
