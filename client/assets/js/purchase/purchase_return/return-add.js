@@ -99,6 +99,84 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     });
 
+    // ============================================================
+    // BATCH HANDLING (NEW) — fetch available batches for a product
+    // in the currently selected branch, populate the batch dropdown,
+    // and auto-fill expiry when a batch is chosen.
+    // ============================================================
+    async function loadBatchesForRow(row, productId) {
+        const batchSelect = row.querySelector('.batch-no-select');
+        const expiryInput = row.querySelector('.batch-expiry-input');
+        if (!batchSelect) return;
+
+        const branchId = document.getElementById('branch').value;
+
+        batchSelect.innerHTML = '<option value="">Loading...</option>';
+        batchSelect.disabled = true;
+        if (expiryInput) expiryInput.value = '';
+
+        if (!productId || !branchId) {
+            batchSelect.innerHTML = '<option value="">Select branch first</option>';
+            return;
+        }
+
+        try {
+            const response = await fetch(`../../../../server/api/purchase/purchase_return/get-product-batches.php?product_id=${productId}&branch_id=${branchId}`);
+            const data = await response.json();
+
+            batchSelect.innerHTML = '';
+
+            if (data.success && data.batches && data.batches.length > 0) {
+                batchSelect.appendChild(new Option('Select batch...', ''));
+                data.batches.forEach(b => {
+                    const opt = document.createElement('option');
+                    opt.value = b.batch_no;
+                    opt.textContent = `${b.batch_no} (Qty: ${parseFloat(b.available_qty).toFixed(2)}${b.batch_expiry_date ? ', Exp: ' + b.batch_expiry_date : ''})`;
+                    opt.dataset.expiry = b.batch_expiry_date || '';
+                    opt.dataset.availableQty = b.available_qty;
+                    batchSelect.appendChild(opt);
+                });
+                batchSelect.disabled = false;
+            } else {
+                // No stock available for this product in this branch — cannot be returned
+                batchSelect.appendChild(new Option('No stock available', ''));
+                batchSelect.disabled = true;
+                alert('This product has no available stock in the selected branch, so it cannot be returned. Please remove this row or pick a different product/branch.');
+            }
+        } catch (error) {
+            console.error('Error loading batches:', error);
+            batchSelect.innerHTML = '<option value="">Error loading batches</option>';
+        }
+    }
+
+    // When batch is selected, auto-fill expiry date
+    function handleBatchSelectChange(row) {
+        const batchSelect = row.querySelector('.batch-no-select');
+        const expiryInput = row.querySelector('.batch-expiry-input');
+        if (!batchSelect || !expiryInput) return;
+
+        const selectedOption = batchSelect.options[batchSelect.selectedIndex];
+        expiryInput.value = selectedOption ? (selectedOption.dataset.expiry || '') : '';
+        row.dataset.batchAvailableQty = selectedOption ? (selectedOption.dataset.availableQty || '0') : '0';
+    }
+
+    // Reload batches for every row that already has a product selected
+    // (used when the branch is changed, since batches are branch-specific)
+    function reloadBatchesForAllRows() {
+        const rows = itemsTable.rows;
+        for (let i = 0; i < rows.length; i++) {
+            const row = rows[i];
+            const productId = row.dataset.productId;
+            if (productId) {
+                loadBatchesForRow(row, productId);
+            }
+        }
+    }
+    // Expose for the branch dropdown handler below
+    window._returnReloadBatchesForAllRows = reloadBatchesForAllRows;
+    window._returnLoadBatchesForRow = loadBatchesForRow;
+    window._returnHandleBatchSelectChange = handleBatchSelectChange;
+
     // Load suppliers from API
     async function loadSuppliers(companyId = null) {
         try {
@@ -357,9 +435,6 @@ document.addEventListener('DOMContentLoaded', function () {
             if (data.success) {
                 const invoice = data.invoice;
                 const items = data.items;
-                
-                console.log('Loaded items:', items);
-                console.log('First item unit_entries:', items[0]?.unit_entries);
 
                 // Populate form fields
                 document.getElementById('supplierCodeSearch').value = `${invoice.supplier_code} - ${invoice.supplier_name}`;
@@ -407,7 +482,10 @@ document.addEventListener('DOMContentLoaded', function () {
                 // Recalculate columns ONCE after all rows added
                 recalculateMaxColumns();
 
-                // Second pass: set field values and unit quantities AFTER unit cells exist
+                // Second pass: set field values and unit quantities AFTER unit cells exist,
+                // and load available batches for each row (batch NOT auto-selected here since
+                // this is copying a purchase invoice, not restoring a saved return — the user
+                // must confirm which batch is actually being returned)
                 items.forEach((item, index) => {
                     const row = tbody.rows[index];
                     row.querySelector('.price-cell input').value = item.purchase_price;
@@ -424,6 +502,7 @@ document.addEventListener('DOMContentLoaded', function () {
                         if (unitInput) unitInput.value = entry.quantity;
                     });
                     calculateTotalQuantity(row);
+                    loadBatchesForRow(row, item.product_id);
                 });
 
                 // Autopopulate discount and shipping fees from invoice
@@ -545,6 +624,29 @@ document.addEventListener('DOMContentLoaded', function () {
                         if (unitInput) unitInput.value = entry.quantity;
                     });
                     calculateTotalQuantity(row);
+
+                    // Load this product's available batches for the branch, then
+                    // restore the previously-saved batch selection + expiry.
+                    // NOTE: relies on return-edit.php returning item.batch_no / item.batch_expiry_date.
+                    loadBatchesForRow(row, item.product_id).then(() => {
+                        if (item.batch_no) {
+                            const batchSelect = row.querySelector('.batch-no-select');
+                            const expiryInput = row.querySelector('.batch-expiry-input');
+                            if (batchSelect) {
+                                // If the saved batch isn't in the "still available" list
+                                // (e.g. fully consumed elsewhere), add it back so editing works.
+                                let opt = Array.from(batchSelect.options).find(o => o.value === item.batch_no);
+                                if (!opt) {
+                                    opt = new Option(item.batch_no, item.batch_no);
+                                    opt.dataset.expiry = item.batch_expiry_date || '';
+                                    batchSelect.appendChild(opt);
+                                    batchSelect.disabled = false;
+                                }
+                                batchSelect.value = item.batch_no;
+                                if (expiryInput) expiryInput.value = item.batch_expiry_date || '';
+                            }
+                        }
+                    });
                 });
 
                 // Update summary
@@ -652,6 +754,14 @@ document.addEventListener('DOMContentLoaded', function () {
                     loadPurchaseInvoiceDetails(value);
                 }
 
+                // Branch changed — batches are branch-specific, so reload every
+                // row's batch dropdown against the newly selected branch.
+                if (hiddenInputId === 'branch') {
+                    if (window._returnReloadBatchesForAllRows) {
+                        window._returnReloadBatchesForAllRows();
+                    }
+                }
+
                 // Hide options
                 optionsContainer.style.display = 'none';
 
@@ -685,472 +795,6 @@ document.addEventListener('DOMContentLoaded', function () {
                     option.style.display = 'none';
                 }
             }
-        }
-    }
-
-    // Add a new row to the items table
-    function addRow() {
-        const rowCount = itemsTable.rows.length;
-        const row = itemsTable.insertRow();
-
-        // Serial number
-        const cell0 = row.insertCell(0);
-        cell0.textContent = rowCount + 1;
-
-        // Code (searchable dropdown)
-        const cell1 = row.insertCell(1);
-        const codeContainer = document.createElement('div');
-        codeContainer.className = 'searchable-dropdown';
-        const codeOptionsHtml = productsData.map(product => {
-            const codes = [];
-            if (product.qr_code) codes.push(product.qr_code);
-            if (product.barcode) codes.push(product.barcode);
-            const codeDisplay = codes.length > 0 ? ` (${codes.join(' - ')})` : '';
-            const photoHtml = product.photo ? `<img src="../../../assets/uploads/products/${product.photo}" alt="${product.name}" style="width: 30px; height: 30px; object-fit: cover; margin-right: 8px; border-radius: 4px;">` : '';
-            return `<div class="dropdown-option" data-value="${product.id}" data-price="${product.purchase_price}" data-unit="${product.default_unit_id}" data-carton-conversion="${product.carton_conversion || 0}" data-discount="${product.default_discount || 0}" data-trade-offer="${product.trade_offer_discount || 0}" data-foc="${product.default_foc || 0}" data-gst="${product.sales_tax || 0}" style="display: flex; align-items: center;">${photoHtml}${product.code} - ${product.name}${codeDisplay}</div>`;
-        }).join('');
-        codeContainer.innerHTML = `
-            <input type="text" class="search-input table-input" placeholder="Search product...">
-            <input type="hidden" class="item-code" required>
-        `;
-
-        // Create dropdown options and append to body
-        const dropdownOptions = document.createElement('div');
-        dropdownOptions.className = 'dropdown-options';
-        dropdownOptions.innerHTML = codeOptionsHtml;
-        dropdownOptions.style.position = 'absolute';
-        dropdownOptions.style.display = 'none';
-        dropdownOptions.style.zIndex = '9999';
-        document.body.appendChild(dropdownOptions);
-
-        // Store reference to dropdown
-        codeContainer.querySelector('.search-input').dropdownOptions = dropdownOptions;
-        cell1.appendChild(codeContainer);
-        initTableDropdown(codeContainer);
-
-        // Unit (dropdown)
-        const cell2 = row.insertCell(2);
-        const unitSelect = document.createElement('select');
-        unitSelect.className = 'table-input';
-        const uomOptionsHtml = uomData.map(uom =>
-            `<option value="${uom.id}">${uom.uom_name}</option>`
-        ).join('');
-        unitSelect.innerHTML = `<option value="">Select Unit</option>${uomOptionsHtml}`;
-        unitSelect.required = true;
-        unitSelect.tabIndex = -1;
-
-        // Add UOM change event for price conversion
-        unitSelect.addEventListener('change', function () {
-            handleUOMChange(row, this);
-        });
-
-        cell2.appendChild(unitSelect);
-
-        // Qty (input)
-        const cell3 = row.insertCell(3);
-        const qtyInput = document.createElement('input');
-        qtyInput.type = 'number';
-        qtyInput.className = 'table-input';
-        qtyInput.min = '0';
-        qtyInput.step = '0.01';
-        qtyInput.required = true;
-        cell3.appendChild(qtyInput);
-
-        // Pcs (input)
-        const cell4 = row.insertCell(4);
-        const pcsInput = document.createElement('input');
-        pcsInput.type = 'number';
-        pcsInput.className = 'table-input';
-        pcsInput.min = '0';
-        pcsInput.step = '1';
-        pcsInput.value = '0';
-        cell4.appendChild(pcsInput);
-
-        // Ctn (input)
-        const cell5 = row.insertCell(5);
-        const ctnInput = document.createElement('input');
-        ctnInput.type = 'number';
-        ctnInput.className = 'table-input';
-        ctnInput.min = '0';
-        ctnInput.step = '1';
-        ctnInput.value = '0';
-        cell5.appendChild(ctnInput);
-
-        // Dz (input)
-        const cell6 = row.insertCell(6);
-        const dzInput = document.createElement('input');
-        dzInput.type = 'number';
-        dzInput.className = 'table-input';
-        dzInput.min = '0';
-        dzInput.step = '1';
-        dzInput.value = '0';
-        cell6.appendChild(dzInput);
-
-        // Purchase Price (input)
-        const cell7 = row.insertCell(7);
-        const priceInput = document.createElement('input');
-        priceInput.type = 'number';
-        priceInput.className = 'table-input';
-        priceInput.min = '0';
-        priceInput.step = '0.01';
-        priceInput.required = true;
-        cell7.appendChild(priceInput);
-
-        // Gross Amount (readonly)
-        const cell8 = row.insertCell(8);
-        const grossAmount = document.createElement('input');
-        grossAmount.type = 'text';
-        grossAmount.className = 'table-input';
-        grossAmount.readOnly = true;
-        grossAmount.value = '0.00';
-        grossAmount.tabIndex = -1;
-        cell8.appendChild(grossAmount);
-
-        // Discount % (input)
-        const cell9 = row.insertCell(9);
-        const discountPercent = document.createElement('input');
-        discountPercent.type = 'number';
-        discountPercent.className = 'table-input';
-        discountPercent.min = '0';
-        discountPercent.max = '100';
-        discountPercent.step = '0.01';
-        discountPercent.value = '0';
-        cell9.appendChild(discountPercent);
-
-        // Discount Amount (input)
-        const cell10 = row.insertCell(10);
-        const discountAmount = document.createElement('input');
-        discountAmount.type = 'number';
-        discountAmount.className = 'table-input';
-        discountAmount.min = '0';
-        discountAmount.step = '0.01';
-        discountAmount.value = '0.00';
-        cell10.appendChild(discountAmount);
-
-        // Trade Offer % (input)
-        const cell11 = row.insertCell(11);
-        const tradeOfferPercent = document.createElement('input');
-        tradeOfferPercent.type = 'number';
-        tradeOfferPercent.className = 'table-input';
-        tradeOfferPercent.min = '0';
-        tradeOfferPercent.max = '100';
-        tradeOfferPercent.step = '0.01';
-        tradeOfferPercent.value = '0';
-        cell11.appendChild(tradeOfferPercent);
-
-        // Trade Offer Amount (input)
-        const cell12 = row.insertCell(12);
-        const tradeOfferAmount = document.createElement('input');
-        tradeOfferAmount.type = 'number';
-        tradeOfferAmount.className = 'table-input';
-        tradeOfferAmount.min = '0';
-        tradeOfferAmount.step = '0.01';
-        tradeOfferAmount.value = '0.00';
-        cell12.appendChild(tradeOfferAmount);
-
-        // GST % (input)
-        const cell13 = row.insertCell(13);
-        const gstPercent = document.createElement('input');
-        gstPercent.type = 'number';
-        gstPercent.className = 'table-input';
-        gstPercent.min = '0';
-        gstPercent.max = '100';
-        gstPercent.step = '0.01';
-        gstPercent.value = '0';
-        cell13.appendChild(gstPercent);
-
-        // GST Amount (input)
-        const cell14 = row.insertCell(14);
-        const gstAmount = document.createElement('input');
-        gstAmount.type = 'number';
-        gstAmount.className = 'table-input';
-        gstAmount.min = '0';
-        gstAmount.step = '0.01';
-        gstAmount.value = '0.00';
-        cell14.appendChild(gstAmount);
-
-        // FOC Quantity (input)
-        const cell15 = row.insertCell(15);
-        const focQty = document.createElement('input');
-        focQty.type = 'number';
-        focQty.className = 'table-input';
-        focQty.min = '0';
-        focQty.step = '0.01';
-        focQty.value = '0';
-        cell15.appendChild(focQty);
-
-        // Apply settings to new row
-        const enablePcs = localStorage.getItem('enablePcs') === 'true';
-        const enableCtn = localStorage.getItem('enableCtn') === 'true';
-        const enableDz = localStorage.getItem('enableDz') === 'true';
-        const enableInlineCashDiscount = localStorage.getItem('enableInlineCashDiscount') === 'true';
-        const enableInlineCashDiscountAmount = localStorage.getItem('enableInlineCashDiscountAmount') === 'true';
-        const enableTradeOffer = localStorage.getItem('enableTradeOffer') === 'true';
-        const enableTradeOfferAmount = localStorage.getItem('enableTradeOfferAmount') === 'true';
-        const enableFOC = localStorage.getItem('enableFOC') === 'true';
-        const enableTaxation = localStorage.getItem('enableTaxation') === 'true';
-
-        cell4.style.display = enablePcs ? '' : 'none';
-        cell5.style.display = enableCtn ? '' : 'none';
-        cell6.style.display = enableDz ? '' : 'none';
-        cell9.style.display = enableInlineCashDiscount ? '' : 'none';
-        cell10.style.display = enableInlineCashDiscountAmount ? '' : 'none';
-        cell11.style.display = enableTradeOffer ? '' : 'none';
-        cell12.style.display = enableTradeOfferAmount ? '' : 'none';
-        cell13.style.display = enableTaxation ? '' : 'none';
-        cell14.style.display = enableTaxation ? '' : 'none';
-        cell15.style.display = enableFOC ? '' : 'none';
-
-        // Net Amount (readonly)
-        const cell16 = row.insertCell(16);
-        const netAmount = document.createElement('input');
-        netAmount.type = 'text';
-        netAmount.className = 'table-input';
-        netAmount.readOnly = true;
-        netAmount.value = '0.00';
-        netAmount.tabIndex = 0;
-
-        // Add tab navigation logic for Net Amount
-        netAmount.addEventListener('keydown', function (e) {
-            if (e.key === 'Tab' && !e.shiftKey) {
-                const codeInput = row.cells[1].querySelector('.item-code');
-                if (codeInput.value) {
-                    e.preventDefault();
-                    const currentRowIndex = row.rowIndex - 1; // Subtract 1 for header row
-                    const nextRowIndex = currentRowIndex + 1;
-
-                    if (nextRowIndex < itemsTable.rows.length) {
-                        // Focus on existing next row
-                        const nextRow = itemsTable.rows[nextRowIndex];
-                        nextRow.cells[1].querySelector('.search-input').focus();
-                    } else {
-                        // Create new row and focus on it
-                        addRow();
-                        setTimeout(() => {
-                            const newRow = itemsTable.rows[itemsTable.rows.length - 1];
-                            newRow.cells[1].querySelector('.search-input').focus();
-                        }, 10);
-                    }
-                } else {
-                    e.preventDefault();
-                    // Delete current row if there are multiple rows
-                    if (itemsTable.rows.length > 1) {
-                        // Clean up dropdown options
-                        const searchInput = row.cells[1].querySelector('.search-input');
-                        if (searchInput.dropdownOptions) {
-                            searchInput.dropdownOptions.remove();
-                        }
-                        row.remove();
-                        updateSerialNumbers();
-                        updatereturnSummary();
-                    }
-                    document.getElementById('totalDiscountPercent').focus();
-                }
-            }
-        });
-
-        cell16.appendChild(netAmount);
-
-        // Actions (variants + delete button)
-        const cell17 = row.insertCell(17);
-        const actionsDiv = document.createElement('div');
-        actionsDiv.style.display = 'flex';
-        actionsDiv.style.gap = '4px';
-
-        const addVariantsBtn = document.createElement('button');
-        addVariantsBtn.type = 'button';
-        addVariantsBtn.className = 'btn btn-secondary btn-sm';
-        addVariantsBtn.innerHTML = '<i class="fas fa-boxes"></i>';
-        addVariantsBtn.title = 'Add Variants';
-        addVariantsBtn.tabIndex = -1;
-        addVariantsBtn.style.display = 'none';
-
-        const deleteBtn = document.createElement('button');
-        deleteBtn.type = 'button';
-        deleteBtn.className = 'btn btn-danger btn-sm';
-        deleteBtn.innerHTML = '<i class="fas fa-trash"></i>';
-        deleteBtn.title = 'Delete row';
-        deleteBtn.tabIndex = -1;
-
-        actionsDiv.appendChild(addVariantsBtn);
-        actionsDiv.appendChild(deleteBtn);
-        cell17.appendChild(actionsDiv);
-
-        // Add event listeners for calculations
-        pcsInput.addEventListener('input', calculateQtyFromParts);
-        ctnInput.addEventListener('input', calculateQtyFromParts);
-        dzInput.addEventListener('input', calculateQtyFromParts);
-        qtyInput.addEventListener('input', calculateRow);
-        priceInput.addEventListener('input', calculateRow);
-        discountPercent.addEventListener('input', calculateRow);
-        discountAmount.addEventListener('input', calculateRowFromAmount);
-        tradeOfferPercent.addEventListener('input', calculateRow);
-        tradeOfferAmount.addEventListener('input', calculateRowFromTradeOfferAmount);
-        gstPercent.addEventListener('input', calculateRow);
-        gstAmount.addEventListener('input', calculateRowFromGSTAmount);
-        focQty.addEventListener('input', updatereturnSummary);
-
-        // Add event listener for delete button
-        deleteBtn.addEventListener('click', function () {
-            if (itemsTable.rows.length > 1) {
-                row.remove();
-                updateSerialNumbers();
-                updatereturnSummary();
-            } else {
-                alert('Cannot delete the only row. Add another row first.');
-            }
-        });
-
-        // Add event listener for variants button
-        addVariantsBtn.addEventListener('click', function () {
-            openVariantsModal(row);
-        });
-
-        function calculateQtyFromParts() {
-            const pcs = parseFloat(pcsInput.value) || 0;
-            const ctn = parseFloat(ctnInput.value) || 0;
-            const dz = parseFloat(dzInput.value) || 0;
-            const cartonConversion = parseFloat(row.dataset.cartonConversion) || 0;
-
-            const calculatedQty = pcs + (ctn * cartonConversion) + (dz * 12);
-            qtyInput.value = calculatedQty.toFixed(2);
-            calculateRow();
-        }
-
-        function calculateRow() {
-            const qty = parseFloat(qtyInput.value) || 0;
-            const price = parseFloat(priceInput.value) || 0;
-            const discountPct = parseFloat(discountPercent.value) || 0;
-            const tradeOfferPct = parseFloat(tradeOfferPercent.value) || 0;
-            const gstPct = parseFloat(gstPercent.value) || 0;
-
-            // Calculate gross amount
-            const gross = qty * price;
-            grossAmount.value = gross.toFixed(2);
-
-            // Calculate discount amount
-            const discountAmt = gross * (discountPct / 100);
-            discountAmount.value = discountAmt.toFixed(2);
-
-            // Calculate after discount
-            const afterDiscount = gross - discountAmt;
-
-            // Calculate trade offer amount
-            const tradeOfferAmt = afterDiscount * (tradeOfferPct / 100);
-            tradeOfferAmount.value = tradeOfferAmt.toFixed(2);
-
-            // Calculate after trade offer
-            const afterTradeOffer = afterDiscount - tradeOfferAmt;
-
-            // Calculate GST amount
-            const gstAmt = afterTradeOffer * (gstPct / 100);
-            gstAmount.value = gstAmt.toFixed(2);
-
-            // Calculate net amount
-            const net = afterTradeOffer + gstAmt;
-            netAmount.value = net.toFixed(2);
-
-            // Update return summary
-            updatereturnSummary();
-        }
-
-        function calculateRowFromAmount() {
-            const qty = parseFloat(qtyInput.value) || 0;
-            const price = parseFloat(priceInput.value) || 0;
-            const discountAmt = parseFloat(discountAmount.value) || 0;
-            const tradeOfferPct = parseFloat(tradeOfferPercent.value) || 0;
-            const gstPct = parseFloat(gstPercent.value) || 0;
-
-            // Calculate gross amount
-            const gross = qty * price;
-            grossAmount.value = gross.toFixed(2);
-
-            // Calculate discount percentage from amount
-            const discountPct = gross > 0 ? (discountAmt / gross) * 100 : 0;
-            discountPercent.value = discountPct.toFixed(2);
-
-            // Calculate after discount
-            const afterDiscount = gross - discountAmt;
-
-            // Calculate trade offer amount
-            const tradeOfferAmt = afterDiscount * (tradeOfferPct / 100);
-            tradeOfferAmount.value = tradeOfferAmt.toFixed(2);
-
-            // Calculate after trade offer
-            const afterTradeOffer = afterDiscount - tradeOfferAmt;
-
-            // Calculate GST amount
-            const gstAmt = afterTradeOffer * (gstPct / 100);
-            gstAmount.value = gstAmt.toFixed(2);
-
-            // Calculate net amount
-            const net = afterTradeOffer + gstAmt;
-            netAmount.value = net.toFixed(2);
-
-            // Update return summary
-            updatereturnSummary();
-        }
-
-        function calculateRowFromTradeOfferAmount() {
-            const qty = parseFloat(qtyInput.value) || 0;
-            const price = parseFloat(priceInput.value) || 0;
-            const discountAmt = parseFloat(discountAmount.value) || 0;
-            const tradeOfferAmt = parseFloat(tradeOfferAmount.value) || 0;
-            const gstPct = parseFloat(gstPercent.value) || 0;
-
-            // Calculate gross amount
-            const gross = qty * price;
-            grossAmount.value = gross.toFixed(2);
-
-            // Calculate after discount
-            const afterDiscount = gross - discountAmt;
-
-            // Calculate trade offer percentage from amount
-            const tradeOfferPct = afterDiscount > 0 ? (tradeOfferAmt / afterDiscount) * 100 : 0;
-            tradeOfferPercent.value = tradeOfferPct.toFixed(2);
-
-            // Calculate after trade offer
-            const afterTradeOffer = afterDiscount - tradeOfferAmt;
-
-            // Calculate GST amount
-            const gstAmt = afterTradeOffer * (gstPct / 100);
-            gstAmount.value = gstAmt.toFixed(2);
-
-            // Calculate net amount
-            const net = afterTradeOffer + gstAmt;
-            netAmount.value = net.toFixed(2);
-
-            // Update return summary
-            updatereturnSummary();
-        }
-
-        function calculateRowFromGSTAmount() {
-            const qty = parseFloat(qtyInput.value) || 0;
-            const price = parseFloat(priceInput.value) || 0;
-            const discountAmt = parseFloat(discountAmount.value) || 0;
-            const tradeOfferAmt = parseFloat(tradeOfferAmount.value) || 0;
-            const gstAmt = parseFloat(gstAmount.value) || 0;
-
-            // Calculate gross amount
-            const gross = qty * price;
-            grossAmount.value = gross.toFixed(2);
-
-            // Calculate after discount
-            const afterDiscount = gross - discountAmt;
-
-            // Calculate after trade offer
-            const afterTradeOffer = afterDiscount - tradeOfferAmt;
-
-            // Calculate GST percentage from amount
-            const gstPct = afterTradeOffer > 0 ? (gstAmt / afterTradeOffer) * 100 : 0;
-            gstPercent.value = gstPct.toFixed(2);
-
-            // Calculate net amount
-            const net = afterTradeOffer + gstAmt;
-            netAmount.value = net.toFixed(2);
-
-            // Update return summary
-            updatereturnSummary();
         }
     }
 
@@ -1192,10 +836,33 @@ document.addEventListener('DOMContentLoaded', function () {
         codeContainer.querySelector('.search-input').dropdownOptions = dropdownOptions;
         cell1.appendChild(codeContainer);
         initTableDropdownDynamic(codeContainer, row);
+
+        // Batch No (NEW) — dropdown of available batches for this product+branch.
+        // Populated only after a product is selected (see initTableDropdownDynamic).
+        const batchNoCell = row.insertCell(2);
+        batchNoCell.className = 'batch-no-cell';
+        const batchNoSelect = document.createElement('select');
+        batchNoSelect.className = 'table-input batch-no-select';
+        batchNoSelect.innerHTML = '<option value="">Select product first</option>';
+        batchNoSelect.disabled = true;
+        batchNoSelect.addEventListener('change', function () {
+            handleBatchSelectChange(row);
+        });
+        batchNoCell.appendChild(batchNoSelect);
+
+        // Expiry Date (NEW) — auto-filled from the selected batch, read-only
+        const batchExpiryCell = row.insertCell(3);
+        batchExpiryCell.className = 'batch-expiry-cell';
+        const batchExpiryInput = document.createElement('input');
+        batchExpiryInput.type = 'date';
+        batchExpiryInput.className = 'table-input batch-expiry-input';
+        batchExpiryInput.readOnly = true;
+        batchExpiryInput.tabIndex = -1;
+        batchExpiryCell.appendChild(batchExpiryInput);
         
-        // Unit cells will be added dynamically
+        // Unit cells will be added dynamically (right before .price-cell)
         // Price
-        const priceCell = row.insertCell(2);
+        const priceCell = row.insertCell(4);
         priceCell.className = 'price-cell';
         const priceInput = document.createElement('input');
         priceInput.type = 'number';
@@ -1216,7 +883,7 @@ document.addEventListener('DOMContentLoaded', function () {
         priceCell.appendChild(priceInput);
         
         // Gross Amount
-        const grossCell = row.insertCell(3);
+        const grossCell = row.insertCell(5);
         grossCell.className = 'gross-cell';
         const grossInput = document.createElement('input');
         grossInput.type = 'text';
@@ -1227,7 +894,7 @@ document.addEventListener('DOMContentLoaded', function () {
         grossCell.appendChild(grossInput);
         
         // Discount %
-        const discPercentCell = row.insertCell(4);
+        const discPercentCell = row.insertCell(6);
         discPercentCell.className = 'disc-percent-cell';
         const discPercentInput = document.createElement('input');
         discPercentInput.type = 'number';
@@ -1250,7 +917,7 @@ document.addEventListener('DOMContentLoaded', function () {
         discPercentCell.appendChild(discPercentInput);
         
         // Discount Amount
-        const discAmountCell = row.insertCell(5);
+        const discAmountCell = row.insertCell(7);
         discAmountCell.className = 'disc-amount-cell';
         const discAmountInput = document.createElement('input');
         discAmountInput.type = 'number';
@@ -1261,7 +928,7 @@ document.addEventListener('DOMContentLoaded', function () {
         discAmountCell.appendChild(discAmountInput);
         
         // TO %
-        const toPercentCell = row.insertCell(6);
+        const toPercentCell = row.insertCell(8);
         toPercentCell.className = 'to-percent-cell';
         const toPercentInput = document.createElement('input');
         toPercentInput.type = 'number';
@@ -1284,7 +951,7 @@ document.addEventListener('DOMContentLoaded', function () {
         toPercentCell.appendChild(toPercentInput);
         
         // TO Amount
-        const toAmountCell = row.insertCell(7);
+        const toAmountCell = row.insertCell(9);
         toAmountCell.className = 'to-amount-cell';
         const toAmountInput = document.createElement('input');
         toAmountInput.type = 'number';
@@ -1295,7 +962,7 @@ document.addEventListener('DOMContentLoaded', function () {
         toAmountCell.appendChild(toAmountInput);
         
         // Tax %
-        const gstPercentCell = row.insertCell(8);
+        const gstPercentCell = row.insertCell(10);
         gstPercentCell.className = 'tax-percent-cell';
         const gstPercentInput = document.createElement('input');
         gstPercentInput.type = 'number';
@@ -1318,7 +985,7 @@ document.addEventListener('DOMContentLoaded', function () {
         gstPercentCell.appendChild(gstPercentInput);
         
         // Tax Amount
-        const gstAmountCell = row.insertCell(9);
+        const gstAmountCell = row.insertCell(11);
         gstAmountCell.className = 'tax-amount-cell';
         const gstAmountInput = document.createElement('input');
         gstAmountInput.type = 'number';
@@ -1329,7 +996,7 @@ document.addEventListener('DOMContentLoaded', function () {
         gstAmountCell.appendChild(gstAmountInput);
         
         // FOC Qty
-        const focCell = row.insertCell(10);
+        const focCell = row.insertCell(12);
         focCell.className = 'foc-cell';
         const focInput = document.createElement('input');
         focInput.type = 'number';
@@ -1340,7 +1007,7 @@ document.addEventListener('DOMContentLoaded', function () {
         focCell.appendChild(focInput);
         
         // Net Amount
-        const netCell = row.insertCell(11);
+        const netCell = row.insertCell(13);
         netCell.className = 'net-cell';
         const netInput = document.createElement('input');
         netInput.type = 'text';
@@ -1351,7 +1018,7 @@ document.addEventListener('DOMContentLoaded', function () {
         netCell.appendChild(netInput);
         
         // Actions
-        const actionsCell = row.insertCell(12);
+        const actionsCell = row.insertCell(14);
         const deleteBtn = document.createElement('button');
         deleteBtn.type = 'button';
         deleteBtn.className = 'btn btn-danger btn-sm';
@@ -1376,6 +1043,8 @@ document.addEventListener('DOMContentLoaded', function () {
 
         // Apply current settings to this new row
         applySettingsToRow(row, {
+            enableBatchNo: localStorage.getItem('enableBatchNo') === 'true',
+            enableBatchExpiry: localStorage.getItem('enableBatchExpiry') === 'true',
             enableTradeOffer: localStorage.getItem('enableTradeOffer') === 'true',
             enableTradeOfferAmount: localStorage.getItem('enableTradeOfferAmount') === 'true',
             enableFOC: localStorage.getItem('enableFOC') === 'true',
@@ -1468,6 +1137,11 @@ document.addEventListener('DOMContentLoaded', function () {
                 
                 // Recalculate columns
                 recalculateMaxColumns();
+
+                // NEW: fetch available batches for this product in the selected branch
+                if (window._returnLoadBatchesForRow) {
+                    window._returnLoadBatchesForRow(row, product.id);
+                }
                 
                 // Focus first unit input
                 const firstUnitInput = row.querySelector('.unit-input');
@@ -1499,151 +1173,6 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
-    // Initialize dropdown for table rows
-    function initTableDropdown(container) {
-        const searchInput = container.querySelector('.search-input');
-        const optionsContainer = searchInput.dropdownOptions;
-        const hiddenInput = container.querySelector('input[type="hidden"]');
-        const row = container.closest('tr');
-        let selectedIndex = -1;
-
-        // Show options when clicking on search input
-        searchInput.addEventListener('click', function (e) {
-            e.stopPropagation();
-
-            // Position dropdown relative to input
-            const rect = searchInput.getBoundingClientRect();
-            optionsContainer.style.top = (rect.bottom + window.scrollY) + 'px';
-            optionsContainer.style.left = rect.left + 'px';
-            optionsContainer.style.width = rect.width + 'px';
-            optionsContainer.style.display = 'block';
-
-            filterOptions();
-        });
-
-        // Show options when input receives focus (tab navigation)
-        searchInput.addEventListener('focus', function (e) {
-            // Position dropdown relative to input
-            const rect = searchInput.getBoundingClientRect();
-            optionsContainer.style.top = (rect.bottom + window.scrollY) + 'px';
-            optionsContainer.style.left = rect.left + 'px';
-            optionsContainer.style.width = rect.width + 'px';
-            optionsContainer.style.display = 'block';
-
-            filterOptions();
-        });
-
-        // Handle keyboard navigation
-        searchInput.addEventListener('keydown', function (e) {
-            const visibleOptions = Array.from(optionsContainer.getElementsByClassName('dropdown-option'))
-                .filter(option => option.style.display !== 'none');
-
-            if (e.key === 'ArrowDown') {
-                e.preventDefault();
-                selectedIndex = Math.min(selectedIndex + 1, visibleOptions.length - 1);
-                updateSelection(visibleOptions);
-            } else if (e.key === 'ArrowUp') {
-                e.preventDefault();
-                selectedIndex = Math.max(selectedIndex - 1, -1);
-                updateSelection(visibleOptions);
-            } else if (e.key === 'Enter') {
-                e.preventDefault();
-                if (selectedIndex >= 0 && visibleOptions[selectedIndex]) {
-                    visibleOptions[selectedIndex].click();
-                } else if (visibleOptions.length > 0) {
-                    visibleOptions[0].click();
-                }
-            }
-        });
-
-        function updateSelection(visibleOptions) {
-            visibleOptions.forEach((option, index) => {
-                option.style.backgroundColor = index === selectedIndex ? 'var(--surface-1)' : '';
-            });
-        }
-
-        // Filter options based on search input
-        searchInput.addEventListener('input', function () {
-            selectedIndex = -1;
-            filterOptions();
-        });
-
-        // Select option
-        optionsContainer.addEventListener('click', function (e) {
-            if (e.target.classList.contains('dropdown-option')) {
-                const value = e.target.getAttribute('data-value');
-                const displayText = e.target.textContent;
-                const price = e.target.getAttribute('data-price');
-                const unitId = e.target.getAttribute('data-unit');
-                const cartonConversion = e.target.getAttribute('data-carton-conversion');
-                const discount = e.target.getAttribute('data-discount');
-                const tradeOffer = e.target.getAttribute('data-trade-offer');
-                const foc = e.target.getAttribute('data-foc');
-                const gst = e.target.getAttribute('data-gst');
-
-                searchInput.value = displayText;
-                hiddenInput.value = value;
-
-                row.dataset.cartonConversion = cartonConversion || '0';
-                row.dataset.productId = value;
-
-                checkAndShowVariantsButton(row, value);
-
-                // Update related fields
-                row.cells[7].querySelector('input').value = price;
-                if (unitId) row.cells[2].querySelector('select').value = unitId;
-
-                const enablePcs = localStorage.getItem('enablePcs') === 'true';
-                const enableCtn = localStorage.getItem('enableCtn') === 'true';
-                const enableDz = localStorage.getItem('enableDz') === 'true';
-                const enableInlineCashDiscount = localStorage.getItem('enableInlineCashDiscount') === 'true';
-                const enableTradeOffer = localStorage.getItem('enableTradeOffer') === 'true';
-                const enableFOC = localStorage.getItem('enableFOC') === 'true';
-                const enableTaxation = localStorage.getItem('enableTaxation') === 'true';
-
-                if (enableInlineCashDiscount && discount) {
-                    row.cells[9].querySelector('input').value = discount;
-                }
-                if (enableTradeOffer && tradeOffer) {
-                    row.cells[11].querySelector('input').value = tradeOffer;
-                }
-                if (enableFOC && foc) {
-                    row.cells[15].querySelector('input').value = foc;
-                }
-                if (enableTaxation && gst) {
-                    row.cells[13].querySelector('input').value = gst;
-                }
-
-                optionsContainer.style.display = 'none';
-
-                row.cells[3].querySelector('input').focus();
-            }
-        });
-
-        // Hide options when clicking outside
-        document.addEventListener('click', function () {
-            optionsContainer.style.display = 'none';
-        });
-
-        // Filter options function
-        function filterOptions() {
-            const searchTerm = searchInput.value.toLowerCase();
-            const options = optionsContainer.getElementsByClassName('dropdown-option');
-
-            for (let i = 0; i < options.length; i++) {
-                const option = options[i];
-                const text = option.textContent.toLowerCase();
-
-                if (text.includes(searchTerm)) {
-                    option.style.display = 'block';
-                    option.style.backgroundColor = '';
-                } else {
-                    option.style.display = 'none';
-                }
-            }
-        }
-    }
-
     // Update serial numbers after row deletion
     function updateSerialNumbers() {
         const rows = itemsTable.rows;
@@ -1655,74 +1184,30 @@ document.addEventListener('DOMContentLoaded', function () {
     // Update return summary
     function updatereturnSummary() {
         let totalBill = 0;
-        let totalPcs = 0;
-        let totalCtn = 0;
-        let totalDz = 0;
-        let totalQty = 0;
         let totalPurchasePrice = 0;
         let totalGrossAmount = 0;
         let totalDiscountAmountItems = 0;
+        let totalTradeOfferAmountItems = 0;
+        let totalGSTAmountItems = 0;
+        let totalFOCQty = 0;
         let totalNetAmountItems = 0;
         const rows = itemsTable.rows;
 
         for (let i = 0; i < rows.length; i++) {
-            const pcsInput = rows[i].cells[4].querySelector('input');
-            const ctnInput = rows[i].cells[5].querySelector('input');
-            const dzInput = rows[i].cells[6].querySelector('input');
-            const qtyInput = rows[i].cells[3].querySelector('input');
-            const purchasePriceInput = rows[i].cells[7].querySelector('input');
-            const grossAmountInput = rows[i].cells[8].querySelector('input');
-            const discountAmountInput = rows[i].cells[10].querySelector('input');
-            const tradeOfferAmountInput = rows[i].cells[12].querySelector('input');
-            const gstAmountInput = rows[i].cells[14].querySelector('input');
-            const focQtyInput = rows[i].cells[15].querySelector('input');
-            const netAmountInput = rows[i].cells[16].querySelector('input');
-
-            if (netAmountInput) {
-                totalPcs += parseFloat(pcsInput.value) || 0;
-                totalCtn += parseFloat(ctnInput.value) || 0;
-                totalDz += parseFloat(dzInput.value) || 0;
-                totalQty += parseFloat(qtyInput.value) || 0;
-                totalPurchasePrice += parseFloat(purchasePriceInput.value) || 0;
-                totalGrossAmount += parseFloat(grossAmountInput.value) || 0;
-                totalDiscountAmountItems += parseFloat(discountAmountInput.value) || 0;
-                totalNetAmountItems += parseFloat(netAmountInput.value) || 0;
-                totalBill += parseFloat(netAmountInput.value) || 0;
-            }
-        }
-
-        // Calculate total Trade Offer Amount
-        let totalTradeOfferAmountItems = 0;
-        for (let i = 0; i < rows.length; i++) {
-            const tradeOfferAmountInput = rows[i].cells[12].querySelector('input');
-            if (tradeOfferAmountInput) {
-                totalTradeOfferAmountItems += parseFloat(tradeOfferAmountInput.value) || 0;
-            }
-        }
-
-        // Calculate total Tax Amount
-        let totalGSTAmountItems = 0;
-        for (let i = 0; i < rows.length; i++) {
-            const taxAmountInput = rows[i].querySelector('.tax-amount-cell input');
-            if (taxAmountInput) {
-                totalGSTAmountItems += parseFloat(taxAmountInput.value) || 0;
-            }
-        }
-
-        // Calculate total FOC Qty
-        let totalFOCQty = 0;
-        for (let i = 0; i < rows.length; i++) {
-            const focQtyInput = rows[i].cells[15].querySelector('input');
-            if (focQtyInput) {
-                totalFOCQty += parseFloat(focQtyInput.value) || 0;
+            const netInput = rows[i].querySelector('.net-cell input');
+            if (netInput) {
+                totalPurchasePrice += parseFloat(rows[i].querySelector('.price-cell input')?.value) || 0;
+                totalGrossAmount += parseFloat(rows[i].querySelector('.gross-cell input')?.value) || 0;
+                totalDiscountAmountItems += parseFloat(rows[i].querySelector('.disc-amount-cell input')?.value) || 0;
+                totalTradeOfferAmountItems += parseFloat(rows[i].querySelector('.to-amount-cell input')?.value) || 0;
+                totalGSTAmountItems += parseFloat(rows[i].querySelector('.tax-amount-cell input')?.value) || 0;
+                totalFOCQty += parseFloat(rows[i].querySelector('.foc-cell input')?.value) || 0;
+                totalNetAmountItems += parseFloat(netInput.value) || 0;
+                totalBill += parseFloat(netInput.value) || 0;
             }
         }
 
         // Update totals row
-        document.getElementById('totalQty').textContent = totalQty.toFixed(2);
-        document.getElementById('totalPcs').textContent = totalPcs.toFixed(2);
-        document.getElementById('totalCtn').textContent = totalCtn.toFixed(2);
-        document.getElementById('totalDz').textContent = totalDz.toFixed(2);
         document.getElementById('totalPurchasePrice').textContent = totalPurchasePrice.toFixed(2);
         document.getElementById('totalGrossAmount').textContent = totalGrossAmount.toFixed(2);
         document.getElementById('totalDiscountAmountItems').textContent = totalDiscountAmountItems.toFixed(2);
@@ -1749,6 +1234,13 @@ document.addEventListener('DOMContentLoaded', function () {
         document.getElementById('netAmount').textContent = netAmount.toFixed(2);
     }
 
+    function updateReturnSummaryDynamic() {
+        updatereturnSummary();
+    }
+    function updatereturnSummaryDynamic() {
+        updatereturnSummary();
+    }
+
     // Add event listener for total discount percent
     document.getElementById('totalDiscountPercent').addEventListener('input', updatereturnSummary);
 
@@ -1763,7 +1255,7 @@ document.addEventListener('DOMContentLoaded', function () {
         const rows = itemsTable.rows;
 
         for (let i = 0; i < rows.length; i++) {
-            const netAmountInput = rows[i].cells[16].querySelector('input');
+            const netAmountInput = rows[i].querySelector('.net-cell input');
             if (netAmountInput) {
                 totalBill += parseFloat(netAmountInput.value) || 0;
             }
@@ -1784,35 +1276,6 @@ document.addEventListener('DOMContentLoaded', function () {
 
         document.getElementById('totalDiscountPercent').value = discountPercent.toFixed(2);
         if (document.getElementById('totalTaxAmount')) document.getElementById('totalTaxAmount').value = gstAmount.toFixed(2);
-        document.getElementById('netAmount').textContent = netAmount.toFixed(2);
-    }
-
-    function updatereturnSummaryFromGSTAmount() {
-        let totalBill = 0;
-        const rows = itemsTable.rows;
-
-        for (let i = 0; i < rows.length; i++) {
-            const netAmountInput = rows[i].cells[16].querySelector('input');
-            if (netAmountInput) {
-                totalBill += parseFloat(netAmountInput.value) || 0;
-            }
-        }
-
-        document.getElementById('totalBill').textContent = totalBill.toFixed(2);
-
-        const discountPercent = parseFloat(document.getElementById('totalDiscountPercent').value) || 0;
-        const discountAmount = totalBill * (discountPercent / 100);
-        const afterDiscount = totalBill - discountAmount;
-
-        const gstAmount = parseFloat(document.getElementById('totalTaxAmount')?.value) || 0;
-        const gstPercent = afterDiscount > 0 ? (gstAmount / afterDiscount) * 100 : 0;
-        const shippingFeesEl = document.getElementById('shippingFees');
-        const shippingFees = parseFloat(shippingFeesEl.value) || 0;
-        const shippingFeesType = shippingFeesEl.dataset.type || 'add';
-        const netAmount = afterDiscount + gstAmount + (shippingFeesType === 'subtract' ? -shippingFees : shippingFees);
-
-        document.getElementById('totalDiscountAmount').value = discountAmount.toFixed(2);
-        if (document.getElementById('totalTaxPercent')) document.getElementById('totalTaxPercent').value = gstPercent.toFixed(2);
         document.getElementById('netAmount').textContent = netAmount.toFixed(2);
     }
 
@@ -1843,7 +1306,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
         // Check if at least one item is added
         if (itemsTable.rows.length === 0) {
-            alert('Please add at least one item to the returnData.');
+            alert('Please add at least one item to the return.');
             isValid = false;
         }
 
@@ -1853,6 +1316,7 @@ document.addEventListener('DOMContentLoaded', function () {
             const priceCell = rows[i].querySelector('.price-cell');
             const price = priceCell ? priceCell.querySelector('input') : null;
             const unitInputs = rows[i].querySelectorAll('.unit-input');
+            const batchSelect = rows[i].querySelector('.batch-no-select');
             let hasQty = false;
             
             unitInputs.forEach(input => {
@@ -1861,6 +1325,24 @@ document.addEventListener('DOMContentLoaded', function () {
 
             if (!code || !code.value || !price || !price.value || !hasQty) {
                 alert('Please fill all required fields in the items table.');
+                isValid = false;
+                break;
+            }
+
+            // Batch is mandatory for a return — you can only return stock that
+            // actually exists in a specific batch.
+            if (!batchSelect || !batchSelect.value) {
+                alert('Please select a batch for row ' + (i + 1) + '. A product with no available stock cannot be returned.');
+                isValid = false;
+                break;
+            }
+
+            // Client-side sanity check against the batch's available qty
+            let totalQty = 0;
+            unitInputs.forEach(input => { totalQty += parseFloat(input.value) || 0; });
+            const availableQty = parseFloat(rows[i].dataset.batchAvailableQty) || 0;
+            if (totalQty > availableQty) {
+                alert(`Row ${i + 1}: return quantity (${totalQty}) exceeds available stock in batch "${batchSelect.value}" (${availableQty}).`);
                 isValid = false;
                 break;
             }
@@ -1924,8 +1406,12 @@ document.addEventListener('DOMContentLoaded', function () {
             });
             
             if (unitEntries.length > 0) {
+                const batchSelect = row.querySelector('.batch-no-select');
+                const expiryInput = row.querySelector('.batch-expiry-input');
                 const item = {
                     productId: row.cells[1].querySelector('.item-code').value,
+                    batchNo: batchSelect ? batchSelect.value : null,
+                    batchExpiryDate: expiryInput ? (expiryInput.value || null) : null,
                     unitEntries: unitEntries,
                     purchasePrice: parseFloat(row.querySelector('.price-cell input').value),
                     grossAmount: parseFloat(row.querySelector('.gross-cell input').value),
@@ -2047,6 +1533,8 @@ document.addEventListener('DOMContentLoaded', function () {
     // return Settings Modal
     document.getElementById('invoiceSettingsBtn').addEventListener('click', function () {
         // Load settings from localStorage
+        document.getElementById('enableBatchNo').checked = localStorage.getItem('enableBatchNo') === 'true';
+        document.getElementById('enableBatchExpiry').checked = localStorage.getItem('enableBatchExpiry') === 'true';
         document.getElementById('enableTradeOffer').checked = localStorage.getItem('enableTradeOffer') === 'true';
         document.getElementById('enableTradeOfferAmount').checked = localStorage.getItem('enableTradeOfferAmount') === 'true';
         document.getElementById('enableFOC').checked = localStorage.getItem('enableFOC') === 'true';
@@ -2065,6 +1553,8 @@ document.addEventListener('DOMContentLoaded', function () {
 
     document.getElementById('saveSettingsBtn').addEventListener('click', function () {
         // Save settings to localStorage
+        localStorage.setItem('enableBatchNo', document.getElementById('enableBatchNo').checked);
+        localStorage.setItem('enableBatchExpiry', document.getElementById('enableBatchExpiry').checked);
         localStorage.setItem('enableTradeOffer', document.getElementById('enableTradeOffer').checked);
         localStorage.setItem('enableTradeOfferAmount', document.getElementById('enableTradeOfferAmount').checked);
         localStorage.setItem('enableFOC', document.getElementById('enableFOC').checked);
@@ -2088,6 +1578,8 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // Apply return settings to show/hide columns
     function applyreturnSettings() {
+        const enableBatchNo = localStorage.getItem('enableBatchNo') === 'true';
+        const enableBatchExpiry = localStorage.getItem('enableBatchExpiry') === 'true';
         const enableTradeOffer = localStorage.getItem('enableTradeOffer') === 'true';
         const enableTradeOfferAmount = localStorage.getItem('enableTradeOfferAmount') === 'true';
         const enableFOC = localStorage.getItem('enableFOC') === 'true';
@@ -2100,6 +1592,8 @@ document.addEventListener('DOMContentLoaded', function () {
 
         // Show/hide thead and tfoot columns via data-col attribute
         const colMap = [
+            { col: 'batch-no',      show: enableBatchNo },
+            { col: 'batch-expiry',  show: enableBatchExpiry },
             { col: 'disc-percent',  show: enableInlineCashDiscount },
             { col: 'disc-amount',   show: enableInlineCashDiscountAmount },
             { col: 'to-percent',    show: enableTradeOffer },
@@ -2117,7 +1611,7 @@ document.addEventListener('DOMContentLoaded', function () {
         // Show/hide cells in all existing rows
         const rows = document.getElementById('itemsTable').getElementsByTagName('tbody')[0].rows;
         for (let row of rows) {
-            applySettingsToRow(row, { enableTradeOffer, enableTradeOfferAmount, enableFOC, enableTaxation, enableInlineCashDiscount, enableInlineCashDiscountAmount });
+            applySettingsToRow(row, { enableBatchNo, enableBatchExpiry, enableTradeOffer, enableTradeOfferAmount, enableFOC, enableTaxation, enableInlineCashDiscount, enableInlineCashDiscountAmount });
         }
 
         // Hide/show return summary fields
@@ -2135,7 +1629,9 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function applySettingsToRow(row, settings) {
-        const { enableTradeOffer, enableTradeOfferAmount, enableFOC, enableTaxation, enableInlineCashDiscount, enableInlineCashDiscountAmount } = settings;
+        const { enableBatchNo, enableBatchExpiry, enableTradeOffer, enableTradeOfferAmount, enableFOC, enableTaxation, enableInlineCashDiscount, enableInlineCashDiscountAmount } = settings;
+        const batchNoCell = row.querySelector('.batch-no-cell');
+        const batchExpiryCell = row.querySelector('.batch-expiry-cell');
         const toPercentCell = row.querySelector('.to-percent-cell');
         const toAmountCell = row.querySelector('.to-amount-cell');
         const focCell = row.querySelector('.foc-cell');
@@ -2144,6 +1640,8 @@ document.addEventListener('DOMContentLoaded', function () {
         const discPercentCell = row.querySelector('.disc-percent-cell');
         const discAmountCell = row.querySelector('.disc-amount-cell');
 
+        if (batchNoCell) batchNoCell.style.display = enableBatchNo ? '' : 'none';
+        if (batchExpiryCell) batchExpiryCell.style.display = enableBatchExpiry ? '' : 'none';
         if (toPercentCell) toPercentCell.style.display = enableTradeOffer ? '' : 'none';
         if (toAmountCell) toAmountCell.style.display = enableTradeOfferAmount ? '' : 'none';
         if (focCell) focCell.style.display = enableFOC ? '' : 'none';
@@ -2151,36 +1649,6 @@ document.addEventListener('DOMContentLoaded', function () {
         if (taxAmountCell) taxAmountCell.style.display = enableTaxation ? '' : 'none';
         if (discPercentCell) discPercentCell.style.display = enableInlineCashDiscount ? '' : 'none';
         if (discAmountCell) discAmountCell.style.display = enableInlineCashDiscountAmount ? '' : 'none';
-    }
-
-    // Handle UOM change for price conversion
-    function handleUOMChange(row, unitSelect) {
-        const oldUnitId = unitSelect.dataset.previousValue || unitSelect.value;
-        const newUnitId = unitSelect.value;
-
-        // Store current value for next change
-        unitSelect.dataset.previousValue = newUnitId;
-
-        // Only convert if both units are set and different
-        if (!oldUnitId || !newUnitId || oldUnitId === newUnitId) return;
-
-        const priceInput = row.cells[7].querySelector('input');
-        const currentPrice = parseFloat(priceInput.value) || 0;
-
-        if (currentPrice === 0) return;
-
-        // Get conversion factors
-        const oldConversion = getConversionFactor(oldUnitId, row);
-        const newConversion = getConversionFactor(newUnitId, row);
-
-        if (oldConversion && newConversion) {
-            // Convert price: new_price = old_price * (old_conversion / new_conversion)
-            const newPrice = currentPrice * (oldConversion / newConversion);
-            priceInput.value = newPrice.toFixed(4);
-
-            // Recalculate row
-            priceInput.dispatchEvent(new Event('input'));
-        }
     }
 
     // Get conversion factor for UOM
@@ -2210,7 +1678,7 @@ async function checkAndShowVariantsButton(row, productId) {
         const response = await fetch(`../../../../server/api/purchase/purchase_return/get-child-products.php?parent_id=${productId}`);
         const data = await response.json();
         if (data.success && data.children.length > 0) {
-            const variantsBtn = row.cells[17].querySelector('.btn-secondary');
+            const variantsBtn = row.querySelector('.btn-secondary');
             if (variantsBtn) variantsBtn.style.display = '';
         }
     } catch (error) {
@@ -2343,10 +1811,3 @@ function addChildProducts(parentRow, children) {
     }));
     parentRow.dataset.childProducts = JSON.stringify(childProducts);
 }
-
-
-
-
-
-
-
