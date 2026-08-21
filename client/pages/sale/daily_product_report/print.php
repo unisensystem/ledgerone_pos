@@ -120,7 +120,7 @@ try {
     |--------------------------------------------------------------------------
     |
     | IMPORTANT:
-    | batch_no and batch_expiry_date are directly inside
+    | batch_no, batch_expiry_date and foc_quantity are directly inside
     | sale_invoice_items (sii).
     |
     | NO stock_ledger JOIN is required.
@@ -157,6 +157,8 @@ try {
             sii.batch_expiry_date,
 
             sii.quantity,
+
+            sii.foc_quantity,
 
             COALESCE(
                 u.uom_name,
@@ -569,6 +571,8 @@ foreach ($rows as $row) {
 
 $grand_qty = 0;
 
+$grand_foc_qty = 0;
+
 $grand_amount = 0;
 
 
@@ -576,6 +580,9 @@ foreach ($rows as $row) {
 
     $grand_qty +=
         (float)($row['quantity'] ?? 0);
+
+    $grand_foc_qty +=
+        (float)($row['foc_quantity'] ?? 0);
 
     $grand_amount +=
         (float)($row['net_amount'] ?? 0);
@@ -713,6 +720,11 @@ body {
 }
 
 
+.btn-columns {
+    background: #6f42c1;
+}
+
+
 .btn-cancel {
     background: #6c757d;
 }
@@ -826,42 +838,47 @@ table {
 
 
 col.c-sno {
-    width: 6%;
+    width: 5%;
 }
 
 
 col.c-code {
-    width: 10%;
+    width: 9%;
 }
 
 
 col.c-detail {
-    width: 25%;
+    width: 21%;
 }
 
 
 col.c-batch {
-    width: 12%;
+    width: 10%;
 }
 
 
 col.c-expiry {
-    width: 11%;
+    width: 10%;
 }
 
 
 col.c-price {
-    width: 11%;
+    width: 10%;
 }
 
 
 col.c-qty {
-    width: 11%;
+    width: 9%;
+}
+
+
+col.c-foc {
+    width: 8%;
 }
 
 
 col.c-amount {
-    width: 14%;
+    width: 13%;
 }
 
 
@@ -972,6 +989,130 @@ tr.total-row td {
 
 /*
 |--------------------------------------------------------------------------
+| COLUMN VISIBILITY (toggled by JS via body classes)
+| Example: body.hide-col-foc .col-foc { display: none; }
+|--------------------------------------------------------------------------
+*/
+
+body.hide-col-sno   .col-sno,
+body.hide-col-code  .col-code,
+body.hide-col-detail .col-detail,
+body.hide-col-batch .col-batch,
+body.hide-col-expiry .col-expiry,
+body.hide-col-price .col-price,
+body.hide-col-qty   .col-qty,
+body.hide-col-foc   .col-foc,
+body.hide-col-amount .col-amount {
+    display: none !important;
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| COLUMNS MODAL
+|--------------------------------------------------------------------------
+*/
+
+.modal-overlay {
+
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.45);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    font-family: Arial, sans-serif;
+}
+
+.modal-overlay.open {
+    display: flex;
+}
+
+.modal-box {
+
+    background: #fff;
+    width: 320px;
+    max-width: 90vw;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.25);
+}
+
+.modal-header {
+
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 16px;
+    background: #6f42c1;
+    color: #fff;
+}
+
+.modal-header h3 {
+    margin: 0;
+    font-size: 15px;
+}
+
+.modal-close {
+
+    background: none;
+    border: none;
+    color: #fff;
+    font-size: 20px;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.modal-body {
+
+    padding: 14px 16px;
+    max-height: 320px;
+    overflow-y: auto;
+}
+
+.modal-body label {
+
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 0;
+    font-size: 13px;
+    color: #222;
+    cursor: pointer;
+}
+
+.modal-footer {
+
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    padding: 12px 16px;
+    border-top: 1px solid #eee;
+}
+
+.modal-footer button {
+
+    font-size: 13px;
+    padding: 7px 14px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.modal-btn-reset {
+    background: #e9ecef;
+    color: #333;
+}
+
+.modal-btn-apply {
+    background: #6f42c1;
+    color: #fff;
+}
+
+
+/*
+|--------------------------------------------------------------------------
 | PRINT
 |--------------------------------------------------------------------------
 */
@@ -1045,6 +1186,15 @@ tr.total-row td {
 
 
     <button
+        class="btn-columns"
+        id="columns-btn"
+        type="button"
+    >
+        Columns
+    </button>
+
+
+    <button
         class="btn-cancel"
         onclick="window.close()"
     >
@@ -1058,6 +1208,33 @@ tr.total-row td {
     >
         Back to Page
     </button>
+
+</div>
+
+
+<!-- =========================================================
+     COLUMNS MODAL
+========================================================= -->
+
+<div class="modal-overlay no-print" id="columns-modal-overlay">
+
+    <div class="modal-box">
+
+        <div class="modal-header">
+            <h3>Show / Hide Columns</h3>
+            <button class="modal-close" id="columns-modal-close" type="button">&times;</button>
+        </div>
+
+        <div class="modal-body" id="columns-modal-body">
+            <!-- checkboxes injected by JS -->
+        </div>
+
+        <div class="modal-footer">
+            <button class="modal-btn-reset" id="columns-reset-btn" type="button">Reset</button>
+            <button class="modal-btn-apply" id="columns-apply-btn" type="button">Apply</button>
+        </div>
+
+    </div>
 
 </div>
 
@@ -1156,6 +1333,8 @@ tr.total-row td {
 
     <col class="c-qty">
 
+    <col class="c-foc">
+
     <col class="c-amount">
 
 </colgroup>
@@ -1165,35 +1344,39 @@ tr.total-row td {
 
 <tr>
 
-    <th>
+    <th class="col-sno">
         S. No.
     </th>
 
-    <th>
+    <th class="col-code">
         Code
     </th>
 
-    <th>
+    <th class="col-detail">
         Detail
     </th>
 
-    <th>
+    <th class="col-batch">
         Batch No.
     </th>
 
-    <th>
+    <th class="col-expiry">
         Expiry Date
     </th>
 
-    <th class="num">
+    <th class="num col-price">
         Price
     </th>
 
-    <th class="num">
+    <th class="num col-qty">
         Qty
     </th>
 
-    <th class="num">
+    <th class="num col-foc">
+        FOC
+    </th>
+
+    <th class="num col-amount">
         Amount
     </th>
 
@@ -1210,7 +1393,7 @@ tr.total-row td {
 <tr>
 
     <td
-        colspan="8"
+        colspan="9"
         style="text-align:center; padding:20px;"
     >
         No records found
@@ -1231,10 +1414,10 @@ tr.total-row td {
 
 <tr class="invoice-header">
 
-    <td></td>
+    <td class="col-sno"></td>
 
 
-    <td colspan="6">
+    <td colspan="6" class="col-code col-detail col-batch col-expiry col-price col-qty">
 
         <?= htmlspecialchars(
             fmtDateShort(
@@ -1259,7 +1442,10 @@ tr.total-row td {
     </td>
 
 
-    <td class="bill-no">
+    <td class="col-foc"></td>
+
+
+    <td class="bill-no col-amount">
 
         <?= htmlspecialchars(
             $group['bill_no'],
@@ -1286,14 +1472,14 @@ tr.total-row td {
 
     <!-- S.NO -->
 
-    <td>
+    <td class="col-sno">
         <?= $i + 1 ?>
     </td>
 
 
     <!-- PRODUCT CODE -->
 
-    <td>
+    <td class="col-code">
 
         <?= htmlspecialchars(
             $row['product_code'] ?? '-',
@@ -1306,7 +1492,7 @@ tr.total-row td {
 
     <!-- PRODUCT -->
 
-    <td>
+    <td class="col-detail">
 
         <?= htmlspecialchars(
             $row['product_name'] ?? '-',
@@ -1319,7 +1505,7 @@ tr.total-row td {
 
     <!-- BATCH -->
 
-    <td>
+    <td class="col-batch">
 
         <?= htmlspecialchars(
             $row['batch_no'] ?? '-',
@@ -1332,7 +1518,7 @@ tr.total-row td {
 
     <!-- EXPIRY -->
 
-    <td>
+    <td class="col-expiry">
 
         <?php if (
             !empty(
@@ -1359,7 +1545,7 @@ tr.total-row td {
 
     <!-- PRICE -->
 
-    <td class="num">
+    <td class="num col-price">
 
         <?= htmlspecialchars(
             $currency_symbol,
@@ -1379,7 +1565,7 @@ tr.total-row td {
 
     <!-- QTY -->
 
-    <td class="num">
+    <td class="num col-qty">
 
         <?= number_format(
             (float)(
@@ -1397,9 +1583,23 @@ tr.total-row td {
     </td>
 
 
+    <!-- FOC -->
+
+    <td class="num col-foc">
+
+        <?= number_format(
+            (float)(
+                $row['foc_quantity'] ?? 0
+            ),
+            2
+        ) ?>
+
+    </td>
+
+
     <!-- AMOUNT -->
 
-    <td class="num">
+    <td class="num col-amount">
 
         <?= htmlspecialchars(
             $currency_symbol,
@@ -1428,15 +1628,15 @@ tr.total-row td {
 
 <tr class="total-row">
 
-    <td colspan="6"></td>
+    <td colspan="6" class="col-sno col-code col-detail col-batch col-expiry col-price col-qty"></td>
 
 
-    <td class="num">
+    <td class="num col-foc">
         Total
     </td>
 
 
-    <td class="num">
+    <td class="num col-amount">
 
         <?= htmlspecialchars(
             $currency_symbol,
@@ -1482,6 +1682,13 @@ tr.total-row td {
 
     <?= number_format(
         $grand_qty,
+        2
+    ) ?>,
+
+    FOC
+
+    <?= number_format(
+        $grand_foc_qty,
         2
     ) ?>,
 
@@ -1570,6 +1777,12 @@ const reportGroups = <?= json_encode(
                                 'qty' =>
                                     (float)(
                                         $r['quantity']
+                                        ?? 0
+                                    ),
+
+                                'foc' =>
+                                    (float)(
+                                        $r['foc_quantity']
                                         ?? 0
                                     ),
 
@@ -1705,6 +1918,8 @@ function exportToExcel()
 
                 'Qty': '',
 
+                'FOC': '',
+
                 'Amount':
                     group.bill_no
             });
@@ -1744,6 +1959,9 @@ function exportToExcel()
                                 item.unit || ''
                             }`.trim(),
 
+                        'FOC':
+                            item.foc.toFixed(2),
+
                         'Amount':
                             item.amount.toFixed(2)
 
@@ -1773,7 +1991,9 @@ function exportToExcel()
 
                 'Price': '',
 
-                'Qty': 'Total',
+                'Qty': '',
+
+                'FOC': 'Total',
 
                 'Amount':
                     group.total.toFixed(2)
@@ -1817,6 +2037,8 @@ function exportToExcel()
         { wch: 15 },
 
         { wch: 15 },
+
+        { wch: 10 },
 
         { wch: 18 }
 
@@ -1865,6 +2087,129 @@ function exportToExcel()
     );
 
 }
+
+
+/*
+|--------------------------------------------------------------------------
+| COLUMN SHOW / HIDE
+|
+| Shared with index.php via localStorage so toggling on either page
+| stays in sync (same origin, so the same key is visible on both).
+|--------------------------------------------------------------------------
+*/
+
+const COLUMN_STORAGE_KEY = 'dpsr_column_visibility';
+
+const COLUMN_CONFIG = [
+    { key: 'sno',    label: 'Sr#' },
+    { key: 'code',   label: 'Product Code' },
+    { key: 'detail', label: 'Details' },
+    { key: 'batch',  label: 'Batch No' },
+    { key: 'expiry', label: 'Expiry Date' },
+    { key: 'price',  label: 'Price' },
+    { key: 'qty',    label: 'Qty' },
+    { key: 'foc',    label: 'FOC' },
+    { key: 'amount', label: 'Amount' }
+];
+
+function getColumnPrefs() {
+    try {
+        const raw = localStorage.getItem(COLUMN_STORAGE_KEY);
+        if (!raw) return {};
+        return JSON.parse(raw);
+    } catch (e) {
+        return {};
+    }
+}
+
+function saveColumnPrefs(prefs) {
+    try {
+        localStorage.setItem(COLUMN_STORAGE_KEY, JSON.stringify(prefs));
+    } catch (e) {
+        console.error('Could not save column preferences:', e);
+    }
+}
+
+function applyColumnVisibility() {
+    const prefs = getColumnPrefs();
+    const body = document.body;
+
+    COLUMN_CONFIG.forEach(col => {
+        const isHidden = prefs[col.key] === false;
+        body.classList.toggle(`hide-col-${col.key}`, isHidden);
+    });
+}
+
+function buildColumnsModalBody() {
+    const prefs = getColumnPrefs();
+    const container = document.getElementById('columns-modal-body');
+    if (!container) return;
+
+    container.innerHTML = COLUMN_CONFIG.map(col => {
+        const checked = prefs[col.key] === false ? '' : 'checked';
+        return `
+            <label>
+                <input type="checkbox" data-col-key="${col.key}" ${checked}>
+                ${col.label}
+            </label>
+        `;
+    }).join('');
+}
+
+function openColumnsModal() {
+    buildColumnsModalBody();
+    document.getElementById('columns-modal-overlay').classList.add('open');
+}
+
+function closeColumnsModal() {
+    document.getElementById('columns-modal-overlay').classList.remove('open');
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+
+    // Apply saved column preferences as soon as the page loads
+    applyColumnVisibility();
+
+    const columnsBtn = document.getElementById('columns-btn');
+    const closeBtn = document.getElementById('columns-modal-close');
+    const applyBtn = document.getElementById('columns-apply-btn');
+    const resetBtn = document.getElementById('columns-reset-btn');
+    const overlay = document.getElementById('columns-modal-overlay');
+
+    if (columnsBtn) {
+        columnsBtn.addEventListener('click', openColumnsModal);
+    }
+
+    if (closeBtn) {
+        closeBtn.addEventListener('click', closeColumnsModal);
+    }
+
+    if (overlay) {
+        overlay.addEventListener('click', (e) => {
+            if (e.target === overlay) closeColumnsModal();
+        });
+    }
+
+    if (applyBtn) {
+        applyBtn.addEventListener('click', () => {
+            const prefs = {};
+            document.querySelectorAll('#columns-modal-body input[type="checkbox"]').forEach(cb => {
+                prefs[cb.getAttribute('data-col-key')] = cb.checked;
+            });
+            saveColumnPrefs(prefs);
+            applyColumnVisibility();
+            closeColumnsModal();
+        });
+    }
+
+    if (resetBtn) {
+        resetBtn.addEventListener('click', () => {
+            saveColumnPrefs({});
+            applyColumnVisibility();
+            buildColumnsModalBody();
+        });
+    }
+});
 
 </script>
 
