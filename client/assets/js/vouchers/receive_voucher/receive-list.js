@@ -462,6 +462,8 @@ function loadEditVoucher(id) {
         document.getElementById('editVoucherDate').value = voucher.voucher_date;
         document.getElementById('editCustomer').value = `${voucher.customer_code} - ${voucher.customer_name}`;
         document.getElementById('editBillNo').value = voucher.bill_no || '';
+document.getElementById('editAmount').value = voucher.amount;
+document.getElementById('editAdjustAmount').value = voucher.adjust_amount || 0;
         document.getElementById('editAmount').value = voucher.amount;
         document.getElementById('editDescription').value = voucher.description || '';
         document.getElementById('editChequeDate').value = voucher.cheque_date || '';

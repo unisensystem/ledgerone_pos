@@ -222,9 +222,13 @@ $initialSearch = $_GET['search'] ?? '';
                             <label for="editCustomer">Customer</label>
                             <input type="text" id="editCustomer" readonly>
                         </div>
-                        <div class="form-group">
+                                               <div class="form-group">
                             <label for="editBillNo">Bill No</label>
                             <input type="text" id="editBillNo">
+                        </div>
+                        <div class="form-group">
+                            <label for="editAdjustAmount">Adjust Amount</label>
+                            <input type="number" id="editAdjustAmount" step="0.01" min="0" placeholder="0.00" value="0">
                         </div>
                         <div class="form-group">
                             <label for="editCurrency">Currency</label>
