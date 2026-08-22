@@ -14,13 +14,24 @@ if (!$user_id || !$tenant_id) {
 }
 
 try {
-    $stmt = $pdo->prepare("
+    $city_zone_id = $_GET['city_zone_id'] ?? '';
+
+    $sql = "
         SELECT id, area_name
         FROM areas
         WHERE tenant_id = ?
-        ORDER BY area_name
-    ");
-    $stmt->execute([$tenant_id]);
+    ";
+    $params = [$tenant_id];
+
+    if ($city_zone_id) {
+        $sql .= " AND city_zone_id = ?";
+        $params[] = $city_zone_id;
+    }
+
+    $sql .= " ORDER BY area_name";
+
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute($params);
     $areas = $stmt->fetchAll();
 
     echo json_encode([

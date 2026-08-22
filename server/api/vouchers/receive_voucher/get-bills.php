@@ -38,8 +38,8 @@ try {
     }
     
     // Get bills from sale_invoice
-    $stmt = $pdo->prepare("
-        SELECT si.bill_no, si.net_amount, si.sale_date, c.symbol as currency_symbol
+     $stmt = $pdo->prepare("
+        SELECT si.bill_no, si.net_amount, si.amount_returned, si.sale_date, c.symbol as currency_symbol
         FROM sale_invoice si
         LEFT JOIN ledgerone_public.currencies c ON si.currency_id = c.id
         WHERE si.tenant_id = ? AND si.customer_id = ?
@@ -48,8 +48,8 @@ try {
     $bills = $stmt->fetchAll(PDO::FETCH_ASSOC);
     
     // Get bills from opening_balance_invoices
-    $stmt = $pdo->prepare("
-        SELECT obi.invoice_number as bill_no, obi.debit as net_amount, obi.invoice_date as sale_date, c.symbol as currency_symbol
+      $stmt = $pdo->prepare("
+        SELECT obi.invoice_number as bill_no, obi.debit as net_amount, 0 as amount_returned, obi.invoice_date as sale_date, c.symbol as currency_symbol
         FROM opening_balance_invoices obi
         LEFT JOIN tenant_currencies tc ON obi.tenant_id = tc.tenant_id AND tc.is_base_currency = 1
         LEFT JOIN ledgerone_public.currencies c ON tc.currency_id = c.id
@@ -66,6 +66,30 @@ try {
         return strtotime($b['sale_date']) - strtotime($a['sale_date']);
     });
     
+        // Filter out bills that are already fully settled (received amount + adjust >= net owed after returns)
+    if (!empty($allBills)) {
+        $billNos = array_column($allBills, 'bill_no');
+        $placeholders = implode(',', array_fill(0, count($billNos), '?'));
+
+        $stmt = $pdo->prepare("
+            SELECT bill_no, SUM(amount + adjust_amount) as total_received
+            FROM receive_voucher
+            WHERE tenant_id = ? AND customer_id = ? AND bill_no IN ($placeholders)
+            GROUP BY bill_no
+        ");
+        $stmt->execute(array_merge([$tenant_id, $customer['id']], $billNos));
+        $receivedByBill = [];
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $receivedByBill[$row['bill_no']] = (float) $row['total_received'];
+        }
+
+        $allBills = array_values(array_filter($allBills, function ($bill) use ($receivedByBill) {
+            $netOwed = (float) $bill['net_amount'] - (float) ($bill['amount_returned'] ?? 0);
+            $received = $receivedByBill[$bill['bill_no']] ?? 0;
+            // Keep the bill only if something is still owed on it (0.01 tolerance for rounding)
+            return ($netOwed - $received) > 0.01;
+        }));
+    }
     echo json_encode(['success' => true, 'data' => $allBills]);
 } catch (Exception $e) {
     http_response_code(500);

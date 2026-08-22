@@ -48,7 +48,7 @@ try {
     
     // Get total payments (exclude cheques that are still Pending in post_dated_cheques)
     $stmt = $pdo->prepare("
-        SELECT COALESCE(SUM(rv.amount), 0) as total 
+        SELECT COALESCE(SUM(rv.amount + rv.adjust_amount), 0) as total 
         FROM receive_voucher rv
         WHERE rv.tenant_id = ? AND rv.customer_id = ?
         AND NOT (
