@@ -33,34 +33,40 @@ class CurrencyConverter {
     /**
      * Get exchange rate from API
      */
-    private function getExchangeRate($fromCode, $toCode) {
-        $cacheKey = $fromCode . '_' . $toCode;
-        
-        if (isset($this->cache[$cacheKey])) {
-            return $this->cache[$cacheKey];
-        }
-        
-        try {
-            $url = "https://v6.exchangerate-api.com/v6/{$this->api_key}/latest/{$fromCode}";
-            $response = @file_get_contents($url);
-            
-            if ($response === false) {
-                return 1;
-            }
-            
-            $data = json_decode($response, true);
-            
-            if (isset($data['conversion_rates'][$toCode])) {
-                $rate = $data['conversion_rates'][$toCode];
-                $this->cache[$cacheKey] = $rate;
-                return $rate;
-            }
-        } catch (Exception $e) {
-            return 1;
-        }
-        
+   private function getExchangeRate($fromCode, $toCode) {
+    $cacheKey = $fromCode . '_' . $toCode;
+
+    if (isset($this->cache[$cacheKey])) {
+        return $this->cache[$cacheKey];
+    }
+
+    $url = "https://v6.exchangerate-api.com/v6/{$this->api_key}/latest/{$fromCode}";
+
+    // Timeout add kiya — 4 second se zyada wait nahi karega
+    $context = stream_context_create([
+        'http' => [
+            'timeout' => 4
+        ]
+    ]);
+
+    $response = @file_get_contents($url, false, $context);
+
+    if ($response === false) {
+        $this->cache[$cacheKey] = 1;
         return 1;
     }
+
+    $data = json_decode($response, true);
+
+    if (isset($data['conversion_rates'][$toCode])) {
+        $rate = $data['conversion_rates'][$toCode];
+        $this->cache[$cacheKey] = $rate;
+        return $rate;
+    }
+
+    $this->cache[$cacheKey] = 1;
+    return 1;
+}
     
     /**
      * Convert amount from one currency to another
