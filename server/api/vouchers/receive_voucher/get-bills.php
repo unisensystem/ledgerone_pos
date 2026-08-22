@@ -31,14 +31,14 @@ try {
     ");
     $stmt->execute([$tenant_id, $customer_code]);
     $customer = $stmt->fetch(PDO::FETCH_ASSOC);
-    
+
     if (!$customer) {
         echo json_encode(['success' => true, 'data' => []]);
         exit();
     }
-    
+
     // Get bills from sale_invoice
-     $stmt = $pdo->prepare("
+    $stmt = $pdo->prepare("
         SELECT si.bill_no, si.net_amount, si.amount_returned, si.sale_date, c.symbol as currency_symbol
         FROM sale_invoice si
         LEFT JOIN ledgerone_public.currencies c ON si.currency_id = c.id
@@ -46,9 +46,9 @@ try {
     ");
     $stmt->execute([$tenant_id, $customer['id']]);
     $bills = $stmt->fetchAll(PDO::FETCH_ASSOC);
-    
+
     // Get bills from opening_balance_invoices
-      $stmt = $pdo->prepare("
+    $stmt = $pdo->prepare("
         SELECT obi.invoice_number as bill_no, obi.debit as net_amount, 0 as amount_returned, obi.invoice_date as sale_date, c.symbol as currency_symbol
         FROM opening_balance_invoices obi
         LEFT JOIN tenant_currencies tc ON obi.tenant_id = tc.tenant_id AND tc.is_base_currency = 1
@@ -57,16 +57,17 @@ try {
     ");
     $stmt->execute([$tenant_id, $customer['id']]);
     $openingBills = $stmt->fetchAll(PDO::FETCH_ASSOC);
-    
+
     // Merge both arrays
     $allBills = array_merge($bills, $openingBills);
-    
+
     // Sort by date descending
     usort($allBills, function($a, $b) {
         return strtotime($b['sale_date']) - strtotime($a['sale_date']);
     });
-    
-        // Filter out bills that are already fully settled (received amount + adjust >= net owed after returns)
+
+    // Recompute each bill's amount as the REMAINING balance (net - returned - already received/adjusted),
+    // then drop bills that are fully settled.
     if (!empty($allBills)) {
         $billNos = array_column($allBills, 'bill_no');
         $placeholders = implode(',', array_fill(0, count($billNos), '?'));
@@ -83,16 +84,27 @@ try {
             $receivedByBill[$row['bill_no']] = (float) $row['total_received'];
         }
 
-        $allBills = array_values(array_filter($allBills, function ($bill) use ($receivedByBill) {
+        $allBills = array_values(array_filter(array_map(function ($bill) use ($receivedByBill) {
             $netOwed = (float) $bill['net_amount'] - (float) ($bill['amount_returned'] ?? 0);
             $received = $receivedByBill[$bill['bill_no']] ?? 0;
-            // Keep the bill only if something is still owed on it (0.01 tolerance for rounding)
-            return ($netOwed - $received) > 0.01;
+            $remaining = $netOwed - $received;
+
+            // Frontend reads `net_amount` directly as the bill's amount (see receive-add.js:
+            // bills = data.data.map(bill => ({ amount: bill.net_amount, ... })))
+            // so this must carry the REMAINING balance, not the original invoice total.
+            $bill['net_amount']     = round($remaining, 2);
+            $bill['amount_returned'] = 0; // already netted into remaining above
+            $bill['already_received'] = round($received, 2); // optional, for debugging/UI if needed
+
+            return $bill;
+        }, $allBills), function ($bill) {
+            // 0.01 tolerance for float rounding
+            return $bill['net_amount'] > 0.01;
         }));
     }
+
     echo json_encode(['success' => true, 'data' => $allBills]);
 } catch (Exception $e) {
     http_response_code(500);
     echo json_encode(['error' => 'Database error', 'message' => $e->getMessage()]);
 }
-?>

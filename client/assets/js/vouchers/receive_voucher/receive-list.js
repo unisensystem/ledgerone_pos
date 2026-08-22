@@ -637,6 +637,7 @@ document.getElementById('saveEditBtn').addEventListener('click', function() {
         company_id: companyId,
         bill_no: document.getElementById('editBillNo').value || null,
         amount: amount,
+        adjust_amount: document.getElementById('editAdjustAmount').value || 0,
         currency_id: currencyId,
         project_id: document.getElementById('editProject').value || null,
         payment_method_id: paymentMethodId,
