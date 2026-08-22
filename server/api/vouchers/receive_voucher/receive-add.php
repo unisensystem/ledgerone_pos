@@ -50,6 +50,13 @@ try {
     $recovery_officer_id = (!empty($_POST['recovery_officer']) && $_POST['recovery_officer'] !== 'null') ? $_POST['recovery_officer'] : null;
     $against_pdc_id = (!empty($_POST['against_pdc_id']) && $_POST['against_pdc_id'] !== 'null') ? intval($_POST['against_pdc_id']) : null;
 
+    // Chart-of-accounts IDs used by Receive Voucher on this tenant's live server
+    // Cash = 1, PDC Receivable = 78, Trade Debtors = 2, Adjustment Account = 406
+    const CASH_ACCOUNT_ID = 1;
+    const PDC_RECEIVABLE_ACCOUNT_ID = 78;
+    const TRADE_DEBTORS_ACCOUNT_ID = 2;
+    const ADJUSTMENT_ACCOUNT_ID = 406;
+
     // Look up the customer by customer_code within the tenant.
     // The customer's own company_id is the source of truth and is used for the voucher.
     $stmt = $pdo->prepare("
@@ -186,9 +193,9 @@ try {
     
     // Determine debit account ID
     if ($payment_method_id == 6) {
-        $debit_account_id = 78;
+        $debit_account_id = PDC_RECEIVABLE_ACCOUNT_ID;
     } elseif ($payment_method_id == 1) {
-        $debit_account_id = 1;
+        $debit_account_id = CASH_ACCOUNT_ID;
     } else {
         $stmt = $pdo->prepare("SELECT account_id FROM bank_accounts WHERE id = ? AND tenant_id = ?");
         $stmt->execute([$bank_account_id, $tenant_id]);
@@ -197,7 +204,6 @@ try {
     }
     
     // Insert accounting ledger entries
-     // Insert accounting ledger entries
     $stmt = $pdo->prepare("
         INSERT INTO accounting_ledger (
             tenant_id, transaction_type, reference_table, reference_id, account_id, 
@@ -211,16 +217,16 @@ try {
         $voucher_date, $description, $amount, 0.00
     ]);
 
-     // Adjust amount — Adjustment account (id 324) mein debit
+    // Adjust amount — Adjustment Account (id 406) mein debit
     if ($adjust_amount > 0) {
         $stmt->execute([
-            $tenant_id, 'Receive Voucher', 'receive_voucher', $voucher_id, 324,
+            $tenant_id, 'Receive Voucher', 'receive_voucher', $voucher_id, ADJUSTMENT_ACCOUNT_ID,
             $voucher_date, $description, $adjust_amount, 0.00
         ]);
     }
     // Customer ka Trade Debtors (id 2) ab amount + adjust dono se kam hoga
     $stmt->execute([
-        $tenant_id, 'Receive Voucher', 'receive_voucher', $voucher_id, 2,
+        $tenant_id, 'Receive Voucher', 'receive_voucher', $voucher_id, TRADE_DEBTORS_ACCOUNT_ID,
         $voucher_date, $description, 0.00, $amount + $adjust_amount
     ]);
 
@@ -236,4 +242,3 @@ try {
         'line' => $e->getLine()
     ]);
 }
-?>

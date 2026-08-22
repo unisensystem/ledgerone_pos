@@ -30,6 +30,12 @@ if (!$voucher_id) {
     exit();
 }
 
+// Chart-of-accounts IDs used by Receive Voucher on this tenant's live server
+if (!defined('ADJUSTMENT_ACCOUNT_ID'))     define('ADJUSTMENT_ACCOUNT_ID', 406);
+if (!defined('TRADE_DEBTORS_ACCOUNT_ID'))  define('TRADE_DEBTORS_ACCOUNT_ID', 2);
+if (!defined('CASH_ACCOUNT_ID'))           define('CASH_ACCOUNT_ID', 1);
+if (!defined('PDC_RECEIVABLE_ACCOUNT_ID')) define('PDC_RECEIVABLE_ACCOUNT_ID', 78);
+
 try {
     $input = json_decode(file_get_contents('php://input'), true);
 
@@ -41,27 +47,25 @@ try {
     $adjust_amount = (!empty($input['adjust_amount']) && $input['adjust_amount'] !== 'null')
         ? (float) $input['adjust_amount']
         : 0;
-    $bank_account_id = $input['bank_account_id'] ?? null;
-    $cheque_date = $input['cheque_date'] ?? null;
+    $bank_account_id = !empty($input['bank_account_id']) ? intval($input['bank_account_id']) : null;
     $cheque_no = $input['cheque_no'] ?? null;
+    $cheque_date = $input['cheque_date'] ?? null;
     $voucher_date = $input['voucher_date'] ?? '';
+    $description = $input['description'] ?? null;
 
-    // Need customer_id + company_id for rebuilding ledger entries (not sent by the edit form)
-    $stmt = $pdo->prepare("SELECT customer_id, company_id, tenant_id FROM receive_voucher WHERE id = ? AND tenant_id = ?");
+    // Need customer_id for the PDC rebuild below
+    $stmt = $pdo->prepare("SELECT customer_id, company_id FROM receive_voucher WHERE id = ? AND tenant_id = ?");
     $stmt->execute([$voucher_id, $tenant_id]);
-    $existing = $stmt->fetch(PDO::FETCH_ASSOC);
+    $existingVoucher = $stmt->fetch(PDO::FETCH_ASSOC);
 
-    if (!$existing) {
+    if (!$existingVoucher) {
         echo json_encode(['success' => false, 'error' => 'Voucher not found']);
         exit();
     }
 
-    $customer_id = $existing['customer_id'];
-    $company_id = $input['company_id'] ?? $existing['company_id'];
+    $customer_id = $existingVoucher['customer_id'];
+    $company_id  = $input['company_id'] ?? $existingVoucher['company_id'];
 
-    $pdo->beginTransaction();
-
-    // 1) Update the voucher row (now including adjust_amount)
     $stmt = $pdo->prepare("
         UPDATE receive_voucher
         SET
@@ -92,28 +96,64 @@ try {
         $bank_account_id,
         $cheque_date,
         $cheque_no,
-        $input['description'] ?? null,
+        $description,
         $input['project_id'] ?? null,
         $user_id,
         $voucher_id,
         $tenant_id
     ]);
 
-    // 2) Wipe out the OLD ledger + PDC entries for this voucher — they were built from the
-    //    pre-edit amount/adjust_amount/payment method and are now stale.
-    $stmt = $pdo->prepare("
-        DELETE FROM accounting_ledger
-        WHERE tenant_id = ? AND reference_table = 'receive_voucher' AND reference_id = ?
-    ");
+    // ---- Re-sync accounting_ledger to match the new amount/adjust_amount/payment method ----
+    // Wipe the old entries for this voucher, then rebuild exactly like receive-add.php does.
+    $stmt = $pdo->prepare("DELETE FROM accounting_ledger WHERE tenant_id = ? AND reference_table = 'receive_voucher' AND reference_id = ?");
     $stmt->execute([$tenant_id, $voucher_id]);
 
+    // Determine debit account
+    if ($payment_method_id == 6) {
+        $debit_account_id = PDC_RECEIVABLE_ACCOUNT_ID;
+    } elseif ($payment_method_id == 1) {
+        $debit_account_id = CASH_ACCOUNT_ID;
+    } else {
+        $stmt = $pdo->prepare("SELECT account_id FROM bank_accounts WHERE id = ? AND tenant_id = ?");
+        $stmt->execute([$bank_account_id, $tenant_id]);
+        $bank_account = $stmt->fetch(PDO::FETCH_ASSOC);
+        $debit_account_id = $bank_account['account_id'] ?? null;
+    }
+
+    $ledgerStmt = $pdo->prepare("
+        INSERT INTO accounting_ledger (
+            tenant_id, transaction_type, reference_table, reference_id, account_id,
+            date, description, debit, credit
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ");
+
+    if ($debit_account_id) {
+        $ledgerStmt->execute([
+            $tenant_id, 'Receive Voucher', 'receive_voucher', $voucher_id, $debit_account_id,
+            $voucher_date, $description, $amount, 0.00
+        ]);
+    }
+
+    if ($adjust_amount > 0) {
+        $ledgerStmt->execute([
+            $tenant_id, 'Receive Voucher', 'receive_voucher', $voucher_id, ADJUSTMENT_ACCOUNT_ID,
+            $voucher_date, $description, $adjust_amount, 0.00
+        ]);
+    }
+
+    $ledgerStmt->execute([
+        $tenant_id, 'Receive Voucher', 'receive_voucher', $voucher_id, TRADE_DEBTORS_ACCOUNT_ID,
+        $voucher_date, $description, 0.00, $amount + $adjust_amount
+    ]);
+
+    // ---- Re-sync post_dated_cheques ----
+    // Remove any existing PDC row tied to this voucher, then recreate only if still a cheque payment
     $stmt = $pdo->prepare("
         DELETE FROM post_dated_cheques
         WHERE tenant_id = ? AND reference_table = 'receive_voucher' AND reference_id = ?
     ");
     $stmt->execute([$tenant_id, $voucher_id]);
 
-    // 3) Re-insert a fresh post-dated cheque row if the (possibly new) payment method is PDC (id 6)
     if ($payment_method_id == 6) {
         $stmt = $pdo->prepare("
             INSERT INTO post_dated_cheques (
@@ -127,53 +167,8 @@ try {
         ]);
     }
 
-    // 4) Recompute the debit account the same way receive-add.php does
-    if ($payment_method_id == 6) {
-        $debit_account_id = 78; // Post-Dated Cheques Receivable
-    } elseif ($payment_method_id == 1) {
-        $debit_account_id = 1; // Cash
-    } else {
-        $stmt = $pdo->prepare("SELECT account_id FROM bank_accounts WHERE id = ? AND tenant_id = ?");
-        $stmt->execute([$bank_account_id, $tenant_id]);
-        $bank_account = $stmt->fetch(PDO::FETCH_ASSOC);
-        $debit_account_id = $bank_account['account_id'] ?? null;
-    }
-
-    // 5) Re-insert fresh ledger entries matching the updated amount/adjust_amount
-    $stmt = $pdo->prepare("
-        INSERT INTO accounting_ledger (
-            tenant_id, transaction_type, reference_table, reference_id, account_id,
-            date, description, debit, credit
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    ");
-
-    // Actual cash/bank/cheque received
-    $stmt->execute([
-        $tenant_id, 'Receive Voucher', 'receive_voucher', $voucher_id, $debit_account_id,
-        $voucher_date, $input['description'] ?? null, $amount, 0.00
-    ]);
-
-    // Adjustment portion, if any
-    if ($adjust_amount > 0) {
-        $stmt->execute([
-            $tenant_id, 'Receive Voucher', 'receive_voucher', $voucher_id, 324,
-            $voucher_date, $input['description'] ?? null, $adjust_amount, 0.00
-        ]);
-    }
-
-    // Trade Debtors credit for amount + adjust combined
-    $stmt->execute([
-        $tenant_id, 'Receive Voucher', 'receive_voucher', $voucher_id, 2,
-        $voucher_date, $input['description'] ?? null, 0.00, $amount + $adjust_amount
-    ]);
-
-    $pdo->commit();
-
     echo json_encode(['success' => true, 'message' => 'Voucher updated successfully']);
 } catch (Exception $e) {
-    if ($pdo->inTransaction()) {
-        $pdo->rollBack();
-    }
     http_response_code(500);
     echo json_encode(['error' => 'Database error', 'message' => $e->getMessage()]);
 }
