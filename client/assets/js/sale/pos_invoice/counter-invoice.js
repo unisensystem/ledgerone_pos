@@ -246,26 +246,29 @@ document.addEventListener('DOMContentLoaded', async function() {
     });
 
     // "Buy by Amount" checkbox — optional feature, off by default (not every business wants it)
+    // Elements may not be present in all invoice views (e.g. counter-invoice omits this panel)
     const enableAmountCheckbox = document.getElementById('enableAmountEntry');
     const quickAmountGroup = document.getElementById('quickAmountGroup');
     const quickAmountInput = document.getElementById('quickAmount');
-    enableAmountCheckbox.checked = localStorage.getItem('enableAmountEntry') === 'true';
-    quickAmountGroup.style.display = enableAmountCheckbox.checked ? '' : 'none';
-    enableAmountCheckbox.addEventListener('change', function() {
-        localStorage.setItem('enableAmountEntry', this.checked);
-        quickAmountGroup.style.display = this.checked ? '' : 'none';
-        quickAmountInput.value = '';
-    });
+    if (enableAmountCheckbox && quickAmountGroup && quickAmountInput) {
+        enableAmountCheckbox.checked = localStorage.getItem('enableAmountEntry') === 'true';
+        quickAmountGroup.style.display = enableAmountCheckbox.checked ? '' : 'none';
+        enableAmountCheckbox.addEventListener('change', function() {
+            localStorage.setItem('enableAmountEntry', this.checked);
+            quickAmountGroup.style.display = this.checked ? '' : 'none';
+            quickAmountInput.value = '';
+        });
 
-    quickAmountInput.addEventListener('input', calculateQtyFromAmount);
-    quickAmountInput.addEventListener('keydown', function(e) {
-        if (e.key === 'Enter') {
-            e.preventDefault();
-            e.stopPropagation();
-            calculateQtyFromAmount();
-            document.getElementById('quickAddBtn').click();
-        }
-    });
+        quickAmountInput.addEventListener('input', calculateQtyFromAmount);
+        quickAmountInput.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                e.stopPropagation();
+                calculateQtyFromAmount();
+                document.getElementById('quickAddBtn').click();
+            }
+        });
+    }
 
     document.getElementById('shortcutSettingsBtn').addEventListener('click', function() {
         document.getElementById('shortcutSettingsModal').style.display = 'flex';
