@@ -52,6 +52,11 @@ try {
     $cheque_date = $input['cheque_date'] ?? null;
     $voucher_date = $input['voucher_date'] ?? '';
     $description = $input['description'] ?? null;
+    $dsr_no = $input['dsr_no'] ?? null;
+$container_id = !empty($input['container_id']) ? intval($input['container_id']) : null;
+$sub_account_id = !empty($input['sub_account_id']) ? intval($input['sub_account_id']) : null;
+$recovery_officer_id = !empty($input['recovery_officer_id']) ? $input['recovery_officer_id'] : null;
+$against_pdc_id = !empty($input['against_pdc_id']) ? intval($input['against_pdc_id']) : null;
 
     // Need customer_id for the PDC rebuild below
     $stmt = $pdo->prepare("SELECT customer_id, company_id FROM receive_voucher WHERE id = ? AND tenant_id = ?");
@@ -66,42 +71,52 @@ try {
     $customer_id = $existingVoucher['customer_id'];
     $company_id  = $input['company_id'] ?? $existingVoucher['company_id'];
 
-    $stmt = $pdo->prepare("
-        UPDATE receive_voucher
-        SET
-            voucher_date = ?,
-            company_id = ?,
-            bill_no = ?,
-            amount = ?,
-            adjust_amount = ?,
-            currency_id = ?,
-            payment_method_id = ?,
-            bank_account_id = ?,
-            cheque_date = ?,
-            cheque_no = ?,
-            description = ?,
-            project_id = ?,
-            updated_by = ?
-        WHERE id = ? AND tenant_id = ?
-    ");
+$stmt = $pdo->prepare("
+    UPDATE receive_voucher
+    SET
+        voucher_date = ?,
+        company_id = ?,
+        bill_no = ?,
+        dsr_no = ?,
+        amount = ?,
+        adjust_amount = ?,
+        currency_id = ?,
+        payment_method_id = ?,
+        bank_account_id = ?,
+        cheque_date = ?,
+        cheque_no = ?,
+        description = ?,
+        project_id = ?,
+        container_id = ?,
+        sub_account_id = ?,
+        recovery_officer_id = ?,
+        against_pdc_id = ?,
+        updated_by = ?
+    WHERE id = ? AND tenant_id = ?
+");
 
-    $stmt->execute([
-        $voucher_date,
-        $company_id,
-        $input['bill_no'] ?? null,
-        $amount,
-        $adjust_amount,
-        $input['currency_id'] ?? null,
-        $payment_method_id,
-        $bank_account_id,
-        $cheque_date,
-        $cheque_no,
-        $description,
-        $input['project_id'] ?? null,
-        $user_id,
-        $voucher_id,
-        $tenant_id
-    ]);
+$stmt->execute([
+    $voucher_date,
+    $company_id,
+    $input['bill_no'] ?? null,
+    $dsr_no,
+    $amount,
+    $adjust_amount,
+    $input['currency_id'] ?? null,
+    $payment_method_id,
+    $bank_account_id,
+    $cheque_date,
+    $cheque_no,
+    $description,
+    $input['project_id'] ?? null,
+    $container_id,
+    $sub_account_id,
+    $recovery_officer_id,
+    $against_pdc_id,
+    $user_id,
+    $voucher_id,
+    $tenant_id
+]);
 
     // ---- Re-sync accounting_ledger to match the new amount/adjust_amount/payment method ----
     // Wipe the old entries for this voucher, then rebuild exactly like receive-add.php does.
