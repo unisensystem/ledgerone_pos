@@ -16,6 +16,7 @@ if (!$user_id) {
 ?>
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
@@ -23,22 +24,23 @@ if (!$user_id) {
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="../../../assets/css/vouchers/receive_voucher/receive-add.css?v=<?php echo time(); ?>">
 </head>
+
 <body class="light-theme">
     <div class="container">
         <div class="header">
             <h1 class="page-title">Receive Voucher</h1>
             <div style="display: flex; align-items: center; gap: 16px;">
-            <button type="button" id="customizeFieldsBtn" class="btn btn-secondary" style="height: 40px; padding: 0 16px;">
-                <i class="fas fa-sliders-h"></i>
-                Customize Fields
-            </button>
-            <div class="mode-toggle">
-                <label class="toggle-label">
-                    <input type="checkbox" id="bulkModeToggle">
-                    <span class="toggle-slider"></span>
-                    <span class="toggle-text">Bulk Mode</span>
-                </label>
-            </div>
+                <button type="button" id="customizeFieldsBtn" class="btn btn-secondary" style="height: 40px; padding: 0 16px;">
+                    <i class="fas fa-sliders-h"></i>
+                    Customize Fields
+                </button>
+                <div class="mode-toggle">
+                    <label class="toggle-label">
+                        <input type="checkbox" id="bulkModeToggle">
+                        <span class="toggle-slider"></span>
+                        <span class="toggle-text">Bulk Mode</span>
+                    </label>
+                </div>
             </div>
         </div>
 
@@ -129,6 +131,10 @@ if (!$user_id) {
                                 <!-- Options will be populated by JS -->
                             </select>
                         </div>
+                         <div class="form-group">
+                            <label for="adjustAmount">Adjust</label>
+                            <input type="number" id="adjustAmount" step="0.01" min="0" placeholder="0.00" value="0">
+                        </div>
                         <div class="form-group">
                             <label for="amount" class="required">Amount</label>
                             <div class="currency-input">
@@ -136,6 +142,8 @@ if (!$user_id) {
                                 <input type="number" id="amount" step="0.01" min="0" placeholder="0.00" required>
                             </div>
                         </div>
+                       
+
                         <div class="form-group hidden" id="bankAccountGroup">
                             <label for="bankAccount">Bank Account</label>
                             <select id="bankAccount">
@@ -204,7 +212,7 @@ if (!$user_id) {
         <!-- Bulk Mode Container -->
         <div class="bulk-container" id="bulkModeForm" style="display: none;">
             <div class="bulk-header">
-                <div style="display: flex; gap: 16px; align-items: center; flex: 1;">
+                <div style="display: flex; gap: 16px; align-items: center; flex: 1; flex-wrap: wrap;">
                     <div class="form-group" style="margin: 0; min-width: 250px;">
                         <label for="bulkCompany">Company</label>
                         <select id="bulkCompany" required>
@@ -214,6 +222,24 @@ if (!$user_id) {
                     <div class="form-group" style="margin: 0; min-width: 180px;">
                         <label for="bulkJournalDate">Bulk Journal Date</label>
                         <input type="date" id="bulkJournalDate" title="Applies this date to all rows below">
+                    </div>
+                    <div class="form-group" style="margin: 0; min-width: 160px;">
+                        <label for="bulkCity">City</label>
+                        <select id="bulkCity">
+                            <option value="">Select City</option>
+                        </select>
+                    </div>
+                    <div class="form-group" style="margin: 0; min-width: 160px;">
+                        <label for="bulkZone">Zone</label>
+                        <select id="bulkZone">
+                            <option value="">Select Zone</option>
+                        </select>
+                    </div>
+                    <div class="form-group" style="margin: 0; min-width: 160px;">
+                        <label for="bulkArea">Area</label>
+                        <select id="bulkArea">
+                            <option value="">Select Area</option>
+                        </select>
                     </div>
                     <div class="form-group" style="margin: 0; min-width: 250px;">
                         <label for="bulkRecoveryOfficer">Recovery Officer</label>
@@ -243,6 +269,7 @@ if (!$user_id) {
                             <th>Project</th>
                             <th>Container</th>
                             <th>Currency</th>
+                            <th>Adjust</th>
                             <th>Amount</th>
                             <th>Remaining Balance</th>
                             <th>Payment Method</th>
@@ -314,4 +341,5 @@ if (!$user_id) {
 
     <script src="../../../assets/js/vouchers/receive_voucher/receive-add.js?v=<?php echo time(); ?>"></script>
 </body>
+
 </html>

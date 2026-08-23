@@ -8,24 +8,24 @@ const allCustomizeFields = [
     { id: 'company',          label: 'Company',           visible: true,  bulkCol: null },
     { id: 'customerCode',     label: 'Customer Code',     visible: true,  bulkCol: 1  },
     { id: 'previousBalance',  label: 'Previous Balance',  visible: true,  bulkCol: 2  },
-    { id: 'remainingBalance', label: 'Remaining Balance', visible: true,  bulkCol: 10 },
+    { id: 'remainingBalance', label: 'Remaining Balance', visible: true,  bulkCol: 11 },
     { id: 'subAccount',       label: 'Sub Account',       visible: true,  bulkCol: 3  },
     { id: 'billNo',           label: 'Bill No',           visible: true,  bulkCol: 4  },
     { id: 'dsrNo',            label: 'DSR#',              visible: true,  bulkCol: 5  },
     { id: 'currency',         label: 'Currency',          visible: true,  bulkCol: 8  },
     { id: 'project',          label: 'Project',           visible: true,  bulkCol: 6  },
     { id: 'container',        label: 'Container',         visible: false, bulkCol: 7  },
-    { id: 'amount',           label: 'Amount',            visible: true,  bulkCol: 9  },
-    { id: 'paymentMethod',    label: 'Payment Method',    visible: true,  bulkCol: 11 },
-    { id: 'againstPdc',       label: 'Against PDC',       visible: true,  bulkCol: 12 },
-    { id: 'bankAccount',      label: 'Bank Account',      visible: true,  bulkCol: 13 },
-    { id: 'chequeDate',       label: 'Cheque Date',       visible: true,  bulkCol: 14 },
-    { id: 'chequeNo',         label: 'Cheque No',         visible: true,  bulkCol: 15 },
+    { id: 'adjustAmount',     label: 'Adjust',            visible: true,  bulkCol: 9  },
+    { id: 'amount',           label: 'Amount',            visible: true,  bulkCol: 10 },
+    { id: 'paymentMethod',    label: 'Payment Method',    visible: true,  bulkCol: 12 },
+    { id: 'againstPdc',       label: 'Against PDC',       visible: true,  bulkCol: 13 },
+    { id: 'bankAccount',      label: 'Bank Account',      visible: true,  bulkCol: 14 },
+    { id: 'chequeDate',       label: 'Cheque Date',       visible: true,  bulkCol: 15 },
+    { id: 'chequeNo',         label: 'Cheque No',         visible: true,  bulkCol: 16 },
     { id: 'recoveryOfficer',  label: 'Recovery Officer',  visible: true,  bulkCol: null },
     { id: 'attachment',       label: 'Attachment',        visible: true,  bulkCol: null },
-    { id: 'description',      label: 'Description',       visible: true,  bulkCol: 16 },
+    { id: 'description',      label: 'Description',       visible: true,  bulkCol: 17 },
 ];
-
 // Fields whose single-mode visibility is controlled by payment method logic — skip form-group toggling
 const PAYMENT_CONTROLLED = ['bankAccount', 'chequeDate', 'chequeNo'];
 
@@ -238,6 +238,7 @@ let customers = [];
 let bulkCustomers = [];
 let bills = [];
 let employees = [];
+let bulkEmployees = [];
 let companies = [];
 let projects = [];
 let containers = [];
@@ -245,9 +246,18 @@ let currentCustomerId = null;
 let pendingPdcs = [];
 
 // Fetch customers from API, optionally filtered by recovery officer (associated_sales_officer_id)
-function fetchCustomers(recoveryOfficerId) {
+// and/or by location (city_id / city_zone_id / area_id) — used by bulk mode's City/Zone/Area filter
+function fetchCustomers(recoveryOfficerId, locationFilters) {
     let url = '../../../../server/api/vouchers/receive_voucher/get-suppliers.php';
-    if (recoveryOfficerId) url += `?recovery_officer_id=${recoveryOfficerId}`;
+    const params = new URLSearchParams();
+    if (recoveryOfficerId) params.set('recovery_officer_id', recoveryOfficerId);
+    if (locationFilters) {
+        if (locationFilters.city_id) params.set('city_id', locationFilters.city_id);
+        if (locationFilters.city_zone_id) params.set('city_zone_id', locationFilters.city_zone_id);
+        if (locationFilters.area_id) params.set('area_id', locationFilters.area_id);
+    }
+    const qs = params.toString();
+    if (qs) url += `?${qs}`;
     return fetch(url)
         .then(response => response.json())
         .then(data => {
@@ -264,12 +274,52 @@ function fetchCustomers(recoveryOfficerId) {
         });
 }
 
+// Fetch employees (recovery officers) from API, optionally filtered by location
+// (city_id / city_zone_id / area_id). An officer only has a location indirectly,
+// through the customers assigned to them — filtering is done server-side via a join.
+function fetchEmployees(locationFilters) {
+    let url = '../../../../server/api/vouchers/receive_voucher/get-employees.php';
+    const params = new URLSearchParams();
+    if (locationFilters) {
+        if (locationFilters.city_id) params.set('city_id', locationFilters.city_id);
+        if (locationFilters.city_zone_id) params.set('city_zone_id', locationFilters.city_zone_id);
+        if (locationFilters.area_id) params.set('area_id', locationFilters.area_id);
+    }
+    const qs = params.toString();
+    if (qs) url += `?${qs}`;
+    return fetch(url)
+        .then(response => response.json())
+        .then(data => {
+            if (!data.success) return [];
+            return data.data.map(emp => ({
+                id: emp.employee_id,
+                numericId: emp.id || emp.employee_id,
+                name: emp.full_name,
+                display: `${emp.employee_id} - ${emp.full_name}`
+            }));
+        })
+        .catch(error => {
+            console.error('Error fetching employees:', error);
+            return [];
+        });
+}
+
 // Resolve the numeric employees.id for a searchable Recovery Officer input (used to join against customers.associated_sales_officer_id)
 function resolveEmployeeNumericId(inputId) {
     const empCode = document.getElementById(inputId).dataset.selectedId;
     if (!empCode) return null;
-    const emp = employees.find(e => e.id === empCode);
+    const sourceList = inputId === 'bulkRecoveryOfficer' ? bulkEmployees : employees;
+    const emp = sourceList.find(e => e.id === empCode);
     return emp ? emp.numericId : null;
+}
+
+// Returns the currently selected City/Zone/Area filter for bulk mode
+function getBulkLocationFilters() {
+    return {
+        city_id: document.getElementById('bulkCity').value || '',
+        city_zone_id: document.getElementById('bulkZone').value || '',
+        area_id: document.getElementById('bulkArea').value || ''
+    };
 }
 
 // Called whenever a Recovery Officer is selected/cleared — filters which customers show in the linked Customer Code dropdown
@@ -277,8 +327,9 @@ function onRecoveryOfficerChanged(mode) {
     const inputId = mode === 'bulk' ? 'bulkRecoveryOfficer' : 'recoveryOfficer';
     const numericId = resolveEmployeeNumericId(inputId);
     const targetList = mode === 'bulk' ? bulkCustomers : customers;
+    const locationFilters = mode === 'bulk' ? getBulkLocationFilters() : null;
 
-    fetchCustomers(numericId).then(list => {
+    fetchCustomers(numericId, locationFilters).then(list => {
         targetList.length = 0;
         targetList.push(...list);
 
@@ -294,8 +345,29 @@ function onRecoveryOfficerChanged(mode) {
     });
 }
 
+// Called whenever the bulk mode City/Zone/Area filter changes — refreshes both the
+// Recovery Officer list and the customer list to only what's available in that location
+function refreshBulkLocationFilter() {
+    const locationFilters = getBulkLocationFilters();
+
+    // A previously selected officer may not belong to the newly selected location — clear it
+    const officerInput = document.getElementById('bulkRecoveryOfficer');
+    officerInput.value = '';
+    delete officerInput.dataset.selectedId;
+
+    fetchEmployees(locationFilters).then(list => {
+        bulkEmployees.length = 0;
+        bulkEmployees.push(...list);
+    });
+
+    fetchCustomers(null, locationFilters).then(list => {
+        bulkCustomers.length = 0;
+        bulkCustomers.push(...list);
+    });
+}
+
 // Initial (unfiltered) load for both single-mode and bulk-mode customer lists
-fetchCustomers(null).then(list => {
+fetchCustomers(null, null).then(list => {
     customers.push(...list);
     bulkCustomers.push(...list);
     setupSearchableDropdown('customerCode', 'customerDropdown', customers, 'name', 'code');
@@ -480,22 +552,88 @@ function fetchSubAccountsForCustomer(customerId) {
         .catch(error => console.error('Error fetching sub-accounts:', error));
 }
 
-// Fetch employees from API
-fetch('../../../../server/api/vouchers/receive_voucher/get-employees.php')
+// Fetch employees from API (initial, unfiltered — powers single mode; also seeds bulk mode)
+fetchEmployees(null).then(list => {
+    employees.push(...list);
+    bulkEmployees.push(...list);
+    setupSearchableDropdown('recoveryOfficer', 'recoveryOfficerDropdown', employees, 'display', 'id');
+    setupSearchableDropdown('bulkRecoveryOfficer', 'bulkRecoveryOfficerDropdown', bulkEmployees, 'display', 'id');
+});
+
+// ===== Bulk mode City/Zone/Area cascade filter =====
+
+// Fetch cities from API (bulk mode filter)
+fetch('../../../../server/api/vouchers/receive_voucher/get-cities.php')
     .then(response => response.json())
     .then(data => {
         if (data.success) {
-            employees = data.data.map(emp => ({
-                id: emp.employee_id,
-                numericId: emp.id || emp.employee_id,
-                name: emp.full_name,
-                display: `${emp.employee_id} - ${emp.full_name}`
-            }));
-            setupSearchableDropdown('recoveryOfficer', 'recoveryOfficerDropdown', employees, 'display', 'id');
-            setupSearchableDropdown('bulkRecoveryOfficer', 'bulkRecoveryOfficerDropdown', employees, 'display', 'id');
+            const citySelect = document.getElementById('bulkCity');
+            data.data.forEach(city => {
+                const option = document.createElement('option');
+                option.value = city.id;
+                option.textContent = city.city_name;
+                citySelect.appendChild(option);
+            });
         }
     })
-    .catch(error => console.error('Error fetching employees:', error));
+    .catch(error => console.error('Error fetching cities:', error));
+
+function populateBulkZoneSelect(cityId) {
+    const zoneSelect = document.getElementById('bulkZone');
+    const areaSelect = document.getElementById('bulkArea');
+    zoneSelect.innerHTML = '<option value="">Select Zone</option>';
+    areaSelect.innerHTML = '<option value="">Select Area</option>';
+    if (!cityId) return;
+
+    fetch(`../../../../server/api/vouchers/receive_voucher/get-city-zones.php?city_id=${cityId}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                data.data.forEach(zone => {
+                    const option = document.createElement('option');
+                    option.value = zone.id;
+                    option.textContent = zone.city_zone_name;
+                    zoneSelect.appendChild(option);
+                });
+            }
+        })
+        .catch(error => console.error('Error fetching city zones:', error));
+}
+
+function populateBulkAreaSelect(cityZoneId) {
+    const areaSelect = document.getElementById('bulkArea');
+    areaSelect.innerHTML = '<option value="">Select Area</option>';
+    if (!cityZoneId) return;
+
+    fetch(`../../../../server/api/vouchers/receive_voucher/get-areas.php?city_zone_id=${cityZoneId}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                data.data.forEach(area => {
+                    const option = document.createElement('option');
+                    option.value = area.id;
+                    option.textContent = area.area_name;
+                    areaSelect.appendChild(option);
+                });
+            }
+        })
+        .catch(error => console.error('Error fetching areas:', error));
+}
+
+document.getElementById('bulkCity').addEventListener('change', function() {
+    populateBulkZoneSelect(this.value);
+    refreshBulkLocationFilter();
+});
+
+document.getElementById('bulkZone').addEventListener('change', function() {
+    populateBulkAreaSelect(this.value);
+    refreshBulkLocationFilter();
+});
+
+document.getElementById('bulkArea').addEventListener('change', function() {
+    refreshBulkLocationFilter();
+});
+// ===== END Bulk mode City/Zone/Area cascade filter =====
 
 
 
@@ -814,11 +952,13 @@ function setupSearchableDropdown(inputId, dropdownId, data, displayKey, valueKey
 
 // Update remaining balance when amount changes
 document.getElementById('amount').addEventListener('input', updateRemainingBalance);
+document.getElementById('adjustAmount').addEventListener('input', updateRemainingBalance);
 
 function updateRemainingBalance() {
     const previousBalance = parseFloat(document.getElementById('previousBalance').value) || 0;
     const amount = parseFloat(document.getElementById('amount').value) || 0;
-    const remainingBalance = previousBalance - amount;
+    const adjust = parseFloat(document.getElementById('adjustAmount').value) || 0;
+    const remainingBalance = previousBalance - amount - adjust;
     document.getElementById('remainingBalance').value = remainingBalance.toFixed(2);
 }
 
@@ -951,6 +1091,7 @@ function addBulkRow() {
         <td><select class="bulk-project"><option value="">Select</option></select></td>
         <td><select class="bulk-container"><option value="">Select</option></select></td>
         <td><select class="bulk-currency" required></select></td>
+        <td><input type="number" class="bulk-adjust" step="0.01" min="0" placeholder="0.00" value="0"></td>
         <td><input type="number" class="bulk-amount" step="0.01" min="0" placeholder="0.00" required></td>
         <td><input type="text" class="bulk-rem-balance" readonly></td>
         <td><select class="bulk-payment" required></select></td>
@@ -986,7 +1127,11 @@ function addBulkRow() {
         updateBulkTotal();
         updateBulkRowRemainingBalance(row);
     });
-    
+
+    row.querySelector('.bulk-adjust').addEventListener('input', function() {
+        updateBulkRowRemainingBalance(row);
+    });
+
     row.querySelector('.bulk-payment').addEventListener('change', function() {
         const bankSelect = row.querySelector('.bulk-bank');
         const chequeDateInput = row.querySelector('.bulk-cheque-date');
@@ -1204,7 +1349,8 @@ function setupBulkCustomerDropdown(row) {
 function updateBulkRowRemainingBalance(row) {
     const prevBalance = parseFloat(row.querySelector('.bulk-prev-balance').value) || 0;
     const amount = parseFloat(row.querySelector('.bulk-amount').value) || 0;
-    const remBalance = prevBalance - amount;
+    const adjust = parseFloat(row.querySelector('.bulk-adjust').value) || 0;
+    const remBalance = prevBalance - amount - adjust;
     row.querySelector('.bulk-rem-balance').value = remBalance.toFixed(2);
 }
 
@@ -1257,7 +1403,8 @@ document.getElementById('postBulkBtn').addEventListener('click', async function(
         formData.append('voucher_date', row.querySelector('.bulk-date').value);
         formData.append('customer_code', row.querySelector('.bulk-customer').value);
         formData.append('company_id', bulkCompanyId);
-        formData.append('previous_balance', row.querySelector('.bulk-prev-balance').value);
+                formData.append('previous_balance', row.querySelector('.bulk-prev-balance').value);
+        formData.append('adjust_amount', row.querySelector('.bulk-adjust').value || 0);
         formData.append('sub_account_id', row.querySelector('.bulk-sub-account').value || null);
         formData.append('bill_no', row.querySelector('.bulk-bill').value || null);
         formData.append('dsr_no', row.querySelector('.bulk-dsr').value || null);
@@ -1274,7 +1421,7 @@ document.getElementById('postBulkBtn').addEventListener('click', async function(
         
         const recoveryOfficerValue = document.getElementById('bulkRecoveryOfficer').dataset.selectedId;
         if (recoveryOfficerValue) {
-            const selectedEmployee = employees.find(emp => emp.id === recoveryOfficerValue);
+            const selectedEmployee = bulkEmployees.find(emp => emp.id === recoveryOfficerValue);
             if (selectedEmployee && selectedEmployee.numericId) {
                 formData.append('recovery_officer', selectedEmployee.numericId);
             }
@@ -1355,6 +1502,7 @@ form.addEventListener('submit', function (e) {
     formData.append('customer_code', document.getElementById('customerCode').value.split(' - ')[0]);
     formData.append('company_id', document.getElementById('company').value);
     formData.append('previous_balance', document.getElementById('previousBalance').value);
+    formData.append('adjust_amount', document.getElementById('adjustAmount').value || 0);
     formData.append('sub_account_id', document.getElementById('subAccount').value || null);
     formData.append('bill_no', document.getElementById('billNo').dataset.selectedBillNo || document.getElementById('billNo').value.split(' - ')[0] || null);
     formData.append('dsr_no', document.getElementById('dsrNo').value || null);

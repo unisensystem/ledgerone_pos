@@ -135,11 +135,11 @@ try {
                     $prev_invoices += $amount;
                 }
                 
-                $stmt = $pdo->prepare("SELECT rv.amount, rv.currency_id FROM receive_voucher rv WHERE rv.tenant_id = ? AND rv.customer_id = ? AND rv.voucher_date < ?{$company_filter}
-                    AND rv.id NOT IN (
-                        SELECT pdc.reference_id FROM post_dated_cheques pdc
-                        WHERE pdc.tenant_id = ? AND pdc.reference_table = 'receive_voucher' AND pdc.status = 'Pending'
-                    )");
+               $stmt = $pdo->prepare("SELECT (rv.amount + rv.adjust_amount) as amount, rv.currency_id FROM receive_voucher rv WHERE rv.tenant_id = ? AND rv.customer_id = ? AND rv.voucher_date < ?{$company_filter}
+    AND rv.id NOT IN (
+        SELECT pdc.reference_id FROM post_dated_cheques pdc
+        WHERE pdc.tenant_id = ? AND pdc.reference_table = 'receive_voucher' AND pdc.status = 'Pending'
+    )");
                 $params_prev = [$tenant_id, $customer['id'], $from_date];
                 if ($company_id) $params_prev[] = $company_id;
                 $params_prev[] = $tenant_id;
@@ -257,11 +257,11 @@ try {
                 if ($company_id) $return_params[] = $company_id;
             }
             
-            $payment_sql = "SELECT rv.amount, rv.currency_id FROM receive_voucher rv WHERE rv.tenant_id = ? AND rv.customer_id = ?{$company_filter}
-                AND rv.id NOT IN (
-                    SELECT pdc.reference_id FROM post_dated_cheques pdc
-                    WHERE pdc.tenant_id = ? AND pdc.reference_table = 'receive_voucher' AND pdc.status = 'Pending'
-                )";
+            $payment_sql = "SELECT (rv.amount + rv.adjust_amount) as amount, rv.currency_id FROM receive_voucher rv WHERE rv.tenant_id = ? AND rv.customer_id = ?{$company_filter}
+    AND rv.id NOT IN (
+        SELECT pdc.reference_id FROM post_dated_cheques pdc
+        WHERE pdc.tenant_id = ? AND pdc.reference_table = 'receive_voucher' AND pdc.status = 'Pending'
+    )";
             $payment_params = [$tenant_id, $customer['id']];
             if ($company_id) $payment_params[] = $company_id;
             $payment_params[] = $tenant_id;
@@ -483,7 +483,7 @@ try {
                 $stmt->execute($params_sub);
                 $prev_invoices_sub = $stmt->fetch()['total'];
                 
-                $stmt = $pdo->prepare("SELECT COALESCE(SUM(amount), 0) as total FROM receive_voucher WHERE tenant_id = ? AND customer_id = ? AND voucher_date < ? AND sub_account_id = ?{$company_filter_detail}");
+$stmt = $pdo->prepare("SELECT COALESCE(SUM(amount + adjust_amount), 0) as total FROM receive_voucher WHERE tenant_id = ? AND customer_id = ? AND voucher_date < ? AND sub_account_id = ?{$company_filter_detail}");
                 $params_sub = [$tenant_id, $customer_id, $from_date, $sub_account_id];
                 if ($company_id) $params_sub[] = $company_id;
                 $stmt->execute($params_sub);
@@ -514,7 +514,7 @@ try {
             $stmt->execute([$tenant_id, $customer_id, $from_date]);
             $prev_invoices_main = $stmt->fetch()['total'];
             
-            $stmt = $pdo->prepare("SELECT COALESCE(SUM(amount), 0) as total FROM receive_voucher WHERE tenant_id = ? AND customer_id = ? AND voucher_date < ? AND (sub_account_id IS NULL OR sub_account_id = 0)");
+$stmt = $pdo->prepare("SELECT COALESCE(SUM(amount + adjust_amount), 0) as total FROM receive_voucher WHERE tenant_id = ? AND customer_id = ? AND voucher_date < ? AND (sub_account_id IS NULL OR sub_account_id = 0)");
             $stmt->execute([$tenant_id, $customer_id, $from_date]);
             $prev_payments_main = $stmt->fetch()['total'];
             
@@ -553,9 +553,9 @@ try {
                 $stmt->execute([$tenant_id, $customer_id, $from_date, $sub_id]);
                 $prev_invoices_sub = $stmt->fetch()['total'];
                 
-                $stmt = $pdo->prepare("SELECT COALESCE(SUM(amount), 0) as total FROM receive_voucher WHERE tenant_id = ? AND customer_id = ? AND voucher_date < ? AND sub_account_id = ?");
-                $stmt->execute([$tenant_id, $customer_id, $from_date, $sub_id]);
-                $prev_payments_sub = $stmt->fetch()['total'];
+                $stmt = $pdo->prepare("SELECT COALESCE(SUM(amount + adjust_amount), 0) as total FROM receive_voucher WHERE tenant_id = ? AND customer_id = ? AND voucher_date < ? AND sub_account_id = ?");
+$stmt->execute([$tenant_id, $customer_id, $from_date, $sub_id]);
+$prev_payments_sub = $stmt->fetch()['total'];
                 
                 $stmt = $pdo->prepare("SELECT COALESCE(SUM(amount), 0) as total FROM payment_voucher WHERE tenant_id = ? AND customer_id IS NOT NULL AND supplier_id IS NULL AND customer_id = ? AND voucher_date < ? AND COALESCE(NULLIF(customer_sub_account_id, 0), sub_account_id) = ?");
                 $stmt->execute([$tenant_id, $customer_id, $from_date, $sub_id]);
@@ -619,8 +619,10 @@ try {
         $invoices = $stmt->fetchAll(PDO::FETCH_ASSOC);
         
         // Get receive vouchers (exclude those linked to PDCs)
+             // Get receive vouchers (exclude those linked to PDCs)
         $sql = "SELECT voucher_date as date, CONCAT('Receipt - ', voucher_number) as description,
-                voucher_number as reference, 0 as debit, amount as credit, 'payment' as type, sub_account_id, currency_id
+                voucher_number as reference, 0 as debit, amount as credit, 'payment' as type, sub_account_id, currency_id,
+                bill_no, adjust_amount
                 FROM receive_voucher 
                 WHERE tenant_id = ? AND customer_id = ?{$company_filter}
                 AND id NOT IN (
@@ -642,28 +644,26 @@ try {
         $stmt = $pdo->prepare($sql);
         $stmt->execute($params);
         $payments = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        
-        // Get payment vouchers
-        $sql = "SELECT id, voucher_date as date, CONCAT('Payment - ', voucher_number) as description,
-                voucher_number as reference, amount as debit, 0 as credit, 'payment_voucher' as type, 
-                COALESCE(NULLIF(customer_sub_account_id, 0), sub_account_id) as sub_account_id, currency_id
-                FROM payment_voucher 
-                WHERE tenant_id = ? AND customer_id IS NOT NULL AND supplier_id IS NULL AND customer_id = ?{$company_filter}";
-        $params = [$tenant_id, $customer_id];
-        if ($company_id) $params[] = $company_id;
-        if ($sub_account_id) {
-            $sql .= " AND COALESCE(NULLIF(customer_sub_account_id, 0), sub_account_id) = ?";
-            $params[] = $sub_account_id;
+
+        // Split adjust_amount into its own "Adjustment" credit line, tagged with the bill_no
+        $adjustment_rows = [];
+        foreach ($payments as &$p) {
+            if (!empty($p['adjust_amount']) && floatval($p['adjust_amount']) > 0) {
+                $adjustment_rows[] = [
+                    'date' => $p['date'],
+                    'description' => 'Adjustment - ' . $p['reference'] . ($p['bill_no'] ? ' (Bill: ' . $p['bill_no'] . ')' : ''),
+                    'reference' => $p['bill_no'] ?: $p['reference'],
+                    'debit' => 0,
+                    'credit' => floatval($p['adjust_amount']),
+                    'type' => 'adjustment_rv',
+                    'sub_account_id' => $p['sub_account_id'],
+                    'currency_id' => $p['currency_id']
+                ];
+            }
+            unset($p['bill_no'], $p['adjust_amount']);
         }
-        if ($from_date && $to_date) {
-            $sql .= " AND voucher_date BETWEEN ? AND ?";
-            $params[] = $from_date;
-            $params[] = $to_date;
-        }
-        $stmt = $pdo->prepare($sql);
-        $stmt->execute($params);
-        $payment_vouchers = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        $payments = array_merge($payments, $payment_vouchers);
+        unset($p);
+        $payments = array_merge($payments, $adjustment_rows);
         
         // Get sale returns
         if ($distribution_id) {
@@ -1117,7 +1117,7 @@ try {
         
         echo json_encode(['success' => true, 'data' => $result, 'opening_balance' => $opening_balance]);
     }
-} catch (Exception $e) {
+} catch (\Throwable $e) {
     http_response_code(500);
     echo json_encode(['success' => false, 'message' => 'Server error', 'error' => $e->getMessage()]);
 }

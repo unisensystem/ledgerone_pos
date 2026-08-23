@@ -18,6 +18,9 @@ if (!$user_id || !$tenant_id) {
 
 try {
     $recovery_officer_id = $_GET['recovery_officer_id'] ?? '';
+    $city_id = $_GET['city_id'] ?? '';
+    $city_zone_id = $_GET['city_zone_id'] ?? '';
+    $area_id = $_GET['area_id'] ?? '';
 
     $sql = "
         SELECT customer_code, customer_name, id
@@ -29,6 +32,17 @@ try {
     if ($recovery_officer_id) {
         $sql .= " AND associated_sales_officer_id = ?";
         $params[] = $recovery_officer_id;
+    }
+
+    if ($area_id) {
+        $sql .= " AND area_id = ?";
+        $params[] = $area_id;
+    } elseif ($city_zone_id) {
+        $sql .= " AND city_zone_id = ?";
+        $params[] = $city_zone_id;
+    } elseif ($city_id) {
+        $sql .= " AND city_id = ?";
+        $params[] = $city_id;
     }
 
     $sql .= " ORDER BY customer_name";

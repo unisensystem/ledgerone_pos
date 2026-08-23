@@ -36,6 +36,7 @@ try {
     $dsr_no = (!empty($_POST['dsr_no']) && $_POST['dsr_no'] !== 'null') ? $_POST['dsr_no'] : null;
     $project_id = (!empty($_POST['project_id']) && $_POST['project_id'] !== 'null') ? intval($_POST['project_id']) : null;
     $container_id = (!empty($_POST['container_id']) && $_POST['container_id'] !== 'null') ? intval($_POST['container_id']) : null;
+    $adjust_amount = (!empty($_POST['adjust_amount']) && $_POST['adjust_amount'] !== 'null') ? floatval($_POST['adjust_amount']) : 0;
     $amount = $_POST['amount'] ?? 0;
     $currency_id = $_POST['currency_id'] ?? '';
     $payment_method_id = $_POST['payment_method_id'] ?? '';
@@ -152,18 +153,17 @@ try {
         $attachment = $finalFileName;
     }
 
-    // Insert receive voucher
-    $stmt = $pdo->prepare("
+      $stmt = $pdo->prepare("
         INSERT INTO receive_voucher (
             tenant_id, company_id, voucher_number, voucher_date, customer_id, sub_account_id, bill_no, dsr_no, project_id, container_id,
-            amount, previous_balance, currency_id, payment_method_id, bank_account_id, cheque_date, cheque_no, description, attachment,
+            amount, adjust_amount, previous_balance, currency_id, payment_method_id, bank_account_id, cheque_date, cheque_no, description, attachment,
             recovery_officer_id, against_pdc_id, created_by, updated_by
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ");
     
     $stmt->execute([
         $tenant_id, $company_id, $voucher_number, $voucher_date, $customer['id'], $sub_account_id, $bill_no, $dsr_no, $project_id, $container_id,
-        $amount, $previous_balance, $currency_id, $payment_method_id, $bank_account_id, $cheque_date, $cheque_no, $description, $attachment,
+        $amount, $adjust_amount, $previous_balance, $currency_id, $payment_method_id, $bank_account_id, $cheque_date, $cheque_no, $description, $attachment,
         $recovery_officer_id, $against_pdc_id, $user_id, $user_id
     ]);
     
@@ -197,6 +197,7 @@ try {
     }
     
     // Insert accounting ledger entries
+     // Insert accounting ledger entries
     $stmt = $pdo->prepare("
         INSERT INTO accounting_ledger (
             tenant_id, transaction_type, reference_table, reference_id, account_id, 
@@ -204,16 +205,24 @@ try {
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     ");
     
+    // Actual cash/bank/cheque jo mila
     $stmt->execute([
         $tenant_id, 'Receive Voucher', 'receive_voucher', $voucher_id, $debit_account_id,
         $voucher_date, $description, $amount, 0.00
     ]);
-    
+
+    // Adjust amount — Adjustment account (id 406) mein debit
+if ($adjust_amount > 0) {
+    $stmt->execute([
+        $tenant_id, 'Receive Voucher', 'receive_voucher', $voucher_id, 406,
+        $voucher_date, $description, $adjust_amount, 0.00
+    ]);
+}
+    // Customer ka Trade Debtors (id 2) ab amount + adjust dono se kam hoga
     $stmt->execute([
         $tenant_id, 'Receive Voucher', 'receive_voucher', $voucher_id, 2,
-        $voucher_date, $description, 0.00, $amount
+        $voucher_date, $description, 0.00, $amount + $adjust_amount
     ]);
-
 
     echo json_encode(['success' => true, 'message' => 'Receive voucher created successfully']);
 
