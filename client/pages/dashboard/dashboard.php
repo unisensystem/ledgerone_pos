@@ -29,6 +29,20 @@ $hasPermission = hasPermission($pdo, $role_id, 'Dashboard', 'dashboard', $tenant
 $dateFrom = $_GET['date_from'] ?? null;
 $dateTo = $_GET['date_to'] ?? null;
 $hasDateFilter = $dateFrom && $dateTo;
+
+// Get tenant's base currency symbol (falls back to Rs if none is set)
+$stmt = $pdo->prepare("
+    SELECT c.symbol
+    FROM tenant_currencies tc
+    JOIN ledgerone_public.currencies c ON tc.currency_id = c.id
+    WHERE tc.tenant_id = ? AND tc.is_base_currency = 1
+    LIMIT 1
+");
+$stmt->execute([$tenant_id]);
+$currencySymbol = $stmt->fetchColumn();
+if (!$currencySymbol) {
+    $currencySymbol = 'Rs';
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -1061,7 +1075,7 @@ $hasDateFilter = $dateFrom && $dateTo;
                                     <tr>
                                         <td><?= htmlspecialchars($product['name']) ?></td>
                                         <td><?= number_format($product['total_qty'], 0) ?></td>
-                                        <td>Rs <?= number_format($product['total_revenue'], 0) ?></td>
+                                        <td><?= htmlspecialchars($currencySymbol) ?> <?= number_format($product['total_revenue'], 0) ?></td>
                                     </tr>
                                 <?php endforeach; ?>
                             </tbody>
@@ -1101,7 +1115,7 @@ $hasDateFilter = $dateFrom && $dateTo;
                                     <tr>
                                         <td><?= htmlspecialchars($customer['customer_name']) ?></td>
                                         <td><?= $customer['order_count'] ?></td>
-                                        <td>Rs <?= number_format($customer['total_sales'], 0) ?></td>
+                                        <td><?= htmlspecialchars($currencySymbol) ?> <?= number_format($customer['total_sales'], 0) ?></td>
                                     </tr>
                                 <?php endforeach; ?>
                             </tbody>
@@ -1276,6 +1290,7 @@ $hasDateFilter = $dateFrom && $dateTo;
             const dateFrom = '<?= $dateFrom ?? '' ?>';
             const dateTo = '<?= $dateTo ?? '' ?>';
             const hasDateFilter = <?= $hasDateFilter ? 'true' : 'false' ?>;
+            const currencySymbol = '<?= addslashes($currencySymbol) ?>';
 
             // Load KPI data from APIs
             async function loadKPIs() {
@@ -1285,7 +1300,7 @@ $hasDateFilter = $dateFrom && $dateTo;
                     const stockData = await stockRes.json();
                     if (stockData.success && Array.isArray(stockData.data)) {
                         const totalValue = stockData.data.reduce((sum, item) => sum + parseFloat(item.stock_value || 0), 0);
-                        document.getElementById('kpi-stock-value').textContent = 'Rs ' + totalValue.toLocaleString('en-PK', {maximumFractionDigits: 0});
+                        document.getElementById('kpi-stock-value').textContent = currencySymbol + ' ' + totalValue.toLocaleString('en-PK', {maximumFractionDigits: 0});
                     }
 
                     // Units Sold and Revenue from sale-reports API
@@ -1299,7 +1314,7 @@ $hasDateFilter = $dateFrom && $dateTo;
                         const totalUnits = saleData.data.product_sales.reduce((sum, item) => sum + parseFloat(item.quantity_sold || 0), 0);
                         const totalRevenue = saleData.data.product_sales.reduce((sum, item) => sum + parseFloat(item.revenue || 0), 0);
                         document.getElementById('kpi-units-sold').textContent = totalUnits.toLocaleString('en-PK', {maximumFractionDigits: 0}) + ' Units';
-                        document.getElementById('kpi-revenue').textContent = 'Rs ' + totalRevenue.toLocaleString('en-PK', {maximumFractionDigits: 0});
+                        document.getElementById('kpi-revenue').textContent = currencySymbol + ' ' + totalRevenue.toLocaleString('en-PK', {maximumFractionDigits: 0});
                     }
 
                     // Purchases from purchase-reports API
@@ -1311,7 +1326,7 @@ $hasDateFilter = $dateFrom && $dateTo;
                     const purchaseData = await purchaseRes.json();
                     if (purchaseData.success && purchaseData.summary && purchaseData.summary.invoice) {
                         const totalPurchases = parseFloat(purchaseData.summary.invoice.total_invoice_value || 0);
-                        document.getElementById('kpi-purchases').textContent = 'Rs ' + totalPurchases.toLocaleString('en-PK', {maximumFractionDigits: 0});
+                        document.getElementById('kpi-purchases').textContent = currencySymbol + ' ' + totalPurchases.toLocaleString('en-PK', {maximumFractionDigits: 0});
                     }
 
                     // Accounts Receivable from customer-ledger API
@@ -1319,7 +1334,7 @@ $hasDateFilter = $dateFrom && $dateTo;
                     const customerData = await customerRes.json();
                     if (customerData.success && Array.isArray(customerData.data)) {
                         const totalReceivables = customerData.data.reduce((sum, item) => sum + parseFloat(item.closing_balance || 0), 0);
-                        document.getElementById('kpi-receivables').textContent = 'Rs ' + totalReceivables.toLocaleString('en-PK', {maximumFractionDigits: 0});
+                        document.getElementById('kpi-receivables').textContent = currencySymbol + ' ' + totalReceivables.toLocaleString('en-PK', {maximumFractionDigits: 0});
                     }
 
                     // Accounts Payable from supplier-ledger API
@@ -1327,7 +1342,7 @@ $hasDateFilter = $dateFrom && $dateTo;
                     const supplierData = await supplierRes.json();
                     if (supplierData.success && Array.isArray(supplierData.data)) {
                         const totalPayables = supplierData.data.reduce((sum, item) => sum + parseFloat(item.closing_balance || 0), 0);
-                        document.getElementById('kpi-payables').textContent = 'Rs ' + Math.abs(totalPayables).toLocaleString('en-PK', {maximumFractionDigits: 0});
+                        document.getElementById('kpi-payables').textContent = currencySymbol + ' ' + Math.abs(totalPayables).toLocaleString('en-PK', {maximumFractionDigits: 0});
                     }
                 } catch (error) {
                     console.error('Error loading KPIs:', error);
@@ -1660,7 +1675,7 @@ $hasDateFilter = $dateFrom && $dateTo;
                         <div class="ledger-summary-card">
                             <div class="ledger-summary-label">Opening Balance</div>
                             <div class="ledger-summary-value ${openingBalance >= 0 ? 'positive' : 'negative'}">
-                                Rs ${Math.abs(openingBalance).toLocaleString('en-PK', {maximumFractionDigits: 2})}
+                                ${currencySymbol} ${Math.abs(openingBalance).toLocaleString('en-PK', {maximumFractionDigits: 2})}
                                 <span class="badge ${openingBalance >= 0 ? 'badge-dr' : 'badge-cr'}" style="margin-left: 0.5rem; font-size: 0.75rem;">
                                     ${openingBalance >= 0 ? 'Dr' : 'Cr'}
                                 </span>
@@ -1668,16 +1683,16 @@ $hasDateFilter = $dateFrom && $dateTo;
                         </div>
                         <div class="ledger-summary-card">
                             <div class="ledger-summary-label">Total Debit</div>
-                            <div class="ledger-summary-value">Rs ${totalDebit.toLocaleString('en-PK', {maximumFractionDigits: 2})}</div>
+                            <div class="ledger-summary-value">${currencySymbol} ${totalDebit.toLocaleString('en-PK', {maximumFractionDigits: 2})}</div>
                         </div>
                         <div class="ledger-summary-card">
                             <div class="ledger-summary-label">Total Credit</div>
-                            <div class="ledger-summary-value">Rs ${totalCredit.toLocaleString('en-PK', {maximumFractionDigits: 2})}</div>
+                            <div class="ledger-summary-value">${currencySymbol} ${totalCredit.toLocaleString('en-PK', {maximumFractionDigits: 2})}</div>
                         </div>
                         <div class="ledger-summary-card">
                             <div class="ledger-summary-label">Closing Balance</div>
                             <div class="ledger-summary-value ${closingBalance >= 0 ? 'positive' : 'negative'}">
-                                Rs ${Math.abs(closingBalance).toLocaleString('en-PK', {maximumFractionDigits: 2})}
+                                ${currencySymbol} ${Math.abs(closingBalance).toLocaleString('en-PK', {maximumFractionDigits: 2})}
                                 <span class="badge ${closingBalance >= 0 ? 'badge-dr' : 'badge-cr'}" style="margin-left: 0.5rem; font-size: 0.75rem;">
                                     ${closingBalance >= 0 ? 'Dr' : 'Cr'}
                                 </span>
@@ -1714,9 +1729,9 @@ $hasDateFilter = $dateFrom && $dateTo;
                         html += `
                             <tr class="sub-total">
                                 <td colspan="3" style="font-weight: 700;">Sub Account Total</td>
-                                <td class="text-right" style="font-weight: 700;">Rs ${parseFloat(txn.total_debit || 0).toLocaleString('en-PK', {maximumFractionDigits: 2})}</td>
-                                <td class="text-right" style="font-weight: 700;">Rs ${parseFloat(txn.total_credit || 0).toLocaleString('en-PK', {maximumFractionDigits: 2})}</td>
-                                <td class="text-right" style="font-weight: 700;">Rs ${parseFloat(txn.running_balance || 0).toLocaleString('en-PK', {maximumFractionDigits: 2})}</td>
+                                <td class="text-right" style="font-weight: 700;">${currencySymbol} ${parseFloat(txn.total_debit || 0).toLocaleString('en-PK', {maximumFractionDigits: 2})}</td>
+                                <td class="text-right" style="font-weight: 700;">${currencySymbol} ${parseFloat(txn.total_credit || 0).toLocaleString('en-PK', {maximumFractionDigits: 2})}</td>
+                                <td class="text-right" style="font-weight: 700;">${currencySymbol} ${parseFloat(txn.running_balance || 0).toLocaleString('en-PK', {maximumFractionDigits: 2})}</td>
                             </tr>
                         `;
                     } else {
@@ -1731,10 +1746,10 @@ $hasDateFilter = $dateFrom && $dateTo;
                                 <td>${txn.date || '-'}</td>
                                 <td>${txn.description || '-'}</td>
                                 <td>${txn.reference || '-'}</td>
-                                <td class="text-right">${debit > 0 ? 'Rs ' + debit.toLocaleString('en-PK', {maximumFractionDigits: 2}) : '-'}</td>
-                                <td class="text-right">${credit > 0 ? 'Rs ' + credit.toLocaleString('en-PK', {maximumFractionDigits: 2}) : '-'}</td>
+                                <td class="text-right">${debit > 0 ? currencySymbol + ' ' + debit.toLocaleString('en-PK', {maximumFractionDigits: 2}) : '-'}</td>
+                                <td class="text-right">${credit > 0 ? currencySymbol + ' ' + credit.toLocaleString('en-PK', {maximumFractionDigits: 2}) : '-'}</td>
                                 <td class="text-right" style="font-weight: 600;">
-                                    Rs ${Math.abs(balance).toLocaleString('en-PK', {maximumFractionDigits: 2})}
+                                    ${currencySymbol} ${Math.abs(balance).toLocaleString('en-PK', {maximumFractionDigits: 2})}
                                     <span class="badge ${balance >= 0 ? 'badge-dr' : 'badge-cr'}" style="margin-left: 0.5rem;">
                                         ${balance >= 0 ? 'Dr' : 'Cr'}
                                     </span>
@@ -1765,11 +1780,11 @@ $hasDateFilter = $dateFrom && $dateTo;
                     <div class="ledger-summary">
                         <div class="ledger-summary-card">
                             <div class="ledger-summary-label">Total Debit</div>
-                            <div class="ledger-summary-value">Rs ${parseFloat(summary.totalDebits || 0).toLocaleString('en-PK', {maximumFractionDigits: 2})}</div>
+                            <div class="ledger-summary-value">${currencySymbol} ${parseFloat(summary.totalDebits || 0).toLocaleString('en-PK', {maximumFractionDigits: 2})}</div>
                         </div>
                         <div class="ledger-summary-card">
                             <div class="ledger-summary-label">Total Credit</div>
-                            <div class="ledger-summary-value">Rs ${parseFloat(summary.totalCredits || 0).toLocaleString('en-PK', {maximumFractionDigits: 2})}</div>
+                            <div class="ledger-summary-value">${currencySymbol} ${parseFloat(summary.totalCredits || 0).toLocaleString('en-PK', {maximumFractionDigits: 2})}</div>
                         </div>
                         <div class="ledger-summary-card">
                             <div class="ledger-summary-label">Transaction Count</div>
@@ -1808,10 +1823,10 @@ $hasDateFilter = $dateFrom && $dateTo;
                             <td>${entry.date || '-'}</td>
                             <td>${entry.description || '-'}</td>
                             <td>${entry.reference || '-'}</td>
-                            <td class="text-right">${debit > 0 ? 'Rs ' + debit.toLocaleString('en-PK', {maximumFractionDigits: 2}) : '-'}</td>
-                            <td class="text-right">${credit > 0 ? 'Rs ' + credit.toLocaleString('en-PK', {maximumFractionDigits: 2}) : '-'}</td>
+                            <td class="text-right">${debit > 0 ? currencySymbol + ' ' + debit.toLocaleString('en-PK', {maximumFractionDigits: 2}) : '-'}</td>
+                            <td class="text-right">${credit > 0 ? currencySymbol + ' ' + credit.toLocaleString('en-PK', {maximumFractionDigits: 2}) : '-'}</td>
                             <td class="text-right" style="font-weight: 600;">
-                                Rs ${Math.abs(balance).toLocaleString('en-PK', {maximumFractionDigits: 2})}
+                                ${currencySymbol} ${Math.abs(balance).toLocaleString('en-PK', {maximumFractionDigits: 2})}
                                 <span class="badge ${balance >= 0 ? 'badge-dr' : 'badge-cr'}" style="margin-left: 0.5rem;">
                                     ${balance >= 0 ? 'Dr' : 'Cr'}
                                 </span>
@@ -1904,33 +1919,33 @@ $hasDateFilter = $dateFrom && $dateTo;
                         if (bs[1]) {
                             Object.values(bs[1]).forEach(sub => {
                                 sub.accounts.forEach(acc => {
-                                    assetsHTML += `<tr><td>${acc.name}</td><td>Rs ${acc.balance.toLocaleString()}</td></tr>`;
+                                    assetsHTML += `<tr><td>${acc.name}</td><td>${currencySymbol} ${acc.balance.toLocaleString()}</td></tr>`;
                                     totalAssets += acc.balance;
                                 });
                             });
                         }
-                        assetsHTML += `<tr style="font-weight: 600; background: #f0f9ff;"><td>Total Assets</td><td>Rs ${totalAssets.toLocaleString()}</td></tr>`;
+                        assetsHTML += `<tr style="font-weight: 600; background: #f0f9ff;"><td>Total Assets</td><td>${currencySymbol} ${totalAssets.toLocaleString()}</td></tr>`;
 
                         let liabilitiesHTML = '';
                         if (bs[2]) {
                             Object.values(bs[2]).forEach(sub => {
                                 sub.accounts.forEach(acc => {
-                                    liabilitiesHTML += `<tr><td>${acc.name}</td><td>Rs ${acc.balance.toLocaleString()}</td></tr>`;
+                                    liabilitiesHTML += `<tr><td>${acc.name}</td><td>${currencySymbol} ${acc.balance.toLocaleString()}</td></tr>`;
                                     totalLiabilities += acc.balance;
                                 });
                             });
                         }
-                        liabilitiesHTML += `<tr style="font-weight: 600; background: #fef2f2;"><td>Total Liabilities</td><td>Rs ${totalLiabilities.toLocaleString()}</td></tr>`;
+                        liabilitiesHTML += `<tr style="font-weight: 600; background: #fef2f2;"><td>Total Liabilities</td><td>${currencySymbol} ${totalLiabilities.toLocaleString()}</td></tr>`;
 
                         if (bs[3]) {
                             Object.values(bs[3]).forEach(sub => {
                                 sub.accounts.forEach(acc => {
-                                    liabilitiesHTML += `<tr><td>${acc.name}</td><td>Rs ${acc.balance.toLocaleString()}</td></tr>`;
+                                    liabilitiesHTML += `<tr><td>${acc.name}</td><td>${currencySymbol} ${acc.balance.toLocaleString()}</td></tr>`;
                                     totalEquity += acc.balance;
                                 });
                             });
                         }
-                        liabilitiesHTML += `<tr style="font-weight: 600; background: #f0fdf4;"><td>Total Equity</td><td>Rs ${totalEquity.toLocaleString()}</td></tr>`;
+                        liabilitiesHTML += `<tr style="font-weight: 600; background: #f0fdf4;"><td>Total Equity</td><td>${currencySymbol} ${totalEquity.toLocaleString()}</td></tr>`;
 
                         document.getElementById('assetsBody').innerHTML = assetsHTML;
                         document.getElementById('liabilitiesBody').innerHTML = liabilitiesHTML;
@@ -2091,19 +2106,19 @@ $hasDateFilter = $dateFrom && $dateTo;
                         summaryDiv.innerHTML = `
                             <div class="ledger-summary-card">
                                 <div class="ledger-summary-label">Opening Balance</div>
-                                <div class="ledger-summary-value">Rs ${(balances.opening_balance || 0).toLocaleString('en-PK', {maximumFractionDigits: 2})}</div>
+                                <div class="ledger-summary-value">${currencySymbol} ${(balances.opening_balance || 0).toLocaleString('en-PK', {maximumFractionDigits: 2})}</div>
                             </div>
                             <div class="ledger-summary-card">
                                 <div class="ledger-summary-label">Total Inflow</div>
-                                <div class="ledger-summary-value positive">Rs ${(balances.total_inflow || 0).toLocaleString('en-PK', {maximumFractionDigits: 2})}</div>
+                                <div class="ledger-summary-value positive">${currencySymbol} ${(balances.total_inflow || 0).toLocaleString('en-PK', {maximumFractionDigits: 2})}</div>
                             </div>
                             <div class="ledger-summary-card">
                                 <div class="ledger-summary-label">Total Outflow</div>
-                                <div class="ledger-summary-value negative">Rs ${(balances.total_outflow || 0).toLocaleString('en-PK', {maximumFractionDigits: 2})}</div>
+                                <div class="ledger-summary-value negative">${currencySymbol} ${(balances.total_outflow || 0).toLocaleString('en-PK', {maximumFractionDigits: 2})}</div>
                             </div>
                             <div class="ledger-summary-card">
                                 <div class="ledger-summary-label">Closing Balance</div>
-                                <div class="ledger-summary-value">Rs ${(balances.closing_balance || 0).toLocaleString('en-PK', {maximumFractionDigits: 2})}</div>
+                                <div class="ledger-summary-value">${currencySymbol} ${(balances.closing_balance || 0).toLocaleString('en-PK', {maximumFractionDigits: 2})}</div>
                             </div>
                         `;
 
@@ -2116,9 +2131,9 @@ $hasDateFilter = $dateFrom && $dateTo;
                                         <td>${txn.date || '-'}</td>
                                         <td>${txn.description || '-'}</td>
                                         <td>${txn.reference || '-'}</td>
-                                        <td class="text-right">${txn.inflow > 0 ? 'Rs ' + parseFloat(txn.inflow).toLocaleString('en-PK', {maximumFractionDigits: 2}) : '-'}</td>
-                                        <td class="text-right">${txn.outflow > 0 ? 'Rs ' + parseFloat(txn.outflow).toLocaleString('en-PK', {maximumFractionDigits: 2}) : '-'}</td>
-                                        <td class="text-right" style="font-weight: 600;">Rs ${parseFloat(txn.bank_balance || 0).toLocaleString('en-PK', {maximumFractionDigits: 2})}</td>
+                                        <td class="text-right">${txn.inflow > 0 ? currencySymbol + ' ' + parseFloat(txn.inflow).toLocaleString('en-PK', {maximumFractionDigits: 2}) : '-'}</td>
+                                        <td class="text-right">${txn.outflow > 0 ? currencySymbol + ' ' + parseFloat(txn.outflow).toLocaleString('en-PK', {maximumFractionDigits: 2}) : '-'}</td>
+                                        <td class="text-right" style="font-weight: 600;">${currencySymbol} ${parseFloat(txn.bank_balance || 0).toLocaleString('en-PK', {maximumFractionDigits: 2})}</td>
                                     </tr>
                                 `;
                             });
@@ -2266,7 +2281,7 @@ $hasDateFilter = $dateFrom && $dateTo;
                                 ${item.date ? `<div style="font-size:12px; color:#94a3b8;">${item.date}</div>` : ''}
                             </div>
                             <div style="font-size:14px; font-weight:700; color:#16a34a;">
-                                ${item.amount !== null ? 'Rs ' + parseFloat(item.amount).toLocaleString('en-PK') : ''}
+                                ${item.amount !== null ? currencySymbol + ' ' + parseFloat(item.amount).toLocaleString('en-PK') : ''}
                             </div>
                         </div>
                     `).join('');
