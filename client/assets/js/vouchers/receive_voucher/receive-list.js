@@ -144,7 +144,7 @@ function fetchVouchers(page = 1) {
 
     const projectFilter = document.getElementById('projectFilter').value;
     if (projectFilter) url += `&project_id=${projectFilter}`;
-    
+
     fetch(url)
         .then(response => response.json())
         .then(data => {
@@ -170,10 +170,10 @@ function fetchVouchers(page = 1) {
                     projectName: voucher.project_name,
                     status: 'posted'
                 }));
-                
+
                 currentPage = data.pagination.current_page;
                 totalPages = data.pagination.total_pages;
-                
+
                 renderVouchers(vouchers);
                 updatePagination(data.pagination);
                 renderSummary(data.summary);
@@ -209,17 +209,17 @@ function initSearchableDropdown(searchInputId, optionsContainerId, hiddenInputId
     const searchInput = document.getElementById(searchInputId);
     const optionsContainer = document.getElementById(optionsContainerId);
     const hiddenInput = document.getElementById(hiddenInputId);
-    
+
     searchInput.addEventListener('click', function(e) {
         e.stopPropagation();
         optionsContainer.style.display = 'block';
         filterOptions();
     });
-    
+
     searchInput.addEventListener('input', function() {
         filterOptions();
     });
-    
+
     optionsContainer.addEventListener('click', function(e) {
         if (e.target.classList.contains('dropdown-option')) {
             const value = e.target.getAttribute('data-value');
@@ -229,15 +229,15 @@ function initSearchableDropdown(searchInputId, optionsContainerId, hiddenInputId
             optionsContainer.style.display = 'none';
         }
     });
-    
+
     document.addEventListener('click', function() {
         optionsContainer.style.display = 'none';
     });
-    
+
     function filterOptions() {
         const searchTerm = searchInput.value.toLowerCase();
         const options = optionsContainer.getElementsByClassName('dropdown-option');
-        
+
         for (let i = 0; i < options.length; i++) {
             const option = options[i];
             const text = option.textContent.toLowerCase();
@@ -381,15 +381,15 @@ function updatePagination(pagination) {
     const { current_page, total_pages, total_records, limit } = pagination;
     const startRecord = (current_page - 1) * limit + 1;
     const endRecord = Math.min(current_page * limit, total_records);
-    
+
     // Update pagination info
-    document.getElementById('paginationInfo').textContent = 
+    document.getElementById('paginationInfo').textContent =
         `Showing ${startRecord} to ${endRecord} of ${total_records} entries`;
-    
+
     // Update pagination controls
     const paginationControls = document.querySelector('.pagination-controls');
     paginationControls.innerHTML = '';
-    
+
     // Previous button
     const prevBtn = document.createElement('button');
     prevBtn.className = 'pagination-btn';
@@ -399,11 +399,11 @@ function updatePagination(pagination) {
         if (current_page > 1) fetchVouchers(current_page - 1);
     });
     paginationControls.appendChild(prevBtn);
-    
+
     // Page numbers
     const startPage = Math.max(1, current_page - 2);
     const endPage = Math.min(total_pages, current_page + 2);
-    
+
     for (let i = startPage; i <= endPage; i++) {
         const pageBtn = document.createElement('button');
         pageBtn.className = `pagination-btn ${i === current_page ? 'active' : ''}`;
@@ -411,7 +411,7 @@ function updatePagination(pagination) {
         pageBtn.addEventListener('click', () => fetchVouchers(i));
         paginationControls.appendChild(pageBtn);
     }
-    
+
     // Next button
     const nextBtn = document.createElement('button');
     nextBtn.className = 'pagination-btn';
@@ -432,44 +432,50 @@ function editVoucher(id) {
     loadEditVoucher(id);
 }
 
+// Safe getter — returns null if the element doesn't exist or has no value.
+// Prevents crashes when a new field hasn't been added to the modal HTML yet.
+function getEditVal(id) {
+    const el = document.getElementById(id);
+    return (el && el.value) ? el.value : null;
+}
+
 function loadEditVoucher(id) {
-    // Fetch voucher details + all dropdowns in parallel (ensures data is always fresh)
     Promise.all([
         fetch(`../../../../server/api/vouchers/receive_voucher/receive-get.php?id=${id}`).then(r => r.json()),
         fetch('../../../../server/api/vouchers/receive_voucher/get-companies.php').then(r => r.json()),
         fetch('../../../../server/api/vouchers/receive_voucher/get-currencies.php').then(r => r.json()),
         fetch('../../../../server/api/vouchers/receive_voucher/get-payment-methods.php').then(r => r.json()),
         fetch('../../../../server/api/vouchers/receive_voucher/get-bank-accounts.php').then(r => r.json()),
-        fetch('../../../../server/api/master_setup/project_setup/get-projects-dropdown.php').then(r => r.json())
-    ]).then(([voucherRes, companiesRes, currenciesRes, methodsRes, banksRes, projectsRes]) => {
+        fetch('../../../../server/api/master_setup/project_setup/get-projects-dropdown.php').then(r => r.json()),
+        fetch('../../../../server/api/vouchers/receive_voucher/get-employees.php').then(r => r.json()),
+        fetch('../../../../server/api/vouchers/receive_voucher/get-containers.php').then(r => r.json())
+    ]).then(([voucherRes, companiesRes, currenciesRes, methodsRes, banksRes, projectsRes, employeesRes, containersRes]) => {
         if (!voucherRes.success) {
             alert('Error loading voucher: ' + (voucherRes.error || 'Unknown error'));
             return;
         }
 
-        // Update global arrays
         if (companiesRes.success) companies = companiesRes.data;
         if (currenciesRes.success) currencies = currenciesRes.data;
         if (methodsRes.success) paymentMethods = methodsRes.data;
         if (banksRes.success) bankAccounts = banksRes.data;
-        // projects API returns data.projects (not data.data)
         if (projectsRes.success) projects = projectsRes.projects || [];
+        const editEmployees = employeesRes.success ? employeesRes.data : [];
+        const editContainers = containersRes.success ? containersRes.data : [];
 
         const voucher = voucherRes.data;
 
-        // Populate basic fields
+        // ---- Core (required) fields — populate these FIRST, unconditionally ----
         document.getElementById('editVoucherNumber').value = voucher.voucher_number;
         document.getElementById('editVoucherDate').value = voucher.voucher_date;
         document.getElementById('editCustomer').value = `${voucher.customer_code} - ${voucher.customer_name}`;
         document.getElementById('editBillNo').value = voucher.bill_no || '';
-document.getElementById('editAmount').value = voucher.amount;
-document.getElementById('editAdjustAmount').value = voucher.adjust_amount || 0;
         document.getElementById('editAmount').value = voucher.amount;
+        document.getElementById('editAdjustAmount').value = voucher.adjust_amount || 0;
         document.getElementById('editDescription').value = voucher.description || '';
         document.getElementById('editChequeDate').value = voucher.cheque_date || '';
         document.getElementById('editChequeNo').value = voucher.cheque_no || '';
 
-        // Populate companies — auto-select by company_id
         const companySelect = document.getElementById('editCompany');
         companySelect.innerHTML = '<option value="">Select Company</option>';
         companies.forEach(company => {
@@ -480,7 +486,6 @@ document.getElementById('editAdjustAmount').value = voucher.adjust_amount || 0;
             companySelect.appendChild(option);
         });
 
-        // Populate currencies — auto-select by currency_id
         const currencySelect = document.getElementById('editCurrency');
         currencySelect.innerHTML = '<option value="">Select Currency</option>';
         currencies.forEach(currency => {
@@ -491,21 +496,18 @@ document.getElementById('editAdjustAmount').value = voucher.adjust_amount || 0;
             currencySelect.appendChild(option);
         });
 
-        // Populate payment methods — auto-select by payment_method_id
         const paymentMethodSelect = document.getElementById('editPaymentMethod');
         paymentMethodSelect.innerHTML = '<option value="">Select Payment Method</option>';
         paymentMethods.forEach(method => {
             const option = document.createElement('option');
             option.value = method.id;
             option.textContent = method.name;
-            // DB stores Cash as id=1, but dropdown has Cash as id=7
             const dbId = String(voucher.payment_method_id);
             const matchId = (dbId === '1') ? '7' : dbId;
             if (String(method.id) === matchId) option.selected = true;
             paymentMethodSelect.appendChild(option);
         });
 
-        // Populate bank accounts — auto-select by bank_account_id
         const bankAccountSelect = document.getElementById('editBankAccount');
         bankAccountSelect.innerHTML = '<option value="">Select Bank Account</option>';
         bankAccounts.forEach(account => {
@@ -516,7 +518,6 @@ document.getElementById('editAdjustAmount').value = voucher.adjust_amount || 0;
             bankAccountSelect.appendChild(option);
         });
 
-        // Populate projects — auto-select by project_id
         const projectSelect = document.getElementById('editProject');
         projectSelect.innerHTML = '<option value="">Select Project</option>';
         projects.forEach(project => {
@@ -527,15 +528,104 @@ document.getElementById('editAdjustAmount').value = voucher.adjust_amount || 0;
             projectSelect.appendChild(option);
         });
 
-        // Handle visibility based on payment method
-        handleEditPaymentMethodChange(voucher.payment_method_id);
+        // ---- Debug: confirm required values actually got set ----
+        console.log('[editVoucher] company=', companySelect.value, 'currency=', currencySelect.value, 'payment=', paymentMethodSelect.value, 'amount=', document.getElementById('editAmount').value);
 
-        // Add change listener
+        // ---- New optional fields — null-safe, won't break the above if missing from HTML ----
+        const officerSelect = document.getElementById('editRecoveryOfficer');
+        if (officerSelect) {
+            officerSelect.innerHTML = '<option value="">Select Recovery Officer</option>';
+            editEmployees.forEach(emp => {
+                const option = document.createElement('option');
+                option.value = emp.id;
+                option.textContent = `${emp.employee_id} - ${emp.full_name}`;
+                if (String(emp.id) === String(voucher.recovery_officer_id)) option.selected = true;
+                officerSelect.appendChild(option);
+            });
+        } else {
+            console.warn('[editVoucher] #editRecoveryOfficer not found in DOM — add it to receive-list.php');
+        }
+
+        const containerSelect = document.getElementById('editContainer');
+        if (containerSelect) {
+            containerSelect.innerHTML = '<option value="">Select Container</option>';
+            editContainers.forEach(c => {
+                const option = document.createElement('option');
+                option.value = c.id;
+                option.textContent = `${c.container_code} - ${c.container_name}`;
+                if (String(c.id) === String(voucher.container_id)) option.selected = true;
+                containerSelect.appendChild(option);
+            });
+        } else {
+            console.warn('[editVoucher] #editContainer not found in DOM — add it to receive-list.php');
+        }
+
+        const dsrInput = document.getElementById('editDsrNo');
+        if (dsrInput) {
+            dsrInput.value = voucher.dsr_no || '';
+        } else {
+            console.warn('[editVoucher] #editDsrNo not found in DOM — add it to receive-list.php');
+        }
+
+        const subAccountSelect = document.getElementById('editSubAccount');
+        if (subAccountSelect) {
+            subAccountSelect.innerHTML = '<option value="">Select Sub Account</option>';
+            if (voucher.customer_id) {
+                fetch(`../../../../server/api/vouchers/receive_voucher/get-sub-accounts.php?customer_id=${voucher.customer_id}`)
+                    .then(r => r.json())
+                    .then(data => {
+                        if (data.success) {
+                            data.data.forEach(sa => {
+                                const option = document.createElement('option');
+                                option.value = sa.id;
+                                option.textContent = sa.sub_account_name;
+                                if (String(sa.id) === String(voucher.sub_account_id)) option.selected = true;
+                                subAccountSelect.appendChild(option);
+                            });
+                        }
+                    })
+                    .catch(err => console.warn('[editVoucher] sub-account fetch failed', err));
+            }
+        } else {
+            console.warn('[editVoucher] #editSubAccount not found in DOM — add it to receive-list.php');
+        }
+
+        const pdcSelect = document.getElementById('editAgainstPdc');
+        if (pdcSelect) {
+            pdcSelect.innerHTML = '<option value="">— No PDC —</option>';
+            if (voucher.customer_id) {
+                fetch(`../../../../server/api/vouchers/receive_voucher/get-pending-pdcs.php?customer_id=${voucher.customer_id}`)
+                    .then(r => r.json())
+                    .then(data => {
+                        if (data.success) {
+                            data.data.forEach(pdc => {
+                                const opt = document.createElement('option');
+                                opt.value = pdc.id;
+                                const date = new Date(pdc.cheque_date).toLocaleDateString();
+                                opt.textContent = `${pdc.cheque_no} (${date}) Rem:${parseFloat(pdc.remaining).toFixed(0)}`;
+                                if (String(pdc.id) === String(voucher.against_pdc_id)) opt.selected = true;
+                                pdcSelect.appendChild(opt);
+                            });
+                            if (voucher.against_pdc_id && !data.data.some(p => String(p.id) === String(voucher.against_pdc_id))) {
+                                const opt = document.createElement('option');
+                                opt.value = voucher.against_pdc_id;
+                                opt.textContent = `PDC #${voucher.against_pdc_id} (current)`;
+                                opt.selected = true;
+                                pdcSelect.appendChild(opt);
+                            }
+                        }
+                    })
+                    .catch(err => console.warn('[editVoucher] pdc fetch failed', err));
+            }
+        } else {
+            console.warn('[editVoucher] #editAgainstPdc not found in DOM — add it to receive-list.php');
+        }
+
+        handleEditPaymentMethodChange(voucher.payment_method_id);
         paymentMethodSelect.onchange = function() {
             handleEditPaymentMethodChange(this.value);
         };
 
-        // Store voucher ID for saving
         document.getElementById('editModal').dataset.voucherId = id;
         document.getElementById('editModal').classList.add('show');
     }).catch(error => {
@@ -551,7 +641,7 @@ function handleEditPaymentMethodChange(methodId) {
     const bankSelect = document.getElementById('editBankAccount');
     const chequeInput = document.getElementById('editChequeDate');
     const chequeNoInput = document.getElementById('editChequeNo');
-    
+
     if (methodId == 7 || methodId == 1) {
         bankGroup.style.display = 'none';
         chequeGroup.style.display = 'none';
@@ -605,7 +695,7 @@ document.getElementById('confirmDeleteBtn').addEventListener('click', function()
             console.error('Error:', error);
             alert('Network error occurred');
         });
-        
+
         document.getElementById('deleteModal').classList.remove('show');
         voucherToDelete = null;
     }
@@ -622,37 +712,48 @@ document.getElementById('cancelEditBtn').addEventListener('click', function() {
 
 document.getElementById('saveEditBtn').addEventListener('click', function() {
     const voucherId = document.getElementById('editModal').dataset.voucherId;
-    
-    // Validate required fields
+
     const companyId = document.getElementById('editCompany').value;
     const currencyId = document.getElementById('editCurrency').value;
     const paymentMethodId = document.getElementById('editPaymentMethod').value;
     const amount = document.getElementById('editAmount').value;
-    
-    if (!companyId || !currencyId || !paymentMethodId || !amount) {
-        alert('Please fill in all required fields');
+
+    const missing = [];
+    if (!companyId) missing.push('Company');
+    if (!currencyId) missing.push('Currency');
+    if (!paymentMethodId) missing.push('Payment Method');
+    if (!amount) missing.push('Amount');
+
+    if (missing.length > 0) {
+        alert('Please fill in: ' + missing.join(', '));
         return;
     }
-    
+
+    // Optional / new fields fetched safely — won't crash if not yet present in the modal HTML
     const formData = {
         voucher_date: document.getElementById('editVoucherDate').value,
         company_id: companyId,
-        bill_no: document.getElementById('editBillNo').value || null,
+        bill_no: getEditVal('editBillNo'),
+        dsr_no: getEditVal('editDsrNo'),
         amount: amount,
-        adjust_amount: document.getElementById('editAdjustAmount').value || 0,
+        adjust_amount: getEditVal('editAdjustAmount') || 0,
         currency_id: currencyId,
-        project_id: document.getElementById('editProject').value || null,
+        project_id: getEditVal('editProject'),
+        container_id: getEditVal('editContainer'),
+        sub_account_id: getEditVal('editSubAccount'),
+        recovery_officer_id: getEditVal('editRecoveryOfficer'),
+        against_pdc_id: getEditVal('editAgainstPdc'),
         payment_method_id: paymentMethodId,
-        bank_account_id: document.getElementById('editBankAccount').value || null,
-        cheque_date: document.getElementById('editChequeDate').value || null,
-        cheque_no: document.getElementById('editChequeNo').value || null,
-        description: document.getElementById('editDescription').value || null
+        bank_account_id: getEditVal('editBankAccount'),
+        cheque_date: getEditVal('editChequeDate'),
+        cheque_no: getEditVal('editChequeNo'),
+        description: getEditVal('editDescription')
     };
-    
+
     // Disable button to prevent double submission
     this.disabled = true;
     this.textContent = 'Saving...';
-    
+
     // Call edit API
     fetch(`../../../../server/api/vouchers/receive_voucher/receive-edit.php?id=${voucherId}`, {
         method: 'PUT',
@@ -686,7 +787,6 @@ document.getElementById('newVoucherBtn').addEventListener('click', function () {
 });
 
 // Export button
-// Export button
 document.getElementById('exportBtn').addEventListener('click', function () {
     exportVouchersToExcel();
 });
@@ -695,8 +795,6 @@ document.getElementById('exportBtn').addEventListener('click', function () {
 document.getElementById('refreshBtn').addEventListener('click', function () {
     fetchVouchers(currentPage);
 });
-
-
 
 // Set default date values for filters (last 30 days)
 const today = new Date();
@@ -771,6 +869,7 @@ function exportVouchersToExcel() {
     const dateStr = new Date().toISOString().slice(0, 10);
     XLSX.writeFile(workbook, `receive-vouchers-${dateStr}.xlsx`);
 }
+
 function renderSummary(summary) {
     if (!summary) return;
     const sym = (vouchers[0] && vouchers[0].currencySymbol) ? vouchers[0].currencySymbol : '';

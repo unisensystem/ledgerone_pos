@@ -243,6 +243,34 @@ $initialSearch = $_GET['search'] ?? '';
                             </select>
                         </div>
                         <div class="form-group">
+    <label for="editRecoveryOfficer">Recovery Officer</label>
+    <select id="editRecoveryOfficer">
+        <option value="">Select Recovery Officer</option>
+    </select>
+</div>
+<div class="form-group">
+    <label for="editSubAccount">Sub Account</label>
+    <select id="editSubAccount">
+        <option value="">Select Sub Account</option>
+    </select>
+</div>
+<div class="form-group">
+    <label for="editDsrNo">DSR#</label>
+    <input type="text" id="editDsrNo" placeholder="DSR-B-24-26-20251231-20260112">
+</div>
+<div class="form-group">
+    <label for="editAgainstPdc">Against PDC</label>
+    <select id="editAgainstPdc">
+        <option value="">— No PDC —</option>
+    </select>
+</div>
+<div class="form-group hidden" id="editContainerGroup">
+    <label for="editContainer">Container</label>
+    <select id="editContainer">
+        <option value="">Select Container</option>
+    </select>
+</div>
+                        <div class="form-group">
                             <label for="editAmount">Amount</label>
                             <input type="number" id="editAmount" step="0.01" required>
                         </div>

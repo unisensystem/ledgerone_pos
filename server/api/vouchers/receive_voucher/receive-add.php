@@ -211,7 +211,7 @@ try {
         $voucher_date, $description, $amount, 0.00
     ]);
 
-    // Adjust amount — Adjustment account (id 406) mein debit
+    // Adjust amount â€” Adjustment account (id 406) mein debit
 if ($adjust_amount > 0) {
     $stmt->execute([
         $tenant_id, 'Receive Voucher', 'receive_voucher', $voucher_id, 406,
