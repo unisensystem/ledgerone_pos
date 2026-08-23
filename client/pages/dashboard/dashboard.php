@@ -209,7 +209,7 @@ if (!$currencySymbol) {
 
         .ledger-input {
             flex: 1;
-            min-width: 250px;
+           min-width: 113px;
             height: 44px;
             padding: 0 1rem;
             border: 1.5px solid #d6dbe4;
@@ -811,6 +811,265 @@ if (!$currencySymbol) {
                 min-width: 600px;
             }
         }
+
+        .todo-trigger-badge {
+    position: absolute;
+    top: -6px;
+    right: -6px;
+    background: #dc2626;
+    color: white;
+    font-size: 11px;
+    font-weight: 700;
+    min-width: 18px;
+    height: 18px;
+    border-radius: 9999px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 4px;
+}
+
+.todo-modal {
+    display: none !important;
+    position: fixed !important;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(0, 0, 0, 0.6);
+    z-index: 99999 !important;
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(4px);
+    margin: 0;
+    padding: 0;
+}
+
+.todo-modal.show {
+    display: flex !important;
+    animation: fadeIn 0.2s ease;
+}
+
+.todo-modal-content {
+    background: white;
+    width: 95%;
+    max-width: 1000px;
+    max-height: 85vh;
+    border-radius: 12px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+    animation: slideUp 0.3s ease;
+}
+
+.todo-modal-header {
+    padding: 1.25rem 1.5rem;
+    background: linear-gradient(135deg, #1f7bff 0%, #1559b8 100%);
+    color: white;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-shrink: 0;
+}
+
+.todo-modal-header h3 {
+    margin: 0;
+    font-size: 1.2rem;
+    font-weight: 600;
+    color: white !important;
+}
+
+.todo-modal-close {
+    background: rgba(255, 255, 255, 0.1);
+    border: none;
+    color: white;
+    font-size: 1.5rem;
+    cursor: pointer;
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+}
+
+.todo-modal-close:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+.todo-modal-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 1.5rem;
+    background: #f8fafc;
+}
+
+.todo-add-form {
+    display: grid;
+    grid-template-columns: 1.2fr 1.8fr 140px 110px auto;
+    gap: 0.75rem;
+    margin-bottom: 1.25rem;
+    align-items: start;
+}
+
+.todo-add-form textarea {
+    resize: vertical;
+    min-height: 44px;
+    padding: 0.6rem 1rem;
+    border: 1.5px solid #d6dbe4;
+    border-radius: 0.5rem;
+    font-size: 14px;
+    font-family: inherit;
+}
+
+.todo-add-form .btn {
+    height: 44px;
+    white-space: nowrap;
+}
+
+.todo-table-wrap {
+    background: white;
+    border-radius: 10px;
+    overflow: hidden;
+    border: 1px solid #e2e8f0;
+}
+
+.todo-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.todo-table thead {
+    background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+    border-bottom: 2px solid #e2e8f0;
+}
+
+.todo-table th {
+    padding: 0.85rem 1rem;
+    text-align: left;
+    font-weight: 700;
+    font-size: 11px;
+    color: #475569;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    white-space: nowrap;
+}
+
+.todo-table td {
+    padding: 0.85rem 1rem;
+    border-bottom: 1px solid #f1f5f9;
+    font-size: 13.5px;
+    color: #334155;
+    vertical-align: top;
+}
+
+.todo-table tbody tr:last-child td {
+    border-bottom: none;
+}
+
+.todo-table tbody tr:hover {
+    background: #f8fafc;
+}
+
+.todo-table tbody tr.overdue {
+    background: #fef2f2;
+}
+
+.todo-table tbody tr.done .todo-heading {
+    text-decoration: line-through;
+    color: #94a3b8;
+}
+
+.todo-heading {
+    font-weight: 600;
+    color: #0f172a;
+}
+
+.todo-desc {
+    color: #64748b;
+    font-size: 12.5px;
+    max-width: 260px;
+    word-break: break-word;
+}
+
+.todo-day-tag {
+    font-size: 11px;
+    color: #64748b;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.todo-overdue-tag {
+    display: inline-block;
+    margin-top: 0.25rem;
+    font-size: 10px;
+    font-weight: 700;
+    color: #dc2626;
+    background: #fee2e2;
+    padding: 0.15rem 0.5rem;
+    border-radius: 9999px;
+    text-transform: uppercase;
+}
+
+.todo-delete {
+    cursor: pointer;
+    color: #cbd5e1;
+    font-size: 15px;
+}
+
+.todo-delete:hover {
+    color: #dc2626;
+}
+
+.todo-empty {
+    text-align: center;
+    color: #94a3b8;
+    padding: 2.5rem 1rem;
+    font-size: 14px;
+}
+
+.todo-toast {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    background: #dc2626;
+    color: white;
+    padding: 1rem 1.25rem;
+    border-radius: 0.75rem;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+    z-index: 100000;
+    max-width: 320px;
+    font-size: 14px;
+    display: flex;
+    gap: 0.75rem;
+    align-items: flex-start;
+    animation: slideUp 0.3s ease;
+}
+
+.todo-toast i {
+    font-size: 1.25rem;
+    margin-top: 2px;
+}
+
+@media (max-width: 768px) {
+    .todo-add-form {
+        grid-template-columns: 1fr;
+    }
+    .todo-modal-content {
+        width: 100%;
+        height: 100vh;
+        max-height: 100vh;
+        border-radius: 0;
+    }
+    .todo-table-wrap {
+        overflow-x: auto;
+    }
+    .todo-table {
+        min-width: 650px;
+    }
+}
+        
     </style>
 </head>
 
@@ -994,6 +1253,11 @@ if (!$currencySymbol) {
                         <i class="fas fa-university"></i>
                         <span>Bank Statement</span>
                     </a>
+                    <a href="#" class="action-btn" style="position: relative;" onclick="openTodoModal(); return false;">
+    <i class="fas fa-list-check"></i>
+    <span>Todo List</span>
+    <span id="todoBadge" class="todo-trigger-badge" style="display:none;">0</span>
+</a>
                 </div>
             </div>
 
@@ -1222,6 +1486,48 @@ if (!$currencySymbol) {
             </div>
         </div>
     <?php endif; ?>
+
+    <!-- Todo List Modal -->
+<div id="todoModal" class="todo-modal">
+    <div class="todo-modal-content" onclick="event.stopPropagation()">
+        <div class="todo-modal-header">
+            <h3><i class="fas fa-list-check"></i> Todo List</h3>
+            <button class="todo-modal-close" onclick="closeTodoModal()">&times;</button>
+        </div>
+        <div class="todo-modal-body">
+            <div class="todo-add-form">
+                <input type="text" id="todoHeading" class="ledger-input" placeholder="Heading (e.g. Follow up on invoice)">
+                <textarea id="todoDescription" placeholder="Description (optional)"></textarea>
+                <input type="date" id="todoDueDate" class="ledger-input">
+                <input type="time" id="todoDueTime" class="ledger-input">
+                <button class="btn btn-primary" onclick="addTodo()"><i class="fas fa-plus"></i> Add</button>
+            </div>
+
+            <div style="display:flex; justify-content:flex-end; margin-bottom:0.75rem;">
+                <button class="btn btn-secondary" onclick="clearTodos()"><i class="fas fa-trash-alt"></i> Clear All</button>
+            </div>
+
+            <div class="todo-table-wrap">
+                <table class="todo-table">
+                    <thead>
+                        <tr>
+                            <th style="width:40px;"></th>
+                            <th>Date</th>
+                            <th>Day</th>
+                            <th>Time</th>
+                            <th>Heading</th>
+                            <th>Description</th>
+                            <th style="width:40px;"></th>
+                        </tr>
+                    </thead>
+                    <tbody id="todoTableBody">
+                        <tr><td colspan="7" class="todo-empty">Loading...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
 
     <!-- Bank Statement Modal -->
     <div id="bankStatementModal" class="bank-modal">
@@ -2318,7 +2624,196 @@ if (!$currencySymbol) {
                     console.error(err);
                 }
             }
+let todoNotifiedIds = new Set();
 
+function escapeHtml(str) {
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+}
+
+function openTodoModal() {
+    document.getElementById('todoModal').classList.add('show');
+    loadTodos();
+}
+
+function closeTodoModal() {
+    document.getElementById('todoModal').classList.remove('show');
+}
+
+document.getElementById('todoModal')?.addEventListener('click', function () {
+    closeTodoModal();
+});
+
+document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') closeTodoModal();
+});
+
+function isOverdue(dueDate, dueTime, isDone) {
+    if (!dueDate || isDone) return false;
+    const now = new Date();
+    const target = new Date(dueDate + 'T' + (dueTime || '23:59:59'));
+    return target < now;
+}
+
+async function loadTodos() {
+    const tbody = document.getElementById('todoTableBody');
+    try {
+        const res = await fetch('../../../server/api/todos/todos.php?action=list');
+        const data = await res.json();
+        if (!data.success) return;
+
+        const todos = data.data;
+        const overdueCount = todos.filter(t => isOverdue(t.due_date, t.due_time, t.is_done)).length;
+        updateTodoBadge(overdueCount);
+        checkOverdueNotifications(todos);
+
+        if (!todos.length) {
+            tbody.innerHTML = '<tr><td colspan="7" class="todo-empty"><i class="fas fa-clipboard-check" style="font-size:1.5rem; display:block; margin-bottom:0.5rem;"></i>No tasks yet. Add one above.</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = todos.map(t => {
+            const overdue = isOverdue(t.due_date, t.due_time, t.is_done);
+            let dateLabel = '-', dayLabel = '-';
+            if (t.due_date) {
+                const d = new Date(t.due_date + 'T00:00:00');
+                dateLabel = d.toLocaleDateString('en-PK', { day: 'numeric', month: 'short', year: 'numeric' });
+                dayLabel = d.toLocaleDateString('en-PK', { weekday: 'short' });
+            }
+            const timeLabel = t.due_time ? t.due_time.slice(0, 5) : '-';
+
+            return `
+                <tr class="${t.is_done == 1 ? 'done' : ''} ${overdue ? 'overdue' : ''}" data-id="${t.id}">
+                    <td><input type="checkbox" class="todo-checkbox" ${t.is_done == 1 ? 'checked' : ''} onchange="toggleTodo(${t.id})"></td>
+                    <td>${dateLabel}</td>
+                    <td><span class="todo-day-tag">${dayLabel}</span></td>
+                    <td>${timeLabel}</td>
+                    <td>
+                        <div class="todo-heading">${escapeHtml(t.heading)}</div>
+                        ${overdue ? '<span class="todo-overdue-tag">Overdue</span>' : ''}
+                    </td>
+                    <td class="todo-desc">${t.description ? escapeHtml(t.description) : '-'}</td>
+                    <td><i class="fas fa-times todo-delete" onclick="deleteTodo(${t.id})"></i></td>
+                </tr>
+            `;
+        }).join('');
+    } catch (err) {
+        console.error(err);
+        tbody.innerHTML = '<tr><td colspan="7" class="todo-empty" style="color:#dc2626;">Failed to load todo list</td></tr>';
+    }
+}
+
+function updateTodoBadge(count) {
+    const badge = document.getElementById('todoBadge');
+    if (!badge) return;
+    if (count > 0) {
+        badge.textContent = count;
+        badge.style.display = 'flex';
+    } else {
+        badge.style.display = 'none';
+    }
+}
+
+function checkOverdueNotifications(todos) {
+    todos.forEach(t => {
+        if (isOverdue(t.due_date, t.due_time, t.is_done) && !todoNotifiedIds.has(t.id)) {
+            todoNotifiedIds.add(t.id);
+            showTodoToast(t);
+        }
+    });
+}
+
+function showTodoToast(todo) {
+    const toast = document.createElement('div');
+    toast.className = 'todo-toast';
+    toast.innerHTML = `
+        <i class="fas fa-triangle-exclamation"></i>
+        <div>
+            <div style="font-weight:700; margin-bottom:0.25rem;">Task overdue</div>
+            <div>${escapeHtml(todo.heading)}</div>
+        </div>
+    `;
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 6000);
+}
+
+async function addTodo() {
+    const headingInput = document.getElementById('todoHeading');
+    const descInput = document.getElementById('todoDescription');
+    const dateInput = document.getElementById('todoDueDate');
+    const timeInput = document.getElementById('todoDueTime');
+
+    const heading = headingInput.value.trim();
+    if (!heading) return;
+
+    try {
+        const res = await fetch('../../../server/api/todos/todos.php?action=add', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                heading,
+                description: descInput.value.trim(),
+                due_date: dateInput.value || null,
+                due_time: timeInput.value || null
+            })
+        });
+        const data = await res.json();
+        if (data.success) {
+            headingInput.value = '';
+            descInput.value = '';
+            dateInput.value = '';
+            timeInput.value = '';
+            loadTodos();
+        } else {
+            alert(data.message || 'Could not add task');
+        }
+    } catch (err) {
+        console.error(err);
+    }
+}
+
+async function toggleTodo(id) {
+    try {
+        await fetch('../../../server/api/todos/todos.php?action=toggle', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id })
+        });
+        loadTodos();
+    } catch (err) {
+        console.error(err);
+    }
+}
+
+async function deleteTodo(id) {
+    try {
+        await fetch('../../../server/api/todos/todos.php?action=delete', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id })
+        });
+        loadTodos();
+    } catch (err) {
+        console.error(err);
+    }
+}
+
+async function clearTodos() {
+    if (!confirm('Clear the entire todo list? This cannot be undone.')) return;
+    try {
+        await fetch('../../../server/api/todos/todos.php?action=clear', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        });
+        loadTodos();
+    } catch (err) {
+        console.error(err);
+    }
+}
+
+loadTodos();
+setInterval(loadTodos, 5 * 60 * 1000);
             loadShortcutsUI();
         </script>
     
