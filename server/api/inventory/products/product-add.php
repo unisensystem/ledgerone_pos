@@ -153,8 +153,8 @@ try {
         error_log('Processing ' . count($_POST['branch']) . ' stock opening entries');
         $stockOpeningCount = 0;
         $stockOpeningStmt = $pdo->prepare("
-            INSERT INTO stock_opening (product_id, tenant_id, branch_id, opening_qty, opening_price, batch_no, expiry_date, unit_id)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO stock_opening (product_id, tenant_id, branch_id, opening_qty, opening_price, opening_price_entry_value, batch_no, expiry_date, unit_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         ");
 
         $stockLedgerStmt = $pdo->prepare("
@@ -166,6 +166,11 @@ try {
             if (!empty($_POST['branch'][$i])) {
                 $branchId = $_POST['branch'][$i];
                 $openingPrice = $_POST['openingPrice'][$i] ?? 0;
+                // Exact raw value the user typed for Opening Price, before it was
+                // converted down to per-Piece (e.g. Carton price 2000) — remembered so
+                // re-opening this product for edit shows the original number back,
+                // instead of re-dividing an already-converted value a second time.
+                $openingPriceEntryValue = !empty($_POST['openingPriceEntryValue'][$i]) ? $_POST['openingPriceEntryValue'][$i] : null;
                 $batchNo = !empty($_POST['batchNo'][$i]) ? $_POST['batchNo'][$i] : null;
                 $batchExpiryDate = !empty($_POST['batchExpiryDate'][$i]) ? $_POST['batchExpiryDate'][$i] : null;
                 
@@ -194,6 +199,7 @@ try {
                                         $branchId,
                                         $unitQty,  // Original quantity for this unit
                                         $openingPrice,
+                                        $openingPriceEntryValue,
                                         $batchNo,
                                         $batchExpiryDate,
                                         $unit_id   // Store the specific unit
@@ -249,6 +255,7 @@ try {
                             $branchId,
                             $originalQty,  // Store ORIGINAL quantity (e.g., 150 for Grams)
                             $openingPrice,
+                            $openingPriceEntryValue,
                             $batchNo,
                             $batchExpiryDate,
                             $unitIdForStock  // Store the unit used

@@ -30,6 +30,7 @@ try {
     if (empty($query)) {
         $stmt = $pdo->prepare("
             SELECT p.id, p.code, p.name, p.default_unit_id, p.product_type, p.uom_type, p.uom_group_id,
+                   p.price_entry_unit_id,
                    u.uom_name as unit_name
             FROM products p
             LEFT JOIN uom u ON p.default_unit_id = u.id
@@ -41,6 +42,7 @@ try {
     } else {
         $stmt = $pdo->prepare("
             SELECT p.id, p.code, p.name, p.default_unit_id, p.product_type, p.uom_type, p.uom_group_id,
+                   p.price_entry_unit_id,
                    u.uom_name as unit_name
             FROM products p
             LEFT JOIN uom u ON p.default_unit_id = u.id

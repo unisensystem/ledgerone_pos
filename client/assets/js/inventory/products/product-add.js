@@ -605,6 +605,27 @@ function handleFormSubmit(e) {
                 formData.set('mrpEntryValue', rawMrp.toFixed(3));
                 formData.set('mrp', (rawMrp / factor).toFixed(3));
             }
+
+            // Opening Price / Unit (Branch-wise Opening Stock) follows the same
+            // entry unit — convert every branch row's price down to per-Piece too,
+            // and remember each row's exact raw value (like tradePriceEntryValue)
+            // so editing shows the original number back instead of re-dividing an
+            // already-converted value a second time.
+            const rawOpeningPrices = formData.getAll('openingPrice[]');
+            if (rawOpeningPrices.length > 0) {
+                formData.delete('openingPrice[]');
+                formData.delete('openingPriceEntryValue[]');
+                rawOpeningPrices.forEach(raw => {
+                    const rawVal = parseFloat(raw);
+                    if (!isNaN(rawVal) && rawVal > 0) {
+                        formData.append('openingPriceEntryValue[]', rawVal.toFixed(3));
+                        formData.append('openingPrice[]', (rawVal / factor).toFixed(3));
+                    } else {
+                        formData.append('openingPriceEntryValue[]', '');
+                        formData.append('openingPrice[]', raw);
+                    }
+                });
+            }
         }
     }
 
@@ -854,7 +875,7 @@ function addStockEntry() {
                 </div>
                 ${unitColumns}
                 <div class="form-group">
-                    <label>Opening Price / Unit</label>
+                    <label class="opening-price-label">Opening Price / Unit</label>
                     <input type="number" name="openingPrice[]" step="0.01" min="0">
                 </div>
                 ${batchFields}
@@ -879,7 +900,7 @@ function addStockEntry() {
                     <input type="number" name="openingQty[]" step="0.01" min="0">
                 </div>
                 <div class="form-group">
-                    <label>Opening Price / Unit</label>
+                    <label class="opening-price-label">Opening Price / Unit</label>
                     <input type="number" name="openingPrice[]" step="0.01" min="0">
                 </div>
                 ${batchFields}
@@ -893,6 +914,17 @@ function addStockEntry() {
     stockEntries.appendChild(newEntry);
     initBranchDropdown(newEntry.querySelector('.custom-dropdown'));
     calculateTotalStock();
+
+    // Keep this new entry's "Opening Price" label consistent with the
+    // current Trade Price / MRP entry-unit selection (Carton/Dozen/etc.)
+    if (window.ENABLE_CARTON_PRICE_ENTRY && typeof currentPriceEntryUnitId !== 'undefined' && currentPriceEntryUnitId) {
+        const units = window.currentGroupUnits || [];
+        const unit = units.find(u => String(u.id) === String(currentPriceEntryUnitId));
+        if (unit && unit.is_base_unit != 1) {
+            const label = newEntry.querySelector('.opening-price-label');
+            if (label) label.textContent = `Opening Price / ${escProdText(unit.uom_name)}`;
+        }
+    }
 }
 
 function removeStockEntry(button) {
@@ -912,11 +944,23 @@ function calculateTotalStock() {
     
     let totalQtyInBaseUnits = 0;
     let totalValue = 0;
-    
+
+    // If Trade Price / MRP are being entered against a non-Piece unit (e.g.
+    // Carton), Opening Price / Unit follows the same unit — convert it down
+    // to a per-Piece rate before valuing the row, same as everywhere else.
+    let openingPriceUnitFactor = 1;
+    if (window.ENABLE_CARTON_PRICE_ENTRY && typeof currentPriceEntryUnitId !== 'undefined' && currentPriceEntryUnitId) {
+        const priceUnit = (window.currentGroupUnits || []).find(u => String(u.id) === String(currentPriceEntryUnitId));
+        if (priceUnit && priceUnit.is_base_unit != 1) {
+            const factor = getUnitFactorValue(priceUnit);
+            if (factor) openingPriceUnitFactor = factor;
+        }
+    }
+
     if (uomType === 'group' && window.currentGroupUnits && window.currentGroupUnits.length > 0) {
         // For UOM Group, convert all quantities to base units
         for (let i = 0; i < priceInputs.length; i++) {
-            const price = parseFloat(priceInputs[i].value) || 0;
+            const price = (parseFloat(priceInputs[i].value) || 0) / openingPriceUnitFactor;
             let rowQtyInBaseUnits = 0;
             
             window.currentGroupUnits.forEach(unit => {
@@ -2005,12 +2049,13 @@ function loadProductForEdit(productId) {
                 }
                 
                 // Handle UOM Type selection based on what's saved
+                let uomReadyPromise = Promise.resolve();
                 if (product.uom_type === 'group' && product.uom_group_id) {
                     // UOM Group is selected
                     safeSetChecked('uomTypeGroup', true);
                     handleUomTypeChange();
                     safeSetValue('uomGroup', product.uom_group_id);
-                    handleUomGroupChange().then(() => {
+                    uomReadyPromise = handleUomGroupChange().then(() => {
                         applyStoredPriceEntry(product);
                         loadGroupConversionFactorsForEdit(productId);
                     });
@@ -2062,7 +2107,11 @@ function loadProductForEdit(productId) {
                     if (searchInput) searchInput.value = product.regime_name;
                     if (hiddenInput) hiddenInput.value = product.tax_regime_id;
                 }
-                    loadStockOpeningData(productId);
+                    // Wait for the UOM Group's per-unit Opening Qty columns (Carton,
+                    // Dozen, etc.) to actually exist in the DOM before trying to
+                    // populate them — handleUomGroupChange() above builds them
+                    // asynchronously and isn't guaranteed to have finished yet.
+                    uomReadyPromise.then(() => loadStockOpeningData(productId));
 
             }, 1000);
             
@@ -2188,10 +2237,12 @@ function loadStockOpeningData(productId) {
                         branchSearch.value = firstEntry.branch_display;
                     }
                     
-                    // Set price (same for all units in this branch)
+                    // Set price (same for all units in this branch) — prefer the exact
+                    // raw value the user originally typed (e.g. Carton price 2000) over
+                    // the stored per-Piece rate, so it doesn't get divided again on save.
                     const priceInput = firstRow.querySelector('input[name="openingPrice[]"]');
-                    if (priceInput && firstEntry.opening_price) {
-                        priceInput.value = firstEntry.opening_price;
+                    if (priceInput && (firstEntry.opening_price_entry_value || firstEntry.opening_price)) {
+                        priceInput.value = firstEntry.opening_price_entry_value || firstEntry.opening_price;
                     }
                     // paste yahan ↓
 const batchNoInput = firstRow.querySelector('input[name="batchNo[]"]');
@@ -2241,10 +2292,10 @@ if (batchExpiryInput && firstEntry.expiry_date && firstEntry.expiry_date !== '00
                         branchSearch.value = branchEntries[0].branch_display;
                     }
                     
-                    // Set price
+                    // Set price — prefer the exact raw entered value (see comment above).
                     const priceInput = newRow.querySelector('input[name="openingPrice[]"]');
-                    if (priceInput && branchEntries[0].opening_price) {
-                        priceInput.value = branchEntries[0].opening_price;
+                    if (priceInput && (branchEntries[0].opening_price_entry_value || branchEntries[0].opening_price)) {
+                        priceInput.value = branchEntries[0].opening_price_entry_value || branchEntries[0].opening_price;
                     }
                     const batchNoInput = newRow.querySelector('input[name="batchNo[]"]');
 if (batchNoInput && branchEntries[0].batch_no) {
@@ -2534,6 +2585,10 @@ function updatePriceFieldLabels(unitName) {
     const suffix = unitName ? ` / ${escProdText(unitName)}` : ' / Selected Unit';
     if (tradeLabel) tradeLabel.textContent = `Trade Price (TP)${suffix}`;
     if (mrpLabel) mrpLabel.textContent = `Maximum Retail Price (MRP)${suffix}`;
+
+    document.querySelectorAll('.opening-price-label').forEach(label => {
+        label.textContent = `Opening Price${suffix}`;
+    });
 }
 
 function populatePriceEntryUnitDropdown(units) {
@@ -2589,11 +2644,21 @@ function handlePriceEntryUnitChange() {
                 input.value = ((val * newFactor) / oldFactor).toFixed(3);
             }
         });
+
+        // Opening Price / Unit (Branch-wise Opening Stock) follows the same
+        // entry unit — live-convert any already-typed values too.
+        document.querySelectorAll('input[name="openingPrice[]"]').forEach(input => {
+            const val = parseFloat(input.value);
+            if (!isNaN(val) && val > 0) {
+                input.value = ((val * newFactor) / oldFactor).toFixed(3);
+            }
+        });
     }
 
     currentPriceEntryUnitId = String(newUnitId);
     updatePriceFieldLabels(newUnit.uom_name);
     localStorage.setItem('priceEntryUnitPreference', newUnit.uom_name);
+    calculateTotalStock();
 }
 
 // Re-apply an edited product's remembered price-entry unit + its EXACT originally-

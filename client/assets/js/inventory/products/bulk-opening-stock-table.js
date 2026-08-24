@@ -83,7 +83,7 @@ function addRow() {
             </div>
             <div class="qty-columns"></div>
             <div class="form-group">
-                <label>Opening Price / Unit</label>
+                <label class="opening-price-label">Opening Price / Unit</label>
                 <input type="number" name="openingPrice[]" class="opening-price" step="0.01" min="0" value="">
             </div>
             <div class="form-group">
@@ -443,19 +443,24 @@ function selectProduct(row, product) {
     const qtyColumnsContainer = row.querySelector('.qty-columns');
     const productDropdown = row.querySelector('.custom-dropdown:has(.product-search)');
     const dropdownList = productDropdown ? productDropdown.querySelector('.dropdown-list') : null;
-    
+
     productSearch.value = `${product.name} (${product.code})`;
     productId.value = product.id;
     uomType.value = product.uom_type;
     uomGroupId.value = product.uom_group_id || '';
     defaultUnitId.value = product.default_unit_id || '';
-    
+    row.dataset.priceEntryUnitId = product.price_entry_unit_id || '';
+
+    // Reset until the group-unit/conversion lookups (if any) resolve.
+    delete row.dataset.priceEntryFactor;
+    resetOpeningPriceLabel(row);
+
     if (dropdownList) {
         dropdownList.style.display = 'none';
     }
-    
+
     qtyColumnsContainer.innerHTML = '';
-    
+
     if (product.uom_type === 'unit') {
         const formGroup = document.createElement('div');
         formGroup.className = 'form-group';
@@ -464,38 +469,82 @@ function selectProduct(row, product) {
             <input type="number" name="openingQty[]" step="0.01" min="0" placeholder="Qty" class="qty-input">
         `;
         qtyColumnsContainer.appendChild(formGroup);
-        
+
         const input = formGroup.querySelector('input');
         input.addEventListener('change', updateSummary);
         input.addEventListener('input', updateSummary);
     } else if (product.uom_type === 'group' && product.uom_group_id) {
         fetchUomGroupUnits(product.uom_group_id, row);
     }
-    
+
     updateSummary();
 }
 
+function escBulkText(v) {
+    return String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+function resetOpeningPriceLabel(row) {
+    const label = row.querySelector('.opening-price-label');
+    if (label) label.textContent = 'Opening Price / Unit';
+}
+
+// Effective base-unit conversion factor for one of this row's units — universal
+// units (e.g. Dozen) carry their own factor; per_product units (e.g. Carton) are
+// looked up per-product since the same unit can mean a different quantity on
+// different products.
+function getRowUnitFactor(unit, productConversions) {
+    if (unit.is_base_unit == 1) return 1;
+    if (unit.unit_scope === 'per_product') {
+        const conv = productConversions.find(c => String(c.uom_id) === String(unit.id));
+        const factor = conv ? parseFloat(conv.conversion_factor) : NaN;
+        return (!isNaN(factor) && factor > 0) ? factor : null;
+    }
+    const factor = parseFloat(unit.conversion_factor);
+    return (!isNaN(factor) && factor > 0) ? factor : null;
+}
+
 function fetchUomGroupUnits(groupId, row) {
-    fetch('../../../../server/api/inventory/products/uom-group-units.php?group_id=' + groupId)
-        .then(response => response.json())
-        .then(data => {
-            if (data.success && data.units && data.units.length > 0) {
+    const productId = row.querySelector('.product-id').value;
+
+    Promise.all([
+        fetch('../../../../server/api/inventory/products/uom-group-units.php?group_id=' + groupId).then(r => r.json()),
+        fetch('../../../../server/api/inventory/products/product-uom-conversions.php?product_id=' + productId).then(r => r.json())
+    ])
+        .then(([unitsData, convData]) => {
+            if (unitsData.success && unitsData.units && unitsData.units.length > 0) {
+                const productConversions = (convData.success && convData.conversions) ? convData.conversions : [];
                 const qtyColumnsContainer = row.querySelector('.qty-columns');
                 qtyColumnsContainer.innerHTML = '';
-                
-                data.units.forEach(unit => {
+
+                unitsData.units.forEach(unit => {
+                    const factor = getRowUnitFactor(unit, productConversions);
+
                     const formGroup = document.createElement('div');
                     formGroup.className = 'form-group';
                     formGroup.innerHTML = `
-                        <label>${unit.uom_name}</label>
+                        <label>${escBulkText(unit.uom_name)}</label>
                         <input type="number" name="openingQty[${unit.id}][]" step="0.01" min="0" placeholder="Qty" class="qty-input">
                     `;
                     qtyColumnsContainer.appendChild(formGroup);
-                    
+
                     const input = formGroup.querySelector('input');
+                    input.dataset.conversionFactor = factor || 1;
                     input.addEventListener('change', updateSummary);
                     input.addEventListener('input', updateSummary);
+
+                    // This product's own "Enter Trade Price / MRP By" unit (if set) —
+                    // Opening Price follows the same unit instead of always Piece.
+                    if (row.dataset.priceEntryUnitId && String(unit.id) === String(row.dataset.priceEntryUnitId) && unit.is_base_unit != 1) {
+                        if (factor) {
+                            row.dataset.priceEntryFactor = factor;
+                            const label = row.querySelector('.opening-price-label');
+                            if (label) label.textContent = `Opening Price / ${escBulkText(unit.uom_name)}`;
+                        }
+                    }
                 });
+
+                updateSummary();
             }
         })
         .catch(error => console.error('Error loading UOM group units:', error));
@@ -513,14 +562,16 @@ function updateSummary() {
         const priceInput = row.querySelector('.opening-price');
         
         if (productId && productId.trim() !== '' && branchId && branchId.trim() !== '') {
-            const price = parseFloat(priceInput.value) || 0;
-            
+            const priceEntryFactor = parseFloat(row.dataset.priceEntryFactor) || 1;
+            const price = (parseFloat(priceInput.value) || 0) / priceEntryFactor;
+
             const qtyInputs = row.querySelectorAll('input[name^="openingQty"]');
             let rowQty = 0;
             qtyInputs.forEach(input => {
-                rowQty += parseFloat(input.value) || 0;
+                const factor = parseFloat(input.dataset.conversionFactor) || 1;
+                rowQty += (parseFloat(input.value) || 0) * factor;
             });
-            
+
             if (rowQty > 0 || price > 0) {
                 totalEntries++;
                 totalQty += rowQty;
@@ -545,7 +596,11 @@ function saveOpeningStock() {
         const productId = row.querySelector('.product-id').value;
         const branchId = row.querySelector('.branch-id').value;
         const uomType = row.querySelector('.uom-type').value;
-        const price = parseFloat(row.querySelector('.opening-price').value) || 0;
+        const priceEntryFactor = parseFloat(row.dataset.priceEntryFactor) || 1;
+        // Opening Price may have been entered against this product's own Carton/Dozen
+        // "Enter Trade Price / MRP By" unit — convert it down to per-Piece before
+        // saving, since stock_opening/stock_ledger always store cost per base unit.
+        const price = ((parseFloat(row.querySelector('.opening-price').value) || 0) / priceEntryFactor);
         const vendorId = row.querySelector('.vendor-id').value || null;
         const batchNo = row.querySelector('.batch-no').value || null;
         const expiryDate = row.querySelector('.expiry-date').value || null;
