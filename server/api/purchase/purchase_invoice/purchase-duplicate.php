@@ -186,10 +186,8 @@ try {
         ) VALUES (?, 'Purchase Invoice', 'purchase_invoice', ?, ?, ?, ?, ?, ?)
     ");
 
-    $purchaseAmount = $invoice['total_bill'] - $invoice['total_discount_amount'];
-
-    // 1. Debit - Purchases
-    $ledger_stmt->execute([$tenant_id, $new_invoice_id, 19, $final_date, 'Purchase Invoice - ' . $new_bill_no, $purchaseAmount, 0]);
+    // 1. Debit - Purchases (Net Amount)
+    $ledger_stmt->execute([$tenant_id, $new_invoice_id, 19, $final_date, 'Purchase Invoice - ' . $new_bill_no, $invoice['net_amount'], 0]);
 
     // 2. Debit - Input Tax Receivable (invoice-level GST)
     if ($invoice['total_tax_amount'] > 0) {
@@ -201,12 +199,9 @@ try {
         $ledger_stmt->execute([$tenant_id, $new_invoice_id, 110, $final_date, 'Purchase Invoice - ' . $new_bill_no, $invoice['shipping_fees'], 0]);
     }
 
-    // 4. Credit - Purchase Discounts Received
-    if ($invoice['total_discount_amount'] > 0) {
-        $ledger_stmt->execute([$tenant_id, $new_invoice_id, 103, $final_date, 'Purchase Invoice - ' . $new_bill_no, 0, $invoice['total_discount_amount']]);
-    }
-
-    // 5. Credit - Trade Creditors
+    // 4. Credit - Trade Creditors (Net Amount) — Purchase Discounts Received no
+    // longer gets its own ledger line; it's folded into Net Amount on
+    // Purchases/Trade Creditors instead.
     $ledger_stmt->execute([$tenant_id, $new_invoice_id, 14, $final_date, 'Purchase Invoice - ' . $new_bill_no, 0, $invoice['net_amount']]);
 
     // 6. Debit - Input Tax Receivable for each invoice-level tax

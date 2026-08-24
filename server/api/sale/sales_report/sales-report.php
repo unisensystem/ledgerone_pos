@@ -72,7 +72,7 @@ $stmt = $pdo->prepare("
                SUM(sii.quantity) as quantity_sold, 
                SUM(sii.net_amount) as revenue,
                GROUP_CONCAT(DISTINCT NULLIF(sii.batch_no,'') SEPARATOR ', ') as batch_no,
-               MIN(CASE WHEN sii.batch_expiry_date >= CURDATE() THEN sii.batch_expiry_date END) as nearest_expiry
+               MIN(CASE WHEN sii.expiry_date >= CURDATE() THEN sii.expiry_date END) as nearest_expiry
         FROM sale_invoice_items sii
         JOIN sale_invoice si ON sii.sale_invoice_id = si.id AND si.tenant_id = ?
         WHERE sii.tenant_id = ? AND si.sale_date BETWEEN ? AND ? AND si.status = 'Posted'" . ($company_id ? " AND si.company_id = ?" : "") . "
