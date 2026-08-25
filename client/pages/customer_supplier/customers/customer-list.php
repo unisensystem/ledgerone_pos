@@ -40,16 +40,20 @@ $currency_symbol = $currency['symbol'] ?? '$';
 <body class="light-mode">
     <div class="container">
         <div class="header">
-            <div class="header-actions">
-                <a href="customer-add.php" class="btn btn-primary">
-                    <i class="fas fa-plus"></i>
-                    Add Customer
-                </a>
-                <a href="opening-balance-invoices-add.php" class="btn btn-success">
-                    <i class="fas fa-file-invoice-dollar"></i>
-                    Add Opening Invoices
-                </a>
-            </div>
+          <div class="header-actions">
+    <a href="customer-add.php" class="btn btn-primary">
+        <i class="fas fa-plus"></i>
+        Add Customer
+    </a>
+    <a href="customer-import.php" class="btn btn-secondary">
+        <i class="fas fa-file-import"></i>
+        Import Customers
+    </a>
+    <a href="opening-balance-invoices-add.php" class="btn btn-success">
+        <i class="fas fa-file-invoice-dollar"></i>
+        Add Opening Invoices
+    </a>
+</div>
         </div>
 
         <div class="page-title">
