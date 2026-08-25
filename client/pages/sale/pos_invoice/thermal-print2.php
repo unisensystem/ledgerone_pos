@@ -361,9 +361,9 @@
         <table class="items-table">
             <thead>
                 <tr>
-                    <th style="width: 10%;" class="text-right">Ctn</th>
-                    <th style="width: 10%;" class="text-right">Dz</th>
-                    <th style="width: 10%;" class="text-right">Pcs</th>
+                    <th style="width: 10%;" class="text-right" id="ctnHeader">Ctn</th>
+                    <th style="width: 10%;" class="text-right" id="dzHeader">Dz</th>
+                    <th style="width: 10%;" class="text-right" id="pcsHeader">Pcs</th>
                     <th class="item-col">Item</th>
                     <th style="width: 15%;" class="text-right">Rate</th>
                     <th style="width: 11%;" class="text-right disc-col">Disc</th>
@@ -379,10 +379,6 @@
         
         <div class="divider"></div>
         
-        <div class="total-row">
-            <span>Subtotal:</span>
-            <span id="totalBill">0.00</span>
-        </div>
         <div class="total-row" id="discountRow">
             <span>Discount:</span>
             <span id="discountAmount">0.00</span>
@@ -402,10 +398,6 @@
         <div class="total-row">
             <span>Cash Received:</span>
             <span id="amountPaid">0.00</span>
-        </div>
-        <div class="total-row">
-            <span>Balance:</span>
-            <span id="remainingBalance">0.00</span>
         </div>
         <div class="total-row" id="previousBalanceRow">
             <span>Prv. Balance:</span>
@@ -480,20 +472,40 @@
             return (num % 1 === 0) ? num.toFixed(0) : num.toFixed(2);
         }
         
+        // Same unit IDs used app-wide for Sale Invoice (9=Piece, 10=Dozen, 16=Carton)
+        function uomHeaderLabel(uoms, unitId, fallback) {
+            const unit = uoms.find(u => Number(u.id) === unitId);
+            if (!unit || !unit.uom_name) return fallback;
+            const match = unit.uom_name.match(/\(([^)]+)\)/);
+            return match ? match[1] : unit.uom_name;
+        }
+
+        function applyUomHeaders(uoms) {
+            document.getElementById('ctnHeader').textContent = uomHeaderLabel(uoms, 16, 'Ctn');
+            document.getElementById('dzHeader').textContent = uomHeaderLabel(uoms, 10, 'Dz');
+            document.getElementById('pcsHeader').textContent = uomHeaderLabel(uoms, 9, 'Pcs');
+        }
+
         async function loadData() {
             try {
-                const [userResponse, invoiceResponse] = await Promise.all([
+                const [userResponse, invoiceResponse, uomResponse] = await Promise.all([
                     fetch('../../../../server/api/sale/pos_invoice/get-user.php'),
-                    fetch(`../../../../server/api/sale/pos_invoice/pos-edit.php?id=${invoiceId}`)
+                    fetch(`../../../../server/api/sale/pos_invoice/pos-edit.php?id=${invoiceId}`),
+                    fetch('../../../../server/api/sale/pos_invoice/get-uom.php')
                 ]);
-                
+
                 const userData = await userResponse.json();
                 const invoiceData = await invoiceResponse.json();
-                
+                const uomData = await uomResponse.json();
+
                 if (userData.success) {
                     document.getElementById('printedBy').textContent = userData.user.full_name;
                 }
-                
+
+                if (uomData.success) {
+                    applyUomHeaders(uomData.uoms);
+                }
+
                 if (invoiceData.success) {
                     // Load company data if company_id exists
                     if (invoiceData.invoice.company_id) {
@@ -677,8 +689,6 @@
                 <td class="text-right">${currencySymbol}${totalAmount.toFixed(2)}</td>
             `;
             
-            document.getElementById('totalBill').textContent = `${currencySymbol}${parseFloat(invoice.total_bill).toFixed(2)}`;
-            
             // Discount - always shown now (even if 0), like FoxPro
             const discountAmt = parseFloat(invoice.total_discount_amount || 0);
             document.getElementById('discountAmount').textContent = `${currencySymbol}${discountAmt.toFixed(2)}`;
@@ -706,7 +716,6 @@
             const payableAmount = previousBalance + remainingBalance;
             
             document.getElementById('amountPaid').textContent = `${currencySymbol}${amountPaid.toFixed(2)}`;
-            document.getElementById('remainingBalance').textContent = `${currencySymbol}${remainingBalance.toFixed(2)}`;
             document.getElementById('payableAmount').textContent = `${currencySymbol}${payableAmount.toFixed(2)}`;
             
             document.getElementById('paymentMethod').textContent = invoice.payment_method || '-';

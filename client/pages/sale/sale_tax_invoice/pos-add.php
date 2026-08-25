@@ -377,6 +377,9 @@ if (!$user_id) {
                 <button class="btn btn-secondary" id="printThermalBtn" style="width: 100%;">
                     <i class="fas fa-receipt"></i> Print Thermal Invoice
                 </button>
+                <button class="btn btn-secondary" id="printThermal2Btn" style="width: 100%;">
+                    <i class="fas fa-receipt"></i> Print Thermal Invoice 2
+                </button>
                 <label style="display: flex; align-items: center; gap: 8px; margin-top: 10px; cursor: pointer;">
                     <input type="checkbox" id="rememberPrintChoice" style="width: auto;">
                     <span>Remember my choice</span>

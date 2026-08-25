@@ -3276,11 +3276,27 @@ function initializePage(permissions) {
             printInvoice(invoiceId, 'thermal');
             performReset();
         };
+
+        document.getElementById('printThermal2Btn').onclick = function () {
+            if (document.getElementById('rememberPrintChoice').checked) {
+                localStorage.setItem('pos_print_preference', 'thermal2');
+            }
+            document.getElementById('printOptionsModal').style.display = 'none';
+            printInvoice(invoiceId, 'thermal2');
+            performReset();
+        };
     }
 
     function printInvoice(invoiceId, type) {
         if (invoiceId) {
-            const url = type === 'full' ? `invoice-print.php?id=${invoiceId}` : `thermal-print.php?id=${invoiceId}`;
+            let url;
+            if (type === 'full') {
+                url = `invoice-print.php?id=${invoiceId}`;
+            } else if (type === 'thermal2') {
+                url = `thermal-print2.php?id=${invoiceId}`;
+            } else {
+                url = `thermal-print.php?id=${invoiceId}`;
+            }
             window.open(url, '_blank');
         }
     }

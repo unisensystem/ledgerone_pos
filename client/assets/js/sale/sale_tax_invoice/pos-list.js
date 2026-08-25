@@ -423,11 +423,11 @@ function initializeListPage(permissions) {
     function showPrintOptions(invoiceId) {
         const savedChoice = localStorage.getItem('pos_print_preference');
         if (savedChoice) {
-            const url = savedChoice === 'full' ? `invoice-print.php?id=${invoiceId}` : `thermal-print.php?id=${invoiceId}`;
+            const url = savedChoice === 'full' ? `invoice-print.php?id=${invoiceId}` : (savedChoice === 'thermal2' ? `thermal-print2.php?id=${invoiceId}` : `thermal-print.php?id=${invoiceId}`);
             window.open(url, '_blank');
             return;
         }
-        
+
         const modal = document.createElement('div');
         modal.className = 'modal';
         modal.style.display = 'flex';
@@ -442,6 +442,9 @@ function initializeListPage(permissions) {
                     <button class="btn btn-secondary" id="printThermalBtnList" style="width: 100%;">
                         <i class="fas fa-receipt"></i> Print Thermal Invoice
                     </button>
+                    <button class="btn btn-secondary" id="printThermal2BtnList" style="width: 100%;">
+                        <i class="fas fa-receipt"></i> Print Thermal Invoice 2
+                    </button>
                     <label style="display: flex; align-items: center; gap: 8px; margin-top: 10px; cursor: pointer;">
                         <input type="checkbox" id="rememberPrintChoiceList" style="width: auto;">
                         <span>Remember my choice</span>
@@ -450,7 +453,7 @@ function initializeListPage(permissions) {
             </div>
         `;
         document.body.appendChild(modal);
-        
+
         document.getElementById('printFullBtnList').onclick = function() {
             if (document.getElementById('rememberPrintChoiceList').checked) {
                 localStorage.setItem('pos_print_preference', 'full');
@@ -458,7 +461,7 @@ function initializeListPage(permissions) {
             window.open(`invoice-print.php?id=${invoiceId}`, '_blank');
             modal.remove();
         };
-        
+
         document.getElementById('printThermalBtnList').onclick = function() {
             if (document.getElementById('rememberPrintChoiceList').checked) {
                 localStorage.setItem('pos_print_preference', 'thermal');
@@ -466,7 +469,15 @@ function initializeListPage(permissions) {
             window.open(`thermal-print.php?id=${invoiceId}`, '_blank');
             modal.remove();
         };
-        
+
+        document.getElementById('printThermal2BtnList').onclick = function() {
+            if (document.getElementById('rememberPrintChoiceList').checked) {
+                localStorage.setItem('pos_print_preference', 'thermal2');
+            }
+            window.open(`thermal-print2.php?id=${invoiceId}`, '_blank');
+            modal.remove();
+        };
+
         modal.addEventListener('click', function(e) {
             if (e.target === modal) {
                 modal.remove();
