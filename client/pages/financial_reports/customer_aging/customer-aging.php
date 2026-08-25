@@ -200,6 +200,19 @@ select.form-select:disabled {
                         <option value="45+">45+ Days</option>
                     </select>
                 </div>
+
+                <!-- View Mode: All Invoices vs Unbilled RV & SR (bill_no / sale_invoice_no is null) -->
+                <div class="form-group">
+                    <label class="form-label">View Mode</label>
+                    <div class="view-toggle-wrapper">
+                        <span class="view-toggle-label">All Invoices</span>
+                        <label class="toggle-switch" title="Show only Receive Vouchers / Sale Returns that have no bill_no yet">
+                            <input type="checkbox" id="viewModeToggle">
+                            <span class="toggle-slider"></span>
+                        </label>
+                        <span class="view-toggle-label" id="viewModeLabel">Unbilled RV/SR</span>
+                    </div>
+                </div>
                 
                 <button class="btn btn-ghost" id="resetFiltersBtn">
                     <i class="fas fa-redo"></i> Reset Filters
@@ -207,9 +220,9 @@ select.form-select:disabled {
             </div>
         </div>
         
-        <!-- Buckets Summary -->
+        <!-- Buckets Summary (hidden in Unbilled RV/SR view mode) -->
         <h2>Overdue Summary</h2>
-        <div class="buckets-summary">
+        <div class="buckets-summary" id="bucketsSummarySection">
             <div class="bucket-card">
                 <div class="bucket-value" id="totalOverdueValue">$0</div>
                 <div class="bucket-label">Total Overdue</div>
@@ -240,7 +253,7 @@ select.form-select:disabled {
             <div class="card-header">
                 <h3>Aging Report Details</h3>
                 <div class="d-flex align-center" style="gap: 16px;">
-                    <div class="view-toggle-wrapper">
+                    <div class="view-toggle-wrapper" id="autoClearWrapper">
                         <span class="view-toggle-label">Standard</span>
                         <label class="toggle-switch" title="Include unallocated receive vouchers distributed FIFO across oldest bills">
                             <input type="checkbox" id="autoClearToggle">
@@ -260,12 +273,12 @@ select.form-select:disabled {
                             <th>Customer Code</th>
                             <th>Customer Name</th>
                             <th>Address</th>
-                            <th>Invoice No</th>
-                            <th>Invoice Date</th>
+                            <th id="colRefNo">Invoice No</th>
+                            <th id="colRefDate">Invoice Date</th>
                             <th>Type</th>
                             <th>Amount</th>
-                            <th>Days Overdue</th>
-                            <th>Bucket</th>
+                            <th id="colDaysOverdue">Days Overdue</th>
+                            <th id="colBucket">Bucket</th>
                         </tr>
                     </thead>
                     <tbody id="reportTableBody">
