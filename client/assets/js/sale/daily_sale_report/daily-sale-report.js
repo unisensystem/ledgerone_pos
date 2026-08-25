@@ -3,10 +3,6 @@ let itemWiseData = [];
 let billWiseData = [];
 let currentPage = 1;
 const itemsPerPage = 20;
-// Sale Return toggle - off by default, so R.QTY/R.Amt/Net Amount behave exactly as
-// before (blank return columns). Turning it on tells the backend to also compute
-// sale_return totals per product and merge them into r_qty/r_amt.
-let includeSaleReturn = false;
 
 // DOM Elements
 const itemWiseToggle = document.getElementById('item-wise-toggle');
@@ -19,8 +15,6 @@ const searchBtn = document.getElementById('search-btn');
 const resetBtn = document.getElementById('reset-btn');
 const exportBtn = document.getElementById('export-btn');
 const printBtn = document.getElementById('print-btn');
-const saleReturnToggleBtn = document.getElementById('sale-return-toggle');
-const saleReturnToggleLabel = document.getElementById('sale-return-toggle-label');
 const loading = document.getElementById('loading');
 const reportCount = document.getElementById('report-count');
 const paginationContainer = document.getElementById('pagination');
@@ -454,7 +448,6 @@ function init() {
     bindClick(resetBtn, handleReset);
     bindClick(exportBtn, handleExport);
     bindClick(printBtn, handlePrint);
-    bindClick(saleReturnToggleBtn, handleSaleReturnToggle);
 
     bindClick(itemWiseToggle, function() { switchReportType('item'); });
     bindClick(billWiseToggle, function() { switchReportType('bill'); });
@@ -506,7 +499,6 @@ function buildReportParams(includeReference) {
     if (dateFrom) params.set('date_from', dateFrom);
     if (dateTo) params.set('date_to', dateTo);
     if (project) params.set('project_id', project);
-    if (includeSaleReturn) params.set('include_sale_return', '1');
 
     appendArrayParams(params, 'invoice_types', getSelectedIds('invoiceTypes'));
     appendArrayParams(params, 'sales_officer_ids', getSelectedIds('salesOfficers'));
@@ -616,9 +608,6 @@ function buildItemRow(item, num) {
     const tradeOfferAmt = parseFloat(item.trade_offer_amount || 0);
     const amount = parseFloat(item.amount || 0);
 
-    // R.QTY / R.Amt only ever come back non-zero from the API when the Sale Return
-    // toggle is on (see buildReportParams/include_sale_return), so no extra check is
-    // needed here - they render blank on their own whenever there's nothing to show.
     const rQty = parseFloat(item.r_qty || 0);
     const rAmt = parseFloat(item.r_amt || 0);
     const rQtyDisplay = rQty ? rQty.toFixed(2) : '';
@@ -822,10 +811,6 @@ function handleReset() {
     referenceCard.style.display = 'none';
     referenceNumber.textContent = '-';
 
-    // Reset also turns Sale Return back off, same as every other filter.
-    includeSaleReturn = false;
-    updateSaleReturnToggleUI();
-
     currentPage = 1;
     fetchReportData();
 }
@@ -837,25 +822,6 @@ function handleExport() {
 
 function handlePrint() {
     window.open('print.php?' + buildReportParams(true), '_blank');
-}
-
-// Toggles the Sale Return button on/off. On: R.QTY/R.Amt/Net Amount are recalculated
-// with return quantities and amounts included, for every product currently in the
-// filtered result. Off: those columns go back to blank, same as before this feature.
-function handleSaleReturnToggle() {
-    includeSaleReturn = !includeSaleReturn;
-    updateSaleReturnToggleUI();
-    currentPage = 1;
-    fetchReportData();
-}
-
-function updateSaleReturnToggleUI() {
-    if (!saleReturnToggleBtn) return;
-    saleReturnToggleBtn.classList.toggle('btn-primary', includeSaleReturn);
-    saleReturnToggleBtn.classList.toggle('btn-ghost', !includeSaleReturn);
-    if (saleReturnToggleLabel) {
-        saleReturnToggleLabel.textContent = includeSaleReturn ? 'On' : 'Off';
-    }
 }
 
 function renderPagination(total) {

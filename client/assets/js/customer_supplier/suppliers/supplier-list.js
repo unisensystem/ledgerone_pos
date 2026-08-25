@@ -10,9 +10,11 @@ document.addEventListener('DOMContentLoaded', function () {
     const searchInput = document.getElementById('searchInput');
     const statusFilter = document.getElementById('statusFilter');
     const companyFilter = document.getElementById('companyFilter');
+    const categoryFilter = document.getElementById('categoryFilter');
 
     checkPermissions().then(() => {
         loadCompanyFilter();
+        loadCategoryFilter();
         loadSuppliers();
     });
 
@@ -22,6 +24,7 @@ document.addEventListener('DOMContentLoaded', function () {
             search: searchInput.value,
             status: statusFilter.value,
             company: companyFilter.value,
+            category: categoryFilter.value,
             page: currentPage,
             limit: showAll ? 999999 : rowsPerPage,
             show_all: showAll ? '1' : '0'
@@ -60,8 +63,9 @@ document.addEventListener('DOMContentLoaded', function () {
             row.innerHTML = `
                 <td>${startSr + index}</td>
                 <td><span class="customer-code">${supplier.supplier_code}</span></td>
-                <td><span class="supplier-name">${supplier.supplier_name}</span></td>
                 <td>${supplier.brand_name || '-'}</td>
+                <td>${supplier.category_name || '-'}</td>
+                <td><span class="supplier-name">${supplier.supplier_name}</span></td>
                 <td>${supplier.city || '-'}</td>
                 <td>${supplier.primary_phone || '-'}</td>
                 <td>${supplier.credit_days || 0}</td>
@@ -127,6 +131,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     statusFilter.addEventListener('change', () => { currentPage = 1; loadSuppliers(); });
     companyFilter.addEventListener('change', () => { currentPage = 1; loadSuppliers(); });
+    categoryFilter.addEventListener('change', () => { currentPage = 1; loadSuppliers(); });
 
     const rowsPerPageSelect = document.getElementById('rowsPerPage');
     if (rowsPerPageSelect) {
@@ -155,6 +160,21 @@ document.addEventListener('DOMContentLoaded', function () {
                         opt.value = c.id;
                         opt.textContent = c.company_name;
                         companyFilter.appendChild(opt);
+                    });
+                }
+            });
+    }
+
+    function loadCategoryFilter() {
+        fetch('../../../../server/api/customer_supplier/suppliers/supplier-categories.php')
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    data.categories.forEach(c => {
+                        const opt = document.createElement('option');
+                        opt.value = c.id;
+                        opt.textContent = c.category_name;
+                        categoryFilter.appendChild(opt);
                     });
                 }
             });
@@ -212,6 +232,7 @@ document.addEventListener('DOMContentLoaded', function () {
         document.getElementById('viewSupplierCode').textContent = s.supplier_code || '-';
         document.getElementById('viewSupplierName').textContent = s.supplier_name || '-';
         document.getElementById('viewBrandName').textContent = s.brand_name || '-';
+        document.getElementById('viewSupplierCategory').textContent = s.category_name || '-';
         document.getElementById('viewCity').textContent = s.city || '-';
         document.getElementById('viewPartyType').textContent = s.party_type || '-';
         document.getElementById('viewAddress').textContent = s.address || '-';
@@ -280,9 +301,11 @@ document.addEventListener('DOMContentLoaded', function () {
         $('#editCompany').select2({ placeholder: 'Select Company', allowClear: false, dropdownParent: $('#editModal') });
         $('#editSalesman').select2({ placeholder: 'Select Salesman', allowClear: true, dropdownParent: $('#editModal') });
         $('#editPartyType').select2({ placeholder: 'Select Party Type', allowClear: true, dropdownParent: $('#editModal') });
+        $('#editSupplierCategory').select2({ placeholder: 'Select Supplier Category', allowClear: true, dropdownParent: $('#editModal') });
 
         loadEditCompanies();
         loadEditSalesmen();
+        loadEditCategories();
     });
 
     function loadEditCompanies() {
@@ -301,6 +324,16 @@ document.addEventListener('DOMContentLoaded', function () {
             .then(data => {
                 if (data.success) {
                     data.employees.forEach(e => $('#editSalesman').append(new Option(e.full_name, e.id)));
+                }
+            });
+    }
+
+    function loadEditCategories() {
+        fetch('../../../../server/api/customer_supplier/suppliers/supplier-categories.php')
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    data.categories.forEach(c => $('#editSupplierCategory').append(new Option(c.category_name, c.id)));
                 }
             });
     }
@@ -340,6 +373,7 @@ document.addEventListener('DOMContentLoaded', function () {
             $('#editCompany').val(s.company_id || '').trigger('change');
             $('#editSalesman').val(s.salesman_id || '').trigger('change');
             $('#editPartyType').val(s.party_type || '').trigger('change');
+            $('#editSupplierCategory').val(s.supplier_category_id || '').trigger('change');
         }, 100);
 
         loadEditSubAccounts(s.id);
@@ -440,6 +474,7 @@ document.addEventListener('DOMContentLoaded', function () {
         $('#editCompany').val('').trigger('change');
         $('#editSalesman').val('').trigger('change');
         $('#editPartyType').val('').trigger('change');
+        $('#editSupplierCategory').val('').trigger('change');
     }
 
     editModalClose.addEventListener('click', closeEditModal);
@@ -452,6 +487,7 @@ document.addEventListener('DOMContentLoaded', function () {
         const formData = {
             id: currentEditingSupplierId,
             companyId: $('#editCompany').val(),
+            categoryId: $('#editSupplierCategory').val() || null,
             supplierName: document.getElementById('editSupplierName').value.trim(),
             brandName: document.getElementById('editBrandName').value.trim(),
             city: document.getElementById('editCity').value.trim(),

@@ -9,6 +9,7 @@ document.addEventListener('DOMContentLoaded', function () {
         { id: 'salesmanSearch',   label: 'Salesman',               visible: true },
         { id: 'supplierName',     label: 'Brand Name - Company',   visible: true },
         { id: 'brandName',        label: 'Supplier Name',          visible: true },
+        { id: 'supplierCategory', label: 'Supplier Category', visible: true },
         { id: 'address',          label: 'Address',                visible: true },
         { id: 'citySearch',       label: 'City',                   visible: true },
         { id: 'primaryPhone',     label: 'Primary Phone',          visible: true },
@@ -190,6 +191,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // Load companies, employees, projects, cities
     loadCompanies();
+    loadSupplierCategories();
     loadEmployees();
     loadProjects();
     loadCities();
@@ -514,6 +516,187 @@ document.addEventListener('DOMContentLoaded', function () {
         notification.classList.add(type, 'show');
         setTimeout(() => notification.classList.remove('show'), 5000);
     }
+    // ===== SUPPLIER CATEGORIES MANAGEMENT =====
+const categoriesModal = document.getElementById('categoriesModal');
+const categoriesModalClose = document.getElementById('categoriesModalClose');
+const categoriesCloseBtn = document.getElementById('categoriesCloseBtn');
+const manageCategoriesBtn = document.getElementById('manageCategoriesBtn');
+const addCategoryBtn = document.getElementById('addCategoryBtn');
+const categoriesTableBody = document.getElementById('categoriesTableBody');
+
+const categoryFormModal = document.getElementById('categoryFormModal');
+const categoryFormModalClose = document.getElementById('categoryFormModalClose');
+const categoryFormCancelBtn = document.getElementById('categoryFormCancelBtn');
+const categoryForm = document.getElementById('categoryForm');
+const categoryFormTitle = document.getElementById('categoryFormTitle');
+const categoryNameInput = document.getElementById('categoryName');
+const categoryFormSaveBtn = document.getElementById('categoryFormSaveBtn');
+
+let currentEditingCategoryId = null;
+let supplierCategories = [];
+
+function loadSupplierCategories() {
+    fetch('../../../../server/api/customer_supplier/suppliers/supplier-categories.php')
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                supplierCategories = data.categories;
+                const select = document.getElementById('supplierCategory');
+                select.innerHTML = '<option value="">Select Supplier Category</option>';
+                data.categories.forEach(category => {
+                    select.appendChild(new Option(category.category_name, category.id));
+                });
+            }
+        })
+        .catch(err => console.error('loadSupplierCategories error:', err));
+}
+
+function loadCategoriesTable() {
+    fetch('../../../../server/api/customer_supplier/suppliers/supplier-categories.php')
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                supplierCategories = data.categories;
+                renderCategoriesTable(data.categories);
+            }
+        });
+}
+
+function renderCategoriesTable(categories) {
+    categoriesTableBody.innerHTML = '';
+    categories.forEach(category => {
+        const isSystem = category.tenant_id == 0;
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td style="padding: 12px; border-bottom: 1px solid var(--border-default);">
+                ${category.category_name}
+                ${isSystem ? '<span class="system-badge"><i class="fas fa-lock"></i> System</span>' : ''}
+            </td>
+            <td style="padding: 12px; border-bottom: 1px solid var(--border-default); text-align: center;">
+                <button class="action-btn edit" data-id="${category.id}" ${isSystem ? 'disabled' : ''}>
+                    <i class="fas fa-edit"></i>
+                </button>
+                <button class="action-btn delete" data-id="${category.id}" ${isSystem ? 'disabled' : ''}>
+                    <i class="fas fa-trash"></i>
+                </button>
+            </td>
+        `;
+        categoriesTableBody.appendChild(row);
+    });
+}
+
+manageCategoriesBtn.addEventListener('click', function () {
+    loadCategoriesTable();
+    categoriesModal.classList.add('show');
+});
+
+function closeCategoriesModal() {
+    categoriesModal.classList.remove('show');
+}
+
+categoriesModalClose.addEventListener('click', closeCategoriesModal);
+categoriesCloseBtn.addEventListener('click', closeCategoriesModal);
+categoriesModal.addEventListener('click', function (e) {
+    if (e.target === categoriesModal) closeCategoriesModal();
+});
+
+addCategoryBtn.addEventListener('click', function () {
+    currentEditingCategoryId = null;
+    categoryFormTitle.innerHTML = '<i class="fas fa-plus"></i> Add Supplier Category';
+    categoryNameInput.value = '';
+    categoryFormModal.classList.add('show');
+});
+
+categoriesTableBody.addEventListener('click', function (e) {
+    const target = e.target.closest('button');
+    if (!target) return;
+    const categoryId = target.dataset.id;
+
+    if (target.classList.contains('edit')) {
+        const category = supplierCategories.find(c => c.id == categoryId);
+        if (category) {
+            currentEditingCategoryId = categoryId;
+            categoryFormTitle.innerHTML = '<i class="fas fa-edit"></i> Edit Supplier Category';
+            categoryNameInput.value = category.category_name;
+            categoryFormModal.classList.add('show');
+        }
+    } else if (target.classList.contains('delete')) {
+        if (confirm('Are you sure you want to delete this supplier category?')) {
+            deleteCategory(categoryId);
+        }
+    }
+});
+
+function closeCategoryFormModal() {
+    categoryFormModal.classList.remove('show');
+    currentEditingCategoryId = null;
+    categoryNameInput.value = '';
+}
+
+categoryFormModalClose.addEventListener('click', closeCategoryFormModal);
+categoryFormCancelBtn.addEventListener('click', closeCategoryFormModal);
+categoryFormModal.addEventListener('click', function (e) {
+    if (e.target === categoryFormModal) closeCategoryFormModal();
+});
+
+categoryForm.addEventListener('submit', function (e) {
+    e.preventDefault();
+
+    if (!categoryNameInput.value.trim()) {
+        showNotification('Error', 'Category name is required', 'error');
+        return;
+    }
+
+    categoryFormSaveBtn.disabled = true;
+    categoryFormSaveBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
+
+    const url = '../../../../server/api/customer_supplier/suppliers/supplier-categories.php';
+    const method = currentEditingCategoryId ? 'PUT' : 'POST';
+    const data = { category_name: categoryNameInput.value.trim() };
+    if (currentEditingCategoryId) data.id = currentEditingCategoryId;
+
+    fetch(url, {
+        method: method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showNotification('Success', data.message, 'success');
+            closeCategoryFormModal();
+            loadCategoriesTable();
+            loadSupplierCategories();
+        } else {
+            showNotification('Error', data.message, 'error');
+        }
+    })
+    .catch(() => showNotification('Error', 'Failed to save supplier category', 'error'))
+    .finally(() => {
+        categoryFormSaveBtn.disabled = false;
+        categoryFormSaveBtn.innerHTML = '<i class="fas fa-save"></i> Save';
+    });
+});
+
+function deleteCategory(categoryId) {
+    fetch('../../../../server/api/customer_supplier/suppliers/supplier-categories.php', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: categoryId })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showNotification('Success', data.message, 'success');
+            loadCategoriesTable();
+            loadSupplierCategories();
+        } else {
+            showNotification('Error', data.message, 'error');
+        }
+    })
+    .catch(() => showNotification('Error', 'Failed to delete supplier category', 'error'));
+}
+// ===== END SUPPLIER CATEGORIES MANAGEMENT =====
 
     notificationClose.addEventListener('click', () => notification.classList.remove('show'));
 
@@ -557,6 +740,7 @@ document.addEventListener('DOMContentLoaded', function () {
             projectId: document.getElementById('project').value || null,
             companyId: companySelect.value,
             salesmanId: salesmanIdsInput.value || null,
+            categoryId: document.getElementById('supplierCategory').value || null,
             associatedCompanyIds: assocCompanyIdsInput.value || null,
             supplierName: document.getElementById('supplierName').value.trim(),
             brandName: document.getElementById('brandName').value.trim(),

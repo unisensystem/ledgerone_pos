@@ -55,6 +55,7 @@ try {
         'tenant_id' => $tenant_id,
         'company_id' => (int)$input['companyId'],
         'salesman_id' => !empty($input['salesmanId']) ? trim($input['salesmanId']) : null,
+        'supplier_category_id' => !empty($input['categoryId']) ? (int)$input['categoryId'] : null,
         'project_id' => !empty($input['projectId']) ? (int)$input['projectId'] : null,
         'supplier_code' => $supplier_code,
         'supplier_name' => trim($input['supplierName']),

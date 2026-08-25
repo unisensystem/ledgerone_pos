@@ -33,7 +33,7 @@ try {
     $sql = "
         SELECT
             batch_no,
-            expiry_date AS batch_expiry_date,
+            batch_expiry_date,
             SUM(COALESCE(qty_in, 0)) - SUM(COALESCE(qty_out, 0)) AS remaining_qty,
             MIN(transaction_date) AS first_transaction_date,
             MIN(id) AS first_id
@@ -51,7 +51,7 @@ try {
     }
 
     $sql .= "
-        GROUP BY batch_no, expiry_date
+        GROUP BY batch_no, batch_expiry_date
         HAVING remaining_qty > 0
         ORDER BY first_transaction_date ASC, first_id ASC
     ";

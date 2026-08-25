@@ -246,29 +246,26 @@ document.addEventListener('DOMContentLoaded', async function() {
     });
 
     // "Buy by Amount" checkbox — optional feature, off by default (not every business wants it)
-    // Elements may not be present in all invoice views (e.g. counter-invoice omits this panel)
     const enableAmountCheckbox = document.getElementById('enableAmountEntry');
     const quickAmountGroup = document.getElementById('quickAmountGroup');
     const quickAmountInput = document.getElementById('quickAmount');
-    if (enableAmountCheckbox && quickAmountGroup && quickAmountInput) {
-        enableAmountCheckbox.checked = localStorage.getItem('enableAmountEntry') === 'true';
-        quickAmountGroup.style.display = enableAmountCheckbox.checked ? '' : 'none';
-        enableAmountCheckbox.addEventListener('change', function() {
-            localStorage.setItem('enableAmountEntry', this.checked);
-            quickAmountGroup.style.display = this.checked ? '' : 'none';
-            quickAmountInput.value = '';
-        });
+    enableAmountCheckbox.checked = localStorage.getItem('enableAmountEntry') === 'true';
+    quickAmountGroup.style.display = enableAmountCheckbox.checked ? '' : 'none';
+    enableAmountCheckbox.addEventListener('change', function() {
+        localStorage.setItem('enableAmountEntry', this.checked);
+        quickAmountGroup.style.display = this.checked ? '' : 'none';
+        quickAmountInput.value = '';
+    });
 
-        quickAmountInput.addEventListener('input', calculateQtyFromAmount);
-        quickAmountInput.addEventListener('keydown', function(e) {
-            if (e.key === 'Enter') {
-                e.preventDefault();
-                e.stopPropagation();
-                calculateQtyFromAmount();
-                document.getElementById('quickAddBtn').click();
-            }
-        });
-    }
+    quickAmountInput.addEventListener('input', calculateQtyFromAmount);
+    quickAmountInput.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            e.stopPropagation();
+            calculateQtyFromAmount();
+            document.getElementById('quickAddBtn').click();
+        }
+    });
 
     document.getElementById('shortcutSettingsBtn').addEventListener('click', function() {
         document.getElementById('shortcutSettingsModal').style.display = 'flex';
@@ -1440,13 +1437,13 @@ function showChildProductModal(parent, children) {
 function addProductWithChildren(parent, children) {
     // Parent qty = sum of all children quantities
     const qty = children.reduce((sum, child) => sum + child.qty, 0);
-
+    
     // Calculate parent price from sum of children prices
     const totalChildPrice = children.reduce((sum, child) => sum + (child.price * child.qty), 0);
-
+    
     // Get UOM name from product's default_unit_id
     const uom = uomData.find(u => u.id == parent.default_unit_id);
-
+    
     const item = {
         id: Date.now(),
         product: parent.name,
@@ -1459,20 +1456,19 @@ function addProductWithChildren(parent, children) {
         gstPercent: parseFloat(parent.sales_tax || 0),
         children: children
     };
-
+    
     item.gross = item.qty * item.price;
     item.discountAmount = item.gross * (item.discountPercent / 100);
     item.gstAmount = (item.gross - item.discountAmount) * (item.gstPercent / 100);
     item.net = item.gross - item.discountAmount + item.gstAmount;
-
+    
     currentInvoice.items.push(item);
     renderItems();
     updateSummary();
-
+    
     document.getElementById('quickProduct').value = '';
     document.getElementById('quickQty').value = 1;
-    const quickAmountEl = document.getElementById('quickAmount');
-    if (quickAmountEl) quickAmountEl.value = '';
+    document.getElementById('quickAmount').value = '';
     document.getElementById('productSuggestions').style.display = 'none';
     document.getElementById('quickProduct').focus();
     isAddingProduct = false;
@@ -1481,7 +1477,7 @@ function addProductWithChildren(parent, children) {
 function addProductToInvoice(product) {
     // Get UOM name from product's default_unit_id
     const uom = uomData.find(u => u.id == product.default_unit_id);
-
+    
     const item = {
         id: Date.now(),
         product: product.name,
@@ -1493,20 +1489,19 @@ function addProductToInvoice(product) {
         discountPercent: parseFloat(product.default_discount || 0),
         gstPercent: parseFloat(product.sales_tax || 0)
     };
-
+    
     item.gross = item.qty * item.price;
     item.discountAmount = item.gross * (item.discountPercent / 100);
     item.gstAmount = (item.gross - item.discountAmount) * (item.gstPercent / 100);
     item.net = item.gross - item.discountAmount + item.gstAmount;
-
+    
     currentInvoice.items.push(item);
     renderItems();
     updateSummary();
-
+    
     document.getElementById('quickProduct').value = '';
     document.getElementById('quickQty').value = 1;
-    const quickAmountEl = document.getElementById('quickAmount');
-    if (quickAmountEl) quickAmountEl.value = '';
+    document.getElementById('quickAmount').value = '';
     document.getElementById('productSuggestions').style.display = 'none';
     document.getElementById('quickProduct').focus();
     isAddingProduct = false;

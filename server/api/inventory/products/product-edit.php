@@ -42,11 +42,6 @@ try {
     $trade_price = !empty($_POST['tradePrice']) ? $_POST['tradePrice'] : 0;
     $wholesale_price = !empty($_POST['wholesalePrice']) ? $_POST['wholesalePrice'] : 0;
     $mrp = !empty($_POST['mrp']) ? $_POST['mrp'] : 0;
-    // Carton-price-entry feature (tenant-gated) — remembers which unit Trade Price/MRP
-    // were originally typed in, and the exact value, so editing shows it back verbatim.
-    $price_entry_unit_id = !empty($_POST['priceEntryUnitId']) ? $_POST['priceEntryUnitId'] : null;
-    $trade_price_entry_value = !empty($_POST['tradePriceEntryValue']) ? $_POST['tradePriceEntryValue'] : null;
-    $mrp_entry_value = !empty($_POST['mrpEntryValue']) ? $_POST['mrpEntryValue'] : null;
     $default_discount = !empty($_POST['defaultDiscount']) ? $_POST['defaultDiscount'] : 0;
     $trade_offer_discount = !empty($_POST['tradeOfferDiscount']) ? $_POST['tradeOfferDiscount'] : 0;
     $default_foc = !empty($_POST['defaultFoc']) ? $_POST['defaultFoc'] : 0;
@@ -92,41 +87,37 @@ try {
     // Update product
     if ($photo_filename) {
         $stmt = $pdo->prepare("
-            UPDATE products SET
+            UPDATE products SET 
                 company_id = ?, name = ?, product_type = ?, uom_type = ?, default_unit_id = ?, uom_group_id = ?, product_conversion_factor = ?, category_id = ?, subcategory_id = ?,
-                inventory_account_id = ?, vendor_id = ?, parent_product_id = ?, description = ?, qr_code = ?, barcode = ?, purchase_price = ?,
-                trade_price = ?, wholesale_price = ?, mrp = ?, price_entry_unit_id = ?, trade_price_entry_value = ?, mrp_entry_value = ?,
-                default_discount = ?, trade_offer_discount = ?, default_foc = ?,
-                carton_conversion = ?, tax_regime_id = ?, min_stock_level = ?, max_stock_level = ?,
+                inventory_account_id = ?, vendor_id = ?, parent_product_id = ?, description = ?, qr_code = ?, barcode = ?, purchase_price = ?, 
+                trade_price = ?, wholesale_price = ?, mrp = ?, default_discount = ?, trade_offer_discount = ?, default_foc = ?, 
+                carton_conversion = ?, tax_regime_id = ?, min_stock_level = ?, max_stock_level = ?, 
                 manufacturing_date = ?, expiry_date = ?, photo = ?, is_active = ?, stock_affects = ?, invoice_affects = ?, updated_at = CURRENT_TIMESTAMP
             WHERE id = ? AND tenant_id = ?
         ");
-
+        
         $stmt->execute([
             $company, $name, $product_type, $uom_type, $default_unit, $uom_group_id, $product_conversion_factor, $category, $subcategory,
             $inventory_account, $vendor_id, $parent_product_id, $description, $qr_code, $barcode, $purchase_price,
-            $trade_price, $wholesale_price, $mrp, $price_entry_unit_id, $trade_price_entry_value, $mrp_entry_value,
-            $default_discount, $trade_offer_discount, $default_foc,
+            $trade_price, $wholesale_price, $mrp, $default_discount, $trade_offer_discount, $default_foc,
             $carton_conversion, $tax_regime_id, $min_stock, $max_stock,
             $manufacturing_date, $expiry_date, $photo_filename, $is_active, $stock_affects, $invoice_affects, $product_id, $tenant_id
         ]);
     } else {
         $stmt = $pdo->prepare("
-            UPDATE products SET
+            UPDATE products SET 
                 company_id = ?, name = ?, product_type = ?, uom_type = ?, default_unit_id = ?, uom_group_id = ?, product_conversion_factor = ?, category_id = ?, subcategory_id = ?,
-                inventory_account_id = ?, vendor_id = ?, parent_product_id = ?, description = ?, qr_code = ?, barcode = ?, purchase_price = ?,
-                trade_price = ?, wholesale_price = ?, mrp = ?, price_entry_unit_id = ?, trade_price_entry_value = ?, mrp_entry_value = ?,
-                default_discount = ?, trade_offer_discount = ?, default_foc = ?,
-                carton_conversion = ?, tax_regime_id = ?, min_stock_level = ?, max_stock_level = ?,
+                inventory_account_id = ?, vendor_id = ?, parent_product_id = ?, description = ?, qr_code = ?, barcode = ?, purchase_price = ?, 
+                trade_price = ?, wholesale_price = ?, mrp = ?, default_discount = ?, trade_offer_discount = ?, default_foc = ?, 
+                carton_conversion = ?, tax_regime_id = ?, min_stock_level = ?, max_stock_level = ?, 
                 manufacturing_date = ?, expiry_date = ?, is_active = ?, stock_affects = ?, invoice_affects = ?, updated_at = CURRENT_TIMESTAMP
             WHERE id = ? AND tenant_id = ?
         ");
-
+        
         $stmt->execute([
             $company, $name, $product_type, $uom_type, $default_unit, $uom_group_id, $product_conversion_factor, $category, $subcategory,
             $inventory_account, $vendor_id, $parent_product_id, $description, $qr_code, $barcode, $purchase_price,
-            $trade_price, $wholesale_price, $mrp, $price_entry_unit_id, $trade_price_entry_value, $mrp_entry_value,
-            $default_discount, $trade_offer_discount, $default_foc,
+            $trade_price, $wholesale_price, $mrp, $default_discount, $trade_offer_discount, $default_foc,
             $carton_conversion, $tax_regime_id, $min_stock, $max_stock,
             $manufacturing_date, $expiry_date, $is_active, $stock_affects, $invoice_affects, $product_id, $tenant_id
         ]);
@@ -186,12 +177,12 @@ try {
         
         // Insert new stock opening entries
         $stockOpeningStmt = $pdo->prepare("
-            INSERT INTO stock_opening (product_id, tenant_id, branch_id, opening_qty, opening_price, batch_no, expiry_date, unit_id)
+            INSERT INTO stock_opening (product_id, tenant_id, branch_id, opening_qty, opening_price, batch_no, batch_expiry_date, unit_id)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         ");
-
+        
         $stockLedgerStmt = $pdo->prepare("
-            INSERT INTO stock_ledger (tenant_id, account_id, branch_id, product_id, reference_table, reference_id, qty_in, unit_cost, batch_no, expiry_date, unit_id, transaction_type, transaction_date)
+            INSERT INTO stock_ledger (tenant_id, account_id, branch_id, product_id, reference_table, reference_id, qty_in, unit_cost, batch_no, batch_expiry_date, unit_id, transaction_type, transaction_date)
             VALUES (?, ?, ?, ?, 'stock_opening', ?, ?, ?, ?, ?, ?, 'Opening Stock', CURDATE())
         ");
         

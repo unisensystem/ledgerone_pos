@@ -1,9 +1,5 @@
 const API_BASE = '../../../../server/api/inventory/stock_position/stock-position.php';
 
-function escLedger(v) {
-    return String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-}
-
 // Pagination variables
 let currentPage = 1;
 const itemsPerPage = 20;  // Increased from 10 to show more rows per page (fixes FOC pagination issue)
@@ -15,11 +11,6 @@ let customerCurrentPage = 1;
 let customerTotalItems = 0;
 let allCustomerEntries = [];
 let customerCurrency = '$';
-// Company-wise Ledger pagination variables
-let companyCurrentPage = 1;
-let companyTotalItems = 0;
-let allCompanyEntries = [];
-let companyCurrency = '$';
 
 // Item-wise Ledger pagination variables
 let itemCurrentPage = 1;
@@ -127,11 +118,6 @@ function printList() {
         return;
     }
 
-    if (activeTab === 'company-ledger') {
-        openCompanyLedgerPreview();
-        return;
-    }
-
     const branch = document.getElementById('branch').value;
     const product = document.getElementById('product').value;
     const inventoryType = document.getElementById('inventory-type').value;
@@ -141,96 +127,18 @@ function printList() {
     const fromDate = document.getElementById('from-date').value;
     const toDate = document.getElementById('to-date').value;
     const valuationMethod = document.getElementById('valuation-method').value;
-
-    let url = `print.php?type=${activeTab}&`;
-
-    if (activeTab === 'position') {
-        if (branch) url += `branch_id=${branch}&`;
-        if (product) url += `product_id=${product}&`;
-        if (inventoryType) url += `inventory_type_id=${inventoryType}&`;
-        if (stockStatus) url += `stock_status=${stockStatus}&`;
-        if (status) url += `status=${status}&`;
-        if (stockLevelFilter) url += `stock_level=${stockLevelFilter}&`;
-        if (fromDate) url += `from_date=${fromDate}&`;
-        if (toDate) url += `to_date=${toDate}&`;
-        if (valuationMethod) url += `valuation_method=${valuationMethod}&`;
-    } else if (activeTab === 'item-ledger') {
-        // Item-wise Ledger tab filters
-        const itemName = document.getElementById('item').value;
-        let productId = null;
-        if (itemName) {
-            const options = document.querySelectorAll('#item-list option');
-            for (let option of options) {
-                if (option.value === itemName) {
-                    productId = option.getAttribute('data-id');
-                    break;
-                }
-            }
-        }
-        const itemFromDate = document.getElementById('from-date').value;
-        const itemToDate = document.getElementById('to-date').value;
-        const batchFilter = document.getElementById('item-batch-filter')?.value;
-        const expiryFilter = document.getElementById('item-expiry-filter')?.value;
-
-        if (productId) url += `product_id=${productId}&`;
-        if (itemFromDate) url += `from_date=${itemFromDate}&`;
-        if (itemToDate) url += `to_date=${itemToDate}&`;
-        if (batchFilter) url += `batch_no=${encodeURIComponent(batchFilter)}&`;
-        if (expiryFilter) url += `expiry_date=${expiryFilter}&`;
-    } else if (activeTab === 'branch-ledger') {
-        const branchName = document.querySelector('input[list="branch-ledger-list"]')?.value;
-        let branchId = null;
-        if (branchName) {
-            const options = document.querySelectorAll('#branch-ledger-list option');
-            for (let option of options) {
-                if (option.value === branchName) {
-                    branchId = option.getAttribute('data-id');
-                    break;
-                }
-            }
-        }
-        const branchFromDate = document.getElementById('from-date-branch')?.value;
-        const branchToDate = document.getElementById('to-date-branch')?.value;
-
-        if (branchId) url += `branch_id=${branchId}&`;
-        if (branchFromDate) url += `from_date=${branchFromDate}&`;
-        if (branchToDate) url += `to_date=${branchToDate}&`;
-    } else if (activeTab === 'detailed-ledger') {
-        const branchInput = document.getElementById('detailed-branch').value;
-        const productInput = document.getElementById('detailed-product').value;
-        let branchId = null;
-        if (branchInput) {
-            const options = document.querySelectorAll('#detailed-branch-list option');
-            for (let option of options) {
-                if (option.value === branchInput) {
-                    branchId = option.getAttribute('data-id');
-                    break;
-                }
-            }
-        }
-        let productId = null;
-        if (productInput) {
-            const options = document.querySelectorAll('#detailed-product-list option');
-            for (let option of options) {
-                if (option.value === productInput) {
-                    productId = option.getAttribute('data-id');
-                    break;
-                }
-            }
-        }
-        const detailedFromDate = document.getElementById('detailed-from-date').value;
-        const detailedToDate = document.getElementById('detailed-to-date').value;
-        const batchFilter = document.getElementById('detailed-batch-filter')?.value;
-        const expiryFilter = document.getElementById('detailed-expiry-filter')?.value;
-
-        if (branchId) url += `branch_id=${branchId}&`;
-        if (productId) url += `product_id=${productId}&`;
-        if (detailedFromDate) url += `from_date=${detailedFromDate}&`;
-        if (detailedToDate) url += `to_date=${detailedToDate}&`;
-        if (batchFilter) url += `batch_no=${encodeURIComponent(batchFilter)}&`;
-        if (expiryFilter) url += `expiry_date=${expiryFilter}&`;
-    }
-
+    
+    let url = 'print.php?';
+    if (branch) url += `branch_id=${branch}&`;
+    if (product) url += `product_id=${product}&`;
+    if (inventoryType) url += `inventory_type_id=${inventoryType}&`;
+    if (stockStatus) url += `stock_status=${stockStatus}&`;
+    if (status) url += `status=${status}&`;
+    if (stockLevelFilter) url += `stock_level=${stockLevelFilter}&`;
+    if (fromDate) url += `from_date=${fromDate}&`;
+    if (toDate) url += `to_date=${toDate}&`;
+    if (valuationMethod) url += `valuation_method=${valuationMethod}&`;
+    
     window.open(url, '_blank');
 }
 
@@ -247,7 +155,7 @@ function computeRunningBalances(entries) {
     return entries.map(entry => {
         const key = `${entry.product_name}-${entry.branch_name}`;
         if (!balances[key]) balances[key] = 0;
-        balances[key] += parseFloat(entry.qty_in || 0) - parseFloat(entry.qty_out || 0) - parseFloat(entry.qty_foc || 0);
+        balances[key] += parseFloat(entry.qty_in || 0) - parseFloat(entry.qty_out || 0);
         return {
             ...entry,
             balance: balances[key],
@@ -255,6 +163,7 @@ function computeRunningBalances(entries) {
         };
     });
 }
+
 // Builds a CSV file from an array of plain objects and triggers a download.
 // No external library needed — Excel opens CSV files natively.
 function downloadAsExcelCSV(rows, filename) {
@@ -305,12 +214,6 @@ function exportToExcel() {
         return;
     }
 
-    // Company-wise Ledger: same pattern as Customer-wise Ledger — open the print preview first.
-    if (activeTab === 'company-ledger') {
-        openCompanyLedgerPreview();
-        return;
-    }
-
     switch (activeTab) {
         case 'position': {
             filename = `stock_position_${today}.csv`;
@@ -335,8 +238,6 @@ function exportToExcel() {
             rows = allLedgerEntries.map(entry => ({
                 'Date': entry.transaction_date,
                 'Transaction': entry.transaction_type,
-                'Batch No': entry.batch_no || '-',
-                'Expiry Date': entry.batch_expiry_date || '-',
                 'Qty In': entry.qty_in > 0 ? `${parseFloat(entry.qty_in).toFixed(2)} ${entry.unit_symbol || 'L'}` : '-',
                 'Qty Out': entry.qty_out > 0 ? `${parseFloat(entry.qty_out).toFixed(2)} ${entry.unit_symbol || 'L'}` : '-',
                 'Balance': `${parseFloat(entry.balance).toFixed(2)} ${entry.unit_symbol || 'L'}`,
@@ -357,9 +258,7 @@ function exportToExcel() {
                 'Value': ((parseFloat(entry.qty_in || 0) - parseFloat(entry.qty_out || 0)) * parseFloat(entry.unit_cost)).toFixed(2)
             }));
             break;
-            
         }
-
         case 'detailed-ledger': {
             filename = `detailed_ledger_${today}.csv`;
             rows = computeRunningBalances(allDetailedEntries).map(entry => ({
@@ -367,8 +266,6 @@ function exportToExcel() {
                 'Product': entry.product_name,
                 'Branch': entry.branch_name,
                 'Transaction': entry.transaction_type,
-                 'Batch No': entry.batch_no || '-',
-                'Expiry Date': entry.batch_expiry_date || '-',
                 'Qty In': entry.qty_in > 0 ? `${parseFloat(entry.qty_in).toFixed(2)} ${entry.unit_symbol || 'L'}` : '-',
                 'Qty Out': entry.qty_out > 0 ? `${parseFloat(entry.qty_out).toFixed(2)} ${entry.unit_symbol || 'L'}` : '-',
                 'Balance': `${parseFloat(entry.balance).toFixed(2)} ${entry.unit_symbol || 'L'}`,
@@ -427,82 +324,15 @@ function openCustomerLedgerPreview() {
 
     const fromDate = document.getElementById('from-date-customer').value;
     const toDate = document.getElementById('to-date-customer').value;
-    const batchFilter = document.getElementById('customer-batch-filter')?.value;
-    const expiryFilter = document.getElementById('customer-expiry-filter')?.value;
 
     let url = `print_customer_ledger.php?`;
     if (customerId) url += `customer_id=${customerId}&`;
     if (productId) url += `product_id=${productId}&`;
     if (fromDate) url += `from_date=${fromDate}&`;
     if (toDate) url += `to_date=${toDate}&`;
-    if (batchFilter) url += `batch_no=${encodeURIComponent(batchFilter)}&`;
-    if (expiryFilter) url += `expiry_date=${expiryFilter}&`;
 
     window.open(url, '_blank');
 }
-
-// Company-wise (Supplier) Ledger ke liye print preview page kholta hai
-function openCompanyLedgerPreview() {
-    const companyName = document.getElementById('company-ledger-input').value;
-    const branchName = document.getElementById('company-branch-input').value;
-    const productName = document.getElementById('company-product-input').value;
-
-    if (!companyName || companyName.trim() === '') {
-        alert('Please select a Supplier');
-        return;
-    }
-
-    let companyId = null;
-    const companyOptions = document.querySelectorAll('#company-ledger-list option');
-    for (let option of companyOptions) {
-        if (option.value === companyName) {
-            companyId = option.getAttribute('data-id');
-            break;
-        }
-    }
-    if (!companyId) {
-        alert('Invalid supplier selected. Please pick from the list.');
-        return;
-    }
-
-    let branchId = null;
-    if (branchName) {
-        const branchOptions = document.querySelectorAll('#company-branch-list option');
-        for (let option of branchOptions) {
-            if (option.value === branchName) {
-                branchId = option.getAttribute('data-id');
-                break;
-            }
-        }
-    }
-
-    let productId = null;
-    if (productName) {
-        const productOptions = document.querySelectorAll('#company-product-list option');
-        for (let option of productOptions) {
-            if (option.value === productName) {
-                productId = option.getAttribute('data-id');
-                break;
-            }
-        }
-    }
-
-    const fromDate = document.getElementById('from-date-company').value;
-    const toDate = document.getElementById('to-date-company').value;
-    const batchFilter = document.getElementById('company-batch-filter')?.value;
-    const expiryFilter = document.getElementById('company-expiry-filter')?.value;
-
-    let url = `print_company_ledger.php?company_id=${companyId}&`;
-    if (branchId) url += `branch_id=${branchId}&`;
-    if (productId) url += `product_id=${productId}&`;
-    if (fromDate) url += `from_date=${fromDate}&`;
-    if (toDate) url += `to_date=${toDate}&`;
-    if (batchFilter) url += `batch_no=${encodeURIComponent(batchFilter)}&`;
-    if (expiryFilter) url += `expiry_date=${expiryFilter}&`;
-
-    window.open(url, '_blank');
-}
-
 function exportToJSON() {
     alert('JSON export functionality to be implemented');
 }
@@ -571,6 +401,11 @@ async function loadStockPosition() {
             }
         }
         
+        console.log('=== Filter Debug ===');
+        console.log('Show Base Units Checkbox:', showBaseUnits);
+        console.log('Branch ID:', branchId);
+        console.log('Product ID:', productId);
+        
         let url = `${API_BASE}?action=position`;
         if (branchId) url += `&branch_id=${branchId}`;
         if (productId) url += `&product_id=${productId}`;
@@ -583,24 +418,34 @@ async function loadStockPosition() {
         if (valuationMethod) url += `&valuation_method=${valuationMethod}`;
         if (showBaseUnits) url += `&show_base_units=true`;
         
+        console.log('API URL:', url);
+        
         const response = await fetch(url);
         const data = await response.json();
         
         if (data.success) {
+            console.log('Debug info:', data.debug);
+            console.log('Raw data count:', data.data.length);
             allPositions = Array.isArray(data.data) ? data.data : [];
             
             // Apply stock level filter
             if (stockLevelFilter === 'zero-or-less') {
+                console.log('Applying filter: zero-or-less');
                 allPositions = allPositions.filter(pos => {
                     const stock = parseFloat(pos.current_stock);
+                    console.log(`Product: ${pos.product_name}, Stock: ${stock}, Include: ${stock <= 0}`);
                     return stock <= 0;
                 });
             } else if (stockLevelFilter === 'greater-than-zero') {
+                console.log('Applying filter: greater-than-zero');
                 allPositions = allPositions.filter(pos => {
                     const stock = parseFloat(pos.current_stock);
+                    console.log(`Product: ${pos.product_name}, Stock: ${stock}, Include: ${stock > 0}`);
                     return stock > 0;
                 });
             }
+            
+            console.log('Filtered data count:', allPositions.length);
             
             // Add product_id to each position for toggle functionality
             allPositions = allPositions.map((pos, idx) => ({
@@ -620,7 +465,7 @@ async function loadStockPosition() {
 }
 
 function populateProductDropdowns(products) {
-const productLists = ['#product-list', '#item-list', '#detailed-product-list', '#customer-product-list', '#company-product-list'];
+    const productLists = ['#product-list', '#item-list', '#detailed-product-list', '#customer-product-list'];
     productLists.forEach(selector => {
         const datalist = document.querySelector(selector);
         if (datalist) {
@@ -663,17 +508,17 @@ function updatePositionTable(currency = '$') {
         const isChild = pos.parent_product_id;
         const hasChildren = !isChild && pageData.some(p => p.parent_product_id === pos.product_id);
         const toggleBtn = hasChildren ? `<i class="fas fa-chevron-down" style="cursor: pointer; margin-right: 8px;" onclick="toggleChildren(${pos.product_id})"></i>` : '';
-        const productDisplay = isChild ? `<span style="margin-left: 28px; color: var(--subtext);">↳ ${escLedger(pos.product_name)}</span>` : `${toggleBtn}${escLedger(pos.product_name)}`;
-
+        const productDisplay = isChild ? `<span style="margin-left: 28px; color: var(--subtext);">↳ ${pos.product_name}</span>` : `${toggleBtn}${pos.product_name}`;
+        
         return `
         <tr class="${isChild ? 'child-row' : 'parent-row'}" data-product-id="${pos.product_id}" data-parent-id="${pos.parent_product_id || ''}" style="${isChild ? 'background-color: var(--table-row-alt);' : ''}">
             <td>${productDisplay}</td>
-            <td class="col-branch">${escLedger(pos.branch_display)}</td>
-            <td class="col-inventory-type">${escLedger(pos.inventory_type || '-')}</td>
-            <td class="col-opening-balance">${parseFloat(pos.opening_balance || 0).toFixed(2)} ${escLedger(pos.unit_symbol || 'L')}</td>
-            <td class="col-qty-in">${parseFloat(pos.total_qty_in || 0).toFixed(2)} ${escLedger(pos.unit_symbol || 'L')}</td>
-            <td class="col-qty-out">${parseFloat(pos.total_qty_out || 0).toFixed(2)} ${escLedger(pos.unit_symbol || 'L')}</td>
-            <td class="col-current-stock">${parseFloat(pos.current_stock).toFixed(2)} ${escLedger(pos.unit_symbol || 'L')}</td>
+            <td class="col-branch">${pos.branch_display}</td>
+            <td class="col-inventory-type">${pos.inventory_type || '-'}</td>
+            <td class="col-opening-balance">${parseFloat(pos.opening_balance || 0).toFixed(2)} ${pos.unit_symbol || 'L'}</td>
+            <td class="col-qty-in">${parseFloat(pos.total_qty_in || 0).toFixed(2)} ${pos.unit_symbol || 'L'}</td>
+            <td class="col-qty-out">${parseFloat(pos.total_qty_out || 0).toFixed(2)} ${pos.unit_symbol || 'L'}</td>
+            <td class="col-current-stock">${parseFloat(pos.current_stock).toFixed(2)} ${pos.unit_symbol || 'L'}</td>
             <td class="col-unit-cost">${currency}${parseFloat(pos.unit_cost).toFixed(2)}</td>
             <td class="col-stock-value">${currency}${parseFloat(pos.stock_value).toFixed(2)}</td>
             <td class="col-status"><span class="status-badge status-${pos.status}">${pos.status.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase())}</span></td>
@@ -694,31 +539,7 @@ function updatePositionTable(currency = '$') {
     
     applyColumnVisibility();
 }
-function filterLedgerByBatchExpiry(entries, batchFilter, expiryFilter) {
-    const batch = (batchFilter || '').trim().toLowerCase();
 
-    return entries.filter(entry => {
-        // Batch No filter
-        if (batch) {
-            const entryBatch = String(entry.batch_no || '').toLowerCase();
-
-            if (!entryBatch.includes(batch)) {
-                return false;
-            }
-        }
-
-        // Expiry Date filter
-        if (expiryFilter) {
-            const entryExpiry = String(entry.batch_expiry_date || '').slice(0, 10);
-
-            if (entryExpiry !== expiryFilter) {
-                return false;
-            }
-        }
-
-        return true;
-    });
-}
 function updatePaginationControls() {
     const totalPages = Math.ceil(totalItems / itemsPerPage);
     const startItem = totalItems === 0 ? 0 : (currentPage - 1) * itemsPerPage + 1;
@@ -755,28 +576,26 @@ function renderLedgerTable(currency = '$') {
     const finalBalance = allLedgerEntries.length > 0 ? parseFloat(allLedgerEntries[allLedgerEntries.length - 1].balance) : 0;
     const finalValue = allLedgerEntries.length > 0 ? parseFloat(allLedgerEntries[allLedgerEntries.length - 1].value) : 0;
     
-tbody.innerHTML = pageData.map(entry => `
-    <tr>
-        <td>${entry.transaction_date}</td>
-        <td><span class="transaction-badge transaction-${entry.transaction_type.toLowerCase().replace(' ', '-')}">${escLedger(entry.transaction_type)}</span></td>
-        <td>${escLedger(entry.batch_no || '-')}</td>
-        <td>${escLedger(entry.batch_expiry_date || '-')}</td>
-        <td>${entry.qty_in > 0 ? parseFloat(entry.qty_in).toFixed(2) + ' ' + escLedger(entry.unit_symbol || 'L') : '-'}</td>
-        <td>${entry.qty_out > 0 ? parseFloat(entry.qty_out).toFixed(2) + ' ' + escLedger(entry.unit_symbol || 'L') : '-'}</td>
-        <td>${parseFloat(entry.balance).toFixed(2)} ${escLedger(entry.unit_symbol || 'L')}</td>
-        <td>${currency}${parseFloat(entry.unit_cost).toFixed(2)}</td>
-        <td>${currency}${parseFloat(entry.value).toFixed(2)}</td>
-    </tr>
-`).join('') + `
-    <tr style="font-weight: bold; background-color: var(--table-header);">
-        <td colspan="4">Total (${allLedgerEntries.length} transactions)</td>
-        <td>${totalQtyIn.toFixed(2)} ${escLedger(allLedgerEntries[0]?.unit_symbol || 'L')}</td>
-        <td>${totalQtyOut.toFixed(2)} ${escLedger(allLedgerEntries[0]?.unit_symbol || 'L')}</td>
-        <td>${finalBalance.toFixed(2)} ${escLedger(allLedgerEntries[0]?.unit_symbol || 'L')}</td>
-        <td>-</td>
-        <td>${currency}${finalValue.toFixed(2)}</td>
-    </tr>
-`;
+    tbody.innerHTML = pageData.map(entry => `
+        <tr>
+            <td>${entry.transaction_date}</td>
+            <td><span class="transaction-badge transaction-${entry.transaction_type.toLowerCase().replace(' ', '-')}">${entry.transaction_type}</span></td>
+            <td>${entry.qty_in > 0 ? parseFloat(entry.qty_in).toFixed(2) + ' ' + (entry.unit_symbol || 'L') : '-'}</td>
+            <td>${entry.qty_out > 0 ? parseFloat(entry.qty_out).toFixed(2) + ' ' + (entry.unit_symbol || 'L') : '-'}</td>
+            <td>${parseFloat(entry.balance).toFixed(2)} ${entry.unit_symbol || 'L'}</td>
+            <td>${currency}${parseFloat(entry.unit_cost).toFixed(2)}</td>
+            <td>${currency}${parseFloat(entry.value).toFixed(2)}</td>
+        </tr>
+    `).join('') + `
+        <tr style="font-weight: bold; background-color: var(--table-header);">
+            <td colspan="2">Total (${allLedgerEntries.length} transactions)</td>
+            <td>${totalQtyIn.toFixed(2)} ${allLedgerEntries[0]?.unit_symbol || 'L'}</td>
+            <td>${totalQtyOut.toFixed(2)} ${allLedgerEntries[0]?.unit_symbol || 'L'}</td>
+            <td>${finalBalance.toFixed(2)} ${allLedgerEntries[0]?.unit_symbol || 'L'}</td>
+            <td>-</td>
+            <td>${currency}${finalValue.toFixed(2)}</td>
+        </tr>
+    `;
 }
 
 function updateItemPaginationControls() {
@@ -798,9 +617,6 @@ async function loadDetailedLedger() {
         const productInput = document.getElementById('detailed-product').value;
         const fromDate = document.getElementById('detailed-from-date').value;
         const toDate = document.getElementById('detailed-to-date').value;
-        // NEW: Batch No and Expiry Date filters
-        const batchFilter = document.getElementById('detailed-batch-filter').value;
-        const expiryFilter = document.getElementById('detailed-expiry-filter').value;
         
         // Find branch ID from datalist
         let branchId = null;
@@ -832,19 +648,22 @@ async function loadDetailedLedger() {
         if (fromDate) url += `&from_date=${fromDate}`;
         if (toDate) url += `&to_date=${toDate}`;
         
+        console.log('Fetching Detailed Ledger from URL:', url);
         const response = await fetch(url);
         const data = await response.json();
         
-       if (data.success) {
-    // Filter by Batch No and Expiry Date
-    const filteredData = filterLedgerByBatchExpiry(
-        data.data,
-        batchFilter,
-        expiryFilter
-    );
-
-    updateDetailedLedgerTable(filteredData, data.currency);
-}
+        console.log('API Response Status:', data.success);
+        console.log('Total Rows Returned:', data.data?.length);
+        console.log('All Transaction Types:', data.data?.map(t => t.transaction_type) ?? []);
+        console.log('FOC Transactions:', data.data?.filter(t => t.transaction_type.includes('FOC')) ?? []);
+        
+        if (data.success) {
+            console.log('DEBUG - Detailed Ledger API Response:', {
+                totalRows: data.data.length,
+                transactions: data.data.map(t => ({ id: t.id, type: t.transaction_type, qty_in: t.qty_in, qty_out: t.qty_out, product: t.product_name }))
+            });
+            updateDetailedLedgerTable(data.data, data.currency);
+        }
     } catch (error) {
         console.error('Error loading detailed ledger:', error);
     }
@@ -885,6 +704,13 @@ function renderDetailedLedgerTable(currency = '$') {
     const totalQtyIn = processedLedger.reduce((sum, entry) => sum + parseFloat(entry.qty_in || 0), 0);
     const totalQtyOut = processedLedger.reduce((sum, entry) => sum + parseFloat(entry.qty_out || 0), 0);
     
+    console.log('=== Detailed Ledger Totals Debug ===');
+    console.log('Total transactions:', processedLedger.length);
+    console.log('Total Qty In:', totalQtyIn);
+    console.log('Total Qty Out:', totalQtyOut);
+    console.log('All OUT transactions:', processedLedger.filter(e => parseFloat(e.qty_out) > 0).map(e => ({ type: e.transaction_type, out: e.qty_out })));
+    console.log('Manual sum check:', processedLedger.reduce((sum, e) => sum + parseFloat(e.qty_out || 0), 0));
+    
     // Calculate total balance - sum of all final balances per product-branch
     const totalBalance = Object.values(balances).reduce((sum, balance) => sum + balance, 0);
     
@@ -899,30 +725,28 @@ function renderDetailedLedgerTable(currency = '$') {
     });
     const totalValue = Object.values(finalValues).reduce((sum, value) => sum + value, 0);
     
-   tbody.innerHTML = pageData.map(entry => `
-    <tr>
-        <td>${entry.transaction_date}</td>
-        <td>${escLedger(entry.product_name)}</td>
-        <td>${escLedger(entry.branch_name)}</td>
-        <td><span class="transaction-badge transaction-${entry.transaction_type.toLowerCase().replace(' ', '-')}">${escLedger(entry.transaction_type)}</span></td>
-        <td>${escLedger(entry.batch_no || '-')}</td>
-        <td>${escLedger(entry.batch_expiry_date || '-')}</td>
-        <td>${entry.qty_in > 0 ? parseFloat(entry.qty_in).toFixed(2) + ' ' + escLedger(entry.unit_symbol || 'L') : '-'}</td>
-        <td>${entry.qty_out > 0 ? parseFloat(entry.qty_out).toFixed(2) + ' ' + escLedger(entry.unit_symbol || 'L') : '-'}</td>
-        <td>${parseFloat(entry.balance).toFixed(2)} ${escLedger(entry.unit_symbol || 'L')}</td>
-        <td>${currency}${parseFloat(entry.unit_cost).toFixed(2)}</td>
-        <td>${currency}${parseFloat(entry.value).toFixed(2)}</td>
-    </tr>
-`).join('') + `
-    <tr style="font-weight: bold; background-color: var(--table-header);">
-        <td colspan="6">Total (${allDetailedEntries.length} transactions)</td>
-        <td>${totalQtyIn.toFixed(2)} ${escLedger(allDetailedEntries[0]?.unit_symbol || 'L')}</td>
-        <td>${totalQtyOut.toFixed(2)} ${escLedger(allDetailedEntries[0]?.unit_symbol || 'L')}</td>
-        <td>${totalBalance.toFixed(2)} ${escLedger(allDetailedEntries[0]?.unit_symbol || 'L')}</td>
-        <td>-</td>
-        <td>${currency}${totalValue.toFixed(2)}</td>
-    </tr>
-`;
+    tbody.innerHTML = pageData.map(entry => `
+        <tr>
+            <td>${entry.transaction_date}</td>
+            <td>${entry.product_name}</td>
+            <td>${entry.branch_name}</td>
+            <td><span class="transaction-badge transaction-${entry.transaction_type.toLowerCase().replace(' ', '-')}">${entry.transaction_type}</span></td>
+            <td>${entry.qty_in > 0 ? parseFloat(entry.qty_in).toFixed(2) + ' ' + (entry.unit_symbol || 'L') : '-'}</td>
+            <td>${entry.qty_out > 0 ? parseFloat(entry.qty_out).toFixed(2) + ' ' + (entry.unit_symbol || 'L') : '-'}</td>
+            <td>${parseFloat(entry.balance).toFixed(2)} ${entry.unit_symbol || 'L'}</td>
+            <td>${currency}${parseFloat(entry.unit_cost).toFixed(2)}</td>
+            <td>${currency}${parseFloat(entry.value).toFixed(2)}</td>
+        </tr>
+    `).join('') + `
+        <tr style="font-weight: bold; background-color: var(--table-header);">
+            <td colspan="4">Total (${allDetailedEntries.length} transactions)</td>
+            <td>${totalQtyIn.toFixed(2)} ${allDetailedEntries[0]?.unit_symbol || 'L'}</td>
+            <td>${totalQtyOut.toFixed(2)} ${allDetailedEntries[0]?.unit_symbol || 'L'}</td>
+            <td>${totalBalance.toFixed(2)} ${allDetailedEntries[0]?.unit_symbol || 'L'}</td>
+            <td>-</td>
+            <td>${currency}${totalValue.toFixed(2)}</td>
+        </tr>
+    `;
 }
 
 function updateDetailedPaginationControls() {
@@ -964,10 +788,10 @@ function renderBranchLedgerTable(currency = '$') {
     tbody.innerHTML = pageData.map(entry => `
         <tr>
             <td>${entry.transaction_date}</td>
-            <td>${escLedger(entry.product_name)}</td>
-            <td><span class="transaction-badge transaction-${entry.transaction_type.toLowerCase().replace(' ', '-')}">${escLedger(entry.transaction_type)}</span></td>
-            <td>${entry.qty_in > 0 ? parseFloat(entry.qty_in).toFixed(2) + ' ' + escLedger(entry.unit_symbol || 'L') : '-'}</td>
-            <td>${entry.qty_out > 0 ? parseFloat(entry.qty_out).toFixed(2) + ' ' + escLedger(entry.unit_symbol || 'L') : '-'}</td>
+            <td>${entry.product_name}</td>
+            <td><span class="transaction-badge transaction-${entry.transaction_type.toLowerCase().replace(' ', '-')}">${entry.transaction_type}</span></td>
+            <td>${entry.qty_in > 0 ? parseFloat(entry.qty_in).toFixed(2) + ' ' + (entry.unit_symbol || 'L') : '-'}</td>
+            <td>${entry.qty_out > 0 ? parseFloat(entry.qty_out).toFixed(2) + ' ' + (entry.unit_symbol || 'L') : '-'}</td>
             <td>-</td>
             <td>${currency}${parseFloat(entry.unit_cost).toFixed(2)}</td>
             <td>${currency}${((parseFloat(entry.qty_in || 0) - parseFloat(entry.qty_out || 0)) * parseFloat(entry.unit_cost)).toFixed(2)}</td>
@@ -975,8 +799,8 @@ function renderBranchLedgerTable(currency = '$') {
     `).join('') + `
         <tr style="font-weight: bold; background-color: var(--table-header);">
             <td colspan="3">Total (${allBranchEntries.length} transactions)</td>
-            <td>${totalQtyIn.toFixed(2)} ${escLedger(allBranchEntries[0]?.unit_symbol || 'L')}</td>
-            <td>${totalQtyOut.toFixed(2)} ${escLedger(allBranchEntries[0]?.unit_symbol || 'L')}</td>
+            <td>${totalQtyIn.toFixed(2)} ${allBranchEntries[0]?.unit_symbol || 'L'}</td>
+            <td>${totalQtyOut.toFixed(2)} ${allBranchEntries[0]?.unit_symbol || 'L'}</td>
             <td>${totalBalance.toFixed(2)} ${allBranchEntries[0]?.unit_symbol || 'L'}</td>
             <td>-</td>
             <td>${currency}${totalValue.toFixed(2)}</td>
@@ -1026,26 +850,24 @@ function renderCustomerLedgerTable(currency = '$') {
     const totalQtyOut = processedLedger.reduce((sum, e) => sum + parseFloat(e.qty_out || 0), 0);
     const totalValue = processedLedger.reduce((sum, e) => sum + parseFloat(e.value || 0), 0);
 
-tbody.innerHTML = pageData.map(entry => `
+  tbody.innerHTML = pageData.map(entry => `
     <tr>
         <td>${entry.transaction_date}</td>
-        <td>${escLedger(entry.invoice_number || '-')}</td>
-        <td>${escLedger(entry.product_name)}</td>
-        <td>${escLedger(entry.branch_name)}</td>
-        <td><span class="transaction-badge transaction-${entry.transaction_type.toLowerCase().replace(' ', '-')}">${escLedger(entry.transaction_type)}</span></td>
-        <td>${escLedger(entry.batch_no || '-')}</td>
-        <td>${escLedger(entry.batch_expiry_date || '-')}</td>
-        <td>${entry.qty_in > 0 ? parseFloat(entry.qty_in).toFixed(2) + ' ' + escLedger(entry.unit_symbol || 'L') : '-'}</td>
-        <td>${entry.qty_out > 0 ? parseFloat(entry.qty_out).toFixed(2) + ' ' + escLedger(entry.unit_symbol || 'L') : '-'}</td>
-        <td>${parseFloat(entry.balance).toFixed(2)} ${escLedger(entry.unit_symbol || 'L')}</td>
+        <td>${entry.invoice_number || '-'}</td>
+        <td>${entry.product_name}</td>
+        <td>${entry.branch_name}</td>
+        <td><span class="transaction-badge transaction-${entry.transaction_type.toLowerCase().replace(' ', '-')}">${entry.transaction_type}</span></td>
+        <td>${entry.qty_in > 0 ? parseFloat(entry.qty_in).toFixed(2) + ' ' + (entry.unit_symbol || 'L') : '-'}</td>
+        <td>${entry.qty_out > 0 ? parseFloat(entry.qty_out).toFixed(2) + ' ' + (entry.unit_symbol || 'L') : '-'}</td>
+        <td>${parseFloat(entry.balance).toFixed(2)} ${entry.unit_symbol || 'L'}</td>
         <td>${currency}${parseFloat(entry.unit_cost).toFixed(2)}</td>
         <td>${currency}${parseFloat(entry.value).toFixed(2)}</td>
     </tr>
 `).join('') + `
     <tr style="font-weight: bold; background-color: var(--table-header);">
-        <td colspan="7">Total (${allCustomerEntries.length} transactions)</td>
-        <td>${totalQtyIn.toFixed(2)} ${escLedger(allCustomerEntries[0]?.unit_symbol || 'L')}</td>
-        <td>${totalQtyOut.toFixed(2)} ${escLedger(allCustomerEntries[0]?.unit_symbol || 'L')}</td>
+        <td colspan="5">Total (${allCustomerEntries.length} transactions)</td>
+        <td>${totalQtyIn.toFixed(2)} ${allCustomerEntries[0]?.unit_symbol || 'L'}</td>
+        <td>${totalQtyOut.toFixed(2)} ${allCustomerEntries[0]?.unit_symbol || 'L'}</td>
         <td>-</td>
         <td>-</td>
         <td>${currency}${totalValue.toFixed(2)}</td>
@@ -1064,93 +886,6 @@ function updateCustomerPaginationControls() {
     document.getElementById('customer-prev-btn').disabled = customerCurrentPage === 1;
     document.getElementById('customer-next-btn').disabled = customerCurrentPage === totalPages || totalPages === 0;
 }
-function updateCompanyLedgerTable(ledger, currency = '$') {
-    allCompanyEntries = ledger;
-    companyTotalItems = allCompanyEntries.length;
-    companyCurrentPage = 1;
-    companyCurrency = currency;
-
-    renderCompanyLedgerTable(companyCurrency);
-    updateCompanyPaginationControls();
-}
-
-function renderCompanyLedgerTable(currency = '$') {
-    const tbody = document.querySelector('#company-ledger .table tbody');
-
-    const balances = {};
-    const processedLedger = allCompanyEntries.map(entry => {
-        const key = `${entry.product_name}-${entry.branch_name}`;
-        if (!balances[key]) balances[key] = 0;
-        balances[key] += parseFloat(entry.qty_in || 0) - parseFloat(entry.qty_out || 0) - parseFloat(entry.qty_foc || 0);
-        entry.balance = balances[key];
-        entry.value = balances[key] * parseFloat(entry.unit_cost);
-        return entry;
-    });
-
-    const startIndex = (companyCurrentPage - 1) * itemsPerPage;
-    const endIndex = startIndex + itemsPerPage;
-    const pageData = processedLedger.slice(startIndex, endIndex);
-
-    const totalQtyIn = processedLedger.reduce((sum, e) => sum + parseFloat(e.qty_in || 0), 0);
-    const totalQtyOut = processedLedger.reduce((sum, e) => sum + parseFloat(e.qty_out || 0), 0);
-    const totalFoc = processedLedger.reduce((sum, e) => sum + parseFloat(e.qty_foc || 0), 0);
-    const totalValue = processedLedger.reduce((sum, e) => sum + parseFloat(e.value || 0), 0);
-
-    tbody.innerHTML = pageData.map(entry => `
-        <tr>
-            <td>${entry.transaction_date}</td>
-            <td>${escLedger(entry.invoice_number || '-')}</td>
-            <td>${escLedger(entry.product_name)}</td>
-            <td>${escLedger(entry.batch_no || '-')}</td>
-            <td>${escLedger(entry.batch_expiry_date || '-')}</td>
-            <td>${escLedger(entry.branch_name)}</td>
-            <td><span class="transaction-badge transaction-${entry.transaction_type.toLowerCase().replace(' ', '-')}">${escLedger(entry.transaction_type)}</span></td>
-            <td>${entry.qty_in > 0 ? parseFloat(entry.qty_in).toFixed(2) + ' ' + escLedger(entry.unit_symbol || 'L') : '-'}</td>
-            <td>${entry.qty_out > 0 ? parseFloat(entry.qty_out).toFixed(2) + ' ' + escLedger(entry.unit_symbol || 'L') : '-'}</td>
-            <td>${entry.qty_foc > 0 ? parseFloat(entry.qty_foc).toFixed(2) + ' ' + escLedger(entry.unit_symbol || 'L') : '-'}</td>
-            <td>${parseFloat(entry.balance).toFixed(2)} ${escLedger(entry.unit_symbol || 'L')}</td>
-            <td>${currency}${parseFloat(entry.unit_cost).toFixed(2)}</td>
-            <td>${currency}${parseFloat(entry.value).toFixed(2)}</td>
-        </tr>
-    `).join('') + `
-        <tr style="font-weight: bold; background-color: var(--table-header);">
-            <td colspan="7">Total (${allCompanyEntries.length} transactions)</td>
-            <td>${totalQtyIn.toFixed(2)} ${escLedger(allCompanyEntries[0]?.unit_symbol || 'L')}</td>
-            <td>${totalQtyOut.toFixed(2)} ${escLedger(allCompanyEntries[0]?.unit_symbol || 'L')}</td>
-            <td>${totalFoc.toFixed(2)} ${escLedger(allCompanyEntries[0]?.unit_symbol || 'L')}</td>
-            <td>-</td>
-            <td>-</td>
-            <td>${currency}${totalValue.toFixed(2)}</td>
-        </tr>
-    `;
-}
-
-function updateCompanyPaginationControls() {
-    const totalPages = Math.ceil(companyTotalItems / itemsPerPage);
-    const startItem = companyTotalItems === 0 ? 0 : (companyCurrentPage - 1) * itemsPerPage + 1;
-    const endItem = Math.min(companyCurrentPage * itemsPerPage, companyTotalItems);
-
-    document.getElementById('company-pagination-info').textContent = `Showing ${startItem} - ${endItem} of ${companyTotalItems} entries`;
-    document.getElementById('company-page-info').textContent = `Page ${companyCurrentPage} of ${totalPages}`;
-
-    document.getElementById('company-prev-btn').disabled = companyCurrentPage === 1;
-    document.getElementById('company-next-btn').disabled = companyCurrentPage === totalPages || totalPages === 0;
-}
-
-async function loadCompaniesForLedger() {
-    try {
-        const response = await fetch(`${API_BASE}?action=companies`);
-        const data = await response.json();
-        if (data.success) {
-            const datalist = document.getElementById('company-ledger-list');
-            if (datalist) {
-                datalist.innerHTML = data.data.map(c => `<option value="${c.company_name}" data-id="${c.id}">`).join('');
-            }
-        }
-    } catch (error) {
-        console.error('Error loading suppliers:', error);
-    }
-}
 
 async function loadCustomers() {
     try {
@@ -1164,19 +899,6 @@ async function loadCustomers() {
         }
     } catch (error) {
         console.error('Error loading customers:', error);
-    }
-}
-
-function populateCompanyBranchDropdown(branches) {
-    const datalist = document.getElementById('company-branch-list');
-    if (datalist) {
-        datalist.innerHTML = branches.map(b => `<option value="${b.display_name}" data-id="${b.id}">`).join('');
-    }
-}
-function populateCompanyProductDropdown(products) {
-    const datalist = document.getElementById('company-product-list');
-    if (datalist) {
-        datalist.innerHTML = products.map(p => `<option value="${p.name}" data-id="${p.id}">`).join('');
     }
 }
 // Load Dashboard Stats
@@ -1220,9 +942,8 @@ async function loadBranches() {
 }
 
 function populateBranchDropdowns(branches) {
-const branchLists = ['#branch-list', '#branch-ledger-list', '#detailed-branch-list', '#company-branch-list'];
-
-branchLists.forEach(selector => {
+    const branchLists = ['#branch-list', '#branch-ledger-list', '#detailed-branch-list'];
+    branchLists.forEach(selector => {
         const datalist = document.querySelector(selector);
         if (datalist) {
             datalist.innerHTML = branches.map(branch => `<option value="${branch.display_name}" data-id="${branch.id}">`).join('');
@@ -1322,33 +1043,19 @@ document.addEventListener('DOMContentLoaded', () => {
         loadDashboardStats();
     });
 // Clear Customer Filters
- document.getElementById('clearCustomerFilters').addEventListener('click', () => {
+  document.getElementById('clearCustomerFilters').addEventListener('click', () => {
     document.getElementById('customer-ledger-input').value = '';
     document.getElementById('customer-product-input').value = '';
     document.getElementById('from-date-customer').value = '';
     document.getElementById('to-date-customer').value = '';
-
-    document.getElementById('customer-batch-filter').value = '';
-    document.getElementById('customer-expiry-filter').value = '';
-
-    allCustomerEntries = [];
-    customerTotalItems = 0;
-    customerCurrentPage = 1;
-
     const tbody = document.querySelector('#customer-ledger .table tbody');
     tbody.innerHTML = '';
-
-    document.getElementById('customer-pagination-info').textContent =
-        'Showing 0 - 0 of 0 entries';
-
-    document.getElementById('customer-page-info').textContent =
-        'Page 1 of 1';
+    document.getElementById('customer-pagination-info').textContent = 'Showing 0 - 0 of 0 entries';
+    document.getElementById('customer-page-info').textContent = 'Page 1 of 1';
 });
 
     // Apply Customer Filters
  document.getElementById('applyCustomerFilters').addEventListener('click', async () => {
-    const batchFilter = document.getElementById('customer-batch-filter').value;
-const expiryFilter = document.getElementById('customer-expiry-filter').value;
     const customerName = document.getElementById('customer-ledger-input').value;
     const productName = document.getElementById('customer-product-input').value;
     const fromDate = document.getElementById('from-date-customer').value;
@@ -1402,14 +1109,8 @@ const expiryFilter = document.getElementById('customer-expiry-filter').value;
         const data = await response.json();
 
         if (data.success) {
-    const filteredData = filterLedgerByBatchExpiry(
-        data.data,
-        batchFilter,
-        expiryFilter
-    );
-
-    updateCustomerLedgerTable(filteredData, data.currency);
-} else {
+            updateCustomerLedgerTable(data.data, data.currency);
+        } else {
             alert(data.message || 'Failed to load ledger');
         }
     } catch (error) {
@@ -1450,82 +1151,57 @@ const expiryFilter = document.getElementById('customer-expiry-filter').value;
     });
 
     // Clear Item Filters
-   document.getElementById('clearItemFilters').addEventListener('click', () => {
-    document.getElementById('item').value = '';
-    document.getElementById('from-date').value = '';
-    document.getElementById('to-date').value = '';
-
-    document.getElementById('item-batch-filter').value = '';
-    document.getElementById('item-expiry-filter').value = '';
-
-    allLedgerEntries = [];
-    itemTotalItems = 0;
-    itemCurrentPage = 1;
-
-    const tbody = document.querySelector('#item-ledger .table tbody');
-    tbody.innerHTML = '';
-
-    document.getElementById('item-pagination-info').textContent =
-        'Showing 0 - 0 of 0 entries';
-
-    document.getElementById('item-page-info').textContent =
-        'Page 1 of 1';
-});
+    document.getElementById('clearItemFilters').addEventListener('click', () => {
+        document.getElementById('item').value = '';
+        document.getElementById('from-date').value = '';
+        document.getElementById('to-date').value = '';
+        const tbody = document.querySelector('#item-ledger .table tbody');
+        tbody.innerHTML = '';
+        document.getElementById('item-pagination-info').textContent = 'Showing 0 - 0 of 0 entries';
+        document.getElementById('item-page-info').textContent = 'Page 1 of 1';
+    });
 
     // Apply Item Filters
-   document.getElementById('applyFilters').addEventListener('click', async () => {
-    const itemName = document.getElementById('item').value;
-    const fromDate = document.getElementById('from-date').value;
-    const toDate = document.getElementById('to-date').value;
-
-    const batchFilter = document.getElementById('item-batch-filter').value;
-    const expiryFilter = document.getElementById('item-expiry-filter').value;
-
-    if (!itemName) {
-        alert('Please select an item');
-        return;
-    }
-
-    // Find product ID from datalist
-    const options = document.querySelectorAll('#item-list option');
-    let productId = null;
-
-    for (let option of options) {
-        if (option.value === itemName) {
-            productId = option.getAttribute('data-id');
-            break;
+    document.getElementById('applyFilters').addEventListener('click', async () => {
+        const itemName = document.getElementById('item').value;
+        const fromDate = document.getElementById('from-date').value;
+        const toDate = document.getElementById('to-date').value;
+        
+        if (!itemName) {
+            alert('Please select an item');
+            return;
         }
-    }
-
-    if (!productId) {
-        alert('Invalid product selected');
-        return;
-    }
-
-    try {
-        let url = `${API_BASE}?action=ledger&product_id=${productId}`;
-
-        if (fromDate) url += `&from_date=${fromDate}`;
-        if (toDate) url += `&to_date=${toDate}`;
-
-        const response = await fetch(url);
-        const data = await response.json();
-
-        if (data.success) {
-
-            let filteredData = filterLedgerByBatchExpiry(
-                data.data,
-                batchFilter,
-                expiryFilter
-            );
-
-            updateLedgerTable(filteredData, data.currency);
+        
+        // Find product ID from datalist
+        const options = document.querySelectorAll('#item-list option');
+        let productId = null;
+        for (let option of options) {
+            if (option.value === itemName) {
+                productId = option.getAttribute('data-id');
+                break;
+            }
         }
-
-    } catch (error) {
-        console.error('Error loading ledger:', error);
-    }
-});
+        
+        if (!productId) {
+            alert('Invalid product selected');
+            return;
+        }
+        
+        try {
+            let url = `${API_BASE}?action=ledger&product_id=${productId}`;
+            if (fromDate) url += `&from_date=${fromDate}`;
+            if (toDate) url += `&to_date=${toDate}`;
+            
+            const response = await fetch(url);
+            const data = await response.json();
+            
+            if (data.success) {
+                updateLedgerTable(data.data, data.currency);
+            }
+        } catch (error) {
+            console.error('Error loading ledger:', error);
+        }
+    });
 
     // Clear Branch Filters
     document.getElementById('clearBranchFilters').addEventListener('click', () => {
@@ -1543,6 +1219,8 @@ const expiryFilter = document.getElementById('customer-expiry-filter').value;
         const branchName = document.querySelector('input[list="branch-ledger-list"]').value;
         const fromDate = document.getElementById('from-date-branch').value;
         const toDate = document.getElementById('to-date-branch').value;
+        
+        console.log('Branch name:', branchName);
         
         if (!branchName || branchName.trim() === '') {
             alert('Please select a branch');
@@ -1665,112 +1343,6 @@ const expiryFilter = document.getElementById('customer-expiry-filter').value;
         document.getElementById('detailed-to-date').value = '';
         loadDetailedLedger();
     });
-        // Company-wise Ledger pagination event listeners
-    document.getElementById('company-prev-btn').addEventListener('click', () => {
-        if (companyCurrentPage > 1) {
-            companyCurrentPage--;
-            renderCompanyLedgerTable(companyCurrency);
-            updateCompanyPaginationControls();
-        }
-    });
-
-    document.getElementById('company-next-btn').addEventListener('click', () => {
-        const totalPages = Math.ceil(companyTotalItems / itemsPerPage);
-        if (companyCurrentPage < totalPages) {
-            companyCurrentPage++;
-            renderCompanyLedgerTable(companyCurrency);
-            updateCompanyPaginationControls();
-        }
-    });
-
-    // Clear Company Filters
-    document.getElementById('clearCompanyFilters').addEventListener('click', () => {
-        document.getElementById('company-ledger-input').value = '';
-        document.getElementById('company-branch-input').value = '';
-        document.getElementById('company-product-input').value = '';
-        document.getElementById('from-date-company').value = '';
-        document.getElementById('to-date-company').value = '';
-        const tbody = document.querySelector('#company-ledger .table tbody');
-        tbody.innerHTML = '';
-        document.getElementById('company-pagination-info').textContent = 'Showing 0 - 0 of 0 entries';
-        document.getElementById('company-page-info').textContent = 'Page 1 of 1';
-    });
-
-    // Apply Company Filters
-    document.getElementById('applyCompanyFilters').addEventListener('click', async () => {
-        const batchFilter = document.getElementById('company-batch-filter').value;
-const expiryFilter = document.getElementById('company-expiry-filter').value;
-        const companyName = document.getElementById('company-ledger-input').value;
-        const branchName = document.getElementById('company-branch-input').value;
-        const productName = document.getElementById('company-product-input').value;
-        const fromDate = document.getElementById('from-date-company').value;
-        const toDate = document.getElementById('to-date-company').value;
-
-        if (!companyName || companyName.trim() === '') {
-            alert('Please select a Supplier');
-            return;
-        }
-
-        let companyId = null;
-        const companyOptions = document.querySelectorAll('#company-ledger-list option');
-        for (let option of companyOptions) {
-            if (option.value === companyName) {
-                companyId = option.getAttribute('data-id');
-                break;
-            }
-        }
-        if (!companyId) {
-            alert('Invalid supplier selected. Please pick from the list.');
-            return;
-        }
-
-        let branchId = null;
-        if (branchName) {
-            const branchOptions = document.querySelectorAll('#company-branch-list option');
-            for (let option of branchOptions) {
-                if (option.value === branchName) {
-                    branchId = option.getAttribute('data-id');
-                    break;
-                }
-            }
-        }
-
-        let productId = null;
-        if (productName) {
-            const productOptions = document.querySelectorAll('#company-product-list option');
-            for (let option of productOptions) {
-                if (option.value === productName) {
-                    productId = option.getAttribute('data-id');
-                    break;
-                }
-            }
-        }
-
-        try {
-            let url = `${API_BASE}?action=company-ledger&company_id=${companyId}`;
-            if (branchId) url += `&branch_id=${branchId}`;
-            if (productId) url += `&product_id=${productId}`;
-            if (fromDate) url += `&from_date=${fromDate}`;
-            if (toDate) url += `&to_date=${toDate}`;
-
-            const response = await fetch(url);
-            const data = await response.json();
-
-           if (data.success) {
-    const filteredData = filterLedgerByBatchExpiry(
-        data.data,
-        batchFilter,
-        expiryFilter
-    );
-
-    updateCompanyLedgerTable(filteredData, data.currency);
-}else {
-                alert(data.message || 'Failed to load ledger');
-            }
-        } catch (error) {
-            console.error('Error loading supplier ledger:', error);
-        }
-    });
 
     // Load initial data
     loadDashboardStats();
@@ -1778,8 +1350,7 @@ const expiryFilter = document.getElementById('company-expiry-filter').value;
     loadProducts();
     loadInventoryTypes();
     loadDistributions();
-        loadCustomers();
-            loadCompaniesForLedger();
+        loadCustomers();          // <-- YE LINE ADD KARO
 
     loadStockPosition();
     

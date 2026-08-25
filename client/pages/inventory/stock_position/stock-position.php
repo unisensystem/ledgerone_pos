@@ -86,7 +86,6 @@ $currency_symbol = $currency['symbol'];
                 <div class="tab" data-tab="branch-ledger">Branch-wise Ledger</div>
                 <div class="tab" data-tab="detailed-ledger">Detailed Ledger</div>
                 <div class="tab" data-tab="customer-ledger">Customer-wise Ledger</div>
-                                <div class="tab" data-tab="company-ledger">Company-wise Ledger</div>
             </div>
 
             <!-- Stock Position Tab -->
@@ -303,15 +302,6 @@ $currency_symbol = $currency['symbol'];
                         <input type="text" class="form-control" id="item" list="item-list" placeholder="Select Item">
                         <datalist id="item-list"></datalist>
                     </div>
-                    <div class="filter-group">
-    <label class="form-label" for="item-batch-filter">Batch No</label>
-    <input type="text" class="form-control" id="item-batch-filter" placeholder="Search Batch No">
-</div>
-
-<div class="filter-group">
-    <label class="form-label" for="item-expiry-filter">Expiry Date</label>
-    <input type="date" class="form-control" id="item-expiry-filter">
-</div>
                     <div class="form-group">
                         <label class="form-label" for="from-date">From Date</label>
                         <input type="date" class="form-control" id="from-date">
@@ -335,8 +325,6 @@ $currency_symbol = $currency['symbol'];
                             <tr>
                                 <th>Date</th>
                                 <th>Transaction</th>
-                                <th>Batch No</th>
-                                <th>Expiry Date</th>
                                 <th>Qty In</th>
                                 <th>Qty Out</th>
                                 <th>Balance</th>
@@ -431,185 +419,80 @@ $currency_symbol = $currency['symbol'];
             </div>
 
             <!-- Customer-wise Ledger Tab -->
-            <div class="tab-content" id="customer-ledger">
-                <div class="card-header">
-                    <h2 class="card-title">Customer-wise Stock Ledger</h2>
-                    <div class="action-buttons">
-                        <div class="dropdown">
-                            <button class="btn btn-primary dropdown-toggle" type="button" data-toggle="dropdown">
-                                <i class="fas fa-file-export"></i> Export
-                            </button>
-                            <div class="dropdown-menu">
-                                <a class="dropdown-item" href="#" onclick="printList()"><i class="fas fa-print"></i> Print List</a>
-                                <a class="dropdown-item" href="#" onclick="exportToExcel()"><i class="fas fa-file-excel"></i> Export To Excel</a>
-                                <a class="dropdown-item" href="#" onclick="exportToJSON()"><i class="fas fa-file-code"></i> Export JSON</a>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div class="form-row">
-                    <div class="form-group">
-                        <label class="form-label" for="customer-ledger-input">Customer</label>
-                        <input type="text" class="form-control" id="customer-ledger-input" list="customer-ledger-list" placeholder="Select Customer">
-                        <datalist id="customer-ledger-list"></datalist>
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label" for="customer-product-input">Product</label>
-                        <input type="text" class="form-control" id="customer-product-input" list="customer-product-list" placeholder="All Products">
-                        <datalist id="customer-product-list"></datalist>
-                    </div>
-                    <div class="filter-group">
-    <label class="form-label" for="customer-batch-filter">Batch No</label>
-    <input type="text" class="form-control" id="customer-batch-filter" placeholder="Search Batch No">
-</div>
-
-<div class="filter-group">
-    <label class="form-label" for="customer-expiry-filter">Expiry Date</label>
-    <input type="date" class="form-control" id="customer-expiry-filter">
-</div>
-                    <div class="form-group">
-                        <label class="form-label" for="from-date-customer">From Date</label>
-                        <input type="date" class="form-control" id="from-date-customer">
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label" for="to-date-customer">To Date</label>
-                        <input type="date" class="form-control" id="to-date-customer">
-                    </div>
-                    <div class="form-group" style="display: flex; align-items: flex-end; gap: 8px;">
-                        <button class="btn btn-primary" id="applyCustomerFilters">
-                            <i class="fas fa-filter"></i> Apply Filters
-                        </button>
-                        <button class="btn btn-secondary" id="clearCustomerFilters">
-                            <i class="fas fa-times"></i> Clear
-                        </button>
-                    </div>
-                </div>
-                <div class="table-container">
-                    <table class="table">
-                        <thead>
-                            <tr>
-                                <th>Date</th>
-                                <th>Invoice #</th>
-                                <th>Product</th>
-                                <th>Branch</th>
-                                <th>Transaction</th>
-                                <th>Batch No</th>
-<th>Expiry Date</th>
-                                <th>Qty In</th>
-                                <th>Qty Out</th>
-                                <th>Balance</th>
-                                <th>Unit Cost</th>
-                                <th>Value</th>
-                            </tr>
-                        </thead>
-                        <tbody></tbody>
-                    </table>
-                    <div class="pagination-container">
-                        <div class="pagination-info">
-                            <span id="customer-pagination-info">Showing 0 - 0 of 0 entries</span>
-                        </div>
-                        <div class="pagination-controls">
-                            <button class="btn btn-secondary" id="customer-prev-btn" disabled>Previous</button>
-                            <span id="customer-page-info">Page 1 of 1</span>
-                            <button class="btn btn-secondary" id="customer-next-btn" disabled>Next</button>
-                        </div>
-                    </div>
+<div class="tab-content" id="customer-ledger">
+    <div class="card-header">
+        <h2 class="card-title">Customer-wise Stock Ledger</h2>
+        <div class="action-buttons">
+            <div class="dropdown">
+                <button class="btn btn-primary dropdown-toggle" type="button" data-toggle="dropdown">
+                    <i class="fas fa-file-export"></i> Export
+                </button>
+                <div class="dropdown-menu">
+                    <a class="dropdown-item" href="#" onclick="printList()"><i class="fas fa-print"></i> Print List</a>
+                    <a class="dropdown-item" href="#" onclick="exportToExcel()"><i class="fas fa-file-excel"></i> Export To Excel</a>
+                    <a class="dropdown-item" href="#" onclick="exportToJSON()"><i class="fas fa-file-code"></i> Export JSON</a>
                 </div>
             </div>
-
-            <!-- Supplier-wise Ledger Tab -->
-            <div class="tab-content" id="company-ledger">
-                <div class="card-header">
-                    <h2 class="card-title">Company-wise Stock Ledger</h2>
-                    <div class="action-buttons">
-                        <div class="dropdown">
-                            <button class="btn btn-primary dropdown-toggle" type="button" data-toggle="dropdown">
-                                <i class="fas fa-file-export"></i> Export
-                            </button>
-                            <div class="dropdown-menu">
-                                <a class="dropdown-item" href="#" onclick="printList()"><i class="fas fa-print"></i> Print List</a>
-                                <a class="dropdown-item" href="#" onclick="exportToExcel()"><i class="fas fa-file-excel"></i> Export To Excel</a>
-                                <a class="dropdown-item" href="#" onclick="exportToJSON()"><i class="fas fa-file-code"></i> Export JSON</a>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div class="form-row">
-                    <div class="form-group">
-                        <label class="form-label" for="company-ledger-input">Supplier</label>
-                        <input type="text" class="form-control" id="company-ledger-input" list="company-ledger-list" placeholder="Select Supplier">
-                        <datalist id="company-ledger-list"></datalist>
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label" for="company-branch-input">Branch</label>
-                        <input type="text" class="form-control" id="company-branch-input" list="company-branch-list" placeholder="All Branches">
-                        <datalist id="company-branch-list"></datalist>
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label" for="company-product-input">Product</label>
-                        <input type="text" class="form-control" id="company-product-input" list="company-product-list" placeholder="All Products">
-                        <datalist id="company-product-list"></datalist>
-                    </div>
-                    <div class="filter-group">
-    <label class="form-label" for="company-batch-filter">Batch No</label>
-    <input type="text" class="form-control" id="company-batch-filter" placeholder="Search Batch No">
+        </div>
+    </div>
+    <div class="form-row">
+        <div class="form-group">
+            <label class="form-label" for="customer-ledger-input">Customer</label>
+            <input type="text" class="form-control" id="customer-ledger-input" list="customer-ledger-list" placeholder="Select Customer">
+            <datalist id="customer-ledger-list"></datalist>
+        </div>
+        <div class="form-group">
+    <label class="form-label" for="customer-product-input">Product</label>
+    <input type="text" class="form-control" id="customer-product-input" list="customer-product-list" placeholder="All Products">
+    <datalist id="customer-product-list"></datalist>
 </div>
-
-<div class="filter-group">
-    <label class="form-label" for="company-expiry-filter">Expiry Date</label>
-    <input type="date" class="form-control" id="company-expiry-filter">
-</div>
-                    <div class="form-group">
-                        <label class="form-label" for="from-date-company">From Date</label>
-                        <input type="date" class="form-control" id="from-date-company">
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label" for="to-date-company">To Date</label>
-                        <input type="date" class="form-control" id="to-date-company">
-                    </div>
-                    <div class="form-group" style="display: flex; align-items: flex-end; gap: 8px;">
-                        <button class="btn btn-primary" id="applyCompanyFilters">
-                            <i class="fas fa-filter"></i> Apply Filters
-                        </button>
-                        <button class="btn btn-secondary" id="clearCompanyFilters">
-                            <i class="fas fa-times"></i> Clear
-                        </button>
-                    </div>
-                </div>
-                <div class="table-container">
-                    <table class="table">
-                        <thead>
-                            <tr>
-                                <th>Date</th>
-                                <th>Invoice #</th>
-                                <th>Product</th>
-                                 <th>Batch No</th>
-<th>Expiry Date</th>
-                                <th>Branch</th>
-                                <th>Transaction</th>
-                                <th>Qty In</th>
-                                <th>Qty Out</th>
-                                <th>FOC</th>
-                                <th>Balance</th>
-                                <th>Unit Cost</th>
-                                <th>Value</th>
-                            </tr>
-                        </thead>
-                        <tbody></tbody>
-                    </table>
-                    <div class="pagination-container">
-                        <div class="pagination-info">
-                            <span id="company-pagination-info">Showing 0 - 0 of 0 entries</span>
-                        </div>
-                        <div class="pagination-controls">
-                            <button class="btn btn-secondary" id="company-prev-btn" disabled>Previous</button>
-                            <span id="company-page-info">Page 1 of 1</span>
-                            <button class="btn btn-secondary" id="company-next-btn" disabled>Next</button>
-                        </div>
-                    </div>
-                </div>
+        <div class="form-group">
+            <label class="form-label" for="from-date-customer">From Date</label>
+            <input type="date" class="form-control" id="from-date-customer">
+        </div>
+        <div class="form-group">
+            <label class="form-label" for="to-date-customer">To Date</label>
+            <input type="date" class="form-control" id="to-date-customer">
+        </div>
+        <div class="form-group" style="display: flex; align-items: flex-end; gap: 8px;">
+            <button class="btn btn-primary" id="applyCustomerFilters">
+                <i class="fas fa-filter"></i> Apply Filters
+            </button>
+            <button class="btn btn-secondary" id="clearCustomerFilters">
+                <i class="fas fa-times"></i> Clear
+            </button>
+        </div>
+    </div>
+    <div class="table-container">
+        <table class="table">
+       <thead>
+    <tr>
+        <th>Date</th>
+        <th>Invoice #</th>
+        <th>Product</th>
+        <th>Branch</th>
+        <th>Transaction</th>
+        <th>Qty In</th>
+        <th>Qty Out</th>
+        <th>Balance</th>
+        <th>Unit Cost</th>
+        <th>Value</th>
+    </tr>
+</thead>
+            <tbody></tbody>
+        </table>
+        <div class="pagination-container">
+            <div class="pagination-info">
+                <span id="customer-pagination-info">Showing 0 - 0 of 0 entries</span>
             </div>
-
+            <div class="pagination-controls">
+                <button class="btn btn-secondary" id="customer-prev-btn" disabled>Previous</button>
+                <span id="customer-page-info">Page 1 of 1</span>
+                <button class="btn btn-secondary" id="customer-next-btn" disabled>Next</button>
+            </div>
+        </div>
+    </div>
+</div>
             <!-- Detailed Ledger Tab -->
             <div class="tab-content" id="detailed-ledger">
                 <div class="card-header">
@@ -638,15 +521,6 @@ $currency_symbol = $currency['symbol'];
                         <input type="text" class="form-control" id="detailed-product" list="detailed-product-list" placeholder="All Products">
                         <datalist id="detailed-product-list"></datalist>
                     </div>
-                    <div class="filter-group">
-    <label class="form-label" for="detailed-batch-filter">Batch No</label>
-    <input type="text" class="form-control" id="detailed-batch-filter" placeholder="Search Batch No">
-</div>
-
-<div class="filter-group">
-    <label class="form-label" for="detailed-expiry-filter">Expiry Date</label>
-    <input type="date" class="form-control" id="detailed-expiry-filter">
-</div>
                     <div class="form-group">
                         <label class="form-label" for="detailed-from-date">From Date</label>
                         <input type="date" class="form-control" id="detailed-from-date">
@@ -672,8 +546,6 @@ $currency_symbol = $currency['symbol'];
                                 <th>Product</th>
                                 <th>Branch</th>
                                 <th>Transaction</th>
-                                <th>Batch No</th>
-<th>Expiry Date</th>
                                 <th>Qty In</th>
                                 <th>Qty Out</th>
                                 <th>Balance</th>

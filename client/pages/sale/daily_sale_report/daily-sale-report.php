@@ -212,12 +212,6 @@ $currency_symbol = $currency['symbol'];
                 <button class="btn btn-ghost" id="export-btn">
                     <i class="fas fa-download"></i> Export as CSV
                 </button>
-                <!-- Sale Return toggle - controls whether R.QTY/R.Amt/Net Amount include
-                     sale-return figures (see includeSaleReturn / handleSaleReturnToggle in JS).
-                     Starts as btn-ghost/"Off" to match includeSaleReturn = false default. -->
-                <button class="btn btn-ghost" id="sale-return-toggle" type="button">
-                    <i class="fas fa-undo"></i> Sale Return: <span id="sale-return-toggle-label">Off</span>
-                </button>
             </div>
         </div>
 
@@ -244,7 +238,7 @@ $currency_symbol = $currency['symbol'];
         <th class="text-right">FOC</th>
         <th class="text-right">Rate</th>
         <th class="text-right">Discount</th>
-        <th class="text-right">Trade Offer</th>
+        <th class="text-right">Trader Offer</th>
         <th class="text-right">Amount</th>
         <th class="text-right">R.QTY</th>
         <th class="text-right">R.Amt</th>

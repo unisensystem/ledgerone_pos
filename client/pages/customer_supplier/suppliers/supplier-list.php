@@ -93,6 +93,9 @@ $currency_symbol = $currency['symbol'] ?? '$';
                     <select class="filter-select" id="companyFilter">
                         <option value="">All Companies</option>
                     </select>
+                    <select class="filter-select" id="categoryFilter">
+                        <option value="">All Categories</option>
+                    </select>
                     <select class="filter-select" id="statusFilter">
                         <option value="">All Statuses</option>
                         <option value="active">Active</option>
@@ -107,8 +110,9 @@ $currency_symbol = $currency['symbol'] ?? '$';
                         <tr>
                             <th>Sr#</th>
                             <th>Supplier Code</th>
-                            <th>Supplier Name</th>
                             <th>Brand Name</th>
+                            <th>Category</th>
+                            <th>Supplier Name</th>
                             <th>City</th>
                             <th>Phone</th>
                             <th>Credit Days</th>
@@ -160,6 +164,10 @@ $currency_symbol = $currency['symbol'] ?? '$';
                     <div class="form-group col-4">
                         <label>Brand Name</label>
                         <div class="view-field" id="viewBrandName"></div>
+                    </div>
+                    <div class="form-group col-4">
+                        <label>Supplier Category</label>
+                        <div class="view-field" id="viewSupplierCategory"></div>
                     </div>
                     <div class="form-group col-4">
                         <label>City</label>
@@ -275,6 +283,12 @@ $currency_symbol = $currency['symbol'] ?? '$';
                         <div class="form-group col-4">
                             <label>Brand Name</label>
                             <input type="text" id="editBrandName" maxlength="200">
+                        </div>
+                        <div class="form-group col-4">
+                            <label>Supplier Category</label>
+                            <select id="editSupplierCategory">
+                                <option value="">Select Supplier Category</option>
+                            </select>
                         </div>
                         <div class="form-group col-4">
                             <label>City</label>

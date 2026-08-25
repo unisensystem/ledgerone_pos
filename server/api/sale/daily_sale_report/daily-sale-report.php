@@ -110,60 +110,6 @@ function resolveConversionFactor($item) {
     return 1.0;
 }
 
-// Builds the "how much of this product was returned" query for the item-wise report.
-// Mirrors the same filter set as the main sale query, but sourced from
-// sale_return / sale_return_items instead of sale_invoice / sale_invoice_items:
-//   - date range, sales officer, supplier man, vendor, company -> live directly on
-//     sale_return (or via the product join for vendor)
-//   - city / city zone / area -> via customers, joined on sale_return.customer_id
-//   - invoice type (Cash/Credit) -> sale_return has no invoice_type of its own, so it's
-//     reached via sale_return.sale_invoice_no -> sale_invoice.id (the original invoice
-//     this return was made against). OutStation still comes from the customer flag,
-//     same as the main query.
-// Returns rows keyed by product_id (+ sale_officer_id when officer-wise grouping is active),
-// same as $grouped in the main item-wise query, so results can be merged directly.
-function fetchSaleReturnTotals($pdo, $tenant_id, $date_from, $date_to, $sales_officer_ids,
-    $supplier_man_ids, $vendor_ids, $company_ids, $invoice_types, $city_ids, $city_zone_ids,
-    $area_ids, $group_by_officer) {
-
-    $sql = "SELECT
-                sri.product_id,
-                sr.sale_officer_id,
-                SUM(sri.quantity) as r_qty,
-                SUM(sri.net_amount) as r_amt
-            FROM sale_return_items sri
-            JOIN sale_return sr ON sri.sale_invoice_id = sr.id
-            JOIN products p ON sri.product_id = p.id
-            LEFT JOIN customers c ON sr.customer_id = c.id
-            LEFT JOIN sale_invoice si ON sr.sale_invoice_no = si.id
-            WHERE sr.tenant_id = ? AND sr.status = 'Posted'";
-    $params = [$tenant_id];
-
-    if ($date_from) {
-        $sql .= " AND sr.sale_date >= ?";
-        $params[] = $date_from;
-    }
-    if ($date_to) {
-        $sql .= " AND sr.sale_date <= ?";
-        $params[] = $date_to;
-    }
-
-    addInFilter($sql, $params, 'sr.sale_officer_id', $sales_officer_ids);
-    addInFilter($sql, $params, 'sr.supplier_man_id', $supplier_man_ids);
-    addInFilter($sql, $params, 'p.vendor_id', $vendor_ids);
-    addInFilter($sql, $params, 'sr.company_id', $company_ids);
-    addInvoiceTypeFilter($sql, $params, $invoice_types);
-    addInFilter($sql, $params, 'c.city_id', $city_ids);
-    addInFilter($sql, $params, 'c.city_zone_id', $city_zone_ids);
-    addInFilter($sql, $params, 'c.area_id', $area_ids);
-
-    $sql .= " GROUP BY sri.product_id" . ($group_by_officer ? ", sr.sale_officer_id" : "");
-
-    $stmt = $pdo->prepare($sql);
-    $stmt->execute($params);
-    return $stmt->fetchAll(PDO::FETCH_ASSOC);
-}
-
 try {
     $report_type = $_GET['report_type'] ?? 'item-wise';
     $invoice_types = getStringArrayParam('invoice_types', 'invoice_type');
@@ -176,10 +122,6 @@ try {
     $area_ids = getIntArrayParam('area_ids', 'area_id');
     $date_from = $_GET['date_from'] ?? null;
     $date_to = $_GET['date_to'] ?? null;
-    // Sale Return toggle - the frontend only sends this when the user has switched the
-    // "Sale Return" button on, so the extra query/joins below are skipped on every
-    // normal DSR request.
-    $include_sale_return = !empty($_GET['include_sale_return']);
     $has_search_filters = !empty($invoice_types)
         || !empty($sales_officer_ids)
         || !empty($supplier_man_ids)
@@ -283,8 +225,7 @@ try {
                     'discount_amount' => 0,
                     'trade_offer_amount' => 0,
                     'tax_amt' => 0,
-                    // Return Qty / Return Amt - populated below from sale_return_items,
-                    // only when the "Sale Return" toggle is on (see fetchSaleReturnTotals).
+                    // Return Qty / Return Amt - not wired up yet, kept for future use.
                     // Net Amount (amount - r_amt + tax_amt) is computed on the frontend from these.
                     'r_qty' => 0,
                     'r_amt' => 0,
@@ -335,25 +276,6 @@ try {
             $g['total_pack'] = ($g['ctn_qty'] * $packing) + ($g['dzn_qty'] * 12) + ($g['pcs_qty'] * 1) + ($g['foc_qty'] * 1);
         }
         unset($g);
-
-        // Merge in Sale Return totals, if the toggle is on. Only products that already
-        // have a row in $grouped (i.e. matched the sale filters above) get their r_qty/
-        // r_amt filled in - a return for a product outside the current filtered result
-        // set is not shown, same as the rest of this report is scoped to the filters.
-        if ($include_sale_return) {
-            $returnRows = fetchSaleReturnTotals(
-                $pdo, $tenant_id, $date_from, $date_to, $sales_officer_ids,
-                $supplier_man_ids, $vendor_ids, $company_ids, $invoice_types,
-                $city_ids, $city_zone_ids, $area_ids, $has_search_filters
-            );
-            foreach ($returnRows as $r) {
-                $key = $has_search_filters ? $r['sale_officer_id'] . '_' . $r['product_id'] : $r['product_id'];
-                if (isset($grouped[$key])) {
-                    $grouped[$key]['r_qty'] += (float)$r['r_qty'];
-                    $grouped[$key]['r_amt'] += (float)$r['r_amt'];
-                }
-            }
-        }
         
         $data = array_values($grouped);
         
