@@ -31,7 +31,7 @@ try {
     }
     
     $stmt = $pdo->prepare("
-        SELECT u.id, u.uom_name, u.unit_scope, u.is_base_unit
+        SELECT u.id, u.uom_name, u.unit_scope, u.is_base_unit, u.conversion_factor
         FROM uom_group_units ugu
         INNER JOIN uom u ON ugu.uom_id = u.id
         WHERE ugu.uom_group_id = ?

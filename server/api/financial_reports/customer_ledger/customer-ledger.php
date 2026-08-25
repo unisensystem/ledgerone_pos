@@ -843,8 +843,31 @@ $prev_payments_sub = $stmt->fetch()['total'];
         $stmt->execute($adj_params);
         $adjustments = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
+        // Get payment vouchers (Payment to Customer)
+        $sql = "SELECT voucher_date as date,
+                CONCAT('Payment to Customer - ', voucher_number) as description,
+                voucher_number as reference,
+                amount as debit, 0 as credit, 'payment_voucher' as type,
+                COALESCE(NULLIF(customer_sub_account_id, 0), sub_account_id) as sub_account_id, currency_id
+                FROM payment_voucher
+                WHERE tenant_id = ? AND customer_id IS NOT NULL AND supplier_id IS NULL AND customer_id = ?{$company_filter}";
+        $params = [$tenant_id, $customer_id];
+        if ($company_id) $params[] = $company_id;
+        if ($sub_account_id) {
+            $sql .= " AND COALESCE(NULLIF(customer_sub_account_id, 0), sub_account_id) = ?";
+            $params[] = $sub_account_id;
+        }
+        if ($from_date && $to_date) {
+            $sql .= " AND voucher_date BETWEEN ? AND ?";
+            $params[] = $from_date;
+            $params[] = $to_date;
+        }
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute($params);
+        $payment_vouchers_detail = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
         // Combine and sort transactions
-        $transactions = array_merge($invoices, $payments, $returns, $pdcs, $rent_cash_transactions, $tv_out, $tv_in, $adjustments);
+        $transactions = array_merge($invoices, $payments, $returns, $pdcs, $rent_cash_transactions, $tv_out, $tv_in, $adjustments, $payment_vouchers_detail);
         
         // Get sub accounts
         $stmt = $pdo->prepare("SELECT id, sub_account_name FROM customer_sub_accounts WHERE tenant_id = ? AND customer_id = ?");

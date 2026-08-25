@@ -330,7 +330,7 @@ if (!$currencySymbol) {
         }
 
         .ledger-modal-header h3::before {
-            content: '📊';
+            content: '??';
             font-size: 1.5rem;
         }
 
@@ -1078,7 +1078,7 @@ if (!$currencySymbol) {
         <div class="container"
             style="display: flex; justify-content: center; align-items: center; min-height: 100vh; text-align: center;">
             <div>
-                <h1 style="color: var(--danger); font-size: 3rem; margin-bottom: 1rem;">⚠️</h1>
+                <h1 style="color: var(--danger); font-size: 3rem; margin-bottom: 1rem;">??</h1>
                 <h2 style="color: var(--dark); margin-bottom: 0.5rem;">Not Authorized</h2>
                 <p style="color: #64748b;">You don't have permission to access the Dashboard.</p>
             </div>
@@ -2099,7 +2099,7 @@ if (!$currencySymbol) {
                         <div class="ledger-summary-card">
                             <div class="ledger-summary-label">Balance Status</div>
                             <div class="ledger-summary-value ${summary.isBalanced ? 'positive' : 'negative'}">
-                                ${summary.isBalanced ? 'Balanced ✓' : 'Unbalanced'}
+                                ${summary.isBalanced ? 'Balanced ?' : 'Unbalanced'}
                             </div>
                         </div>
                     </div>
@@ -2521,7 +2521,7 @@ if (!$currencySymbol) {
             shortcutKeyInput.value = '';
             select.value = '';
             loadShortcutsUI();
-            if (window.DashboardCore) await window.DashboardCore.loadShortcuts();   // 👈 ye line add karo
+            if (window.DashboardCore) await window.DashboardCore.loadShortcuts();   // ?? ye line add karo
         } else {
             alert(data.message || 'Save failed');
         }
@@ -2539,7 +2539,7 @@ if (!$currencySymbol) {
             body: JSON.stringify({ id })
         });
         loadShortcutsUI();
-        if (window.DashboardCore) await window.DashboardCore.loadShortcuts();   // 👈 ye line add karo
+        if (window.DashboardCore) await window.DashboardCore.loadShortcuts();   // ?? ye line add karo
     } catch (err) {
         console.error(err);
     }
@@ -2583,7 +2583,7 @@ if (!$currencySymbol) {
                             onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background='white'">
                             <div>
                                 <div style="font-size:11px; color:#3b82f6; font-weight:600; text-transform:uppercase;">${item.module}</div>
-                                <div style="font-size:14px; color:#0f172a; font-weight:600;">${item.number}${item.party ? ' — ' + item.party : ''}</div>
+                                <div style="font-size:14px; color:#0f172a; font-weight:600;">${item.number}${item.party ? ' � ' + item.party : ''}</div>
                                 ${item.date ? `<div style="font-size:12px; color:#94a3b8;">${item.date}</div>` : ''}
                             </div>
                             <div style="font-size:14px; font-weight:700; color:#16a34a;">
@@ -2613,7 +2613,7 @@ if (!$currencySymbol) {
                     if (data.success && data.data.length) {
                         list.innerHTML = data.data.map(s => `
                             <span style="display:flex; align-items:center; gap:0.5rem; background:white; border:1.5px solid #d6dbe4; border-radius:0.5rem; padding:0.4rem 0.75rem; font-size:13px;">
-                                <strong style="color:var(--primary);">${s.key_combo}</strong> → ${s.page_label}
+                                <strong style="color:var(--primary);">${s.key_combo}</strong> ? ${s.page_label}
                                 <i class="fas fa-times" style="cursor:pointer; color:#94a3b8;" onclick="deleteShortcut(${s.id})"></i>
                             </span>
                         `).join('');

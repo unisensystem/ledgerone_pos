@@ -252,23 +252,33 @@ function updateRowUnitCells(row) {
 }
 
 // Calculate row amounts
-function calculateRowAmounts(row, totalQty, price) {
+function calculateRowAmounts(row, totalQty, price, source) {
     totalQty = Number(totalQty) || 0;
     price = Number(price) || 0;
-    
-    const discountPercent = parseFloat(row.querySelector('.disc-percent-cell input')?.value) || 0;
+
+    const discPercentInput = row.querySelector('.disc-percent-cell input');
+    const discAmountInput = row.querySelector('.disc-amount-cell input');
     const taxPercent = parseFloat(row.querySelector('.tax-percent-cell input')?.value) || 0;
-    
+
     const gross = Number(totalQty) * Number(price);
     const grossInput = row.querySelector('.gross-cell input');
     if (grossInput) {
         grossInput.value = gross.toFixed(3);
     }
-    
-    // Discount amount
-    const discountAmt = gross * (discountPercent / 100);
-    row.querySelector('.disc-amount-cell input').value = discountAmt.toFixed(3);
-    
+
+    // Discount: if triggered from the Amount field, back-calculate the percent;
+    // otherwise (typing Disc %, changing qty/price/tax) derive amount from percent.
+    let discountAmt, discountPercent;
+    if (source === 'amount') {
+        discountAmt = parseFloat(discAmountInput?.value) || 0;
+        discountPercent = gross > 0 ? (discountAmt / gross) * 100 : 0;
+        if (discPercentInput) discPercentInput.value = discountPercent.toFixed(3);
+    } else {
+        discountPercent = parseFloat(discPercentInput?.value) || 0;
+        discountAmt = gross * (discountPercent / 100);
+        if (discAmountInput) discAmountInput.value = discountAmt.toFixed(3);
+    }
+
     // After discount
     const afterDiscount = gross - discountAmt;
     

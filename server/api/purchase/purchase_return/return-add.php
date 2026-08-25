@@ -169,7 +169,7 @@ try {
         $stock_stmt = $pdo->prepare("
             INSERT INTO stock_ledger (
                 tenant_id, account_id, branch_id, product_id, reference_table, reference_id,
-                qty_out, unit_cost, unit_id, batch_no, batch_expiry_date, transaction_type, transaction_date
+                qty_out, unit_cost, unit_id, batch_no, expiry_date, transaction_type, transaction_date
             ) VALUES (?, ?, ?, ?, 'purchase_return', ?, ?, ?, ?, ?, ?, 'Purchase Return', ?)
         ");
         $stock_stmt->execute([

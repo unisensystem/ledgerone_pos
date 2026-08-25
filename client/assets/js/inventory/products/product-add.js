@@ -43,6 +43,35 @@ window.addEventListener('load', function () {
     
     // UOM Group change handler
     document.getElementById('uomGroup').addEventListener('change', handleUomGroupChange);
+
+    // Price Entry Unit change handler (enter Trade Price / MRP by Piece, Carton, etc.)
+    document.getElementById('priceEntryUnit').addEventListener('change', handlePriceEntryUnitChange);
+
+    // Self-service toggle for the "Enter Trade Price / MRP By" feature — lets each
+    // business turn it on/off for themselves; default is off/unchanged for everyone.
+    document.getElementById('enableCartonPriceEntryToggle').addEventListener('change', function() {
+        const checkbox = this;
+        const enabled = checkbox.checked;
+        fetch('../../../../server/api/inventory/products/toggle-carton-price-entry.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ enabled })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                window.ENABLE_CARTON_PRICE_ENTRY = enabled;
+                populatePriceEntryUnitDropdown(window.currentGroupUnits || []);
+            } else {
+                alert('Could not save this setting: ' + (data.message || 'unknown error'));
+                checkbox.checked = !enabled;
+            }
+        })
+        .catch(() => {
+            alert('Could not save this setting — please try again.');
+            checkbox.checked = !enabled;
+        });
+    });
     
     // Load categories and subcategories
     loadCategories();
@@ -545,7 +574,61 @@ function handleFormSubmit(e) {
     // Prepare form data
     const formData = new FormData(document.getElementById('productForm'));
     const editId = document.getElementById('productForm').dataset.editId;
-    
+
+    // If Trade Price / MRP were entered against a non-Piece unit (e.g. Carton),
+    // send BOTH: (1) the Piece-equivalent in tradePrice/mrp — the backend and every
+    // downstream page (Sale Invoice, reports, stock valuation) always expect these
+    // fields to be per-Piece — and (2) the exact raw value + unit the user typed, so
+    // re-opening this product for edit can show back exactly "2000" instead of a
+    // rounded recomputation like 1999.992.
+    const priceEntryUnitGroup = document.getElementById('priceEntryUnitGroup');
+    if (window.ENABLE_CARTON_PRICE_ENTRY && priceEntryUnitGroup && priceEntryUnitGroup.style.display !== 'none' && currentPriceEntryUnitId) {
+        const units = window.currentGroupUnits || [];
+        const unit = units.find(u => String(u.id) === String(currentPriceEntryUnitId));
+        if (unit && unit.is_base_unit != 1) {
+            const factor = getUnitFactorValue(unit);
+            if (!factor) {
+                alert(`Please enter a valid Conversion Factor for ${unit.uom_name} before saving.`);
+                submitBtn.disabled = false;
+                submitBtn.classList.remove('loading');
+                submitBtn.textContent = editId ? 'Update Product' : 'Save Product';
+                return;
+            }
+            formData.set('priceEntryUnitId', unit.id);
+            const rawTrade = parseFloat(formData.get('tradePrice'));
+            if (!isNaN(rawTrade) && rawTrade > 0) {
+                formData.set('tradePriceEntryValue', rawTrade.toFixed(3));
+                formData.set('tradePrice', (rawTrade / factor).toFixed(3));
+            }
+            const rawMrp = parseFloat(formData.get('mrp'));
+            if (!isNaN(rawMrp) && rawMrp > 0) {
+                formData.set('mrpEntryValue', rawMrp.toFixed(3));
+                formData.set('mrp', (rawMrp / factor).toFixed(3));
+            }
+
+            // Opening Price / Unit (Branch-wise Opening Stock) follows the same
+            // entry unit — convert every branch row's price down to per-Piece too,
+            // and remember each row's exact raw value (like tradePriceEntryValue)
+            // so editing shows the original number back instead of re-dividing an
+            // already-converted value a second time.
+            const rawOpeningPrices = formData.getAll('openingPrice[]');
+            if (rawOpeningPrices.length > 0) {
+                formData.delete('openingPrice[]');
+                formData.delete('openingPriceEntryValue[]');
+                rawOpeningPrices.forEach(raw => {
+                    const rawVal = parseFloat(raw);
+                    if (!isNaN(rawVal) && rawVal > 0) {
+                        formData.append('openingPriceEntryValue[]', rawVal.toFixed(3));
+                        formData.append('openingPrice[]', (rawVal / factor).toFixed(3));
+                    } else {
+                        formData.append('openingPriceEntryValue[]', '');
+                        formData.append('openingPrice[]', raw);
+                    }
+                });
+            }
+        }
+    }
+
     // Collect schemes from modal
     const schemes = collectAllSchemes();
     console.log('Schemes collected in handleFormSubmit:', schemes);
@@ -792,7 +875,7 @@ function addStockEntry() {
                 </div>
                 ${unitColumns}
                 <div class="form-group">
-                    <label>Opening Price / Unit</label>
+                    <label class="opening-price-label">Opening Price / Unit</label>
                     <input type="number" name="openingPrice[]" step="0.01" min="0">
                 </div>
                 ${batchFields}
@@ -817,7 +900,7 @@ function addStockEntry() {
                     <input type="number" name="openingQty[]" step="0.01" min="0">
                 </div>
                 <div class="form-group">
-                    <label>Opening Price / Unit</label>
+                    <label class="opening-price-label">Opening Price / Unit</label>
                     <input type="number" name="openingPrice[]" step="0.01" min="0">
                 </div>
                 ${batchFields}
@@ -831,6 +914,17 @@ function addStockEntry() {
     stockEntries.appendChild(newEntry);
     initBranchDropdown(newEntry.querySelector('.custom-dropdown'));
     calculateTotalStock();
+
+    // Keep this new entry's "Opening Price" label consistent with the
+    // current Trade Price / MRP entry-unit selection (Carton/Dozen/etc.)
+    if (window.ENABLE_CARTON_PRICE_ENTRY && typeof currentPriceEntryUnitId !== 'undefined' && currentPriceEntryUnitId) {
+        const units = window.currentGroupUnits || [];
+        const unit = units.find(u => String(u.id) === String(currentPriceEntryUnitId));
+        if (unit && unit.is_base_unit != 1) {
+            const label = newEntry.querySelector('.opening-price-label');
+            if (label) label.textContent = `Opening Price / ${escProdText(unit.uom_name)}`;
+        }
+    }
 }
 
 function removeStockEntry(button) {
@@ -850,11 +944,23 @@ function calculateTotalStock() {
     
     let totalQtyInBaseUnits = 0;
     let totalValue = 0;
-    
+
+    // If Trade Price / MRP are being entered against a non-Piece unit (e.g.
+    // Carton), Opening Price / Unit follows the same unit — convert it down
+    // to a per-Piece rate before valuing the row, same as everywhere else.
+    let openingPriceUnitFactor = 1;
+    if (window.ENABLE_CARTON_PRICE_ENTRY && typeof currentPriceEntryUnitId !== 'undefined' && currentPriceEntryUnitId) {
+        const priceUnit = (window.currentGroupUnits || []).find(u => String(u.id) === String(currentPriceEntryUnitId));
+        if (priceUnit && priceUnit.is_base_unit != 1) {
+            const factor = getUnitFactorValue(priceUnit);
+            if (factor) openingPriceUnitFactor = factor;
+        }
+    }
+
     if (uomType === 'group' && window.currentGroupUnits && window.currentGroupUnits.length > 0) {
         // For UOM Group, convert all quantities to base units
         for (let i = 0; i < priceInputs.length; i++) {
-            const price = parseFloat(priceInputs[i].value) || 0;
+            const price = (parseFloat(priceInputs[i].value) || 0) / openingPriceUnitFactor;
             let rowQtyInBaseUnits = 0;
             
             window.currentGroupUnits.forEach(unit => {
@@ -1943,12 +2049,14 @@ function loadProductForEdit(productId) {
                 }
                 
                 // Handle UOM Type selection based on what's saved
+                let uomReadyPromise = Promise.resolve();
                 if (product.uom_type === 'group' && product.uom_group_id) {
                     // UOM Group is selected
                     safeSetChecked('uomTypeGroup', true);
                     handleUomTypeChange();
                     safeSetValue('uomGroup', product.uom_group_id);
-                    handleUomGroupChange().then(() => {
+                    uomReadyPromise = handleUomGroupChange().then(() => {
+                        applyStoredPriceEntry(product);
                         loadGroupConversionFactorsForEdit(productId);
                     });
                 } else {
@@ -1999,7 +2107,11 @@ function loadProductForEdit(productId) {
                     if (searchInput) searchInput.value = product.regime_name;
                     if (hiddenInput) hiddenInput.value = product.tax_regime_id;
                 }
-                    loadStockOpeningData(productId);
+                    // Wait for the UOM Group's per-unit Opening Qty columns (Carton,
+                    // Dozen, etc.) to actually exist in the DOM before trying to
+                    // populate them — handleUomGroupChange() above builds them
+                    // asynchronously and isn't guaranteed to have finished yet.
+                    uomReadyPromise.then(() => loadStockOpeningData(productId));
 
             }, 1000);
             
@@ -2041,7 +2153,7 @@ function loadProductForEdit(productId) {
                 }
             }
             
-            // Load existing stock opening data
+            
             
             // Load existing schemes
             loadExistingSchemesForEdit(productId);
@@ -2087,13 +2199,20 @@ function loadStockOpeningData(productId) {
                     const stockEntries = data.stock_entries;
                     console.log('Loaded stock entries:', stockEntries);
                     
-                    // Group entries by branch
+                    // Group entries by branch. For 'group' UOM products, several
+                    // stock_opening rows (one per unit) together represent ONE opening
+                    // stock event for that branch, so they belong in the same row. For
+                    // 'unit' products, each row is an independent historical entry
+                    // (different batch/date) — grouping those by branch_id alone would
+                    // only ever render the first one and silently hide the rest, so key
+                    // each one uniquely instead.
                     const entriesByBranch = {};
                 stockEntries.forEach(entry => {
-                    if (!entriesByBranch[entry.branch_id]) {
-                        entriesByBranch[entry.branch_id] = [];
+                    const groupKey = uomType === 'group' ? entry.branch_id : `${entry.branch_id}_${entry.id}`;
+                    if (!entriesByBranch[groupKey]) {
+                        entriesByBranch[groupKey] = [];
                     }
-                    entriesByBranch[entry.branch_id].push(entry);
+                    entriesByBranch[groupKey].push(entry);
                 });
                 
                 // Clear existing stock entry rows (except first empty template)
@@ -2118,10 +2237,12 @@ function loadStockOpeningData(productId) {
                         branchSearch.value = firstEntry.branch_display;
                     }
                     
-                    // Set price (same for all units in this branch)
+                    // Set price (same for all units in this branch) — prefer the exact
+                    // raw value the user originally typed (e.g. Carton price 2000) over
+                    // the stored per-Piece rate, so it doesn't get divided again on save.
                     const priceInput = firstRow.querySelector('input[name="openingPrice[]"]');
-                    if (priceInput && firstEntry.opening_price) {
-                        priceInput.value = firstEntry.opening_price;
+                    if (priceInput && (firstEntry.opening_price_entry_value || firstEntry.opening_price)) {
+                        priceInput.value = firstEntry.opening_price_entry_value || firstEntry.opening_price;
                     }
                     // paste yahan ↓
 const batchNoInput = firstRow.querySelector('input[name="batchNo[]"]');
@@ -2129,8 +2250,8 @@ if (batchNoInput && firstEntry.batch_no) {
     batchNoInput.value = firstEntry.batch_no;
 }
 const batchExpiryInput = firstRow.querySelector('input[name="batchExpiryDate[]"]');
-if (batchExpiryInput && firstEntry.batch_expiry_date && firstEntry.batch_expiry_date !== '0000-00-00') {
-    batchExpiryInput.value = firstEntry.batch_expiry_date;
+if (batchExpiryInput && firstEntry.expiry_date && firstEntry.expiry_date !== '0000-00-00') {
+    batchExpiryInput.value = firstEntry.expiry_date;
 }
                     
                     if (uomType === 'group') {
@@ -2171,18 +2292,18 @@ if (batchExpiryInput && firstEntry.batch_expiry_date && firstEntry.batch_expiry_
                         branchSearch.value = branchEntries[0].branch_display;
                     }
                     
-                    // Set price
+                    // Set price — prefer the exact raw entered value (see comment above).
                     const priceInput = newRow.querySelector('input[name="openingPrice[]"]');
-                    if (priceInput && branchEntries[0].opening_price) {
-                        priceInput.value = branchEntries[0].opening_price;
+                    if (priceInput && (branchEntries[0].opening_price_entry_value || branchEntries[0].opening_price)) {
+                        priceInput.value = branchEntries[0].opening_price_entry_value || branchEntries[0].opening_price;
                     }
                     const batchNoInput = newRow.querySelector('input[name="batchNo[]"]');
 if (batchNoInput && branchEntries[0].batch_no) {
     batchNoInput.value = branchEntries[0].batch_no;
 }
 const batchExpiryInput = newRow.querySelector('input[name="batchExpiryDate[]"]');
-if (batchExpiryInput && branchEntries[0].batch_expiry_date && branchEntries[0].batch_expiry_date !== '0000-00-00') {
-    batchExpiryInput.value = branchEntries[0].batch_expiry_date;
+if (batchExpiryInput && branchEntries[0].expiry_date && branchEntries[0].expiry_date !== '0000-00-00') {
+    batchExpiryInput.value = branchEntries[0].expiry_date;
 }
                     
                     if (uomType === 'group') {
@@ -2412,33 +2533,160 @@ function handleUomGroupChange() {
 
 function displayGroupConversionFactors(units) {
     clearGroupConversionFactors();
-    
+
     const perProductUnits = units.filter(u => u.unit_scope === 'per_product' && u.is_base_unit == 0);
-    
-    if (perProductUnits.length === 0) return;
-    
-    const conversionFactorGroup = document.getElementById('productConversionFactorGroup');
-    const formRow = conversionFactorGroup.closest('.form-row');
-    
-    perProductUnits.forEach(unit => {
-        const fieldGroup = document.createElement('div');
-        fieldGroup.className = 'form-group group-conversion-factor';
-        fieldGroup.innerHTML = `
-            <label class="required">${unit.uom_name} Conversion Factor</label>
-            <input type="number" name="groupConversionFactor[${unit.id}]" step="0.000001" min="0" placeholder="e.g., 1000" required>
-            <div class="helper-text">Conversion factor for ${unit.uom_name}</div>
-        `;
-        formRow.insertBefore(fieldGroup, conversionFactorGroup.nextSibling);
-    });
+
+    if (perProductUnits.length > 0) {
+        const conversionFactorGroup = document.getElementById('productConversionFactorGroup');
+        const formRow = conversionFactorGroup.closest('.form-row');
+
+        perProductUnits.forEach(unit => {
+            const fieldGroup = document.createElement('div');
+            fieldGroup.className = 'form-group group-conversion-factor';
+            fieldGroup.innerHTML = `
+                <label class="required">${unit.uom_name} Conversion Factor</label>
+                <input type="number" name="groupConversionFactor[${unit.id}]" step="0.000001" min="0" placeholder="e.g., 1000" required>
+                <div class="helper-text">Conversion factor for ${unit.uom_name}</div>
+            `;
+            formRow.insertBefore(fieldGroup, conversionFactorGroup.nextSibling);
+        });
+    }
+
+    populatePriceEntryUnitDropdown(units);
 }
 
 function clearGroupConversionFactors() {
     document.querySelectorAll('.group-conversion-factor').forEach(el => el.remove());
+    populatePriceEntryUnitDropdown([]);
 }
 
+// --- Price Entry Unit (enter Trade Price / MRP by Piece, Carton, Dozen, etc.) ---
+let currentPriceEntryUnitId = null;
+
+function escProdText(v) {
+    return String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+function getUnitFactorValue(unit) {
+    if (!unit) return null;
+    if (unit.is_base_unit == 1) return 1;
+    if (unit.unit_scope === 'per_product') {
+        const input = document.querySelector(`input[name="groupConversionFactor[${unit.id}]"]`);
+        const val = input ? parseFloat(input.value) : NaN;
+        return (!isNaN(val) && val > 0) ? val : null;
+    }
+    const val = parseFloat(unit.conversion_factor);
+    return (!isNaN(val) && val > 0) ? val : null;
+}
+
+function updatePriceFieldLabels(unitName) {
+    const tradeLabel = document.getElementById('tradePriceLabel');
+    const mrpLabel = document.getElementById('mrpLabel');
+    const suffix = unitName ? ` / ${escProdText(unitName)}` : ' / Selected Unit';
+    if (tradeLabel) tradeLabel.textContent = `Trade Price (TP)${suffix}`;
+    if (mrpLabel) mrpLabel.textContent = `Maximum Retail Price (MRP)${suffix}`;
+
+    document.querySelectorAll('.opening-price-label').forEach(label => {
+        label.textContent = `Opening Price${suffix}`;
+    });
+}
+
+function populatePriceEntryUnitDropdown(units) {
+    const group = document.getElementById('priceEntryUnitGroup');
+    const select = document.getElementById('priceEntryUnit');
+    if (!group || !select) return;
+
+    if (!window.ENABLE_CARTON_PRICE_ENTRY || !units || units.length <= 1) {
+        group.style.display = 'none';
+        select.innerHTML = '<option value="">Select Unit</option>';
+        currentPriceEntryUnitId = null;
+        updatePriceFieldLabels(null);
+        return;
+    }
+
+    group.style.display = '';
+    select.innerHTML = units.map(u =>
+        `<option value="${u.id}">${escProdText(u.uom_name)}</option>`
+    ).join('');
+
+    const baseUnit = units.find(u => u.is_base_unit == 1) || units[0];
+    const preferredName = localStorage.getItem('priceEntryUnitPreference');
+    const preferredUnit = preferredName ? units.find(u => u.uom_name === preferredName) : null;
+    const initialUnit = preferredUnit || baseUnit;
+
+    select.value = initialUnit.id;
+    currentPriceEntryUnitId = String(initialUnit.id);
+    updatePriceFieldLabels(initialUnit.uom_name);
+}
+
+function handlePriceEntryUnitChange() {
+    const select = document.getElementById('priceEntryUnit');
+    const newUnitId = select.value;
+    const units = window.currentGroupUnits || [];
+    const newUnit = units.find(u => String(u.id) === String(newUnitId));
+    if (!newUnit) return;
+
+    const newFactor = getUnitFactorValue(newUnit);
+    if (newFactor === null) {
+        alert(`Please enter the Conversion Factor for ${newUnit.uom_name} first.`);
+        select.value = currentPriceEntryUnitId || '';
+        return;
+    }
+
+    const oldUnit = units.find(u => String(u.id) === String(currentPriceEntryUnitId));
+    const oldFactor = oldUnit ? getUnitFactorValue(oldUnit) : 1;
+
+    if (oldFactor) {
+        ['tradePrice', 'mrp'].forEach(fieldId => {
+            const input = document.getElementById(fieldId);
+            const val = parseFloat(input.value);
+            if (!isNaN(val) && val > 0) {
+                input.value = ((val * newFactor) / oldFactor).toFixed(3);
+            }
+        });
+
+        // Opening Price / Unit (Branch-wise Opening Stock) follows the same
+        // entry unit — live-convert any already-typed values too.
+        document.querySelectorAll('input[name="openingPrice[]"]').forEach(input => {
+            const val = parseFloat(input.value);
+            if (!isNaN(val) && val > 0) {
+                input.value = ((val * newFactor) / oldFactor).toFixed(3);
+            }
+        });
+    }
+
+    currentPriceEntryUnitId = String(newUnitId);
+    updatePriceFieldLabels(newUnit.uom_name);
+    localStorage.setItem('priceEntryUnitPreference', newUnit.uom_name);
+    calculateTotalStock();
+}
+
+// Re-apply an edited product's remembered price-entry unit + its EXACT originally-
+// typed Trade Price / MRP values (not a recomputed multiply-back, which would drift
+// from rounding — e.g. 2000 -> 83.333 -> *24 = 1999.992, not 2000).
+function applyStoredPriceEntry(product) {
+    if (!window.ENABLE_CARTON_PRICE_ENTRY) return;
+    if (!product.price_entry_unit_id) return; // stored in Piece terms — dropdown already defaults to Piece
+
+    const units = window.currentGroupUnits || [];
+    const unit = units.find(u => String(u.id) === String(product.price_entry_unit_id));
+    if (!unit) return; // unit no longer part of this group — fall back to the raw Piece values already shown
+
+    const select = document.getElementById('priceEntryUnit');
+    if (select) select.value = unit.id;
+    currentPriceEntryUnitId = String(unit.id);
+    updatePriceFieldLabels(unit.uom_name);
+
+    if (product.trade_price_entry_value !== null && product.trade_price_entry_value !== undefined && product.trade_price_entry_value !== '') {
+        document.getElementById('tradePrice').value = product.trade_price_entry_value;
+    }
+    if (product.mrp_entry_value !== null && product.mrp_entry_value !== undefined && product.mrp_entry_value !== '') {
+        document.getElementById('mrp').value = product.mrp_entry_value;
+    }
+}
 
 function loadGroupConversionFactorsForEdit(productId) {
-    fetch(`../../../../server/api/inventory/products/product-uom-conversions.php?product_id=${productId}`)
+    return fetch(`../../../../server/api/inventory/products/product-uom-conversions.php?product_id=${productId}`)
     .then(response => response.json())
     .then(data => {
         if (data.success && data.conversions) {

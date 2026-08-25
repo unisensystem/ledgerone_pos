@@ -231,29 +231,18 @@ try {
         ) VALUES (?, 'Sale Invoice', 'sale_invoice', ?, ?, ?, ?, ?, ?)
     ");
 
-    $totalTradeOffer  = 0;
-    $totalItemTax     = 0;
-    $totalGrossAmount = 0;
+    $totalTradeOffer = 0;
     foreach ($items as $item) {
         if (!empty($item['parent_row_id'])) continue;
-        $totalTradeOffer  += floatval($item['trade_offer_amount']);
-        $totalItemTax     += floatval($item['tax_amount']);
-        $totalGrossAmount += floatval($item['gross_amount']);
+        $totalTradeOffer += floatval($item['trade_offer_amount']);
     }
-    $totalInvoiceDiscount = floatval($invoice['total_discount_amount']);
-    $netReceivable        = floatval($invoice['net_amount']) - $withholdingTaxAmount;
 
-    // Debit: Trade Debtors
-    $ledger->execute([$tenant_id, $newInvoiceId, 2, $final_date, 'Sale Invoice - '.$newBillNo, $netReceivable, 0]);
+    // Debit: Trade Debtors (Net Amount)
+    $ledger->execute([$tenant_id, $newInvoiceId, 2, $final_date, 'Sale Invoice - '.$newBillNo, $invoice['net_amount'], 0]);
 
     // Debit: AIT Receivable (Withholding Tax)
     if ($withholdingTaxAmount > 0) {
         $ledger->execute([$tenant_id, $newInvoiceId, 137, $final_date, 'AIT Withholding - '.$newBillNo, $withholdingTaxAmount, 0]);
-    }
-
-    // Debit: Discount Allowed
-    if ($totalInvoiceDiscount > 0) {
-        $ledger->execute([$tenant_id, $newInvoiceId, 89, $final_date, 'Sale Invoice - '.$newBillNo, $totalInvoiceDiscount, 0]);
     }
 
     // Debit: Trade Discount (Trade Offer)
@@ -261,13 +250,10 @@ try {
         $ledger->execute([$tenant_id, $newInvoiceId, 105, $final_date, 'Sale Invoice - '.$newBillNo, $totalTradeOffer, 0]);
     }
 
-    // Credit: Sales Revenue
-    $ledger->execute([$tenant_id, $newInvoiceId, 9, $final_date, 'Sale Invoice - '.$newBillNo, 0, $totalGrossAmount]);
-
-    // Credit: Sales Tax Payable (item-level tax)
-    if ($totalItemTax > 0) {
-        $ledger->execute([$tenant_id, $newInvoiceId, 106, $final_date, 'Sale Invoice - '.$newBillNo, 0, $totalItemTax]);
-    }
+    // Credit: Sales Revenue (Net Amount) — Discount Allowed and Sales Tax
+    // Payable no longer get their own ledger lines; both are folded into
+    // Net Amount on Trade Debtors/Sales Revenue instead.
+    $ledger->execute([$tenant_id, $newInvoiceId, 9, $final_date, 'Sale Invoice - '.$newBillNo, 0, $invoice['net_amount']]);
 
     $pdo->commit();
 

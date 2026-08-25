@@ -223,7 +223,7 @@ try {
         p.name AS product_name,
 
         sii.batch_no,
-        sii.batch_expiry_date,
+        sii.expiry_date AS batch_expiry_date,
 
         sii.quantity,
         sii.foc_quantity,
@@ -403,7 +403,7 @@ try {
             if ($expiry_date !== null && $expiry_date !== '') {
 
                 $sql .= "
-                    AND DATE(sii.batch_expiry_date) = ?
+                    AND DATE(sii.expiry_date) = ?
                 ";
 
                 $params[] = $expiry_date;

@@ -364,7 +364,7 @@ if ($tenant_id) {
                 <input type="number" name="openingQty[]" step="0.01" min="0">
             </div>
             <div class="form-group">
-                <label>Opening Price / Unit</label>
+                <label class="opening-price-label">Opening Price / Unit</label>
                 <input type="number" name="openingPrice[]" step="0.01" min="0">
             </div>
             <div class="form-group">

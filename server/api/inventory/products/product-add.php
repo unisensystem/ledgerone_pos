@@ -57,6 +57,11 @@ try {
     $trade_price = !empty($_POST['tradePrice']) ? $_POST['tradePrice'] : 0;
     $wholesale_price = !empty($_POST['wholesalePrice']) ? $_POST['wholesalePrice'] : 0;
     $mrp = !empty($_POST['mrp']) ? $_POST['mrp'] : 0;
+    // Carton-price-entry feature (tenant-gated) — remembers which unit Trade Price/MRP
+    // were originally typed in, and the exact value, so editing shows it back verbatim.
+    $price_entry_unit_id = !empty($_POST['priceEntryUnitId']) ? $_POST['priceEntryUnitId'] : null;
+    $trade_price_entry_value = !empty($_POST['tradePriceEntryValue']) ? $_POST['tradePriceEntryValue'] : null;
+    $mrp_entry_value = !empty($_POST['mrpEntryValue']) ? $_POST['mrpEntryValue'] : null;
     $default_discount = !empty($_POST['defaultDiscount']) ? $_POST['defaultDiscount'] : 0;
     $trade_offer_discount = !empty($_POST['tradeOfferDiscount']) ? $_POST['tradeOfferDiscount'] : 0;
     $default_foc = !empty($_POST['defaultFoc']) ? $_POST['defaultFoc'] : 0;
@@ -93,20 +98,22 @@ try {
         INSERT INTO products (
             tenant_id, company_id, code, name, product_type, uom_type, default_unit_id, uom_group_id, product_conversion_factor, category_id, subcategory_id,
             inventory_account_id, vendor_id, parent_product_id, description, qr_code, barcode, purchase_price, trade_price, wholesale_price, mrp,
+            price_entry_unit_id, trade_price_entry_value, mrp_entry_value,
             default_discount, trade_offer_discount, default_foc, carton_conversion, tax_regime_id,
             min_stock_level, max_stock_level, manufacturing_date, expiry_date, photo, is_active, stock_affects, invoice_affects, created_by
         ) VALUES (
-            ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+            ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
         )
     ");
-    
+
     $product_conversion_factor = !empty($_POST['productConversionFactor']) ? $_POST['productConversionFactor'] : null;
     $uom_group_id = !empty($_POST['uomGroup']) ? $_POST['uomGroup'] : null;
     $group_conversion_factors = isset($_POST['groupConversionFactor']) ? $_POST['groupConversionFactor'] : [];
-    
+
     $stmt->execute([
         $tenant_id, $company, $code, $name, $product_type, $uom_type, $default_unit, $uom_group_id, $product_conversion_factor, $category, $subcategory,
         $inventory_account, $vendor_id, $parent_product_id, $description, $qr_code, $barcode, $purchase_price, $trade_price, $wholesale_price, $mrp,
+        $price_entry_unit_id, $trade_price_entry_value, $mrp_entry_value,
         $default_discount, $trade_offer_discount, $default_foc, $carton_conversion, $tax_regime_id,
         $min_stock, $max_stock, $manufacturing_date, $expiry_date, $photo_filename, $is_active, $stock_affects, $invoice_affects, $user_id
     ]);
@@ -146,12 +153,12 @@ try {
         error_log('Processing ' . count($_POST['branch']) . ' stock opening entries');
         $stockOpeningCount = 0;
         $stockOpeningStmt = $pdo->prepare("
-            INSERT INTO stock_opening (product_id, tenant_id, branch_id, opening_qty, opening_price, batch_no, batch_expiry_date, unit_id)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO stock_opening (product_id, tenant_id, branch_id, opening_qty, opening_price, opening_price_entry_value, batch_no, expiry_date, unit_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         ");
-        
+
         $stockLedgerStmt = $pdo->prepare("
-            INSERT INTO stock_ledger (tenant_id, account_id, branch_id, product_id, reference_table, reference_id, qty_in, unit_cost, batch_no, batch_expiry_date, unit_id, transaction_type, transaction_date)
+            INSERT INTO stock_ledger (tenant_id, account_id, branch_id, product_id, reference_table, reference_id, qty_in, unit_cost, batch_no, expiry_date, unit_id, transaction_type, transaction_date)
             VALUES (?, ?, ?, ?, 'stock_opening', ?, ?, ?, ?, ?, ?, 'Opening Stock', CURDATE())
         ");
         
@@ -159,6 +166,11 @@ try {
             if (!empty($_POST['branch'][$i])) {
                 $branchId = $_POST['branch'][$i];
                 $openingPrice = $_POST['openingPrice'][$i] ?? 0;
+                // Exact raw value the user typed for Opening Price, before it was
+                // converted down to per-Piece (e.g. Carton price 2000) — remembered so
+                // re-opening this product for edit shows the original number back,
+                // instead of re-dividing an already-converted value a second time.
+                $openingPriceEntryValue = !empty($_POST['openingPriceEntryValue'][$i]) ? $_POST['openingPriceEntryValue'][$i] : null;
                 $batchNo = !empty($_POST['batchNo'][$i]) ? $_POST['batchNo'][$i] : null;
                 $batchExpiryDate = !empty($_POST['batchExpiryDate'][$i]) ? $_POST['batchExpiryDate'][$i] : null;
                 
@@ -187,6 +199,7 @@ try {
                                         $branchId,
                                         $unitQty,  // Original quantity for this unit
                                         $openingPrice,
+                                        $openingPriceEntryValue,
                                         $batchNo,
                                         $batchExpiryDate,
                                         $unit_id   // Store the specific unit
@@ -242,6 +255,7 @@ try {
                             $branchId,
                             $originalQty,  // Store ORIGINAL quantity (e.g., 150 for Grams)
                             $openingPrice,
+                            $openingPriceEntryValue,
                             $batchNo,
                             $batchExpiryDate,
                             $unitIdForStock  // Store the unit used

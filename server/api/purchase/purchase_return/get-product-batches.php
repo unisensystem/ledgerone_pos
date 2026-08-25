@@ -31,7 +31,7 @@ try {
     $stmt = $pdo->prepare("
         SELECT 
             batch_no,
-            MAX(batch_expiry_date) AS batch_expiry_date,
+            MAX(expiry_date) AS batch_expiry_date,
             COALESCE(SUM(qty_in), 0) - COALESCE(SUM(qty_out), 0) AS available_qty
         FROM stock_ledger
         WHERE tenant_id = ?

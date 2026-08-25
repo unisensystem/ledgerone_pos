@@ -3777,6 +3777,7 @@ function saveInvoice(status = 'Posted') {
                 dozen: 0,
                 salePrice: salePrice,
                 grossAmount: isFirstUnit ? grossAmount : 0,
+                discountPercent: isFirstUnit ? discountPercent : 0,
                 discountAmount: isFirstUnit ? discountAmount : 0,
                 tradeOfferAmount: isFirstUnit ? tradeOfferAmount : 0,
                 taxPercent: taxPercent,
@@ -5254,6 +5255,17 @@ async function addRowDynamic() {
     discAmountInput.min = '0';
     discAmountInput.step = '0.001';
     discAmountInput.value = '0.000';
+    discAmountInput.addEventListener('input', function() {
+        const unitInputs = row.querySelectorAll('.unit-input');
+        let totalQty = 0;
+        unitInputs.forEach(input => {
+            const qty = parseFloat(input.value) || 0;
+            const cf = parseFloat(input.dataset.conversionFactor) || 1;
+            totalQty = totalQty + (qty * cf);
+        });
+        const price = parseFloat(row.querySelector('.price-cell input').value) || 0;
+        calculateRowAmounts(row, totalQty, price, 'amount');
+    });
     discAmountCell.appendChild(discAmountInput);
     
     // TO Amount

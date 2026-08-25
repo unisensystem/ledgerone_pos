@@ -268,11 +268,8 @@ try {
         }
         
         $totalInvoiceDiscount = floatval($input['totalDiscountAmount'] ?? 0);
-        
-        // Calculate net receivable (after withholding tax)
-        $netReceivable = $input['netAmount'] - $withholdingTaxAmount;
-        
-        // Debit: Trade Debtors (Net Receivable after withholding tax)
+
+        // Debit: Trade Debtors (Net Amount)
         $pdo->prepare("
             INSERT INTO accounting_ledger (
                 tenant_id, transaction_type, reference_table, reference_id,
@@ -280,9 +277,9 @@ try {
             ) VALUES (?, 'Sale Invoice', 'sale_invoice', ?, 2, ?, ?, ?)
         ")->execute([
             $tenant_id, $invoice_id, $input['saleDate'],
-            'Sale Invoice - ' . $billNo, $netReceivable
+            'Sale Invoice - ' . $billNo, $input['netAmount']
         ]);
-        
+
         // Debit: AIT Receivable (Withholding Tax)
         if ($withholdingTaxAmount > 0) {
             $pdo->prepare("
@@ -295,20 +292,7 @@ try {
                 'AIT Withholding - ' . $billNo, $withholdingTaxAmount
             ]);
         }
-        
-        // Debit: Discount Allowed (Invoice-level discount only)
-        if ($totalInvoiceDiscount > 0) {
-            $pdo->prepare("
-                INSERT INTO accounting_ledger (
-                    tenant_id, transaction_type, reference_table, reference_id,
-                    account_id, date, description, debit
-                ) VALUES (?, 'Sale Invoice', 'sale_invoice', ?, 89, ?, ?, ?)
-            ")->execute([
-                $tenant_id, $invoice_id, $input['saleDate'],
-                'Sale Invoice - ' . $billNo, $totalInvoiceDiscount
-            ]);
-        }
-        
+
         // Debit: Trade Discount (Trade Offer)
         if ($totalTradeOffer > 0) {
             $pdo->prepare("
@@ -321,8 +305,10 @@ try {
                 'Sale Invoice - ' . $billNo, $totalTradeOffer
             ]);
         }
-        
-        // Credit: Sales Revenue (Gross Amount)
+
+        // Credit: Sales Revenue (Net Amount) — Discount Allowed and Sales Tax
+        // Payable no longer get their own ledger lines; both are folded into
+        // Net Amount on Trade Debtors/Sales Revenue instead.
         $pdo->prepare("
             INSERT INTO accounting_ledger (
                 tenant_id, transaction_type, reference_table, reference_id,
@@ -330,21 +316,8 @@ try {
             ) VALUES (?, 'Sale Invoice', 'sale_invoice', ?, 9, ?, ?, ?)
         ")->execute([
             $tenant_id, $invoice_id, $input['saleDate'],
-            'Sale Invoice - ' . $billNo, $totalGrossAmount
+            'Sale Invoice - ' . $billNo, $input['netAmount']
         ]);
-        
-        // Credit: Sales Tax Payable
-        if ($totalTax > 0) {
-            $pdo->prepare("
-                INSERT INTO accounting_ledger (
-                    tenant_id, transaction_type, reference_table, reference_id,
-                    account_id, date, description, credit
-                ) VALUES (?, 'Sale Invoice', 'sale_invoice', ?, 106, ?, ?, ?)
-            ")->execute([
-                $tenant_id, $invoice_id, $input['saleDate'],
-                'Sale Invoice - ' . $billNo, $totalTax
-            ]);
-        }
     }
 
     // Insert receive voucher if amount paid > 0 and status is Posted

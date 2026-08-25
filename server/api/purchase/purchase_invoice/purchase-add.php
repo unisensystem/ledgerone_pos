@@ -143,7 +143,7 @@ try {
                               $stock_stmt = $pdo->prepare("
                     INSERT INTO stock_ledger (
                         tenant_id, account_id, branch_id, product_id, reference_table, reference_id,
-                        qty_in, unit_cost, unit_id, batch_no, batch_expiry_date, transaction_type, transaction_date
+                        qty_in, unit_cost, unit_id, batch_no, expiry_date, transaction_type, transaction_date
                     ) VALUES (?, ?, ?, ?, 'purchase_invoice', ?, ?, ?, ?, ?, ?, 'Purchase Invoice', ?)
                 ");
                 $stock_stmt->execute([
@@ -173,26 +173,22 @@ try {
         ) VALUES (?, 'Purchase Invoice', 'purchase_invoice', ?, ?, ?, ?, ?, ?)
     ");
     
-    // 1. Debit - Purchases (totalBill already has item discounts applied, subtract invoice-level discount)
-    $purchaseAmount = $input['totalBill'] - $input['totalDiscountAmount'];
-    $ledger_stmt->execute([$tenant_id, $invoice_id, 19, $input['purchaseDate'], 'Purchase Invoice - ' . $billNo, $purchaseAmount, 0]);
-    
+    // 1. Debit - Purchases (Net Amount)
+    $ledger_stmt->execute([$tenant_id, $invoice_id, 19, $input['purchaseDate'], 'Purchase Invoice - ' . $billNo, $input['netAmount'], 0]);
+
     // 2. Debit - Input Tax Receivable
     if ($input['totalTaxAmount'] > 0) {
         $ledger_stmt->execute([$tenant_id, $invoice_id, 107, $input['purchaseDate'], 'Purchase Invoice - ' . $billNo, $input['totalTaxAmount'], 0]);
     }
-    
+
     // 3. Debit - Freight Inward
     if ($input['shippingFees'] > 0) {
         $ledger_stmt->execute([$tenant_id, $invoice_id, 110, $input['purchaseDate'], 'Purchase Invoice - ' . $billNo, $input['shippingFees'], 0]);
     }
-    
-    // 4. Credit - Purchase Discounts Received (invoice-level discount)
-    if ($input['totalDiscountAmount'] > 0) {
-        $ledger_stmt->execute([$tenant_id, $invoice_id, 103, $input['purchaseDate'], 'Purchase Invoice - ' . $billNo, 0, $input['totalDiscountAmount']]);
-    }
-    
-    // 5. Credit - Trade Creditors
+
+    // 4. Credit - Trade Creditors (Net Amount) — Purchase Discounts Received no
+    // longer gets its own ledger line; it's folded into Net Amount on
+    // Purchases/Trade Creditors instead.
     $ledger_stmt->execute([$tenant_id, $invoice_id, 14, $input['purchaseDate'], 'Purchase Invoice - ' . $billNo, 0, $input['netAmount']]);
 
     // 6. Save invoice-level taxes
