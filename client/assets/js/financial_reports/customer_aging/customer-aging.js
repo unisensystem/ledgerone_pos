@@ -1,6 +1,7 @@
 // customer-aging.js
 // Handles: filter bar (company, customer, country/region/city/zone/area),
-// data loading, table + summary rendering, pagination, and exports.
+// view mode (all invoices vs unbilled RV/SR), data loading, table + summary
+// rendering, pagination, and exports.
 
 const DATA_ENDPOINT = '../../../../server/api/financial_reports/customer_aging/customer-aging.php';
 const FILTERS_ENDPOINT = '../../../../server/api/financial_reports/customer_aging/location_filters.php';
@@ -12,6 +13,7 @@ const state = {
     rawRows: [],       // raw API response rows
     allRows: [],       // displayed rows (raw or auto-cleared)
     autoClearMode: false,
+    viewMode: 'invoices', // 'invoices' | 'unbilled'
     currencySymbol: '',
     filters: {
         company_id: '',
@@ -31,6 +33,7 @@ document.addEventListener('DOMContentLoaded', () => {
     setupCustomerCombo();
     setupButtons();
     setupAutoClearToggle();
+    setupViewModeToggle();
     loadReportData();
 
     // Bucket cards: click to filter by that bucket
@@ -59,6 +62,55 @@ function setupAutoClearToggle() {
         applyAndRender();
     });
     if (label) label.style.opacity = '0.5';
+}
+
+// ---------- View mode: All Invoices vs Unbilled RV/SR ----------
+
+function setupViewModeToggle() {
+    const toggle = document.getElementById('viewModeToggle');
+    const label  = document.getElementById('viewModeLabel');
+    if (!toggle) return;
+    toggle.addEventListener('change', function () {
+        state.viewMode = this.checked ? 'unbilled' : 'invoices';
+        if (label) {
+            label.style.opacity = this.checked ? '1' : '0.5';
+            label.style.color   = this.checked ? 'var(--primary)' : '';
+            label.style.fontWeight = this.checked ? '600' : '';
+        }
+        updateViewModeUI();
+        state.page = 1;
+        loadReportData();
+    });
+    if (label) label.style.opacity = '0.5';
+    updateViewModeUI();
+}
+
+function updateViewModeUI() {
+    const isUnbilled = state.viewMode === 'unbilled';
+
+    const bucketsSection = document.getElementById('bucketsSummarySection');
+    if (bucketsSection) bucketsSection.style.display = isUnbilled ? 'none' : '';
+
+    const autoClearWrapper = document.getElementById('autoClearWrapper');
+    if (autoClearWrapper) autoClearWrapper.style.display = isUnbilled ? 'none' : '';
+
+    const refNoHeader = document.getElementById('colRefNo');
+    if (refNoHeader) refNoHeader.textContent = isUnbilled ? 'Ref No' : 'Invoice No';
+
+    const refDateHeader = document.getElementById('colRefDate');
+    if (refDateHeader) refDateHeader.textContent = isUnbilled ? 'Date' : 'Invoice Date';
+
+    const daysHeader = document.getElementById('colDaysOverdue');
+    if (daysHeader) daysHeader.textContent = isUnbilled ? '-' : 'Days Overdue';
+
+    const bucketHeader = document.getElementById('colBucket');
+    if (bucketHeader) bucketHeader.textContent = isUnbilled ? '-' : 'Bucket';
+
+    if (isUnbilled) {
+        state.autoClearMode = false;
+        const toggle = document.getElementById('autoClearToggle');
+        if (toggle) toggle.checked = false;
+    }
 }
 
 // ---------- Lookup loaders ----------
@@ -277,6 +329,7 @@ async function loadReportData() {
     Object.entries(state.filters).forEach(([key, val]) => {
         if (val) params.append(key, val);
     });
+    params.append('view_mode', state.viewMode);
 
     try {
         const res = await fetch(`${DATA_ENDPOINT}?${params.toString()}`);
@@ -294,7 +347,7 @@ async function loadReportData() {
 }
 
 function applyAndRender(rawSummary) {
-    if (state.autoClearMode) {
+    if (state.autoClearMode && state.viewMode !== 'unbilled') {
         state.allRows = simulateAutoClear(state.rawRows);
         renderSummary(buildSummaryFromRows(state.allRows));
     } else {
@@ -380,9 +433,11 @@ function renderPage() {
     tbody.innerHTML = '';
 
     if (total === 0) {
-        const msg = state.autoClearMode
-            ? 'No outstanding invoices after auto-clear simulation'
-            : 'No overdue invoices found';
+        const msg = state.viewMode === 'unbilled'
+            ? 'No unbilled receive vouchers or sale returns found'
+            : (state.autoClearMode
+                ? 'No outstanding invoices after auto-clear simulation'
+                : 'No overdue invoices found');
         tbody.innerHTML = `<tr><td colspan="10" style="text-align: center; padding: 20px;">${msg}</td></tr>`;
     } else {
         pageRows.forEach((row, i) => {
@@ -393,6 +448,7 @@ function renderPage() {
             const statusBadge = state.autoClearMode && row.simStatus
                 ? `<span class="status-${row.simStatus}">${row.simStatus === 'partial' ? 'Partial' : 'Pending'}</span>`
                 : '';
+            const daysOverdue = (row.daysOverdue === null || row.daysOverdue === undefined) ? '-' : row.daysOverdue;
             const tr = document.createElement('tr');
             tr.innerHTML = `
                 <td>${start + i + 1}</td>
@@ -403,7 +459,7 @@ function renderPage() {
                 <td>${escapeHtml(row.invoiceDate)}</td>
                 <td>${escapeHtml(row.type)}</td>
                 <td>${escapeHtml(amount)} ${statusBadge}</td>
-                <td>${row.daysOverdue}</td>
+                <td>${daysOverdue}</td>
                 <td>${escapeHtml(row.bucket)}</td>
             `;
             tbody.appendChild(tr);
@@ -460,6 +516,7 @@ function printReport() {
     Object.entries(state.filters).forEach(([key, val]) => {
         if (val) params.append(key, val);
     });
+    params.append('view_mode', state.viewMode);
     if (state.autoClearMode) params.append('auto_clear', '1');
     window.open(`print.php?${params.toString()}`, '_blank');
 }
@@ -473,7 +530,9 @@ function exportToExcel() {
     const headers = ['S#', 'Customer Code', 'Customer Name', 'Address', 'Invoice No', 'Invoice Date', 'Type', 'Amount', 'Days Overdue', 'Bucket'];
     const rows = state.allRows.map((row, i) => [
         i + 1, row.customerCode, row.customerName, row.address,
-        row.invoiceNo, row.invoiceDate, row.type, row.amount, row.daysOverdue, row.bucket
+        row.invoiceNo, row.invoiceDate, row.type, row.amount,
+        (row.daysOverdue === null || row.daysOverdue === undefined) ? '-' : row.daysOverdue,
+        row.bucket
     ]);
     const csv = [headers, ...rows]
         .map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(','))
