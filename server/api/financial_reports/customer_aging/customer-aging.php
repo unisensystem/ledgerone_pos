@@ -32,6 +32,10 @@ try {
     $date_from  = $_GET['date_from'] ?? null;
     $date_to    = $_GET['date_to'] ?? null;
 
+    // View mode: 'invoices' (default, existing aging report) or 'unbilled'
+    // (Receive Vouchers / Sale Returns that carry no bill_no / sale_invoice_no yet)
+    $view_mode = $_GET['view_mode'] ?? 'invoices';
+
     // Get currency symbol
     $stmt = $pdo->prepare("
         SELECT c.symbol 
@@ -81,6 +85,112 @@ $zoneCondition     = $zone_id     ? ' AND c.city_zone_id = ?' : '';
     if ($city_id)     $sharedFilterParams[] = $city_id;
     if ($zone_id)     $sharedFilterParams[] = $zone_id;
     if ($area_id)     $sharedFilterParams[] = $area_id;
+
+    // ---- Unbilled view: Receive Vouchers + Sale Returns with no bill_no ----
+    if ($view_mode === 'unbilled') {
+        // NOTE: assumes receive_voucher has columns (id, rv_no, customer_id, tenant_id,
+        // company_id, amount, voucher_date, bill_no) and sale_return has (id, return_no,
+        // customer_id, tenant_id, company_id, net_amount, return_date, sale_invoice_no,
+        // status). Both are assumed to carry their own customer_id (not just a link via
+        // the sale invoice), since an unbilled row by definition has no invoice to join
+        // through. Rename the column references below if the real schema differs.
+
+        $rvDateCond = str_replace('{date_col}', 'rv.voucher_date', $dateCondition);
+        $srDateCond = str_replace('{date_col}', 'sr.return_date', $dateCondition);
+        $rvCompCond = str_replace('{company_col}', 'c.company_id', $companyCondition);
+        $srCompCond = str_replace('{company_col}', 'c.company_id', $companyCondition);
+
+        $sql = "
+            SELECT
+                rv.id,
+                rv.rv_no as ref_no,
+                rv.voucher_date as ref_date,
+                rv.amount as net_amount,
+                c.customer_code,
+                c.customer_name,
+                c.address,
+                'Receive Voucher' as row_type
+            FROM receive_voucher rv
+            JOIN customers c ON rv.customer_id = c.id
+            WHERE rv.tenant_id = ?
+            AND (rv.bill_no IS NULL OR rv.bill_no = '' OR rv.bill_no = 'null')
+            {$rvDateCond}
+            {$rvCompCond}
+            {$sharedFilterSql}
+
+            UNION ALL
+
+            SELECT
+                sr.id,
+                sr.return_no as ref_no,
+                sr.return_date as ref_date,
+                sr.net_amount,
+                c.customer_code,
+                c.customer_name,
+                c.address,
+                'Sale Return' as row_type
+            FROM sale_return sr
+            JOIN customers c ON sr.customer_id = c.id
+            WHERE sr.tenant_id = ? AND sr.status = 'Posted'
+            AND (sr.sale_invoice_no IS NULL OR sr.sale_invoice_no = '')
+            {$srDateCond}
+            {$srCompCond}
+            {$sharedFilterSql}
+
+            ORDER BY ref_date DESC
+        ";
+
+        $params = [$tenant_id];
+        $params = array_merge($params, $dateParams);
+        if ($company_id) $params[] = $company_id;
+        $params = array_merge($params, $sharedFilterParams);
+
+        $params[] = $tenant_id;
+        $params = array_merge($params, $dateParams);
+        if ($company_id) $params[] = $company_id;
+        $params = array_merge($params, $sharedFilterParams);
+
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute($params);
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        $reportData = [];
+        $totalUnbilled = 0;
+
+        foreach ($rows as $index => $row) {
+            $amount = (float)$row['net_amount'];
+            $totalUnbilled += $amount;
+
+            $reportData[] = [
+                'id'             => $index + 1,
+                'customerCode'   => $row['customer_code'],
+                'customerName'   => $row['customer_name'],
+                'address'        => $row['address'] ?? 'N/A',
+                'invoiceNo'      => $row['ref_no'],
+                'invoiceDate'    => $row['ref_date'],
+                'type'           => $row['row_type'],
+                'amount'         => $currency_symbol . number_format($amount, 2),
+                'outstandingRaw' => $amount,
+                'daysOverdue'    => null,
+                'bucket'         => '-'
+            ];
+        }
+
+        echo json_encode([
+            'success' => true,
+            'data'    => $reportData,
+            'summary' => [
+                'total_overdue' => $currency_symbol . number_format($totalUnbilled, 2),
+                'bucket_15'     => $currency_symbol . '0.00', 'count_15' => 0,
+                'bucket_25'     => $currency_symbol . '0.00', 'count_25' => 0,
+                'bucket_45'     => $currency_symbol . '0.00', 'count_45' => 0,
+            ],
+            'currency_symbol' => $currency_symbol
+        ]);
+        exit;
+    }
+
+    // ---- Default view: existing invoices aging report ----
 
     $siDateCond = str_replace('{date_col}', 'si.sale_date', $dateCondition);
     $obiDateCond = str_replace('{date_col}', 'obi.invoice_date', $dateCondition);
