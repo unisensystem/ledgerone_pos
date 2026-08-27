@@ -339,20 +339,24 @@ try {
             echo json_encode(['success' => true, 'data' => $positions, 'currency' => $currency_symbol, 'debug' => $debug]);
             break;
 
-        case 'ledger':
+   case 'ledger':
             $product_id = $_GET['product_id'] ?? null;
             $company_id = $_GET['company_id'] ?? null;
+            $vendor_id = $_GET['vendor_id'] ?? null;
             $from_date = $_GET['from_date'] ?? null;
             $to_date = $_GET['to_date'] ?? null;
 
-            if (!$product_id) {
-                echo json_encode(['success' => false, 'message' => 'Product ID required']);
+            if (!$product_id && !$vendor_id) {
+                echo json_encode(['success' => false, 'message' => 'Item or Company required']);
                 exit;
             }
 
-            $bbf = 0;
+            // Brought-forward balance(s) before from_date, keyed by product_id
+            // (needed because when only a Company is selected, more than one
+            // product can appear and each must carry its own running balance)
+            $bbf_by_product = [];
             if ($from_date) {
-                $bbf_sql = "SELECT COALESCE(SUM(
+                $bbf_sql = "SELECT sl.product_id, COALESCE(SUM(
                                 (sl.qty_in * COALESCE(CASE WHEN u.unit_scope = 'universal' THEN u.conversion_factor ELSE puc.conversion_factor END, 1)) - 
                                 (sl.qty_out * COALESCE(CASE WHEN u.unit_scope = 'universal' THEN u.conversion_factor ELSE puc.conversion_factor END, 1))
                             ), 0) as bbf 
@@ -362,19 +366,28 @@ try {
                            LEFT JOIN product_uom_conversions puc ON p.id = puc.product_id AND sl.unit_id = puc.uom_id
                            LEFT JOIN purchase_invoice pi ON sl.reference_table = 'purchase_invoice' AND sl.reference_id = pi.id
                            LEFT JOIN sale_invoice si ON sl.reference_table = 'sale_invoice' AND sl.reference_id = si.id
-                           WHERE sl.tenant_id = ? AND sl.product_id = ?" . ($company_id ? " AND (pi.company_id = ? OR si.company_id = ?)" : "") . " AND sl.transaction_date < ?";
+                           WHERE sl.tenant_id = ? AND sl.transaction_date < ?";
+                $bbf_params = [$tenant_id];
+                if ($product_id) { $bbf_sql .= " AND sl.product_id = ?"; $bbf_params[] = $product_id; }
+                if ($vendor_id)  { $bbf_sql .= " AND p.vendor_id = ?"; $bbf_params[] = $vendor_id; }
+                if ($company_id) { $bbf_sql .= " AND (pi.company_id = ? OR si.company_id = ?)"; $bbf_params[] = $company_id; $bbf_params[] = $company_id; }
+                $bbf_sql .= " GROUP BY sl.product_id";
+                // from_date placeholder is positioned right after tenant_id above, so re-insert it in the right order
+                $bbf_params = [$tenant_id, $from_date];
+                if ($product_id) $bbf_params[] = $product_id;
+                if ($vendor_id) $bbf_params[] = $vendor_id;
+                if ($company_id) { $bbf_params[] = $company_id; $bbf_params[] = $company_id; }
+
                 $bbf_stmt = $pdo->prepare($bbf_sql);
-                $bbf_params = [$tenant_id, $product_id];
-                if ($company_id) {
-                    $bbf_params[] = $company_id;
-                    $bbf_params[] = $company_id;
-                }
-                $bbf_params[] = $from_date;
                 $bbf_stmt->execute($bbf_params);
-                $bbf = $bbf_stmt->fetch(PDO::FETCH_ASSOC)['bbf'];
+                foreach ($bbf_stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+                    $bbf_by_product[$row['product_id']] = (float) $row['bbf'];
+                }
             }
 
             $sql = "SELECT 
+                        sl.product_id,
+                        p.name as product_name,
                         sl.transaction_date,
                         sl.transaction_type,
                         sl.batch_no,
@@ -397,9 +410,20 @@ try {
                     LEFT JOIN suppliers s ON pi.supplier_id = s.id
                     LEFT JOIN sale_invoice si ON sl.reference_table = 'sale_invoice' AND sl.reference_id = si.id
                     LEFT JOIN customers c ON si.customer_id = c.id
-                    WHERE sl.tenant_id = ? AND sl.product_id = ?";
+                    WHERE sl.tenant_id = ?";
 
-            $params = [$tenant_id, $product_id];
+            $params = [$tenant_id];
+
+            if ($product_id) {
+                $sql .= " AND sl.product_id = ?";
+                $params[] = $product_id;
+            }
+
+            // "Company" filter (i.e. Supplier/Distribution of the product, via products.vendor_id)
+            if ($vendor_id) {
+                $sql .= " AND p.vendor_id = ?";
+                $params[] = $vendor_id;
+            }
 
             if ($from_date) {
                 $sql .= " AND sl.transaction_date >= ?";
@@ -423,14 +447,18 @@ try {
             $stmt->execute($params);
             $ledger = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-            $balance = $bbf;
+            // Running balance kept per product_id so a Company-only query
+            // (which can span several products) doesn't mix them together.
+            $balances = $bbf_by_product;
             foreach ($ledger as &$entry) {
-                $balance += $entry['qty_in'] - $entry['qty_out'];
-                $entry['balance'] = $balance;
-                $entry['value'] = $balance * $entry['unit_cost'];
+                $pid = $entry['product_id'];
+                if (!isset($balances[$pid])) $balances[$pid] = 0;
+                $balances[$pid] += $entry['qty_in'] - $entry['qty_out'];
+                $entry['balance'] = $balances[$pid];
+                $entry['value'] = $balances[$pid] * $entry['unit_cost'];
             }
 
-            echo json_encode(['success' => true, 'data' => $ledger, 'bbf' => $bbf, 'currency' => $currency_symbol]);
+            echo json_encode(['success' => true, 'data' => $ledger, 'currency' => $currency_symbol]);
             break;
 
         case 'branch-ledger':
@@ -644,8 +672,8 @@ try {
     $from_date = $_GET['from_date'] ?? null;
     $to_date = $_GET['to_date'] ?? null;
 
-    if (!$company_id) {
-        echo json_encode(['success' => false, 'message' => 'Supplier required']);
+    if (!$company_id && !$product_id) {
+        echo json_encode(['success' => false, 'message' => 'Supplier or Product required']);
         exit;
     }
 
@@ -673,11 +701,12 @@ try {
             LEFT JOIN product_uom_conversions puc ON p.id = puc.product_id AND sl.unit_id = puc.uom_id
             LEFT JOIN purchase_invoice pi ON sl.reference_table = 'purchase_invoice' AND sl.reference_id = pi.id
             LEFT JOIN purchase_return pr ON sl.reference_table = 'purchase_return' AND sl.reference_id = pr.id
-            WHERE sl.tenant_id = ? AND p.product_type = 'physical'
-              AND COALESCE(pi.supplier_id, pr.supplier_id) = ?";
+            WHERE sl.tenant_id = ? AND p.product_type = 'physical'";
 
-    $purchaseParams = [$tenant_id, $company_id];
+    $purchaseParams = [$tenant_id];
 
+    // Supplier is now optional — if not given, purchase rows for the selected product from any supplier are shown.
+    if ($company_id) { $purchaseSql .= " AND COALESCE(pi.supplier_id, pr.supplier_id) = ?"; $purchaseParams[] = $company_id; }
     if ($branch_id)  { $purchaseSql .= " AND sl.branch_id = ?"; $purchaseParams[] = $branch_id; }
     if ($product_id) { $purchaseSql .= " AND p.id = ?"; $purchaseParams[] = $product_id; }
     if ($from_date)  { $purchaseSql .= " AND sl.transaction_date >= ?"; $purchaseParams[] = $from_date; }

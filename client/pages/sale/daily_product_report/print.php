@@ -176,8 +176,8 @@ try {
 
             sii.sale_price,
 
-            sii.discount_amount,
-
+                      sii.discount_amount,
+            sii.discount_percent,
             sii.tax_amount,
 
             sii.net_amount
@@ -1672,8 +1672,8 @@ $locationLabel = buildLocationLabel(
 
     <td class="num col-disc">
 
-        <?= number_format(
-            $group['invoice_disc_percent'],
+               <?= number_format(
+            (float)($row['discount_percent'] ?? 0),
             2
         ) ?>%
 
