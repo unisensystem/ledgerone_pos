@@ -50,12 +50,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
                 sm.id as supplier_man_id,
                 sm.employee_id as supplier_man_employee_id,
                 sm.full_name as supplier_man_name,
-                COALESCE(rv.amount, 0) as amount_paid,
-                CASE 
-                    WHEN rv.payment_method_id = 1 THEN 'Cash'
-                    WHEN rv.payment_method_id = 2 THEN 'Bank Transfer'
-                    ELSE NULL
-                END as payment_method
+                (
+                    SELECT COALESCE(SUM(rv.amount), 0) FROM receive_voucher rv
+                    WHERE rv.bill_no = si.bill_no AND rv.tenant_id = si.tenant_id
+                ) as amount_paid,
+                (
+                    SELECT
+                        CASE
+                            WHEN COUNT(*) = 0 THEN NULL
+                            WHEN COUNT(DISTINCT rv.payment_method_id) > 1 THEN 'Split'
+                            WHEN MAX(rv.payment_method_id) = 1 THEN 'Cash'
+                            WHEN MAX(rv.payment_method_id) = 5 THEN 'Bank Transfer'
+                            ELSE NULL
+                        END
+                    FROM receive_voucher rv
+                    WHERE rv.bill_no = si.bill_no AND rv.tenant_id = si.tenant_id
+                ) as payment_method,
+                (
+                    SELECT rv.bank_account_id FROM receive_voucher rv
+                    WHERE rv.bill_no = si.bill_no AND rv.tenant_id = si.tenant_id AND rv.payment_method_id = 5
+                    ORDER BY rv.id ASC LIMIT 1
+                ) as bank_account_id
             FROM sale_invoice si
             LEFT JOIN customers c ON si.customer_id = c.id
             LEFT JOIN customer_sub_accounts csa ON si.sub_account_id = csa.id
@@ -65,7 +80,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
             LEFT JOIN ledgerone_public.currencies cur ON si.currency_id = cur.id
             LEFT JOIN employees e ON si.sale_officer_id = e.id
             LEFT JOIN employees sm ON si.supplier_man_id = sm.id
-            LEFT JOIN receive_voucher rv ON si.bill_no = rv.bill_no AND si.tenant_id = rv.tenant_id
             WHERE si.id = ? AND si.tenant_id = ?
         ");
         $stmt->execute([$invoice_id, $tenant_id]);
@@ -96,10 +110,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
         $itemStmt->execute([$invoice_id, $tenant_id]);
         $items = $itemStmt->fetchAll(PDO::FETCH_ASSOC);
 
+        // Split payment breakdown (only populated when this invoice's payment was
+        // actually split across multiple methods — see pos-add.php/pos-edit.php PUT).
+        $splitsStmt = $pdo->prepare("
+            SELECT payment_method_id, bank_account_id, amount
+            FROM receive_voucher
+            WHERE bill_no = ? AND tenant_id = ?
+            ORDER BY id ASC
+        ");
+        $splitsStmt->execute([$invoice['bill_no'], $tenant_id]);
+        $receiveVouchers = $splitsStmt->fetchAll(PDO::FETCH_ASSOC);
+        // Only surface as a "split" when there's genuinely more than one receive_voucher
+        // for this bill — a normal single-method payment stays a single voucher row.
+        $paymentSplits = count($receiveVouchers) > 1 ? $receiveVouchers : [];
+
         echo json_encode([
             'success' => true,
             'invoice' => $invoice,
-            'items' => $items
+            'items' => $items,
+            'payment_splits' => $paymentSplits
         ]);
 
     } catch (Exception $e) {
@@ -173,16 +202,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
         $pdo->prepare("DELETE FROM stock_ledger WHERE reference_table = 'sale_invoice' AND reference_id = ? AND tenant_id = ?")->execute([$invoice_id, $tenant_id]);
         $pdo->prepare("DELETE FROM accounting_ledger WHERE reference_table = 'sale_invoice' AND reference_id = ? AND tenant_id = ?")->execute([$invoice_id, $tenant_id]);
         
-        // Delete existing receive voucher and its accounting entries
+        // Delete existing receive voucher(s) and their accounting entries — a split
+        // payment produces one receive_voucher row per method, so all matching rows
+        // for this bill_no must be wiped before re-creating them below.
         $billStmt = $pdo->prepare("SELECT bill_no FROM sale_invoice WHERE id = ?");
         $billStmt->execute([$invoice_id]);
         $billNo = $billStmt->fetchColumn();
-        
+
         $rvStmt = $pdo->prepare("SELECT id FROM receive_voucher WHERE bill_no = ? AND tenant_id = ?");
         $rvStmt->execute([$billNo, $tenant_id]);
-        $existingRvId = $rvStmt->fetchColumn();
-        
-        if ($existingRvId) {
+        $existingRvIds = $rvStmt->fetchAll(PDO::FETCH_COLUMN);
+
+        foreach ($existingRvIds as $existingRvId) {
             $pdo->prepare("DELETE FROM accounting_ledger WHERE reference_table = 'receive_voucher' AND reference_id = ? AND tenant_id = ?")->execute([$existingRvId, $tenant_id]);
             $pdo->prepare("DELETE FROM receive_voucher WHERE id = ? AND tenant_id = ?")->execute([$existingRvId, $tenant_id]);
         }
@@ -365,88 +396,108 @@ if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
             ]);
         }
 
-        // Insert receive voucher if amount paid > 0 and status is Posted
+        // Insert receive voucher(s) if amount paid > 0 and status is Posted — see
+        // pos-add.php for the full explanation of the one-voucher-per-split design.
         if ($status === 'Posted' && isset($input['amountPaid']) && $input['amountPaid'] > 0) {
-            // Generate voucher number with year
+            $paymentSplits = (!empty($input['paymentSplits']) && is_array($input['paymentSplits']))
+                ? array_values(array_filter($input['paymentSplits'], function ($s) {
+                    return floatval($s['amount'] ?? 0) > 0;
+                }))
+                : [];
+
+            if (empty($paymentSplits)) {
+                $paymentSplits = [[
+                    'method' => $input['paymentMethod'],
+                    'bankAccountId' => $input['bankAccountId'] ?? null,
+                    'amount' => $input['amountPaid']
+                ]];
+            }
+
             $currentYear = date('Y');
             $voucherStmt = $pdo->prepare("SELECT voucher_number FROM receive_voucher WHERE tenant_id = ? AND voucher_number LIKE ? ORDER BY id DESC LIMIT 1");
             $voucherStmt->execute([$tenant_id, "RV-{$currentYear}-%"]);
             $lastVoucher = $voucherStmt->fetchColumn();
+            $nextNumber = $lastVoucher ? ((int) substr($lastVoucher, strrpos($lastVoucher, '-') + 1)) + 1 : 1;
 
-            if ($lastVoucher) {
-                $lastNumber = (int) substr($lastVoucher, strrpos($lastVoucher, '-') + 1);
-                $newNumber = $lastNumber + 1;
-            } else {
-                $newNumber = 1;
+            foreach ($paymentSplits as $split) {
+                $splitAmount = floatval($split['amount'] ?? 0);
+                if ($splitAmount <= 0) {
+                    continue;
+                }
+
+                $voucherNumber = 'RV-' . $currentYear . '-' . str_pad($nextNumber, 4, '0', STR_PAD_LEFT);
+                $nextNumber++;
+
+                $splitMethodId = ($split['method'] === 'cash') ? 1 : 5;
+                $splitBankAccountId = ($split['method'] === 'cash') ? null : ($split['bankAccountId'] ?? null);
+
+                $rvStmt = $pdo->prepare("
+                    INSERT INTO receive_voucher (
+                        tenant_id, currency_id, voucher_number, voucher_date, customer_id,
+                        bill_no, amount, payment_method_id, bank_account_id, project_id, created_by, updated_by
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ");
+                $rvStmt->execute([
+                    $tenant_id,
+                    $input['currencyId'],
+                    $voucherNumber,
+                    $input['saleDate'],
+                    $input['customerId'],
+                    $billNo,
+                    $splitAmount,
+                    $splitMethodId,
+                    $splitBankAccountId,
+                    $input['projectId'] ?? null,
+                    $user_id,
+                    $user_id
+                ]);
+
+                $voucher_id = $pdo->lastInsertId();
+
+                // Get account_id for cash/bank
+                if ($splitMethodId === 1) {
+                    $cashAccountId = 1;
+                } else {
+                    $cashAccountId = 1;
+                    if (!empty($splitBankAccountId)) {
+                        $bankStmt = $pdo->prepare("SELECT account_id FROM bank_accounts WHERE id = ?");
+                        $bankStmt->execute([$splitBankAccountId]);
+                        $fetchedAccountId = $bankStmt->fetchColumn();
+                        if ($fetchedAccountId !== false && $fetchedAccountId !== null && $fetchedAccountId !== '') {
+                            $cashAccountId = intval($fetchedAccountId);
+                        }
+                    }
+                }
+
+                // Debit Cash/Bank Account
+                $pdo->prepare("
+                    INSERT INTO accounting_ledger (
+                        tenant_id, transaction_type, reference_table, reference_id,
+                        account_id, date, description, debit
+                    ) VALUES (?, 'Receive Voucher', 'receive_voucher', ?, ?, ?, ?, ?)
+                ")->execute([
+                    $tenant_id,
+                    $voucher_id,
+                    $cashAccountId,
+                    $input['saleDate'],
+                    'Receive Voucher - ' . $voucherNumber,
+                    $splitAmount
+                ]);
+
+                // Credit Trade Debtors
+                $pdo->prepare("
+                    INSERT INTO accounting_ledger (
+                        tenant_id, transaction_type, reference_table, reference_id,
+                        account_id, date, description, credit
+                    ) VALUES (?, 'Receive Voucher', 'receive_voucher', ?, 2, ?, ?, ?)
+                ")->execute([
+                    $tenant_id,
+                    $voucher_id,
+                    $input['saleDate'],
+                    'Receive Voucher - ' . $voucherNumber,
+                    $splitAmount
+                ]);
             }
-            $voucherNumber = 'RV-' . $currentYear . '-' . str_pad($newNumber, 4, '0', STR_PAD_LEFT);
-
-            // Determine payment method ID (1=Cash, 2=Bank Transfer)
-            $paymentMethodId = ($input['paymentMethod'] === 'cash') ? 1 : 2;
-
-            // Insert receive voucher
-            $rvStmt = $pdo->prepare("
-                INSERT INTO receive_voucher (
-                    tenant_id, currency_id, voucher_number, voucher_date, customer_id,
-                    bill_no, amount, payment_method_id, bank_account_id, project_id, created_by, updated_by
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ");
-            $rvStmt->execute([
-                $tenant_id,
-                $input['currencyId'],
-                $voucherNumber,
-                $input['saleDate'],
-                $input['customerId'],
-                $billNo,
-                $input['amountPaid'],
-                $paymentMethodId,
-                $input['bankAccountId'] ?? null,
-                $input['projectId'] ?? null,
-                $user_id,
-                $user_id
-            ]);
-
-            $voucher_id = $pdo->lastInsertId();
-
-            // Get account_id for cash/bank
-            if ($input['paymentMethod'] === 'cash') {
-                $cashAccountId = 1;
-            } else {
-                $bankStmt = $pdo->prepare("SELECT account_id FROM bank_accounts WHERE id = ?");
-                $bankStmt->execute([$input['bankAccountId']]);
-                $cashAccountId = $bankStmt->fetchColumn();
-            }
-
-            // Debit Cash/Bank Account
-            $rvDebitStmt = $pdo->prepare("
-                INSERT INTO accounting_ledger (
-                    tenant_id, transaction_type, reference_table, reference_id,
-                    account_id, date, description, debit
-                ) VALUES (?, 'Receive Voucher', 'receive_voucher', ?, ?, ?, ?, ?)
-            ");
-            $rvDebitStmt->execute([
-                $tenant_id,
-                $voucher_id,
-                $cashAccountId,
-                $input['saleDate'],
-                'Receive Voucher - ' . $voucherNumber,
-                $input['amountPaid']
-            ]);
-
-            // Credit Trade Debtors
-            $rvCreditStmt = $pdo->prepare("
-                INSERT INTO accounting_ledger (
-                    tenant_id, transaction_type, reference_table, reference_id,
-                    account_id, date, description, credit
-                ) VALUES (?, 'Receive Voucher', 'receive_voucher', ?, 2, ?, ?, ?)
-            ");
-            $rvCreditStmt->execute([
-                $tenant_id,
-                $voucher_id,
-                $input['saleDate'],
-                'Receive Voucher - ' . $voucherNumber,
-                $input['amountPaid']
-            ]);
         }
 
         $pdo->commit();

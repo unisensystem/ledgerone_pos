@@ -1049,7 +1049,10 @@
             
             items.forEach(item => {
                 if (item.parent_row_id === null) {
-                    const key = item.product_id;
+                    // Same product sold across multiple rows (e.g. different batches) must print as
+                    // separate rows — only merge units that truly belong to one row (same product +
+                    // same batch, split across Carton/Dozen/Piece unit columns).
+                    const key = item.product_id + '_' + (item.batch_no || '');
                     if (!itemsByProduct[key]) {
                         itemsByProduct[key] = {
                             baseItem: item,

@@ -457,9 +457,14 @@
             const currencySymbol = invoice.currency_symbol || '';
 
             // Group parent items by product
+            // Same product sold across multiple rows (e.g. different batches) must print as
+            // separate rows — only merge quantities that truly belong to one row (same product
+            // + same batch, split across Carton/Dozen/Piece unit columns). Merging by product_id
+            // alone summed quantity across batches while only keeping one batch's price/net/tax,
+            // silently dropping the other batch's amounts from the printed totals.
             const itemsByProduct = {};
             items.filter(i => !i.parent_row_id).forEach(item => {
-                const key = item.product_id;
+                const key = item.product_id + '_' + (item.batch_no || '');
                 if (!itemsByProduct[key]) {
                     itemsByProduct[key] = { baseItem: item, totalQty: 0 };
                 }

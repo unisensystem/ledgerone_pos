@@ -157,6 +157,11 @@ try {
                 ? trim($_GET['sale_officer_id'])
                 : null;
 
+            // Supplier Man (delivery man) filter
+            $supplier_man_id = !empty($_GET['supplier_man_id'])
+                ? trim($_GET['supplier_man_id'])
+                : null;
+
             // City filter (from customer's city_id)
             $city_id = !empty($_GET['city_id'])
                 ? trim($_GET['city_id'])
@@ -231,9 +236,15 @@ try {
         COALESCE(u.uom_name, '') AS unit_symbol,
 
         sii.sale_price,
+        sii.gross_amount,
+        sii.discount_percent,
         sii.discount_amount,
+        sii.extra_discount_amount,
         sii.tax_amount,
-        sii.net_amount
+        sii.net_amount,
+
+        so.full_name AS sale_officer_name,
+        sm.full_name AS supplier_man_name
 
     FROM sale_invoice_items sii
 
@@ -248,6 +259,14 @@ try {
     INNER JOIN customers c
         ON si.customer_id = c.id
         AND c.tenant_id = si.tenant_id
+
+    LEFT JOIN employees so
+        ON si.sale_officer_id = so.id
+        AND so.tenant_id = si.tenant_id
+
+    LEFT JOIN employees sm
+        ON si.supplier_man_id = sm.id
+        AND sm.tenant_id = si.tenant_id
 
     LEFT JOIN cities ci
         ON c.city_id = ci.id
@@ -428,6 +447,24 @@ try {
 
 
             // -----------------------------------------------------------------
+            // SUPPLIER MAN (DELIVERY MAN)
+            //
+            // IMPORTANT:
+            // supplier_man_id is directly in sale_invoice (si), referencing
+            // employees.id (same table/relationship as sale_officer_id).
+            // -----------------------------------------------------------------
+
+            if ($supplier_man_id !== null) {
+
+                $sql .= "
+                    AND si.supplier_man_id = ?
+                ";
+
+                $params[] = $supplier_man_id;
+            }
+
+
+            // -----------------------------------------------------------------
             // CITY
             //
             // IMPORTANT:
@@ -506,8 +543,17 @@ try {
                 $row['sale_price'] =
                     (float)($row['sale_price'] ?? 0);
 
+                $row['gross_amount'] =
+                    (float)($row['gross_amount'] ?? 0);
+
+                $row['discount_percent'] =
+                    (float)($row['discount_percent'] ?? 0);
+
                 $row['discount_amount'] =
                     (float)($row['discount_amount'] ?? 0);
+
+                $row['extra_discount_amount'] =
+                    (float)($row['extra_discount_amount'] ?? 0);
 
                 $row['tax_amount'] =
                     (float)($row['tax_amount'] ?? 0);
@@ -596,6 +642,7 @@ $row['invoice_disc_percent'] = (float)($row['invoice_disc_percent'] ?? 0);
                     'batch_no'         => $batch_no,
                     'expiry_date'      => $expiry_date,
                     'sale_officer_id'  => $sale_officer_id,
+                    'supplier_man_id'  => $supplier_man_id,
                     'city_id'          => $city_id,
                     'area_id'          => $area_id
                 ],
@@ -831,7 +878,9 @@ $row['invoice_disc_percent'] = (float)($row['invoice_disc_percent'] ?? 0);
         // SALESMEN (SALE OFFICERS)
         //
         // IMPORTANT:
-        // sale_invoice.sale_officer_id references users.id.
+        // sale_invoice.sale_officer_id references employees.id
+        // (same as pos-add.php's Sales Officer dropdown / get-employees.php),
+        // NOT users.id.
         // =====================================================================
 
         case 'salesmen':
@@ -843,11 +892,57 @@ $row['invoice_disc_percent'] = (float)($row['invoice_disc_percent'] ?? 0);
 
                     full_name
 
-                FROM users
+                FROM employees
 
                 WHERE tenant_id = ?
 
                   AND is_active = 1
+
+                  AND current_status = 'active'
+
+                ORDER BY full_name ASC
+            ";
+
+
+            $stmt = $pdo->prepare($sql);
+
+            $stmt->execute([
+                $tenant_id
+            ]);
+
+
+            echo json_encode([
+                'success' => true,
+                'data' => $stmt->fetchAll(PDO::FETCH_ASSOC)
+            ]);
+
+            break;
+
+
+        // =====================================================================
+        // SUPPLIER MEN (DELIVERY MEN)
+        //
+        // IMPORTANT:
+        // sale_invoice.supplier_man_id references employees.id
+        // (same as pos-add.php's Supplier Man dropdown / get-employees.php).
+        // =====================================================================
+
+        case 'supplier_men':
+
+            $sql = "
+                SELECT
+
+                    id,
+
+                    full_name
+
+                FROM employees
+
+                WHERE tenant_id = ?
+
+                  AND is_active = 1
+
+                  AND current_status = 'active'
 
                 ORDER BY full_name ASC
             ";
@@ -957,6 +1052,7 @@ $row['invoice_disc_percent'] = (float)($row['invoice_disc_percent'] ?? 0);
                     'branches',
                     'products',
                     'salesmen',
+                    'supplier_men',
                     'cities',
                     'areas'
                 ]

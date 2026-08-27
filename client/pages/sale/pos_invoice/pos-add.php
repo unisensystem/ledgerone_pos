@@ -245,8 +245,6 @@ if (!$user_id) {
                                 <th width="3%">S#</th>
                                 <th width="15%">Product Code / Name</th>
                                 <th width="10%">Scheme</th>
-                              <th width="8%">Batch No</th>
-<th width="8%">Expiry Date</th>
                                 <!-- Dynamic unit columns will be inserted here -->
                                 <th width="8%" class="price-cell"><span id="salePriceLabel">Sale Price</span></th>
                                 <th width="8%" class="gross-cell"><span id="grossAmountLabel">Gross Amount</span></th>
@@ -264,13 +262,11 @@ if (!$user_id) {
                             <!-- Rows will be added dynamically -->
                         </tbody>
                         <tfoot>
-                            <tr class="totals-row">
-                                <th style="text-align: left;">Totals</th>
+                             <tr class="totals-row">
+    <th style="text-align: left;">Totals</th>
 <th style="text-align: left;"></th>
 <th style="text-align: left;"></th>
-<th style="text-align: left;"></th>
-<th style="text-align: left;"></th>
-                                <!-- Dynamic unit totals will be inserted here -->
+    <!-- Dynamic unit totals will be inserted here -->
                                 <th id="totalSalePrice" class="price-cell">0.00</th>
                                 <th id="totalGrossAmount" class="gross-cell">0.00</th>
                                 <th class="disc-percent-cell"></th>
@@ -344,6 +340,10 @@ if (!$user_id) {
                             <option value="cash" selected>Cash</option>
                             <option value="bank_transfer">Bank Transfer</option>
                         </select>
+                        <label style="display: flex; align-items: center; gap: 6px; margin-top: 6px; font-size: 11px; cursor: pointer;">
+                            <input type="checkbox" id="splitPaymentToggle" style="width: auto;">
+                            <span>Split Payment (multiple methods)</span>
+                        </label>
                     </div>
                     <div class="summary-item" id="bankAccountContainer" style="display: none;">
                         <span class="summary-label">Bank Account</span>
@@ -351,6 +351,14 @@ if (!$user_id) {
                             <option value="">Select Bank Account</option>
                             <!-- Options loaded dynamically -->
                         </select>
+                    </div>
+                    <div class="summary-item full-width" id="splitPaymentContainer" style="display: none;">
+                        <span class="summary-label">Split Payment</span>
+                        <div id="splitPaymentRows"></div>
+                        <button type="button" class="btn btn-secondary" id="addSplitPaymentBtn" style="margin-top: 8px; padding: 6px 12px; font-size: 12px; width: fit-content;" tabindex="-1">
+                            <i class="fas fa-plus"></i> Add Payment
+                        </button>
+                        <div id="splitPaymentTotal" style="margin-top: 6px; font-size: 12px; color: var(--subtext);"></div>
                     </div>
                     <div class="summary-item">
                         <span class="summary-label" id="amountPaidLabel">Amount Paid</span>

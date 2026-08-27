@@ -77,20 +77,84 @@ async function loadProducts() {
     }
 }
 
+let salesmenData = [];
+let supplierMenData = [];
+
 async function loadSalesmen() {
     try {
         const res = await fetch(`${API_BASE}?action=salesmen`);
         const data = await res.json();
 
         if (data.success) {
-            document.getElementById('salesman-list').innerHTML =
-                data.data.map(s =>
-                    `<option value="${s.full_name}" data-id="${s.id}">`
-                ).join('');
+            salesmenData = data.data || [];
+            setupSearchableDropdown('salesman-search', 'salesman-dropdown', 'salesman-id', salesmenData, 'full_name');
         }
     } catch (e) {
         console.error('Error loading salesmen:', e);
     }
+}
+
+async function loadSupplierMen() {
+    try {
+        const res = await fetch(`${API_BASE}?action=supplier_men`);
+        const data = await res.json();
+
+        if (data.success) {
+            supplierMenData = data.data || [];
+            setupSearchableDropdown('supplier-man-search', 'supplier-man-dropdown', 'supplier-man-id', supplierMenData, 'full_name');
+        }
+    } catch (e) {
+        console.error('Error loading supplier men:', e);
+    }
+}
+
+// Generic type-to-search dropdown: matches anywhere in the label (not just prefix),
+// mirroring the same UX as the Sales Officer / Supplier Man pickers on the invoice
+// Add page (initSearchableDropdown in pos-add.js).
+function setupSearchableDropdown(searchInputId, dropdownId, hiddenIdInputId, items, labelKey) {
+    const searchInput = document.getElementById(searchInputId);
+    const dropdown = document.getElementById(dropdownId);
+    const hiddenInput = document.getElementById(hiddenIdInputId);
+
+    if (!searchInput || !dropdown || !hiddenInput) return;
+
+    function renderOptions(filterText) {
+        const term = (filterText || '').toLowerCase();
+        const matches = items.filter(item => String(item[labelKey] || '').toLowerCase().includes(term));
+
+        if (matches.length === 0) {
+            dropdown.innerHTML = `<div class="dropdown-empty">No matches</div>`;
+        } else {
+            dropdown.innerHTML = matches.map(item =>
+                `<div class="dropdown-option" data-id="${item.id}">${esc(item[labelKey])}</div>`
+            ).join('');
+        }
+
+        dropdown.classList.add('open');
+    }
+
+    searchInput.addEventListener('focus', () => renderOptions(searchInput.value));
+    searchInput.addEventListener('click', () => renderOptions(searchInput.value));
+
+    searchInput.addEventListener('input', () => {
+        hiddenInput.value = '';
+        renderOptions(searchInput.value);
+    });
+
+    dropdown.addEventListener('click', (e) => {
+        const option = e.target.closest('.dropdown-option');
+        if (!option) return;
+
+        searchInput.value = option.textContent;
+        hiddenInput.value = option.getAttribute('data-id');
+        dropdown.classList.remove('open');
+    });
+
+    document.addEventListener('click', (e) => {
+        if (e.target !== searchInput && !dropdown.contains(e.target)) {
+            dropdown.classList.remove('open');
+        }
+    });
 }
 
 async function loadCities() {
@@ -155,8 +219,14 @@ function groupByInvoice(rows) {
                 bill_no: row.bill_no,
                 sale_date: row.sale_date,
                 customer_name: row.customer_name,
+                city_name: row.city_name,
+                area_name: row.area_name,
+                zone_name: row.zone_name,
+                invoice_net_amount: parseFloat(row.invoice_net_amount || 0),
+                invoice_disc_percent: parseFloat(row.invoice_disc_percent || 0),
                 items: [],
-                total_amount: 0
+                total_amount: 0,
+                total_tax: 0
             });
         }
 
@@ -164,6 +234,7 @@ function groupByInvoice(rows) {
 
         group.items.push(row);
         group.total_amount += parseFloat(row.net_amount || 0);
+        group.total_tax += parseFloat(row.tax_amount || 0);
     });
 
     return groups;
@@ -174,7 +245,6 @@ async function loadReport() {
         const customerInput = document.getElementById('customer').value;
         const branchInput = document.getElementById('branch').value;
         const productInput = document.getElementById('product').value;
-        const salesmanInput = document.getElementById('salesman').value;
         const cityInput = document.getElementById('city').value;
         const areaInput = document.getElementById('area').value;
 
@@ -200,10 +270,9 @@ async function loadReport() {
             '#product-list'
         );
 
-        const salesmanId = findIdFromDatalist(
-            salesmanInput,
-            '#salesman-list'
-        );
+        const salesmanId = document.getElementById('salesman-id').value;
+
+        const supplierManId = document.getElementById('supplier-man-id').value;
 
         const cityId = findIdFromDatalist(
             cityInput,
@@ -250,6 +319,11 @@ async function loadReport() {
         // Salesman filter
         if (salesmanId) {
             url += `&sale_officer_id=${encodeURIComponent(salesmanId)}`;
+        }
+
+        // Supplier Man filter
+        if (supplierManId) {
+            url += `&supplier_man_id=${encodeURIComponent(supplierManId)}`;
         }
 
         // City filter
@@ -316,7 +390,7 @@ function renderTable() {
 
         tbody.innerHTML = `
             <tr>
-                <td colspan="9"
+                <td colspan="11"
                     style="text-align:center; padding:24px; color:var(--subtext);">
                     No records found
                 </td>
@@ -331,105 +405,82 @@ function renderTable() {
 
     pageGroups.forEach(group => {
 
+        const locationParts = [group.city_name, group.area_name, group.zone_name]
+            .filter(v => v && v.trim() !== '');
+        const locationText = locationParts.length
+            ? ` (${locationParts.map(esc).join(', ')})`
+            : '';
+
         // Invoice header
         html += `
             <tr style="background-color:var(--table-header);">
-
-                <td colspan="8">
+                <td colspan="10">
                     <strong>
                         ${formatDateShort(group.sale_date)}
                         &nbsp;&nbsp;
-                        ${esc(group.customer_name || '')}
+                        ${esc(group.customer_name || '')}${locationText}
                     </strong>
                 </td>
-
                 <td style="text-align:right;" class="col-amount">
                     <strong>
+                        ${currentCurrency}${group.invoice_net_amount.toFixed(2)}
+                        &nbsp;&nbsp;
                         ${esc(group.bill_no || '')}
                     </strong>
                 </td>
-
             </tr>
         `;
 
         // Item rows
         group.items.forEach((row, idx) => {
 
-            const salePrice =
-                parseFloat(row.sale_price || 0);
+            const salePrice   = parseFloat(row.sale_price || 0);
+            const quantity    = parseFloat(row.quantity || 0);
+            const focQty      = parseFloat(row.foc_quantity || 0);
+            const netAmount   = parseFloat(row.net_amount || 0);
+            const batchNo     = row.batch_no || '-';
+            const expiryDate  = formatDateShort(row.batch_expiry_date) || '-';
+            const discPercent = parseFloat(row.discount_percent || 0); // item-level
 
-            const quantity =
-                parseFloat(row.quantity || 0);
-
-            const focQty =
-                parseFloat(row.foc_quantity || 0);
-
-            const netAmount =
-                parseFloat(row.net_amount || 0);
-
-            const batchNo =
-                row.batch_no || '-';
-
-            const expiryDate =
-                formatDateShort(row.batch_expiry_date) || '-';
+            // Extra Disc % isn't stored directly — only the resulting amount is saved —
+            // so back-derive the % (on the post-main-discount amount), same as the
+            // invoice print pages do.
+            const grossAmount = parseFloat(row.gross_amount || 0);
+            const discAmount = parseFloat(row.discount_amount || 0);
+            const extraDiscAmount = parseFloat(row.extra_discount_amount || 0);
+            const afterMainDiscount = grossAmount - discAmount;
+            const extraDiscPercent = afterMainDiscount > 0 ? (extraDiscAmount / afterMainDiscount * 100) : 0;
 
             html += `
                 <tr>
-
-                    <td class="col-sno">
-                        ${idx + 1}
-                    </td>
-
-                    <td class="col-code">
-                        ${esc(row.product_code || '-')}
-                    </td>
-
-                    <td class="col-detail">
-                        ${esc(row.product_name || '-')}
-                    </td>
-
-                    <td class="col-batch">
-                        ${esc(batchNo)}
-                    </td>
-
-                    <td class="col-expiry">
-                        ${esc(expiryDate)}
-                    </td>
-
-                    <td class="col-price">
-                        ${currentCurrency}${salePrice.toFixed(2)}
-                    </td>
-
-                    <td class="col-qty">
-                        ${quantity.toFixed(2)}
-                        ${esc(row.unit_symbol || '')}
-                    </td>
-
-                    <td class="col-foc">
-                        ${focQty.toFixed(2)}
-                    </td>
-
-                    <td class="col-amount">
-                        ${currentCurrency}${netAmount.toFixed(2)}
-                    </td>
-
+                    <td class="col-sno">${idx + 1}</td>
+                    <td class="col-code">${esc(row.product_code || '-')}</td>
+                    <td class="col-detail">${esc(row.product_name || '-')}</td>
+                    <td class="col-batch">${esc(batchNo)}</td>
+                    <td class="col-expiry">${esc(expiryDate)}</td>
+                    <td class="col-price">${currentCurrency}${salePrice.toFixed(2)}</td>
+                    <td class="col-qty">${quantity.toFixed(2)} ${esc(row.unit_symbol || '')}</td>
+                    <td class="col-disc">${discPercent.toFixed(2)}%</td>
+                    <td class="col-extradisc">${extraDiscPercent.toFixed(2)}%</td>
+                    <td class="col-foc">${focQty.toFixed(2)}</td>
+                    <td class="col-amount">${currentCurrency}${netAmount.toFixed(2)}</td>
                 </tr>
             `;
         });
 
-        // Invoice total
+        // Invoice total row
         html += `
             <tr style="font-weight:bold;">
+                <td colspan="10" style="text-align:right;">Total</td>
+                <td class="col-amount">${currentCurrency}${group.total_amount.toFixed(2)}</td>
+            </tr>
+        `;
 
-                <td colspan="8"
-                    style="text-align:right;">
-                    Total
-                </td>
-
-                <td class="col-amount">
-                    ${currentCurrency}${group.total_amount.toFixed(2)}
-                </td>
-
+        // Invoice tax row — right under Total
+        html += `
+            <tr style="font-weight:bold;">
+                <td colspan="10" style="text-align:right;">Tax</td>
+                <td class="col-amount">${currentCurrency}${group.total_tax.toFixed(2)}</td>
             </tr>
         `;
     });
@@ -561,12 +612,20 @@ function exportToExcel() {
             'Expiry Date': '',
             'Price': '',
             'Qty': '',
+            'Disc %': '',
+            'Extra Disc %': '',
             'FOC': '',
             'Amount': group.bill_no
         });
 
         // Items
         group.items.forEach((row, idx) => {
+
+            const grossAmount = parseFloat(row.gross_amount || 0);
+            const discAmount = parseFloat(row.discount_amount || 0);
+            const extraDiscAmount = parseFloat(row.extra_discount_amount || 0);
+            const afterMainDiscount = grossAmount - discAmount;
+            const extraDiscPercent = afterMainDiscount > 0 ? (extraDiscAmount / afterMainDiscount * 100) : 0;
 
             rows.push({
                 'S.No': idx + 1,
@@ -590,6 +649,12 @@ function exportToExcel() {
                 'Qty':
                     `${parseFloat(row.quantity || 0).toFixed(2)} ${row.unit_symbol || ''}`,
 
+                'Disc %':
+                    parseFloat(row.discount_percent || 0).toFixed(2),
+
+                'Extra Disc %':
+                    extraDiscPercent.toFixed(2),
+
                 'FOC':
                     parseFloat(row.foc_quantity || 0)
                         .toFixed(2),
@@ -609,9 +674,27 @@ function exportToExcel() {
             'Expiry Date': '',
             'Price': '',
             'Qty': '',
+            'Disc %': '',
+            'Extra Disc %': '',
             'FOC': 'Total',
             'Amount':
                 group.total_amount.toFixed(2)
+        });
+
+        // Tax — right under Total
+        rows.push({
+            'S.No': '',
+            'Code': '',
+            'Detail': '',
+            'Batch No': '',
+            'Expiry Date': '',
+            'Price': '',
+            'Qty': '',
+            'Disc %': '',
+            'Extra Disc %': '',
+            'FOC': 'Tax',
+            'Amount':
+                group.total_tax.toFixed(2)
         });
     });
 
@@ -685,8 +768,11 @@ function printReport() {
     const productInput =
         document.getElementById('product').value;
 
-    const salesmanInput =
-        document.getElementById('salesman').value;
+    const salesmanId =
+        document.getElementById('salesman-id').value;
+
+    const supplierManId =
+        document.getElementById('supplier-man-id').value;
 
     const cityInput =
         document.getElementById('city').value;
@@ -722,12 +808,6 @@ function printReport() {
         findIdFromDatalist(
             productInput,
             '#product-list'
-        );
-
-    const salesmanId =
-        findIdFromDatalist(
-            salesmanInput,
-            '#salesman-list'
         );
 
     const cityId =
@@ -792,6 +872,12 @@ function printReport() {
         );
     }
 
+    if (supplierManId) {
+        params.push(
+            `supplier_man_id=${encodeURIComponent(supplierManId)}`
+        );
+    }
+
     if (cityId) {
         params.push(
             `city_id=${encodeURIComponent(cityId)}`
@@ -830,6 +916,8 @@ const COLUMN_CONFIG = [
     { key: 'expiry', label: 'Expiry Date' },
     { key: 'price',  label: 'Price' },
     { key: 'qty',    label: 'Qty' },
+    { key: 'disc',   label: 'Disc %' },
+    { key: 'extradisc', label: 'Extra Disc %' },
     { key: 'foc',    label: 'FOC' },
     { key: 'amount', label: 'Amount' }
 ];
@@ -942,7 +1030,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 document.getElementById('product').value = '';
 
-                document.getElementById('salesman').value = '';
+                document.getElementById('salesman-search').value = '';
+                document.getElementById('salesman-id').value = '';
+
+                document.getElementById('supplier-man-search').value = '';
+                document.getElementById('supplier-man-id').value = '';
 
                 document.getElementById('city').value = '';
 
@@ -1049,6 +1141,7 @@ document.addEventListener('DOMContentLoaded', () => {
     loadBranches();
     loadProducts();
     loadSalesmen();
+    loadSupplierMen();
     loadCities();
     loadAreas();
     loadReport();

@@ -481,6 +481,7 @@ const invoiceSettingCheckboxes = [
         
         // Setup payment method listener after bank accounts are loaded
         setupPaymentMethodListener();
+        setupSplitPaymentToggle();
 
         if (isEditMode) {
             loadInvoiceData(editId);
@@ -1230,6 +1231,8 @@ const invoiceSettingCheckboxes = [
             const data = await response.json();
 
             if (data.success) {
+                bankAccountsData = data.accounts || [];
+
                 const bankAccountSelect = document.getElementById('bankAccount');
                 bankAccountSelect.innerHTML = '<option value="">Select Bank Account</option>';
 
@@ -1643,7 +1646,10 @@ const invoiceSettingCheckboxes = [
                 const itemsByProduct = {};
                 data.items.forEach(item => {
                     if (!item.parent_row_id) {
-                        const key = item.product_id;
+                        // Same product sold across multiple rows (e.g. different batches) must stay
+                        // separate rows on edit — only merge units that truly belong to one row
+                        // (same product + same batch, split across Carton/Dozen/Piece unit columns).
+                        const key = item.product_id + '_' + (item.batch_no || '');
                         if (!itemsByProduct[key]) {
                             itemsByProduct[key] = {
                                 baseItem: item,
@@ -1800,15 +1806,37 @@ const invoiceSettingCheckboxes = [
                 // Update summary
                 document.getElementById('totalDiscountPercent').value = invoice.total_discount_percent;
                 document.getElementById('totalDiscountAmount').value = invoice.total_discount_amount;
-                document.getElementById('paymentMethod').value = invoice.payment_method || '';
+                // pos-edit.php returns 'Cash' / 'Bank Transfer' (display casing, used by
+                // print pages) — normalize to the select's lowercase option values.
+                const paymentMethodValue = invoice.payment_method === 'Bank Transfer' ? 'bank_transfer'
+                    : (invoice.payment_method === 'Cash' ? 'cash' : '');
+                document.getElementById('paymentMethod').value = paymentMethodValue;
 
                 // Show bank account if payment method is bank_transfer
-                if (invoice.payment_method === 'bank_transfer') {
+                if (paymentMethodValue === 'bank_transfer') {
                     document.getElementById('bankAccountContainer').style.display = 'flex';
                     document.getElementById('bankAccount').value = invoice.bank_account_id || '';
                 }
 
                 document.getElementById('amountPaid').value = invoice.amount_paid || 0;
+
+                // Restore split payment rows if this invoice's payment was split
+                // across multiple methods (see sale_invoice_payment_splits).
+                const paymentSplits = data.payment_splits || [];
+                if (paymentSplits.length > 0) {
+                    setSplitPaymentMode(true);
+                    document.getElementById('splitPaymentRows').innerHTML = '';
+                    paymentSplits.forEach(split => {
+                        createSplitPaymentRow({
+                            method: split.payment_method_id == 5 ? 'bank_transfer' : 'cash',
+                            bankAccountId: split.bank_account_id,
+                            amount: split.amount
+                        });
+                    });
+                    updateSplitPaymentTotal();
+                } else {
+                    setSplitPaymentMode(false);
+                }
 
                 // Set amount paid auto fill radio button
                 const autoFillValue = invoice.amount_paid_auto_fill || 'yes';
@@ -3520,6 +3548,141 @@ const invoiceSettingCheckboxes = [
         }
     }
 
+    // ===== Split Payment (e.g. part Cash + part Bank Transfer on one invoice) =====
+
+    function buildSplitBankAccountOptions(selectEl) {
+        selectEl.innerHTML = '<option value="">Select Bank Account</option>';
+        (bankAccountsData || []).forEach(account => {
+            const option = document.createElement('option');
+            option.value = account.id;
+            option.textContent = `${account.account_title} - ${account.account_number}`;
+            selectEl.appendChild(option);
+        });
+    }
+
+    function getSplitPaymentRows() {
+        const container = document.getElementById('splitPaymentRows');
+        return container ? Array.from(container.querySelectorAll('.split-payment-row')) : [];
+    }
+
+    function updateSplitPaymentTotal() {
+        const rows = getSplitPaymentRows();
+        let total = 0;
+        rows.forEach(row => {
+            total += parseFloat(row.querySelector('.split-amount').value) || 0;
+        });
+
+        const totalEl = document.getElementById('splitPaymentTotal');
+        if (totalEl) {
+            totalEl.textContent = `Split Total: ${total.toFixed(3)}`;
+        }
+
+        // Amount Paid is derived from the split total while split mode is active,
+        // so every existing calculation that reads #amountPaid (remaining balance,
+        // save payload, etc.) keeps working unchanged.
+        const amountPaidEl = document.getElementById('amountPaid');
+        if (amountPaidEl) {
+            amountPaidEl.value = total.toFixed(3);
+            updateRemainingBalance();
+        }
+    }
+
+    function createSplitPaymentRow(prefill) {
+        const container = document.getElementById('splitPaymentRows');
+        if (!container) return null;
+
+        const row = document.createElement('div');
+        row.className = 'split-payment-row';
+        row.style.cssText = 'display: flex; gap: 8px; align-items: center; margin-bottom: 6px;';
+        row.innerHTML = `
+            <select class="split-method table-input" style="flex: 1;" tabindex="-1">
+                <option value="cash">Cash</option>
+                <option value="bank_transfer">Bank Transfer</option>
+            </select>
+            <select class="split-bank-account table-input" style="flex: 1; display: none;" tabindex="-1"></select>
+            <input type="number" class="split-amount table-input" placeholder="Amount" min="0" step="0.001" style="flex: 1;" tabindex="-1">
+            <button type="button" class="btn btn-secondary remove-split-row" style="padding: 6px 10px;" tabindex="-1"><i class="fas fa-times"></i></button>
+        `;
+        container.appendChild(row);
+
+        const methodSelect = row.querySelector('.split-method');
+        const bankSelect = row.querySelector('.split-bank-account');
+        const amountInput = row.querySelector('.split-amount');
+
+        buildSplitBankAccountOptions(bankSelect);
+
+        methodSelect.addEventListener('change', function () {
+            bankSelect.style.display = this.value === 'bank_transfer' ? '' : 'none';
+            if (this.value !== 'bank_transfer') bankSelect.value = '';
+        });
+
+        amountInput.addEventListener('input', updateSplitPaymentTotal);
+
+        row.querySelector('.remove-split-row').addEventListener('click', function () {
+            row.remove();
+            updateSplitPaymentTotal();
+        });
+
+        if (prefill) {
+            methodSelect.value = prefill.method || 'cash';
+            methodSelect.dispatchEvent(new Event('change'));
+            if (prefill.bankAccountId) bankSelect.value = prefill.bankAccountId;
+            if (prefill.amount !== undefined && prefill.amount !== null && prefill.amount !== '') {
+                amountInput.value = prefill.amount;
+            }
+        }
+
+        return row;
+    }
+
+    function setSplitPaymentMode(enabled) {
+        const toggle = document.getElementById('splitPaymentToggle');
+        const splitContainer = document.getElementById('splitPaymentContainer');
+        const bankAccountContainer = document.getElementById('bankAccountContainer');
+        const paymentMethodSelect = document.getElementById('paymentMethod');
+        const amountPaidEl = document.getElementById('amountPaid');
+
+        if (toggle) toggle.checked = enabled;
+
+        if (enabled) {
+            if (paymentMethodSelect) paymentMethodSelect.setAttribute('disabled', 'disabled');
+            if (bankAccountContainer) bankAccountContainer.style.setProperty('display', 'none', 'important');
+            if (splitContainer) splitContainer.style.display = '';
+            if (amountPaidEl) amountPaidEl.setAttribute('readonly', 'readonly');
+        } else {
+            if (paymentMethodSelect) paymentMethodSelect.removeAttribute('disabled');
+            if (splitContainer) {
+                splitContainer.style.display = 'none';
+                document.getElementById('splitPaymentRows').innerHTML = '';
+            }
+            if (amountPaidEl) amountPaidEl.removeAttribute('readonly');
+            if (paymentMethodSelect) paymentMethodSelect.dispatchEvent(new Event('change'));
+        }
+    }
+
+    function setupSplitPaymentToggle() {
+        const toggle = document.getElementById('splitPaymentToggle');
+        const addBtn = document.getElementById('addSplitPaymentBtn');
+
+        if (toggle) {
+            toggle.addEventListener('change', function () {
+                setSplitPaymentMode(this.checked);
+                if (this.checked && getSplitPaymentRows().length === 0) {
+                    createSplitPaymentRow({ method: 'cash', amount: '' });
+                    createSplitPaymentRow({ method: 'bank_transfer', amount: '' });
+                    updateSplitPaymentTotal();
+                }
+            });
+        }
+
+        if (addBtn) {
+            addBtn.addEventListener('click', function () {
+                createSplitPaymentRow({ method: 'cash', amount: '' });
+                updateSplitPaymentTotal();
+            });
+        }
+    }
+
     // Update invoice summary from discount amount
     function updateInvoiceSummaryFromAmount() {
         // Delegate entirely to the main function which handles all discount layers
@@ -4160,7 +4323,33 @@ function saveInvoice(status = 'Posted') {
     });
 
     const brandValue = document.getElementById('brand')?.value;
-    
+
+    // Split payment: collect {method, bankAccountId, amount} for each row with a
+    // positive amount when Split Payment is enabled. Amount Paid mirrors the split
+    // total automatically (see updateSplitPaymentTotal), so no separate validation
+    // is needed here.
+    const splitPaymentEnabled = document.getElementById('splitPaymentToggle')?.checked;
+    let paymentSplits = null;
+    let effectivePaymentMethod = document.getElementById('paymentMethod')?.value;
+    let effectiveBankAccountId = document.getElementById('bankAccount')?.value || null;
+    if (splitPaymentEnabled) {
+        // saveInvoice() lives outside initializePage()'s closure (where the split
+        // payment helpers are defined), so query the rows directly here instead
+        // of calling getSplitPaymentRows().
+        paymentSplits = Array.from(document.querySelectorAll('#splitPaymentRows .split-payment-row'))
+            .map(row => ({
+                method: row.querySelector('.split-method').value,
+                bankAccountId: row.querySelector('.split-bank-account').value || null,
+                amount: parseFloat(row.querySelector('.split-amount').value) || 0
+            }))
+            .filter(split => split.amount > 0);
+
+        if (paymentSplits.length > 0) {
+            effectivePaymentMethod = paymentSplits[0].method;
+            effectiveBankAccountId = paymentSplits[0].bankAccountId;
+        }
+    }
+
     const formData = {
         saleDate: document.getElementById('saleDate').value,
         customerId: document.getElementById('customerCode').value,
@@ -4185,8 +4374,9 @@ function saveInvoice(status = 'Posted') {
         totalDiscountAmount: parseFloat(document.getElementById('totalDiscountAmount')?.value),
         netAmount: parseFloat(document.getElementById('netAmount').textContent),
         netReceivable: parseFloat(document.getElementById('netReceivable').textContent),
-        paymentMethod: document.getElementById('paymentMethod')?.value,
-        bankAccountId: document.getElementById('bankAccount')?.value || null,
+        paymentMethod: effectivePaymentMethod,
+        bankAccountId: effectiveBankAccountId,
+        paymentSplits: paymentSplits,
         amountPaid: parseFloat(document.getElementById('amountPaid')?.value) || 0,
         amountPaidAutoFill: document.querySelector('input[name="autoFillAmountPaid"]:checked')?.value || 'yes',
         remainingBalance: parseFloat(document.getElementById('remainingBalance')?.value) || 0,
@@ -5114,7 +5304,20 @@ async function loadPriceHistory(productId) {
         if (data.success && data.history && data.history.length > 0) {
             const content = data.history.map((item, index) => {
                 const date = new Date(item.sale_date).toLocaleDateString();
-                return `<div>${index + 1}. ${date} - ${item.currency_symbol}${parseFloat(item.sale_price).toFixed(3)} (Qty: ${item.quantity})</div>`;
+
+                // Extra Disc % isn't stored directly — only the resulting amount is
+                // saved — so back-derive the % (on the post-main-discount amount),
+                // same as the invoice print pages and Daily Sale Report do.
+                const grossAmount = parseFloat(item.gross_amount || 0);
+                const discAmount = parseFloat(item.discount_amount || 0);
+                const extraDiscAmount = parseFloat(item.extra_discount_amount || 0);
+                const afterMainDiscount = grossAmount - discAmount;
+                const extraDiscPercent = afterMainDiscount > 0 ? (extraDiscAmount / afterMainDiscount * 100) : 0;
+                const discPercent = parseFloat(item.discount_percent || 0);
+                const bonusQty = parseFloat(item.foc_quantity || 0);
+
+                return `<div>${index + 1}. ${date} - ${item.currency_symbol}${parseFloat(item.sale_price).toFixed(3)} (Qty: ${item.quantity})`
+                    + `<br><span style="font-size: 11px; color: var(--subtext);">Disc %: ${discPercent.toFixed(2)} | Extra Disc %: ${extraDiscPercent.toFixed(2)} | Bonus: ${bonusQty.toFixed(3)}</span></div>`;
             }).join('');
 
             document.getElementById('priceHistoryContent').innerHTML = content;
@@ -5288,6 +5491,14 @@ function validateStockForRow(row) {
         const cf = parseFloat(input.dataset.conversionFactor) || 1;
         totalQty += qty * cf;
     });
+
+    // Bonus (FOC) quantity is entered in the product's base unit (same
+    // convention the backend uses when saving it to stock_ledger) and draws
+    // from the same batch as the regular sale qty, so it must count toward
+    // the same available-stock check.
+    const focInputForStock = row.querySelector('.foc-cell input');
+    const focQtyForStock = parseFloat(focInputForStock?.value) || 0;
+    totalQty += focQtyForStock;
 
     // Update required qty display
     const requiredDisplay = document.getElementById('requiredQtyDisplay');
@@ -6244,6 +6455,13 @@ async function addRowDynamic() {
     focInput.min = '0';
     focInput.step = '0.001';
     focInput.value = '0';
+    // Bonus draws from the same batch as the regular sale qty, so changing it
+    // must re-check available stock too (see validateStockForRow).
+    focInput.addEventListener('input', function() {
+        if (typeof validateStockForRow === 'function') {
+            validateStockForRow(row);
+        }
+    });
     focCell.appendChild(focInput);
     
     // Net Amount

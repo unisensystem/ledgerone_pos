@@ -226,7 +226,6 @@
         }
 
         .a6-mode .invoice-header {
-            flex-direction: column;
             align-items: flex-start;
             margin-bottom: 6px;
             padding-bottom: 5px;
@@ -234,8 +233,7 @@
         }
 
         .a6-mode .invoice-details {
-            text-align: left;
-            width: 100%;
+            text-align: right;
         }
 
         .a6-mode .company-info {
@@ -693,8 +691,12 @@
         // Paper size management
         function setPaperSize(size) {
             localStorage.setItem('invoicePaperSize', size);
-            document.documentElement.style.setProperty('--page-size', size);
-            
+            // "A6" is not a valid CSS @page size keyword (only A3/A4/A5/B4/B5/letter/legal/ledger are) —
+            // browsers silently ignore it and fall back to the default page size, which is why A6
+            // printed as tiny content on a full-size blank page. Use explicit physical dimensions instead.
+            const pageSizeValue = size === 'A6' ? '105mm 148mm' : size;
+            document.documentElement.style.setProperty('--page-size', pageSizeValue);
+
             document.body.classList.remove('a5-mode', 'a6-mode');
             if (size === 'A5') document.body.classList.add('a5-mode');
             if (size === 'A6') document.body.classList.add('a6-mode');
@@ -1059,10 +1061,26 @@
             }
 
             document.getElementById('companyName').textContent = company.company_name || company.legal_name || 'Company Name';
-            document.getElementById('companyAddress').textContent = company.address || '';
-            document.getElementById('companyCityState').textContent = `${company.city || ''}, ${company.state || ''} ${company.zipcode || ''}`.trim();
-            document.getElementById('companyPhone').textContent = company.phone ? `Phone: ${company.phone}` : '';
-            document.getElementById('companyEmail').textContent = company.email ? `Email: ${company.email}` : '';
+            setCompanyInfoLine('companyAddress', company.address || '');
+
+            const cityStateText = `${company.city || ''}, ${company.state || ''} ${company.zipcode || ''}`
+                .replace(/^,\s*/, '').replace(/,\s*$/, '').trim();
+            setCompanyInfoLine('companyCityState', cityStateText);
+
+            setCompanyInfoLine('companyPhone', company.phone ? `Phone: ${company.phone}` : '');
+            setCompanyInfoLine('companyEmail', company.email ? `Email: ${company.email}` : '');
+        }
+
+        // Fills a company-info <p> with text, or hides the whole line when there's nothing to show
+        // (an empty <p> still takes up a line and looks broken, especially on the cramped A6 layout)
+        function setCompanyInfoLine(elementId, text) {
+            const el = document.getElementById(elementId);
+            if (!text) {
+                el.style.display = 'none';
+            } else {
+                el.style.display = '';
+                el.textContent = text;
+            }
         }
 
         function populateInvoiceData(invoice, items, closingBalanceData) {
@@ -1181,7 +1199,10 @@
             
             items.forEach(item => {
                 if (item.parent_row_id === null) {
-                    const key = item.product_id;
+                    // Same product sold across multiple rows (e.g. different batches) must print as
+                    // separate rows — only merge units that truly belong to one row (same product +
+                    // same batch, split across Carton/Dozen/Piece unit columns).
+                    const key = item.product_id + '_' + (item.batch_no || '');
                     if (!itemsByProduct[key]) {
                         itemsByProduct[key] = {
                             baseItem: item,

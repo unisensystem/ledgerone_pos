@@ -27,17 +27,66 @@ if (!$user_id) {
         | Example: body.hide-col-foc .col-foc { display: none; }
         |--------------------------------------------------------------------------
         */
-       body.hide-col-sno    .col-sno,
-body.hide-col-code   .col-code,
-body.hide-col-detail .col-detail,
-body.hide-col-batch  .col-batch,
-body.hide-col-price  .col-price,
-body.hide-col-qty    .col-qty,
-body.hide-col-disc   .col-disc,
-body.hide-col-foc    .col-foc,
-body.hide-col-amount .col-amount {
+       body.hide-col-sno       .col-sno,
+body.hide-col-code      .col-code,
+body.hide-col-detail    .col-detail,
+body.hide-col-batch     .col-batch,
+body.hide-col-expiry    .col-expiry,
+body.hide-col-price     .col-price,
+body.hide-col-qty       .col-qty,
+body.hide-col-disc      .col-disc,
+body.hide-col-extradisc .col-extradisc,
+body.hide-col-foc       .col-foc,
+body.hide-col-amount    .col-amount {
     display: none !important;
 }
+
+        /*
+        |--------------------------------------------------------------------------
+        | SEARCHABLE DROPDOWN (Salesman / Supplier Man)
+        |--------------------------------------------------------------------------
+        */
+        .search-dropdown-group {
+            position: relative;
+        }
+
+        .search-dropdown {
+            display: none;
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            z-index: 50;
+            background: #fff;
+            border: 1px solid #ccc;
+            border-top: none;
+            max-height: 220px;
+            overflow-y: auto;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.12);
+        }
+
+        .search-dropdown.open {
+            display: block;
+        }
+
+        .search-dropdown .dropdown-option {
+            padding: 8px 12px;
+            font-size: 13px;
+            color: #222;
+            cursor: pointer;
+        }
+
+        .search-dropdown .dropdown-option:hover,
+        .search-dropdown .dropdown-option.active {
+            background: #1a6cdc;
+            color: #fff;
+        }
+
+        .search-dropdown .dropdown-empty {
+            padding: 8px 12px;
+            font-size: 13px;
+            color: #888;
+        }
 
         /*
         |--------------------------------------------------------------------------
@@ -171,10 +220,17 @@ body.hide-col-amount .col-amount {
                     <input type="text" class="form-control" id="product" list="product-list" placeholder="All Products">
                     <datalist id="product-list"></datalist>
                 </div>
-                <div class="form-group">
-                    <label class="form-label" for="salesman">Salesman</label>
-                    <input type="text" class="form-control" id="salesman" list="salesman-list" placeholder="All Salesmen">
-                    <datalist id="salesman-list"></datalist>
+                <div class="form-group search-dropdown-group">
+                    <label class="form-label" for="salesman-search">Salesman</label>
+                    <input type="text" class="form-control" id="salesman-search" placeholder="All Salesmen" autocomplete="off">
+                    <input type="hidden" id="salesman-id" value="">
+                    <div class="search-dropdown" id="salesman-dropdown"></div>
+                </div>
+                <div class="form-group search-dropdown-group">
+                    <label class="form-label" for="supplier-man-search">Supplier Man</label>
+                    <input type="text" class="form-control" id="supplier-man-search" placeholder="All Supplier Men" autocomplete="off">
+                    <input type="hidden" id="supplier-man-id" value="">
+                    <div class="search-dropdown" id="supplier-man-dropdown"></div>
                 </div>
                 <div class="form-group">
                     <label class="form-label" for="city">City</label>
@@ -228,9 +284,11 @@ body.hide-col-amount .col-amount {
     <th class="col-code">Product Code</th>
     <th class="col-detail">Details</th>
     <th class="col-batch">Batch No</th>
+    <th class="col-expiry">Expiry Date</th>
     <th class="col-price">Price</th>
     <th class="col-qty">Qty</th>
     <th class="col-disc">Disc %</th>
+    <th class="col-extradisc">Extra Disc %</th>
     <th class="col-foc">FOC</th>
     <th class="col-amount">Amount</th>
 </tr>

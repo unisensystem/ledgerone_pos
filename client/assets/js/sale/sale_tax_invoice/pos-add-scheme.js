@@ -590,7 +590,14 @@ async function calculateGivenSchemeAmounts(row, product) {
     if (focInput) {
         focInput.value = totalFOCQty.toFixed(3);
     }
-    
+
+    // Setting .value programmatically doesn't fire the FOC input's own 'input'
+    // listener, so the Available Stock check (which now includes Bonus qty)
+    // must be re-run explicitly here.
+    if (typeof validateStockForRow === 'function') {
+        validateStockForRow(row);
+    }
+
     // Keep T.O Amount at 0
     const toAmountInput = row.querySelector('.to-amount-cell input');
     if (toAmountInput) {

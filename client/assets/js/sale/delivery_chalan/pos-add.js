@@ -1323,7 +1323,10 @@ function initializePage(permissions) {
                 const itemsByProduct = {};
                 data.items.forEach(item => {
                     if (!item.parent_row_id) {
-                        const key = item.product_id;
+                        // Same product sold across multiple rows (e.g. different batches) must stay
+                        // separate rows on edit — only merge units that truly belong to one row
+                        // (same product + same batch, split across Carton/Dozen/Piece unit columns).
+                        const key = item.product_id + '_' + (item.batch_no || '');
                         if (!itemsByProduct[key]) {
                             itemsByProduct[key] = {
                                 baseItem: item,

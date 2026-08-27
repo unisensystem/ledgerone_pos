@@ -38,14 +38,22 @@ try {
     $billStmt->execute([$invoice_id, $tenant_id]);
     $billNo = $billStmt->fetchColumn();
     
-    // Get receive_voucher id if exists
+    // Get receive_voucher id(s) if they exist — a split payment produces one
+    // receive_voucher row per method (e.g. one Cash + one Bank Transfer) sharing
+    // this bill_no, so every matching row must be deleted, not just the first.
     if ($billNo) {
-        $rvStmt = $pdo->prepare("SELECT id FROM receive_voucher WHERE bill_no = ? AND tenant_id = ?");
+        $rvStmt = $pdo->prepare("SELECT id, payment_method_id FROM receive_voucher WHERE bill_no = ? AND tenant_id = ?");
         $rvStmt->execute([$billNo, $tenant_id]);
-        $rvId = $rvStmt->fetchColumn();
-        
-        // Delete receive_voucher accounting entries
-        if ($rvId) {
+        $rvRows = $rvStmt->fetchAll(PDO::FETCH_ASSOC);
+
+        foreach ($rvRows as $rvRow) {
+            $rvId = $rvRow['id'];
+
+            // Cheque-method vouchers also have a post_dated_cheques row
+            if ($rvRow['payment_method_id'] == 6) {
+                $pdo->prepare("DELETE FROM post_dated_cheques WHERE tenant_id = ? AND reference_table = 'receive_voucher' AND reference_id = ?")->execute([$tenant_id, $rvId]);
+            }
+
             $pdo->prepare("DELETE FROM accounting_ledger WHERE reference_table = 'receive_voucher' AND reference_id = ? AND tenant_id = ?")->execute([$rvId, $tenant_id]);
             $pdo->prepare("DELETE FROM receive_voucher WHERE id = ? AND tenant_id = ?")->execute([$rvId, $tenant_id]);
         }

@@ -1,3 +1,64 @@
+(function() {
+    // Current page ka URL check karke decide karo ke ye normal POS hai ya Med POS
+    const prefix = window.location.pathname.includes('med_pos_invoice') ? 'med_' : 'pos_';
+    
+    const originalGetItem = localStorage.getItem.bind(localStorage);
+    const originalSetItem = localStorage.setItem.bind(localStorage);
+    const originalRemoveItem = localStorage.removeItem.bind(localStorage);
+
+    const sharedKeys = new Set([
+        'enableTaxation', 'enableExtraDiscountItem',
+        'enableBatchNo','enableExpiryDate','enableFOC','enableTradeOfferAmount',
+        'enableCashDiscountPercent','enableCashDiscountAmount',
+        'enableInvoiceCashDiscountPercent','enableInvoiceCashDiscountAmount',
+        'enableExtraDiscount1','enableExtraDiscount2','enableShippingFees',
+        'enableAmountPaidPaymentMethod','enablePrintQRCode',
+        'defaultScheme','salePriceSetting','productFilteringMode',
+        'productDisplayMode','customerDisplayMode',
+        'totalsLayout','childDisplayMode','printColumnCustomization',
+        'pos_print_preference','showSettingsButtons','compactMode',
+        'labelTotalBill','labelDiscountAmount','labelShippingFees','labelNetAmount',
+        'labelAmountPaid','labelPaymentMethod','labelRemainingBalance',
+        'hidePrintCustomerPhone','hidePrintCustomerEmail','hidePrintCustomerAddress',
+        'hidePrintPreviousBalance','hidePrintBranch','hidePrintCurrency',
+        'hidePrintSalesOfficer','hidePrintBiltyNo','hidePrintTransport',
+        'hidePrintRemarks','hidePrintTotalBill','hidePrintNetAmount',
+        'hidePrintPaymentMethod','hidePrintAmountPaid','hidePrintRemainingBalance',
+        'hidePrintAmountInWords','hidePrintSignatures','hidePrintGeneratedBy',
+        'hidePrintGeneratedOn','pos_shortcuts',
+        'hideInvoiceTypeStandard','hideDueDateStandard','hideBrandStandard',
+        'hideSalesOfficerStandard','hideSupplierManStandard','hideAreaCityStandard',
+        'hideSubAccountStandard','hideSaleOrderStandard','hideCurrencyStandard',
+        'hideTransportNameStandard','hideBiltyNoStandard','hideProjectStandard',
+        'hideContainerStandard','hideRemarksStandard'
+    ]);
+
+    localStorage.getItem = function(key) {
+        return originalGetItem(sharedKeys.has(key) ? prefix + key : key);
+    };
+    localStorage.setItem = function(key, value) {
+        return originalSetItem(sharedKeys.has(key) ? prefix + key : key, value);
+    };
+    localStorage.removeItem = function(key) {
+        return originalRemoveItem(sharedKeys.has(key) ? prefix + key : key);
+    };
+})();
+
+
+// Item/invoice-level taxation is opt-in per page: ON by default on the medical
+// POS invoice (med_pos_invoice), OFF by default on the regular POS invoice —
+// this preserves existing pos_invoice behavior (tax columns/regimes stay hidden
+// and inert there) while giving med_pos_invoice full tax functionality. Users
+// can still flip it either way via Invoice Settings if the "Taxation" checkbox
+// exists on the page.
+const isMedInvoicePage = window.location.pathname.includes('med_pos_invoice');
+function isTaxationEnabled() {
+    const stored = localStorage.getItem('enableTaxation');
+    if (stored === 'true') return true;
+    if (stored === 'false') return false;
+    return isMedInvoicePage;
+}
+
 // Global variables for products and UOM data
 let uomData = [];
 let branchesData = [];
@@ -49,6 +110,24 @@ function getCustomerDisplayText(customer) {
     if (displayMode === 'name_only') return customer.customer_name;
     if (displayMode === 'code_and_name') return `${customer.customer_code} | ${customer.customer_name}`;
     return `${customer.customer_code} | ${customer.customer_name} | ${customer.address || 'N/A'}`;
+}
+
+// Effective per-Piece sale price for a product. Products entered via a non-Piece
+// unit (e.g. Carton, via the "Enter Trade Price / MRP By" product-form feature)
+// store a rounded-to-3-decimals per-Piece rate for general use, PLUS the exact
+// originally-typed value and unit. Recomputing live here (full floating-point
+// precision, only rounded at the final Gross/Net amount) avoids a whole-Carton
+// sale totalling 1999.992 instead of 2000 — see calculateRowAmounts's
+// gross.toFixed(3), which absorbs the tiny float epsilon correctly.
+function getEffectivePriceValue(product, salePriceSetting) {
+    const flatPrice = salePriceSetting === 'mrp' ? (product.mrp || 0) : (product.trade_price || 0);
+    if (!product.price_entry_unit_id || !product.price_entry_unit_factor) return flatPrice;
+
+    const factor = parseFloat(product.price_entry_unit_factor);
+    const entryValue = salePriceSetting === 'mrp' ? product.mrp_entry_value : product.trade_price_entry_value;
+    if (!factor || factor <= 0 || !entryValue) return flatPrice;
+
+    return (parseFloat(entryValue) / factor).toFixed(6);
 }
 
 // Function to get product display text based on display mode setting
@@ -163,18 +242,22 @@ function initializePage(permissions) {
     }
 
     // Add real-time listeners to invoice settings checkboxes
-    const invoiceSettingCheckboxes = [
-        'enableTradeOfferAmount',
-        'enableFOC',
-        'enableCashDiscountPercent',
-        'enableCashDiscountAmount',
-        'enableInvoiceCashDiscountPercent',
-        'enableInvoiceCashDiscountAmount',
-        'enableExtraDiscount1',
-        'enableExtraDiscount2',
-        'enableShippingFees',
-        'enableAmountPaidPaymentMethod'
-    ];
+const invoiceSettingCheckboxes = [
+    'enableTradeOfferAmount',
+    'enableFOC',
+    'enableCashDiscountPercent',
+    'enableCashDiscountAmount',
+    'enableInvoiceCashDiscountPercent',
+    'enableInvoiceCashDiscountAmount',
+    'enableExtraDiscount1',
+    'enableExtraDiscount2',
+    'enableShippingFees',
+    'enableAmountPaidPaymentMethod',
+    'enableBatchNo',        // NEW
+    'enableExpiryDate',     // NEW
+    'enableTaxation',       // NEW — only exists on med_pos_invoice's settings modal
+    'enableExtraDiscountItem' // NEW — only exists on med_pos_invoice's settings modal
+];
 
     invoiceSettingCheckboxes.forEach(checkboxId => {
         const checkbox = document.getElementById(checkboxId);
@@ -398,6 +481,7 @@ function initializePage(permissions) {
         
         // Setup payment method listener after bank accounts are loaded
         setupPaymentMethodListener();
+        setupSplitPaymentToggle();
 
         if (isEditMode) {
             loadInvoiceData(editId);
@@ -1147,6 +1231,8 @@ function initializePage(permissions) {
             const data = await response.json();
 
             if (data.success) {
+                bankAccountsData = data.accounts || [];
+
                 const bankAccountSelect = document.getElementById('bankAccount');
                 bankAccountSelect.innerHTML = '<option value="">Select Bank Account</option>';
 
@@ -1560,7 +1646,10 @@ function initializePage(permissions) {
                 const itemsByProduct = {};
                 data.items.forEach(item => {
                     if (!item.parent_row_id) {
-                        const key = item.product_id;
+                        // Same product sold across multiple rows (e.g. different batches) must stay
+                        // separate rows on edit — only merge units that truly belong to one row
+                        // (same product + same batch, split across Carton/Dozen/Piece unit columns).
+                        const key = item.product_id + '_' + (item.batch_no || '');
                         if (!itemsByProduct[key]) {
                             itemsByProduct[key] = {
                                 baseItem: item,
@@ -1599,12 +1688,27 @@ function initializePage(permissions) {
                         });
                     }
 
-                    // Restore saved batch no / expiry date instead of re-fetching current stock batch
-                    const batchNoInputEl = lastRow.querySelector('.batch-no-input');
+                    // Restore saved batch no / expiry date instead of re-fetching current stock batch.
+                    // The dropdown must actually be populated first (loadProductBatches) — just setting
+                    // .value on an empty <select> silently no-ops since there's no matching <option>.
+                    // The saved batch may no longer appear in the "available" list (e.g. fully consumed
+                    // since this sale), so add it as a fallback option to guarantee it stays selectable.
+                    const batchNoSelectEl = lastRow.querySelector('.batch-no-input');
                     const batchExpiryInputEl = lastRow.querySelector('.batch-expiry-input');
-                    if (batchNoInputEl) batchNoInputEl.value = item.batch_no || '';
-                    if (batchExpiryInputEl) batchExpiryInputEl.value = item.batch_expiry_date || '';
-                    
+                    if (batchNoSelectEl && item.batch_no) {
+                        await loadProductBatches(lastRow, item.product_id);
+                        let matchingOption = Array.from(batchNoSelectEl.options).find(o => o.value === item.batch_no);
+                        if (!matchingOption) {
+                            matchingOption = document.createElement('option');
+                            matchingOption.value = item.batch_no;
+                            matchingOption.textContent = item.batch_no + (item.expiry_date ? ` - Exp: ${item.expiry_date}` : '') + ' (as invoiced)';
+                            batchNoSelectEl.appendChild(matchingOption);
+                        }
+                        batchNoSelectEl.value = item.batch_no;
+                        lastRow.dataset.batchNo = item.batch_no;
+                    }
+                    if (batchExpiryInputEl) batchExpiryInputEl.value = item.expiry_date || '';
+
                     const priceInput = lastRow.querySelector('.price-cell input');
                     if (priceInput) priceInput.value = item.sale_price;
                     const grossInput = lastRow.querySelector('.gross-cell input');
@@ -1613,8 +1717,24 @@ function initializePage(permissions) {
                     if (discPercentInput) discPercentInput.value = item.discount_percent;
                     const discAmountInput = lastRow.querySelector('.disc-amount-cell input');
                     if (discAmountInput) discAmountInput.value = item.discount_amount;
+                    // Extra Discount field holds a %, but what's saved is the amount —
+                    // back-derive the percent from the amount that was actually invoiced.
+                    const extraDiscAmountInput = lastRow.querySelector('.extra-disc-cell input');
+                    if (extraDiscAmountInput) {
+                        const afterMainDiscount = (parseFloat(item.gross_amount) || 0) - (parseFloat(item.discount_amount) || 0);
+                        const extraDiscPercent = afterMainDiscount > 0 ? ((parseFloat(item.extra_discount_amount) || 0) / afterMainDiscount * 100) : 0;
+                        extraDiscAmountInput.value = extraDiscPercent.toFixed(3);
+                    }
                     const toAmountInput = lastRow.querySelector('.to-amount-cell input');
                     if (toAmountInput) toAmountInput.value = item.trade_offer_amount || 0;
+
+                    // Restore the tax dataset (formula/base/inclusive flag) via a fresh lookup so any
+                    // FUTURE recalculation (qty/price edited later) uses the correct regime — then
+                    // overwrite the visible tax_percent/tax_amount with the SAVED historical values,
+                    // since a fresh lookup can legitimately differ from what was actually invoiced.
+                    if (typeof loadTaxForNewProduct === 'function' && invoice.customer_id) {
+                        await loadTaxForNewProduct(lastRow, invoice.customer_id, item.product_id);
+                    }
                     const taxPercentInput = lastRow.querySelector('.tax-percent-cell input');
                     if (taxPercentInput) taxPercentInput.value = item.tax_percent || 0;
                     const taxAmountInput = lastRow.querySelector('.tax-amount-cell input');
@@ -1623,15 +1743,32 @@ function initializePage(permissions) {
                     if (focInput) focInput.value = item.foc_quantity || 0;
                     const netInput = lastRow.querySelector('.net-cell input');
                     if (netInput) netInput.value = item.net_amount;
-                    
-                    // Set scheme and trigger scheme change
+
+                    // Set scheme — this recalculates the row from current inputs/dataset (to correctly
+                    // toggle T.O Amt/FOC readonly state for the scheme), which would clobber the
+                    // historical values just restored above. Re-apply them afterward so the row
+                    // displays exactly what was invoiced, not a fresh recalculation. Called directly
+                    // (not via dispatchEvent) and awaited so this ordering is guaranteed even for the
+                    // async Less/Less Special/Given scheme handlers.
                     const schemeSelect = lastRow.querySelector('.scheme-select');
                     if (schemeSelect) {
                         const itemScheme = item.scheme || 'sale_on_tp';
                         schemeSelect.value = itemScheme;
-                        // Trigger scheme change event to apply correct calculations
-                        schemeSelect.dispatchEvent(new Event('change'));
+                        if (typeof onSchemeChange === 'function') {
+                            await onSchemeChange(lastRow, itemScheme);
+                        }
                     }
+                    if (discAmountInput) discAmountInput.value = item.discount_amount;
+                    if (extraDiscAmountInput) {
+                        const afterMainDiscount = (parseFloat(item.gross_amount) || 0) - (parseFloat(item.discount_amount) || 0);
+                        const extraDiscPercent = afterMainDiscount > 0 ? ((parseFloat(item.extra_discount_amount) || 0) / afterMainDiscount * 100) : 0;
+                        extraDiscAmountInput.value = extraDiscPercent.toFixed(3);
+                    }
+                    if (toAmountInput) toAmountInput.value = item.trade_offer_amount || 0;
+                    if (taxPercentInput) taxPercentInput.value = item.tax_percent || 0;
+                    if (taxAmountInput) taxAmountInput.value = item.tax_amount || 0;
+                    if (focInput) focInput.value = item.foc_quantity || 0;
+                    if (netInput) netInput.value = item.net_amount;
                 }
 
                 // Load child items
@@ -1669,15 +1806,37 @@ function initializePage(permissions) {
                 // Update summary
                 document.getElementById('totalDiscountPercent').value = invoice.total_discount_percent;
                 document.getElementById('totalDiscountAmount').value = invoice.total_discount_amount;
-                document.getElementById('paymentMethod').value = invoice.payment_method || '';
+                // pos-edit.php returns 'Cash' / 'Bank Transfer' (display casing, used by
+                // print pages) — normalize to the select's lowercase option values.
+                const paymentMethodValue = invoice.payment_method === 'Bank Transfer' ? 'bank_transfer'
+                    : (invoice.payment_method === 'Cash' ? 'cash' : '');
+                document.getElementById('paymentMethod').value = paymentMethodValue;
 
                 // Show bank account if payment method is bank_transfer
-                if (invoice.payment_method === 'bank_transfer') {
+                if (paymentMethodValue === 'bank_transfer') {
                     document.getElementById('bankAccountContainer').style.display = 'flex';
                     document.getElementById('bankAccount').value = invoice.bank_account_id || '';
                 }
 
                 document.getElementById('amountPaid').value = invoice.amount_paid || 0;
+
+                // Restore split payment rows if this invoice's payment was split
+                // across multiple methods (see sale_invoice_payment_splits).
+                const paymentSplits = data.payment_splits || [];
+                if (paymentSplits.length > 0) {
+                    setSplitPaymentMode(true);
+                    document.getElementById('splitPaymentRows').innerHTML = '';
+                    paymentSplits.forEach(split => {
+                        createSplitPaymentRow({
+                            method: split.payment_method_id == 5 ? 'bank_transfer' : 'cash',
+                            bankAccountId: split.bank_account_id,
+                            amount: split.amount
+                        });
+                    });
+                    updateSplitPaymentTotal();
+                } else {
+                    setSplitPaymentMode(false);
+                }
 
                 // Set amount paid auto fill radio button
                 const autoFillValue = invoice.amount_paid_auto_fill || 'yes';
@@ -1833,6 +1992,12 @@ function initializePage(permissions) {
                     if (discPercentInput) discPercentInput.value = item.discount_percent || 0;
                     const discAmountInput = lastRow.querySelector('.disc-amount-cell input');
                     if (discAmountInput) discAmountInput.value = item.discount_amount || 0;
+                    const extraDiscAmountInput = lastRow.querySelector('.extra-disc-cell input');
+                    if (extraDiscAmountInput) {
+                        const afterMainDiscount = (parseFloat(item.gross_amount) || 0) - (parseFloat(item.discount_amount) || 0);
+                        const extraDiscPercent = afterMainDiscount > 0 ? ((parseFloat(item.extra_discount_amount) || 0) / afterMainDiscount * 100) : 0;
+                        extraDiscAmountInput.value = extraDiscPercent.toFixed(3);
+                    }
                     const toAmountInput = lastRow.querySelector('.to-amount-cell input');
                     if (toAmountInput) toAmountInput.value = item.trade_offer_amount || 0;
                     const taxPercentInput = lastRow.querySelector('.tax-percent-cell input');
@@ -3093,6 +3258,8 @@ function initializePage(permissions) {
             document.getElementById('totalDiscountAmountItems').textContent = totalDiscountAmountItems.toFixed(3);
             document.getElementById('totalTradeOfferAmount').textContent = totalTradeOfferAmount.toFixed(3);
             document.getElementById('totalTaxAmount').textContent = totalTaxAmount.toFixed(3);
+            const itemTaxAmountSummaryEl = document.getElementById('itemTaxAmountSummary'); // NEW — med_pos_invoice only
+            if (itemTaxAmountSummaryEl) itemTaxAmountSummaryEl.textContent = totalTaxAmount.toFixed(3);
             document.getElementById('totalFocQty').textContent = totalFocQty.toFixed(3);
             document.getElementById('totalNetAmountItems').textContent = totalNetAmountItems.toFixed(3);
             document.getElementById('totalBill').textContent = totalNetAmountItems.toFixed(3);
@@ -3197,18 +3364,32 @@ function initializePage(permissions) {
 
     // Update remaining balance
     function updateRemainingBalance() {
-        const netAmount = parseFloat(document.getElementById('netAmount').textContent) || 0;
+        const hasRemainingBalanceTax = window.invoiceLevelTaxRegimes?.some(r => r.tax_base === 'remaining_balance');
         const amountPaid = parseFloat(document.getElementById('amountPaid').value) || 0;
+
+        if (hasRemainingBalanceTax && typeof calculateInvoiceLevelTaxes === 'function') {
+            // Re-run taxes so phase-2 uses the updated amountPaid as its base input.
+            calculateInvoiceLevelTaxes();
+            // The remaining balance field must show the pre-remaining-balance-tax outstanding
+            // amount (interimNetReceivable − amountPaid), not the post-tax final receivable.
+            // Using the post-tax value would silently inflate the displayed balance by the tax
+            // itself, making the field inconsistent with what the user sees as "owed before tax".
+            const interim = window.invoiceLevelInterimNetReceivable
+                ?? parseFloat(document.getElementById('netReceivable').textContent)
+                ?? 0;
+            document.getElementById('remainingBalance').value = Math.max(0, interim - amountPaid).toFixed(3);
+            return;
+        }
+
+        const netAmount = parseFloat(document.getElementById('netAmount').textContent) || 0;
         const remainingBalance = netAmount - amountPaid;
         document.getElementById('remainingBalance').value = remainingBalance.toFixed(3);
     }
 
-    // Invoice-level taxes disabled — no-op
-    async function loadInvoiceLevelTaxRegimes(customerId, companyId = null) {
-        window.invoiceLevelTaxRegimes = [];
-        const container = document.getElementById('invoiceLevelTaxesContainer');
-        if (container) container.innerHTML = '';
-    }
+    // loadInvoiceLevelTaxRegimes intentionally NOT redeclared here — removing this
+    // local stub lets calls made from within initializePage() fall through the
+    // scope chain to the real global implementation in invoice-level-taxes-dynamic.js,
+    // which is gated by isTaxationEnabled() (stays a no-op on the regular POS page).
 
     // Add event listener for total discount percent
     const totalDiscountPercent = document.getElementById('totalDiscountPercent');
@@ -3364,6 +3545,141 @@ function initializePage(permissions) {
             setTimeout(() => {
                 paymentMethod.dispatchEvent(new Event('change'));
             }, 100);
+        }
+    }
+
+    // ===== Split Payment (e.g. part Cash + part Bank Transfer on one invoice) =====
+
+    function buildSplitBankAccountOptions(selectEl) {
+        selectEl.innerHTML = '<option value="">Select Bank Account</option>';
+        (bankAccountsData || []).forEach(account => {
+            const option = document.createElement('option');
+            option.value = account.id;
+            option.textContent = `${account.account_title} - ${account.account_number}`;
+            selectEl.appendChild(option);
+        });
+    }
+
+    function getSplitPaymentRows() {
+        const container = document.getElementById('splitPaymentRows');
+        return container ? Array.from(container.querySelectorAll('.split-payment-row')) : [];
+    }
+
+    function updateSplitPaymentTotal() {
+        const rows = getSplitPaymentRows();
+        let total = 0;
+        rows.forEach(row => {
+            total += parseFloat(row.querySelector('.split-amount').value) || 0;
+        });
+
+        const totalEl = document.getElementById('splitPaymentTotal');
+        if (totalEl) {
+            totalEl.textContent = `Split Total: ${total.toFixed(3)}`;
+        }
+
+        // Amount Paid is derived from the split total while split mode is active,
+        // so every existing calculation that reads #amountPaid (remaining balance,
+        // save payload, etc.) keeps working unchanged.
+        const amountPaidEl = document.getElementById('amountPaid');
+        if (amountPaidEl) {
+            amountPaidEl.value = total.toFixed(3);
+            updateRemainingBalance();
+        }
+    }
+
+    function createSplitPaymentRow(prefill) {
+        const container = document.getElementById('splitPaymentRows');
+        if (!container) return null;
+
+        const row = document.createElement('div');
+        row.className = 'split-payment-row';
+        row.style.cssText = 'display: flex; gap: 8px; align-items: center; margin-bottom: 6px;';
+        row.innerHTML = `
+            <select class="split-method table-input" style="flex: 1;" tabindex="-1">
+                <option value="cash">Cash</option>
+                <option value="bank_transfer">Bank Transfer</option>
+            </select>
+            <select class="split-bank-account table-input" style="flex: 1; display: none;" tabindex="-1"></select>
+            <input type="number" class="split-amount table-input" placeholder="Amount" min="0" step="0.001" style="flex: 1;" tabindex="-1">
+            <button type="button" class="btn btn-secondary remove-split-row" style="padding: 6px 10px;" tabindex="-1"><i class="fas fa-times"></i></button>
+        `;
+        container.appendChild(row);
+
+        const methodSelect = row.querySelector('.split-method');
+        const bankSelect = row.querySelector('.split-bank-account');
+        const amountInput = row.querySelector('.split-amount');
+
+        buildSplitBankAccountOptions(bankSelect);
+
+        methodSelect.addEventListener('change', function () {
+            bankSelect.style.display = this.value === 'bank_transfer' ? '' : 'none';
+            if (this.value !== 'bank_transfer') bankSelect.value = '';
+        });
+
+        amountInput.addEventListener('input', updateSplitPaymentTotal);
+
+        row.querySelector('.remove-split-row').addEventListener('click', function () {
+            row.remove();
+            updateSplitPaymentTotal();
+        });
+
+        if (prefill) {
+            methodSelect.value = prefill.method || 'cash';
+            methodSelect.dispatchEvent(new Event('change'));
+            if (prefill.bankAccountId) bankSelect.value = prefill.bankAccountId;
+            if (prefill.amount !== undefined && prefill.amount !== null && prefill.amount !== '') {
+                amountInput.value = prefill.amount;
+            }
+        }
+
+        return row;
+    }
+
+    function setSplitPaymentMode(enabled) {
+        const toggle = document.getElementById('splitPaymentToggle');
+        const splitContainer = document.getElementById('splitPaymentContainer');
+        const bankAccountContainer = document.getElementById('bankAccountContainer');
+        const paymentMethodSelect = document.getElementById('paymentMethod');
+        const amountPaidEl = document.getElementById('amountPaid');
+
+        if (toggle) toggle.checked = enabled;
+
+        if (enabled) {
+            if (paymentMethodSelect) paymentMethodSelect.setAttribute('disabled', 'disabled');
+            if (bankAccountContainer) bankAccountContainer.style.setProperty('display', 'none', 'important');
+            if (splitContainer) splitContainer.style.display = '';
+            if (amountPaidEl) amountPaidEl.setAttribute('readonly', 'readonly');
+        } else {
+            if (paymentMethodSelect) paymentMethodSelect.removeAttribute('disabled');
+            if (splitContainer) {
+                splitContainer.style.display = 'none';
+                document.getElementById('splitPaymentRows').innerHTML = '';
+            }
+            if (amountPaidEl) amountPaidEl.removeAttribute('readonly');
+            if (paymentMethodSelect) paymentMethodSelect.dispatchEvent(new Event('change'));
+        }
+    }
+
+    function setupSplitPaymentToggle() {
+        const toggle = document.getElementById('splitPaymentToggle');
+        const addBtn = document.getElementById('addSplitPaymentBtn');
+
+        if (toggle) {
+            toggle.addEventListener('change', function () {
+                setSplitPaymentMode(this.checked);
+                if (this.checked && getSplitPaymentRows().length === 0) {
+                    createSplitPaymentRow({ method: 'cash', amount: '' });
+                    createSplitPaymentRow({ method: 'bank_transfer', amount: '' });
+                    updateSplitPaymentTotal();
+                }
+            });
+        }
+
+        if (addBtn) {
+            addBtn.addEventListener('click', function () {
+                createSplitPaymentRow({ method: 'cash', amount: '' });
+                updateSplitPaymentTotal();
+            });
         }
     }
 
@@ -3779,7 +4095,7 @@ const defaultColumns = [
     { id: 'to_amt', label: 'T.O Amt', fixed: false },
     { id: 'gst_pct', label: 'GST %', fixed: false },
     { id: 'gst_amt', label: 'GST Amt', fixed: false },
-    { id: 'foc', label: 'FOC Qty', fixed: false },
+    { id: 'foc', label: isMedInvoicePage ? 'Bonus' : 'FOC Qty', fixed: false },
     { id: 'net', label: 'Net Amt', fixed: false }
 ];
 
@@ -4007,7 +4323,33 @@ function saveInvoice(status = 'Posted') {
     });
 
     const brandValue = document.getElementById('brand')?.value;
-    
+
+    // Split payment: collect {method, bankAccountId, amount} for each row with a
+    // positive amount when Split Payment is enabled. Amount Paid mirrors the split
+    // total automatically (see updateSplitPaymentTotal), so no separate validation
+    // is needed here.
+    const splitPaymentEnabled = document.getElementById('splitPaymentToggle')?.checked;
+    let paymentSplits = null;
+    let effectivePaymentMethod = document.getElementById('paymentMethod')?.value;
+    let effectiveBankAccountId = document.getElementById('bankAccount')?.value || null;
+    if (splitPaymentEnabled) {
+        // saveInvoice() lives outside initializePage()'s closure (where the split
+        // payment helpers are defined), so query the rows directly here instead
+        // of calling getSplitPaymentRows().
+        paymentSplits = Array.from(document.querySelectorAll('#splitPaymentRows .split-payment-row'))
+            .map(row => ({
+                method: row.querySelector('.split-method').value,
+                bankAccountId: row.querySelector('.split-bank-account').value || null,
+                amount: parseFloat(row.querySelector('.split-amount').value) || 0
+            }))
+            .filter(split => split.amount > 0);
+
+        if (paymentSplits.length > 0) {
+            effectivePaymentMethod = paymentSplits[0].method;
+            effectiveBankAccountId = paymentSplits[0].bankAccountId;
+        }
+    }
+
     const formData = {
         saleDate: document.getElementById('saleDate').value,
         customerId: document.getElementById('customerCode').value,
@@ -4032,8 +4374,9 @@ function saveInvoice(status = 'Posted') {
         totalDiscountAmount: parseFloat(document.getElementById('totalDiscountAmount')?.value),
         netAmount: parseFloat(document.getElementById('netAmount').textContent),
         netReceivable: parseFloat(document.getElementById('netReceivable').textContent),
-        paymentMethod: document.getElementById('paymentMethod')?.value,
-        bankAccountId: document.getElementById('bankAccount')?.value || null,
+        paymentMethod: effectivePaymentMethod,
+        bankAccountId: effectiveBankAccountId,
+        paymentSplits: paymentSplits,
         amountPaid: parseFloat(document.getElementById('amountPaid')?.value) || 0,
         amountPaidAutoFill: document.querySelector('input[name="autoFillAmountPaid"]:checked')?.value || 'yes',
         remainingBalance: parseFloat(document.getElementById('remainingBalance')?.value) || 0,
@@ -4116,11 +4459,14 @@ function saveInvoice(status = 'Posted') {
         const focInput = row.querySelector('.foc-cell input');
         const netInput = row.querySelector('.net-cell input');
         const schemeSelect = row.querySelector('.scheme-select');
-        
+
         const salePrice = parseFloat(priceInput.value);
         const grossAmount = parseFloat(grossInput.value);
         const discountPercent = parseFloat(discPercentInput.value) || 0;
         const discountAmount = parseFloat(discAmountInput.value);
+        // Extra Discount is entered as a % (see calculateRowAmounts) — the computed
+        // amount is cached on the row's dataset, not read straight from the input.
+        const extraDiscountAmount = parseFloat(row.dataset.extraDiscountAmount) || 0;
         const tradeOfferAmount = parseFloat(toAmountInput.value) || 0;
         const taxPercent = parseFloat(taxPercentInput.value) || 0;
         const taxAmount = parseFloat(taxAmountInput.value) || 0;
@@ -4157,7 +4503,9 @@ const scheme = schemeSelect ? schemeSelect.value : 'sale_on_tp';
         dozen: dozenVal,
         salePrice: salePrice,
         grossAmount: isFirstUnit ? grossAmount : 0,
+        discountPercent: isFirstUnit ? discountPercent : 0,
         discountAmount: isFirstUnit ? discountAmount : 0,
+        extraDiscountAmount: isFirstUnit ? extraDiscountAmount : 0,
         tradeOfferAmount: isFirstUnit ? tradeOfferAmount : 0,
         taxPercent: taxPercent,
         taxAmount: isFirstUnit ? taxAmount : 0,
@@ -4376,6 +4724,17 @@ function loadInvoiceSettings() {
     document.getElementById('enableAmountPaidPaymentMethod').checked = localStorage.getItem('enableAmountPaidPaymentMethod') === 'true';
     document.getElementById('enableExtraDiscount1').checked = localStorage.getItem('enableExtraDiscount1') === 'true';
     document.getElementById('enableExtraDiscount2').checked = localStorage.getItem('enableExtraDiscount2') === 'true';
+    // Taxation / Extra Discount / Batch No / Expiry Date checkboxes only exist on
+    // med_pos_invoice's settings modal — guard their absence on the regular POS
+    // invoice page, which doesn't have these controls.
+    const enableTaxationCheckbox = document.getElementById('enableTaxation');
+    if (enableTaxationCheckbox) enableTaxationCheckbox.checked = isTaxationEnabled();
+    const enableExtraDiscountItemCheckbox = document.getElementById('enableExtraDiscountItem');
+    if (enableExtraDiscountItemCheckbox) enableExtraDiscountItemCheckbox.checked = localStorage.getItem('enableExtraDiscountItem') !== 'false';
+    const enableBatchNoCheckbox = document.getElementById('enableBatchNo');
+    if (enableBatchNoCheckbox) enableBatchNoCheckbox.checked = localStorage.getItem('enableBatchNo') !== 'false';
+    const enableExpiryDateCheckbox = document.getElementById('enableExpiryDate');
+    if (enableExpiryDateCheckbox) enableExpiryDateCheckbox.checked = localStorage.getItem('enableExpiryDate') !== 'false';
 }
 
 // Save invoice settings to localStorage
@@ -4414,8 +4773,19 @@ function saveInvoiceSettings() {
     localStorage.setItem('enableShippingFees', document.getElementById('enableShippingFees').checked);
     localStorage.setItem('enablePrintQRCode', document.getElementById('enablePrintQRCode').checked);
     localStorage.setItem('enableAmountPaidPaymentMethod', document.getElementById('enableAmountPaidPaymentMethod').checked);
+    // Taxation / Extra Discount / Batch No / Expiry Date checkboxes only exist on
+    // med_pos_invoice's settings modal — guard their absence on the regular POS
+    // invoice page, which doesn't have these controls.
+    const enableTaxationCheckbox = document.getElementById('enableTaxation');
+    if (enableTaxationCheckbox) localStorage.setItem('enableTaxation', enableTaxationCheckbox.checked);
+    const enableExtraDiscountItemCheckbox = document.getElementById('enableExtraDiscountItem');
+    if (enableExtraDiscountItemCheckbox) localStorage.setItem('enableExtraDiscountItem', enableExtraDiscountItemCheckbox.checked);
+    const enableBatchNoCheckbox = document.getElementById('enableBatchNo');
+    if (enableBatchNoCheckbox) localStorage.setItem('enableBatchNo', enableBatchNoCheckbox.checked);
+    const enableExpiryDateCheckbox = document.getElementById('enableExpiryDate');
+    if (enableExpiryDateCheckbox) localStorage.setItem('enableExpiryDate', enableExpiryDateCheckbox.checked);
     alert('Invoice settings saved successfully!');
-    
+
     // Refresh product dropdowns if display mode changed
     if (previousDisplayMode !== selectedDisplayMode) {
         refreshProductDisplayInDropdowns();
@@ -4499,12 +4869,16 @@ function applyInvoiceSettings() {
     const enableCashDiscountAmount = localStorage.getItem('enableCashDiscountAmount') === 'true';
     const enableTradeOfferAmount = localStorage.getItem('enableTradeOfferAmount') === 'true';
     const enableFOC = localStorage.getItem('enableFOC') === 'true';
-    const enableTaxation = false;
+    const enableTaxation = isTaxationEnabled();
     const enableInvoiceCashDiscountPercent = localStorage.getItem('enableInvoiceCashDiscountPercent') === 'true';
     const enableInvoiceCashDiscountAmount = localStorage.getItem('enableInvoiceCashDiscountAmount') === 'true';
     const enableExtraDiscount1 = localStorage.getItem('enableExtraDiscount1') === 'true';
     const enableExtraDiscount2 = localStorage.getItem('enableExtraDiscount2') === 'true';
     const enableShippingFees = localStorage.getItem('enableShippingFees') === 'true';
+    // top of applyInvoiceSettings(), with the other enable* consts
+const enableBatchNo = localStorage.getItem('enableBatchNo') !== 'false';
+const enableExpiryDate = localStorage.getItem('enableExpiryDate') !== 'false';
+const enableExtraDiscountItem = localStorage.getItem('enableExtraDiscountItem') !== 'false';
 
     // Hide/show table columns by class name (works with dynamic unit columns)
     const itemsTable = document.getElementById('itemsTable');
@@ -4514,21 +4888,27 @@ function applyInvoiceSettings() {
         const tfoot = itemsTable.getElementsByTagName('tfoot')[0];
         
         // Apply visibility to header
-        if (thead) {
-            const discPercentHeaders = thead.querySelectorAll('.disc-percent-cell');
-            const discAmountHeaders = thead.querySelectorAll('.disc-amount-cell');
-            const toAmountHeaders = thead.querySelectorAll('.to-amount-cell');
-            const taxPercentHeaders = thead.querySelectorAll('.tax-percent-cell');
-            const taxAmountHeaders = thead.querySelectorAll('.tax-amount-cell');
-            const focHeaders = thead.querySelectorAll('.foc-cell');
-            
-            discPercentHeaders.forEach(cell => cell.style.display = enableCashDiscountPercent ? '' : 'none');
-            discAmountHeaders.forEach(cell => cell.style.display = enableCashDiscountAmount ? '' : 'none');
-            toAmountHeaders.forEach(cell => cell.style.display = enableTradeOfferAmount ? '' : 'none');
-            taxPercentHeaders.forEach(cell => cell.style.display = enableTaxation ? '' : 'none');
-            taxAmountHeaders.forEach(cell => cell.style.display = enableTaxation ? '' : 'none');
-            focHeaders.forEach(cell => cell.style.display = enableFOC ? '' : 'none');
-        }
+       if (thead) {
+    const discPercentHeaders = thead.querySelectorAll('.disc-percent-cell');
+    const discAmountHeaders = thead.querySelectorAll('.disc-amount-cell');
+    const toAmountHeaders = thead.querySelectorAll('.to-amount-cell');
+    const taxPercentHeaders = thead.querySelectorAll('.tax-percent-cell');
+    const taxAmountHeaders = thead.querySelectorAll('.tax-amount-cell');
+    const focHeaders = thead.querySelectorAll('.foc-cell');
+    const batchNoHeaders = thead.querySelectorAll('.batch-no-cell');           // NEW
+    const batchExpiryHeaders = thead.querySelectorAll('.batch-expiry-cell');   // NEW
+    const extraDiscHeaders = thead.querySelectorAll('.extra-disc-cell');       // NEW
+
+    discPercentHeaders.forEach(cell => cell.style.display = enableCashDiscountPercent ? '' : 'none');
+    discAmountHeaders.forEach(cell => cell.style.display = enableCashDiscountAmount ? '' : 'none');
+    toAmountHeaders.forEach(cell => cell.style.display = enableTradeOfferAmount ? '' : 'none');
+    taxPercentHeaders.forEach(cell => cell.style.display = enableTaxation ? '' : 'none');
+    taxAmountHeaders.forEach(cell => cell.style.display = enableTaxation ? '' : 'none');
+    focHeaders.forEach(cell => cell.style.display = enableFOC ? '' : 'none');
+    batchNoHeaders.forEach(cell => cell.style.display = enableBatchNo ? '' : 'none');           // NEW
+    batchExpiryHeaders.forEach(cell => cell.style.display = enableExpiryDate ? '' : 'none');     // NEW
+    extraDiscHeaders.forEach(cell => cell.style.display = enableExtraDiscountItem ? '' : 'none'); // NEW
+}
         
         // Apply visibility to body rows AND disable/enable inputs
         if (tbody) {
@@ -4538,7 +4918,10 @@ function applyInvoiceSettings() {
             const taxPercentCells = tbody.querySelectorAll('.tax-percent-cell');
             const taxAmountCells = tbody.querySelectorAll('.tax-amount-cell');
             const focCells = tbody.querySelectorAll('.foc-cell');
-            
+            const batchNoCells = tbody.querySelectorAll('.batch-no-cell');           // NEW
+            const batchExpiryCells = tbody.querySelectorAll('.batch-expiry-cell');   // NEW
+            const extraDiscCells = tbody.querySelectorAll('.extra-disc-cell');       // NEW
+
             discPercentCells.forEach(cell => {
                 cell.style.display = enableCashDiscountPercent ? '' : 'none';
                 const input = cell.querySelector('input');
@@ -4579,7 +4962,7 @@ function applyInvoiceSettings() {
                     if (!enableTaxation) input.value = '0.00';
                 }
             });
-            focCells.forEach(cell => {
+          focCells.forEach(cell => {
                 cell.style.display = enableFOC ? '' : 'none';
                 const input = cell.querySelector('input');
                 if (input) {
@@ -4587,24 +4970,40 @@ function applyInvoiceSettings() {
                     if (!enableFOC) input.value = '0';
                 }
             });
+            batchNoCells.forEach(cell => cell.style.display = enableBatchNo ? '' : 'none');           // NEW
+            batchExpiryCells.forEach(cell => cell.style.display = enableExpiryDate ? '' : 'none');     // NEW
+            extraDiscCells.forEach(cell => {                                                          // NEW
+                cell.style.display = enableExtraDiscountItem ? '' : 'none';
+                const input = cell.querySelector('input');
+                if (input) {
+                    input.disabled = !enableExtraDiscountItem;
+                    if (!enableExtraDiscountItem) input.value = '0.00';
+                }
+            });
         }
-        
+
         // Apply visibility to footer
-        if (tfoot) {
-            const discPercentFooters = tfoot.querySelectorAll('.disc-percent-cell');
-            const discAmountFooters = tfoot.querySelectorAll('.disc-amount-cell');
-            const toAmountFooters = tfoot.querySelectorAll('.to-amount-cell');
-            const taxPercentFooters = tfoot.querySelectorAll('.tax-percent-cell');
-            const taxAmountFooters = tfoot.querySelectorAll('.tax-amount-cell');
-            const focFooters = tfoot.querySelectorAll('.foc-cell');
-            
-            discPercentFooters.forEach(cell => cell.style.display = enableCashDiscountPercent ? '' : 'none');
-            discAmountFooters.forEach(cell => cell.style.display = enableCashDiscountAmount ? '' : 'none');
-            toAmountFooters.forEach(cell => cell.style.display = enableTradeOfferAmount ? '' : 'none');
-            taxPercentFooters.forEach(cell => cell.style.display = enableTaxation ? '' : 'none');
-            taxAmountFooters.forEach(cell => cell.style.display = enableTaxation ? '' : 'none');
-            focFooters.forEach(cell => cell.style.display = enableFOC ? '' : 'none');
-        }
+       if (tfoot) {
+    const discPercentFooters = tfoot.querySelectorAll('.disc-percent-cell');
+    const discAmountFooters = tfoot.querySelectorAll('.disc-amount-cell');
+    const toAmountFooters = tfoot.querySelectorAll('.to-amount-cell');
+    const taxPercentFooters = tfoot.querySelectorAll('.tax-percent-cell');
+    const taxAmountFooters = tfoot.querySelectorAll('.tax-amount-cell');
+    const focFooters = tfoot.querySelectorAll('.foc-cell');
+    const batchNoFooters = tfoot.querySelectorAll('.batch-no-cell');          // NEW
+    const batchExpiryFooters = tfoot.querySelectorAll('.batch-expiry-cell');  // NEW
+    const extraDiscFooters = tfoot.querySelectorAll('.extra-disc-cell');      // NEW
+
+    discPercentFooters.forEach(cell => cell.style.display = enableCashDiscountPercent ? '' : 'none');
+    discAmountFooters.forEach(cell => cell.style.display = enableCashDiscountAmount ? '' : 'none');
+    toAmountFooters.forEach(cell => cell.style.display = enableTradeOfferAmount ? '' : 'none');
+    taxPercentFooters.forEach(cell => cell.style.display = enableTaxation ? '' : 'none');
+    taxAmountFooters.forEach(cell => cell.style.display = enableTaxation ? '' : 'none');
+    focFooters.forEach(cell => cell.style.display = enableFOC ? '' : 'none');
+    batchNoFooters.forEach(cell => cell.style.display = enableBatchNo ? '' : 'none');           // NEW
+    batchExpiryFooters.forEach(cell => cell.style.display = enableExpiryDate ? '' : 'none');     // NEW
+    extraDiscFooters.forEach(cell => cell.style.display = enableExtraDiscountItem ? '' : 'none'); // NEW
+}
     }
 
     // Hide/show invoice summary fields AND disable/enable inputs
@@ -4905,7 +5304,20 @@ async function loadPriceHistory(productId) {
         if (data.success && data.history && data.history.length > 0) {
             const content = data.history.map((item, index) => {
                 const date = new Date(item.sale_date).toLocaleDateString();
-                return `<div>${index + 1}. ${date} - ${item.currency_symbol}${parseFloat(item.sale_price).toFixed(3)} (Qty: ${item.quantity})</div>`;
+
+                // Extra Disc % isn't stored directly — only the resulting amount is
+                // saved — so back-derive the % (on the post-main-discount amount),
+                // same as the invoice print pages and Daily Sale Report do.
+                const grossAmount = parseFloat(item.gross_amount || 0);
+                const discAmount = parseFloat(item.discount_amount || 0);
+                const extraDiscAmount = parseFloat(item.extra_discount_amount || 0);
+                const afterMainDiscount = grossAmount - discAmount;
+                const extraDiscPercent = afterMainDiscount > 0 ? (extraDiscAmount / afterMainDiscount * 100) : 0;
+                const discPercent = parseFloat(item.discount_percent || 0);
+                const bonusQty = parseFloat(item.foc_quantity || 0);
+
+                return `<div>${index + 1}. ${date} - ${item.currency_symbol}${parseFloat(item.sale_price).toFixed(3)} (Qty: ${item.quantity})`
+                    + `<br><span style="font-size: 11px; color: var(--subtext);">Disc %: ${discPercent.toFixed(2)} | Extra Disc %: ${extraDiscPercent.toFixed(2)} | Bonus: ${bonusQty.toFixed(3)}</span></div>`;
             }).join('');
 
             document.getElementById('priceHistoryContent').innerHTML = content;
@@ -5013,7 +5425,7 @@ async function loadProductStock(productId) {
             const stockColor = stock > 0 ? 'var(--success)' : 'var(--error)';
             
             document.getElementById('stockContent').innerHTML = `
-                <div style="color: ${stockColor}; font-weight: 600;">
+                <div id="availableStockLine" style="color: ${stockColor}; font-weight: 600;">
                     Available Stock: ${stockDisplay}
                 </div>
                 <div id="requiredQtyDisplay" style="margin-top: 8px; color: var(--body); font-size: 12px;"></div>
@@ -5046,11 +5458,31 @@ async function loadProductStock(productId) {
     }
 }
 
-// Validate stock for a row
+// Validate stock for a row. When the product has batch tracking (a batch
+// is selected in the Batch No dropdown), validation and the "Available
+// Stock" display use that specific batch's remaining qty instead of the
+// product's total stock across all batches — selling more than one batch
+// has left should fail even if other batches of the same product have
+// plenty of stock; the user must switch batches instead.
 function validateStockForRow(row) {
-    const availableStock = parseFloat(row.dataset.availableStock) || 0;
+    const totalProductStock = parseFloat(row.dataset.availableStock) || 0;
     const unitName = row.dataset.stockUnitName || '';
-    
+    const batchQtyRaw = row.dataset.batchQtyAvailable;
+    const hasBatchQty = batchQtyRaw !== undefined && batchQtyRaw !== '';
+    const batchNo = row.dataset.batchNo || '';
+    const availableStock = hasBatchQty ? (parseFloat(batchQtyRaw) || 0) : totalProductStock;
+
+    // Keep the shared "Available Stock" panel in sync with whichever batch
+    // is currently selected for this row (falls back to total stock when
+    // the product has no batch tracking).
+    const availableStockLine = document.getElementById('availableStockLine');
+    if (availableStockLine) {
+        const stockDisplay = unitName ? `${availableStock.toFixed(3)} ${unitName}` : `${availableStock.toFixed(3)} units`;
+        const label = hasBatchQty && batchNo ? `Available Stock (Batch ${batchNo}): ` : 'Available Stock: ';
+        availableStockLine.textContent = `${label}${stockDisplay}`;
+        availableStockLine.style.color = availableStock > 0 ? 'var(--success)' : 'var(--error)';
+    }
+
     // Calculate total required quantity
     const unitInputs = row.querySelectorAll('.unit-input');
     let totalQty = 0;
@@ -5059,18 +5491,32 @@ function validateStockForRow(row) {
         const cf = parseFloat(input.dataset.conversionFactor) || 1;
         totalQty += qty * cf;
     });
-    
+
+    // Bonus (FOC) quantity is entered in the product's base unit (same
+    // convention the backend uses when saving it to stock_ledger) and draws
+    // from the same batch as the regular sale qty, so it must count toward
+    // the same available-stock check.
+    const focInputForStock = row.querySelector('.foc-cell input');
+    const focQtyForStock = parseFloat(focInputForStock?.value) || 0;
+    totalQty += focQtyForStock;
+
     // Update required qty display
     const requiredDisplay = document.getElementById('requiredQtyDisplay');
     if (requiredDisplay) {
         const requiredQtyText = unitName ? `Required: ${totalQty.toFixed(3)} ${unitName}` : `Required: ${totalQty.toFixed(3)} units`;
         requiredDisplay.innerHTML = requiredQtyText;
-        
+
         if (totalQty > availableStock) {
             requiredDisplay.style.color = 'var(--error)';
             requiredDisplay.style.fontWeight = '600';
-            requiredDisplay.innerHTML += ` <span style="color: var(--error);">?? Exceeds available stock!</span>`;
-            
+            const safeBatchNo = String(batchNo).replace(/[&<>"']/g, function (ch) {
+                return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch];
+            });
+            const exceedsMsg = hasBatchQty && batchNo
+                ? ` <span style="color: var(--error);">?? Exceeds available stock in batch ${safeBatchNo}! Select another batch.</span>`
+                : ` <span style="color: var(--error);">?? Exceeds available stock!</span>`;
+            requiredDisplay.innerHTML += exceedsMsg;
+
             // Highlight the row
             row.style.backgroundColor = 'rgba(227, 79, 79, 0.1)';
             row.style.borderLeft = '4px solid var(--error)';
@@ -5787,38 +6233,38 @@ async function addRowDynamic() {
     const schemeDropdown = createSchemeCell(row);
     schemeCell.appendChild(schemeDropdown);
 
-   // Batch No (auto-filled, read-only, inserted at fixed index 3)
-    const batchNoCell = row.insertCell(3);
-    batchNoCell.className = 'batch-no-cell';
-    const batchNoInput = document.createElement('input');
-    batchNoInput.type = 'text';
-    batchNoInput.className = 'table-input batch-no-input';
-    batchNoInput.readOnly = true;
-    batchNoInput.tabIndex = -1;
-    batchNoInput.placeholder = 'No Batch';
-    batchNoInput.style.color = '#000000';
-    batchNoInput.style.fontWeight = '600';
-    batchNoInput.style.opacity = '1';
-    batchNoInput.style.webkitTextFillColor = '#000000';
-    batchNoCell.appendChild(batchNoInput);
+   // Batch No / Expiry Date — med_pos_invoice only: the column doesn't exist
+    // in the regular POS invoice's table markup, so inserting it there would
+    // leave headerless/footerless cells (same pattern as Extra Discount below).
+    const batchOffset = isMedInvoicePage ? 2 : 0;
+    if (isMedInvoicePage) {
+        // Batch No (dropdown — auto-selects FEFO batch, user can pick another; inserted at fixed index 3)
+        const batchNoCell = row.insertCell(3);
+        batchNoCell.className = 'batch-no-cell';
+        const batchNoInput = document.createElement('select');
+        batchNoInput.className = 'table-input batch-no-input';
+        batchNoInput.innerHTML = '<option value="">No Batch</option>';
+        batchNoInput.style.color = '#000000';
+        batchNoInput.style.fontWeight = '600';
+        batchNoCell.appendChild(batchNoInput);
 
-    // Expiry Date (auto-filled, read-only, inserted at fixed index 4)
-    const batchExpiryCell = row.insertCell(4);
-    batchExpiryCell.className = 'batch-expiry-cell';
-    const batchExpiryInput = document.createElement('input');
-    batchExpiryInput.type = 'text';
-    batchExpiryInput.className = 'table-input batch-expiry-input';
-    batchExpiryInput.readOnly = true;
-    batchExpiryInput.tabIndex = -1;
-    batchExpiryInput.style.color = '#000000';
-    batchExpiryInput.style.fontWeight = '600';
-    batchExpiryInput.style.opacity = '1';
-    batchExpiryInput.style.webkitTextFillColor = '#000000';
-    batchExpiryCell.appendChild(batchExpiryInput);
+        // Expiry Date (auto-filled, read-only, inserted at fixed index 4)
+        const batchExpiryCell = row.insertCell(4);
+        batchExpiryCell.className = 'batch-expiry-cell';
+        const batchExpiryInput = document.createElement('input');
+        batchExpiryInput.type = 'text';
+        batchExpiryInput.className = 'table-input batch-expiry-input';
+        batchExpiryInput.readOnly = true;
+        batchExpiryInput.tabIndex = -1;
+        batchExpiryInput.style.color = '#000000';
+        batchExpiryInput.style.fontWeight = '600';
+        batchExpiryInput.style.opacity = '1';
+        batchExpiryInput.style.webkitTextFillColor = '#000000';
+        batchExpiryCell.appendChild(batchExpiryInput);
+    }
 
-    // Unit cells will be added dynamically (inserted starting at index 5)
     // Price
-    const priceCell = row.insertCell(5);
+    const priceCell = row.insertCell(3 + batchOffset);
     
     // Unit cells will be added dynamically (inserted starting at index 3)
     // Price
@@ -5827,7 +6273,10 @@ async function addRowDynamic() {
     priceInput.type = 'number';
     priceInput.className = 'table-input';
     priceInput.min = '0';
-    priceInput.step = '0.001';
+    // 'any' (not '0.001') — a product priced via a non-Piece entry unit (see
+    // getEffectivePriceValue) can auto-fill a 6-decimal per-Piece rate here;
+    // a stricter step would fail native validation and block Save.
+    priceInput.step = 'any';
     priceInput.required = true;
     priceInput.addEventListener('input', function() {
         const unitInputs = row.querySelectorAll('.unit-input');
@@ -5867,7 +6316,7 @@ async function addRowDynamic() {
     priceCell.appendChild(priceInput);
     
     // Gross Amount
-    const grossCell = row.insertCell(6);
+    const grossCell = row.insertCell(4 + batchOffset);
     grossCell.className = 'gross-cell';
     const grossInput = document.createElement('input');
     grossInput.type = 'text';
@@ -5878,7 +6327,7 @@ async function addRowDynamic() {
     grossCell.appendChild(grossInput);
     
     // Discount %
-    const discPercentCell = row.insertCell(7);
+    const discPercentCell = row.insertCell(5 + batchOffset);
     discPercentCell.className = 'disc-percent-cell';
     const discPercentInput = document.createElement('input');
     discPercentInput.type = 'number';
@@ -5901,7 +6350,7 @@ async function addRowDynamic() {
     discPercentCell.appendChild(discPercentInput);
     
     // Discount Amount
-    const discAmountCell = row.insertCell(8);
+    const discAmountCell = row.insertCell(6 + batchOffset);
     discAmountCell.className = 'disc-amount-cell';
     const discAmountInput = document.createElement('input');
     discAmountInput.type = 'number';
@@ -5921,9 +6370,39 @@ async function addRowDynamic() {
         calculateRowAmounts(row, totalQty, price, 'amount');
     });
     discAmountCell.appendChild(discAmountInput);
-    
+
+    // Extra Discount — item-row-level, applied after the normal discount and
+    // before trade offer/tax (see calculateRowAmounts). med_pos_invoice only:
+    // the column doesn't exist in the regular POS invoice's table markup, so
+    // inserting it there would leave a headerless/footerless cell.
+    const extraDiscOffset = isMedInvoicePage ? 1 : 0;
+    if (isMedInvoicePage) {
+        const extraDiscCell = row.insertCell(7 + batchOffset);
+        extraDiscCell.className = 'extra-disc-cell';
+        const extraDiscInput = document.createElement('input');
+        extraDiscInput.type = 'number';
+        extraDiscInput.className = 'table-input';
+        extraDiscInput.min = '0';
+        extraDiscInput.max = '100';
+        extraDiscInput.step = '0.001';
+        extraDiscInput.value = '0.00';
+        extraDiscInput.title = 'Extra Discount %';
+        extraDiscInput.addEventListener('input', function() {
+            const unitInputs = row.querySelectorAll('.unit-input');
+            let totalQty = 0;
+            unitInputs.forEach(input => {
+                const qty = parseFloat(input.value) || 0;
+                const cf = parseFloat(input.dataset.conversionFactor) || 1;
+                totalQty = totalQty + (qty * cf);
+            });
+            const price = parseFloat(row.querySelector('.price-cell input').value) || 0;
+            calculateRowAmounts(row, totalQty, price);
+        });
+        extraDiscCell.appendChild(extraDiscInput);
+    }
+
     // TO Amount
-    const toAmountCell = row.insertCell(9);
+    const toAmountCell = row.insertCell(7 + batchOffset + extraDiscOffset);
     toAmountCell.className = 'to-amount-cell';
     const toAmountInput = document.createElement('input');
     toAmountInput.type = 'number';
@@ -5934,7 +6413,7 @@ async function addRowDynamic() {
     toAmountCell.appendChild(toAmountInput);
     
     // GST %
-    const taxPercentCell = row.insertCell(10);
+    const taxPercentCell = row.insertCell(8 + batchOffset + extraDiscOffset);
     taxPercentCell.className = 'tax-percent-cell';
     const taxPercentInput = document.createElement('input');
     taxPercentInput.type = 'number';
@@ -5957,7 +6436,7 @@ async function addRowDynamic() {
     taxPercentCell.appendChild(taxPercentInput);
     
     // GST Amount
-    const taxAmountCell = row.insertCell(11);
+    const taxAmountCell = row.insertCell(9 + batchOffset + extraDiscOffset);
     taxAmountCell.className = 'tax-amount-cell';
     const taxAmountInput = document.createElement('input');
     taxAmountInput.type = 'number';
@@ -5968,7 +6447,7 @@ async function addRowDynamic() {
     taxAmountCell.appendChild(taxAmountInput);
     
     // FOC Qty
-    const focCell = row.insertCell(12);
+    const focCell = row.insertCell(10 + batchOffset + extraDiscOffset);
     focCell.className = 'foc-cell';
     const focInput = document.createElement('input');
     focInput.type = 'number';
@@ -5976,10 +6455,17 @@ async function addRowDynamic() {
     focInput.min = '0';
     focInput.step = '0.001';
     focInput.value = '0';
+    // Bonus draws from the same batch as the regular sale qty, so changing it
+    // must re-check available stock too (see validateStockForRow).
+    focInput.addEventListener('input', function() {
+        if (typeof validateStockForRow === 'function') {
+            validateStockForRow(row);
+        }
+    });
     focCell.appendChild(focInput);
     
     // Net Amount
-    const netCell = row.insertCell(13);
+    const netCell = row.insertCell(11 + batchOffset + extraDiscOffset);
     netCell.className = 'net-cell';
     const netInput = document.createElement('input');
     netInput.type = 'text';
@@ -5990,7 +6476,7 @@ async function addRowDynamic() {
     netCell.appendChild(netInput);
     
     // Actions
-    const actionsCell = row.insertCell(14);
+    const actionsCell = row.insertCell(12 + batchOffset + extraDiscOffset);
     const deleteBtn = document.createElement('button');
     deleteBtn.type = 'button';
     deleteBtn.className = 'btn btn-danger btn-sm';
@@ -6020,27 +6506,37 @@ async function addRowDynamic() {
 }
 
 // Apply invoice settings to a specific row
+// Apply invoice settings to a specific row
 function applyInvoiceSettingsToRow(row) {
     const enableCashDiscountPercent = localStorage.getItem('enableCashDiscountPercent') === 'true';
     const enableCashDiscountAmount = localStorage.getItem('enableCashDiscountAmount') === 'true';
     const enableTradeOfferAmount = localStorage.getItem('enableTradeOfferAmount') === 'true';
     const enableFOC = localStorage.getItem('enableFOC') === 'true';
-    const enableTaxation = false;
+    const enableTaxation = isTaxationEnabled();
+    const enableBatchNo = localStorage.getItem('enableBatchNo') !== 'false';       // NEW
+    const enableExpiryDate = localStorage.getItem('enableExpiryDate') !== 'false'; // NEW
+    const enableExtraDiscountItem = localStorage.getItem('enableExtraDiscountItem') !== 'false'; // NEW
 
     // Apply visibility to cells in this row
     const discPercentCell = row.querySelector('.disc-percent-cell');
     const discAmountCell = row.querySelector('.disc-amount-cell');
+    const extraDiscCell = row.querySelector('.extra-disc-cell');       // NEW
     const toAmountCell = row.querySelector('.to-amount-cell');
     const taxPercentCell = row.querySelector('.tax-percent-cell');
     const taxAmountCell = row.querySelector('.tax-amount-cell');
     const focCell = row.querySelector('.foc-cell');
-    
+    const batchNoCell = row.querySelector('.batch-no-cell');           // NEW
+    const batchExpiryCell = row.querySelector('.batch-expiry-cell');   // NEW
+
     if (discPercentCell) discPercentCell.style.display = enableCashDiscountPercent ? '' : 'none';
     if (discAmountCell) discAmountCell.style.display = enableCashDiscountAmount ? '' : 'none';
+    if (extraDiscCell) extraDiscCell.style.display = enableExtraDiscountItem ? '' : 'none'; // NEW
     if (toAmountCell) toAmountCell.style.display = enableTradeOfferAmount ? '' : 'none';
     if (taxPercentCell) taxPercentCell.style.display = enableTaxation ? '' : 'none';
     if (taxAmountCell) taxAmountCell.style.display = enableTaxation ? '' : 'none';
     if (focCell) focCell.style.display = enableFOC ? '' : 'none';
+    if (batchNoCell) batchNoCell.style.display = enableBatchNo ? '' : 'none';               // NEW
+    if (batchExpiryCell) batchExpiryCell.style.display = enableExpiryDate ? '' : 'none';     // NEW
 }
 
 // Initialize dropdown for dynamic rows
@@ -6159,7 +6655,7 @@ function initTableDropdownDynamic(container, row) {
             
             // Set price based on saved setting
             const salePriceSetting = localStorage.getItem('salePriceSetting') || 'trade_price';
-            const priceValue = salePriceSetting === 'mrp' ? (product.mrp || 0) : (product.trade_price || 0);
+            const priceValue = getEffectivePriceValue(product, salePriceSetting);
             row.querySelector('.price-cell input').value = priceValue;
             
             // Set default values

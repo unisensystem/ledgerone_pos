@@ -26,10 +26,15 @@ if (!$customer_id || !$product_id) {
 
 try {
     $sql = "
-        SELECT 
+        SELECT
             si.sale_date,
             sii.sale_price,
             sii.quantity,
+            sii.gross_amount,
+            sii.discount_percent,
+            sii.discount_amount,
+            sii.extra_discount_amount,
+            sii.foc_quantity,
             cur.symbol as currency_symbol
         FROM sale_invoice_items sii
         JOIN sale_invoice si ON sii.sale_invoice_id = si.id
