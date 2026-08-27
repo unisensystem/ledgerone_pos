@@ -212,6 +212,29 @@
             }
         }
 
+        /* ---- Page-break control (fixes rows/sections being sliced across pages) ---- */
+        /* Applies to both browser "Print" (native @page pagination) and the
+           html2pdf.js download flow (configured further down with pagebreak.mode:'css'). */
+        .items-table thead { display: table-header-group; }
+        .items-table tfoot { display: table-footer-group; }
+        .items-table tr {
+            page-break-inside: avoid;
+            break-inside: avoid;
+        }
+        .invoice-header,
+        .invoice-meta,
+        #brandRow,
+        .totals-section,
+        #amountInWordsSection,
+        #signaturesSection {
+            page-break-inside: avoid;
+            break-inside: avoid;
+        }
+        /* Keep the very last few item rows from being orphaned right above the totals block */
+        .totals-section {
+            page-break-before: auto;
+        }
+
         /* A6 Optimization */
         body.a6-mode {
             font-size: 7px;
@@ -1599,7 +1622,12 @@
                 filename: `Invoice-${invoiceNo}.pdf`,
                 image: { type: 'jpeg', quality: 0.98 },
                 html2canvas: { scale: 2, useCORS: true, allowTaint: true, logging: false },
-                jsPDF: { unit: 'mm', format: format, orientation: 'portrait' }
+                jsPDF: { unit: 'mm', format: format, orientation: 'portrait' },
+                // 'css' mode makes html2pdf respect the page-break-inside/avoid rules defined
+                // in <style> instead of just slicing the rendered canvas at a fixed page height —
+                // this is what stops a table row (or the totals/signature block) from being cut
+                // in half between page 1 and page 2.
+                pagebreak: { mode: ['css', 'legacy'], avoid: ['tr', '.totals-section', '#amountInWordsSection', '#signaturesSection'] }
             }).from(document.querySelector('.invoice-container')).save();
 
             document.querySelectorAll('.no-print').forEach(el => el.style.removeProperty('display'));
