@@ -339,156 +339,807 @@ try {
             echo json_encode(['success' => true, 'data' => $positions, 'currency' => $currency_symbol, 'debug' => $debug]);
             break;
 
-        case 'ledger':
-            $product_id = $_GET['product_id'] ?? null;
-            $company_id = $_GET['company_id'] ?? null;
-            $vendor_id = $_GET['vendor_id'] ?? null;
-            $customer_id = $_GET['customer_id'] ?? null;
-            $from_date = $_GET['from_date'] ?? null;
-            $to_date = $_GET['to_date'] ?? null;
+      case 'ledger':
 
-            // No filter required anymore — with nothing selected, the full
-            // tenant-wide item ledger loads (matches Detailed Ledger behaviour).
+    $product_id = $_GET['product_id'] ?? null;
+    $company_id = $_GET['company_id'] ?? null;
+    $vendor_id = $_GET['vendor_id'] ?? null;
+    $customer_id = $_GET['customer_id'] ?? null;
+    $from_date = $_GET['from_date'] ?? null;
+    $to_date = $_GET['to_date'] ?? null;
 
-            // Brought-forward balance(s) before from_date, keyed by product_id
-            // (needed because when only a Company is selected, more than one
-            // product can appear and each must carry its own running balance)
-            $bbf_by_product = [];
-            if ($from_date) {
-                $bbf_sql = "SELECT sl.product_id, COALESCE(SUM(
-                                (sl.qty_in * COALESCE(CASE WHEN u.unit_scope = 'universal' THEN u.conversion_factor ELSE puc.conversion_factor END, 1)) - 
-                                (sl.qty_out * COALESCE(CASE WHEN u.unit_scope = 'universal' THEN u.conversion_factor ELSE puc.conversion_factor END, 1))
-                            ), 0) as bbf 
-                           FROM stock_ledger sl
-                           JOIN products p ON sl.product_id = p.id
-                           LEFT JOIN uom u ON sl.unit_id = u.id
-                           LEFT JOIN product_uom_conversions puc ON p.id = puc.product_id AND sl.unit_id = puc.uom_id
-                           LEFT JOIN purchase_invoice pi ON sl.reference_table = 'purchase_invoice' AND sl.reference_id = pi.id
-                           LEFT JOIN sale_invoice si ON sl.reference_table = 'sale_invoice' AND sl.reference_id = si.id
-                           WHERE sl.tenant_id = ? AND sl.transaction_date < ?";
-                $bbf_params = [$tenant_id];
-                if ($product_id) {
-                    $bbf_sql .= " AND sl.product_id = ?";
-                    $bbf_params[] = $product_id;
-                }
-                if ($vendor_id) {
-                    $bbf_sql .= " AND p.vendor_id = ?";
-                    $bbf_params[] = $vendor_id;
-                }
-                if ($customer_id) {
-                    $bbf_sql .= " AND si.customer_id = ?";
-                    $bbf_params[] = $customer_id;
-                }
-                if ($company_id) {
-                    $bbf_sql .= " AND (pi.company_id = ? OR si.company_id = ?)";
-                    $bbf_params[] = $company_id;
-                    $bbf_params[] = $company_id;
-                }
-                $bbf_sql .= " GROUP BY sl.product_id";
-                // from_date placeholder is positioned right after tenant_id above, so re-insert it in the right order
-                $bbf_params = [$tenant_id, $from_date];
-                if ($product_id) $bbf_params[] = $product_id;
-                if ($vendor_id) $bbf_params[] = $vendor_id;
-                if ($customer_id) $bbf_params[] = $customer_id;
-                if ($company_id) {
-                    $bbf_params[] = $company_id;
-                    $bbf_params[] = $company_id;
-                }
 
-                $bbf_stmt = $pdo->prepare($bbf_sql);
-                $bbf_stmt->execute($bbf_params);
-                foreach ($bbf_stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
-                    $bbf_by_product[$row['product_id']] = (float) $row['bbf'];
-                }
+    /*
+    |--------------------------------------------------------------------------
+    | BROUGHT FORWARD BALANCE
+    |--------------------------------------------------------------------------
+    |
+    | If from_date is selected, calculate stock before from_date.
+    | Balance is calculated in BASE UNIT.
+    |
+    */
+
+    $bbf_by_product = [];
+
+    if ($from_date) {
+
+        $bbf_sql = "SELECT
+                        sl.product_id,
+
+                        COALESCE(
+                            SUM(
+                                (
+                                    sl.qty_in *
+                                    COALESCE(
+                                        CASE
+                                            WHEN u.base_unit_id IS NOT NULL
+                                                 AND u.unit_scope = 'universal'
+                                            THEN u.conversion_factor
+
+                                            WHEN puc.conversion_factor IS NOT NULL
+                                            THEN puc.conversion_factor
+
+                                            ELSE 1
+                                        END,
+                                        1
+                                    )
+                                )
+                                -
+                                (
+                                    sl.qty_out *
+                                    COALESCE(
+                                        CASE
+                                            WHEN u.base_unit_id IS NOT NULL
+                                                 AND u.unit_scope = 'universal'
+                                            THEN u.conversion_factor
+
+                                            WHEN puc.conversion_factor IS NOT NULL
+                                            THEN puc.conversion_factor
+
+                                            ELSE 1
+                                        END,
+                                        1
+                                    )
+                                )
+                            ),
+                            0
+                        ) AS bbf
+
+                    FROM stock_ledger sl
+
+                    JOIN products p
+                        ON sl.product_id = p.id
+                       AND sl.tenant_id = p.tenant_id
+
+                    LEFT JOIN uom u
+                        ON sl.unit_id = u.id
+
+                    LEFT JOIN product_uom_conversions puc
+                        ON p.id = puc.product_id
+                       AND sl.unit_id = puc.uom_id
+
+                    LEFT JOIN purchase_invoice pi
+                        ON sl.reference_table = 'purchase_invoice'
+                       AND sl.reference_id = pi.id
+
+                    LEFT JOIN sale_invoice si
+                        ON sl.reference_table = 'sale_invoice'
+                       AND sl.reference_id = si.id
+
+                    WHERE sl.tenant_id = ?
+                      AND p.product_type = 'physical'
+                      AND sl.transaction_date < ?";
+
+        $bbf_params = [
+            $tenant_id,
+            $from_date
+        ];
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Product filter
+        |--------------------------------------------------------------------------
+        */
+
+        if ($product_id) {
+
+            $bbf_sql .= " AND sl.product_id = ?";
+            $bbf_params[] = $product_id;
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Vendor filter
+        |--------------------------------------------------------------------------
+        */
+
+        if ($vendor_id) {
+
+            $bbf_sql .= " AND p.vendor_id = ?";
+            $bbf_params[] = $vendor_id;
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Customer filter
+        |--------------------------------------------------------------------------
+        */
+
+        if ($customer_id) {
+
+            $bbf_sql .= " AND si.customer_id = ?";
+            $bbf_params[] = $customer_id;
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Company filter
+        |--------------------------------------------------------------------------
+        */
+
+        if ($company_id) {
+
+            $bbf_sql .= " AND (
+                                pi.company_id = ?
+                                OR
+                                si.company_id = ?
+                              )";
+
+            $bbf_params[] = $company_id;
+            $bbf_params[] = $company_id;
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Group by product
+        |--------------------------------------------------------------------------
+        */
+
+        $bbf_sql .= " GROUP BY sl.product_id";
+
+
+        $bbf_stmt = $pdo->prepare($bbf_sql);
+        $bbf_stmt->execute($bbf_params);
+
+        foreach ($bbf_stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+
+            $bbf_by_product[$row['product_id']] =
+                (float)$row['bbf'];
+        }
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | MAIN ITEM-WISE STOCK LEDGER QUERY
+    |--------------------------------------------------------------------------
+    |
+    | IMPORTANT:
+    |
+    | qty_in / qty_out are converted into BASE UNIT here.
+    |
+    | Example:
+    |
+    | Carton = 10 Piece
+    | Dozen  = 12 Piece
+    | Piece  = 1 Piece
+    |
+    | Therefore:
+    |
+    | 1 Carton = 10
+    | 1 Dozen  = 12
+    | 3 Piece  = 3
+    |
+    | Total Opening = 25 Piece
+    |
+    */
+
+    $sql = "SELECT
+
+                sl.id,
+
+                sl.product_id,
+
+                p.name AS product_name,
+
+                sl.transaction_date,
+
+                sl.transaction_type,
+
+                sl.batch_no,
+
+                sl.expiry_date AS batch_expiry_date,
+
+                COALESCE(
+                    pi.bill_no,
+                    si.bill_no
+                ) AS invoice_number,
+
+                vs.supplier_name AS company_name,
+
+
+                /*
+                |--------------------------------------------------------------------------
+                | CONVERT QTY IN TO BASE UNIT
+                |--------------------------------------------------------------------------
+                */
+
+                (
+                    sl.qty_in *
+                    COALESCE(
+                        CASE
+
+                            WHEN u.base_unit_id IS NOT NULL
+                                 AND u.unit_scope = 'universal'
+                            THEN u.conversion_factor
+
+                            WHEN puc.conversion_factor IS NOT NULL
+                            THEN puc.conversion_factor
+
+                            ELSE 1
+
+                        END,
+                        1
+                    )
+                ) AS qty_in,
+
+
+                /*
+                |--------------------------------------------------------------------------
+                | CONVERT QTY OUT TO BASE UNIT
+                |--------------------------------------------------------------------------
+                */
+
+                (
+                    sl.qty_out *
+                    COALESCE(
+                        CASE
+
+                            WHEN u.base_unit_id IS NOT NULL
+                                 AND u.unit_scope = 'universal'
+                            THEN u.conversion_factor
+
+                            WHEN puc.conversion_factor IS NOT NULL
+                            THEN puc.conversion_factor
+
+                            ELSE 1
+
+                        END,
+                        1
+                    )
+                ) AS qty_out,
+
+
+                sl.unit_cost,
+
+
+                /*
+                |--------------------------------------------------------------------------
+                | ALWAYS SHOW BASE UNIT
+                |--------------------------------------------------------------------------
+                */
+
+                COALESCE(
+                    base_u.uom_name,
+                    u.uom_name,
+                    'L'
+                ) AS unit_symbol,
+
+
+                /*
+                |--------------------------------------------------------------------------
+                | PARTY NAME
+                |--------------------------------------------------------------------------
+                */
+
+                CASE
+
+                    WHEN sl.reference_table = 'purchase_invoice'
+                    THEN s.supplier_name
+
+                    WHEN sl.reference_table = 'sale_invoice'
+                    THEN c.customer_name
+
+                    ELSE NULL
+
+                END AS party_name,
+
+
+                /*
+                |--------------------------------------------------------------------------
+                | CUSTOMER / SUPPLIER NAME
+                |--------------------------------------------------------------------------
+                */
+
+                CASE
+
+                    WHEN sl.reference_table = 'sale_invoice'
+                    THEN c.customer_name
+
+                    WHEN sl.reference_table = 'sale_return'
+                    THEN c2.customer_name
+
+                    WHEN sl.reference_table = 'purchase_invoice'
+                    THEN s.supplier_name
+
+                    WHEN sl.reference_table = 'purchase_return'
+                    THEN s2.supplier_name
+
+                    ELSE NULL
+
+                END AS customer_name
+
+
+            FROM stock_ledger sl
+
+
+            JOIN products p
+                ON sl.product_id = p.id
+               AND sl.tenant_id = p.tenant_id
+
+
+            LEFT JOIN suppliers vs
+                ON p.vendor_id = vs.id
+
+
+            LEFT JOIN uom u
+                ON sl.unit_id = u.id
+
+
+            LEFT JOIN uom base_u
+                ON COALESCE(
+                       u.base_unit_id,
+                       u.id
+                   ) = base_u.id
+
+
+            LEFT JOIN product_uom_conversions puc
+                ON p.id = puc.product_id
+               AND sl.unit_id = puc.uom_id
+
+
+            LEFT JOIN purchase_invoice pi
+                ON sl.reference_table = 'purchase_invoice'
+               AND sl.reference_id = pi.id
+
+
+            LEFT JOIN suppliers s
+                ON pi.supplier_id = s.id
+
+
+            LEFT JOIN sale_invoice si
+                ON sl.reference_table = 'sale_invoice'
+               AND sl.reference_id = si.id
+
+
+            LEFT JOIN customers c
+                ON si.customer_id = c.id
+
+
+            LEFT JOIN sale_return sr
+                ON sl.reference_table = 'sale_return'
+               AND sl.reference_id = sr.id
+
+
+            LEFT JOIN customers c2
+                ON sr.customer_id = c2.id
+
+
+            LEFT JOIN purchase_return pr
+                ON sl.reference_table = 'purchase_return'
+               AND sl.reference_id = pr.id
+
+
+            LEFT JOIN suppliers s2
+                ON pr.supplier_id = s2.id
+
+
+            WHERE sl.tenant_id = ?";
+
+
+    $params = [
+        $tenant_id
+    ];
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | PRODUCT FILTER
+    |--------------------------------------------------------------------------
+    */
+
+    if ($product_id) {
+
+        $sql .= " AND sl.product_id = ?";
+        $params[] = $product_id;
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | VENDOR FILTER
+    |--------------------------------------------------------------------------
+    */
+
+    if ($vendor_id) {
+
+        $sql .= " AND p.vendor_id = ?";
+        $params[] = $vendor_id;
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | CUSTOMER FILTER
+    |--------------------------------------------------------------------------
+    */
+
+    if ($customer_id) {
+
+        $sql .= " AND si.customer_id = ?";
+        $params[] = $customer_id;
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | FROM DATE
+    |--------------------------------------------------------------------------
+    */
+
+    if ($from_date) {
+
+        $sql .= " AND sl.transaction_date >= ?";
+        $params[] = $from_date;
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | TO DATE
+    |--------------------------------------------------------------------------
+    */
+
+    if ($to_date) {
+
+        $sql .= " AND sl.transaction_date <= ?";
+        $params[] = $to_date;
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | COMPANY FILTER
+    |--------------------------------------------------------------------------
+    */
+
+    if ($company_id) {
+
+        $sql .= " AND (
+                            pi.company_id = ?
+                            OR
+                            si.company_id = ?
+                          )";
+
+        $params[] = $company_id;
+        $params[] = $company_id;
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | ORDER BY
+    |--------------------------------------------------------------------------
+    */
+
+    $sql .= " ORDER BY
+                    sl.transaction_date ASC,
+                    sl.id ASC";
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | EXECUTE QUERY
+    |--------------------------------------------------------------------------
+    */
+
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute($params);
+
+    $raw_ledger = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | MERGE OPENING STOCK
+    |--------------------------------------------------------------------------
+    |
+    | THIS IS THE MAIN FIX.
+    |
+    | Example database rows:
+    |
+    | 4473 = 1 Carton = 10 Piece
+    | 4474 = 1 Dozen  = 12 Piece
+    | 4475 = 3 Piece  = 3 Piece
+    |
+    | These will become:
+    |
+    | Opening Stock = 25 Piece
+    |
+    | Only Opening Stock is merged.
+    |
+    | Purchase / Sale / Returns remain individual rows.
+    |
+    |--------------------------------------------------------------------------
+    */
+
+    $ledger = [];
+
+    $opening_groups = [];
+
+
+    foreach ($raw_ledger as $entry) {
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | OPENING STOCK
+        |--------------------------------------------------------------------------
+        */
+
+        if ($entry['transaction_type'] === 'Opening Stock') {
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | GROUP KEY
+            |--------------------------------------------------------------------------
+            |
+            | Same product + same transaction date
+            |
+            | So:
+            |
+            | cream + 2026-08-28
+            |
+            | = ONE opening row
+            |
+            |--------------------------------------------------------------------------
+            */
+
+            $group_key =
+                $entry['product_id']
+                . '|'
+                . $entry['transaction_date'];
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | FIRST OPENING ROW
+            |--------------------------------------------------------------------------
+            */
+
+            if (!isset($opening_groups[$group_key])) {
+
+                $opening_groups[$group_key] = $entry;
+
+
+                /*
+                |--------------------------------------------------------------------------
+                | Reset quantities
+                |--------------------------------------------------------------------------
+                */
+
+                $opening_groups[$group_key]['qty_in'] = 0;
+
+                $opening_groups[$group_key]['qty_out'] = 0;
+
+
+                /*
+                |--------------------------------------------------------------------------
+                | Keep first ID
+                |--------------------------------------------------------------------------
+                |
+                | Needed for correct sorting.
+                |
+                |--------------------------------------------------------------------------
+                */
+
+                $opening_groups[$group_key]['id'] =
+                    (int)$entry['id'];
+
+
+                /*
+                |--------------------------------------------------------------------------
+                | BASE UNIT
+                |--------------------------------------------------------------------------
+                */
+
+                $opening_groups[$group_key]['unit_symbol'] =
+                    $entry['unit_symbol'] ?: 'L';
             }
 
-            $sql = "SELECT 
-            sl.product_id,
-            p.name as product_name,
-            sl.transaction_date,
-            sl.transaction_type,
-            sl.batch_no,
-            sl.expiry_date AS batch_expiry_date,
-            COALESCE(pi.bill_no, si.bill_no) as invoice_number,
-            vs.supplier_name as company_name,
-            sl.qty_in * COALESCE(CASE WHEN u.unit_scope = 'universal' THEN u.conversion_factor ELSE puc.conversion_factor END, 1) as qty_in,
-            sl.qty_out * COALESCE(CASE WHEN u.unit_scope = 'universal' THEN u.conversion_factor ELSE puc.conversion_factor END, 1) as qty_out,
-            sl.unit_cost,
-            COALESCE(base_u.uom_name, u.uom_name, 'L') as unit_symbol,
-            CASE 
-                WHEN sl.reference_table = 'purchase_invoice' THEN s.supplier_name
-                WHEN sl.reference_table = 'sale_invoice' THEN c.customer_name
-                ELSE NULL
-            END as party_name,
-            CASE 
-                WHEN sl.reference_table = 'sale_invoice' THEN c.customer_name
-                ELSE NULL
-            END as customer_name
-        FROM stock_ledger sl
-        JOIN products p ON sl.product_id = p.id
-        LEFT JOIN suppliers vs ON p.vendor_id = vs.id
-        LEFT JOIN uom u ON sl.unit_id = u.id
-        LEFT JOIN uom base_u ON COALESCE(u.base_unit_id, u.id) = base_u.id
-        LEFT JOIN product_uom_conversions puc ON p.id = puc.product_id AND sl.unit_id = puc.uom_id
-        LEFT JOIN purchase_invoice pi ON sl.reference_table = 'purchase_invoice' AND sl.reference_id = pi.id
-        LEFT JOIN suppliers s ON pi.supplier_id = s.id
-        LEFT JOIN sale_invoice si ON sl.reference_table = 'sale_invoice' AND sl.reference_id = si.id
-        LEFT JOIN customers c ON si.customer_id = c.id
-        WHERE sl.tenant_id = ?";
 
-            $params = [$tenant_id];
+            /*
+            |--------------------------------------------------------------------------
+            | ADD CONVERTED QTY
+            |--------------------------------------------------------------------------
+            |
+            | IMPORTANT:
+            |
+            | SQL has already converted:
+            |
+            | Carton 1 -> 10
+            | Dozen  1 -> 12
+            | Piece  3 -> 3
+            |
+            | So here simply SUM them.
+            |
+            |--------------------------------------------------------------------------
+            */
 
-            if ($product_id) {
-                $sql .= " AND sl.product_id = ?";
-                $params[] = $product_id;
+            $opening_groups[$group_key]['qty_in'] +=
+                (float)$entry['qty_in'];
+
+
+            $opening_groups[$group_key]['qty_out'] +=
+                (float)$entry['qty_out'];
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | NORMAL TRANSACTIONS
+        |--------------------------------------------------------------------------
+        |
+        | Purchase / Sale / Return / FOC etc.
+        | remain separate.
+        |
+        |--------------------------------------------------------------------------
+        */
+
+        else {
+
+            $ledger[] = $entry;
+        }
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | ADD MERGED OPENING ROWS
+    |--------------------------------------------------------------------------
+    */
+
+    foreach ($opening_groups as $opening) {
+
+        $ledger[] = $opening;
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | SORT COMPLETE LEDGER
+    |--------------------------------------------------------------------------
+    */
+
+    usort(
+        $ledger,
+        function ($a, $b) {
+
+            /*
+            |--------------------------------------------------------------------------
+            | First sort by date
+            |--------------------------------------------------------------------------
+            */
+
+            $date_compare = strcmp(
+                $a['transaction_date'],
+                $b['transaction_date']
+            );
+
+
+            if ($date_compare !== 0) {
+
+                return $date_compare;
             }
 
-            // "Company" filter (i.e. Supplier/Distribution of the product, via products.vendor_id)
-            if ($vendor_id) {
-                $sql .= " AND p.vendor_id = ?";
-                $params[] = $vendor_id;
-            }
 
-            if ($customer_id) {
-                $sql .= " AND si.customer_id = ?";
-                $params[] = $customer_id;
-            }
+            /*
+            |--------------------------------------------------------------------------
+            | Same date -> sort by ID
+            |--------------------------------------------------------------------------
+            */
 
-            if ($from_date) {
-                $sql .= " AND sl.transaction_date >= ?";
-                $params[] = $from_date;
-            }
+            return (
+                (int)($a['id'] ?? 0)
+            ) <=> (
+                (int)($b['id'] ?? 0)
+            );
+        }
+    );
 
-            if ($to_date) {
-                $sql .= " AND sl.transaction_date <= ?";
-                $params[] = $to_date;
-            }
 
-            if ($company_id) {
-                $sql .= " AND (pi.company_id = ? OR si.company_id = ?)";
-                $params[] = $company_id;
-                $params[] = $company_id;
-            }
+    /*
+    |--------------------------------------------------------------------------
+    | RUNNING BALANCE PER PRODUCT
+    |--------------------------------------------------------------------------
+    |
+    | Each product gets its own running balance.
+    |
+    |--------------------------------------------------------------------------
+    */
 
-            $sql .= " ORDER BY sl.transaction_date ASC, sl.id ASC";
+    $balances = $bbf_by_product;
 
-            $stmt = $pdo->prepare($sql);
-            $stmt->execute($params);
-            $ledger = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-            // Running balance kept per product_id so a Company-only query
-            // (which can span several products) doesn't mix them together.
-            $balances = $bbf_by_product;
-            foreach ($ledger as &$entry) {
-                $pid = $entry['product_id'];
-                if (!isset($balances[$pid])) $balances[$pid] = 0;
-                $balances[$pid] += $entry['qty_in'] - $entry['qty_out'];
-                $entry['balance'] = $balances[$pid];
-                $entry['value'] = $balances[$pid] * $entry['unit_cost'];
-            }
+    foreach ($ledger as &$entry) {
 
-            echo json_encode(['success' => true, 'data' => $ledger, 'currency' => $currency_symbol]);
-            break;
+        $pid = $entry['product_id'];
+
+
+        if (!isset($balances[$pid])) {
+
+            $balances[$pid] = 0;
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | ADD IN / SUBTRACT OUT
+        |--------------------------------------------------------------------------
+        */
+
+        $balances[$pid] +=
+            (float)$entry['qty_in']
+            -
+            (float)$entry['qty_out'];
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | RUNNING BALANCE
+        |--------------------------------------------------------------------------
+        */
+
+        $entry['balance'] =
+            $balances[$pid];
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | STOCK VALUE
+        |--------------------------------------------------------------------------
+        */
+
+        $entry['value'] =
+            $balances[$pid]
+            *
+            (float)$entry['unit_cost'];
+    }
+
+
+    unset($entry);
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | RESPONSE
+    |--------------------------------------------------------------------------
+    */
+
+    echo json_encode([
+        'success' => true,
+        'data' => $ledger,
+        'currency' => $currency_symbol
+    ]);
+
+    break;
+
 
         case 'branch-ledger':
             $branch_id = $_GET['branch_id'] ?? null;
@@ -694,136 +1345,726 @@ try {
             echo json_encode(['success' => true, 'data' => $ledger, 'currency' => $currency_symbol]);
             break;
 
-      case 'item-movement':
-    $product_id  = $_GET['product_id'] ?? null;
-    $branch_id   = $_GET['branch_id'] ?? null;
-    $vendor_id   = $_GET['vendor_id'] ?? null;   // Company / Supplier
-    $from_date   = $_GET['from_date'] ?? null;
-    $to_date     = $_GET['to_date'] ?? null;
+       case 'item-movement':
 
-    // ========== Opening (before from_date) ==========
-    $bbf_by_product = [];
-    if ($from_date) {
-        $bbf_sql = "SELECT 
-                        sl.product_id, 
-                        COALESCE(SUM(sl.qty_in - sl.qty_out), 0) as bbf
-                    FROM stock_ledger sl
-                    JOIN products p ON sl.product_id = p.id AND sl.tenant_id = p.tenant_id
-                    WHERE sl.tenant_id = ? 
-                      AND p.product_type = 'physical' 
-                      AND sl.transaction_date < ?";
-        $bbf_params = [$tenant_id, $from_date];
+    $product_id = $_GET['product_id'] ?? null;
+    $branch_id  = $_GET['branch_id'] ?? null;
+    $vendor_id  = $_GET['vendor_id'] ?? null;
+    $from_date  = $_GET['from_date'] ?? null;
+    $to_date    = $_GET['to_date'] ?? null;
 
-        if ($product_id) { $bbf_sql .= " AND sl.product_id = ?"; $bbf_params[] = $product_id; }
-        if ($branch_id)  { $bbf_sql .= " AND sl.branch_id = ?";  $bbf_params[] = $branch_id; }
-        if ($vendor_id)  { $bbf_sql .= " AND p.vendor_id = ?";   $bbf_params[] = $vendor_id; }
 
-        $bbf_sql .= " GROUP BY sl.product_id";
+    /*
+    |--------------------------------------------------------------------------
+    | BASE UNIT CONVERSION
+    |--------------------------------------------------------------------------
+    |
+    | Piece  = 1
+    | Dozen  = 12
+    | Carton = product-specific conversion
+    |
+    |--------------------------------------------------------------------------
+    */
 
-        $bbf_stmt = $pdo->prepare($bbf_sql);
-        $bbf_stmt->execute($bbf_params);
-        foreach ($bbf_stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
-            $bbf_by_product[$row['product_id']] = (float) $row['bbf'];
-        }
+    $conversionFactor = "
+        COALESCE(
+            CASE
+
+                WHEN u.base_unit_id IS NOT NULL
+                     AND u.unit_scope = 'universal'
+                THEN u.conversion_factor
+
+                WHEN puc.conversion_factor IS NOT NULL
+                THEN puc.conversion_factor
+
+                ELSE 1
+
+            END,
+            1
+        )
+    ";
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | OPENING BALANCE
+    |--------------------------------------------------------------------------
+    |
+    | IMPORTANT:
+    |
+    | Item Stock Movement mein Opening Stock ko from_date ke din bhi
+    | Opening mein include karna hai.
+    |
+    | Example:
+    |
+    | 1 Carton = 10
+    | 1 Dozen  = 12
+    | 3 Piece  = 3
+    |
+    | Opening = 25 Piece
+    |
+    |--------------------------------------------------------------------------
+    */
+
+    $opening_sql = "
+        SELECT
+
+            sl.product_id,
+
+            COALESCE(
+                SUM(
+                    (
+                        sl.qty_in * {$conversionFactor}
+                    )
+                    -
+                    (
+                        sl.qty_out * {$conversionFactor}
+                    )
+                ),
+                0
+            ) AS opening
+
+
+        FROM stock_ledger sl
+
+
+        JOIN products p
+            ON sl.product_id = p.id
+           AND sl.tenant_id = p.tenant_id
+
+
+        LEFT JOIN uom u
+            ON sl.unit_id = u.id
+
+
+        LEFT JOIN product_uom_conversions puc
+            ON p.id = puc.product_id
+           AND sl.unit_id = puc.uom_id
+
+
+        WHERE sl.tenant_id = ?
+
+          AND p.product_type = 'physical'
+    ";
+
+
+    $opening_params = [
+        $tenant_id
+    ];
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | PRODUCT FILTER
+    |--------------------------------------------------------------------------
+    */
+
+    if ($product_id) {
+
+        $opening_sql .= " AND sl.product_id = ?";
+        $opening_params[] = $product_id;
     }
 
-    // ========== Period movements ==========
-    $sql = "SELECT
-                sl.product_id,
-                p.name as product_name,
-                COALESCE(base_u.uom_name, u.uom_name, 'L') as unit_symbol,
 
-                COALESCE(SUM(CASE 
-                    WHEN sl.reference_table = 'purchase_invoice' THEN sl.qty_in ELSE 0 
-                END), 0) as purchase,
+    /*
+    |--------------------------------------------------------------------------
+    | BRANCH FILTER
+    |--------------------------------------------------------------------------
+    */
 
-                COALESCE(SUM(CASE 
-                    WHEN sl.reference_table = 'sale_invoice' THEN sl.qty_out ELSE 0 
-                END), 0) as sale,
+    if ($branch_id) {
 
-                COALESCE(SUM(CASE 
-                    WHEN sl.reference_table IN ('sale_return', 'credit_note') THEN sl.qty_in ELSE 0 
-                END), 0) as credit_note,
+        $opening_sql .= " AND sl.branch_id = ?";
+        $opening_params[] = $branch_id;
+    }
 
-                COALESCE(SUM(CASE 
-                    WHEN sl.reference_table IN ('purchase_return', 'debit_note') THEN sl.qty_out ELSE 0 
-                END), 0) as debit_note
 
-            FROM stock_ledger sl
-            JOIN products p ON sl.product_id = p.id AND sl.tenant_id = p.tenant_id
-            LEFT JOIN uom u ON sl.unit_id = u.id
-            LEFT JOIN uom base_u ON COALESCE(u.base_unit_id, u.id) = base_u.id
-            WHERE sl.tenant_id = ? 
-              AND p.product_type = 'physical'";
+    /*
+    |--------------------------------------------------------------------------
+    | VENDOR FILTER
+    |--------------------------------------------------------------------------
+    */
 
-    $params = [$tenant_id];
+    if ($vendor_id) {
 
-    if ($product_id) { $sql .= " AND sl.product_id = ?"; $params[] = $product_id; }
-    if ($branch_id)  { $sql .= " AND sl.branch_id = ?";  $params[] = $branch_id; }
-    if ($vendor_id)  { $sql .= " AND p.vendor_id = ?";   $params[] = $vendor_id; }
-    if ($from_date)  { $sql .= " AND sl.transaction_date >= ?"; $params[] = $from_date; }
-    if ($to_date)    { $sql .= " AND sl.transaction_date <= ?"; $params[] = $to_date; }
+        $opening_sql .= " AND p.vendor_id = ?";
+        $opening_params[] = $vendor_id;
+    }
 
-    $sql .= " GROUP BY sl.product_id, p.name, unit_symbol
-              ORDER BY p.name ASC";
+
+    /*
+    |--------------------------------------------------------------------------
+    | DATE FILTER
+    |--------------------------------------------------------------------------
+    |
+    | IMPORTANT:
+    |
+    | <= from_date
+    |
+    | This includes Opening Stock created on from_date.
+    |
+    |--------------------------------------------------------------------------
+    */
+
+    if ($from_date) {
+
+        $opening_sql .= " AND sl.transaction_date <= ?";
+        $opening_params[] = $from_date;
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | GET OPENING
+    |--------------------------------------------------------------------------
+    */
+
+    $opening_sql .= " GROUP BY sl.product_id";
+
+
+    $opening_stmt = $pdo->prepare($opening_sql);
+    $opening_stmt->execute($opening_params);
+
+    $opening_rows = $opening_stmt->fetchAll(PDO::FETCH_ASSOC);
+
+
+    $opening_by_product = [];
+
+
+    foreach ($opening_rows as $row) {
+
+        $opening_by_product[$row['product_id']] =
+            (float)$row['opening'];
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | PERIOD MOVEMENTS
+    |--------------------------------------------------------------------------
+    |
+    | Opening Stock ko yahan include nahi karna.
+    |
+    | Purchase / Sale / Returns only.
+    |
+    |--------------------------------------------------------------------------
+    */
+
+    $sql = "
+        SELECT
+
+            sl.product_id,
+
+            p.name AS product_name,
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | BASE UNIT NAME
+            |--------------------------------------------------------------------------
+            */
+
+            COALESCE(
+                base_u.uom_name,
+                u.uom_name,
+                'L'
+            ) AS unit_symbol,
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | PURCHASE
+            |--------------------------------------------------------------------------
+            */
+
+            COALESCE(
+                SUM(
+                    CASE
+                        WHEN sl.reference_table = 'purchase_invoice'
+                        THEN sl.qty_in * {$conversionFactor}
+                        ELSE 0
+                    END
+                ),
+                0
+            ) AS purchase,
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | SALE
+            |--------------------------------------------------------------------------
+            */
+
+            COALESCE(
+                SUM(
+                    CASE
+                        WHEN sl.reference_table = 'sale_invoice'
+                        THEN sl.qty_out * {$conversionFactor}
+                        ELSE 0
+                    END
+                ),
+                0
+            ) AS sale,
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | CREDIT NOTE / SALE RETURN
+            |--------------------------------------------------------------------------
+            */
+
+            COALESCE(
+                SUM(
+                    CASE
+                        WHEN sl.reference_table IN (
+                            'sale_return',
+                            'credit_note'
+                        )
+                        THEN sl.qty_in * {$conversionFactor}
+                        ELSE 0
+                    END
+                ),
+                0
+            ) AS credit_note,
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | DEBIT NOTE / PURCHASE RETURN
+            |--------------------------------------------------------------------------
+            */
+
+            COALESCE(
+                SUM(
+                    CASE
+                        WHEN sl.reference_table IN (
+                            'purchase_return',
+                            'debit_note'
+                        )
+                        THEN sl.qty_out * {$conversionFactor}
+                        ELSE 0
+                    END
+                ),
+                0
+            ) AS debit_note
+
+
+        FROM stock_ledger sl
+
+
+        JOIN products p
+            ON sl.product_id = p.id
+           AND sl.tenant_id = p.tenant_id
+
+
+        LEFT JOIN uom u
+            ON sl.unit_id = u.id
+
+
+        LEFT JOIN uom base_u
+            ON COALESCE(
+                   u.base_unit_id,
+                   u.id
+               ) = base_u.id
+
+
+        LEFT JOIN product_uom_conversions puc
+            ON p.id = puc.product_id
+           AND sl.unit_id = puc.uom_id
+
+
+        WHERE sl.tenant_id = ?
+
+          AND p.product_type = 'physical'
+    ";
+
+
+    $params = [
+        $tenant_id
+    ];
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | PRODUCT FILTER
+    |--------------------------------------------------------------------------
+    */
+
+    if ($product_id) {
+
+        $sql .= " AND sl.product_id = ?";
+        $params[] = $product_id;
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | BRANCH FILTER
+    |--------------------------------------------------------------------------
+    */
+
+    if ($branch_id) {
+
+        $sql .= " AND sl.branch_id = ?";
+        $params[] = $branch_id;
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | VENDOR FILTER
+    |--------------------------------------------------------------------------
+    */
+
+    if ($vendor_id) {
+
+        $sql .= " AND p.vendor_id = ?";
+        $params[] = $vendor_id;
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | FROM DATE
+    |--------------------------------------------------------------------------
+    |
+    | Opening Stock is already handled above.
+    |
+    | So period movements should start AFTER opening date.
+    |
+    |--------------------------------------------------------------------------
+    */
+
+    if ($from_date) {
+
+        $sql .= " AND sl.transaction_date >= ?";
+        $params[] = $from_date;
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | TO DATE
+    |--------------------------------------------------------------------------
+    */
+
+    if ($to_date) {
+
+        $sql .= " AND sl.transaction_date <= ?";
+        $params[] = $to_date;
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | IMPORTANT:
+    | Opening Stock must NOT be counted as Purchase/Sale movement.
+    |--------------------------------------------------------------------------
+    */
+
+    $sql .= "
+        AND sl.transaction_type <> 'Opening Stock'
+    ";
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | GROUP
+    |--------------------------------------------------------------------------
+    */
+
+    $sql .= "
+        GROUP BY
+            sl.product_id,
+            p.name,
+            unit_symbol
+
+        ORDER BY
+            p.name ASC
+    ";
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | EXECUTE
+    |--------------------------------------------------------------------------
+    */
 
     $stmt = $pdo->prepare($sql);
     $stmt->execute($params);
+
     $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-    // ========== Final 1-row-per-product ==========
+
+    /*
+    |--------------------------------------------------------------------------
+    | FINAL ONE ROW PER PRODUCT
+    |--------------------------------------------------------------------------
+    */
+
     $movement = [];
+
     $seen = [];
 
+
+    /*
+    |--------------------------------------------------------------------------
+    | PRODUCTS HAVING MOVEMENTS
+    |--------------------------------------------------------------------------
+    */
+
     foreach ($rows as $row) {
+
         $pid = $row['product_id'];
+
         $seen[$pid] = true;
 
-        $opening     = $bbf_by_product[$pid] ?? 0;
-        $purchase    = (float) $row['purchase'];
-        $sale        = (float) $row['sale'];
-        $credit_note = (float) $row['credit_note'];
-        $debit_note  = (float) $row['debit_note'];
-        $closing     = $opening + $purchase + $credit_note - $sale - $debit_note;
+
+        /*
+        |--------------------------------------------------------------------------
+        | OPENING
+        |--------------------------------------------------------------------------
+        */
+
+        $opening =
+            $opening_by_product[$pid] ?? 0;
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | MOVEMENTS
+        |--------------------------------------------------------------------------
+        */
+
+        $purchase =
+            (float)$row['purchase'];
+
+        $sale =
+            (float)$row['sale'];
+
+        $credit_note =
+            (float)$row['credit_note'];
+
+        $debit_note =
+            (float)$row['debit_note'];
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | CLOSING
+        |--------------------------------------------------------------------------
+        */
+
+        $closing =
+            $opening
+            +
+            $purchase
+            +
+            $credit_note
+            -
+            $sale
+            -
+            $debit_note;
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | RESULT
+        |--------------------------------------------------------------------------
+        */
 
         $movement[] = [
-            'product_id'   => $pid,
-            'product_name' => $row['product_name'],
-            'unit_symbol'  => $row['unit_symbol'] ?: 'L',
-            'opening'      => $opening,
-            'purchase'     => $purchase,
-            'sale'         => $sale,
-            'credit_note'  => $credit_note,
-            'debit_note'   => $debit_note,
-            'closing'      => $closing
+
+            'product_id' =>
+                $pid,
+
+            'product_name' =>
+                $row['product_name'],
+
+            'unit_symbol' =>
+                $row['unit_symbol'] ?: 'L',
+
+            'opening' =>
+                $opening,
+
+            'purchase' =>
+                $purchase,
+
+            'sale' =>
+                $sale,
+
+            'credit_note' =>
+                $credit_note,
+
+            'debit_note' =>
+                $debit_note,
+
+            'closing' =>
+                $closing
         ];
     }
 
-    // Products with only Opening (no movement in period)
-    foreach ($bbf_by_product as $pid => $opening) {
-        if (isset($seen[$pid])) continue;
 
-        $name_stmt = $pdo->prepare("SELECT name FROM products WHERE id = ? AND tenant_id = ?");
-        $name_stmt->execute([$pid, $tenant_id]);
-        $pname = $name_stmt->fetchColumn() ?: 'Unknown';
+    /*
+    |--------------------------------------------------------------------------
+    | PRODUCTS HAVING ONLY OPENING STOCK
+    |--------------------------------------------------------------------------
+    |
+    | If product has Opening Stock but no Purchase/Sale in selected period,
+    | it must still appear.
+    |
+    |--------------------------------------------------------------------------
+    */
+
+    foreach ($opening_by_product as $pid => $opening) {
+
+        if (isset($seen[$pid])) {
+            continue;
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | PRODUCT NAME
+        |--------------------------------------------------------------------------
+        */
+
+        $name_stmt = $pdo->prepare("
+            SELECT name
+            FROM products
+            WHERE id = ?
+              AND tenant_id = ?
+            LIMIT 1
+        ");
+
+
+        $name_stmt->execute([
+            $pid,
+            $tenant_id
+        ]);
+
+
+        $pname =
+            $name_stmt->fetchColumn()
+            ?: 'Unknown';
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | GET BASE UNIT
+        |--------------------------------------------------------------------------
+        */
+
+        $unit_stmt = $pdo->prepare("
+            SELECT
+                COALESCE(
+                    base_u.uom_name,
+                    u.uom_name,
+                    'L'
+                ) AS unit_symbol
+
+            FROM products p
+
+            LEFT JOIN product_uom_conversions puc
+                ON p.id = puc.product_id
+
+            LEFT JOIN uom u
+                ON puc.uom_id = u.id
+
+            LEFT JOIN uom base_u
+                ON COALESCE(
+                       u.base_unit_id,
+                       u.id
+                   ) = base_u.id
+
+            WHERE p.id = ?
+              AND p.tenant_id = ?
+
+            LIMIT 1
+        ");
+
+
+        $unit_stmt->execute([
+            $pid,
+            $tenant_id
+        ]);
+
+
+        $unit_symbol =
+            $unit_stmt->fetchColumn()
+            ?: 'Piece';
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | ADD PRODUCT
+        |--------------------------------------------------------------------------
+        */
 
         $movement[] = [
-            'product_id'   => $pid,
-            'product_name' => $pname,
-            'unit_symbol'  => 'L',
-            'opening'      => $opening,
-            'purchase'     => 0,
-            'sale'         => 0,
-            'credit_note'  => 0,
-            'debit_note'   => 0,
-            'closing'      => $opening
+
+            'product_id' =>
+                $pid,
+
+            'product_name' =>
+                $pname,
+
+            'unit_symbol' =>
+                $unit_symbol,
+
+            'opening' =>
+                (float)$opening,
+
+            'purchase' =>
+                0,
+
+            'sale' =>
+                0,
+
+            'credit_note' =>
+                0,
+
+            'debit_note' =>
+                0,
+
+            'closing' =>
+                (float)$opening
         ];
     }
 
-    usort($movement, fn($a, $b) => strcmp($a['product_name'], $b['product_name']));
 
-    echo json_encode(['success' => true, 'data' => $movement, 'currency' => $currency_symbol]);
+    /*
+    |--------------------------------------------------------------------------
+    | SORT BY PRODUCT NAME
+    |--------------------------------------------------------------------------
+    */
+
+    usort(
+        $movement,
+        function ($a, $b) {
+
+            return strcmp(
+                $a['product_name'],
+                $b['product_name']
+            );
+        }
+    );
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | RESPONSE
+    |--------------------------------------------------------------------------
+    */
+
+    echo json_encode([
+        'success' => true,
+        'data' => $movement,
+        'currency' => $currency_symbol
+    ]);
+
     break;
+
 
         case 'customers':
             $customers_sql = "SELECT id, customer_name FROM customers WHERE tenant_id = ? AND status = 'ACTIVE' ORDER BY customer_name";
