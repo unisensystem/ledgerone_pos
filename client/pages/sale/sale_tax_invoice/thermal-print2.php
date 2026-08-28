@@ -620,9 +620,9 @@
 
             // Previous balance - always shown now (even if 0), like FoxPro
             const previousBalance = parseFloat(invoice.previous_balance || 0);
-            document.getElementById('previousBalance').textContent = `${invoice.currency_symbol || ''}${previousBalance.toFixed(2)}`;
+            document.getElementById('previousBalance').textContent = `${previousBalance.toFixed(2)}`;
 
-            const currencySymbol = invoice.currency_symbol || '';
+            const currencySymbol = '';
 
             const tbody = document.getElementById('itemsTableBody');
             tbody.innerHTML = '';

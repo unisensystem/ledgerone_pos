@@ -517,7 +517,7 @@ if ($report_type === 'item-wise') {
                         <th class="text-right">FOC</th>
                         <th class="text-right">Rate</th>
                         <th class="text-right">Discount</th>
-                        <th class="text-right">Trader Offer</th>
+                        <th class="text-right">Trade Offer</th>
                         <th class="text-right">Amount</th>
                         <th class="text-right">R.QTY</th>
                         <th class="text-right">R.Amt</th>

@@ -34,7 +34,7 @@ const itemsSoldItem = document.getElementById('items-sold-item');
 const billsGeneratedItem = document.getElementById('bills-generated-item');
 
 // Number of columns in each table body - kept in sync with the <thead> in the page.
-// item-wise: S# | Product | Packing | PCS Total | CTN | PCS | DZN | FOC | Rate | Discount | Trader Offer | Amount | R.QTY | R.Amt | Net Amount
+// item-wise: S# | Product | Packing | PCS Total | CTN | PCS | DZN | FOC | Rate | Discount | Trade Offer | Amount | R.QTY | R.Amt | Net Amount
 const ITEM_WISE_COLS = 15;
 // bill-wise: S# | Invoice No | Customer Code | Customer Name | Address | Net Amount
 const BILL_WISE_COLS = 6;
