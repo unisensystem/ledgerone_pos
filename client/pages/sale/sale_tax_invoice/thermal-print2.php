@@ -361,9 +361,9 @@
         <table class="items-table">
             <thead>
                 <tr>
-                    <th style="width: 10%;" class="text-right" id="ctnHeader">Ctn</th>
-                    <th style="width: 10%;" class="text-right" id="dzHeader">Dz</th>
-                    <th style="width: 10%;" class="text-right" id="pcsHeader">Pcs</th>
+                    <th style="width: 10%;" class="text-right ctn-col" id="ctnHeader">Ctn</th>
+                    <th style="width: 10%;" class="text-right dz-col" id="dzHeader">Dz</th>
+                    <th style="width: 10%;" class="text-right pc-col" id="pcsHeader">Pcs</th>
                     <th class="item-col">Item</th>
                     <th style="width: 15%;" class="text-right">Rate</th>
                     <th style="width: 11%;" class="text-right disc-col">Disc</th>
@@ -486,6 +486,53 @@
             document.getElementById('pcsHeader').textContent = uomHeaderLabel(uoms, 9, 'Pcs');
         }
 
+        // sale_tax_invoice never populates the carton/dozen/piece columns on
+        // sale_invoice_items (pos-add.js always sends them as 0) - instead each
+        // unit split (Carton/Dozen/Piece) the user entered is saved as its OWN
+        // item row via uom_id + quantity. So route each row's quantity into the
+        // right Ctn/Dz/Pc bucket by its uom_id (same ids as applyUomHeaders above).
+        function getUnitBucket(uomId) {
+            const id = Number(uomId);
+            if (id === 16) return 'carton';
+            if (id === 10) return 'dozen';
+            return 'piece';
+        }
+
+        // Merge the per-unit split rows of the same product+batch back into one
+        // printed line (mirrors the grouping pos-add.js does when reloading for Edit).
+        function groupItemsForPrint(items) {
+            const groups = [];
+            const groupsByKey = {};
+            items.forEach(item => {
+                if (item.parent_row_id) return;
+                const key = item.product_id + '_' + (item.batch_no || '');
+                let group = groupsByKey[key];
+                if (!group) {
+                    group = {
+                        ids: [],
+                        product_name: item.product_name,
+                        sale_price: item.sale_price,
+                        carton: 0,
+                        dozen: 0,
+                        piece: 0,
+                        gross_amount: 0,
+                        discount_amount: 0,
+                        trade_offer_amount: 0,
+                        net_amount: 0
+                    };
+                    groupsByKey[key] = group;
+                    groups.push(group);
+                }
+                group.ids.push(item.id);
+                group[getUnitBucket(item.uom_id)] += parseFloat(item.quantity || 0);
+                group.gross_amount += parseFloat(item.gross_amount || 0);
+                group.discount_amount += parseFloat(item.discount_amount || 0);
+                group.trade_offer_amount += parseFloat(item.trade_offer_amount || 0);
+                group.net_amount += parseFloat(item.net_amount || 0);
+            });
+            return groups;
+        }
+
         async function loadData() {
             try {
                 const [userResponse, invoiceResponse, uomResponse] = await Promise.all([
@@ -580,81 +627,81 @@
             const tbody = document.getElementById('itemsTableBody');
             tbody.innerHTML = '';
 
+            // Merge each product's Carton/Dozen/Piece split rows back into one line
+            const groups = groupItemsForPrint(items);
+
+            // Map each raw (non-grouped) row id -> its children, so a group can pull
+            // in the children attached to any of its underlying split-unit rows
+            const childrenByParentId = {};
+            items.forEach(item => {
+                if (item.parent_row_id !== null && item.parent_row_id !== undefined) {
+                    if (!childrenByParentId[item.parent_row_id]) {
+                        childrenByParentId[item.parent_row_id] = [];
+                    }
+                    childrenByParentId[item.parent_row_id].push(item);
+                }
+            });
+            const childrenOf = (group) => group.ids.reduce((acc, id) => acc.concat(childrenByParentId[id] || []), []);
+
             if (childDisplayMode === 'inline') {
-                // Group children with their parents
-                const itemsById = {};
-                const parentItems = [];
-
-                items.forEach(item => {
-                    itemsById[item.id] = item;
-                    if (item.parent_row_id === null) {
-                        item.children = [];
-                        parentItems.push(item);
-                    }
-                });
-
-                // Attach children to parents
-                items.forEach(item => {
-                    if (item.parent_row_id !== null) {
-                        const parent = itemsById[item.parent_row_id];
-                        if (parent && parent.children) {
-                            parent.children.push(item);
-                        }
-                    }
-                });
-
-                // Render grouped items
-                parentItems.forEach((item) => {
+                // Render grouped items with children inline
+                groups.forEach((group) => {
                     const row = tbody.insertRow();
 
-                    // Build children text
+                    const children = childrenOf(group);
                     let childrenText = '';
-                    if (item.children && item.children.length > 0) {
+                    if (children.length > 0) {
                         childrenText = '<br><span style="font-size: 10px; color: #666;">(' +
-                            item.children.map(c => `${c.product_name}: ${parseFloat(c.quantity).toFixed(2)}`).join(' | ') +
+                            children.map(c => `${c.product_name}: ${parseFloat(c.quantity).toFixed(2)}`).join(' | ') +
                             ')</span>';
                     }
 
-                    const discountAmt = parseFloat(item.discount_amount || 0);
-                    const tradeOfferAmt = parseFloat(item.trade_offer_amount || 0);
-                    const totalDisc = discountAmt + tradeOfferAmt;
+                    const totalDisc = group.discount_amount + group.trade_offer_amount;
 
                     const discCell = (!enableCashDiscountAmount && !enableTradeOfferAmount) ? '' : `<td class="text-right disc-col">${currencySymbol + totalDisc.toFixed(2)}</td>`;
 
                     row.innerHTML = `
-                        <td class="text-right">${formatUnitCell(item.carton)}</td>
-                        <td class="text-right">${formatUnitCell(item.dozen)}</td>
-                        <td class="text-right">${formatUnitCell(item.piece)}</td>
-                        <td class="item-col">${item.product_name}${childrenText}</td>
-                        <td class="text-right">${currencySymbol + parseFloat(item.sale_price).toFixed(2)}</td>
+                        <td class="text-right ctn-col">${formatUnitCell(group.carton)}</td>
+                        <td class="text-right dz-col">${formatUnitCell(group.dozen)}</td>
+                        <td class="text-right pc-col">${formatUnitCell(group.piece)}</td>
+                        <td class="item-col">${group.product_name}${childrenText}</td>
+                        <td class="text-right">${currencySymbol + parseFloat(group.sale_price).toFixed(2)}</td>
                         ${discCell}
-                        <td class="text-right">${currencySymbol + parseFloat(item.net_amount).toFixed(2)}</td>
+                        <td class="text-right">${currencySymbol + group.net_amount.toFixed(2)}</td>
                     `;
                 });
             } else {
-                // Separate rows mode (current)
-                items.forEach((item) => {
+                // Separate rows mode: one merged row per product, followed by its child rows
+                groups.forEach((group) => {
                     const row = tbody.insertRow();
 
-                    const isChild = item.parent_row_id !== null;
-                    const indent = isChild ? '<span style="margin-left: 15px; font-size: 11px;">? </span>' : '';
-                    const textStyle = isChild ? 'font-size: 11px; color: #666;' : '';
+                    const totalDisc = group.discount_amount + group.trade_offer_amount;
 
-                    const discountAmt = parseFloat(item.discount_amount || 0);
-                    const tradeOfferAmt = parseFloat(item.trade_offer_amount || 0);
-                    const totalDisc = discountAmt + tradeOfferAmt;
-
-                    const discCell = (!enableCashDiscountAmount && !enableTradeOfferAmount) ? '' : `<td class="text-right disc-col">${isChild ? '-' : currencySymbol + totalDisc.toFixed(2)}</td>`;
+                    const discCell = (!enableCashDiscountAmount && !enableTradeOfferAmount) ? '' : `<td class="text-right disc-col">${currencySymbol + totalDisc.toFixed(2)}</td>`;
 
                     row.innerHTML = `
-                        <td class="text-right">${isChild ? '-' : formatUnitCell(item.carton)}</td>
-                        <td class="text-right">${isChild ? '-' : formatUnitCell(item.dozen)}</td>
-                        <td class="text-right">${isChild ? '-' : formatUnitCell(item.piece)}</td>
-                        <td class="item-col" style="${textStyle}">${indent}${item.product_name}</td>
-                        <td class="text-right">${isChild ? '-' : currencySymbol + parseFloat(item.sale_price).toFixed(2)}</td>
+                        <td class="text-right ctn-col">${formatUnitCell(group.carton)}</td>
+                        <td class="text-right dz-col">${formatUnitCell(group.dozen)}</td>
+                        <td class="text-right pc-col">${formatUnitCell(group.piece)}</td>
+                        <td class="item-col">${group.product_name}</td>
+                        <td class="text-right">${currencySymbol + parseFloat(group.sale_price).toFixed(2)}</td>
                         ${discCell}
-                        <td class="text-right">${isChild ? '-' : currencySymbol + parseFloat(item.net_amount).toFixed(2)}</td>
+                        <td class="text-right">${currencySymbol + group.net_amount.toFixed(2)}</td>
                     `;
+
+                    childrenOf(group).forEach((child) => {
+                        const childRow = tbody.insertRow();
+                        const childDiscCell = (!enableCashDiscountAmount && !enableTradeOfferAmount) ? '' : `<td class="text-right disc-col">-</td>`;
+                        childRow.innerHTML = `
+                            <td class="text-right ctn-col">-</td>
+                            <td class="text-right dz-col">-</td>
+                            <td class="text-right pc-col">-</td>
+                            <td class="item-col" style="font-size: 11px; color: #666;"><span style="margin-left: 15px;">? </span>${child.product_name}</td>
+                            <td class="text-right">-</td>
+                            ${childDiscCell}
+                            <td class="text-right">-</td>
+                        `;
+                    });
                 });
             }
 
@@ -668,26 +715,29 @@
             let totalPiece = 0;
             let totalAmount = 0;
 
-            items.forEach(item => {
-                if (!item.parent_row_id) {
-                    totalCarton += parseFloat(item.carton || 0);
-                    totalDozen  += parseFloat(item.dozen || 0);
-                    totalPiece  += parseFloat(item.piece || 0);
-                    totalAmount += parseFloat(item.net_amount);
-                }
+            groups.forEach(group => {
+                totalCarton += group.carton;
+                totalDozen  += group.dozen;
+                totalPiece  += group.piece;
+                totalAmount += group.net_amount;
             });
 
             const totalsDiscCell = (!enableCashDiscountAmount && !enableTradeOfferAmount) ? '' : `<td class="text-right disc-col"></td>`;
 
             totalsRow.innerHTML = `
-                <td class="text-right">${totalCarton > 0 ? totalCarton.toFixed(0) : '-'}</td>
-                <td class="text-right">${totalDozen > 0 ? totalDozen.toFixed(0) : '-'}</td>
-                <td class="text-right">${totalPiece > 0 ? totalPiece.toFixed(0) : '-'}</td>
+                <td class="text-right ctn-col">${totalCarton > 0 ? totalCarton.toFixed(0) : '-'}</td>
+                <td class="text-right dz-col">${totalDozen > 0 ? totalDozen.toFixed(0) : '-'}</td>
+                <td class="text-right pc-col">${totalPiece > 0 ? totalPiece.toFixed(0) : '-'}</td>
                 <td class="item-col">TOTALS</td>
                 <td class="text-right"></td>
                 ${totalsDiscCell}
                 <td class="text-right">${currencySymbol}${totalAmount.toFixed(2)}</td>
             `;
+
+            // Hide a Ctn/Dz/Pc column entirely when none of this invoice's items use that unit
+            if (totalCarton <= 0) document.querySelectorAll('.ctn-col').forEach(el => el.style.display = 'none');
+            if (totalDozen <= 0) document.querySelectorAll('.dz-col').forEach(el => el.style.display = 'none');
+            if (totalPiece <= 0) document.querySelectorAll('.pc-col').forEach(el => el.style.display = 'none');
 
             // Discount - always shown now (even if 0), like FoxPro
             const discountAmt = parseFloat(invoice.total_discount_amount || 0);
