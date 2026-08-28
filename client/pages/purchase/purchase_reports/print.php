@@ -142,12 +142,12 @@ $company_id = $_GET['company_id'] ?? null;
         const companyId = '<?php echo $company_id; ?>';
         const currencySymbol = '<?php echo $currency_symbol; ?>';
 
-       const tableHeaders = {
-    item: ["Item ID", "Item Name", "Category", "Batch No", "Expiry Date", "Quantity", "Unit Price", "Total Value", "Supplier"],
-    invoice: ["Invoice ID", "Invoice Name", "Category", "Items", "Due Date", "Total Value", "Supplier"],
-    category: ["Category ID", "Category Name", "Type", "Items", "Avg. Price", "Total Value", "Suppliers"],
-    supplier: ["Supplier ID", "Supplier Name", "Items", "Avg. Price", "Total Value", "Primary Contact"]
-};
+        const tableHeaders = {
+            item: ["Item ID", "Item Name", "Category", "Batch No", "Expiry Date", "Quantity", "Unit Price", "Total Value", "Supplier"],
+            invoice: ["Invoice ID", "Invoice Name", "Category", "Batch No", "Expiry Date", "Items", "Due Date", "Total Value", "Supplier"],
+            category: ["Category ID", "Category Name", "Type", "Batch No", "Expiry Date", "Items", "Avg. Price", "Total Value", "Suppliers"],
+            supplier: ["Supplier ID", "Supplier Name", "Batch No", "Expiry Date", "Items", "Avg. Price", "Total Value", "Primary Contact"]
+        };
 
         const reportTitles = {
             item: 'Item-wise Purchase Report',
@@ -191,14 +191,14 @@ $company_id = $_GET['company_id'] ?? null;
                 const row = document.createElement('tr');
                 let cells = [];
 
-               if (reportType === 'item') {
-    cells = [item.id, item.name, item.category, item.batchNo || '-', item.expiryDate || '-', item.quantity, item.unitPrice, item.total, item.supplier];
-} else if (reportType === 'invoice') {
-                    cells = [item.id, item.name, item.category, item.quantity, item.dueDate, item.total, item.supplier];
+                if (reportType === 'item') {
+                    cells = [item.id, item.name, item.category, item.batchNo || '-', item.expiryDate || '-', item.quantity, item.unitPrice, item.total, item.supplier];
+                } else if (reportType === 'invoice') {
+                    cells = [item.id, item.name, item.category, item.batchNo || '-', item.expiryDate || '-', item.quantity, item.dueDate, item.total, item.supplier];
                 } else if (reportType === 'category') {
-                    cells = [item.id, item.name, item.category, item.quantity, item.unitPrice, item.total, item.supplier];
+                    cells = [item.id, item.name, item.category, item.batchNo || '-', item.expiryDate || '-', item.quantity, item.unitPrice, item.total, item.supplier];
                 } else if (reportType === 'supplier') {
-                    cells = [item.id, item.name, item.quantity, item.unitPrice, item.total, item.contact];
+                    cells = [item.id, item.name, item.batchNo || '-', item.expiryDate || '-', item.quantity, item.unitPrice, item.total, item.contact];
                 }
 
                 cells.forEach(cellContent => {

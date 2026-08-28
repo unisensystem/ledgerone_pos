@@ -67,19 +67,23 @@ $report_config = [
         ],
     ],
     'item-ledger' => [
-        'title' => 'Item-wise Stock Ledger Report',
-        'columns' => [
-            ['key' => 'date',        'label' => 'Date'],
-            ['key' => 'transaction', 'label' => 'Transaction'],
-            ['key' => 'batch_no',    'label' => 'Batch No'],
-            ['key' => 'expiry',      'label' => 'Expiry Date'],
-            ['key' => 'qty_in',      'label' => 'Qty In'],
-            ['key' => 'qty_out',     'label' => 'Qty Out'],
-            ['key' => 'balance',     'label' => 'Balance'],
-            ['key' => 'unit_cost',   'label' => 'Unit Cost'],
-            ['key' => 'value',       'label' => 'Value'],
-        ],
+    'title' => 'Item-wise Stock Ledger Report',
+    'columns' => [
+        ['key' => 'date',        'label' => 'Date'],
+        ['key' => 'invoice',     'label' => 'Invoice #'],
+        ['key' => 'name',        'label' => 'Name'],
+        ['key' => 'company',     'label' => 'Company'],
+        ['key' => 'customer',    'label' => 'Customer'],
+        ['key' => 'transaction', 'label' => 'Transaction'],
+        ['key' => 'batch_no',    'label' => 'Batch No'],
+        ['key' => 'expiry',      'label' => 'Expiry Date'],
+        ['key' => 'qty_in',      'label' => 'Qty In'],
+        ['key' => 'qty_out',     'label' => 'Qty Out'],
+        ['key' => 'balance',     'label' => 'Balance'],
+        ['key' => 'unit_cost',   'label' => 'Unit Cost'],
+        ['key' => 'value',       'label' => 'Value'],
     ],
+],
     'branch-ledger' => [
         'title' => 'Branch-wise Stock Ledger Report',
         'columns' => [
@@ -451,18 +455,20 @@ $config = $report_config[$report_type];
                     } else if (stockLevel === 'greater-than-zero') {
                         rows = rows.filter(pos => parseFloat(pos.current_stock) > 0);
                     }
-                } else if (REPORT_TYPE === 'item-ledger') {
-                    let url = `${API_BASE}?action=ledger`;
-                    if (urlParams.get('product_id')) url += `&product_id=${urlParams.get('product_id')}`;
-                    if (urlParams.get('from_date')) url += `&from_date=${urlParams.get('from_date')}`;
-                    if (urlParams.get('to_date')) url += `&to_date=${urlParams.get('to_date')}`;
+              } else if (REPORT_TYPE === 'item-ledger') {
+    let url = `${API_BASE}?action=ledger`;
+    if (urlParams.get('product_id'))  url += `&product_id=${urlParams.get('product_id')}`;
+    if (urlParams.get('vendor_id'))   url += `&vendor_id=${urlParams.get('vendor_id')}`;
+    if (urlParams.get('customer_id')) url += `&customer_id=${urlParams.get('customer_id')}`;
+    if (urlParams.get('from_date'))   url += `&from_date=${urlParams.get('from_date')}`;
+    if (urlParams.get('to_date'))     url += `&to_date=${urlParams.get('to_date')}`;
 
-                    const response = await fetch(url);
-                    const data = await response.json();
-                    if (!data.success) return;
-                    rows = filterByBatchExpiry(data.data, batchFilter, expiryFilter);
-                    currency = data.currency || '$';
-                } else if (REPORT_TYPE === 'branch-ledger') {
+    const response = await fetch(url);
+    const data = await response.json();
+    if (!data.success) return;
+    rows = filterByBatchExpiry(data.data, batchFilter, expiryFilter);
+    currency = data.currency || '$';
+} else if (REPORT_TYPE === 'branch-ledger') {
                     let url = `${API_BASE}?action=branch-ledger`;
                     if (urlParams.get('branch_id')) url += `&branch_id=${urlParams.get('branch_id')}`;
                     if (urlParams.get('from_date')) url += `&from_date=${urlParams.get('from_date')}`;
@@ -523,20 +529,24 @@ $config = $report_config[$report_type];
             }).join('');
         }
 
-        function renderItemLedgerRows(rows) {
-            return rows.map(entry => `
-                <tr>
-                    <td>${entry.transaction_date}</td>
-                    <td>${entry.transaction_type}</td>
-                    <td>${entry.batch_no || '-'}</td>
-                    <td>${entry.batch_expiry_date || '-'}</td>
-                    <td>${entry.qty_in > 0 ? fmtQty(entry.qty_in, entry.unit_symbol) : '-'}</td>
-                    <td>${entry.qty_out > 0 ? fmtQty(entry.qty_out, entry.unit_symbol) : '-'}</td>
-                    <td>${fmtQty(entry.balance, entry.unit_symbol)}</td>
-                    <td>${currentCurrency}${parseFloat(entry.unit_cost).toFixed(2)}</td>
-                    <td>${currentCurrency}${parseFloat(entry.value).toFixed(2)}</td>
-                </tr>`).join('');
-        }
+       function renderItemLedgerRows(rows) {
+    return rows.map(entry => `
+        <tr>
+            <td>${entry.transaction_date}</td>
+            <td>${entry.invoice_number || '-'}</td>
+            <td>${entry.product_name || '-'}</td>
+            <td>${entry.company_name || '-'}</td>
+            <td>${entry.customer_name || '-'}</td>
+            <td>${entry.transaction_type}</td>
+            <td>${entry.batch_no || '-'}</td>
+            <td>${entry.batch_expiry_date || '-'}</td>
+            <td>${entry.qty_in > 0 ? fmtQty(entry.qty_in, entry.unit_symbol) : '-'}</td>
+            <td>${entry.qty_out > 0 ? fmtQty(entry.qty_out, entry.unit_symbol) : '-'}</td>
+            <td>${fmtQty(entry.balance, entry.unit_symbol)}</td>
+            <td>${currentCurrency}${parseFloat(entry.unit_cost).toFixed(2)}</td>
+            <td>${currentCurrency}${parseFloat(entry.value).toFixed(2)}</td>
+        </tr>`).join('');
+}
 
         function renderBranchLedgerRows(rows) {
             return rows.map(entry => `
@@ -603,23 +613,23 @@ $config = $report_config[$report_type];
                 if (totalValue > 0) {
                     wordsHtml = `<tr><td colspan="${colCount}" style="text-align: center; font-style: italic; padding: 10px;">Amount in Words: ${numberToWords(totalValue)} Only</td></tr>`;
                 }
-            } else if (REPORT_TYPE === 'item-ledger') {
-                bodyHtml = renderItemLedgerRows(rows);
-                const totalQtyIn = rows.reduce((s, e) => s + parseFloat(e.qty_in || 0), 0);
-                const totalQtyOut = rows.reduce((s, e) => s + parseFloat(e.qty_out || 0), 0);
-                const finalBalance = rows.length ? parseFloat(rows[rows.length - 1].balance) : 0;
-                const finalValue = rows.length ? parseFloat(rows[rows.length - 1].value) : 0;
-                const unit = rows[0]?.unit_symbol || 'L';
-                totalsHtml = `
-                    <tr class="totals-row">
-                        <td colspan="4">Total (${rows.length} transactions)</td>
-                        <td>${totalQtyIn.toFixed(2)} ${unit}</td>
-                        <td>${totalQtyOut.toFixed(2)} ${unit}</td>
-                        <td>${finalBalance.toFixed(2)} ${unit}</td>
-                        <td>-</td>
-                        <td>${currency}${finalValue.toFixed(2)}</td>
-                    </tr>`;
-            } else if (REPORT_TYPE === 'branch-ledger') {
+          } else if (REPORT_TYPE === 'item-ledger') {
+    bodyHtml = renderItemLedgerRows(rows);
+    const totalQtyIn = rows.reduce((s, e) => s + parseFloat(e.qty_in || 0), 0);
+    const totalQtyOut = rows.reduce((s, e) => s + parseFloat(e.qty_out || 0), 0);
+    const finalBalance = rows.length ? parseFloat(rows[rows.length - 1].balance) : 0;
+    const finalValue = rows.length ? parseFloat(rows[rows.length - 1].value) : 0;
+    const unit = rows[0]?.unit_symbol || 'L';
+    totalsHtml = `
+        <tr class="totals-row">
+            <td colspan="8">Total (${rows.length} transactions)</td>
+            <td>${totalQtyIn.toFixed(2)} ${unit}</td>
+            <td>${totalQtyOut.toFixed(2)} ${unit}</td>
+            <td>${finalBalance.toFixed(2)} ${unit}</td>
+            <td>-</td>
+            <td>${currency}${finalValue.toFixed(2)}</td>
+        </tr>`;
+} else if (REPORT_TYPE === 'branch-ledger') {
                 bodyHtml = renderBranchLedgerRows(rows);
                 const totalQtyIn = rows.reduce((s, e) => s + parseFloat(e.qty_in || 0), 0);
                 const totalQtyOut = rows.reduce((s, e) => s + parseFloat(e.qty_out || 0), 0);

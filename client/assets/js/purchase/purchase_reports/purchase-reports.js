@@ -6,17 +6,26 @@ let currentSearchTerm = '';
 // Column headers for each report type
 const tableHeaders = {
     item: ["Item ID", "Item Name", "Category", "Batch No", "Expiry Date", "Quantity", "Unit Price", "Total Value", "Supplier", "Actions"],
-    invoice: ["Invoice ID", "Invoice Name", "Category", "Items", "Due Date", "Total Value", "Supplier", "Actions"],
-    category: ["Category ID", "Category Name", "Type", "Items", "Avg. Price", "Total Value", "Suppliers", "Actions"],
-    supplier: ["Supplier ID", "Supplier Name", "Items", "Avg. Price", "Total Value", "Primary Contact", "Actions"]
+    invoice: ["Invoice ID", "Invoice Name", "Category", "Batch No", "Expiry Date", "Items", "Due Date", "Total Value", "Supplier", "Actions"],
+    category: ["Category ID", "Category Name", "Type", "Batch No", "Expiry Date", "Items", "Avg. Price", "Total Value", "Suppliers", "Actions"],
+    supplier: ["Supplier ID", "Supplier Name", "Batch No", "Expiry Date", "Items", "Avg. Price", "Total Value", "Primary Contact", "Actions"]
 };
 
 const colKeys = {
     item: ["id","name","category","batchNo","expiryDate","quantity","unitPrice","total","supplier","actions"],
-    invoice: ["id","name","category","quantity","dueDate","total","supplier","actions"],
-    category: ["id","name","category","quantity","unitPrice","total","supplier","actions"],
-    supplier: ["id","name","quantity","unitPrice","total","contact","actions"]
+    invoice: ["id","name","category","batchNo","expiryDate","quantity","dueDate","total","supplier","actions"],
+    category: ["id","name","category","batchNo","expiryDate","quantity","unitPrice","total","supplier","actions"],
+    supplier: ["id","name","batchNo","expiryDate","quantity","unitPrice","total","contact","actions"]
 };
+
+// Helper: render an expiry date value, highlighting it in red if it's within 30 days
+function renderExpiryCell(expiryDate) {
+    const isExpiringSoon = expiryDate && expiryDate !== '-' &&
+        (new Date(expiryDate) - new Date()) / (1000 * 60 * 60 * 24) <= 30;
+    return isExpiringSoon
+        ? `<span style="color:#d64545; font-weight:600;">${expiryDate}</span>`
+        : (expiryDate || '-');
+}
 
 // Initialize with item-wise report
 document.addEventListener('DOMContentLoaded', function () {
@@ -264,7 +273,7 @@ tableHeaders[reportType].forEach((header, idx) => {
 });
 
     if (data.length === 0) {
-        tableBody.innerHTML = '<tr><td colspan="8" style="text-align: center; padding: 20px;">No data available</td></tr>';
+        tableBody.innerHTML = '<tr><td colspan="10" style="text-align: center; padding: 20px;">No data available</td></tr>';
         return;
     }
 
@@ -272,7 +281,7 @@ tableHeaders[reportType].forEach((header, idx) => {
     const filteredData = filterData(data, currentSearchTerm, reportType);
     
     if (filteredData.length === 0) {
-        tableBody.innerHTML = '<tr><td colspan="8" style="text-align: center; padding: 20px;">No matching results found</td></tr>';
+        tableBody.innerHTML = '<tr><td colspan="10" style="text-align: center; padding: 20px;">No matching results found</td></tr>';
         return;
     }
 
@@ -290,18 +299,22 @@ function filterData(data, searchTerm, reportType) {
             return item.id.toLowerCase().includes(term) ||
                    item.name.toLowerCase().includes(term) ||
                    item.category.toLowerCase().includes(term) ||
+                   (item.batchNo || '').toLowerCase().includes(term) ||
                    item.supplier.toLowerCase().includes(term);
         } else if (reportType === 'invoice') {
             return item.id.toLowerCase().includes(term) ||
                    item.name.toLowerCase().includes(term) ||
+                   (item.batchNo || '').toLowerCase().includes(term) ||
                    item.supplier.toLowerCase().includes(term);
         } else if (reportType === 'category') {
             return item.id.toLowerCase().includes(term) ||
                    item.name.toLowerCase().includes(term) ||
-                   item.category.toLowerCase().includes(term);
+                   item.category.toLowerCase().includes(term) ||
+                   (item.batchNo || '').toLowerCase().includes(term);
         } else if (reportType === 'supplier') {
             return item.id.toLowerCase().includes(term) ||
                    item.name.toLowerCase().includes(term) ||
+                   (item.batchNo || '').toLowerCase().includes(term) ||
                    item.contact.toLowerCase().includes(term);
         }
         return true;
@@ -321,11 +334,7 @@ function renderTableRows(data, reportType, tableBody) {
         let cells = [];
         
        if (reportType === 'item') {
-    const isExpiringSoon = item.expiryDate && item.expiryDate !== '-' &&
-        (new Date(item.expiryDate) - new Date()) / (1000*60*60*24) <= 30;
-    const expiryHtml = isExpiringSoon
-        ? `<span style="color:#d64545; font-weight:600;">${item.expiryDate}</span>`
-        : (item.expiryDate || '-');
+    const expiryHtml = renderExpiryCell(item.expiryDate);
 
     cells = [item.id, item.name, item.category, item.batchNo || '-', expiryHtml, item.quantity, item.unitPrice, item.total, item.supplier];
 
@@ -349,16 +358,19 @@ function renderTableRows(data, reportType, tableBody) {
     return;
 }
          else if (reportType === 'invoice') {
-            cells = [item.id, item.name, item.category, item.quantity, item.dueDate, item.total, item.supplier];
+            const expiryHtml = renderExpiryCell(item.expiryDate);
+            cells = [item.id, item.name, item.category, item.batchNo || '-', expiryHtml, item.quantity, item.dueDate, item.total, item.supplier];
             
-            cells.forEach(cellContent => {
+            cells.forEach((cellContent, idx) => {
                 const cell = document.createElement('td');
                 cell.innerHTML = cellContent;
+                cell.setAttribute('data-col', colKeys.invoice[idx]);
                 row.appendChild(cell);
             });
             
             // Add expand button
             const actionCell = document.createElement('td');
+            actionCell.setAttribute('data-col', 'actions');
             actionCell.innerHTML = '<button class="btn-ghost btn-sm expand-btn" style="padding: 4px 8px;"><i class="fas fa-chevron-down"></i></button>';
             row.appendChild(actionCell);
             
@@ -370,15 +382,18 @@ function renderTableRows(data, reportType, tableBody) {
             tableBody.appendChild(row);
             return;
         } else if (reportType === 'category') {
-            cells = [item.id, item.name, item.category, item.quantity, item.unitPrice, item.total, item.supplier];
+            const expiryHtml = renderExpiryCell(item.expiryDate);
+            cells = [item.id, item.name, item.category, item.batchNo || '-', expiryHtml, item.quantity, item.unitPrice, item.total, item.supplier];
             
-            cells.forEach(cellContent => {
+            cells.forEach((cellContent, idx) => {
                 const cell = document.createElement('td');
                 cell.innerHTML = cellContent;
+                cell.setAttribute('data-col', colKeys.category[idx]);
                 row.appendChild(cell);
             });
             
             const actionCell = document.createElement('td');
+            actionCell.setAttribute('data-col', 'actions');
             actionCell.innerHTML = '<button class="btn-ghost btn-sm expand-btn" style="padding: 4px 8px;"><i class="fas fa-chevron-down"></i></button>';
             row.appendChild(actionCell);
             
@@ -389,15 +404,18 @@ function renderTableRows(data, reportType, tableBody) {
             tableBody.appendChild(row);
             return;
         } else if (reportType === 'supplier') {
-            cells = [item.id, item.name, item.quantity, item.unitPrice, item.total, item.contact];
+            const expiryHtml = renderExpiryCell(item.expiryDate);
+            cells = [item.id, item.name, item.batchNo || '-', expiryHtml, item.quantity, item.unitPrice, item.total, item.contact];
             
-            cells.forEach(cellContent => {
+            cells.forEach((cellContent, idx) => {
                 const cell = document.createElement('td');
                 cell.innerHTML = cellContent;
+                cell.setAttribute('data-col', colKeys.supplier[idx]);
                 row.appendChild(cell);
             });
             
             const actionCell = document.createElement('td');
+            actionCell.setAttribute('data-col', 'actions');
             actionCell.innerHTML = '<button class="btn-ghost btn-sm expand-btn" style="padding: 4px 8px;"><i class="fas fa-chevron-down"></i></button>';
             row.appendChild(actionCell);
             
@@ -432,7 +450,7 @@ function toggleInvoicesBreakdown(row, invoices, button) {
     const breakdownRow = document.createElement('tr');
     breakdownRow.classList.add('breakdown-row');
     breakdownRow.innerHTML = `
-        <td colspan="8" style="padding: 0; background-color: #f7f9fc;">
+        <td colspan="10" style="padding: 0; background-color: #f7f9fc;">
             <div style="padding: 16px; margin: 8px;">
                 <h4 style="margin-bottom: 12px; color: var(--heading); font-size: 14px;">Purchase Invoices</h4>
                 <table style="width: 100%; background: white; border-radius: 4px;">
@@ -440,6 +458,8 @@ function toggleInvoicesBreakdown(row, invoices, button) {
                         <tr style="background-color: #eff2f7;">
                             <th style="padding: 8px;">Invoice No</th>
                             <th style="padding: 8px;">Date</th>
+                            <th style="padding: 8px;">Batch No</th>
+                            <th style="padding: 8px;">Expiry Date</th>
                             <th style="padding: 8px;">Quantity</th>
                             <th style="padding: 8px;">Unit Price</th>
                             <th style="padding: 8px;">Total</th>
@@ -451,6 +471,8 @@ function toggleInvoicesBreakdown(row, invoices, button) {
                             <tr>
                                 <td style="padding: 8px;">${inv.billNo}</td>
                                 <td style="padding: 8px;">${inv.date}</td>
+                                <td style="padding: 8px;">${inv.batchNo || '-'}</td>
+                                <td style="padding: 8px;">${renderExpiryCell(inv.expiryDate)}</td>
                                 <td style="padding: 8px;">${inv.quantity}</td>
                                 <td style="padding: 8px;">${inv.price}</td>
                                 <td style="padding: 8px;">${inv.total}</td>
@@ -480,13 +502,15 @@ function toggleItemsBreakdown(row, items, button) {
     const breakdownRow = document.createElement('tr');
     breakdownRow.classList.add('breakdown-row');
     breakdownRow.innerHTML = `
-        <td colspan="8" style="padding: 0; background-color: #f7f9fc;">
+        <td colspan="10" style="padding: 0; background-color: #f7f9fc;">
             <div style="padding: 16px; margin: 8px;">
                 <h4 style="margin-bottom: 12px; color: var(--heading); font-size: 14px;">Invoice Items Breakdown</h4>
                 <table style="width: 100%; background: white; border-radius: 4px;">
                     <thead>
                         <tr style="background-color: #eff2f7;">
                             <th style="padding: 8px;">Product</th>
+                            <th style="padding: 8px;">Batch No</th>
+                            <th style="padding: 8px;">Expiry Date</th>
                             <th style="padding: 8px;">Quantity</th>
                             <th style="padding: 8px;">Unit Price</th>
                             <th style="padding: 8px;">Total</th>
@@ -496,6 +520,8 @@ function toggleItemsBreakdown(row, items, button) {
                         ${items.map(item => `
                             <tr>
                                 <td style="padding: 8px;">${item.product}</td>
+                                <td style="padding: 8px;">${item.batchNo || '-'}</td>
+                                <td style="padding: 8px;">${renderExpiryCell(item.expiryDate)}</td>
                                 <td style="padding: 8px;">${item.quantity}</td>
                                 <td style="padding: 8px;">${item.price}</td>
                                 <td style="padding: 8px;">${item.total}</td>
@@ -524,7 +550,7 @@ function toggleSupplierInvoicesBreakdown(row, invoices, button) {
     const breakdownRow = document.createElement('tr');
     breakdownRow.classList.add('breakdown-row');
     breakdownRow.innerHTML = `
-        <td colspan="8" style="padding: 0; background-color: #f7f9fc;">
+        <td colspan="10" style="padding: 0; background-color: #f7f9fc;">
             <div style="padding: 16px; margin: 8px;">
                 <h4 style="margin-bottom: 12px; color: var(--heading); font-size: 14px;">Supplier Invoices</h4>
                 ${invoices.map((inv, idx) => `
@@ -540,6 +566,8 @@ function toggleSupplierInvoicesBreakdown(row, invoices, button) {
                                 <thead>
                                     <tr style="background-color: #eff2f7;">
                                         <th style="padding: 8px; text-align: left;">Product</th>
+                                        <th style="padding: 8px; text-align: left;">Batch No</th>
+                                        <th style="padding: 8px; text-align: left;">Expiry Date</th>
                                         <th style="padding: 8px; text-align: left;">Quantity</th>
                                         <th style="padding: 8px; text-align: left;">Unit Price</th>
                                         <th style="padding: 8px; text-align: left;">Total</th>
@@ -549,6 +577,8 @@ function toggleSupplierInvoicesBreakdown(row, invoices, button) {
                                     ${inv.items.map(item => `
                                         <tr>
                                             <td style="padding: 8px;">${item.product}</td>
+                                            <td style="padding: 8px;">${item.batchNo || '-'}</td>
+                                            <td style="padding: 8px;">${renderExpiryCell(item.expiryDate)}</td>
                                             <td style="padding: 8px;">${item.quantity}</td>
                                             <td style="padding: 8px;">${item.price}</td>
                                             <td style="padding: 8px;">${item.total}</td>
@@ -596,13 +626,15 @@ function toggleCategoryBreakdown(row, subcategories, button) {
     const breakdownRow = document.createElement('tr');
     breakdownRow.classList.add('breakdown-row');
     breakdownRow.innerHTML = `
-        <td colspan="8" style="padding: 0; background-color: #f7f9fc;">
+        <td colspan="10" style="padding: 0; background-color: #f7f9fc;">
             <div style="padding: 16px; margin: 8px;">
                 <h4 style="margin-bottom: 12px; color: var(--heading); font-size: 14px;">Subcategories</h4>
                 ${subcategories.map((subcat, scIdx) => `
                     <div style="margin-bottom: 16px; background: white; border-radius: 4px; padding: 12px;">
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px solid #e1e6ee;">
                             <strong>Subcategory: ${subcat.name}</strong>
+                            <span>Batch No: ${subcat.batchNo || '-'}</span>
+                            <span>Expiry: ${renderExpiryCell(subcat.expiryDate)}</span>
                             <span>Quantity: ${subcat.quantity}</span>
                             <strong>Total: ${subcat.total}</strong>
                             <button class="btn-ghost btn-sm expand-subcat-btn" data-sc-idx="${scIdx}" style="padding: 4px 8px;"><i class="fas fa-chevron-down"></i></button>
@@ -621,6 +653,8 @@ function toggleCategoryBreakdown(row, subcategories, button) {
                                             <thead>
                                                 <tr style="background-color: #eff2f7;">
                                                     <th style="padding: 6px; text-align: left;">Product</th>
+                                                    <th style="padding: 6px; text-align: left;">Batch No</th>
+                                                    <th style="padding: 6px; text-align: left;">Expiry Date</th>
                                                     <th style="padding: 6px; text-align: left;">Quantity</th>
                                                     <th style="padding: 6px; text-align: left;">Unit Price</th>
                                                     <th style="padding: 6px; text-align: left;">Total</th>
@@ -630,6 +664,8 @@ function toggleCategoryBreakdown(row, subcategories, button) {
                                                 ${inv.items.map(item => `
                                                     <tr>
                                                         <td style="padding: 6px;">${item.product}</td>
+                                                        <td style="padding: 6px;">${item.batchNo || '-'}</td>
+                                                        <td style="padding: 6px;">${renderExpiryCell(item.expiryDate)}</td>
                                                         <td style="padding: 6px;">${item.quantity}</td>
                                                         <td style="padding: 6px;">${item.price}</td>
                                                         <td style="padding: 6px;">${item.total}</td>

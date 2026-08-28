@@ -52,6 +52,21 @@ function updateDashboard() {
     filterReportType();
 }
 
+// Helper to render batch/expiry cell text (flags near-expiry batches in red)
+function formatExpiryCell(expiryValue) {
+    if (!expiryValue) return '-';
+    // expiryValue can be a single date or a comma separated list; check earliest for "expiring soon" styling
+    const firstDate = expiryValue.split(',')[0].trim();
+    const isExpiringSoon = firstDate && !isNaN(new Date(firstDate)) && (new Date(firstDate) - new Date()) / (1000*60*60*24) <= 30;
+    return isExpiringSoon
+        ? `<span style="color:#d64545; font-weight:600;">${expiryValue}</span>`
+        : expiryValue;
+}
+
+function formatBatchCell(batchValue) {
+    return batchValue && batchValue.length ? batchValue : '-';
+}
+
 // Load Projects
 async function loadProjects() {
     try {
@@ -97,7 +112,7 @@ function populateBranchTable() {
     tableBody.innerHTML = '';
 
     if (!reportData || !reportData.branch_sales.length) {
-        tableBody.innerHTML = '<tr><td colspan="5" style="text-align:center">No data available</td></tr>';
+        tableBody.innerHTML = '<tr><td colspan="7" style="text-align:center">No data available</td></tr>';
         return;
     }
 
@@ -112,12 +127,14 @@ function populateBranchTable() {
             <td>${CURRENCY_SYMBOL}${parseFloat(item.total_sales || 0).toLocaleString()}</td>
             <td>${parseFloat(item.transactions || 0).toLocaleString()}</td>
             <td>${CURRENCY_SYMBOL}${parseFloat(item.avg_sale || 0).toLocaleString()}</td>
+            <td>${formatBatchCell(item.batch_no)}</td>
+            <td>${formatExpiryCell(item.nearest_expiry)}</td>
         `;
         
         const detailRow = document.createElement('tr');
         detailRow.style.display = 'none';
         detailRow.innerHTML = `
-            <td colspan="5" style="padding: 0;">
+            <td colspan="7" style="padding: 0;">
                 <div style="padding: 16px; background: #f7f9fc; border-left: 3px solid #E8B23F;">
                     <div style="font-weight: 600; margin-bottom: 8px;">Daily Breakdown</div>
                     <div id="branch-breakdown-${index}">Loading...</div>
@@ -139,7 +156,7 @@ function populateCategoryTable() {
     tableBody.innerHTML = '';
 
     if (!reportData || !reportData.categories.length) {
-        tableBody.innerHTML = '<tr><td colspan="3" style="text-align:center">No data available</td></tr>';
+        tableBody.innerHTML = '<tr><td colspan="5" style="text-align:center">No data available</td></tr>';
         return;
     }
 
@@ -154,6 +171,8 @@ function populateCategoryTable() {
             <td>${item.category}</td>
             <td>${CURRENCY_SYMBOL}${parseFloat(item.total || 0).toLocaleString()}</td>
             <td>${percentage}%</td>
+            <td>${formatBatchCell(item.batch_no)}</td>
+            <td>${formatExpiryCell(item.nearest_expiry)}</td>
         `;
         tableBody.appendChild(row);
     });
@@ -249,7 +268,7 @@ function populateOfficerTable() {
     tableBody.innerHTML = '';
 
     if (!reportData || !reportData.officer_sales.length) {
-        tableBody.innerHTML = '<tr><td colspan="6" style="text-align:center">No data available</td></tr>';
+        tableBody.innerHTML = '<tr><td colspan="7" style="text-align:center">No data available</td></tr>';
         return;
     }
 
@@ -263,13 +282,15 @@ function populateOfficerTable() {
             <td>${item.officer_name}</td>
             <td>${parseFloat(item.total_invoices || 0).toLocaleString()}</td>
             <td>${CURRENCY_SYMBOL}${parseFloat(item.total_sales || 0).toLocaleString()}</td>
+            <td>${formatBatchCell(item.batch_no)}</td>
+            <td>${formatExpiryCell(item.nearest_expiry)}</td>
             <td><span class="badge ${item.status === 'Active' ? 'badge-success' : 'badge-warning'}">${item.status}</span></td>
         `;
         
         const detailRow = document.createElement('tr');
         detailRow.style.display = 'none';
         detailRow.innerHTML = `
-            <td colspan="5" style="padding: 0;">
+            <td colspan="7" style="padding: 0;">
                 <div style="padding: 16px; background: #f7f9fc; border-left: 3px solid #1F7BFF;">
                     <div style="font-weight: 600; margin-bottom: 8px;">Daily Breakdown</div>
                     <div id="officer-breakdown-${index}">Loading...</div>
@@ -356,7 +377,7 @@ function populateTerritoryTable() {
     tableBody.innerHTML = '';
 
     if (!reportData || !reportData.territory_sales.length) {
-        tableBody.innerHTML = '<tr><td colspan="7" style="text-align:center">No data available</td></tr>';
+        tableBody.innerHTML = '<tr><td colspan="9" style="text-align:center">No data available</td></tr>';
         return;
     }
 
@@ -373,12 +394,14 @@ function populateTerritoryTable() {
             <td>${item.area}</td>
             <td>${parseFloat(item.total_invoices || 0).toLocaleString()}</td>
             <td>${CURRENCY_SYMBOL}${parseFloat(item.total_sales || 0).toLocaleString()}</td>
+            <td>${formatBatchCell(item.batch_no)}</td>
+            <td>${formatExpiryCell(item.nearest_expiry)}</td>
         `;
         
         const detailRow = document.createElement('tr');
         detailRow.style.display = 'none';
         detailRow.innerHTML = `
-            <td colspan="7" style="padding: 0;">
+            <td colspan="9" style="padding: 0;">
                 <div style="padding: 16px; background: #f7f9fc; border-left: 3px solid #2FBF71;">
                     <div style="font-weight: 600; margin-bottom: 8px;">Territory Invoices</div>
                     <div id="territory-details-${index}">Loading...</div>
@@ -400,7 +423,7 @@ function populateInvoiceTable() {
     tableBody.innerHTML = '';
 
     if (!reportData || !reportData.invoice_sales.length) {
-        tableBody.innerHTML = '<tr><td colspan="7" style="text-align:center">No data available</td></tr>';
+        tableBody.innerHTML = '<tr><td colspan="9" style="text-align:center">No data available</td></tr>';
         return;
     }
 
@@ -417,12 +440,14 @@ function populateInvoiceTable() {
             <td>${CURRENCY_SYMBOL}${parseFloat(item.total_bill || 0).toLocaleString()}</td>
             <td>${CURRENCY_SYMBOL}${parseFloat(item.total_discount_amount || 0).toLocaleString()}</td>
             <td>${CURRENCY_SYMBOL}${parseFloat(item.net_amount || 0).toLocaleString()}</td>
+            <td>${formatBatchCell(item.batch_no)}</td>
+            <td>${formatExpiryCell(item.nearest_expiry)}</td>
         `;
         
         const detailRow = document.createElement('tr');
         detailRow.style.display = 'none';
         detailRow.innerHTML = `
-            <td colspan="7" style="padding: 0;">
+            <td colspan="9" style="padding: 0;">
                 <div style="padding: 16px; background: #f7f9fc; border-left: 3px solid #E8B23F;">
                     <div style="font-weight: 600; margin-bottom: 8px;">Invoice Items</div>
                     <div id="invoice-details-${item.id}">Loading...</div>
@@ -444,7 +469,7 @@ function populateVendorTable() {
     tableBody.innerHTML = '';
 
     if (!reportData || !reportData.vendor_sales.length) {
-        tableBody.innerHTML = '<tr><td colspan="5" style="text-align:center">No data available</td></tr>';
+        tableBody.innerHTML = '<tr><td colspan="7" style="text-align:center">No data available</td></tr>';
         return;
     }
 
@@ -459,12 +484,14 @@ function populateVendorTable() {
             <td>${parseFloat(item.total_invoices || 0).toLocaleString()}</td>
             <td>${parseFloat(item.total_quantity || 0).toLocaleString()}</td>
             <td>${CURRENCY_SYMBOL}${parseFloat(item.total_sales || 0).toLocaleString()}</td>
+            <td>${formatBatchCell(item.batch_no)}</td>
+            <td>${formatExpiryCell(item.nearest_expiry)}</td>
         `;
         
         const detailRow = document.createElement('tr');
         detailRow.style.display = 'none';
         detailRow.innerHTML = `
-            <td colspan="5" style="padding: 0;">
+            <td colspan="7" style="padding: 0;">
                 <div style="padding: 16px; background: #f7f9fc; border-left: 3px solid #946CE6;">
                     <div style="font-weight: 600; margin-bottom: 8px;">Products Sold</div>
                     <div id="vendor-details-${item.vendor_id}">Loading...</div>
@@ -486,7 +513,7 @@ function populateCustomerTable() {
     tableBody.innerHTML = '';
 
     if (!reportData || !reportData.customer_sales.length) {
-        tableBody.innerHTML = '<tr><td colspan="4" style="text-align:center">No data available</td></tr>';
+        tableBody.innerHTML = '<tr><td colspan="6" style="text-align:center">No data available</td></tr>';
         return;
     }
 
@@ -500,12 +527,14 @@ function populateCustomerTable() {
             <td>${item.customer_name}</td>
             <td>${parseFloat(item.total_invoices || 0).toLocaleString()}</td>
             <td>${CURRENCY_SYMBOL}${parseFloat(item.total_sales || 0).toLocaleString()}</td>
+            <td>${formatBatchCell(item.batch_no)}</td>
+            <td>${formatExpiryCell(item.nearest_expiry)}</td>
         `;
         
         const detailRow = document.createElement('tr');
         detailRow.style.display = 'none';
         detailRow.innerHTML = `
-            <td colspan="4" style="padding: 0;">
+            <td colspan="6" style="padding: 0;">
                 <div style="padding: 16px; background: #f7f9fc; border-left: 3px solid #1F7BFF;">
                     <div style="font-weight: 600; margin-bottom: 8px;">Customer Invoices</div>
                     <div id="customer-details-${item.customer_id}">Loading...</div>
@@ -527,7 +556,7 @@ function populateSupplierManTable() {
     tableBody.innerHTML = '';
 
     if (!reportData || !reportData.supplier_man_sales.length) {
-        tableBody.innerHTML = '<tr><td colspan="5" style="text-align:center">No data available</td></tr>';
+        tableBody.innerHTML = '<tr><td colspan="7" style="text-align:center">No data available</td></tr>';
         return;
     }
 
@@ -544,13 +573,15 @@ function populateSupplierManTable() {
             <td>${item.supplier_man_name}</td>
             <td>${parseFloat(item.total_invoices || 0).toLocaleString()}</td>
             <td>${CURRENCY_SYMBOL}${parseFloat(item.total_sales || 0).toLocaleString()}</td>
+            <td>${formatBatchCell(item.batch_no)}</td>
+            <td>${formatExpiryCell(item.nearest_expiry)}</td>
             <td><span class="badge ${item.status === 'Active' ? 'badge-success' : 'badge-warning'}">${item.status}</span></td>
         `;
         
         const detailRow = document.createElement('tr');
         detailRow.style.display = 'none';
         detailRow.innerHTML = `
-            <td colspan="5" style="padding: 0;">
+            <td colspan="7" style="padding: 0;">
                 <div style="padding: 16px; background: #f7f9fc; border-left: 3px solid #946CE6;">
                     <div style="font-weight: 600; margin-bottom: 8px;">Daily Breakdown</div>
                     <div id="supplier_man-breakdown-${index}">Loading...</div>
@@ -873,9 +904,9 @@ async function toggleBreakdown(row, detailRow, type, id, index) {
                 
                 const data = result.data;
                 
-                const headers = type === 'branch' ? '<tr><th>Date</th><th>Quantity</th><th>Unit</th><th>Revenue</th></tr>' : 
-                               type === 'officer' ? '<tr><th>Date</th><th>Invoices</th><th>Revenue</th></tr>' : 
-                               type === 'supplier_man' ? '<tr><th>Date</th><th>Invoices</th><th>Revenue</th></tr>' : 
+                const headers = type === 'branch' ? '<tr><th>Date</th><th>Quantity</th><th>Unit</th><th>Revenue</th><th>Batch No</th><th>Expiry Date</th></tr>' : 
+                               type === 'officer' ? '<tr><th>Date</th><th>Invoices</th><th>Revenue</th><th>Batch No</th><th>Expiry Date</th></tr>' : 
+                               type === 'supplier_man' ? '<tr><th>Date</th><th>Invoices</th><th>Revenue</th><th>Batch No</th><th>Expiry Date</th></tr>' : 
                                '<tr><th>Date</th><th>Quantity</th><th>Revenue</th></tr>';
                 
                 let html = `
@@ -891,10 +922,12 @@ async function toggleBreakdown(row, detailRow, type, id, index) {
                             ${headers}`;
                 
                 data.forEach(item => {
+                    const batchCell = formatBatchCell(item.batch_no);
+                    const expiryCell = formatExpiryCell(item.nearest_expiry);
                     if (type === 'branch') {
-                        html += `<tr class="breakdown-row"><td>${item.date}</td><td>${parseFloat(item.volume || 0).toLocaleString()}</td><td>${item.unit || '-'}</td><td>${CURRENCY_SYMBOL}${parseFloat(item.revenue || 0).toLocaleString()}</td></tr>`;
+                        html += `<tr class="breakdown-row"><td>${item.date}</td><td>${parseFloat(item.volume || 0).toLocaleString()}</td><td>${item.unit || '-'}</td><td>${CURRENCY_SYMBOL}${parseFloat(item.revenue || 0).toLocaleString()}</td><td>${batchCell}</td><td>${expiryCell}</td></tr>`;
                     } else if (type === 'officer' || type === 'supplier_man') {
-                        html += `<tr class="breakdown-row"><td>${item.date}</td><td>${parseFloat(item.invoices || 0).toLocaleString()}</td><td>${CURRENCY_SYMBOL}${parseFloat(item.revenue || 0).toLocaleString()}</td></tr>`;
+                        html += `<tr class="breakdown-row"><td>${item.date}</td><td>${parseFloat(item.invoices || 0).toLocaleString()}</td><td>${CURRENCY_SYMBOL}${parseFloat(item.revenue || 0).toLocaleString()}</td><td>${batchCell}</td><td>${expiryCell}</td></tr>`;
                     } else {
                         html += `<tr class="breakdown-row"><td>${item.date}</td><td>${parseFloat(item.volume || 0).toLocaleString()}</td><td>${CURRENCY_SYMBOL}${parseFloat(item.revenue || 0).toLocaleString()}</td></tr>`;
                     }
@@ -952,24 +985,36 @@ async function toggleDetails(row, detailRow, type, id, index) {
                 let html = '<div style="max-height: 300px; overflow-y: auto;"><table style="width: 100%; font-size: 13px;">';
                 
                 if (type === 'product_invoices') {
-                    html += '<tr><th>Invoice #</th><th>Date</th><th>Customer</th><th>Quantity</th><th>Price</th><th>Amount</th></tr>';
+                    html += '<tr><th>Invoice #</th><th>Date</th><th>Customer</th><th>Quantity</th><th>Price</th><th>Batch No</th><th>Expiry Date</th><th>Amount</th></tr>';
                     data.forEach(item => {
-                        html += `<tr><td>${item.bill_no}</td><td>${item.sale_date}</td><td>${item.customer_name}</td><td>${parseFloat(item.quantity || 0).toLocaleString()}</td><td>${CURRENCY_SYMBOL}${parseFloat(item.sale_price || 0).toLocaleString()}</td><td>${CURRENCY_SYMBOL}${parseFloat(item.net_amount || 0).toLocaleString()}</td></tr>`;
+                        const expiringSoon = item.expiry_date && (new Date(item.expiry_date) - new Date()) / (1000*60*60*24) <= 30;
+                        const expiryCell = item.expiry_date
+                            ? (expiringSoon ? `<span style="color:#d64545; font-weight:600;">${item.expiry_date}</span>` : item.expiry_date)
+                            : '-';
+                        html += `<tr><td>${item.bill_no}</td><td>${item.sale_date}</td><td>${item.customer_name}</td><td>${parseFloat(item.quantity || 0).toLocaleString()}</td><td>${CURRENCY_SYMBOL}${parseFloat(item.sale_price || 0).toLocaleString()}</td><td>${item.batch_no || '-'}</td><td>${expiryCell}</td><td>${CURRENCY_SYMBOL}${parseFloat(item.net_amount || 0).toLocaleString()}</td></tr>`;
                     });
                 } else if (type === 'vendor_products') {
-                    html += '<tr><th>Product</th><th>Quantity</th><th>Total Sales</th></tr>';
+                    html += '<tr><th>Product</th><th>Batch No</th><th>Expiry Date</th><th>Quantity</th><th>Total Sales</th></tr>';
                     data.forEach(item => {
-                        html += `<tr><td>${item.product_name}</td><td>${parseFloat(item.total_quantity || 0).toLocaleString()}</td><td>${CURRENCY_SYMBOL}${parseFloat(item.total_sales || 0).toLocaleString()}</td></tr>`;
+                        const expiringSoon = item.nearest_expiry && (new Date(item.nearest_expiry) - new Date()) / (1000*60*60*24) <= 30;
+                        const expiryCell = item.nearest_expiry
+                            ? (expiringSoon ? `<span style="color:#d64545; font-weight:600;">${item.nearest_expiry}</span>` : item.nearest_expiry)
+                            : '-';
+                        html += `<tr><td>${item.product_name}</td><td>${item.batch_no || '-'}</td><td>${expiryCell}</td><td>${parseFloat(item.total_quantity || 0).toLocaleString()}</td><td>${CURRENCY_SYMBOL}${parseFloat(item.total_sales || 0).toLocaleString()}</td></tr>`;
                     });
                 } else if (type === 'customer_invoices') {
-                    html += '<tr><th>Invoice #</th><th>Date</th><th>Total Bill</th><th>Discount</th><th>Net Amount</th></tr>';
+                    html += '<tr><th>Invoice #</th><th>Date</th><th>Total Bill</th><th>Discount</th><th>Net Amount</th><th>Batch No</th><th>Expiry Date</th></tr>';
                     data.forEach(item => {
-                        html += `<tr><td>${item.bill_no}</td><td>${item.sale_date}</td><td>${CURRENCY_SYMBOL}${parseFloat(item.total_bill || 0).toLocaleString()}</td><td>${CURRENCY_SYMBOL}${parseFloat(item.total_discount_amount || 0).toLocaleString()}</td><td>${CURRENCY_SYMBOL}${parseFloat(item.net_amount || 0).toLocaleString()}</td></tr>`;
+                        html += `<tr><td>${item.bill_no}</td><td>${item.sale_date}</td><td>${CURRENCY_SYMBOL}${parseFloat(item.total_bill || 0).toLocaleString()}</td><td>${CURRENCY_SYMBOL}${parseFloat(item.total_discount_amount || 0).toLocaleString()}</td><td>${CURRENCY_SYMBOL}${parseFloat(item.net_amount || 0).toLocaleString()}</td><td>${formatBatchCell(item.batch_no)}</td><td>${formatExpiryCell(item.nearest_expiry)}</td></tr>`;
                     });
                 } else if (type === 'invoice_items') {
-                    html += '<tr><th>Product</th><th>Quantity</th><th>Price</th><th>Discount</th><th>Net Amount</th></tr>';
+                    html += '<tr><th>Product</th><th>Batch No</th><th>Expiry Date</th><th>Quantity</th><th>Price</th><th>Discount</th><th>Net Amount</th></tr>';
                     data.forEach(item => {
-                        html += `<tr><td>${item.product_name}</td><td>${parseFloat(item.quantity || 0).toLocaleString()}</td><td>${CURRENCY_SYMBOL}${parseFloat(item.sale_price || 0).toLocaleString()}</td><td>${CURRENCY_SYMBOL}${parseFloat(item.discount_amount || 0).toLocaleString()}</td><td>${CURRENCY_SYMBOL}${parseFloat(item.net_amount || 0).toLocaleString()}</td></tr>`;
+                        const expiringSoon = item.expiry_date && (new Date(item.expiry_date) - new Date()) / (1000*60*60*24) <= 30;
+                        const expiryCell = item.expiry_date
+                            ? (expiringSoon ? `<span style="color:#d64545; font-weight:600;">${item.expiry_date}</span>` : item.expiry_date)
+                            : '-';
+                        html += `<tr><td>${item.product_name}</td><td>${item.batch_no || '-'}</td><td>${expiryCell}</td><td>${parseFloat(item.quantity || 0).toLocaleString()}</td><td>${CURRENCY_SYMBOL}${parseFloat(item.sale_price || 0).toLocaleString()}</td><td>${CURRENCY_SYMBOL}${parseFloat(item.discount_amount || 0).toLocaleString()}</td><td>${CURRENCY_SYMBOL}${parseFloat(item.net_amount || 0).toLocaleString()}</td></tr>`;
                     });
                 }
                 
@@ -1006,9 +1051,9 @@ async function toggleTerritoryDetails(row, detailRow, item, index) {
                 const data = result.data;
                 
                 let html = '<div style="max-height: 300px; overflow-y: auto;"><table style="width: 100%; font-size: 13px;">';
-                html += '<tr><th>Invoice #</th><th>Date</th><th>Customer</th><th>Net Amount</th></tr>';
+                html += '<tr><th>Invoice #</th><th>Date</th><th>Customer</th><th>Net Amount</th><th>Batch No</th><th>Expiry Date</th></tr>';
                 data.forEach(d => {
-                    html += `<tr><td>${d.bill_no}</td><td>${d.sale_date}</td><td>${d.customer_name}</td><td>${CURRENCY_SYMBOL}${parseFloat(d.net_amount || 0).toLocaleString()}</td></tr>`;
+                    html += `<tr><td>${d.bill_no}</td><td>${d.sale_date}</td><td>${d.customer_name}</td><td>${CURRENCY_SYMBOL}${parseFloat(d.net_amount || 0).toLocaleString()}</td><td>${formatBatchCell(d.batch_no)}</td><td>${formatExpiryCell(d.nearest_expiry)}</td></tr>`;
                 });
                 html += '</table></div>';
                 container.innerHTML = data.length > 0 ? html : 'No data available';

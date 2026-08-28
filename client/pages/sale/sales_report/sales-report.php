@@ -247,6 +247,8 @@ $currency_symbol = $currency['symbol'];
                             <th>Officer Name</th>
                             <th>Total Invoices</th>
                             <th>Total Sales (<?php echo $currency_symbol; ?>)</th>
+                            <th>Batch No</th>
+                            <th>Expiry Date</th>
                             <th>Status</th>
                         </tr>
                     </thead>
@@ -271,6 +273,8 @@ $currency_symbol = $currency['symbol'];
                             <th>Supplier Man Name</th>
                             <th>Total Invoices</th>
                             <th>Total Sales (<?php echo $currency_symbol; ?>)</th>
+                            <th>Batch No</th>
+                            <th>Expiry Date</th>
                             <th>Status</th>
                         </tr>
                     </thead>
@@ -325,6 +329,8 @@ $currency_symbol = $currency['symbol'];
                             <th>Total Sales (<?php echo $currency_symbol; ?>)</th>
                             <th>Transactions</th>
                             <th>Avg Sale (<?php echo $currency_symbol; ?>)</th>
+                            <th>Batch No</th>
+                            <th>Expiry Date</th>
                         </tr>
                     </thead>
                     <tbody id="branchTableBody">
@@ -347,6 +353,8 @@ $currency_symbol = $currency['symbol'];
                             <th>Category</th>
                             <th>Total Revenue (<?php echo $currency_symbol; ?>)</th>
                             <th>Percentage</th>
+                            <th>Batch No</th>
+                            <th>Expiry Date</th>
                         </tr>
                     </thead>
                     <tbody id="categoryTableBody">
@@ -373,6 +381,8 @@ $currency_symbol = $currency['symbol'];
                             <th>Area</th>
                             <th>Total Invoices</th>
                             <th>Total Sales (<?php echo $currency_symbol; ?>)</th>
+                            <th>Batch No</th>
+                            <th>Expiry Date</th>
                         </tr>
                     </thead>
                     <tbody id="territoryTableBody">
@@ -399,6 +409,8 @@ $currency_symbol = $currency['symbol'];
                             <th>Total Bill (<?php echo $currency_symbol; ?>)</th>
                             <th>Discount (<?php echo $currency_symbol; ?>)</th>
                             <th>Net Amount (<?php echo $currency_symbol; ?>)</th>
+                            <th>Batch No</th>
+                            <th>Expiry Date</th>
                         </tr>
                     </thead>
                     <tbody id="invoiceTableBody">
@@ -423,6 +435,8 @@ $currency_symbol = $currency['symbol'];
                             <th>Total Invoices</th>
                             <th>Total Quantity</th>
                             <th>Total Sales (<?php echo $currency_symbol; ?>)</th>
+                            <th>Batch No</th>
+                            <th>Expiry Date</th>
                         </tr>
                     </thead>
                     <tbody id="vendorTableBody">
@@ -446,6 +460,8 @@ $currency_symbol = $currency['symbol'];
                             <th>Customer Name</th>
                             <th>Total Invoices</th>
                             <th>Total Sales (<?php echo $currency_symbol; ?>)</th>
+                            <th>Batch No</th>
+                            <th>Expiry Date</th>
                         </tr>
                     </thead>
                     <tbody id="customerTableBody">

@@ -55,6 +55,14 @@ $stmt->execute([$tenant_id]);
 $currency = $stmt->fetch();
 $currency_symbol = $currency['symbol'] ?? '$';
 
+// Helper to format a batch no / expiry date pair consistently everywhere
+function formatBatchNo($batch_no) {
+    return $batch_no ?: '-';
+}
+function formatExpiryDate($expiry_date) {
+    return $expiry_date ? date('Y-m-d', strtotime($expiry_date)) : '-';
+}
+
 try {
     $data = [];
     $summary = [];
@@ -197,7 +205,7 @@ try {
             $results = $stmt->fetchAll(PDO::FETCH_ASSOC);
             
             foreach ($results as $row) {
-                // Get invoices for this product
+                // Get invoices for this product (now including batch no + expiry per invoice line)
                 $invoiceStmt = $pdo->prepare("
                     SELECT 
                         pi.bill_no,
@@ -205,6 +213,8 @@ try {
                         pii.quantity,
                         pii.purchase_price,
                         pii.net_amount,
+                        pii.batch_no,
+                        pii.batch_expiry_date,
                         s.supplier_name
                     FROM purchase_invoice_items pii
                     JOIN purchase_invoice pi ON pii.purchase_invoice_id = pi.id
@@ -223,6 +233,8 @@ try {
                         'quantity' => number_format($invoice['quantity'], 2),
                         'price' => $currency_symbol . number_format($invoice['purchase_price'], 2),
                         'total' => $currency_symbol . number_format($invoice['net_amount'], 2),
+                        'batchNo' => formatBatchNo($invoice['batch_no']),
+                        'expiryDate' => formatExpiryDate($invoice['batch_expiry_date']),
                         'supplier' => $invoice['supplier_name']
                     ];
                 }
@@ -252,7 +264,9 @@ try {
                     COUNT(pii.id) as items,
                     pi.purchase_date as due_date,
                     pi.net_amount as total,
-                    s.supplier_name as supplier
+                    s.supplier_name as supplier,
+                    GROUP_CONCAT(DISTINCT NULLIF(pii.batch_no,'') SEPARATOR ', ') as batch_no,
+                    MIN(CASE WHEN pii.batch_expiry_date >= CURDATE() THEN pii.batch_expiry_date END) as nearest_expiry
                 FROM purchase_invoice pi
                 JOIN suppliers s ON pi.supplier_id = s.id
                 LEFT JOIN purchase_invoice_items pii ON pi.id = pii.purchase_invoice_id
@@ -268,13 +282,15 @@ try {
             $results = $stmt->fetchAll(PDO::FETCH_ASSOC);
             
             foreach ($results as $row) {
-                // Get items for this invoice
+                // Get items for this invoice (with batch no + expiry per item)
                 $itemStmt = $pdo->prepare("
                     SELECT 
                         p.name as product_name,
                         pii.quantity,
                         pii.purchase_price,
-                        pii.net_amount
+                        pii.net_amount,
+                        pii.batch_no,
+                        pii.batch_expiry_date
                     FROM purchase_invoice_items pii
                     JOIN products p ON pii.product_id = p.id
                     WHERE pii.purchase_invoice_id = ?
@@ -288,7 +304,9 @@ try {
                         'product' => $item['product_name'],
                         'quantity' => number_format($item['quantity'], 2),
                         'price' => $currency_symbol . number_format($item['purchase_price'], 2),
-                        'total' => $currency_symbol . number_format($item['net_amount'], 2)
+                        'total' => $currency_symbol . number_format($item['net_amount'], 2),
+                        'batchNo' => formatBatchNo($item['batch_no']),
+                        'expiryDate' => formatExpiryDate($item['batch_expiry_date'])
                     ];
                 }
                 
@@ -296,6 +314,8 @@ try {
                     'id' => $row['id'],
                     'name' => $row['name'],
                     'category' => $row['category'],
+                    'batchNo' => $row['batch_no'] ?: '-',
+                    'expiryDate' => $row['nearest_expiry'] ? date('Y-m-d', strtotime($row['nearest_expiry'])) : '-',
                     'quantity' => $row['items'] . ' items',
                     'dueDate' => date('Y-m-d', strtotime($row['due_date'])),
                     'total' => $currency_symbol . number_format($row['total'], 2),
@@ -315,7 +335,9 @@ try {
                     SUM(pii.quantity) as quantity,
                     AVG(pii.purchase_price) as unit_price,
                     SUM(pii.net_amount) as total,
-                    'Multiple' as supplier
+                    'Multiple' as supplier,
+                    GROUP_CONCAT(DISTINCT NULLIF(pii.batch_no,'') SEPARATOR ', ') as batch_no,
+                    MIN(CASE WHEN pii.batch_expiry_date >= CURDATE() THEN pii.batch_expiry_date END) as nearest_expiry
                 FROM purchase_invoice_items pii
                 JOIN purchase_invoice pi ON pii.purchase_invoice_id = pi.id
                 JOIN products p ON pii.product_id = p.id
@@ -337,7 +359,9 @@ try {
                         COALESCE(sc.subcategory_name, 'Uncategorized') as subcategory_name,
                         SUM(pii.quantity) as quantity,
                         AVG(pii.purchase_price) as unit_price,
-                        SUM(pii.net_amount) as total
+                        SUM(pii.net_amount) as total,
+                        GROUP_CONCAT(DISTINCT NULLIF(pii.batch_no,'') SEPARATOR ', ') as batch_no,
+                        MIN(CASE WHEN pii.batch_expiry_date >= CURDATE() THEN pii.batch_expiry_date END) as nearest_expiry
                     FROM purchase_invoice_items pii
                     JOIN purchase_invoice pi ON pii.purchase_invoice_id = pi.id
                     JOIN products p ON pii.product_id = p.id
@@ -371,13 +395,15 @@ try {
                     
                     $invoicesBreakdown = [];
                     foreach ($invoices as $invoice) {
-                        // Get items for this invoice in this subcategory
+                        // Get items for this invoice in this subcategory (with batch no + expiry)
                         $itemStmt = $pdo->prepare("
                             SELECT 
                                 p.name as product_name,
                                 pii.quantity,
                                 pii.purchase_price,
-                                pii.net_amount
+                                pii.net_amount,
+                                pii.batch_no,
+                                pii.batch_expiry_date
                             FROM purchase_invoice_items pii
                             JOIN products p ON pii.product_id = p.id
                             WHERE pii.purchase_invoice_id = ?
@@ -392,7 +418,9 @@ try {
                                 'product' => $item['product_name'],
                                 'quantity' => number_format($item['quantity'], 2),
                                 'price' => $currency_symbol . number_format($item['purchase_price'], 2),
-                                'total' => $currency_symbol . number_format($item['net_amount'], 2)
+                                'total' => $currency_symbol . number_format($item['net_amount'], 2),
+                                'batchNo' => formatBatchNo($item['batch_no']),
+                                'expiryDate' => formatExpiryDate($item['batch_expiry_date'])
                             ];
                         }
                         
@@ -412,6 +440,8 @@ try {
                             'quantity' => number_format($subcat['quantity'], 0),
                             'unitPrice' => $currency_symbol . number_format($subcat['unit_price'], 2),
                             'total' => $currency_symbol . number_format($subcat['total'], 2),
+                            'batchNo' => formatBatchNo($subcat['batch_no']),
+                            'expiryDate' => formatExpiryDate($subcat['nearest_expiry']),
                             'invoices' => $invoicesBreakdown
                         ];
                     }
@@ -425,6 +455,8 @@ try {
                     'unitPrice' => $currency_symbol . number_format($row['unit_price'], 2),
                     'total' => $currency_symbol . number_format($row['total'], 2),
                     'supplier' => $row['supplier'],
+                    'batchNo' => $row['batch_no'] ?: '-',
+                    'expiryDate' => $row['nearest_expiry'] ? date('Y-m-d', strtotime($row['nearest_expiry'])) : '-',
                     'subcategories' => $subcategoriesBreakdown
                 ];
             }
@@ -441,7 +473,9 @@ try {
                     AVG(pii.purchase_price) as unit_price,
                     SUM(pi.net_amount) as total,
                     s.supplier_name as supplier,
-                    COALESCE(s.email, 'N/A') as contact
+                    COALESCE(s.email, 'N/A') as contact,
+                    GROUP_CONCAT(DISTINCT NULLIF(pii.batch_no,'') SEPARATOR ', ') as batch_no,
+                    MIN(CASE WHEN pii.batch_expiry_date >= CURDATE() THEN pii.batch_expiry_date END) as nearest_expiry
                 FROM purchase_invoice pi
                 JOIN suppliers s ON pi.supplier_id = s.id
                 LEFT JOIN purchase_invoice_items pii ON pi.id = pii.purchase_invoice_id
@@ -471,13 +505,15 @@ try {
                 
                 $invoicesBreakdown = [];
                 foreach ($invoices as $invoice) {
-                    // Get items for each invoice
+                    // Get items for each invoice (with batch no + expiry)
                     $itemStmt = $pdo->prepare("
                         SELECT 
                             p.name as product_name,
                             pii.quantity,
                             pii.purchase_price,
-                            pii.net_amount
+                            pii.net_amount,
+                            pii.batch_no,
+                            pii.batch_expiry_date
                         FROM purchase_invoice_items pii
                         JOIN products p ON pii.product_id = p.id
                         WHERE pii.purchase_invoice_id = ?
@@ -491,7 +527,9 @@ try {
                             'product' => $item['product_name'],
                             'quantity' => number_format($item['quantity'], 2),
                             'price' => $currency_symbol . number_format($item['purchase_price'], 2),
-                            'total' => $currency_symbol . number_format($item['net_amount'], 2)
+                            'total' => $currency_symbol . number_format($item['net_amount'], 2),
+                            'batchNo' => formatBatchNo($item['batch_no']),
+                            'expiryDate' => formatExpiryDate($item['batch_expiry_date'])
                         ];
                     }
                     
@@ -512,6 +550,8 @@ try {
                     'total' => $currency_symbol . number_format($row['total'], 2),
                     'supplier' => $row['supplier'],
                     'contact' => $row['contact'],
+                    'batchNo' => $row['batch_no'] ?: '-',
+                    'expiryDate' => $row['nearest_expiry'] ? date('Y-m-d', strtotime($row['nearest_expiry'])) : '-',
                     'invoices' => $invoicesBreakdown
                 ];
             }
