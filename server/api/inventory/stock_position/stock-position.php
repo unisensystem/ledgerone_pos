@@ -875,6 +875,14 @@ try {
     |
     | Purchase / Sale / Returns remain individual rows.
     |
+    | IMPORTANT (batch fix):
+    | Rows are only merged together when they share the SAME product,
+    | SAME date, AND SAME batch_no/expiry_date. This is what lets a
+    | single opening entry's multiple unit-type rows (Carton + Dozen +
+    | Piece) collapse into one row, while two DIFFERENT opening entries
+    | for different batches on the same date stay as separate rows
+    | instead of being silently summed into one.
+    |
     |--------------------------------------------------------------------------
     */
 
@@ -900,13 +908,15 @@ try {
             | GROUP KEY
             |--------------------------------------------------------------------------
             |
-            | Same product + same transaction date
+            | Same product + same transaction date + same batch/expiry
             |
             | So:
             |
-            | cream + 2026-08-28
+            | cream + 2026-08-28 + batch B-001
             |
             | = ONE opening row
+            |
+            | but a different batch on the SAME date stays as its own row.
             |
             |--------------------------------------------------------------------------
             */
@@ -914,7 +924,11 @@ try {
             $group_key =
                 $entry['product_id']
                 . '|'
-                . $entry['transaction_date'];
+                . $entry['transaction_date']
+                . '|'
+                . ($entry['batch_no'] ?? '')
+                . '|'
+                . ($entry['batch_expiry_date'] ?? '');
 
 
             /*
@@ -1390,10 +1404,18 @@ try {
     | OPENING BALANCE
     |--------------------------------------------------------------------------
     |
-    | IMPORTANT:
+    | IMPORTANT (fix):
     |
-    | Item Stock Movement mein Opening Stock ko from_date ke din bhi
-    | Opening mein include karna hai.
+    | This must be the balance as of the START of from_date - i.e. every
+    | transaction strictly BEFORE from_date, PLUS any 'Opening Stock' rows
+    | dated exactly ON from_date (those represent an opening balance entry,
+    | not a period movement).
+    |
+    | Previously this used "transaction_date <= from_date" for ALL
+    | transaction types, which double-counted anything dated exactly on
+    | from_date: a Purchase/Sale on that date was added into Opening here
+    | AND added again into Purchase/Sale below (which uses ">= from_date").
+    | That's what was making the Opening figure wrong.
     |
     | Example:
     |
@@ -1497,19 +1519,38 @@ try {
     | DATE FILTER
     |--------------------------------------------------------------------------
     |
-    | IMPORTANT:
+    | IMPORTANT (fix):
     |
-    | <= from_date
+    | Strictly BEFORE from_date for every transaction type, OR exactly ON
+    | from_date but ONLY when it's an 'Opening Stock' row. This avoids
+    | double-counting a same-day Purchase/Sale that the period-movement
+    | query below also picks up via ">= from_date".
     |
-    | This includes Opening Stock created on from_date.
+    | IMPORTANT (fix #2 - no from_date selected):
+    |
+    | When from_date is NOT provided, there is no date split to rely on,
+    | so previously ALL transaction types (Opening Stock + Purchase +
+    | Sale + Returns) were summed together into "opening" - which made
+    | opening equal the CURRENT balance, not the opening balance. That
+    | current-balance figure then got treated as opening AND the same
+    | Purchase/Sale rows were subtracted again in the period-movement
+    | totals below, producing a wrong (double-subtracted) Closing.
+    |
+    | Fix: with no from_date, opening must only ever be the recorded
+    | 'Opening Stock' entries.
     |
     |--------------------------------------------------------------------------
     */
 
     if ($from_date) {
 
-        $opening_sql .= " AND sl.transaction_date <= ?";
+        $opening_sql .= " AND (sl.transaction_date < ? OR (sl.transaction_date = ? AND sl.transaction_type = 'Opening Stock'))";
         $opening_params[] = $from_date;
+        $opening_params[] = $from_date;
+
+    } else {
+
+        $opening_sql .= " AND sl.transaction_type = 'Opening Stock'";
     }
 
 
