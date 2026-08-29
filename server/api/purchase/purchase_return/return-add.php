@@ -41,12 +41,9 @@ try {
         throw new Exception('At least one item is required');
     }
 
-    // Validate that every item has a batch selected (batch_no required for return)
-    foreach ($input['items'] as $item) {
-        if (empty($item['batchNo'])) {
-            throw new Exception('Please select a batch for every item — a product with no available stock cannot be returned');
-        }
-    }
+    // NOTE: batch is now OPTIONAL. A product with no batch tracking (or legacy
+    // stock with no batch_no) can still be returned — batchNo will simply be
+    // null/empty for that item and the "no batch" bucket in stock_ledger is used.
     
     $pdo->beginTransaction();
     
@@ -112,6 +109,13 @@ try {
     ");
     
     foreach ($input['items'] as $item) {
+
+        // Normalize batchNo: treat missing/empty/"NONE" as NULL (no-batch stock)
+        $batchNo = $item['batchNo'] ?? null;
+        if ($batchNo === '' || $batchNo === 'NONE') {
+            $batchNo = null;
+        }
+
         // Each item can have multiple unit entries
         $isFirstEntry = true;
         foreach ($item['unitEntries'] as $unitEntry) {
@@ -132,7 +136,7 @@ try {
                 $item['gstPercent'] ?? 0.00,
                 $isFirstEntry ? $item['gstAmount'] : 0,
                 $item['focQty'] ?? 0,
-                $item['batchNo'],
+                $batchNo,
                 $item['batchExpiryDate'] ?? null,
                 $user_id,
                 $user_id
@@ -151,18 +155,31 @@ try {
             $totalQty += $unitEntry['quantity'];
         }
 
-        // Safety check: don't let qty_out exceed what's actually available in this batch.
+        // Safety check: don't let qty_out exceed what's actually available.
+        // If batchNo is null, check the "no batch" bucket in stock_ledger instead
+        // of a specific batch, since that's where legacy/non-batch-tracked stock lives.
         // (Frontend already restricts this via get-product-batches.php, this is a server-side guard.)
-        $avail_stmt = $pdo->prepare("
-            SELECT COALESCE(SUM(qty_in),0) - COALESCE(SUM(qty_out),0) AS available_qty
-            FROM stock_ledger
-            WHERE tenant_id = ? AND product_id = ? AND branch_id = ? AND batch_no = ?
-        ");
-        $avail_stmt->execute([$tenant_id, $item['productId'], $input['branchId'], $item['batchNo']]);
+        if ($batchNo === null) {
+            $avail_stmt = $pdo->prepare("
+                SELECT COALESCE(SUM(qty_in),0) - COALESCE(SUM(qty_out),0) AS available_qty
+                FROM stock_ledger
+                WHERE tenant_id = ? AND product_id = ? AND branch_id = ?
+                  AND (batch_no IS NULL OR batch_no = '')
+            ");
+            $avail_stmt->execute([$tenant_id, $item['productId'], $input['branchId']]);
+        } else {
+            $avail_stmt = $pdo->prepare("
+                SELECT COALESCE(SUM(qty_in),0) - COALESCE(SUM(qty_out),0) AS available_qty
+                FROM stock_ledger
+                WHERE tenant_id = ? AND product_id = ? AND branch_id = ? AND batch_no = ?
+            ");
+            $avail_stmt->execute([$tenant_id, $item['productId'], $input['branchId'], $batchNo]);
+        }
         $availableQty = (float) $avail_stmt->fetchColumn();
 
         if ($totalQty > $availableQty) {
-            throw new Exception("Return quantity for batch '{$item['batchNo']}' exceeds available stock ({$availableQty})");
+            $batchLabel = $batchNo === null ? 'No Batch' : $batchNo;
+            throw new Exception("Return quantity for batch '{$batchLabel}' exceeds available stock ({$availableQty})");
         }
         
         // Insert into stock_ledger - qty_out for returns (reducing inventory), batch_no/expiry recorded
@@ -181,7 +198,7 @@ try {
             $totalQty,
             $item['purchasePrice'],
             $item['unitEntries'][0]['uomId'],
-            $item['batchNo'],
+            $batchNo,
             $item['batchExpiryDate'] ?? null,
             $input['purchaseDate']
         ]);

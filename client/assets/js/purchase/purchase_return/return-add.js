@@ -103,6 +103,11 @@ document.addEventListener('DOMContentLoaded', function () {
     // BATCH HANDLING (NEW) — fetch available batches for a product
     // in the currently selected branch, populate the batch dropdown,
     // and auto-fill expiry when a batch is chosen.
+    //
+    // Batch is OPTIONAL: if a product has stock that was never assigned
+    // a batch_no (legacy stock or a non-batch-tracked product), the API
+    // returns it as a special entry (batch_no: null) and it's rendered
+    // here as a "No Batch" option with value "NONE".
     // ============================================================
     async function loadBatchesForRow(row, productId) {
         const batchSelect = row.querySelector('.batch-no-select');
@@ -130,15 +135,21 @@ document.addEventListener('DOMContentLoaded', function () {
                 batchSelect.appendChild(new Option('Select batch...', ''));
                 data.batches.forEach(b => {
                     const opt = document.createElement('option');
-                    opt.value = b.batch_no;
-                    opt.textContent = `${b.batch_no} (Qty: ${parseFloat(b.available_qty).toFixed(2)}${b.batch_expiry_date ? ', Exp: ' + b.batch_expiry_date : ''})`;
+                    if (b.batch_no === null) {
+                        // Stock with no batch assigned — still returnable
+                        opt.value = 'NONE';
+                        opt.textContent = `No Batch (Qty: ${parseFloat(b.available_qty).toFixed(2)})`;
+                    } else {
+                        opt.value = b.batch_no;
+                        opt.textContent = `${b.batch_no} (Qty: ${parseFloat(b.available_qty).toFixed(2)}${b.batch_expiry_date ? ', Exp: ' + b.batch_expiry_date : ''})`;
+                    }
                     opt.dataset.expiry = b.batch_expiry_date || '';
                     opt.dataset.availableQty = b.available_qty;
                     batchSelect.appendChild(opt);
                 });
                 batchSelect.disabled = false;
             } else {
-                // No stock available for this product in this branch — cannot be returned
+                // No stock available at all (neither named batches nor no-batch stock)
                 batchSelect.appendChild(new Option('No stock available', ''));
                 batchSelect.disabled = true;
                 alert('This product has no available stock in the selected branch, so it cannot be returned. Please remove this row or pick a different product/branch.');
@@ -627,24 +638,27 @@ document.addEventListener('DOMContentLoaded', function () {
 
                     // Load this product's available batches for the branch, then
                     // restore the previously-saved batch selection + expiry.
+                    // If item.batch_no is null/empty, this was a "No Batch" return —
+                    // select the "NONE" option instead.
                     // NOTE: relies on return-edit.php returning item.batch_no / item.batch_expiry_date.
                     loadBatchesForRow(row, item.product_id).then(() => {
-                        if (item.batch_no) {
-                            const batchSelect = row.querySelector('.batch-no-select');
-                            const expiryInput = row.querySelector('.batch-expiry-input');
-                            if (batchSelect) {
-                                // If the saved batch isn't in the "still available" list
-                                // (e.g. fully consumed elsewhere), add it back so editing works.
-                                let opt = Array.from(batchSelect.options).find(o => o.value === item.batch_no);
-                                if (!opt) {
-                                    opt = new Option(item.batch_no, item.batch_no);
-                                    opt.dataset.expiry = item.batch_expiry_date || '';
-                                    batchSelect.appendChild(opt);
-                                    batchSelect.disabled = false;
-                                }
-                                batchSelect.value = item.batch_no;
-                                if (expiryInput) expiryInput.value = item.batch_expiry_date || '';
+                        const hasSavedBatch = item.batch_no !== undefined && item.batch_no !== null && item.batch_no !== '';
+                        const selectValue = hasSavedBatch ? item.batch_no : 'NONE';
+                        const batchSelect = row.querySelector('.batch-no-select');
+                        const expiryInput = row.querySelector('.batch-expiry-input');
+
+                        if (batchSelect) {
+                            // If the saved batch isn't in the "still available" list
+                            // (e.g. fully consumed elsewhere), add it back so editing works.
+                            let opt = Array.from(batchSelect.options).find(o => o.value === selectValue);
+                            if (!opt) {
+                                opt = new Option(hasSavedBatch ? item.batch_no : 'No Batch', selectValue);
+                                opt.dataset.expiry = item.batch_expiry_date || '';
+                                batchSelect.appendChild(opt);
+                                batchSelect.disabled = false;
                             }
+                            batchSelect.value = selectValue;
+                            if (expiryInput) expiryInput.value = item.batch_expiry_date || '';
                         }
                     });
                 });
@@ -1329,10 +1343,11 @@ document.addEventListener('DOMContentLoaded', function () {
                 break;
             }
 
-            // Batch is mandatory for a return — you can only return stock that
-            // actually exists in a specific batch.
+            // Batch selection is required (either a real batch or the "No Batch" option) —
+            // this just confirms which pool of stock is being returned from, but a
+            // product with truly no available stock still cannot be returned.
             if (!batchSelect || !batchSelect.value) {
-                alert('Please select a batch for row ' + (i + 1) + '. A product with no available stock cannot be returned.');
+                alert('Please select a batch for row ' + (i + 1) + '. If this product has no batch tracking, choose "No Batch".');
                 isValid = false;
                 break;
             }
@@ -1342,7 +1357,8 @@ document.addEventListener('DOMContentLoaded', function () {
             unitInputs.forEach(input => { totalQty += parseFloat(input.value) || 0; });
             const availableQty = parseFloat(rows[i].dataset.batchAvailableQty) || 0;
             if (totalQty > availableQty) {
-                alert(`Row ${i + 1}: return quantity (${totalQty}) exceeds available stock in batch "${batchSelect.value}" (${availableQty}).`);
+                const batchLabel = batchSelect.value === 'NONE' ? 'No Batch' : batchSelect.value;
+                alert(`Row ${i + 1}: return quantity (${totalQty}) exceeds available stock in "${batchLabel}" (${availableQty}).`);
                 isValid = false;
                 break;
             }
@@ -1408,9 +1424,13 @@ document.addEventListener('DOMContentLoaded', function () {
             if (unitEntries.length > 0) {
                 const batchSelect = row.querySelector('.batch-no-select');
                 const expiryInput = row.querySelector('.batch-expiry-input');
+                // "NONE" means "no batch" — send null to the backend, not the literal string
+                const batchNoValue = (batchSelect && batchSelect.value && batchSelect.value !== 'NONE')
+                    ? batchSelect.value
+                    : null;
                 const item = {
                     productId: row.cells[1].querySelector('.item-code').value,
-                    batchNo: batchSelect ? batchSelect.value : null,
+                    batchNo: batchNoValue,
                     batchExpiryDate: expiryInput ? (expiryInput.value || null) : null,
                     unitEntries: unitEntries,
                     purchasePrice: parseFloat(row.querySelector('.price-cell input').value),

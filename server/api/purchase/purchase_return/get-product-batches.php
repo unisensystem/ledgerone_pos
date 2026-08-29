@@ -26,8 +26,7 @@ if (!$product_id || !$branch_id) {
 
 try {
     // Group by batch_no, sum qty_in - qty_out to get real available quantity per batch.
-    // Only batches with a non-empty batch_no and available qty > 0 are returned —
-    // this is what makes "no stock = no batch to return" work automatically.
+    // Only batches with a non-empty batch_no and available qty > 0 are returned.
     $stmt = $pdo->prepare("
         SELECT 
             batch_no,
@@ -45,6 +44,29 @@ try {
     ");
     $stmt->execute([$tenant_id, $product_id, $branch_id]);
     $batches = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    // NEW: stock that was never assigned a batch (legacy rows / non-batch-tracked product).
+    // Surfaced as a special "No Batch" option so it can still be returned.
+    $noBatchStmt = $pdo->prepare("
+        SELECT 
+            COALESCE(SUM(qty_in), 0) - COALESCE(SUM(qty_out), 0) AS available_qty
+        FROM stock_ledger
+        WHERE tenant_id = ?
+          AND product_id = ?
+          AND branch_id = ?
+          AND (batch_no IS NULL OR batch_no = '')
+    ");
+    $noBatchStmt->execute([$tenant_id, $product_id, $branch_id]);
+    $noBatchQty = (float) $noBatchStmt->fetchColumn();
+
+    if ($noBatchQty > 0) {
+        // batch_no = null signals "no batch" to the frontend
+        $batches[] = [
+            'batch_no' => null,
+            'batch_expiry_date' => null,
+            'available_qty' => $noBatchQty
+        ];
+    }
 
     echo json_encode([
         'success' => true,
