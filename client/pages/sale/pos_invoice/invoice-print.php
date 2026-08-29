@@ -88,15 +88,32 @@
 
         .items-table {
             width: 100%;
-            border-collapse: collapse;
+            /* IMPORTANT: border-collapse: collapse breaks the browser's native
+               page-break-inside/break-inside: avoid handling on <tr> in Chrome/Edge —
+               that's why long item lists were getting a row sliced in half across pages.
+               border-collapse: separate + per-cell borders below keeps the same look
+               while letting row-level page breaks actually work. */
+            border-collapse: separate;
+            border-spacing: 0;
             margin-bottom: 20px;
         }
 
         .items-table th,
         .items-table td {
-            border: 1px solid #ddd;
+            border: none;
+            border-right: 1px solid #ddd;
+            border-bottom: 1px solid #ddd;
             padding: 8px;
             text-align: left;
+        }
+
+        .items-table th:first-child,
+        .items-table td:first-child {
+            border-left: 1px solid #ddd;
+        }
+
+        .items-table thead th {
+            border-top: 1px solid #ddd;
         }
 
         .items-table th {
@@ -214,7 +231,10 @@
 
         /* ---- Page-break control (fixes rows/sections being sliced across pages) ---- */
         /* Applies to both browser "Print" (native @page pagination) and the
-           html2pdf.js download flow (configured further down with pagebreak.mode:'css'). */
+           html2pdf.js download flow (configured further down with pagebreak.mode:'css').
+           NOTE: this only works reliably because .items-table now uses
+           border-collapse: separate (see above) — collapse breaks break-inside:avoid on <tr>
+           in Chromium-based browsers, which was the root cause of rows being cut in half. */
         .items-table thead { display: table-header-group; }
         .items-table tfoot { display: table-footer-group; }
         .items-table tr {
