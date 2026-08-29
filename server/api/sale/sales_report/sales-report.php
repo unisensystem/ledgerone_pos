@@ -30,6 +30,12 @@ try {
 
 
     // Sales Officer Wise Sales
+    // NOTE: batch_no / nearest_expiry come from the "ib" (invoice-batch) subquery,
+    // which pre-aggregates sale_invoice_items per invoice. It's LEFT JOINed 1:1 on
+    // si.id, so it does NOT duplicate invoice rows / inflate SUM(si.net_amount) the
+    // way directly joining sale_invoice_items here would.
+    // sale_invoice_items only has "batch_expiry_date" (there is no "expiry_date"
+    // column on this table) - that's what actually holds the item's expiry.
     $stmt = $pdo->prepare("
         SELECT 
             si.sale_officer_id,
@@ -38,14 +44,24 @@ try {
             COALESCE(e.employee_id, '-') as employee_id,
             COUNT(DISTINCT si.id) as total_invoices,
             SUM(si.net_amount) as total_sales,
+            GROUP_CONCAT(DISTINCT ib.batch_no SEPARATOR ', ') as batch_no,
+            MIN(ib.nearest_expiry) as nearest_expiry,
             'Active' as status
         FROM sale_invoice si
         LEFT JOIN employees e ON si.sale_officer_id = e.id AND e.tenant_id = ?
+        LEFT JOIN (
+            SELECT sii.sale_invoice_id,
+                   GROUP_CONCAT(DISTINCT NULLIF(sii.batch_no,'') SEPARATOR ', ') as batch_no,
+                   MIN(CASE WHEN sii.batch_expiry_date >= CURDATE() THEN sii.batch_expiry_date END) as nearest_expiry
+            FROM sale_invoice_items sii
+            WHERE sii.tenant_id = ?
+            GROUP BY sii.sale_invoice_id
+        ) ib ON ib.sale_invoice_id = si.id
         WHERE si.tenant_id = ? AND si.sale_date BETWEEN ? AND ? AND si.status = 'Posted'" . ($company_id ? " AND si.company_id = ?" : "") . "
         GROUP BY si.sale_officer_id, e.full_name, e.employee_id
         ORDER BY total_sales DESC
     ");
-    $params = [$tenant_id, $tenant_id, $date_from, $date_to];
+    $params = [$tenant_id, $tenant_id, $tenant_id, $date_from, $date_to];
     if ($company_id) $params[] = $company_id;
     $stmt->execute($params);
     $officer_sales = $stmt->fetchAll();
@@ -72,7 +88,7 @@ $stmt = $pdo->prepare("
                SUM(sii.quantity) as quantity_sold, 
                SUM(sii.net_amount) as revenue,
                GROUP_CONCAT(DISTINCT NULLIF(sii.batch_no,'') SEPARATOR ', ') as batch_no,
-               MIN(CASE WHEN sii.expiry_date >= CURDATE() THEN sii.expiry_date END) as nearest_expiry
+               MIN(CASE WHEN sii.batch_expiry_date >= CURDATE() THEN sii.batch_expiry_date END) as nearest_expiry
         FROM sale_invoice_items sii
         JOIN sale_invoice si ON sii.sale_invoice_id = si.id AND si.tenant_id = ?
         WHERE sii.tenant_id = ? AND si.sale_date BETWEEN ? AND ? AND si.status = 'Posted'" . ($company_id ? " AND si.company_id = ?" : "") . "
@@ -114,11 +130,16 @@ $stmt = $pdo->prepare("
     $trend = $stmt->fetchAll();
 
     // Category Distribution
+    // sale_invoice_items is already joined at item level here (scoped correctly to
+    // each category's own items), so batch/expiry can be aggregated directly -
+    // no extra params needed.
     $stmt = $pdo->prepare("
         SELECT 
             COALESCE(pc.category_name, 'Uncategorized') as category,
             SUM(sii.quantity) as total_volume,
-            SUM(sii.net_amount) as total
+            SUM(sii.net_amount) as total,
+            GROUP_CONCAT(DISTINCT NULLIF(sii.batch_no,'') SEPARATOR ', ') as batch_no,
+            MIN(CASE WHEN sii.batch_expiry_date >= CURDATE() THEN sii.batch_expiry_date END) as nearest_expiry
         FROM sale_invoice_items sii
         JOIN sale_invoice si ON sii.sale_invoice_id = si.id AND si.tenant_id = ?
         LEFT JOIN products p ON sii.product_id = p.id
@@ -132,6 +153,8 @@ $stmt = $pdo->prepare("
     $categories = $stmt->fetchAll();
 
     // Branch Wise Sales
+    // sale_invoice_items is already joined here too - add batch/expiry the same
+    // way, no extra params needed.
     $stmt = $pdo->prepare("
         SELECT 
             COALESCE(b.parent_branch_id, si.branch_id) as branch_id,
@@ -143,7 +166,9 @@ $stmt = $pdo->prepare("
             CASE 
                 WHEN COUNT(DISTINCT si.id) > 0 THEN SUM(si.net_amount) / COUNT(DISTINCT si.id)
                 ELSE 0
-            END as avg_sale
+            END as avg_sale,
+            GROUP_CONCAT(DISTINCT NULLIF(sii.batch_no,'') SEPARATOR ', ') as batch_no,
+            MIN(CASE WHEN sii.batch_expiry_date >= CURDATE() THEN sii.batch_expiry_date END) as nearest_expiry
         FROM sale_invoice si
         JOIN sale_invoice_items sii ON si.id = sii.sale_invoice_id AND sii.tenant_id = ?
         LEFT JOIN branches b ON si.branch_id = b.id
@@ -158,6 +183,8 @@ $stmt = $pdo->prepare("
     $branch_sales = $stmt->fetchAll();
 
     // Territory Wise Sales
+    // No item-level join here, so use the "ib" invoice-batch subquery (same
+    // reasoning as Sales Officer above) to avoid inflating total_sales.
     $stmt = $pdo->prepare("
         SELECT 
             COALESCE(co.country_name, 'Unknown') as country,
@@ -166,7 +193,9 @@ $stmt = $pdo->prepare("
             COALESCE(cz.city_zone_name, '-') as zone,
             COALESCE(a.area_name, '-') as area,
             COUNT(DISTINCT si.id) as total_invoices,
-            SUM(si.net_amount) as total_sales
+            SUM(si.net_amount) as total_sales,
+            GROUP_CONCAT(DISTINCT ib.batch_no SEPARATOR ', ') as batch_no,
+            MIN(ib.nearest_expiry) as nearest_expiry
         FROM sale_invoice si
         LEFT JOIN customers c ON si.customer_id = c.id AND c.tenant_id = ?
         LEFT JOIN countries co ON c.country_id = co.id
@@ -174,16 +203,26 @@ $stmt = $pdo->prepare("
         LEFT JOIN cities ci ON c.city_id = ci.id
         LEFT JOIN city_zones cz ON c.city_zone_id = cz.id
         LEFT JOIN areas a ON c.area_id = a.id
+        LEFT JOIN (
+            SELECT sii.sale_invoice_id,
+                   GROUP_CONCAT(DISTINCT NULLIF(sii.batch_no,'') SEPARATOR ', ') as batch_no,
+                   MIN(CASE WHEN sii.batch_expiry_date >= CURDATE() THEN sii.batch_expiry_date END) as nearest_expiry
+            FROM sale_invoice_items sii
+            WHERE sii.tenant_id = ?
+            GROUP BY sii.sale_invoice_id
+        ) ib ON ib.sale_invoice_id = si.id
         WHERE si.tenant_id = ? AND si.sale_date BETWEEN ? AND ? AND si.status = 'Posted'" . ($company_id ? " AND si.company_id = ?" : "") . "
         GROUP BY co.country_name, r.region_name, ci.city_name, cz.city_zone_name, a.area_name
         ORDER BY total_sales DESC
     ");
-    $params = [$tenant_id, $tenant_id, $date_from, $date_to];
+    $params = [$tenant_id, $tenant_id, $tenant_id, $date_from, $date_to];
     if ($company_id) $params[] = $company_id;
     $stmt->execute($params);
     $territory_sales = $stmt->fetchAll();
 
     // Invoice Wise Sales
+    // One row per invoice already, so the "ib" subquery can be joined straight in
+    // without any extra aggregation needed on the outer query.
     $stmt = $pdo->prepare("
         SELECT 
             si.id,
@@ -194,19 +233,31 @@ $stmt = $pdo->prepare("
             si.total_bill,
             si.total_discount_amount,
             si.net_amount,
-            si.status
+            si.status,
+            ib.batch_no,
+            ib.nearest_expiry
         FROM sale_invoice si
         LEFT JOIN customers c ON si.customer_id = c.id AND c.tenant_id = ?
         LEFT JOIN employees e ON si.sale_officer_id = e.id AND e.tenant_id = ?
+        LEFT JOIN (
+            SELECT sii.sale_invoice_id,
+                   GROUP_CONCAT(DISTINCT NULLIF(sii.batch_no,'') SEPARATOR ', ') as batch_no,
+                   MIN(CASE WHEN sii.batch_expiry_date >= CURDATE() THEN sii.batch_expiry_date END) as nearest_expiry
+            FROM sale_invoice_items sii
+            WHERE sii.tenant_id = ?
+            GROUP BY sii.sale_invoice_id
+        ) ib ON ib.sale_invoice_id = si.id
         WHERE si.tenant_id = ? AND si.sale_date BETWEEN ? AND ? AND si.status = 'Posted'" . ($company_id ? " AND si.company_id = ?" : "") . "
         ORDER BY si.sale_date DESC, si.id DESC
     ");
-    $params = [$tenant_id, $tenant_id, $tenant_id, $date_from, $date_to];
+    $params = [$tenant_id, $tenant_id, $tenant_id, $tenant_id, $date_from, $date_to];
     if ($company_id) $params[] = $company_id;
     $stmt->execute($params);
     $invoice_sales = $stmt->fetchAll();
 
     // Vendor Wise Sales
+    // sale_invoice_items is already joined here (scoped to that vendor's own
+    // products), so batch/expiry can be aggregated directly - no extra params.
     $stmt = $pdo->prepare("
         SELECT 
             p.vendor_id,
@@ -214,7 +265,9 @@ $stmt = $pdo->prepare("
             COALESCE(s.supplier_name, 'Unknown') as vendor_name,
             COUNT(DISTINCT si.id) as total_invoices,
             SUM(sii.quantity) as total_quantity,
-            SUM(sii.net_amount) as total_sales
+            SUM(sii.net_amount) as total_sales,
+            GROUP_CONCAT(DISTINCT NULLIF(sii.batch_no,'') SEPARATOR ', ') as batch_no,
+            MIN(CASE WHEN sii.batch_expiry_date >= CURDATE() THEN sii.batch_expiry_date END) as nearest_expiry
         FROM sale_invoice_items sii
         JOIN sale_invoice si ON sii.sale_invoice_id = si.id AND si.tenant_id = ?
         JOIN products p ON sii.product_id = p.id AND p.tenant_id = ?
@@ -229,25 +282,37 @@ $stmt = $pdo->prepare("
     $vendor_sales = $stmt->fetchAll();
 
     // Customer Wise Sales
+    // No item-level join here, so use the "ib" invoice-batch subquery.
     $stmt = $pdo->prepare("
         SELECT 
             si.customer_id,
             CONCAT('CUST-', LPAD(si.customer_id, 3, '0')) as customer_id_display,
             COALESCE(c.customer_name, 'Walk-in') as customer_name,
             COUNT(DISTINCT si.id) as total_invoices,
-            SUM(si.net_amount) as total_sales
+            SUM(si.net_amount) as total_sales,
+            GROUP_CONCAT(DISTINCT ib.batch_no SEPARATOR ', ') as batch_no,
+            MIN(ib.nearest_expiry) as nearest_expiry
         FROM sale_invoice si
         LEFT JOIN customers c ON si.customer_id = c.id AND c.tenant_id = ?
+        LEFT JOIN (
+            SELECT sii.sale_invoice_id,
+                   GROUP_CONCAT(DISTINCT NULLIF(sii.batch_no,'') SEPARATOR ', ') as batch_no,
+                   MIN(CASE WHEN sii.batch_expiry_date >= CURDATE() THEN sii.batch_expiry_date END) as nearest_expiry
+            FROM sale_invoice_items sii
+            WHERE sii.tenant_id = ?
+            GROUP BY sii.sale_invoice_id
+        ) ib ON ib.sale_invoice_id = si.id
         WHERE si.tenant_id = ? AND si.sale_date BETWEEN ? AND ? AND si.status = 'Posted'" . ($company_id ? " AND si.company_id = ?" : "") . "
         GROUP BY si.customer_id, c.customer_name
         ORDER BY total_sales DESC
     ");
-    $params = [$tenant_id, $tenant_id, $date_from, $date_to];
+    $params = [$tenant_id, $tenant_id, $tenant_id, $date_from, $date_to];
     if ($company_id) $params[] = $company_id;
     $stmt->execute($params);
     $customer_sales = $stmt->fetchAll();
 
     // Supplier Man Wise Sales
+    // No item-level join here either, so use the "ib" invoice-batch subquery.
     $stmt = $pdo->prepare("
         SELECT 
             si.supplier_man_id,
@@ -256,14 +321,24 @@ $stmt = $pdo->prepare("
             COALESCE(e.employee_id, '-') as employee_id,
             COUNT(DISTINCT si.id) as total_invoices,
             SUM(si.net_amount) as total_sales,
+            GROUP_CONCAT(DISTINCT ib.batch_no SEPARATOR ', ') as batch_no,
+            MIN(ib.nearest_expiry) as nearest_expiry,
             'Active' as status
         FROM sale_invoice si
         LEFT JOIN employees e ON si.supplier_man_id = e.id AND e.tenant_id = ?
+        LEFT JOIN (
+            SELECT sii.sale_invoice_id,
+                   GROUP_CONCAT(DISTINCT NULLIF(sii.batch_no,'') SEPARATOR ', ') as batch_no,
+                   MIN(CASE WHEN sii.batch_expiry_date >= CURDATE() THEN sii.batch_expiry_date END) as nearest_expiry
+            FROM sale_invoice_items sii
+            WHERE sii.tenant_id = ?
+            GROUP BY sii.sale_invoice_id
+        ) ib ON ib.sale_invoice_id = si.id
         WHERE si.tenant_id = ? AND si.sale_date BETWEEN ? AND ? AND si.status = 'Posted' AND si.supplier_man_id IS NOT NULL" . ($company_id ? " AND si.company_id = ?" : "") . "
         GROUP BY si.supplier_man_id, e.full_name, e.employee_id
         ORDER BY total_sales DESC
     ");
-    $params = [$tenant_id, $tenant_id, $date_from, $date_to];
+    $params = [$tenant_id, $tenant_id, $tenant_id, $date_from, $date_to];
     if ($company_id) $params[] = $company_id;
     $stmt->execute($params);
     $supplier_man_sales = $stmt->fetchAll();
