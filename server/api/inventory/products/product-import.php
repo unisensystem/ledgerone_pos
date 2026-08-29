@@ -27,8 +27,7 @@ if (!$user_id || !$tenant_id) {
 
 /**
  * Builds a "lowercased label => id" map for a lookup table, so an import row's
- * dropdown-picked text can be matched back to its id. Same helper pattern as
- * customer-import.php.
+ * dropdown-picked text can be matched back to its id.
  */
 function buildLookupMap(PDO $pdo, string $sql, array $params): array
 {
@@ -80,15 +79,19 @@ try {
     $rows = $spreadsheet->getActiveSheet()->toArray(null, true, true, false);
 
     // Expected header order (row 1) - matches product-template.php:
-    // Product Name | Product Type | Default Unit | Category | Subcategory | Vendor | Description |
-    // Unit Conversion Factor | Sales Tax Type | Inventory Account |
-    // Purchase Price | Trade Price | Wholesale Price | MRP | Default Discount % |
-    // Min Stock Level | Max Stock Level | Manufacturing Date | Expiry Date |
-    // QR Code | Barcode | Is Active | Stock Affects | Invoice Affects |
+    // Product Name | Product Type | UOM Type | Default Unit | UOM Group | Category |
+    // Subcategory | Vendor | Description | Unit Conversion Factor | Sales Tax Type |
+    // Inventory Account | Purchase Price | Trade Price | Wholesale Price | MRP |
+    // Default Discount % | Min Stock Level | Max Stock Level | Manufacturing Date |
+    // Expiry Date | QR Code | Barcode | Is Active | Stock Affects | Invoice Affects |
     // Scheme Promo Qty | Scheme Bonus Qty | Scheme To Qty | Scheme To Rs
     //
-    // NOTE: This import only supports Default Unit products. UOM Group products
-    // and Branch-wise Opening Stock are intentionally NOT part of this import.
+    // UOM Type is a switch:
+    //   "Default Unit" -> Default Unit column is used, UOM Group column is ignored.
+    //   "UOM Group"    -> UOM Group column is used, Default Unit column is ignored.
+    // Per-unit quantities (Piece/Carton/Dozen breakdowns) and Branch-wise Opening
+    // Stock are intentionally NOT part of this import in either mode. Scheme
+    // columns only apply to Default Unit rows.
     array_shift($rows); // drop header row
 
     if (empty($rows)) {
@@ -117,6 +120,13 @@ try {
     foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $u) {
         $unitDetails[(int)$u['id']] = $u;
     }
+
+    // UOM Groups (e.g. "Standard") - ADJUST table/column name if different in your schema.
+    $uomGroupMap = buildLookupMap(
+        $pdo,
+        "SELECT id, group_name AS label FROM uom_groups WHERE tenant_id = 0 OR tenant_id = ?",
+        [$tenant_id]
+    );
 
     $categoryMap = buildLookupMap(
         $pdo,
@@ -168,13 +178,15 @@ try {
     $lastProduct = $stmt->fetch();
     $nextCodeNum = $lastProduct ? ((int)substr($lastProduct['code'], -6)) + 1 : 1;
 
+    // uom_type, default_unit_id, uom_group_id and product_conversion_factor are now
+    // bound dynamically per row (Default Unit vs UOM Group), not hardcoded.
     $insertSql = "INSERT INTO products
         (tenant_id, company_id, code, name, product_type, uom_type, default_unit_id, uom_group_id, product_conversion_factor,
          category_id, subcategory_id, inventory_account_id, vendor_id, parent_product_id, description, qr_code, barcode,
          purchase_price, trade_price, wholesale_price, mrp, price_entry_unit_id, trade_price_entry_value, mrp_entry_value,
          default_discount, trade_offer_discount, default_foc, carton_conversion, tax_regime_id,
          min_stock_level, max_stock_level, manufacturing_date, expiry_date, photo, is_active, stock_affects, invoice_affects, created_by)
-        VALUES (?, ?, ?, ?, ?, 'unit', ?, NULL, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, NULL, ?, 0, 0, 0, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?)";
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, NULL, ?, 0, 0, 0, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?)";
     $insertStmt = $pdo->prepare($insertSql);
 
     $schemeStmt = $pdo->prepare("
@@ -195,40 +207,49 @@ try {
         }
 
         $productType    = strtolower(trim((string)($r[1] ?? 'physical'))) === 'service' ? 'service' : 'physical';
-        $defaultUnitTxt = (string)($r[2] ?? '');
-        $categoryTxt    = (string)($r[3] ?? '');
-        $subcategoryTxt = (string)($r[4] ?? '');
-        $vendorTxt      = (string)($r[5] ?? '');
-        $description    = trim((string)($r[6] ?? '')) ?: null;
-        $conversionFactorRaw = $r[7] ?? '';
-        $taxRegimeTxt   = (string)($r[8] ?? '');
-        $accountTxt     = (string)($r[9] ?? '');
-        $purchasePrice  = $r[10] ?? 0;
-        $tradePrice     = $r[11] ?? 0;
-        $wholesalePrice = $r[12] ?? 0;
-        $mrp            = $r[13] ?? 0;
-        $defaultDiscount = $r[14] ?? 0;
-        $minStock       = $r[15] ?? 0;
-        $maxStock       = $r[16] ?? 0;
-        $manufacturingDate = trim((string)($r[17] ?? '')) ?: null;
-        $expiryDate     = trim((string)($r[18] ?? '')) ?: null;
-        $qrCode         = trim((string)($r[19] ?? '')) ?: null;
-        $barcode        = trim((string)($r[20] ?? '')) ?: null;
-        $isActive       = (string)($r[21] ?? 'Yes');
-        $stockAffects   = (string)($r[22] ?? 'Yes');
-        $invoiceAffects = (string)($r[23] ?? 'Yes');
-        $schemePromoQty = $r[24] ?? 0;
-        $schemeBonusQty = $r[25] ?? 0;
-        $schemeToQty    = $r[26] ?? 0;
-        $schemeToRs     = $r[27] ?? 0;
+        $uomTypeTxt     = trim((string)($r[2] ?? ''));
+        $defaultUnitTxt = trim((string)($r[3] ?? ''));
+        $uomGroupTxt    = trim((string)($r[4] ?? ''));
+        $categoryTxt    = (string)($r[5] ?? '');
+        $subcategoryTxt = (string)($r[6] ?? '');
+        $vendorTxt      = (string)($r[7] ?? '');
+        $description    = trim((string)($r[8] ?? '')) ?: null;
+        $conversionFactorRaw = $r[9] ?? '';
+        $taxRegimeTxt   = (string)($r[10] ?? '');
+        $accountTxt     = (string)($r[11] ?? '');
+        $purchasePrice  = $r[12] ?? 0;
+        $tradePrice     = $r[13] ?? 0;
+        $wholesalePrice = $r[14] ?? 0;
+        $mrp            = $r[15] ?? 0;
+        $defaultDiscount = $r[16] ?? 0;
+        $minStock       = $r[17] ?? 0;
+        $maxStock       = $r[18] ?? 0;
+        $manufacturingDate = trim((string)($r[19] ?? '')) ?: null;
+        $expiryDate     = trim((string)($r[20] ?? '')) ?: null;
+        $qrCode         = trim((string)($r[21] ?? '')) ?: null;
+        $barcode        = trim((string)($r[22] ?? '')) ?: null;
+        $isActive       = (string)($r[23] ?? 'Yes');
+        $stockAffects   = (string)($r[24] ?? 'Yes');
+        $invoiceAffects = (string)($r[25] ?? 'Yes');
+        $schemePromoQty = $r[26] ?? 0;
+        $schemeBonusQty = $r[27] ?? 0;
+        $schemeToQty    = $r[28] ?? 0;
+        $schemeToRs     = $r[29] ?? 0;
 
         // Basic validation
         if (strlen($name) > 255) {
             $errors[] = ['row' => $rowNum, 'message' => 'Product name too long'];
             continue;
         }
-        if (trim($defaultUnitTxt) === '') {
-            $errors[] = ['row' => $rowNum, 'message' => 'Default Unit is required'];
+
+        // UOM Type switch: "Default Unit" (default if blank) or "UOM Group".
+        $uomTypeNormalized = mb_strtolower($uomTypeTxt);
+        if ($uomTypeTxt === '' || $uomTypeNormalized === 'default unit') {
+            $isGroupMode = false;
+        } elseif ($uomTypeNormalized === 'uom group') {
+            $isGroupMode = true;
+        } else {
+            $errors[] = ['row' => $rowNum, 'message' => "UOM Type '{$uomTypeTxt}' not recognized - must be 'Default Unit' or 'UOM Group'"];
             continue;
         }
 
@@ -244,12 +265,42 @@ try {
             continue;
         }
 
-        // Dropdown-driven fields
-        $defaultUnitId = resolveLookupValue($unitMap, $defaultUnitTxt);
-        if ($defaultUnitId === false || $defaultUnitId === null) {
-            $errors[] = ['row' => $rowNum, 'message' => "Default Unit '{$defaultUnitTxt}' not found - please pick from the dropdown list"];
-            continue;
+        $defaultUnitId = null;
+        $uomGroupId = null;
+        $productConversionFactor = null;
+
+        if ($isGroupMode) {
+            // ---- UOM Group mode ----
+            $groupTxt = $uomGroupTxt !== '' ? $uomGroupTxt : 'Standard'; // template pre-fills "Standard"
+            $uomGroupId = resolveLookupValue($uomGroupMap, $groupTxt);
+            if ($uomGroupId === false || $uomGroupId === null) {
+                $errors[] = ['row' => $rowNum, 'message' => "UOM Group '{$groupTxt}' not found - please pick from the dropdown list"];
+                continue;
+            }
+            // Default Unit column and Unit Conversion Factor are ignored in this mode.
+        } else {
+            // ---- Default Unit mode ----
+            if ($defaultUnitTxt === '') {
+                $errors[] = ['row' => $rowNum, 'message' => 'Default Unit is required when UOM Type is "Default Unit"'];
+                continue;
+            }
+            $defaultUnitId = resolveLookupValue($unitMap, $defaultUnitTxt);
+            if ($defaultUnitId === false || $defaultUnitId === null) {
+                $errors[] = ['row' => $rowNum, 'message' => "Default Unit '{$defaultUnitTxt}' not found - please pick from the dropdown list"];
+                continue;
+            }
+            // Conversion factor: required only if the chosen unit is per-product scope and not the base unit
+            $unit = $unitDetails[$defaultUnitId] ?? null;
+            if ($unit && $unit['unit_scope'] === 'per_product' && (int)$unit['is_base_unit'] === 0) {
+                if (!is_numeric($conversionFactorRaw) || floatval($conversionFactorRaw) <= 0) {
+                    $errors[] = ['row' => $rowNum, 'message' => "Unit Conversion Factor is required for unit '{$unit['uom_name']}'"];
+                    continue;
+                }
+                $productConversionFactor = floatval($conversionFactorRaw);
+            }
         }
+
+        // Dropdown-driven fields common to both modes
         $categoryId = resolveLookupValue($categoryMap, $categoryTxt);
         if ($categoryId === false) {
             $errors[] = ['row' => $rowNum, 'message' => "Category '{$categoryTxt}' not found - please pick from the dropdown list"];
@@ -282,17 +333,6 @@ try {
             continue;
         }
 
-        // Conversion factor: required only if the chosen unit is per-product scope and not the base unit
-        $unit = $unitDetails[$defaultUnitId] ?? null;
-        $productConversionFactor = null;
-        if ($unit && $unit['unit_scope'] === 'per_product' && (int)$unit['is_base_unit'] === 0) {
-            if (!is_numeric($conversionFactorRaw) || floatval($conversionFactorRaw) <= 0) {
-                $errors[] = ['row' => $rowNum, 'message' => "Unit Conversion Factor is required for unit '{$unit['uom_name']}'"];
-                continue;
-            }
-            $productConversionFactor = floatval($conversionFactorRaw);
-        }
-
         // Duplicate check: same name + same company already exists for this tenant
         $dupKey = strtolower($name) . '|' . ($company_id ?? '');
         if (isset($existing[$dupKey])) {
@@ -302,6 +342,7 @@ try {
 
         try {
             $code = 'PROD-' . str_pad($nextCodeNum, 6, '0', STR_PAD_LEFT);
+            $uomTypeValue = $isGroupMode ? 'group' : 'unit';
 
             $insertStmt->execute([
                 $tenant_id,
@@ -309,7 +350,9 @@ try {
                 $code,
                 $name,
                 $productType,
+                $uomTypeValue,
                 $defaultUnitId,
+                $uomGroupId,
                 $productConversionFactor,
                 $categoryId,
                 $subcategoryId,
@@ -336,21 +379,25 @@ try {
 
             $product_id = $pdo->lastInsertId();
 
-            // Basic scheme (one per row) - only insert if at least one value was given
-            $schemePromoQty = is_numeric($schemePromoQty) ? floatval($schemePromoQty) : 0;
-            $schemeBonusQty = is_numeric($schemeBonusQty) ? floatval($schemeBonusQty) : 0;
-            $schemeToQty    = is_numeric($schemeToQty) ? floatval($schemeToQty) : 0;
-            $schemeToRs     = is_numeric($schemeToRs) ? floatval($schemeToRs) : 0;
-            if ($schemePromoQty > 0 || $schemeBonusQty > 0 || $schemeToQty > 0 || $schemeToRs > 0) {
-                $schemeStmt->execute([
-                    $tenant_id,
-                    $product_id,
-                    $defaultUnitId,
-                    $schemePromoQty,
-                    $schemeBonusQty,
-                    $schemeToQty,
-                    $schemeToRs
-                ]);
+            // Basic scheme (one per row) - only applies to Default Unit rows, since
+            // there's no single unit to attach a scheme to in UOM Group mode without
+            // per-unit columns (explicitly out of scope for this import).
+            if (!$isGroupMode) {
+                $schemePromoQty = is_numeric($schemePromoQty) ? floatval($schemePromoQty) : 0;
+                $schemeBonusQty = is_numeric($schemeBonusQty) ? floatval($schemeBonusQty) : 0;
+                $schemeToQty    = is_numeric($schemeToQty) ? floatval($schemeToQty) : 0;
+                $schemeToRs     = is_numeric($schemeToRs) ? floatval($schemeToRs) : 0;
+                if ($schemePromoQty > 0 || $schemeBonusQty > 0 || $schemeToQty > 0 || $schemeToRs > 0) {
+                    $schemeStmt->execute([
+                        $tenant_id,
+                        $product_id,
+                        $defaultUnitId,
+                        $schemePromoQty,
+                        $schemeBonusQty,
+                        $schemeToQty,
+                        $schemeToRs
+                    ]);
+                }
             }
 
             $existing[$dupKey] = true; // prevent duplicates within the same file too

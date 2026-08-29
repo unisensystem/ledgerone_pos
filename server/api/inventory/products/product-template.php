@@ -28,6 +28,11 @@ $stmt = $pdo->prepare("SELECT uom_name FROM uom WHERE tenant_id = 0 OR tenant_id
 $stmt->execute([$tenant_id]);
 $units = $stmt->fetchAll(PDO::FETCH_COLUMN);
 
+// UOM Groups (e.g. "Standard") - ADJUST table/column name if different in your schema.
+$stmt = $pdo->prepare("SELECT group_name FROM uom_groups WHERE tenant_id = 0 OR tenant_id = ? ORDER BY group_name");
+$stmt->execute([$tenant_id]);
+$uomGroups = $stmt->fetchAll(PDO::FETCH_COLUMN);
+
 $stmt = $pdo->prepare("SELECT category_name FROM categories WHERE tenant_id = 0 OR tenant_id = ? ORDER BY category_name");
 $stmt->execute([$tenant_id]);
 $categories = $stmt->fetchAll(PDO::FETCH_COLUMN);
@@ -42,9 +47,7 @@ $taxRegimes = $stmt->fetchAll(PDO::FETCH_COLUMN);
 
 // "Inventory Account" on the Product form is NOT the full chart of accounts -
 // it is the fixed inventory-account-type list (same options shown in the
-// Product Entry form's "Select Account" dropdown). Using the full `accounts`
-// table pulled in unrelated accounts (Cash, Bank, Expense heads, etc.), which
-// is what was showing up wrong in the template.
+// Product Entry form's "Select Account" dropdown).
 $accounts = [
     'Finished Goods',
     'Packing Materials',
@@ -60,10 +63,13 @@ $accounts = [
 // $accounts = $stmt->fetchAll(PDO::FETCH_COLUMN);
 
 $productTypes = ['Physical', 'Service'];
+$uomTypes = ['Default Unit', 'UOM Group'];
 $yesNo = ['Yes', 'No'];
 
-// Defaults requested for the template
+// Defaults pre-filled on every row
 $defaultProductType      = 'Physical';
+$defaultUomType          = 'Default Unit'; // standard switch value
+$defaultUomGroup         = 'Standard';     // used only when UOM Type = "UOM Group"
 $defaultInventoryAccount = 'Trading Inventory';
 
 // ---- Build workbook ----
@@ -76,32 +82,34 @@ $sheet->setTitle('Products');
 $headers = [
     'A' => 'Product Name',
     'B' => 'Product Type',
-    'C' => 'Default Unit',
-    'D' => 'Category',
-    'E' => 'Subcategory',
-    'F' => 'Vendor',
-    'G' => 'Description',
-    'H' => 'Unit Conversion Factor',
-    'I' => 'Sales Tax Type',
-    'J' => 'Inventory Account',
-    'K' => 'Purchase Price',
-    'L' => 'Trade Price',
-    'M' => 'Wholesale Price',
-    'N' => 'MRP',
-    'O' => 'Default Discount %',
-    'P' => 'Min Stock Level',
-    'Q' => 'Max Stock Level',
-    'R' => 'Manufacturing Date',
-    'S' => 'Expiry Date',
-    'T' => 'QR Code',
-    'U' => 'Barcode',
-    'V' => 'Is Active',
-    'W' => 'Stock Affects',
-    'X' => 'Invoice Affects',
-    'Y' => 'Scheme Promo Qty',
-    'Z' => 'Scheme Bonus Qty',
-    'AA' => 'Scheme To Qty',
-    'AB' => 'Scheme To Rs',
+    'C' => 'UOM Type',
+    'D' => 'Default Unit',
+    'E' => 'UOM Group',
+    'F' => 'Category',
+    'G' => 'Subcategory',
+    'H' => 'Vendor',
+    'I' => 'Description',
+    'J' => 'Unit Conversion Factor',
+    'K' => 'Sales Tax Type',
+    'L' => 'Inventory Account',
+    'M' => 'Purchase Price',
+    'N' => 'Trade Price',
+    'O' => 'Wholesale Price',
+    'P' => 'MRP',
+    'Q' => 'Default Discount %',
+    'R' => 'Min Stock Level',
+    'S' => 'Max Stock Level',
+    'T' => 'Manufacturing Date',
+    'U' => 'Expiry Date',
+    'V' => 'QR Code',
+    'W' => 'Barcode',
+    'X' => 'Is Active',
+    'Y' => 'Stock Affects',
+    'Z' => 'Invoice Affects',
+    'AA' => 'Scheme Promo Qty',
+    'AB' => 'Scheme Bonus Qty',
+    'AC' => 'Scheme To Qty',
+    'AD' => 'Scheme To Rs',
 ];
 
 foreach ($headers as $col => $label) {
@@ -110,28 +118,29 @@ foreach ($headers as $col => $label) {
 
 // Required-field markers + header styling
 $sheet->setCellValue('A1', 'Product Name *');
-$sheet->setCellValue('C1', 'Default Unit *');
+$sheet->setCellValue('D1', "Default Unit\n(if UOM Type = Default Unit)");
+$sheet->setCellValue('E1', "UOM Group\n(if UOM Type = UOM Group)");
 
-$headerRange = 'A1:AB1';
+$headerRange = 'A1:AD1';
 $sheet->getStyle($headerRange)->getFont()->setBold(true)->getColor()->setRGB('FFFFFF');
 $sheet->getStyle($headerRange)->getFill()
     ->setFillType(Fill::FILL_SOLID)
     ->getStartColor()->setRGB('2C3E50');
 $sheet->getStyle($headerRange)->getAlignment()->setWrapText(true);
-$sheet->getRowDimension(1)->setRowHeight(30);
+$sheet->getRowDimension(1)->setRowHeight(42);
 $sheet->freezePane('A2');
 
 foreach (array_keys($headers) as $col) {
     $sheet->getColumnDimension($col)->setWidth(18);
 }
-$sheet->getColumnDimension('G')->setWidth(28);
+$sheet->getColumnDimension('I')->setWidth(28);
 
 $maxRow = 500; // rows available for data entry
 
-// One example row so the expected format is clear
+// Two example rows so the expected format is clear for BOTH switch positions
 $sheet->fromArray([
-    'Blue Ballpoint Pen', $defaultProductType,
-    !empty($units) ? $units[0] : '',
+    'Blue Ballpoint Pen', $defaultProductType, 'Default Unit',
+    !empty($units) ? $units[0] : '', '', // UOM Group left blank - Default Unit mode
     !empty($categories) ? $categories[0] : '',
     '',
     !empty($vendors) ? $vendors[0] : '',
@@ -143,12 +152,31 @@ $sheet->fromArray([
     0, 0, 0, 0
 ], null, 'A2');
 
-// Pre-fill Product Type and Inventory Account with the requested defaults for
-// every blank data row, so the user only needs to change them if a product
-// is actually different (e.g. a Service product, or a non-Trading account).
-for ($row = 3; $row <= $maxRow; $row++) {
+$sheet->fromArray([
+    'Cooking Oil 5L Can', $defaultProductType, 'UOM Group',
+    '', $defaultUomGroup, // Default Unit left blank - UOM Group mode
+    !empty($categories) ? $categories[0] : '',
+    '',
+    !empty($vendors) ? $vendors[0] : '',
+    '', '',
+    !empty($taxRegimes) ? $taxRegimes[0] : '',
+    $defaultInventoryAccount,
+    0, 0, 0, 0, 0, 0, 0, '', '', '', '',
+    'Yes', 'Yes', 'Yes',
+    0, 0, 0, 0
+], null, 'A3');
+
+// Pre-fill Product Type, UOM Type, UOM Group and Inventory Account with the
+// standard defaults for every blank data row from row 4 onward. UOM Type
+// defaults to "Default Unit" - the user only changes it (and fills the "UOM
+// Group" column instead of "Default Unit") for products that use a UOM
+// Group. UOM Group defaults to "Standard" so it's already correct the moment
+// someone switches UOM Type, without having to type it themselves.
+for ($row = 4; $row <= $maxRow; $row++) {
     $sheet->setCellValue('B' . $row, $defaultProductType);
-    $sheet->setCellValue('J' . $row, $defaultInventoryAccount);
+    $sheet->setCellValue('C' . $row, $defaultUomType);
+    $sheet->setCellValue('E' . $row, $defaultUomGroup);
+    $sheet->setCellValue('L' . $row, $defaultInventoryAccount);
 }
 
 // ===== Sheet 2: hidden "Lookups" sheet backing the dropdowns =====
@@ -172,6 +200,8 @@ writeLookupColumn($lookupSheet, 'D', $vendors);
 writeLookupColumn($lookupSheet, 'E', $taxRegimes);
 writeLookupColumn($lookupSheet, 'F', $accounts);
 writeLookupColumn($lookupSheet, 'G', $yesNo);
+writeLookupColumn($lookupSheet, 'H', $uomTypes);
+writeLookupColumn($lookupSheet, 'I', $uomGroups);
 
 $lookupSheet->setSheetState(\PhpOffice\PhpSpreadsheet\Worksheet\Worksheet::SHEETSTATE_HIDDEN);
 
@@ -195,28 +225,32 @@ function applyListDropdown($sheet, string $col, int $firstRow, int $lastRow, str
 }
 
 applyListDropdown($sheet, 'B', 2, $maxRow, 'Lookups!$A$1:$A$' . count($productTypes), true);
+applyListDropdown($sheet, 'C', 2, $maxRow, 'Lookups!$H$1:$H$' . count($uomTypes), true);
 
 if (!empty($units)) {
-    applyListDropdown($sheet, 'C', 2, $maxRow, 'Lookups!$B$1:$B$' . count($units), true);
+    applyListDropdown($sheet, 'D', 2, $maxRow, 'Lookups!$B$1:$B$' . count($units));
+}
+if (!empty($uomGroups)) {
+    applyListDropdown($sheet, 'E', 2, $maxRow, 'Lookups!$I$1:$I$' . count($uomGroups));
 }
 if (!empty($categories)) {
-    applyListDropdown($sheet, 'D', 2, $maxRow, 'Lookups!$C$1:$C$' . count($categories));
+    applyListDropdown($sheet, 'F', 2, $maxRow, 'Lookups!$C$1:$C$' . count($categories));
 }
-// Subcategory (E) is intentionally free-text - it depends on which Category was
+// Subcategory (G) is intentionally free-text - it depends on which Category was
 // picked, and Excel can't easily drive a dependent dropdown off free-typed text.
 // Type it exactly as it appears under that Category in the system.
 if (!empty($vendors)) {
-    applyListDropdown($sheet, 'F', 2, $maxRow, 'Lookups!$D$1:$D$' . count($vendors));
+    applyListDropdown($sheet, 'H', 2, $maxRow, 'Lookups!$D$1:$D$' . count($vendors));
 }
 if (!empty($taxRegimes)) {
-    applyListDropdown($sheet, 'I', 2, $maxRow, 'Lookups!$E$1:$E$' . count($taxRegimes));
+    applyListDropdown($sheet, 'K', 2, $maxRow, 'Lookups!$E$1:$E$' . count($taxRegimes));
 }
 if (!empty($accounts)) {
-    applyListDropdown($sheet, 'J', 2, $maxRow, 'Lookups!$F$1:$F$' . count($accounts));
+    applyListDropdown($sheet, 'L', 2, $maxRow, 'Lookups!$F$1:$F$' . count($accounts));
 }
 
 // Yes/No dropdowns
-foreach (['V', 'W', 'X'] as $col) {
+foreach (['X', 'Y', 'Z'] as $col) {
     applyListDropdown($sheet, $col, 2, $maxRow, 'Lookups!$G$1:$G$2');
 }
 
@@ -227,24 +261,34 @@ $infoSheet->fromArray([
     ['LedgerOne ERP - Product Import Template'],
     [''],
     ['1. Fill data in the "Products" sheet. Do not change the header row.'],
-    ['2. Product Name and Default Unit are required. All other fields are optional.'],
-    ['3. This import only supports DEFAULT UNIT products (single unit of measure).'],
-    ['   UOM Group products are not supported - add those manually via Product Entry.'],
-    ['4. Columns like Product Type, Default Unit, Category, Vendor, Sales Tax Type,'],
-    ['   Inventory Account, and the Yes/No columns show a dropdown arrow - click the'],
-    ['   cell and pick a value from the list instead of typing, so the import matches'],
-    ['   it correctly to your system records.'],
-    ['5. Subcategory is free text - type it exactly as it appears under the chosen'],
+    ['2. Product Name is required.'],
+    ['3. UOM Type is a switch with two values:'],
+    ['     - "Default Unit" -> fill the "Default Unit" column (Piece, Carton, etc.),'],
+    ['       leave "UOM Group" blank.'],
+    ['     - "UOM Group" -> fill the "UOM Group" column (defaults to "Standard"),'],
+    ['       leave "Default Unit" blank.'],
+    ['   Every row is pre-filled with UOM Type = "Default Unit" and UOM Group ='],
+    ['   "Standard" - only change UOM Type to "UOM Group" for products that need it;'],
+    ['   the UOM Group column is already correct once you do.'],
+    ['4. Per-unit quantities (Piece/Carton/Dozen breakdowns) are NOT part of this'],
+    ['   import, even for UOM Group products - only the group itself is assigned.'],
+    ['5. Columns like Product Type, UOM Type, Default Unit, UOM Group, Category,'],
+    ['   Vendor, Sales Tax Type, Inventory Account, and the Yes/No columns show a'],
+    ['   dropdown arrow - click the cell and pick a value from the list instead of'],
+    ['   typing, so the import matches it correctly to your system records.'],
+    ['6. Subcategory is free text - type it exactly as it appears under the chosen'],
     ['   Category in the system. Leave blank if not applicable.'],
-    ['6. Unit Conversion Factor is only required if the Default Unit you picked is a'],
-    ['   product-specific (non-universal) unit that is not already a base unit.'],
-    ['7. Branch-wise Opening Stock is NOT part of this import - add it separately'],
+    ['7. Unit Conversion Factor only applies to Default Unit rows, and only when the'],
+    ['   Default Unit picked is a product-specific (non-universal) unit that is not'],
+    ['   already a base unit. It is ignored for UOM Group rows.'],
+    ['8. Branch-wise Opening Stock is NOT part of this import - add it separately'],
     ['   from the product list after import.'],
-    ['8. Scheme columns (Promo Qty / Bonus Qty / To Qty / To Rs) are optional and,'],
-    ['   if filled, create a single basic scheme against the Default Unit.'],
-    ['9. Product Type defaults to "Physical" and Inventory Account defaults to'],
-    ['   "Trading Inventory" on every row - change these only for Service products'],
-    ['   or a different inventory account type.'],
+    ['9. Scheme columns (Promo Qty / Bonus Qty / To Qty / To Rs) only apply to'],
+    ['   Default Unit rows and, if filled, create a single basic scheme against that'],
+    ['   unit. They are ignored for UOM Group rows.'],
+    ['10. Product Type defaults to "Physical" and Inventory Account defaults to'],
+    ['    "Trading Inventory" on every row - change these only for Service products'],
+    ['    or a different inventory account type.'],
 ], null, 'A1');
 $infoSheet->getStyle('A1')->getFont()->setBold(true)->setSize(13);
 $infoSheet->getColumnDimension('A')->setWidth(90);
