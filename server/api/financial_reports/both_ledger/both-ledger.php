@@ -39,16 +39,20 @@ session_write_close();
 // server-to-server call, and the session cookie it carries, to an
 // attacker-controlled host. The TCP destination below is always 127.0.0.1.
 //
-// The incoming request's Host header IS still forwarded as the `Host:` line
-// on the loopback request (not as the connection target) - production runs
-// Apache with name-based virtual hosting, so a request to 127.0.0.1 with no
-// matching Host header falls through to the wrong vhost (or none) instead of
-// reaching this same app. Since the TCP destination stays hardcoded, a forged
-// Host header can at worst select a different vhost already on this same
-// box, not redirect the request anywhere external.
+// Production runs Apache with name-based virtual hosting, so a loopback
+// request with no matching Host header falls through to the wrong vhost (or
+// none) instead of reaching this same app - so a `Host:` line has to be
+// sent. It is NOT taken from the client-supplied $_SERVER['HTTP_HOST']
+// (that string is attacker-controlled and, interpolated raw into a header
+// block, could inject extra headers via embedded CRLF, or select a
+// different vhost hosted on this same box). Instead it's matched against a
+// fixed allowlist of this app's own known hostnames; anything else falls
+// back to the loopback IP itself as the Host value.
 $scheme = 'http';
 $host = '127.0.0.1';
-$requestHost = $_SERVER['HTTP_HOST'] ?? $host;
+$allowedHosts = ['ledgerone.unisensystems.com', 'localhost'];
+$incomingHost = strtolower(explode(':', $_SERVER['HTTP_HOST'] ?? '')[0]);
+$requestHost = in_array($incomingHost, $allowedHosts, true) ? $incomingHost : $host;
 $financialReportsDir = dirname(dirname($_SERVER['SCRIPT_NAME'])); // .../server/api/financial_reports
 
 function fetchInternalLedger($url, $cookieHeader, $hostHeader) {
@@ -62,12 +66,16 @@ function fetchInternalLedger($url, $cookieHeader, $hostHeader) {
     ]);
     $response = @file_get_contents($url, false, $context);
     if ($response === false) {
+        error_log("both-ledger.php: internal request failed to connect: $url");
         return ['success' => false, 'message' => 'Internal request failed to connect'];
     }
     $decoded = json_decode($response, true);
     if ($decoded === null) {
         $status = isset($http_response_header[0]) ? $http_response_header[0] : 'no status line';
-        return ['success' => false, 'message' => 'Internal request returned non-JSON response (' . $status . '): ' . substr(strip_tags($response), 0, 200)];
+        // Full response is logged server-side only - never echoed back to the
+        // client, which could otherwise leak internal error detail/paths.
+        error_log("both-ledger.php: internal request to $url returned non-JSON ($status): " . substr($response, 0, 500));
+        return ['success' => false, 'message' => 'Internal ledger request failed (' . $status . ')'];
     }
     return $decoded;
 }
