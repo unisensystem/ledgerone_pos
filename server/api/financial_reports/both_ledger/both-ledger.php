@@ -34,25 +34,42 @@ $cookieValue = session_id();
 session_write_close();
 
 // Always target the loopback address for these internal sub-requests, never
-// $_SERVER['HTTP_HOST'] (client-supplied and spoofable) - otherwise a forged
-// Host header could redirect this server-to-server call, and the session
-// cookie it carries, to an attacker-controlled host.
+// $_SERVER['HTTP_HOST'] as the connection target (client-supplied and
+// spoofable) - otherwise a forged Host header could redirect this
+// server-to-server call, and the session cookie it carries, to an
+// attacker-controlled host. The TCP destination below is always 127.0.0.1.
+//
+// The incoming request's Host header IS still forwarded as the `Host:` line
+// on the loopback request (not as the connection target) - production runs
+// Apache with name-based virtual hosting, so a request to 127.0.0.1 with no
+// matching Host header falls through to the wrong vhost (or none) instead of
+// reaching this same app. Since the TCP destination stays hardcoded, a forged
+// Host header can at worst select a different vhost already on this same
+// box, not redirect the request anywhere external.
 $scheme = 'http';
 $host = '127.0.0.1';
+$requestHost = $_SERVER['HTTP_HOST'] ?? $host;
 $financialReportsDir = dirname(dirname($_SERVER['SCRIPT_NAME'])); // .../server/api/financial_reports
 
-function fetchInternalLedger($url, $cookieHeader) {
+function fetchInternalLedger($url, $cookieHeader, $hostHeader) {
     $context = stream_context_create([
         'http' => [
             'method' => 'GET',
-            'header' => "Cookie: $cookieHeader\r\n",
+            'header' => "Host: $hostHeader\r\nCookie: $cookieHeader\r\n",
             'timeout' => 20,
             'ignore_errors' => true
         ]
     ]);
     $response = @file_get_contents($url, false, $context);
-    if ($response === false) return null;
-    return json_decode($response, true);
+    if ($response === false) {
+        return ['success' => false, 'message' => 'Internal request failed to connect'];
+    }
+    $decoded = json_decode($response, true);
+    if ($decoded === null) {
+        $status = isset($http_response_header[0]) ? $http_response_header[0] : 'no status line';
+        return ['success' => false, 'message' => 'Internal request returned non-JSON response (' . $status . '): ' . substr(strip_tags($response), 0, 200)];
+    }
+    return $decoded;
 }
 
 $cookieHeader = "$cookieName=$cookieValue";
@@ -97,7 +114,7 @@ try {
             if ($company_id) $custParams['company_id'] = $company_id;
             if ($target_currency_id) $custParams['currency_id'] = $target_currency_id;
             $custUrl = "$scheme://$host$financialReportsDir/customer_ledger/customer-ledger.php?" . http_build_query($custParams);
-            $custResp = fetchInternalLedger($custUrl, $cookieHeader);
+            $custResp = fetchInternalLedger($custUrl, $cookieHeader, $requestHost);
             $custRow = ($custResp && $custResp['success'] && !empty($custResp['data'])) ? $custResp['data'][0] : null;
 
             $suppRow = null;
@@ -108,7 +125,7 @@ try {
                 if ($company_id) $suppParams['company_id'] = $company_id;
                 if ($target_currency_id) $suppParams['currency_id'] = $target_currency_id;
                 $suppUrl = "$scheme://$host$financialReportsDir/supplier_ledger/supplier-ledger.php?" . http_build_query($suppParams);
-                $suppResp = fetchInternalLedger($suppUrl, $cookieHeader);
+                $suppResp = fetchInternalLedger($suppUrl, $cookieHeader, $requestHost);
                 $suppRow = ($suppResp && $suppResp['success'] && !empty($suppResp['data'])) ? $suppResp['data'][0] : null;
             }
 
@@ -152,7 +169,7 @@ try {
     if ($company_id) $custParams['company_id'] = $company_id;
     if ($target_currency_id) $custParams['currency_id'] = $target_currency_id;
     $custUrl = "$scheme://$host$financialReportsDir/customer_ledger/customer-ledger.php?" . http_build_query($custParams);
-    $custResp = fetchInternalLedger($custUrl, $cookieHeader);
+    $custResp = fetchInternalLedger($custUrl, $cookieHeader, $requestHost);
 
     $suppResp = null;
     if ($supplier_id) {
@@ -162,7 +179,7 @@ try {
         if ($company_id) $suppParams['company_id'] = $company_id;
         if ($target_currency_id) $suppParams['currency_id'] = $target_currency_id;
         $suppUrl = "$scheme://$host$financialReportsDir/supplier_ledger/supplier-ledger.php?" . http_build_query($suppParams);
-        $suppResp = fetchInternalLedger($suppUrl, $cookieHeader);
+        $suppResp = fetchInternalLedger($suppUrl, $cookieHeader, $requestHost);
     }
 
     if (!$custResp || !$custResp['success']) {
