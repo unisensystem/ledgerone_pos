@@ -40,12 +40,31 @@ $stmt = $pdo->prepare("SELECT regime_name FROM tax_regimes WHERE tenant_id = 0 O
 $stmt->execute([$tenant_id]);
 $taxRegimes = $stmt->fetchAll(PDO::FETCH_COLUMN);
 
-$stmt = $pdo->prepare("SELECT name FROM accounts WHERE tenant_id = 0 OR tenant_id = ? ORDER BY name");
-$stmt->execute([$tenant_id]);
-$accounts = $stmt->fetchAll(PDO::FETCH_COLUMN);
+// "Inventory Account" on the Product form is NOT the full chart of accounts -
+// it is the fixed inventory-account-type list (same options shown in the
+// Product Entry form's "Select Account" dropdown). Using the full `accounts`
+// table pulled in unrelated accounts (Cash, Bank, Expense heads, etc.), which
+// is what was showing up wrong in the template.
+$accounts = [
+    'Finished Goods',
+    'Packing Materials',
+    'Raw Materials',
+    'Semi-Finished Goods',
+    'Trading Inventory',
+    'WIP-Internal',
+];
+// If these values actually live in a table in your schema (e.g. an
+// `inventory_account_types` table), replace the array above with a query like:
+// $stmt = $pdo->prepare("SELECT type_name FROM inventory_account_types WHERE tenant_id = 0 OR tenant_id = ? ORDER BY type_name");
+// $stmt->execute([$tenant_id]);
+// $accounts = $stmt->fetchAll(PDO::FETCH_COLUMN);
 
 $productTypes = ['Physical', 'Service'];
 $yesNo = ['Yes', 'No'];
+
+// Defaults requested for the template
+$defaultProductType      = 'Physical';
+$defaultInventoryAccount = 'Trading Inventory';
 
 // ---- Build workbook ----
 $spreadsheet = new Spreadsheet();
@@ -107,20 +126,30 @@ foreach (array_keys($headers) as $col) {
 }
 $sheet->getColumnDimension('G')->setWidth(28);
 
+$maxRow = 500; // rows available for data entry
+
 // One example row so the expected format is clear
 $sheet->fromArray([
-    'Blue Ballpoint Pen', 'Physical',
+    'Blue Ballpoint Pen', $defaultProductType,
     !empty($units) ? $units[0] : '',
     !empty($categories) ? $categories[0] : '',
     '',
     !empty($vendors) ? $vendors[0] : '',
     '', '',
     !empty($taxRegimes) ? $taxRegimes[0] : '',
-    !empty($accounts) ? $accounts[0] : '',
+    $defaultInventoryAccount,
     0, 0, 0, 0, 0, 0, 0, '', '', '', '',
     'Yes', 'Yes', 'Yes',
     0, 0, 0, 0
 ], null, 'A2');
+
+// Pre-fill Product Type and Inventory Account with the requested defaults for
+// every blank data row, so the user only needs to change them if a product
+// is actually different (e.g. a Service product, or a non-Trading account).
+for ($row = 3; $row <= $maxRow; $row++) {
+    $sheet->setCellValue('B' . $row, $defaultProductType);
+    $sheet->setCellValue('J' . $row, $defaultInventoryAccount);
+}
 
 // ===== Sheet 2: hidden "Lookups" sheet backing the dropdowns =====
 $lookupSheet = new \PhpOffice\PhpSpreadsheet\Worksheet\Worksheet($spreadsheet, 'Lookups');
@@ -164,8 +193,6 @@ function applyListDropdown($sheet, string $col, int $firstRow, int $lastRow, str
         $validation->setFormula1($lookupRange);
     }
 }
-
-$maxRow = 500; // rows available for data entry
 
 applyListDropdown($sheet, 'B', 2, $maxRow, 'Lookups!$A$1:$A$' . count($productTypes), true);
 
@@ -215,6 +242,9 @@ $infoSheet->fromArray([
     ['   from the product list after import.'],
     ['8. Scheme columns (Promo Qty / Bonus Qty / To Qty / To Rs) are optional and,'],
     ['   if filled, create a single basic scheme against the Default Unit.'],
+    ['9. Product Type defaults to "Physical" and Inventory Account defaults to'],
+    ['   "Trading Inventory" on every row - change these only for Service products'],
+    ['   or a different inventory account type.'],
 ], null, 'A1');
 $infoSheet->getStyle('A1')->getFont()->setBold(true)->setSize(13);
 $infoSheet->getColumnDimension('A')->setWidth(90);

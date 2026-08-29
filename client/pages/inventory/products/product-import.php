@@ -306,6 +306,45 @@ if (!$user_id) {
             cursor: pointer;
             margin-left: auto;
         }
+
+        .urdu-guide {
+            direction: rtl;
+            text-align: right;
+            font-family: 'Noto Nastaliq Urdu', 'Jameel Noori Nastaleeq', 'Inter', sans-serif;
+            background: #fffbeb;
+            border: 1px solid #fde68a;
+            border-radius: 10px;
+            padding: 14px 18px;
+            margin-bottom: 20px;
+        }
+
+        .urdu-guide h4 {
+            margin: 0 0 8px 0;
+            font-size: 15px;
+            font-weight: 700;
+            color: #92400e;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            flex-direction: row-reverse;
+            justify-content: flex-end;
+        }
+
+        .urdu-guide ul {
+            margin: 0;
+            padding-right: 20px;
+            font-size: 14px;
+            line-height: 1.9;
+            color: #78350f;
+        }
+
+        .urdu-guide li {
+            margin-bottom: 2px;
+        }
+
+        .urdu-guide b {
+            color: #b45309;
+        }
     </style>
 </head>
 
@@ -320,6 +359,17 @@ if (!$user_id) {
                 <a href="product-list.php" class="btn btn-secondary btn-sm" style="padding: 0 16px; height: 40px; text-decoration:none; display:inline-flex; align-items:center; gap:6px;">
                     <i class="fas fa-arrow-left"></i> Back to List
                 </a>
+            </div>
+
+            <div class="urdu-guide">
+                <h4><i class="fas fa-info-circle"></i> رہنمائی</h4>
+                <ul>
+                    <li><b>Product Name</b> اور <b>Default Unit</b> بھرنا لازمی ہے، باقی تمام کالمز اختیاری (optional) ہیں۔</li>
+                    <li><b>Product Type</b> از خود (by default) <b>Physical</b> پر سیٹ ہے &mdash; اگر پروڈکٹ سروس ہے تو اسے <b>Service</b> میں تبدیل کریں۔</li>
+                    <li><b>Inventory Account</b> از خود (by default) <b>Trading Inventory</b> پر سیٹ ہے &mdash; صرف مختلف اکاؤنٹ ہونے کی صورت میں تبدیل کریں۔</li>
+                    <li>جن کالمز میں ڈراپ ڈاؤن (dropdown) موجود ہے، وہاں صرف لسٹ میں سے ہی ویلیو منتخب کریں، ٹائپ نہ کریں۔</li>
+                    <li>یہ امپورٹ صرف <b>Default Unit</b> والی پروڈکٹس سپورٹ کرتا ہے۔ UOM Group پروڈکٹس اور برانچ کے مطابق اوپننگ اسٹاک اس میں شامل نہیں &mdash; وہ بعد میں خود شامل کریں۔</li>
+                </ul>
             </div>
 
             <div class="helper-text" style="margin-bottom: 20px;">
@@ -394,6 +444,39 @@ if (!$user_id) {
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
     <script src="../../../assets/js/inventory/products/product-import.js"></script>
+    <script>
+        // If the Company dropdown ends up with only ONE actual company
+        // (i.e. just "No Company" + 1 real option), auto-select that company
+        // instead of leaving "No Company" selected by default.
+        // product-import.js fills #company asynchronously (after an AJAX call),
+        // so we watch it with a MutationObserver instead of running this on
+        // page load directly.
+        (function () {
+            const companySelect = document.getElementById('company');
+            if (!companySelect) return;
+
+            function autoSelectIfSingleCompany() {
+                // Real companies = all options except the blank "No Company" one
+                const realOptions = Array.from(companySelect.options).filter(opt => opt.value !== '');
+                if (realOptions.length === 1 && companySelect.value === '') {
+                    companySelect.value = realOptions[0].value;
+                    // Let select2 (and any other listeners) know the value changed
+                    if (window.jQuery) {
+                        jQuery(companySelect).trigger('change');
+                    } else {
+                        companySelect.dispatchEvent(new Event('change'));
+                    }
+                }
+            }
+
+            // Run once in case options are already there (e.g. server-rendered)
+            autoSelectIfSingleCompany();
+
+            // Watch for options being added dynamically by product-import.js
+            const observer = new MutationObserver(autoSelectIfSingleCompany);
+            observer.observe(companySelect, { childList: true });
+        })();
+    </script>
 </body>
 
 </html>
