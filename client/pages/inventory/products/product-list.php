@@ -85,6 +85,11 @@ $initialSearch = $_GET['search'] ?? '';
                     </svg>
                     Add Product
                 </button>
+
+                <a href="product-import.php" class="btn btn-secondary btn-sm" style="text-decoration:none; display:inline-flex; align-items:center; gap:6px;">
+    <i class="fas fa-file-import"></i>
+    Import Products
+</a>
             </div>
         </div>
 
