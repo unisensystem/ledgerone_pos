@@ -305,6 +305,23 @@ if (!$user_id) {
                 </button>
             </div>
             <div class="modal-body" style="text-align: left; padding: 24px;">
+
+            <!-- NEW: Customer Display Format -->
+    <div style="margin-bottom: 20px; padding-bottom: 16px; border-bottom: 1px solid var(--border-default);">
+        <label style="display:block; margin-bottom:10px; font-weight:600; font-size:13px;">Customer Display</label>
+        <div style="display:flex; gap:16px; flex-wrap: wrap;">
+            <label style="display:flex; align-items:center; gap:6px; font-size:13px; cursor:pointer;">
+                <input type="radio" name="customerDisplayFormat" value="both" id="custFmtBoth"> Code + Name
+            </label>
+            <label style="display:flex; align-items:center; gap:6px; font-size:13px; cursor:pointer;">
+                <input type="radio" name="customerDisplayFormat" value="code" id="custFmtCode"> Code Only
+            </label>
+            <label style="display:flex; align-items:center; gap:6px; font-size:13px; cursor:pointer;">
+                <input type="radio" name="customerDisplayFormat" value="name" id="custFmtName"> Name Only
+            </label>
+        </div>
+    </div>
+    <!-- END NEW -->
                 <div style="margin-bottom: 16px; display: flex; gap: 8px;">
                     <button type="button" class="btn btn-secondary" id="customizeSelectAllBtn" style="flex: 1; height: 36px; font-size: 13px;">
                         <i class="fas fa-check-square"></i> Select All

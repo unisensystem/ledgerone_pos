@@ -126,9 +126,62 @@ function populateCustomizeList() {
 // Apply on load
 applyCustomizeVisibility();
 
+// ===== CUSTOMER DISPLAY FORMAT (Code / Name / Both) =====
+const CUSTOMER_DISPLAY_KEY = 'receiveVoucherCustomerDisplayFormat';
+
+function getCustomerDisplayFormat() {
+    const fmt = localStorage.getItem(CUSTOMER_DISPLAY_KEY);
+    return (fmt === 'code' || fmt === 'name' || fmt === 'both') ? fmt : 'both';
+}
+
+function setCustomerDisplayFormat(fmt) {
+    localStorage.setItem(CUSTOMER_DISPLAY_KEY, fmt);
+}
+
+// Plain text version (used for input.value)
+function formatCustomerDisplay(code, name) {
+    const fmt = getCustomerDisplayFormat();
+    if (fmt === 'code') return code || '';
+    if (fmt === 'name') return name || '';
+    return `${code || ''} - ${name || ''}`;
+}
+
+// HTML (bold) version (used inside dropdown list items)
+function formatCustomerDisplayHTML(code, name) {
+    const fmt = getCustomerDisplayFormat();
+    if (fmt === 'code') return `<strong>${code || ''}</strong>`;
+    if (fmt === 'name') return `<strong>${name || ''}</strong>`;
+    return `<strong>${code || ''}</strong> - ${name || ''}`;
+}
+
+// Re-apply the chosen format to any already-selected customer fields (single + bulk)
+function reapplyCustomerDisplayFormat() {
+    const singleInput = document.getElementById('customerCode');
+    if (singleInput && singleInput.dataset.selectedId) {
+        singleInput.value = formatCustomerDisplay(singleInput.dataset.selectedId, singleInput.dataset.selectedName || '');
+    }
+    document.querySelectorAll('.bulk-customer').forEach(input => {
+        if (input.dataset.selectedCode) {
+            input.value = formatCustomerDisplay(input.dataset.selectedCode, input.dataset.selectedName || '');
+        }
+    });
+}
+
+function getCustomerFormatRadio() {
+    return document.querySelector('input[name="customerDisplayFormat"]:checked');
+}
+
+function setCustomerFormatRadioTo(fmt) {
+    const radio = document.querySelector(`input[name="customerDisplayFormat"][value="${fmt}"]`);
+    if (radio) radio.checked = true;
+}
+// ===== END CUSTOMER DISPLAY FORMAT =====
+
 // Button open
 document.getElementById('customizeFieldsBtn').addEventListener('click', function () {
     populateCustomizeList();
+    // Sync the Customer Display radio group to the currently saved preference
+    setCustomerFormatRadioTo(getCustomerDisplayFormat());
     document.getElementById('customizeFieldsModal').classList.add('show');
 });
 
@@ -157,6 +210,14 @@ document.getElementById('customizeSaveBtn').addEventListener('click', function (
     });
     saveCustomizeVisibility(v);
     applyCustomizeVisibility();
+
+    // Save Customer Display format preference and re-render any already-selected customers
+    const selectedFmt = getCustomerFormatRadio();
+    if (selectedFmt) {
+        setCustomerDisplayFormat(selectedFmt.value);
+        reapplyCustomerDisplayFormat();
+    }
+
     closeCustomizeModal();
 });
 
@@ -165,6 +226,12 @@ document.getElementById('customizeResetBtn').addEventListener('click', function 
     if (confirm('Reset field visibility to default?')) {
         saveCustomizeVisibility(getCustomizeDefaults());
         applyCustomizeVisibility();
+
+        // Reset Customer Display format back to default ("both")
+        setCustomerDisplayFormat('both');
+        reapplyCustomerDisplayFormat();
+        setCustomerFormatRadioTo('both');
+
         populateCustomizeList();
     }
 });
@@ -338,6 +405,7 @@ function onRecoveryOfficerChanged(mode) {
             const customerInput = document.getElementById('customerCode');
             customerInput.value = '';
             delete customerInput.dataset.selectedId;
+            delete customerInput.dataset.selectedName;
             document.getElementById('previousBalance').value = '';
             document.getElementById('remainingBalance').value = '';
             document.getElementById('subAccount').innerHTML = '<option value="">Select Sub Account</option>';
@@ -809,8 +877,12 @@ function setupSearchableDropdown(inputId, dropdownId, data, displayKey, valueKey
                     option.innerHTML = `<strong>${item[valueKey]}</strong> - ${date} - ${currency}${parseFloat(item.amount).toFixed(2)}`;
                     option.dataset.display = `${date} - ${currency}${parseFloat(item.amount).toFixed(2)}`;
                     option.dataset.billno = item[valueKey];
+                } else if (inputId === 'customerCode') {
+                    // For customers: respect the Customize Fields "Customer Display" preference (code / name / both)
+                    option.innerHTML = formatCustomerDisplayHTML(item[valueKey], item[displayKey]);
+                    option.dataset.display = item[displayKey];
                 } else {
-                    // For suppliers: show code - name
+                    // For suppliers/employees: show code - name
                     option.innerHTML = `<strong>${item[valueKey]}</strong> - ${item[displayKey]}`;
                     option.dataset.display = item[displayKey];
                 }
@@ -824,7 +896,12 @@ function setupSearchableDropdown(inputId, dropdownId, data, displayKey, valueKey
                 }
 
                 option.addEventListener('click', function () {
-                    input.value = this.dataset.displaytext || `${this.dataset.value} - ${this.dataset.display}`;
+                    if (inputId === 'customerCode') {
+                        input.value = formatCustomerDisplay(this.dataset.value, this.dataset.display);
+                        input.dataset.selectedName = this.dataset.display;
+                    } else {
+                        input.value = this.dataset.displaytext || `${this.dataset.value} - ${this.dataset.display}`;
+                    }
                     input.dataset.selectedId = this.dataset.value;
                     hideFloatingDropdown(dropdown);
 
@@ -881,7 +958,12 @@ function setupSearchableDropdown(inputId, dropdownId, data, displayKey, valueKey
             e.preventDefault();
             const selectedItem = items[highlightedIndex];
             if (selectedItem.dataset.value) {
-                input.value = selectedItem.dataset.displaytext || `${selectedItem.dataset.value} - ${selectedItem.dataset.display}`;
+                if (inputId === 'customerCode') {
+                    input.value = formatCustomerDisplay(selectedItem.dataset.value, selectedItem.dataset.display);
+                    input.dataset.selectedName = selectedItem.dataset.display;
+                } else {
+                    input.value = selectedItem.dataset.displaytext || `${selectedItem.dataset.value} - ${selectedItem.dataset.display}`;
+                }
                 input.dataset.selectedId = selectedItem.dataset.value;
                 hideFloatingDropdown(dropdown);
 
@@ -1222,9 +1304,12 @@ function setupBulkCustomerDropdown(row) {
             filtered.slice(0, 10).forEach(customer => {
                 const option = document.createElement('div');
                 option.className = 'dropdown-item';
-                option.innerHTML = `<strong>${customer.code}</strong> - ${customer.name}`;
+                // Respect the Customize Fields "Customer Display" preference (code / name / both)
+                option.innerHTML = formatCustomerDisplayHTML(customer.code, customer.name);
                 option.addEventListener('click', function() {
-                    input.value = customer.code;
+                    input.value = formatCustomerDisplay(customer.code, customer.name);
+                    input.dataset.selectedCode = customer.code;
+                    input.dataset.selectedName = customer.name;
                     hideFloatingDropdown(dropdown);
                     // Fetch bills for this customer
                     fetchBillsForCustomer(customer.code);
@@ -1261,6 +1346,15 @@ function setupBulkCustomerDropdown(row) {
             showFloatingDropdown(input, dropdown);
         } else {
             hideFloatingDropdown(dropdown);
+        }
+    });
+
+    // If the user clears the box by hand, drop the stored code/name so the format
+    // helper doesn't keep re-writing a stale value into the field
+    input.addEventListener('input', function() {
+        if (this.value.trim() === '') {
+            delete this.dataset.selectedCode;
+            delete this.dataset.selectedName;
         }
     });
 
@@ -1401,7 +1495,10 @@ document.getElementById('postBulkBtn').addEventListener('click', async function(
     for (const row of rows) {
         const formData = new FormData();
         formData.append('voucher_date', row.querySelector('.bulk-date').value);
-        formData.append('customer_code', row.querySelector('.bulk-customer').value);
+        // Always send the real customer code (dataset), never the formatted display text,
+        // so "Name Only" / "Code Only" display preferences don't break the backend lookup.
+        const bulkCustEl = row.querySelector('.bulk-customer');
+        formData.append('customer_code', bulkCustEl.dataset.selectedCode || bulkCustEl.value);
         formData.append('company_id', bulkCompanyId);
                 formData.append('previous_balance', row.querySelector('.bulk-prev-balance').value);
         formData.append('adjust_amount', row.querySelector('.bulk-adjust').value || 0);
@@ -1499,7 +1596,10 @@ form.addEventListener('submit', function (e) {
     // Prepare form data
     const formData = new FormData();
     formData.append('voucher_date', document.getElementById('voucherDate').value);
-    formData.append('customer_code', document.getElementById('customerCode').value.split(' - ')[0]);
+    // Always send the real customer code (dataset), never the formatted display text,
+    // so "Name Only" / "Code Only" display preferences don't break the backend lookup.
+    const custEl = document.getElementById('customerCode');
+    formData.append('customer_code', custEl.dataset.selectedId || custEl.value.split(' - ')[0]);
     formData.append('company_id', document.getElementById('company').value);
     formData.append('previous_balance', document.getElementById('previousBalance').value);
     formData.append('adjust_amount', document.getElementById('adjustAmount').value || 0);
@@ -1574,6 +1674,11 @@ function resetForm() {
     document.getElementById('againstPdc').innerHTML = '<option value="">Select Pending PDC...</option>';
     document.getElementById('pdcRemainingInfo').style.display = 'none';
     pendingPdcs = [];
+
+    // Reset customer field selection metadata
+    const custEl = document.getElementById('customerCode');
+    delete custEl.dataset.selectedId;
+    delete custEl.dataset.selectedName;
 
     // Reset border colors
     const fields = form.querySelectorAll('input, select, textarea');
