@@ -454,6 +454,7 @@ if (!$user_id) {
                                             <th style="padding: 12px; border: 1px solid var(--border-default); text-align: left;">Sales Officer</th>
                                             <th style="padding: 12px; border: 1px solid var(--border-default); text-align: left;">Invoice Number</th>
                                             <th style="padding: 12px; border: 1px solid var(--border-default); text-align: left;">Debit (Dr)</th>
+                                            <th style="padding: 12px; border: 1px solid var(--border-default); text-align: left;">Credit (Cr)</th>
                                             <th style="padding: 12px; border: 1px solid var(--border-default); text-align: left;">Invoice Date</th>
                                             <th style="padding: 12px; border: 1px solid var(--border-default); text-align: center; width: 80px;">Actions</th>
                                         </tr>
@@ -463,7 +464,7 @@ if (!$user_id) {
                                     </tbody>
                                     <tfoot>
                                         <tr>
-                                            <td colspan="6" style="padding: 12px; border: 1px solid var(--border-default);">
+                                            <td colspan="7" style="padding: 12px; border: 1px solid var(--border-default);">
                                                 <button type="button" class="btn btn-secondary btn-sm" id="addInvoiceBtn">
                                                     <i class="fas fa-plus"></i>
                                                     Add Invoice

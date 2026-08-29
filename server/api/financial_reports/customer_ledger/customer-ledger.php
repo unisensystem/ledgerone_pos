@@ -898,7 +898,7 @@ $prev_payments_sub = $stmt->fetch()['total'];
         // Add main account opening balance (only if not filtering by sub account)
         if (!$sub_account_id) {
             // Fetch individual opening balance invoices
-            $ob_stmt = $pdo->prepare("SELECT invoice_number, debit, invoice_date FROM opening_balance_invoices WHERE tenant_id = ? AND customer_id = ? ORDER BY invoice_date ASC, id ASC");
+            $ob_stmt = $pdo->prepare("SELECT invoice_number, debit, credit, invoice_date FROM opening_balance_invoices WHERE tenant_id = ? AND customer_id = ? ORDER BY invoice_date ASC, id ASC");
             $ob_stmt->execute([$tenant_id, $customer_id]);
             $ob_invoices = $ob_stmt->fetchAll(PDO::FETCH_ASSOC);
 
@@ -921,14 +921,15 @@ $prev_payments_sub = $stmt->fetch()['total'];
                 // No date filter: show individual OB invoice rows
                 $ob_running = 0;
                 foreach ($ob_invoices as $obi) {
-                    $ob_amount = floatval($obi['debit']);
-                    $ob_running += $ob_amount;
+                    $ob_debit = floatval($obi['debit']);
+                    $ob_credit = floatval($obi['credit'] ?? 0);
+                    $ob_running += $ob_debit - $ob_credit;
                     $result[] = [
                         'date' => $obi['invoice_date'] ?: 'Opening Balance',
                         'description' => 'Opening Balance',
                         'reference' => $obi['invoice_number'] ?: 'OB-MAIN',
-                        'debit' => $ob_amount,
-                        'credit' => 0,
+                        'debit' => $ob_debit,
+                        'credit' => $ob_credit,
                         'running_balance' => $ob_running,
                         'type' => 'opening_balance',
                         'sub_account_id' => null

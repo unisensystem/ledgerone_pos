@@ -501,12 +501,13 @@ document.addEventListener('DOMContentLoaded', function () {
                             <td style="padding: 12px; border: 1px solid var(--border-default);">${salesOfficerName}</td>
                             <td style="padding: 12px; border: 1px solid var(--border-default);">${invoice.invoice_number || '-'}</td>
                             <td style="padding: 12px; border: 1px solid var(--border-default);">${currencySymbol}${parseFloat(invoice.debit || 0).toFixed(2)}</td>
+                            <td style="padding: 12px; border: 1px solid var(--border-default);">${currencySymbol}${parseFloat(invoice.credit || 0).toFixed(2)}</td>
                             <td style="padding: 12px; border: 1px solid var(--border-default);">${invoice.invoice_date ? new Date(invoice.invoice_date).toLocaleDateString() : '-'}</td>
                         `;
                         tbody.appendChild(row);
                     });
                 } else {
-                    tbody.innerHTML = '<tr><td colspan="5" style="padding: 12px; border: 1px solid var(--border-default); text-align: center; color: var(--subtext);">No invoices</td></tr>';
+                    tbody.innerHTML = '<tr><td colspan="6" style="padding: 12px; border: 1px solid var(--border-default); text-align: center; color: var(--subtext);">No invoices</td></tr>';
                 }
             });
     }
@@ -960,8 +961,10 @@ document.addEventListener('DOMContentLoaded', function () {
             // Only set readonly if there are invoices
             if (hasInvoices) {
                 editOpeningDebit.setAttribute('readonly', 'readonly');
+                editOpeningCredit.setAttribute('readonly', 'readonly');
             } else {
                 editOpeningDebit.removeAttribute('readonly');
+                editOpeningCredit.removeAttribute('readonly');
             }
         });
         
@@ -1071,7 +1074,10 @@ document.addEventListener('DOMContentLoaded', function () {
                 <input type="text" class="edit-invoice-number" value="${invoice?.invoice_number || ''}" style="width: 100%; padding: 8px; border: 1px solid var(--input-border); border-radius: 6px;" placeholder="Invoice #">
             </td>
             <td style="padding: 8px; border: 1px solid var(--border-default);">
-                <input type="number" class="edit-invoice-debit" value="${invoice?.debit || ''}" step="0.01" min="0" style="width: 100%; padding: 8px; border: 1px solid var(--input-border); border-radius: 6px;" placeholder="0.00">
+                <input type="number" class="edit-invoice-debit" value="${invoice?.debit || ''}" step="0.01" min="0" style="width: 100%; padding: 8px; border: 1px solid var(--input-border); border-radius: 6px;" placeholder="0.00" ${invoice && invoice.credit > 0 ? 'disabled' : ''}>
+            </td>
+            <td style="padding: 8px; border: 1px solid var(--border-default);">
+                <input type="number" class="edit-invoice-credit" value="${invoice?.credit || ''}" step="0.01" min="0" style="width: 100%; padding: 8px; border: 1px solid var(--input-border); border-radius: 6px;" placeholder="0.00" ${invoice && invoice.debit > 0 ? 'disabled' : ''}>
             </td>
             <td style="padding: 8px; border: 1px solid var(--border-default);">
                 <input type="date" class="edit-invoice-date" value="${invoice?.invoice_date || ''}" style="width: 100%; padding: 8px; border: 1px solid var(--input-border); border-radius: 6px;">
@@ -1098,29 +1104,51 @@ document.addEventListener('DOMContentLoaded', function () {
             salesHidden.value = employee ? employee.id : '';
         });
         
-        row.querySelector('.edit-invoice-debit').addEventListener('input', calculateEditInvoiceTotal);
+        const editInvoiceDebitInput = row.querySelector('.edit-invoice-debit');
+        const editInvoiceCreditInput = row.querySelector('.edit-invoice-credit');
+
+        editInvoiceDebitInput.addEventListener('input', function() {
+            if (this.value && parseFloat(this.value) > 0) {
+                editInvoiceCreditInput.disabled = true;
+                editInvoiceCreditInput.value = '';
+            } else {
+                editInvoiceCreditInput.disabled = false;
+            }
+            calculateEditInvoiceTotal();
+        });
+
+        editInvoiceCreditInput.addEventListener('input', function() {
+            if (this.value && parseFloat(this.value) > 0) {
+                editInvoiceDebitInput.disabled = true;
+                editInvoiceDebitInput.value = '';
+            } else {
+                editInvoiceDebitInput.disabled = false;
+            }
+            calculateEditInvoiceTotal();
+        });
+
         row.querySelector('.btn-remove-edit-invoice').addEventListener('click', function() {
             row.remove();
             calculateEditInvoiceTotal();
         });
     }
-    
+
     function calculateEditInvoiceTotal() {
         const rows = document.getElementById('editInvoicesTableBody').querySelectorAll('tr');
         if (rows.length === 0) return; // Don't clear if no invoice rows
-        
-        let total = 0;
+
+        let totalDebit = 0;
+        let totalCredit = 0;
         rows.forEach(row => {
-            const debit = parseFloat(row.querySelector('.edit-invoice-debit').value) || 0;
-            total += debit;
+            totalDebit += parseFloat(row.querySelector('.edit-invoice-debit').value) || 0;
+            totalCredit += parseFloat(row.querySelector('.edit-invoice-credit').value) || 0;
         });
         const editOpeningDebit = document.getElementById('editOpeningDebit');
-        editOpeningDebit.value = total > 0 ? total.toFixed(2) : '';
-        if (total > 0) {
-            document.getElementById('editOpeningCredit').disabled = true;
-        } else {
-            document.getElementById('editOpeningCredit').disabled = false;
-        }
+        const editOpeningCredit = document.getElementById('editOpeningCredit');
+        editOpeningDebit.value = totalDebit > 0 ? totalDebit.toFixed(2) : '';
+        editOpeningCredit.value = totalCredit > 0 ? totalCredit.toFixed(2) : '';
+        editOpeningDebit.disabled = false;
+        editOpeningCredit.disabled = false;
     }
     
     function addEditSubAccountRow(subAccount = null) {
@@ -1192,14 +1220,16 @@ document.addEventListener('DOMContentLoaded', function () {
             const salesOfficer = row.querySelector('.edit-invoice-sales-officer').value;
             const invoiceNumber = row.querySelector('.edit-invoice-number').value.trim();
             const debit = parseFloat(row.querySelector('.edit-invoice-debit').value) || 0;
+            const credit = parseFloat(row.querySelector('.edit-invoice-credit').value) || 0;
             const invoiceDate = row.querySelector('.edit-invoice-date').value;
-            
-            if (distribution || salesOfficer || invoiceNumber || debit > 0 || invoiceDate) {
+
+            if (distribution || salesOfficer || invoiceNumber || debit > 0 || credit > 0 || invoiceDate) {
                 invoices.push({
                     distribution,
                     salesOfficer,
                     invoiceNumber,
                     debit,
+                    credit,
                     invoiceDate
                 });
             }
@@ -1247,6 +1277,7 @@ document.addEventListener('DOMContentLoaded', function () {
         document.getElementById('editOpeningDebit').disabled = false;
         document.getElementById('editOpeningCredit').disabled = false;
         document.getElementById('editOpeningDebit').removeAttribute('readonly');
+        document.getElementById('editOpeningCredit').removeAttribute('readonly');
         // Reset territory dropdowns
         $('#editRegion').prop('disabled', true).empty().append('<option value="">Select Region</option>').trigger('change');
         $('#editCity').prop('disabled', true).empty().append('<option value="">Select City</option>').trigger('change');

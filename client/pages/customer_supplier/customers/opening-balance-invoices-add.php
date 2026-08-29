@@ -55,9 +55,10 @@ if (!$user_id) {
                                 <th style="width: 20%;"><i class="fas fa-user"></i> Customer</th>
                                 <th style="width: 18%;"><i class="fas fa-sitemap"></i> Distribution</th>
                                 <th style="width: 18%;"><i class="fas fa-user-tie"></i> Sales Officer</th>
-                                <th style="width: 15%;"><i class="fas fa-hashtag"></i> Invoice Number</th>
-                                <th style="width: 12%;"><i class="fas fa-calculator"></i> Debit (Dr)</th>
-                                <th style="width: 12%;"><i class="fas fa-calendar"></i> Invoice Date</th>
+                                <th style="width: 13%;"><i class="fas fa-hashtag"></i> Invoice Number</th>
+                                <th style="width: 10%;"><i class="fas fa-calculator"></i> Debit (Dr)</th>
+                                <th style="width: 10%;"><i class="fas fa-calculator"></i> Credit (Cr)</th>
+                                <th style="width: 10%;"><i class="fas fa-calendar"></i> Invoice Date</th>
                                 <th style="width: 8%;"><i class="fas fa-trash"></i> Actions</th>
                             </tr>
                         </thead>
@@ -71,6 +72,10 @@ if (!$user_id) {
                     <div class="summary-item">
                         <label>Total Opening Debit:</label>
                         <span class="summary-value" id="totalDebit">0.00</span>
+                    </div>
+                    <div class="summary-item">
+                        <label>Total Opening Credit:</label>
+                        <span class="summary-value" id="totalCredit">0.00</span>
                     </div>
                 </div>
 

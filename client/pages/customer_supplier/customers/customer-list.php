@@ -361,6 +361,7 @@ $currency_symbol = $currency['symbol'] ?? '$';
                                             <th style="padding: 12px; border: 1px solid var(--border-default); text-align: left;">Sales Officer</th>
                                             <th style="padding: 12px; border: 1px solid var(--border-default); text-align: left;">Invoice Number</th>
                                             <th style="padding: 12px; border: 1px solid var(--border-default); text-align: left;">Debit (Dr)</th>
+                                            <th style="padding: 12px; border: 1px solid var(--border-default); text-align: left;">Credit (Cr)</th>
                                             <th style="padding: 12px; border: 1px solid var(--border-default); text-align: left;">Invoice Date</th>
                                             <th style="padding: 12px; border: 1px solid var(--border-default); text-align: center; width: 80px;">Actions</th>
                                         </tr>
@@ -369,7 +370,7 @@ $currency_symbol = $currency['symbol'] ?? '$';
                                     </tbody>
                                     <tfoot>
                                         <tr>
-                                            <td colspan="6" style="padding: 12px; border: 1px solid var(--border-default);">
+                                            <td colspan="7" style="padding: 12px; border: 1px solid var(--border-default);">
                                                 <button type="button" class="btn btn-secondary btn-sm" id="editAddInvoiceBtn">
                                                     <i class="fas fa-plus"></i> Add Invoice
                                                 </button>
@@ -621,12 +622,13 @@ $currency_symbol = $currency['symbol'] ?? '$';
                                         <th style="padding: 12px; border: 1px solid var(--border-default); text-align: left;">Sales Officer</th>
                                         <th style="padding: 12px; border: 1px solid var(--border-default); text-align: left;">Invoice Number</th>
                                         <th style="padding: 12px; border: 1px solid var(--border-default); text-align: left;">Debit (Dr)</th>
+                                        <th style="padding: 12px; border: 1px solid var(--border-default); text-align: left;">Credit (Cr)</th>
                                         <th style="padding: 12px; border: 1px solid var(--border-default); text-align: left;">Invoice Date</th>
                                     </tr>
                                 </thead>
                                 <tbody id="viewInvoicesTableBody">
                                     <tr>
-                                        <td colspan="5" style="padding: 12px; border: 1px solid var(--border-default); text-align: center; color: var(--subtext);">No invoices</td>
+                                        <td colspan="6" style="padding: 12px; border: 1px solid var(--border-default); text-align: center; color: var(--subtext);">No invoices</td>
                                     </tr>
                                 </tbody>
                             </table>

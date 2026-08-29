@@ -903,6 +903,18 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     });
 
+    openingCredit.addEventListener('click', function() {
+        if (invoicesTableBody.querySelectorAll('tr').length === 0) {
+            this.removeAttribute('readonly');
+        }
+    });
+
+    openingCredit.addEventListener('blur', function() {
+        if (invoicesTableBody.querySelectorAll('tr').length > 0) {
+            this.setAttribute('readonly', 'readonly');
+        }
+    });
+
     openingDebit.addEventListener('input', function() {
         if (this.value && parseFloat(this.value) > 0) {
             openingCredit.disabled = true;
@@ -926,18 +938,18 @@ document.addEventListener('DOMContentLoaded', function () {
     // Calculate total from invoices
     function calculateInvoiceTotal() {
         const rows = invoicesTableBody.querySelectorAll('tr');
-        let total = 0;
+        let totalDebit = 0;
+        let totalCredit = 0;
         rows.forEach(row => {
-            const debit = parseFloat(row.querySelector('.invoice-debit').value) || 0;
-            total += debit;
+            totalDebit += parseFloat(row.querySelector('.invoice-debit').value) || 0;
+            totalCredit += parseFloat(row.querySelector('.invoice-credit').value) || 0;
         });
-        openingDebit.value = total > 0 ? total.toFixed(2) : '';
+        openingDebit.value = totalDebit > 0 ? totalDebit.toFixed(2) : '';
+        openingCredit.value = totalCredit > 0 ? totalCredit.toFixed(2) : '';
         openingDebit.setAttribute('readonly', 'readonly');
-        if (total > 0) {
-            openingCredit.disabled = true;
-        } else {
-            openingCredit.disabled = false;
-        }
+        openingCredit.setAttribute('readonly', 'readonly');
+        openingDebit.disabled = false;
+        openingCredit.disabled = false;
     }
 
     // Add invoice row
@@ -968,6 +980,9 @@ document.addEventListener('DOMContentLoaded', function () {
                 <input type="number" class="invoice-debit" step="0.01" min="0" style="width: 100%; padding: 8px; border: 1px solid var(--input-border); border-radius: 6px;" placeholder="0.00">
             </td>
             <td style="padding: 8px; border: 1px solid var(--border-default);">
+                <input type="number" class="invoice-credit" step="0.01" min="0" style="width: 100%; padding: 8px; border: 1px solid var(--input-border); border-radius: 6px;" placeholder="0.00">
+            </td>
+            <td style="padding: 8px; border: 1px solid var(--border-default);">
                 <input type="date" class="invoice-date" style="width: 100%; padding: 8px; border: 1px solid var(--input-border); border-radius: 6px;">
             </td>
             <td style="padding: 8px; border: 1px solid var(--border-default); text-align: center;">
@@ -994,9 +1009,30 @@ document.addEventListener('DOMContentLoaded', function () {
             salesHidden.value = employee ? employee.id : '';
         });
         
-        // Auto-calculate on debit input
-        row.querySelector('.invoice-debit').addEventListener('input', calculateInvoiceTotal);
-        
+        // Row-level Debit/Credit mutual exclusion
+        const invoiceDebitInput = row.querySelector('.invoice-debit');
+        const invoiceCreditInput = row.querySelector('.invoice-credit');
+
+        invoiceDebitInput.addEventListener('input', function() {
+            if (this.value && parseFloat(this.value) > 0) {
+                invoiceCreditInput.disabled = true;
+                invoiceCreditInput.value = '';
+            } else {
+                invoiceCreditInput.disabled = false;
+            }
+            calculateInvoiceTotal();
+        });
+
+        invoiceCreditInput.addEventListener('input', function() {
+            if (this.value && parseFloat(this.value) > 0) {
+                invoiceDebitInput.disabled = true;
+                invoiceDebitInput.value = '';
+            } else {
+                invoiceDebitInput.disabled = false;
+            }
+            calculateInvoiceTotal();
+        });
+
         row.querySelector('.btn-remove-invoice').addEventListener('click', function() {
             row.remove();
             calculateInvoiceTotal();
@@ -1105,14 +1141,16 @@ document.addEventListener('DOMContentLoaded', function () {
             const salesOfficer = row.querySelector('.invoice-sales-officer').value;
             const invoiceNumber = row.querySelector('.invoice-number').value.trim();
             const debit = parseFloat(row.querySelector('.invoice-debit').value) || 0;
+            const credit = parseFloat(row.querySelector('.invoice-credit').value) || 0;
             const invoiceDate = row.querySelector('.invoice-date').value;
-            
-            if (distribution || salesOfficer || invoiceNumber || debit > 0 || invoiceDate) {
+
+            if (distribution || salesOfficer || invoiceNumber || debit > 0 || credit > 0 || invoiceDate) {
                 invoices.push({
                     distribution,
                     salesOfficer,
                     invoiceNumber,
                     debit,
+                    credit,
                     invoiceDate
                 });
             }

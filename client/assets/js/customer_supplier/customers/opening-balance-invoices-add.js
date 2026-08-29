@@ -136,7 +136,10 @@ function addInvoiceRow() {
             <input type="text" class="invoice-number form-control required" placeholder="INV001" data-row-id="${rowCounter}">
         </td>
         <td>
-            <input type="number" class="debit-amount form-control required" placeholder="0.00" step="0.01" min="0" data-row-id="${rowCounter}">
+            <input type="number" class="debit-amount form-control" placeholder="0.00" step="0.01" min="0" data-row-id="${rowCounter}">
+        </td>
+        <td>
+            <input type="number" class="credit-amount form-control" placeholder="0.00" step="0.01" min="0" data-row-id="${rowCounter}">
         </td>
         <td>
             <input type="date" class="invoice-date form-control required" data-row-id="${rowCounter}">
@@ -208,7 +211,8 @@ function addInvoiceRow() {
     const addBtn = row.querySelector('.add-row-btn');
     const deleteBtn = row.querySelector('.delete-row-btn');
     const debitInput = row.querySelector('.debit-amount');
-    
+    const creditInput = row.querySelector('.credit-amount');
+
     if (addBtn) {
         addBtn.addEventListener('click', function (e) {
             e.preventDefault();
@@ -225,15 +229,34 @@ function addInvoiceRow() {
         });
     }
     
-    if (debitInput) {
-        debitInput.addEventListener('change', updateTotalDebit);
-        debitInput.addEventListener('blur', updateTotalDebit);
-        debitInput.addEventListener('input', updateTotalDebit);
+    if (debitInput && creditInput) {
+        const onDebitInput = function () {
+            if (debitInput.value && parseFloat(debitInput.value) > 0) {
+                creditInput.disabled = true;
+                creditInput.value = '';
+            } else {
+                creditInput.disabled = false;
+            }
+            updateTotals();
+        };
+        const onCreditInput = function () {
+            if (creditInput.value && parseFloat(creditInput.value) > 0) {
+                debitInput.disabled = true;
+                debitInput.value = '';
+            } else {
+                debitInput.disabled = false;
+            }
+            updateTotals();
+        };
+        debitInput.addEventListener('change', onDebitInput);
+        debitInput.addEventListener('input', onDebitInput);
+        creditInput.addEventListener('change', onCreditInput);
+        creditInput.addEventListener('input', onCreditInput);
     }
-    
+
     updateRowNumbers();
     updateDeleteButtons();
-    updateTotalDebit();
+    updateTotals();
 }
 
 // Update button visibility
@@ -270,7 +293,7 @@ function deleteRow(rowId) {
         row.remove();
         updateRowNumbers();
         updateDeleteButtons();
-        updateTotalDebit();
+        updateTotals();
     } else {
         showNotification('Warning', 'At least one row must remain', 'warning');
     }
@@ -287,21 +310,25 @@ function updateRowNumbers() {
     });
 }
 
-// Update total debit
-function updateTotalDebit() {
-    let total = 0;
-    const debitInputs = document.querySelectorAll('.debit-amount');
-    
-    debitInputs.forEach(input => {
-        const value = parseFloat(input.value) || 0;
-        if (value > 0) {
-            total += value;
-        }
+// Update total debit and total credit
+function updateTotals() {
+    let totalDebit = 0;
+    let totalCredit = 0;
+
+    document.querySelectorAll('.debit-amount').forEach(input => {
+        totalDebit += parseFloat(input.value) || 0;
     });
-    
+    document.querySelectorAll('.credit-amount').forEach(input => {
+        totalCredit += parseFloat(input.value) || 0;
+    });
+
     const totalDebitElement = document.getElementById('totalDebit');
     if (totalDebitElement) {
-        totalDebitElement.textContent = total.toFixed(2);
+        totalDebitElement.textContent = totalDebit.toFixed(2);
+    }
+    const totalCreditElement = document.getElementById('totalCredit');
+    if (totalCreditElement) {
+        totalCreditElement.textContent = totalCredit.toFixed(2);
     }
 }
 
@@ -445,16 +472,20 @@ function validateFormData() {
         const officerId = row.querySelector('.officer-input').value.trim();
         const invoiceNumber = row.querySelector('.invoice-number').value.trim();
         const debit = row.querySelector('.debit-amount').value.trim();
+        const credit = row.querySelector('.credit-amount').value.trim();
         const invoiceDate = row.querySelector('.invoice-date').value.trim();
-        
+
+        const debitVal = parseFloat(debit) || 0;
+        const creditVal = parseFloat(credit) || 0;
+
         const rowErrors = [];
-        
+
         if (!customerId) rowErrors.push('Customer is required');
         if (!invoiceDate) rowErrors.push('Invoice date is required');
-        if (!debit || isNaN(parseFloat(debit)) || parseFloat(debit) <= 0) {
-            rowErrors.push('Debit amount must be greater than 0');
+        if (debitVal <= 0 && creditVal <= 0) {
+            rowErrors.push('Either Debit or Credit amount must be greater than 0');
         }
-        
+
         if (rowErrors.length > 0) {
             rowErrors.forEach(err => {
                 errors.push(`Row ${index + 1}: ${err}`);
@@ -467,7 +498,8 @@ function validateFormData() {
                 employee_id: officerId ? parseInt(officerId) : null,
                 invoice_number: invoiceNumber,
                 invoice_date: invoiceDate,
-                debit: parseFloat(debit)
+                debit: debitVal,
+                credit: creditVal
             });
         }
     });
@@ -517,7 +549,7 @@ function saveAllInvoices() {
                 document.getElementById('invoicesTableBody').innerHTML = '';
                 rowCounter = 0;
                 addInvoiceRow();
-                updateTotalDebit();
+                updateTotals();
             }, 1500);
         } else {
             showNotification('❌ Error', data.message || 'Failed to save', 'error');

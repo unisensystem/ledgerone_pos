@@ -150,72 +150,79 @@ try {
         $opening_debit = floatval($input['openingDebit'] ?? 0);
         $opening_credit = floatval($input['openingCredit'] ?? 0);
         
-        if ($opening_debit > 0) {
-            // Check if opening invoices are provided
-            $opening_invoices = $input['openingInvoices'] ?? [];
-            
-            if (!empty($opening_invoices)) {
-                // Insert individual invoice entries
-                foreach ($opening_invoices as $invoice) {
-                    if (!empty($invoice['debit']) && $invoice['debit'] > 0) {
-                        // Insert into opening_balance_invoices table
-                        $invoice_sql = "INSERT INTO opening_balance_invoices (tenant_id, customer_id, distribution_id, employee_id, invoice_number, debit, invoice_date) VALUES (?, ?, ?, ?, ?, ?, ?)";
-                        $stmt = $pdo->prepare($invoice_sql);
-                        $stmt->execute([
-                            $tenant_id,
-                            $customer_id,
-                            !empty($invoice['distribution']) ? $invoice['distribution'] : null,
-                            !empty($invoice['salesOfficer']) ? $invoice['salesOfficer'] : null,
-                            $invoice['invoiceNumber'] ?? '',
-                            $invoice['debit'],
-                            !empty($invoice['invoiceDate']) ? $invoice['invoiceDate'] : date('Y-m-d')
-                        ]);
-                        
-                        // Get supplier and employee names for ledger description
-                        $supplier_name = 'N/A';
-                        $employee_name = 'N/A';
-                        
-                        if (!empty($invoice['distribution'])) {
-                            $stmt = $pdo->prepare("SELECT supplier_name FROM suppliers WHERE id = ? AND tenant_id = ?");
-                            $stmt->execute([$invoice['distribution'], $tenant_id]);
-                            $supplier = $stmt->fetch();
-                            if ($supplier) $supplier_name = $supplier['supplier_name'];
-                        }
-                        
-                        if (!empty($invoice['salesOfficer'])) {
-                            $stmt = $pdo->prepare("SELECT full_name FROM employees WHERE id = ? AND tenant_id = ?");
-                            $stmt->execute([$invoice['salesOfficer'], $tenant_id]);
-                            $employee = $stmt->fetch();
-                            if ($employee) $employee_name = $employee['full_name'];
-                        }
-                        
-                        $description = 'Opening invoice: ' . ($invoice['invoiceNumber'] ?? 'N/A') . 
-                                     ' - Distribution: ' . $supplier_name . 
-                                     ' - Sales Officer: ' . $employee_name;
-                        
-                        $invoice_date = !empty($invoice['invoiceDate']) ? $invoice['invoiceDate'] : date('Y-m-d');
-                        
-                        // Insert ledger entries
-                        $ledger_sql = "INSERT INTO accounting_ledger (tenant_id, transaction_type, reference_table, reference_id, account_id, date, description, debit, credit) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
-                        $stmt = $pdo->prepare($ledger_sql);
-                        $stmt->execute([$tenant_id, 'customer_opening', 'customers', $customer_id, 2, $invoice_date, $description, $invoice['debit'], 0]);
-                        $stmt->execute([$tenant_id, 'customer_opening', 'customers', $customer_id, 90, $invoice_date, $description, 0, $invoice['debit']]);
-                    }
+        $opening_invoices = $input['openingInvoices'] ?? [];
+
+        if (!empty($opening_invoices)) {
+            // Insert individual invoice entries (each row is either Debit or Credit)
+            foreach ($opening_invoices as $invoice) {
+                $inv_debit = floatval($invoice['debit'] ?? 0);
+                $inv_credit = floatval($invoice['credit'] ?? 0);
+                if ($inv_debit <= 0 && $inv_credit <= 0) continue;
+
+                // Insert into opening_balance_invoices table
+                $invoice_sql = "INSERT INTO opening_balance_invoices (tenant_id, customer_id, distribution_id, employee_id, invoice_number, debit, credit, invoice_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
+                $stmt = $pdo->prepare($invoice_sql);
+                $stmt->execute([
+                    $tenant_id,
+                    $customer_id,
+                    !empty($invoice['distribution']) ? $invoice['distribution'] : null,
+                    !empty($invoice['salesOfficer']) ? $invoice['salesOfficer'] : null,
+                    $invoice['invoiceNumber'] ?? '',
+                    $inv_debit,
+                    $inv_credit,
+                    !empty($invoice['invoiceDate']) ? $invoice['invoiceDate'] : date('Y-m-d')
+                ]);
+
+                // Get supplier and employee names for ledger description
+                $supplier_name = 'N/A';
+                $employee_name = 'N/A';
+
+                if (!empty($invoice['distribution'])) {
+                    $stmt = $pdo->prepare("SELECT supplier_name FROM suppliers WHERE id = ? AND tenant_id = ?");
+                    $stmt->execute([$invoice['distribution'], $tenant_id]);
+                    $supplier = $stmt->fetch();
+                    if ($supplier) $supplier_name = $supplier['supplier_name'];
                 }
-            } else {
+
+                if (!empty($invoice['salesOfficer'])) {
+                    $stmt = $pdo->prepare("SELECT full_name FROM employees WHERE id = ? AND tenant_id = ?");
+                    $stmt->execute([$invoice['salesOfficer'], $tenant_id]);
+                    $employee = $stmt->fetch();
+                    if ($employee) $employee_name = $employee['full_name'];
+                }
+
+                $description = 'Opening invoice: ' . ($invoice['invoiceNumber'] ?? 'N/A') .
+                             ' - Distribution: ' . $supplier_name .
+                             ' - Sales Officer: ' . $employee_name;
+
+                $invoice_date = !empty($invoice['invoiceDate']) ? $invoice['invoiceDate'] : date('Y-m-d');
+
+                // Insert ledger entries (Trade Debtors = 2, Opening Balance Equity = 90)
+                $ledger_sql = "INSERT INTO accounting_ledger (tenant_id, transaction_type, reference_table, reference_id, account_id, date, description, debit, credit) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
+                $stmt = $pdo->prepare($ledger_sql);
+                if ($inv_debit > 0) {
+                    $stmt->execute([$tenant_id, 'customer_opening', 'customers', $customer_id, 2, $invoice_date, $description, $inv_debit, 0]);
+                    $stmt->execute([$tenant_id, 'customer_opening', 'customers', $customer_id, 90, $invoice_date, $description, 0, $inv_debit]);
+                } else {
+                    $stmt->execute([$tenant_id, 'customer_opening', 'customers', $customer_id, 90, $invoice_date, $description, $inv_credit, 0]);
+                    $stmt->execute([$tenant_id, 'customer_opening', 'customers', $customer_id, 2, $invoice_date, $description, 0, $inv_credit]);
+                }
+            }
+        } else {
+            if ($opening_debit > 0) {
                 // Single opening debit entry
                 $ledger_sql = "INSERT INTO accounting_ledger (tenant_id, transaction_type, reference_table, reference_id, account_id, date, description, debit, credit) VALUES (?, ?, ?, ?, ?, CURDATE(), ?, ?, ?)";
                 $stmt = $pdo->prepare($ledger_sql);
                 $stmt->execute([$tenant_id, 'customer_opening', 'customers', $customer_id, 2, 'Customer opening debit balance', $opening_debit, 0]);
                 $stmt->execute([$tenant_id, 'customer_opening', 'customers', $customer_id, 90, 'Customer opening debit balance', 0, $opening_debit]);
             }
-        }
-        
-        if ($opening_credit > 0) {
-            $ledger_sql = "INSERT INTO accounting_ledger (tenant_id, transaction_type, reference_table, reference_id, account_id, date, description, debit, credit) VALUES (?, ?, ?, ?, ?, CURDATE(), ?, ?, ?)";
-            $stmt = $pdo->prepare($ledger_sql);
-            $stmt->execute([$tenant_id, 'customer_opening', 'customers', $customer_id, 90, 'Customer opening credit balance', $opening_credit, 0]);
-            $stmt->execute([$tenant_id, 'customer_opening', 'customers', $customer_id, 2, 'Customer opening credit balance', 0, $opening_credit]);
+
+            if ($opening_credit > 0) {
+                $ledger_sql = "INSERT INTO accounting_ledger (tenant_id, transaction_type, reference_table, reference_id, account_id, date, description, debit, credit) VALUES (?, ?, ?, ?, ?, CURDATE(), ?, ?, ?)";
+                $stmt = $pdo->prepare($ledger_sql);
+                $stmt->execute([$tenant_id, 'customer_opening', 'customers', $customer_id, 90, 'Customer opening credit balance', $opening_credit, 0]);
+                $stmt->execute([$tenant_id, 'customer_opening', 'customers', $customer_id, 2, 'Customer opening credit balance', 0, $opening_credit]);
+            }
         }
         
         // Upsert sub-accounts: update existing rows (by id), insert new ones,
