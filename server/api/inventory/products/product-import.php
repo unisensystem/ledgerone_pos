@@ -60,6 +60,39 @@ function yesNoToInt(string $value): int
     return (mb_strtolower(trim($value)) === 'yes') ? 1 : 0;
 }
 
+/**
+ * Parses the "Group Unit Conversion Factors" cell, format: "Carton:1000;Dozen:12"
+ * Returns:
+ *  - [] (empty array) if the cell was blank
+ *  - ['unit name (lowercased)' => float factor, ...] on success
+ *  - null if the text is present but malformed (caller should error the row)
+ */
+function parseGroupUnitConversions(string $raw): ?array
+{
+    $raw = trim($raw);
+    if ($raw === '') {
+        return [];
+    }
+    $result = [];
+    foreach (explode(';', $raw) as $pair) {
+        $pair = trim($pair);
+        if ($pair === '') {
+            continue;
+        }
+        $parts = explode(':', $pair, 2);
+        if (count($parts) !== 2) {
+            return null;
+        }
+        $unitName = trim($parts[0]);
+        $factor   = trim($parts[1]);
+        if ($unitName === '' || !is_numeric($factor) || floatval($factor) <= 0) {
+            return null;
+        }
+        $result[mb_strtolower($unitName)] = floatval($factor);
+    }
+    return $result;
+}
+
 try {
     // Company is OPTIONAL for products (unlike Customer import) - applies to the whole batch if given
     $company_id = !empty($_POST['companyId']) ? (int)$_POST['companyId'] : null;
@@ -84,13 +117,20 @@ try {
     // Inventory Account | Purchase Price | Trade Price | Wholesale Price | MRP |
     // Default Discount % | Min Stock Level | Max Stock Level | Manufacturing Date |
     // Expiry Date | QR Code | Barcode | Is Active | Stock Affects | Invoice Affects |
-    // Scheme Promo Qty | Scheme Bonus Qty | Scheme To Qty | Scheme To Rs
+    // Scheme Promo Qty | Scheme Bonus Qty | Scheme To Qty | Scheme To Rs |
+    // Group Unit Conversion Factors
     //
     // UOM Type is a switch:
     //   "Default Unit" -> Default Unit column is used, UOM Group column is ignored.
     //   "UOM Group"    -> UOM Group column is used, Default Unit column is ignored.
+    //
+    // Unit Conversion Factor (col J) only applies to Default Unit rows.
+    // Group Unit Conversion Factors (col AE) only applies to UOM Group rows, and only
+    // when that group contains per-product, non-base units - format:
+    // "Carton:1000;Dozen:12" (unit name : factor, semicolon separated).
+    //
     // Per-unit quantities (Piece/Carton/Dozen breakdowns) and Branch-wise Opening
-    // Stock are intentionally NOT part of this import in either mode. Scheme
+    // Stock are intentionally NOT part of this import in either mode.  Scheme
     // columns only apply to Default Unit rows.
     array_shift($rows); // drop header row
 
@@ -127,6 +167,21 @@ try {
         "SELECT id, group_name AS label FROM uom_groups WHERE tenant_id = 0 OR tenant_id = ?",
         [$tenant_id]
     );
+
+    // Units that belong to each UOM group (same data the Add Product form gets from
+    // uom-group-units.php). ADJUST table/column names below if your junction table
+    // is named differently (e.g. uom_group_items, group_units, etc.).
+    $groupUnitsMap = []; // group_id => [ ['id'=>, 'uom_name'=>, 'unit_scope'=>, 'is_base_unit'=>], ... ]
+    $stmt = $pdo->prepare("
+        SELECT gu.group_id, u.id, u.uom_name, u.unit_scope, u.is_base_unit
+        FROM uom_group_units gu
+        JOIN uom u ON u.id = gu.unit_id
+        WHERE u.tenant_id = 0 OR u.tenant_id = ?
+    ");
+    $stmt->execute([$tenant_id]);
+    foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+        $groupUnitsMap[(int)$row['group_id']][] = $row;
+    }
 
     $categoryMap = buildLookupMap(
         $pdo,
@@ -194,6 +249,13 @@ try {
         VALUES (?, ?, ?, ?, ?, ?, ?)
     ");
 
+    // Per-unit conversion factors for UOM Group products (e.g. Carton = 1000 Pieces).
+    // Mirrors the product_uom_conversions insert product-add.php does for the manual form.
+    $groupConvStmt = $pdo->prepare("
+        INSERT INTO product_uom_conversions (product_id, uom_id, conversion_factor)
+        VALUES (?, ?, ?)
+    ");
+
     $inserted = 0;
     $skipped = 0;
     $errors = [];
@@ -235,6 +297,7 @@ try {
         $schemeBonusQty = $r[27] ?? 0;
         $schemeToQty    = $r[28] ?? 0;
         $schemeToRs     = $r[29] ?? 0;
+        $groupUnitConversionsRaw = trim((string)($r[30] ?? ''));
 
         // Basic validation
         if (strlen($name) > 255) {
@@ -268,6 +331,7 @@ try {
         $defaultUnitId = null;
         $uomGroupId = null;
         $productConversionFactor = null;
+        $groupConversionsToInsert = []; // unit_id => factor, applied after product insert
 
         if ($isGroupMode) {
             // ---- UOM Group mode ----
@@ -277,7 +341,36 @@ try {
                 $errors[] = ['row' => $rowNum, 'message' => "UOM Group '{$groupTxt}' not found - please pick from the dropdown list"];
                 continue;
             }
-            // Default Unit column and Unit Conversion Factor are ignored in this mode.
+            // Default Unit column and the plain "Unit Conversion Factor" column are
+            // ignored in this mode. Per-unit factors (if the group needs any) come
+            // from the "Group Unit Conversion Factors" column instead.
+
+            $unitsNeedingFactor = [];
+            foreach ($groupUnitsMap[$uomGroupId] ?? [] as $u) {
+                if ($u['unit_scope'] === 'per_product' && (int)$u['is_base_unit'] === 0) {
+                    $unitsNeedingFactor[mb_strtolower($u['uom_name'])] = $u;
+                }
+            }
+
+            if (!empty($unitsNeedingFactor)) {
+                $parsedFactors = parseGroupUnitConversions($groupUnitConversionsRaw);
+                if ($parsedFactors === null) {
+                    $errors[] = ['row' => $rowNum, 'message' => "Group Unit Conversion Factors format invalid - use 'UnitName:Factor;UnitName:Factor', e.g. 'Carton:1000'"];
+                    continue;
+                }
+                $missingUnit = null;
+                foreach ($unitsNeedingFactor as $lname => $u) {
+                    if (!array_key_exists($lname, $parsedFactors)) {
+                        $missingUnit = $u['uom_name'];
+                        break;
+                    }
+                    $groupConversionsToInsert[(int)$u['id']] = $parsedFactors[$lname];
+                }
+                if ($missingUnit !== null) {
+                    $errors[] = ['row' => $rowNum, 'message' => "Group Unit Conversion Factors missing a value for unit '{$missingUnit}'"];
+                    continue;
+                }
+            }
         } else {
             // ---- Default Unit mode ----
             if ($defaultUnitTxt === '') {
@@ -378,6 +471,13 @@ try {
             ]);
 
             $product_id = $pdo->lastInsertId();
+
+            // Per-unit conversion factors for UOM Group products (Carton, Dozen, etc.)
+            if ($isGroupMode && !empty($groupConversionsToInsert)) {
+                foreach ($groupConversionsToInsert as $unitId => $factor) {
+                    $groupConvStmt->execute([$product_id, $unitId, $factor]);
+                }
+            }
 
             // Basic scheme (one per row) - only applies to Default Unit rows, since
             // there's no single unit to attach a scheme to in UOM Group mode without

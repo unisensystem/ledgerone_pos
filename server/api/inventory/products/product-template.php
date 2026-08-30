@@ -62,6 +62,25 @@ $accounts = [
 // $stmt->execute([$tenant_id]);
 // $accounts = $stmt->fetchAll(PDO::FETCH_COLUMN);
 
+// ---- Fetch which units (with scope/base-unit info) belong to each UOM group, so the
+// Instructions sheet can tell the user exactly which units need a conversion factor.
+// ADJUST table/column names below if your junction table is named differently.
+$groupUnitsInfo = []; // group_name => array of unit names that need a factor (per_product, non-base)
+$stmt = $pdo->prepare("
+    SELECT g.group_name, u.uom_name
+    FROM uom_group_units gu
+    JOIN uom_groups g ON g.id = gu.group_id
+    JOIN uom u ON u.id = gu.unit_id
+    WHERE (g.tenant_id = 0 OR g.tenant_id = ?)
+      AND u.unit_scope = 'per_product'
+      AND u.is_base_unit = 0
+    ORDER BY g.group_name, u.uom_name
+");
+$stmt->execute([$tenant_id]);
+foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+    $groupUnitsInfo[$row['group_name']][] = $row['uom_name'];
+}
+
 $productTypes = ['Physical', 'Service'];
 $uomTypes = ['Default Unit', 'UOM Group'];
 $yesNo = ['Yes', 'No'];
@@ -110,6 +129,7 @@ $headers = [
     'AB' => 'Scheme Bonus Qty',
     'AC' => 'Scheme To Qty',
     'AD' => 'Scheme To Rs',
+    'AE' => 'Group Unit Conversion Factors',
 ];
 
 foreach ($headers as $col => $label) {
@@ -120,8 +140,10 @@ foreach ($headers as $col => $label) {
 $sheet->setCellValue('A1', 'Product Name *');
 $sheet->setCellValue('D1', "Default Unit\n(if UOM Type = Default Unit)");
 $sheet->setCellValue('E1', "UOM Group\n(if UOM Type = UOM Group)");
+$sheet->setCellValue('J1', "Unit Conversion Factor\n(Default Unit rows only)");
+$sheet->setCellValue('AE1', "Group Unit Conversion Factors\n(UOM Group rows only - see Instructions)");
 
-$headerRange = 'A1:AD1';
+$headerRange = 'A1:AE1';
 $sheet->getStyle($headerRange)->getFont()->setBold(true)->getColor()->setRGB('FFFFFF');
 $sheet->getStyle($headerRange)->getFill()
     ->setFillType(Fill::FILL_SOLID)
@@ -134,6 +156,7 @@ foreach (array_keys($headers) as $col) {
     $sheet->getColumnDimension($col)->setWidth(18);
 }
 $sheet->getColumnDimension('I')->setWidth(28);
+$sheet->getColumnDimension('AE')->setWidth(32);
 
 $maxRow = 500; // rows available for data entry
 
@@ -149,9 +172,18 @@ $sheet->fromArray([
     $defaultInventoryAccount,
     0, 0, 0, 0, 0, 0, 0, '', '', '', '',
     'Yes', 'Yes', 'Yes',
-    0, 0, 0, 0
+    0, 0, 0, 0,
+    '' // Group Unit Conversion Factors - not applicable in Default Unit mode
 ], null, 'A2');
 
+// Example UOM Group row - filled with a sample factor ONLY if the "Standard" group
+// actually has a unit that needs one; otherwise left blank, since not every group
+// needs this column at all.
+$standardExampleFactor = '';
+if (!empty($groupUnitsInfo[$defaultUomGroup])) {
+    $exampleUnit = $groupUnitsInfo[$defaultUomGroup][0];
+    $standardExampleFactor = $exampleUnit . ':1000';
+}
 $sheet->fromArray([
     'Cooking Oil 5L Can', $defaultProductType, 'UOM Group',
     '', $defaultUomGroup, // Default Unit left blank - UOM Group mode
@@ -163,7 +195,8 @@ $sheet->fromArray([
     $defaultInventoryAccount,
     0, 0, 0, 0, 0, 0, 0, '', '', '', '',
     'Yes', 'Yes', 'Yes',
-    0, 0, 0, 0
+    0, 0, 0, 0,
+    $standardExampleFactor
 ], null, 'A3');
 
 // Pre-fill Product Type, UOM Type, UOM Group and Inventory Account with the
@@ -257,7 +290,7 @@ foreach (['X', 'Y', 'Z'] as $col) {
 // ===== Sheet 3: Instructions =====
 $infoSheet = new \PhpOffice\PhpSpreadsheet\Worksheet\Worksheet($spreadsheet, 'Instructions');
 $spreadsheet->addSheet($infoSheet);
-$infoSheet->fromArray([
+$infoLines = [
     ['LedgerOne ERP - Product Import Template'],
     [''],
     ['1. Fill data in the "Products" sheet. Do not change the header row.'],
@@ -281,15 +314,30 @@ $infoSheet->fromArray([
     ['7. Unit Conversion Factor only applies to Default Unit rows, and only when the'],
     ['   Default Unit picked is a product-specific (non-universal) unit that is not'],
     ['   already a base unit. It is ignored for UOM Group rows.'],
-    ['8. Branch-wise Opening Stock is NOT part of this import - add it separately'],
+    ['8. Group Unit Conversion Factors applies ONLY to UOM Group rows, and only when'],
+    ['   that group contains a product-specific unit that is not the base unit (e.g.'],
+    ['   Carton, Dozen). Format: "UnitName:Factor", multiple units separated by a'],
+    ['   semicolon - example: "Carton:1000;Dozen:12". Leave blank if your UOM Group'],
+    ['   has no such units. It is ignored for Default Unit rows.'],
+    ['9. Branch-wise Opening Stock is NOT part of this import - add it separately'],
     ['   from the product list after import.'],
-    ['9. Scheme columns (Promo Qty / Bonus Qty / To Qty / To Rs) only apply to'],
-    ['   Default Unit rows and, if filled, create a single basic scheme against that'],
-    ['   unit. They are ignored for UOM Group rows.'],
-    ['10. Product Type defaults to "Physical" and Inventory Account defaults to'],
+    ['10. Scheme columns (Promo Qty / Bonus Qty / To Qty / To Rs) only apply to'],
+    ['    Default Unit rows and, if filled, create a single basic scheme against that'],
+    ['    unit. They are ignored for UOM Group rows.'],
+    ['11. Product Type defaults to "Physical" and Inventory Account defaults to'],
     ['    "Trading Inventory" on every row - change these only for Service products'],
     ['    or a different inventory account type.'],
-], null, 'A1');
+];
+
+if (!empty($groupUnitsInfo)) {
+    $infoLines[] = [''];
+    $infoLines[] = ['UOM Groups that need Group Unit Conversion Factors, and which units:'];
+    foreach ($groupUnitsInfo as $groupName => $unitNames) {
+        $infoLines[] = ['     - ' . $groupName . ': ' . implode(', ', $unitNames)];
+    }
+}
+
+$infoSheet->fromArray($infoLines, null, 'A1');
 $infoSheet->getStyle('A1')->getFont()->setBold(true)->setSize(13);
 $infoSheet->getColumnDimension('A')->setWidth(90);
 
