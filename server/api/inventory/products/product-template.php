@@ -64,13 +64,13 @@ $accounts = [
 
 // ---- Fetch which units (with scope/base-unit info) belong to each UOM group, so the
 // Instructions sheet can tell the user exactly which units need a conversion factor.
-// ADJUST table/column names below if your junction table is named differently.
+// (table uom_group_units, columns uom_group_id / uom_id - matches uom-group-units.php)
 $groupUnitsInfo = []; // group_name => array of unit names that need a factor (per_product, non-base)
 $stmt = $pdo->prepare("
     SELECT g.group_name, u.uom_name
-    FROM uom_group_units gu
-    JOIN uom_groups g ON g.id = gu.group_id
-    JOIN uom u ON u.id = gu.unit_id
+    FROM uom_group_units ugu
+    JOIN uom_groups g ON g.id = ugu.uom_group_id
+    JOIN uom u ON u.id = ugu.uom_id
     WHERE (g.tenant_id = 0 OR g.tenant_id = ?)
       AND u.unit_scope = 'per_product'
       AND u.is_base_unit = 0

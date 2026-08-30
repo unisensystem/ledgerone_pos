@@ -29,6 +29,10 @@ if (!$user_id) {
                     <i class="fas fa-plus"></i>
                     Add Customer + Supplier
                 </a>
+                <a href="both-import.php" class="btn btn-secondary btn-sm" style="text-decoration:none; display:inline-flex; align-items:center; gap:6px;">
+    <i class="fas fa-file-import"></i>
+    Import Customer + Supplier
+</a>
             </div>
         </div>
 

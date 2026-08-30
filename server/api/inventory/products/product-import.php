@@ -169,18 +169,17 @@ try {
     );
 
     // Units that belong to each UOM group (same data the Add Product form gets from
-    // uom-group-units.php). ADJUST table/column names below if your junction table
-    // is named differently (e.g. uom_group_items, group_units, etc.).
-    $groupUnitsMap = []; // group_id => [ ['id'=>, 'uom_name'=>, 'unit_scope'=>, 'is_base_unit'=>], ... ]
+    // uom-group-units.php: table uom_group_units, columns uom_group_id / uom_id).
+    $groupUnitsMap = []; // uom_group_id => [ ['id'=>, 'uom_name'=>, 'unit_scope'=>, 'is_base_unit'=>], ... ]
     $stmt = $pdo->prepare("
-        SELECT gu.group_id, u.id, u.uom_name, u.unit_scope, u.is_base_unit
-        FROM uom_group_units gu
-        JOIN uom u ON u.id = gu.unit_id
+        SELECT ugu.uom_group_id, u.id, u.uom_name, u.unit_scope, u.is_base_unit
+        FROM uom_group_units ugu
+        JOIN uom u ON u.id = ugu.uom_id
         WHERE u.tenant_id = 0 OR u.tenant_id = ?
     ");
     $stmt->execute([$tenant_id]);
     foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
-        $groupUnitsMap[(int)$row['group_id']][] = $row;
+        $groupUnitsMap[(int)$row['uom_group_id']][] = $row;
     }
 
     $categoryMap = buildLookupMap(
@@ -345,30 +344,27 @@ try {
             // ignored in this mode. Per-unit factors (if the group needs any) come
             // from the "Group Unit Conversion Factors" column instead.
 
-            $unitsNeedingFactor = [];
+            // Group Unit Conversion Factors column is OPTIONAL: if given, it's saved
+            // per unit; if left blank (or missing a particular unit), that unit's
+            // conversion factor is simply left unset - no error, row still imports.
+            $unitsInGroup = [];
             foreach ($groupUnitsMap[$uomGroupId] ?? [] as $u) {
                 if ($u['unit_scope'] === 'per_product' && (int)$u['is_base_unit'] === 0) {
-                    $unitsNeedingFactor[mb_strtolower($u['uom_name'])] = $u;
+                    $unitsInGroup[mb_strtolower($u['uom_name'])] = $u;
                 }
             }
 
-            if (!empty($unitsNeedingFactor)) {
+            if (!empty($unitsInGroup) && $groupUnitConversionsRaw !== '') {
                 $parsedFactors = parseGroupUnitConversions($groupUnitConversionsRaw);
                 if ($parsedFactors === null) {
                     $errors[] = ['row' => $rowNum, 'message' => "Group Unit Conversion Factors format invalid - use 'UnitName:Factor;UnitName:Factor', e.g. 'Carton:1000'"];
                     continue;
                 }
-                $missingUnit = null;
-                foreach ($unitsNeedingFactor as $lname => $u) {
-                    if (!array_key_exists($lname, $parsedFactors)) {
-                        $missingUnit = $u['uom_name'];
-                        break;
+                foreach ($unitsInGroup as $lname => $u) {
+                    if (array_key_exists($lname, $parsedFactors)) {
+                        $groupConversionsToInsert[(int)$u['id']] = $parsedFactors[$lname];
                     }
-                    $groupConversionsToInsert[(int)$u['id']] = $parsedFactors[$lname];
-                }
-                if ($missingUnit !== null) {
-                    $errors[] = ['row' => $rowNum, 'message' => "Group Unit Conversion Factors missing a value for unit '{$missingUnit}'"];
-                    continue;
+                    // not provided -> skip silently, factor stays unset for this unit
                 }
             }
         } else {
