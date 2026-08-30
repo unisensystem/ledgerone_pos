@@ -176,21 +176,16 @@ try {
                 if ($company_id) $params[] = $company_id;
                 $params[] = $from_date;
                 $params[] = $to_date;
-                // Query 8: purchase_return
+                // Query 8: payroll_entries
                 $params[] = $tenant_id;
                 if ($company_id) $params[] = $company_id;
                 $params[] = $from_date;
                 $params[] = $to_date;
-                // Query 9: payroll_entries
-                $params[] = $tenant_id;
-                if ($company_id) $params[] = $company_id;
-                $params[] = $from_date;
-                $params[] = $to_date;
-                // Query 10: rent
+                // Query 9: rent
                 $params[] = $tenant_id;
                 $params[] = $from_date;
                 $params[] = $to_date;
-                // Query 11: production_expenses (NO company_id)
+                // Query 10: production_expenses (NO company_id)
                 $params[] = $tenant_id;
                 $params[] = $from_date;
                 $params[] = $to_date;
@@ -217,15 +212,12 @@ try {
                 // Query 7: expense_voucher
                 $params[] = $tenant_id;
                 if ($company_id) $params[] = $company_id;
-                // Query 8: purchase_return
+                // Query 8: payroll_entries
                 $params[] = $tenant_id;
                 if ($company_id) $params[] = $company_id;
-                // Query 9: payroll_entries
+                // Query 9: rent
                 $params[] = $tenant_id;
-                if ($company_id) $params[] = $company_id;
-                // Query 10: rent
-                $params[] = $tenant_id;
-                // Query 11: production_expenses (NO company_id)
+                // Query 10: production_expenses (NO company_id)
                 $params[] = $tenant_id;
             }
             break;
@@ -257,15 +249,12 @@ try {
         // Query 7: expense_voucher
         $params[] = $tenant_id;
         if ($company_id) $params[] = $company_id;
-        // Query 8: purchase_return
+        // Query 8: payroll_entries
         $params[] = $tenant_id;
         if ($company_id) $params[] = $company_id;
-        // Query 9: payroll_entries
+        // Query 9: rent
         $params[] = $tenant_id;
-        if ($company_id) $params[] = $company_id;
-        // Query 10: rent
-        $params[] = $tenant_id;
-        // Query 11: production_expenses (NO company_id)
+        // Query 10: production_expenses (NO company_id)
         $params[] = $tenant_id;
     }
 
@@ -404,25 +393,6 @@ try {
         AND ev.is_cash_flow = 1
         " . ($company_id ? " AND ev.company_id = ?" : "") . "
         {$date_conditions[6]}
-        
-        UNION ALL
-        
-        SELECT 
-            pr.purchase_date as date,
-            CAST(CONCAT('Purchase Return - ', pr.bill_no) AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci as description,
-            CAST(COALESCE(s.supplier_name, 'Supplier') AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci as account,
-            CAST(pr.bill_no AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci as reference,
-            CAST('Cash' AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci as method,
-            CAST('-' AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci as bank_account,
-            pr.net_amount as inflow,
-            0 as outflow,
-            pr.currency_id
-        FROM purchase_return pr
-        LEFT JOIN suppliers s ON pr.supplier_id = s.id
-        WHERE pr.tenant_id = ? 
-        AND pr.net_amount > 0
-        " . ($company_id ? " AND pr.company_id = ?" : "") . "
-        {$date_conditions[7]}
         
         UNION ALL
         
@@ -739,17 +709,6 @@ try {
                 UNION ALL
                 
                 SELECT 
-                    pr.net_amount as inflow,
-                    0 as outflow,
-                    '-' as bank_account
-                FROM purchase_return pr
-                WHERE pr.tenant_id = ? AND pr.net_amount > 0 AND pr.purchase_date < ?
-                " . ($company_id ? " AND pr.company_id = ?" : "") . "
-                " . ($bank_account !== 'all' ? " AND 1=0" : "") . "
-                
-                UNION ALL
-                
-                SELECT 
                     CASE WHEN pei.type = 'Advance Return' THEN pei.amount ELSE 0 END as inflow,
                     CASE WHEN pei.type != 'Advance Return' THEN pei.amount ELSE 0 END as outflow,
                     COALESCE(ba.bank_name, '-') as bank_account
@@ -764,8 +723,6 @@ try {
         ";
         $soft_stmt = $pdo->prepare($soft_sql);
         $params_soft = [$tenant_id, $from_date];
-        if ($company_id) $params_soft[] = $company_id;
-        $params_soft = array_merge($params_soft, [$tenant_id, $from_date]);
         if ($company_id) $params_soft[] = $company_id;
         $params_soft = array_merge($params_soft, [$tenant_id, $from_date]);
         if ($company_id) $params_soft[] = $company_id;
