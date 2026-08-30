@@ -45,6 +45,24 @@ if (!$user_id) {
                 <div class="form-grid">
                     <div class="form-section">
                         <h3 class="section-title">
+                            <i class="fas fa-building"></i> Company
+                        </h3>
+                        <div class="form-group col-8">
+                            <label for="companySelect">
+                                <i class="fas fa-building"></i> Select Company (optional)
+                            </label>
+                            <select id="companySelect">
+                                <option value="">-- Use Company column from the file (per row) --</option>
+                            </select>
+                            <div class="helper-text">
+                                <i class="fas fa-info-circle"></i>
+                                If you pick a company here, <strong>every row</strong> in the file will be imported under this company and the file's own "Company" column will be ignored. Leave this blank to match each row's Company text against your company list instead.
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-section">
+                        <h3 class="section-title">
                             <i class="fas fa-file-excel"></i> Upload File
                         </h3>
                         <div class="form-group col-8">

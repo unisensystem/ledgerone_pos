@@ -124,8 +124,12 @@ try {
     //   "Default Unit" -> Default Unit column is used, UOM Group column is ignored.
     //   "UOM Group"    -> UOM Group column is used, Default Unit column is ignored.
     //
-    // Unit Conversion Factor (col J) only applies to Default Unit rows.
-    // Group Unit Conversion Factors (col AE) only applies to UOM Group rows, and only
+    // Unit Conversion Factor (col J):
+    //   - Default Unit rows: applies to the picked Default Unit as before.
+    //   - UOM Group rows: used as a FALLBACK only when the group has exactly one
+    //     per-product, non-base unit (unambiguous). If "Group Unit Conversion
+    //     Factors" (col AE) is also given, AE takes priority over col J.
+    // Group Unit Conversion Factors (col AE) applies to UOM Group rows, and only
     // when that group contains per-product, non-base units - format:
     // "Carton:1000;Dozen:12" (unit name : factor, semicolon separated).
     //
@@ -340,13 +344,18 @@ try {
                 $errors[] = ['row' => $rowNum, 'message' => "UOM Group '{$groupTxt}' not found - please pick from the dropdown list"];
                 continue;
             }
-            // Default Unit column and the plain "Unit Conversion Factor" column are
-            // ignored in this mode. Per-unit factors (if the group needs any) come
-            // from the "Group Unit Conversion Factors" column instead.
+            // Default Unit column is ignored in this mode.
 
             // Group Unit Conversion Factors column is OPTIONAL: if given, it's saved
             // per unit; if left blank (or missing a particular unit), that unit's
             // conversion factor is simply left unset - no error, row still imports.
+            //
+            // As a convenience, when this UOM Group has exactly ONE unit that needs a
+            // factor, the plain "Unit Conversion Factor" (col J) is also accepted as a
+            // fallback - unambiguous in that case. If the group has more than one such
+            // unit, col J alone can't tell them apart, so it's rejected with an error
+            // telling the user to use "Group Unit Conversion Factors" instead. If both
+            // columns are given, "Group Unit Conversion Factors" (AE) takes priority.
             $unitsInGroup = [];
             foreach ($groupUnitsMap[$uomGroupId] ?? [] as $u) {
                 if ($u['unit_scope'] === 'per_product' && (int)$u['is_base_unit'] === 0) {
@@ -354,15 +363,32 @@ try {
                 }
             }
 
-            if (!empty($unitsInGroup) && $groupUnitConversionsRaw !== '') {
-                $parsedFactors = parseGroupUnitConversions($groupUnitConversionsRaw);
-                if ($parsedFactors === null) {
-                    $errors[] = ['row' => $rowNum, 'message' => "Group Unit Conversion Factors format invalid - use 'UnitName:Factor;UnitName:Factor', e.g. 'Carton:1000'"];
-                    continue;
+            $factorsToApply = [];
+            if (!empty($unitsInGroup)) {
+                if ($groupUnitConversionsRaw !== '') {
+                    // Explicit "UnitName:Factor" format takes priority when given
+                    $parsedFactors = parseGroupUnitConversions($groupUnitConversionsRaw);
+                    if ($parsedFactors === null) {
+                        $errors[] = ['row' => $rowNum, 'message' => "Group Unit Conversion Factors format invalid - use 'UnitName:Factor;UnitName:Factor', e.g. 'Carton:1000'"];
+                        continue;
+                    }
+                    $factorsToApply = $parsedFactors;
+                } elseif (is_numeric($conversionFactorRaw) && floatval($conversionFactorRaw) > 0) {
+                    // Fallback: plain "Unit Conversion Factor" column (J) - only
+                    // unambiguous when this UOM Group has exactly ONE unit needing a factor.
+                    if (count($unitsInGroup) === 1) {
+                        $onlyUnitName = array_key_first($unitsInGroup);
+                        $factorsToApply = [$onlyUnitName => floatval($conversionFactorRaw)];
+                    } else {
+                        $unitNames = implode(', ', array_map(fn($u) => $u['uom_name'], $unitsInGroup));
+                        $errors[] = ['row' => $rowNum, 'message' => "UOM Group '{$groupTxt}' has multiple units needing factors ({$unitNames}) - use 'Group Unit Conversion Factors' column with 'UnitName:Factor' format instead of the single 'Unit Conversion Factor' value"];
+                        continue;
+                    }
                 }
+
                 foreach ($unitsInGroup as $lname => $u) {
-                    if (array_key_exists($lname, $parsedFactors)) {
-                        $groupConversionsToInsert[(int)$u['id']] = $parsedFactors[$lname];
+                    if (array_key_exists($lname, $factorsToApply)) {
+                        $groupConversionsToInsert[(int)$u['id']] = $factorsToApply[$lname];
                     }
                     // not provided -> skip silently, factor stays unset for this unit
                 }

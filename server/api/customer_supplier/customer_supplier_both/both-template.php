@@ -100,8 +100,6 @@ $headers = [
     'AN' => 'Party Type',
     'AO' => 'AIT %',
     'AP' => 'Credit Days',
-    'AQ' => 'Supplier Opening Debit',
-    'AR' => 'Supplier Opening Credit',
 ];
 
 foreach ($headers as $col => $label) {
@@ -114,7 +112,7 @@ $sheet->setCellValue('B1', 'Party Name *');
 $sheet->setCellValue('AI1', "Associated Companies\n(comma-separated names)");
 $sheet->setCellValue('AJ1', "Salesman\n(comma-separated names)");
 
-$headerRange = 'A1:AR1';
+$headerRange = 'A1:AP1';
 $sheet->getStyle($headerRange)->getFont()->setBold(true)->getColor()->setRGB('FFFFFF');
 $sheet->getStyle($headerRange)->getFill()
     ->setFillType(Fill::FILL_SOLID)
@@ -144,7 +142,7 @@ $sheet->fromArray([
     'No', '', 'No', '', 0, 0, 0, 0, 'No', 0, 0,
     '', '',
     !empty($supplierCategories) ? $supplierCategories[0] : '',
-    '', 'Bhakkar', 'Unregistered', 0, 0, 0, 0
+    '', 'Bhakkar', 'Unregistered', 0, 0
 ], null, 'A2');
 
 // Pre-fill Yes/No defaults on every blank data row (Blacklist, Out Station,

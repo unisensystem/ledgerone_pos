@@ -1,6 +1,7 @@
 document.addEventListener('DOMContentLoaded', function () {
     const form = document.getElementById('importForm');
     const fileInput = document.getElementById('importFile');
+    const companySelect = document.getElementById('companySelect');
     const submitBtn = document.getElementById('submitBtn');
     const resetBtn = document.getElementById('resetBtn');
     const resultBox = document.getElementById('resultBox');
@@ -21,6 +22,25 @@ document.addEventListener('DOMContentLoaded', function () {
     }
     notificationClose.addEventListener('click', () => notification.classList.remove('show'));
 
+    // ---- Load companies into the dropdown ----
+    fetch('../../../../server/api/customer_supplier/customer_supplier_both/get-companies.php')
+        .then(r => r.json())
+        .then(data => {
+            if (data.success && Array.isArray(data.companies)) {
+                data.companies.forEach(c => {
+                    const opt = document.createElement('option');
+                    opt.value = c.id;
+                    opt.textContent = c.company_code ? `${c.company_name} (${c.company_code})` : c.company_name;
+                    companySelect.appendChild(opt);
+                });
+            } else {
+                console.warn('Could not load companies:', data.message || 'Unknown error');
+            }
+        })
+        .catch(() => {
+            console.warn('Failed to fetch company list - the dropdown will only show the default option.');
+        });
+
     form.addEventListener('submit', function (e) {
         e.preventDefault();
 
@@ -31,6 +51,9 @@ document.addEventListener('DOMContentLoaded', function () {
 
         const formData = new FormData();
         formData.append('file', fileInput.files[0]);
+        if (companySelect.value) {
+            formData.append('company_id', companySelect.value);
+        }
 
         submitBtn.disabled = true;
         submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Importing...';
