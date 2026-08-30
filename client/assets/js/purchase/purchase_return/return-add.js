@@ -1343,24 +1343,19 @@ document.addEventListener('DOMContentLoaded', function () {
                 break;
             }
 
-            // Batch selection is required (either a real batch or the "No Batch" option) —
-            // this just confirms which pool of stock is being returned from, but a
-            // product with truly no available stock still cannot be returned.
-            if (!batchSelect || !batchSelect.value) {
-                alert('Please select a batch for row ' + (i + 1) + '. If this product has no batch tracking, choose "No Batch".');
-                isValid = false;
-                break;
-            }
-
-            // Client-side sanity check against the batch's available qty
+            // Batch selection is now OPTIONAL — user can save the row without
+            // picking a batch. When a batch IS selected, we still sanity-check
+            // the quantity against that batch's available stock.
             let totalQty = 0;
             unitInputs.forEach(input => { totalQty += parseFloat(input.value) || 0; });
-            const availableQty = parseFloat(rows[i].dataset.batchAvailableQty) || 0;
-            if (totalQty > availableQty) {
-                const batchLabel = batchSelect.value === 'NONE' ? 'No Batch' : batchSelect.value;
-                alert(`Row ${i + 1}: return quantity (${totalQty}) exceeds available stock in "${batchLabel}" (${availableQty}).`);
-                isValid = false;
-                break;
+            if (batchSelect && batchSelect.value) {
+                const availableQty = parseFloat(rows[i].dataset.batchAvailableQty) || 0;
+                if (totalQty > availableQty) {
+                    const batchLabel = batchSelect.value === 'NONE' ? 'No Batch' : batchSelect.value;
+                    alert(`Row ${i + 1}: return quantity (${totalQty}) exceeds available stock in "${batchLabel}" (${availableQty}).`);
+                    isValid = false;
+                    break;
+                }
             }
         }
 

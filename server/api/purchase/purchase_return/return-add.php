@@ -156,15 +156,17 @@ try {
         }
 
         // Safety check: don't let qty_out exceed what's actually available.
-        // If batchNo is null, check the "no batch" bucket in stock_ledger instead
-        // of a specific batch, since that's where legacy/non-batch-tracked stock lives.
-        // (Frontend already restricts this via get-product-batches.php, this is a server-side guard.)
+        // Batch selection is OPTIONAL on the frontend now — when the user
+        // doesn't pick a specific batch ($batchNo === null), we check the
+        // TOTAL available stock for this product/branch across ALL batches
+        // (not just the "no batch" bucket), since an unspecified batch means
+        // the return isn't tied to one particular batch. When a specific
+        // batch IS chosen, we still check availability within that batch only.
         if ($batchNo === null) {
             $avail_stmt = $pdo->prepare("
                 SELECT COALESCE(SUM(qty_in),0) - COALESCE(SUM(qty_out),0) AS available_qty
                 FROM stock_ledger
                 WHERE tenant_id = ? AND product_id = ? AND branch_id = ?
-                  AND (batch_no IS NULL OR batch_no = '')
             ");
             $avail_stmt->execute([$tenant_id, $item['productId'], $input['branchId']]);
         } else {

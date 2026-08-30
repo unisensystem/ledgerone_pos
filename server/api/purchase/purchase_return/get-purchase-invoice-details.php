@@ -73,6 +73,32 @@ try {
     ");
     $itemStmt->execute([$invoice_id, $tenant_id]);
     $rawItems = $itemStmt->fetchAll(PDO::FETCH_ASSOC);
+
+    // NEW: already-returned quantities against THIS purchase invoice, grouped
+    // by product_id + uom_id. Used below to subtract from the original invoice
+    // quantities so re-selecting the same invoice only offers the remaining
+    // (not-yet-returned) quantity — otherwise a product returned once could be
+    // "returned" again for its full original qty.
+    //
+    // NOTE: purchase_return_items.purchase_invoice_id actually stores the
+    // PARENT RETURN's own id (set from purchase_return's lastInsertId in
+    // return-add.php), NOT the original purchase invoice id. The original
+    // purchase invoice id is stored on purchase_return.purchase_invoice_no.
+    // So we join through purchase_return to filter by the real invoice id.
+    $returnedStmt = $pdo->prepare("
+        SELECT pri.product_id, pri.uom_id, COALESCE(SUM(pri.quantity), 0) AS returned_qty
+        FROM purchase_return_items pri
+        INNER JOIN purchase_return pr ON pri.purchase_invoice_id = pr.id
+        WHERE pr.purchase_invoice_no = ? AND pri.tenant_id = ?
+        GROUP BY pri.product_id, pri.uom_id
+    ");
+    $returnedStmt->execute([$invoice_id, $tenant_id]);
+    $returnedRows = $returnedStmt->fetchAll(PDO::FETCH_ASSOC);
+
+    $returnedMap = []; // [product_id][uom_id] => already returned qty
+    foreach ($returnedRows as $r) {
+        $returnedMap[$r['product_id']][$r['uom_id']] = floatval($r['returned_qty']);
+    }
     
     // Group items by product_id
     $productGroups = [];
@@ -115,6 +141,40 @@ try {
                 $totalNet += floatval($item['net_amount']);
             }
         }
+
+        // NEW: subtract already-returned qty (per uom) from the original
+        // invoice qty, so only the remaining returnable qty is offered.
+        $originalTotalQty = 0;
+        foreach ($uomMap as $uomId => $u) {
+            $originalTotalQty += $u['quantity'];
+        }
+
+        $remainingTotalQty = 0;
+        foreach ($uomMap as $uomId => &$u) {
+            $alreadyReturned = $returnedMap[$productId][$uomId] ?? 0;
+            $remainingQty = $u['quantity'] - $alreadyReturned;
+            if ($remainingQty < 0) $remainingQty = 0;
+            $u['quantity'] = $remainingQty;
+            $remainingTotalQty += $remainingQty;
+        }
+        unset($u);
+
+        // Drop uom entries that are fully consumed (nothing left to return)
+        $uomMap = array_filter($uomMap, function ($u) {
+            return $u['quantity'] > 0;
+        });
+
+        // If everything on this product has already been returned, skip it
+        // entirely — there's nothing left to return.
+        if ($remainingTotalQty <= 0) {
+            continue;
+        }
+
+        // Scale the money fields (gross/discount/trade offer/tax/foc/net) down
+        // proportionally to how much quantity is actually left, so the return
+        // form reflects only the remaining portion instead of the full
+        // original invoice amounts.
+        $ratio = ($originalTotalQty > 0) ? ($remainingTotalQty / $originalTotalQty) : 1;
         
         $itemIndex++;
         $groupedItems[$itemIndex] = [
@@ -125,15 +185,15 @@ try {
             'uom_group_id' => $firstItem['uom_group_id'],
             'default_unit_id' => $firstItem['default_unit_id'],
             'purchase_price' => $firstItem['purchase_price'],
-            'gross_amount' => $totalGross,
+            'gross_amount' => round($totalGross * $ratio, 2),
             'discount_percent' => $firstItem['discount_percent'],
-            'discount_amount' => $totalDiscount,
+            'discount_amount' => round($totalDiscount * $ratio, 2),
             'trade_offer_percent' => $firstItem['trade_offer_percent'],
-            'trade_offer_amount' => $totalTradeOffer,
+            'trade_offer_amount' => round($totalTradeOffer * $ratio, 2),
             'tax_percent' => $firstItem['tax_percent'],
-            'tax_amount' => $totalTax,
-            'foc_quantity' => $totalFoc,
-            'net_amount' => $totalNet,
+            'tax_amount' => round($totalTax * $ratio, 2),
+            'foc_quantity' => round($totalFoc * $ratio, 2),
+            'net_amount' => round($totalNet * $ratio, 2),
             'unit_entries' => array_values($uomMap)
         ];
     }
