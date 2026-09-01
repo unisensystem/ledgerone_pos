@@ -243,11 +243,15 @@ function updateBalances(balances) {
     const openingBalance = document.querySelector('.opening-balance .balance-value');
     const totalInflow = document.querySelector('.total-inflow .balance-value');
     const totalOutflow = document.querySelector('.total-outflow .balance-value');
+    const netFlow = document.querySelector('.net-flow .balance-value');
     const closingBalance = document.querySelector('.closing-balance .balance-value');
+    
+    const net = (balances.total_inflow || 0) - (balances.total_outflow || 0);
     
     if (openingBalance) openingBalance.textContent = formatCurrency(balances.opening_balance);
     if (totalInflow) totalInflow.textContent = formatCurrency(balances.total_inflow);
     if (totalOutflow) totalOutflow.textContent = formatCurrency(balances.total_outflow);
+    if (netFlow) netFlow.textContent = formatCurrency(net);
     if (closingBalance) closingBalance.textContent = formatCurrency(balances.closing_balance);
 }
 
