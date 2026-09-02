@@ -1302,10 +1302,10 @@ try {
             $from_date = $_GET['from_date'] ?? null;
             $to_date = $_GET['to_date'] ?? null;
 
-            if (!$customer_id && !$product_id) {
-                echo json_encode(['success' => false, 'message' => 'Customer or Product required']);
-                exit;
-            }
+            // NOTE: Customer/Product used to be mandatory here — the tab now
+            // auto-loads full tenant-wide data by default (same pattern as the
+            // other ledger tabs), with customer_id/product_id as optional
+            // narrowing filters, so that requirement was removed.
 
             $sql = "SELECT 
                         sl.transaction_date,

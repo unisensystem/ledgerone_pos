@@ -509,6 +509,10 @@ tabs.forEach(tab => {
         if (tabId === 'item-ledger') loadItemLedger();
         if (tabId === 'detailed-ledger') loadDetailedLedger();
         if (tabId === 'item-movement') loadItemMovement();
+        // Customer-wise Ledger used to stay empty until a Customer/Product filter
+        // was applied — every other ledger tab auto-loads full data on open, so
+        // this brings it in line with that same pattern.
+        if (tabId === 'customer-ledger') loadCustomerLedger();
     });
 });
 
@@ -1122,6 +1126,71 @@ function updateCustomerPaginationControls() {
     document.getElementById('customer-prev-btn').disabled = customerCurrentPage === 1;
     document.getElementById('customer-next-btn').disabled = customerCurrentPage === totalPages || totalPages === 0;
 }
+
+// Load Customer-wise Ledger (auto-loads full tenant-wide data when no Customer/Product
+// filter is set — same "no mandatory selection" pattern as loadItemLedger above).
+// Used both when the tab is opened and when "Apply Filters" is clicked.
+async function loadCustomerLedger() {
+    const batchFilter = document.getElementById('customer-batch-filter').value;
+    const expiryFilter = document.getElementById('customer-expiry-filter').value;
+    const customerName = document.getElementById('customer-ledger-input').value;
+    const productName = document.getElementById('customer-product-input').value;
+    const fromDate = document.getElementById('from-date-customer').value;
+    const toDate = document.getElementById('to-date-customer').value;
+
+    // Resolve customer id (optional)
+    let customerId = null;
+    if (customerName) {
+        const options = document.querySelectorAll('#customer-ledger-list option');
+        for (let option of options) {
+            if (option.value === customerName) {
+                customerId = option.getAttribute('data-id');
+                break;
+            }
+        }
+        if (!customerId) {
+            alert('Invalid customer selected. Please pick from the list.');
+            return;
+        }
+    }
+
+    // Resolve product id (optional)
+    let productId = null;
+    if (productName) {
+        const productOptions = document.querySelectorAll('#customer-product-list option');
+        for (let option of productOptions) {
+            if (option.value === productName) {
+                productId = option.getAttribute('data-id');
+                break;
+            }
+        }
+        if (!productId) {
+            alert('Invalid product selected. Please pick from the list.');
+            return;
+        }
+    }
+
+    try {
+        let url = `${API_BASE}?action=customer-ledger`;
+        if (customerId) url += `&customer_id=${customerId}`;
+        if (productId) url += `&product_id=${productId}`;
+        if (fromDate) url += `&from_date=${fromDate}`;
+        if (toDate) url += `&to_date=${toDate}`;
+
+        const response = await fetch(url);
+        const data = await response.json();
+
+        if (data.success) {
+            const filteredData = filterLedgerByBatchExpiry(data.data, batchFilter, expiryFilter);
+            updateCustomerLedgerTable(filteredData, data.currency);
+        } else {
+            alert(data.message || 'Failed to load ledger');
+        }
+    } catch (error) {
+        console.error('Error loading customer ledger:', error);
+    }
+}
+
 function updateMovementTable(entries, currency = '$') {
     allMovementEntries = entries;
     movementTotalItems = allMovementEntries.length;
@@ -1416,91 +1485,15 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('customer-batch-filter').value = '';
     document.getElementById('customer-expiry-filter').value = '';
 
-    allCustomerEntries = [];
-    customerTotalItems = 0;
-    customerCurrentPage = 1;
-
-    const tbody = document.querySelector('#customer-ledger .table tbody');
-    tbody.innerHTML = '';
-
-    document.getElementById('customer-pagination-info').textContent =
-        'Showing 0 - 0 of 0 entries';
-
-    document.getElementById('customer-page-info').textContent =
-        'Page 1 of 1';
+    // Clear means "back to default" — reload the full, unfiltered ledger
+    // instead of leaving the table empty (matches the other tabs' Clear buttons).
+    loadCustomerLedger();
 });
 
     // Apply Customer Filters
- document.getElementById('applyCustomerFilters').addEventListener('click', async () => {
-    const batchFilter = document.getElementById('customer-batch-filter').value;
-const expiryFilter = document.getElementById('customer-expiry-filter').value;
-    const customerName = document.getElementById('customer-ledger-input').value;
-    const productName = document.getElementById('customer-product-input').value;
-    const fromDate = document.getElementById('from-date-customer').value;
-    const toDate = document.getElementById('to-date-customer').value;
-
-    if ((!customerName || customerName.trim() === '') && (!productName || productName.trim() === '')) {
-        alert('Please select a Customer or a Product');
-        return;
-    }
-
-    // Resolve customer id (optional)
-    let customerId = null;
-    if (customerName) {
-        const options = document.querySelectorAll('#customer-ledger-list option');
-        for (let option of options) {
-            if (option.value === customerName) {
-                customerId = option.getAttribute('data-id');
-                break;
-            }
-        }
-        if (!customerId) {
-            alert('Invalid customer selected. Please pick from the list.');
-            return;
-        }
-    }
-
-    // Resolve product id (optional)
-    let productId = null;
-    if (productName) {
-        const productOptions = document.querySelectorAll('#customer-product-list option');
-        for (let option of productOptions) {
-            if (option.value === productName) {
-                productId = option.getAttribute('data-id');
-                break;
-            }
-        }
-        if (!productId) {
-            alert('Invalid product selected. Please pick from the list.');
-            return;
-        }
-    }
-
-    try {
-        let url = `${API_BASE}?action=customer-ledger`;
-        if (customerId) url += `&customer_id=${customerId}`;
-        if (productId) url += `&product_id=${productId}`;
-        if (fromDate) url += `&from_date=${fromDate}`;
-        if (toDate) url += `&to_date=${toDate}`;
-
-        const response = await fetch(url);
-        const data = await response.json();
-
-        if (data.success) {
-    const filteredData = filterLedgerByBatchExpiry(
-        data.data,
-        batchFilter,
-        expiryFilter
-    );
-
-    updateCustomerLedgerTable(filteredData, data.currency);
-} else {
-            alert(data.message || 'Failed to load ledger');
-        }
-    } catch (error) {
-        console.error('Error loading customer ledger:', error);
-    }
-});
+    document.getElementById('applyCustomerFilters').addEventListener('click', () => {
+        loadCustomerLedger();
+    });
     // Customer-wise Ledger pagination event listeners
     document.getElementById('customer-prev-btn').addEventListener('click', () => {
         if (customerCurrentPage > 1) {

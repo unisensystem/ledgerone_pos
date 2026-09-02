@@ -7,6 +7,10 @@
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { background: #f0f0f0; font-family: Arial, sans-serif; }
 
+        /* Default before JS runs, so a print triggered before DOMContentLoaded
+           still has a sane fallback page size. */
+        :root { --page-size: A4; }
+
         .no-print {
             padding: 16px 24px;
             background: #fff;
@@ -25,6 +29,7 @@
             font-size: 14px;
         }
         .no-print button:hover { background: #0056b3; }
+        .no-print button:disabled { background: #99c2ff !important; cursor: not-allowed; }
         .size-btn { background: #6c757d !important; }
         .size-btn:hover { background: #545b62 !important; }
         .size-btn.active { background: #28a745 !important; }
@@ -32,9 +37,11 @@
 
         .invoice-frame-wrapper {
             page-break-after: always;
+            break-after: page;
         }
         .invoice-frame-wrapper:last-child {
             page-break-after: avoid;
+            break-after: avoid;
         }
 
         iframe {
@@ -44,17 +51,60 @@
             background: white;
         }
 
+        /* SCREEN-ONLY separation between invoices. This is the actual fix for
+           the "invoices collapsing into each other" complaint: instead of
+           chasing pixel-perfect iframe height (font rendering, images, QR
+           codes etc. can all shift real height by a few px), we make each
+           invoice visually its own card with a clear gap, background and
+           label, ON SCREEN ONLY. Even if one iframe's height is slightly off,
+           the gap + shadow + label make it obvious where one invoice ends and
+           the next begins — they can never visually "merge" again.
+           This block is wrapped in @media screen so print is completely
+           unaffected and keeps using the real @page pagination below. */
+        @media screen {
+            #framesContainer {
+                padding: 24px;
+                display: flex;
+                flex-direction: column;
+                gap: 32px;
+            }
+            .invoice-frame-wrapper {
+                background: white;
+                box-shadow: 0 2px 10px rgba(0, 0, 0, 0.15);
+                border-radius: 6px;
+                overflow: hidden;
+            }
+            .invoice-label {
+                background: #333;
+                color: #fff;
+                font-size: 12px;
+                font-weight: bold;
+                padding: 6px 12px;
+                letter-spacing: 0.5px;
+            }
+        }
+        /* The label only makes sense on screen — never print it */
+        .invoice-label { display: none; }
+        @media screen { .invoice-label { display: block; } }
+
         @media print {
             .no-print { display: none; }
             body { background: white; }
             iframe { height: auto; }
+
+            /* IMPORTANT: each invoice iframe sets its own @page size internally,
+               but that's ignored once this parent page is what gets printed —
+               the browser reads paper size from the TOP document's @page rule,
+               not from nested iframes. Without this, A3/A5/A6 selection had no
+               effect on the actual printed/PDF paper size in bulk print. */
+            @page { size: var(--page-size); }
         }
     </style>
 </head>
 <body>
 
 <div class="no-print">
-    <button onclick="printAll()">🖨️ Print All</button>
+    <button id="printBtn" onclick="printAll()" disabled>🖨️ Print All</button>
     <button class="size-btn" onclick="setPaperSize('A3')" id="btnA3">A3</button>
     <button class="size-btn" onclick="setPaperSize('A4')" id="btnA4">A4</button>
     <button class="size-btn" onclick="setPaperSize('A5')" id="btnA5">A5</button>
@@ -69,6 +119,8 @@
     const idsParam = urlParams.get('ids') || '';
     const ids = idsParam.split(',').map(s => s.trim()).filter(Boolean);
 
+    const printBtn = document.getElementById('printBtn');
+
     if (ids.length === 0) {
         document.getElementById('statusMsg').textContent = 'No invoice IDs provided.';
     }
@@ -76,32 +128,113 @@
     let loadedCount = 0;
     const container = document.getElementById('framesContainer');
 
+    // Measures the REAL height of an invoice iframe's rendered content.
+    //
+    // We take the MAX of several measurement methods instead of trusting just
+    // one. getBoundingClientRect() on the content wrapper is normally accurate,
+    // but for large invoices (many item rows) subpixel/table-layout rounding
+    // can occasionally make it come in a hair short — and any underestimate
+    // means the tail of that invoice gets visually clipped. scrollHeight can
+    // never be smaller than the true content height, so taking the max of all
+    // of them means we only ever risk a tiny bit of extra blank space, never
+    // a cut-off invoice.
+    function measureContentHeight(doc) {
+        let maxBottom = 0;
+        const body = doc.body;
+        if (body) {
+            Array.from(body.children).forEach(el => {
+                if (el.classList && el.classList.contains('no-print')) return;
+                const rect = el.getBoundingClientRect();
+                if (rect.bottom > maxBottom) maxBottom = rect.bottom;
+            });
+        }
+        const scrollHeights = [
+            doc.documentElement.scrollHeight,
+            body ? body.scrollHeight : 0,
+            body ? body.offsetHeight : 0
+        ];
+        return Math.ceil(Math.max(maxBottom, ...scrollHeights));
+    }
+
     ids.forEach((id, index) => {
         const wrapper = document.createElement('div');
         wrapper.className = 'invoice-frame-wrapper';
+
+        // Screen-only label so each invoice is unmistakably its own block —
+        // this, plus the card gap/shadow in the CSS above, is what actually
+        // guarantees invoices can never look "collapsed" into each other,
+        // regardless of any small height-measurement inaccuracy.
+        const label = document.createElement('div');
+        label.className = 'invoice-label';
+        label.textContent = `Invoice ${index + 1} of ${ids.length} (ID: ${id})`;
+        wrapper.appendChild(label);
 
         const iframe = document.createElement('iframe');
         iframe.src = `invoice-print.php?id=${id}`;
         iframe.scrolling = 'no';
 
-        // Resize iframe to fit content after load
+        // The iframe's 'load' event fires once its initial HTML/CSS/scripts are
+        // parsed — NOT once invoice-print.php's own async data (items, company,
+        // QR code) has finished loading and rendering. Reading height only here
+        // used to freeze the iframe at the "Loading items..." placeholder
+        // height, so real invoices with more/fewer items than that placeholder
+        // got clipped or left with a big blank gap.
+        //
+        // Fix: keep syncing height (a) right when invoice-print.php tells us its
+        // data finished rendering ('invoiceLoaded', which it already dispatches),
+        // (b) continuously via ResizeObserver — which stays active forever, so
+        // even a slow-loading company logo image or QR code that changes the
+        // layout well after load still gets picked up and corrected — and
+        // (c) one final forced re-sync right before printing, as a safety net.
         iframe.addEventListener('load', function () {
+            let win, doc;
             try {
-                const doc = iframe.contentDocument || iframe.contentWindow.document;
-                // Hide the print buttons inside the iframe
-                doc.querySelectorAll('.no-print').forEach(el => el.style.display = 'none');
-                // Set height to content
-                iframe.style.height = doc.body.scrollHeight + 'px';
-            } catch(e) {}
-
-            loadedCount++;
-            document.getElementById('statusMsg').textContent =
-                `Loaded ${loadedCount} of ${ids.length} invoice(s)`;
-
-            if (loadedCount === ids.length) {
-                document.getElementById('statusMsg').textContent =
-                    `${ids.length} invoice(s) ready. Click "Print All" to print.`;
+                win = iframe.contentWindow;
+                doc = iframe.contentDocument || win.document;
+            } catch (e) {
+                return; // cross-origin or inaccessible — nothing more we can do
             }
+
+            // Hide the print buttons inside the iframe
+            doc.querySelectorAll('.no-print').forEach(el => el.style.display = 'none');
+
+            const syncHeight = () => {
+                const h = measureContentHeight(doc);
+                iframe.style.height = h + 'px';
+            };
+            syncHeight();
+
+            // Keep a reference so printAll() can force one last accurate
+            // measurement on every iframe right before printing.
+            iframe._syncHeight = syncHeight;
+
+            // These two observers run forever (never disconnected) — between
+            // them, ANY reason the content could grow (image finishing load,
+            // more rows added, QR code appearing, font swap) triggers an
+            // immediate re-measurement, so a large invoice with many rows is
+            // just as safe as a small one.
+            try {
+                new ResizeObserver(syncHeight).observe(doc.body);
+            } catch (e) {}
+            try {
+                new MutationObserver(syncHeight).observe(doc.body, {
+                    childList: true, subtree: true, characterData: true, attributes: true
+                });
+            } catch (e) {}
+
+            win.addEventListener('invoiceLoaded', () => {
+                syncHeight();
+
+                loadedCount++;
+                document.getElementById('statusMsg').textContent =
+                    loadedCount === ids.length
+                        ? `${ids.length} invoice(s) ready. Click "Print All" to print.`
+                        : `Loaded ${loadedCount} of ${ids.length} invoice(s)`;
+
+                if (loadedCount === ids.length) {
+                    printBtn.disabled = false;
+                }
+            });
         });
 
         wrapper.appendChild(iframe);
@@ -109,14 +242,35 @@
     });
 
     function printAll() {
-        window.print();
+        if (printBtn.disabled) return;
+
+        // Force one last accurate measurement on every iframe right before
+        // printing, then give the browser a moment to apply those heights
+        // before the print dialog opens.
+        document.querySelectorAll('iframe').forEach(iframe => {
+            if (typeof iframe._syncHeight === 'function') iframe._syncHeight();
+        });
+
+        requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+                window.print();
+            });
+        });
     }
 
     function setPaperSize(size) {
         localStorage.setItem('invoicePaperSize', size);
+        // 'A6' isn't a valid CSS @page size keyword — use explicit physical
+        // dimensions, same mapping invoice-print.php uses for its own @page.
+        const pageSizeValue = size === 'A6' ? '105mm 148mm' : size;
+        document.documentElement.style.setProperty('--page-size', pageSizeValue);
+
         document.querySelectorAll('.size-btn').forEach(btn => btn.classList.remove('active'));
         document.getElementById('btn' + size).classList.add('active');
-        // Propagate to all loaded iframes
+
+        // Propagate to all loaded iframes so each invoice's own a5-mode/a6-mode
+        // styling switches too (this also triggers the ResizeObserver above to
+        // resync each iframe's height for the new, differently-sized content).
         document.querySelectorAll('iframe').forEach(iframe => {
             try {
                 iframe.contentWindow.setPaperSize(size);
