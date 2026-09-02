@@ -3056,12 +3056,6 @@ const invoiceSettingCheckboxes = [
             }
         }
 
-        // Filter options based on search input
-        searchInput.addEventListener('input', function () {
-            selectedIndex = -1;
-            filterOptions();
-        });
-
         // Select option
         optionsContainer.addEventListener('click', async function (e) {
             if (e.target.classList.contains('dropdown-option')) {
@@ -3176,14 +3170,15 @@ const invoiceSettingCheckboxes = [
             for (let i = 0; i < options.length; i++) {
                 const option = options[i];
                 const text = option.textContent.toLowerCase();
-
-                if (text.includes(searchTerm)) {
-                    option.style.display = 'block';
-                    option.style.backgroundColor = '';
-                } else {
-                    option.style.display = 'none';
-                }
+                option.style.display = text.includes(searchTerm) ? 'block' : 'none';
             }
+            // Re-apply highlight after filtering
+            const visibleOptions = Array.from(optionsContainer.getElementsByClassName('dropdown-option'))
+                .filter(o => o.style.display !== 'none');
+            visibleOptions.forEach((o, i) => {
+                o.style.backgroundColor = i === selectedIndex ? '#1a6cdc' : '';
+                o.style.color = i === selectedIndex ? 'white' : '';
+            });
         }
     }
 
@@ -5372,12 +5367,15 @@ async function loadPurchaseHistory(productId) {
         const data = await response.json();
         if (data.success && data.history && data.history.length > 0) {
             const latestPurchasePrice = parseFloat(data.history[0].purchase_price);
+            const latestDiscPercent = parseFloat(data.history[0].discount_percent || 0);
+            const latestExtraDiscPercent = parseFloat(data.history[0].extra_discount_percent || 0);
+            const latestBatchNo = data.history[0].batch_no || '';
             const content = data.history.map((item, index) => {
                 const date = new Date(item.purchase_date).toLocaleDateString();
                 return `<div>${index + 1}. ${date} - ${item.currency_symbol}${parseFloat(item.purchase_price).toFixed(3)} (Qty: ${item.quantity})</div>`;
             }).join('');
             document.getElementById('purchaseHistoryContent').innerHTML = content;
-            document.getElementById('purchaseHistoryInner').style.display = 'block';
+            document.getElementById('purchaseHistoryInner').style.display = 'none'; // hidden by design
             // Store latest purchase price on the active row for validation
             const itemsTable = document.getElementById('itemsTable')?.getElementsByTagName('tbody')[0];
             if (itemsTable) {
@@ -5386,6 +5384,9 @@ async function loadPurchaseHistory(productId) {
                     const codeInput = rows[i].cells[1]?.querySelector('.item-code');
                     if (codeInput && codeInput.value == productId) {
                         rows[i].dataset.latestPurchasePrice = latestPurchasePrice;
+                        rows[i].dataset.purchaseDiscPercent = latestDiscPercent;
+                        rows[i].dataset.purchaseExtraDiscPercent = latestExtraDiscPercent;
+                        rows[i].dataset.purchaseBatchNo = latestBatchNo;
                         validateSalePriceVsPurchase(rows[i]);
                         break;
                     }
@@ -5398,6 +5399,47 @@ async function loadPurchaseHistory(productId) {
         console.error('Error loading purchase history:', error);
         document.getElementById('purchaseHistoryInner').style.display = 'none';
     }
+}
+
+// Validate disc% and extra disc% vs purchase disc%
+function validateDiscVsPurchase(row) {
+    const purchaseDisc = parseFloat(row.dataset.purchaseDiscPercent);
+    const purchaseExtraDisc = parseFloat(row.dataset.purchaseExtraDiscPercent);
+    const purchaseBatch = row.dataset.purchaseBatchNo || '';
+    const batchInfo = purchaseBatch ? ` (Batch: ${purchaseBatch})` : '';
+
+    const discInput = row.querySelector('.disc-percent-cell input');
+    const extraDiscInput = row.querySelector('.extra-disc-cell input');
+
+    row.querySelectorAll('.disc-warning').forEach(el => el.remove());
+
+    if (discInput && !isNaN(purchaseDisc) && purchaseDisc > 0) {
+        if ((parseFloat(discInput.value) || 0) > purchaseDisc) {
+            showDiscWarning(discInput, `Disc% exceeds purchase (${purchaseDisc.toFixed(2)}%${batchInfo})`);
+        }
+    }
+
+    if (extraDiscInput && !isNaN(purchaseExtraDisc) && purchaseExtraDisc > 0) {
+        if ((parseFloat(extraDiscInput.value) || 0) > purchaseExtraDisc) {
+            showDiscWarning(extraDiscInput, `Extra Disc% exceeds purchase (${purchaseExtraDisc.toFixed(2)}%${batchInfo})`);
+        }
+    }
+}
+
+function showDiscWarning(inputEl, msg) {
+    const existing = document.getElementById('discWarnToast');
+    if (existing) existing.remove();
+    const toast = document.createElement('div');
+    toast.id = 'discWarnToast';
+    toast.style.cssText = 'position:fixed;top:18px;right:18px;z-index:99999;background:#c0392b;color:#fff;font-size:13px;font-weight:600;padding:10px 18px;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,0.3);display:flex;align-items:center;gap:8px;';
+    toast.innerHTML = `<span style="font-size:16px">\u26a0\ufe0f</span> ${msg}`;
+    document.body.appendChild(toast);
+    const warn = document.createElement('div');
+    warn.className = 'disc-warning';
+    warn.style.cssText = 'color:#c0392b;font-size:10px;font-weight:700;margin-top:2px;';
+    warn.textContent = `\u26a0\ufe0f ${msg}`;
+    inputEl.parentNode.appendChild(warn);
+    setTimeout(() => { if (toast.parentNode) toast.remove(); }, 4000);
 }
 
 // Validate sale price vs latest purchase price
@@ -6346,6 +6388,7 @@ async function addRowDynamic() {
         });
         const price = parseFloat(row.querySelector('.price-cell input').value) || 0;
         calculateRowAmounts(row, totalQty, price);
+        validateDiscVsPurchase(row);
     });
     discPercentCell.appendChild(discPercentInput);
     
@@ -6397,6 +6440,7 @@ async function addRowDynamic() {
             });
             const price = parseFloat(row.querySelector('.price-cell input').value) || 0;
             calculateRowAmounts(row, totalQty, price);
+            validateDiscVsPurchase(row);
         });
         extraDiscCell.appendChild(extraDiscInput);
     }
@@ -6614,7 +6658,8 @@ function initTableDropdownDynamic(container, row) {
 
     function updateSelectionDynamic(visibleOptions) {
         visibleOptions.forEach((option, index) => {
-            option.style.backgroundColor = index === selectedIndex ? 'var(--surface-1)' : '';
+            option.style.backgroundColor = index === selectedIndex ? '#1a6cdc' : '';
+            option.style.color = index === selectedIndex ? 'white' : '';
         });
         if (selectedIndex >= 0 && visibleOptions[selectedIndex]) {
             visibleOptions[selectedIndex].scrollIntoView({ block: 'nearest' });
@@ -6753,14 +6798,15 @@ function initTableDropdownDynamic(container, row) {
         for (let i = 0; i < options.length; i++) {
             const option = options[i];
             const text = option.textContent.toLowerCase();
-            
-            if (text.includes(searchTerm)) {
-                option.style.display = 'block';
-                option.style.backgroundColor = '';
-            } else {
-                option.style.display = 'none';
-            }
+            option.style.display = text.includes(searchTerm) ? 'block' : 'none';
         }
+        // Re-apply highlight after filtering
+        const visibleOpts = Array.from(optionsContainer.getElementsByClassName('dropdown-option'))
+            .filter(o => o.style.display !== 'none');
+        visibleOpts.forEach((o, i) => {
+            o.style.backgroundColor = i === selectedIndex ? '#1a6cdc' : '';
+            o.style.color = i === selectedIndex ? 'white' : '';
+        });
     }
 }
 

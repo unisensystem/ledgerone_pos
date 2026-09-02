@@ -5678,7 +5678,8 @@ function initTableDropdownDynamic(container, row) {
     
     function updateSelectionDynamic(visibleOptions) {
         visibleOptions.forEach((option, index) => {
-            option.style.backgroundColor = index === selectedIndex ? 'var(--surface-1)' : '';
+            option.style.backgroundColor = index === selectedIndex ? '#1a6cdc' : '';
+            option.style.color = index === selectedIndex ? 'white' : '';
         });
     }
     
@@ -5802,14 +5803,15 @@ function initTableDropdownDynamic(container, row) {
         for (let i = 0; i < options.length; i++) {
             const option = options[i];
             const text = option.textContent.toLowerCase();
-            
-            if (text.includes(searchTerm)) {
-                option.style.display = 'block';
-                option.style.backgroundColor = '';
-            } else {
-                option.style.display = 'none';
-            }
+            option.style.display = text.includes(searchTerm) ? 'block' : 'none';
         }
+        // Re-apply highlight after filtering
+        const visibleOpts = Array.from(optionsContainer.getElementsByClassName('dropdown-option'))
+            .filter(o => o.style.display !== 'none');
+        visibleOpts.forEach((o, i) => {
+            o.style.backgroundColor = i === selectedIndex ? '#1a6cdc' : '';
+            o.style.color = i === selectedIndex ? 'white' : '';
+        });
     }
 }
 

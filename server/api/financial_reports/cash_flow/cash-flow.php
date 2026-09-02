@@ -51,18 +51,18 @@ try {
     
     switch ($date_range) {
         case 'today':
+            // [0]rv [1]pv [2]revenue_split [3]pdc [4]sale_return [5]expense [6]payroll [7]journal [8]rent [9]pex
             $date_conditions = [
                 "AND rv.voucher_date = CURDATE()",
-                "AND pv.voucher_date = CURDATE()", 
+                "AND pv.voucher_date = CURDATE()",
                 "AND sdu.usage_date = CURDATE()",
                 "AND pdc.cheque_date = CURDATE()",
-                "AND jv.voucher_date = CURDATE()",
                 "AND sr.sale_date = CURDATE()",
                 "AND ev.date = CURDATE()",
-                "AND pr.purchase_date = CURDATE()",
                 "AND pe.payroll_date = CURDATE()",
+                "AND jv.voucher_date = CURDATE()",
                 "AND al.date = CURDATE()",
-                "AND pex.created_at >= CURDATE()"
+                "AND DATE(pex.created_at) = CURDATE()"
             ];
             break;
         case 'week':
@@ -71,13 +71,12 @@ try {
                 "AND pv.voucher_date >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)",
                 "AND sdu.usage_date >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)",
                 "AND pdc.cheque_date >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)",
-                "AND jv.voucher_date >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)",
                 "AND sr.sale_date >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)",
                 "AND ev.date >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)",
-                "AND pr.purchase_date >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)",
                 "AND pe.payroll_date >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)",
+                "AND jv.voucher_date >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)",
                 "AND al.date >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)",
-                "AND pex.created_at >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)"
+                "AND DATE(pex.created_at) >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)"
             ];
             break;
         case 'month':
@@ -86,13 +85,12 @@ try {
                 "AND pv.voucher_date >= DATE_SUB(CURDATE(), INTERVAL 1 MONTH)",
                 "AND sdu.usage_date >= DATE_SUB(CURDATE(), INTERVAL 1 MONTH)",
                 "AND pdc.cheque_date >= DATE_SUB(CURDATE(), INTERVAL 1 MONTH)",
-                "AND jv.voucher_date >= DATE_SUB(CURDATE(), INTERVAL 1 MONTH)",
                 "AND sr.sale_date >= DATE_SUB(CURDATE(), INTERVAL 1 MONTH)",
                 "AND ev.date >= DATE_SUB(CURDATE(), INTERVAL 1 MONTH)",
-                "AND pr.purchase_date >= DATE_SUB(CURDATE(), INTERVAL 1 MONTH)",
                 "AND pe.payroll_date >= DATE_SUB(CURDATE(), INTERVAL 1 MONTH)",
+                "AND jv.voucher_date >= DATE_SUB(CURDATE(), INTERVAL 1 MONTH)",
                 "AND al.date >= DATE_SUB(CURDATE(), INTERVAL 1 MONTH)",
-                "AND pex.created_at >= DATE_SUB(CURDATE(), INTERVAL 1 MONTH)"
+                "AND DATE(pex.created_at) >= DATE_SUB(CURDATE(), INTERVAL 1 MONTH)"
             ];
             break;
         case 'quarter':
@@ -101,13 +99,12 @@ try {
                 "AND pv.voucher_date >= DATE_SUB(CURDATE(), INTERVAL 3 MONTH)",
                 "AND sdu.usage_date >= DATE_SUB(CURDATE(), INTERVAL 3 MONTH)",
                 "AND pdc.cheque_date >= DATE_SUB(CURDATE(), INTERVAL 3 MONTH)",
-                "AND jv.voucher_date >= DATE_SUB(CURDATE(), INTERVAL 3 MONTH)",
                 "AND sr.sale_date >= DATE_SUB(CURDATE(), INTERVAL 3 MONTH)",
                 "AND ev.date >= DATE_SUB(CURDATE(), INTERVAL 3 MONTH)",
-                "AND pr.purchase_date >= DATE_SUB(CURDATE(), INTERVAL 3 MONTH)",
                 "AND pe.payroll_date >= DATE_SUB(CURDATE(), INTERVAL 3 MONTH)",
+                "AND jv.voucher_date >= DATE_SUB(CURDATE(), INTERVAL 3 MONTH)",
                 "AND al.date >= DATE_SUB(CURDATE(), INTERVAL 3 MONTH)",
-                "AND pex.created_at >= DATE_SUB(CURDATE(), INTERVAL 3 MONTH)"
+                "AND DATE(pex.created_at) >= DATE_SUB(CURDATE(), INTERVAL 3 MONTH)"
             ];
             break;
         case 'year':
@@ -116,32 +113,30 @@ try {
                 "AND pv.voucher_date >= DATE_SUB(CURDATE(), INTERVAL 1 YEAR)",
                 "AND sdu.usage_date >= DATE_SUB(CURDATE(), INTERVAL 1 YEAR)",
                 "AND pdc.cheque_date >= DATE_SUB(CURDATE(), INTERVAL 1 YEAR)",
-                "AND jv.voucher_date >= DATE_SUB(CURDATE(), INTERVAL 1 YEAR)",
                 "AND sr.sale_date >= DATE_SUB(CURDATE(), INTERVAL 1 YEAR)",
                 "AND ev.date >= DATE_SUB(CURDATE(), INTERVAL 1 YEAR)",
-                "AND pr.purchase_date >= DATE_SUB(CURDATE(), INTERVAL 1 YEAR)",
                 "AND pe.payroll_date >= DATE_SUB(CURDATE(), INTERVAL 1 YEAR)",
+                "AND jv.voucher_date >= DATE_SUB(CURDATE(), INTERVAL 1 YEAR)",
                 "AND al.date >= DATE_SUB(CURDATE(), INTERVAL 1 YEAR)",
-                "AND pex.created_at >= DATE_SUB(CURDATE(), INTERVAL 1 YEAR)"
+                "AND DATE(pex.created_at) >= DATE_SUB(CURDATE(), INTERVAL 1 YEAR)"
             ];
             break;
         case 'custom':
             if ($from_date && $to_date) {
                 $date_conditions = [
-                    "AND rv.voucher_date BETWEEN ? AND ?",
-                    "AND pv.voucher_date BETWEEN ? AND ?",
-                    "AND sdu.usage_date BETWEEN ? AND ?",
-                    "AND pdc.cheque_date BETWEEN ? AND ?",
-                    "AND jv.voucher_date BETWEEN ? AND ?",
-                    "AND sr.sale_date BETWEEN ? AND ?",
-                    "AND ev.date BETWEEN ? AND ?",
-                    "AND pr.purchase_date BETWEEN ? AND ?",
-                    "AND pe.payroll_date BETWEEN ? AND ?",
-                    "AND al.date BETWEEN ? AND ?",
-                    "AND DATE(pex.created_at) BETWEEN ? AND ?"
+                    "AND rv.voucher_date BETWEEN ? AND ?",      // [0] receive_voucher
+                    "AND pv.voucher_date BETWEEN ? AND ?",      // [1] payment_voucher
+                    "AND sdu.usage_date BETWEEN ? AND ?",       // [2] revenue_split
+                    "AND pdc.cheque_date BETWEEN ? AND ?",      // [3] post_dated_cheques
+                    "AND sr.sale_date BETWEEN ? AND ?",         // [4] sale_return
+                    "AND ev.date BETWEEN ? AND ?",              // [5] expense_voucher
+                    "AND pe.payroll_date BETWEEN ? AND ?",      // [6] payroll_entries
+                    "AND jv.voucher_date BETWEEN ? AND ?",      // [7] journal_voucher
+                    "AND al.date BETWEEN ? AND ?",              // [8] rent
+                    "AND DATE(pex.created_at) BETWEEN ? AND ?"  // [9] production_expenses
                 ];
-                // Build params array properly
                 $params = [];
+                // SQL UNION order: rv, pv, revenue_split, pdc, sr, ev, payroll, jv, rent, pex
                 // Query 1: receive_voucher
                 $params[] = $tenant_id;
                 if ($company_id) $params[] = $company_id;
@@ -152,7 +147,7 @@ try {
                 if ($company_id) $params[] = $company_id;
                 $params[] = $from_date;
                 $params[] = $to_date;
-                // Query 3: station_daily_usage/revenue_split (NO company_id)
+                // Query 3: revenue_split (NO company_id)
                 $params[] = $tenant_id;
                 $params[] = $from_date;
                 $params[] = $to_date;
@@ -161,27 +156,27 @@ try {
                 if ($company_id) $params[] = $company_id;
                 $params[] = $from_date;
                 $params[] = $to_date;
-                // Query 5: journal_voucher
+                // Query 5: sale_return
                 $params[] = $tenant_id;
                 if ($company_id) $params[] = $company_id;
                 $params[] = $from_date;
                 $params[] = $to_date;
-                // Query 6: sale_return
+                // Query 6: expense_voucher
                 $params[] = $tenant_id;
                 if ($company_id) $params[] = $company_id;
                 $params[] = $from_date;
                 $params[] = $to_date;
-                // Query 7: expense_voucher
+                // Query 7: payroll_entries
                 $params[] = $tenant_id;
                 if ($company_id) $params[] = $company_id;
                 $params[] = $from_date;
                 $params[] = $to_date;
-                // Query 8: payroll_entries
+                // Query 8: journal_voucher
                 $params[] = $tenant_id;
                 if ($company_id) $params[] = $company_id;
                 $params[] = $from_date;
                 $params[] = $to_date;
-                // Query 9: rent
+                // Query 9: rent (NO company_id)
                 $params[] = $tenant_id;
                 $params[] = $from_date;
                 $params[] = $to_date;
@@ -190,43 +185,45 @@ try {
                 $params[] = $from_date;
                 $params[] = $to_date;
             } else {
-                $date_conditions = ["", "", "", "", "", "", "", "", "", "", ""];
+                $date_conditions = ["", "", "", "", "", "", "", "", "", ""];
                 $params = [];
+                // SQL UNION order: rv, pv, revenue_split, pdc, sr, ev, payroll, jv, rent, pex
                 // Query 1: receive_voucher
                 $params[] = $tenant_id;
                 if ($company_id) $params[] = $company_id;
                 // Query 2: payment_voucher
                 $params[] = $tenant_id;
                 if ($company_id) $params[] = $company_id;
-                // Query 3: station_daily_usage/revenue_split (NO company_id)
+                // Query 3: revenue_split (NO company_id)
                 $params[] = $tenant_id;
                 // Query 4: post_dated_cheques
                 $params[] = $tenant_id;
                 if ($company_id) $params[] = $company_id;
-                // Query 5: journal_voucher
+                // Query 5: sale_return
                 $params[] = $tenant_id;
                 if ($company_id) $params[] = $company_id;
-                // Query 6: sale_return
+                // Query 6: expense_voucher
                 $params[] = $tenant_id;
                 if ($company_id) $params[] = $company_id;
-                // Query 7: expense_voucher
+                // Query 7: payroll_entries
                 $params[] = $tenant_id;
                 if ($company_id) $params[] = $company_id;
-                // Query 8: payroll_entries
+                // Query 8: journal_voucher
                 $params[] = $tenant_id;
                 if ($company_id) $params[] = $company_id;
-                // Query 9: rent
+                // Query 9: rent (NO company_id)
                 $params[] = $tenant_id;
                 // Query 10: production_expenses (NO company_id)
                 $params[] = $tenant_id;
             }
             break;
         default:
-            $date_conditions = ["", "", "", "", "", "", "", "", "", "", ""];
-            $params = array_fill(0, 11, $tenant_id);
+            $date_conditions = ["", "", "", "", "", "", "", "", "", ""];
+            $params = [];
     }
     
     // For non-custom ranges, just add tenant_id for each query
+    // SQL UNION order: rv, pv, revenue_split, pdc, sr, ev, payroll, jv, rent, pex
     if ($date_range !== 'custom') {
         $params = [];
         // Query 1: receive_voucher
@@ -235,24 +232,24 @@ try {
         // Query 2: payment_voucher
         $params[] = $tenant_id;
         if ($company_id) $params[] = $company_id;
-        // Query 3: station_daily_usage/revenue_split (NO company_id)
+        // Query 3: revenue_split (NO company_id)
         $params[] = $tenant_id;
         // Query 4: post_dated_cheques
         $params[] = $tenant_id;
         if ($company_id) $params[] = $company_id;
-        // Query 5: journal_voucher
+        // Query 5: sale_return
         $params[] = $tenant_id;
         if ($company_id) $params[] = $company_id;
-        // Query 6: sale_return
+        // Query 6: expense_voucher
         $params[] = $tenant_id;
         if ($company_id) $params[] = $company_id;
-        // Query 7: expense_voucher
+        // Query 7: payroll_entries
         $params[] = $tenant_id;
         if ($company_id) $params[] = $company_id;
-        // Query 8: payroll_entries
+        // Query 8: journal_voucher
         $params[] = $tenant_id;
         if ($company_id) $params[] = $company_id;
-        // Query 9: rent
+        // Query 9: rent (NO company_id)
         $params[] = $tenant_id;
         // Query 10: production_expenses (NO company_id)
         $params[] = $tenant_id;
@@ -369,7 +366,7 @@ try {
         AND sr.status = 'Posted'
         AND sr.amount_refunded > 0
         " . ($company_id ? " AND sr.company_id = ?" : "") . "
-        {$date_conditions[5]}
+        {$date_conditions[4]}
         
         UNION ALL
         
@@ -392,7 +389,7 @@ try {
         AND evl.cheque_date IS NULL
         AND ev.is_cash_flow = 1
         " . ($company_id ? " AND ev.company_id = ?" : "") . "
-        {$date_conditions[6]}
+        {$date_conditions[5]}
         
         UNION ALL
         
@@ -414,7 +411,7 @@ try {
         WHERE pei.tenant_id = ? 
         AND pei.cheque_date IS NULL
         " . ($company_id ? " AND pe.company_id = ?" : "") . "
-        {$date_conditions[8]}
+        {$date_conditions[6]}
         
         UNION ALL
         
@@ -447,7 +444,7 @@ try {
         AND jv.status = 'posted'
         AND (cash_line.account_id = 1 OR cash_acc.sub_account_id = 75 OR cash_line.account_id IN (78, 79))
         " . ($company_id ? " AND jv.company_id = ?" : "") . "
-        {$date_conditions[4]}
+        {$date_conditions[7]}
         
         UNION ALL
         
@@ -465,7 +462,7 @@ try {
         JOIN rent_management rm ON al.reference_id = rm.id AND al.reference_table = 'rent_management'
         LEFT JOIN customers c ON rm.customer_id = c.id
         WHERE al.tenant_id = ? AND al.account_id IN (1, 7) AND al.debit > 0
-        {$date_conditions[9]}
+        {$date_conditions[8]}
         
         UNION ALL
         
@@ -481,7 +478,7 @@ try {
             NULL as currency_id
         FROM production_expenses pex
         WHERE pex.tenant_id = ?
-        {$date_conditions[10]}
+        {$date_conditions[9]}
         
         ORDER BY date DESC, inflow DESC, outflow DESC
     ";
@@ -489,6 +486,15 @@ try {
     $stmt = $pdo->prepare($sql);
     $stmt->execute($params);
     $all_transactions = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    $query_debug = [
+        'date_range' => $date_range,
+        'from_date' => $from_date,
+        'to_date' => $to_date,
+        'company_id' => $company_id,
+        'params_count' => count($params),
+        'params' => $params,
+        'rows_fetched' => count($all_transactions)
+    ];
     
     // Convert currency for all transactions
     foreach ($all_transactions as &$transaction) {
@@ -722,21 +728,38 @@ try {
             ) as soft_transactions
         ";
         $soft_stmt = $pdo->prepare($soft_sql);
-        $params_soft = [$tenant_id, $from_date];
+        // Build params_soft matching exact UNION order in soft_sql:
+        // 1: rv (tenant, from, [company])
+        // 2: pv (tenant, from, [company])
+        // 3: revenue_split (tenant, from)
+        // 4: pdc (tenant, from, [company])
+        // 5: journal (tenant, from, [company])
+        // 6: sale_return (tenant, from, [company])
+        // 7: expense_voucher (tenant, from, [company])
+        // 8: payroll (tenant, from, [company])
+        $params_soft = [];
+        // 1: rv
+        $params_soft[] = $tenant_id; $params_soft[] = $from_date;
         if ($company_id) $params_soft[] = $company_id;
-        $params_soft = array_merge($params_soft, [$tenant_id, $from_date]);
+        // 2: pv
+        $params_soft[] = $tenant_id; $params_soft[] = $from_date;
         if ($company_id) $params_soft[] = $company_id;
-        $params_soft = array_merge($params_soft, [$tenant_id, $from_date]);
+        // 3: revenue_split
+        $params_soft[] = $tenant_id; $params_soft[] = $from_date;
+        // 4: pdc
+        $params_soft[] = $tenant_id; $params_soft[] = $from_date;
         if ($company_id) $params_soft[] = $company_id;
-        $params_soft = array_merge($params_soft, [$tenant_id, $from_date]);
+        // 5: journal
+        $params_soft[] = $tenant_id; $params_soft[] = $from_date;
         if ($company_id) $params_soft[] = $company_id;
-        $params_soft = array_merge($params_soft, [$tenant_id, $from_date]);
+        // 6: sale_return
+        $params_soft[] = $tenant_id; $params_soft[] = $from_date;
         if ($company_id) $params_soft[] = $company_id;
-        $params_soft = array_merge($params_soft, [$tenant_id, $from_date]);
+        // 7: expense_voucher
+        $params_soft[] = $tenant_id; $params_soft[] = $from_date;
         if ($company_id) $params_soft[] = $company_id;
-        $params_soft = array_merge($params_soft, [$tenant_id, $from_date]);
-        if ($company_id) $params_soft[] = $company_id;
-        $params_soft = array_merge($params_soft, [$tenant_id, $from_date]);
+        // 8: payroll
+        $params_soft[] = $tenant_id; $params_soft[] = $from_date;
         if ($company_id) $params_soft[] = $company_id;
         $soft_stmt->execute($params_soft);
         $soft_result = $soft_stmt->fetch();
@@ -818,7 +841,8 @@ try {
         'soft_opening_bank' => $soft_opening_bank ?? 0,
         'combined_opening' => $opening_balance,
         'base_currency_id' => $base_currency_id,
-        'target_currency_id' => $target_currency_id
+        'target_currency_id' => $target_currency_id,
+        'query' => $query_debug
     ];
 
     echo json_encode([

@@ -27,6 +27,7 @@ try {
     
     $payroll_date = $data['payroll_date'] ?? null;
     $payroll_code = $data['payroll_code'] ?? null;
+    $company_id = $data['company_id'] ?? null;
     $items = $data['items'] ?? [];
     
     if (!$payroll_date || !$payroll_code || empty($items)) {
@@ -40,10 +41,10 @@ try {
     
     // Insert payroll entry
     $stmt = $pdo->prepare("
-        INSERT INTO payroll_entries (tenant_id, payroll_code, payroll_date, total_amount)
-        VALUES (?, ?, ?, ?)
+        INSERT INTO payroll_entries (tenant_id, company_id, payroll_code, payroll_date, total_amount)
+        VALUES (?, ?, ?, ?, ?)
     ");
-    $stmt->execute([$tenant_id, $payroll_code, $payroll_date, $total_amount]);
+    $stmt->execute([$tenant_id, $company_id, $payroll_code, $payroll_date, $total_amount]);
     $payroll_id = $pdo->lastInsertId();
     
     // Insert payroll items

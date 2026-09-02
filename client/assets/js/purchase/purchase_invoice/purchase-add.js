@@ -649,6 +649,9 @@ document.addEventListener('DOMContentLoaded', function () {
                         const discAmountCell = row.querySelector('.disc-amount-cell input');
                         if (discAmountCell) discAmountCell.value = item.discount_amount || 0;
 
+                        const extraDiscCell = row.querySelector('.extra-disc-percent-cell input');
+                        if (extraDiscCell) extraDiscCell.value = item.extra_discount_percent || 0;
+
                         const toPercentCell = row.querySelector('.to-percent-cell input');
                         if (toPercentCell) toPercentCell.value = item.trade_offer_percent || 0;
 
@@ -766,7 +769,8 @@ document.addEventListener('DOMContentLoaded', function () {
 
         function updateSelection(visibleOptions) {
             visibleOptions.forEach((option, index) => {
-                option.style.backgroundColor = index === selectedIndex ? 'var(--surface-1)' : '';
+                option.style.backgroundColor = index === selectedIndex ? '#1a6cdc' : '';
+            option.style.color = index === selectedIndex ? 'white' : '';
             });
         }
 
@@ -1435,8 +1439,31 @@ document.addEventListener('DOMContentLoaded', function () {
         discAmountInput.value = '0.000';
         discAmountCell.appendChild(discAmountInput);
         
+        // Extra Discount %
+        const extraDiscPercentCell = row.insertCell(9);
+        extraDiscPercentCell.className = 'extra-disc-percent-cell';
+        const extraDiscPercentInput = document.createElement('input');
+        extraDiscPercentInput.type = 'number';
+        extraDiscPercentInput.className = 'table-input';
+        extraDiscPercentInput.min = '0';
+        extraDiscPercentInput.max = '100';
+        extraDiscPercentInput.step = '0.01';
+        extraDiscPercentInput.value = '0';
+        extraDiscPercentInput.addEventListener('input', function() {
+            const unitInputs = row.querySelectorAll('.unit-input');
+            let totalQty = 0;
+            unitInputs.forEach(input => {
+                const qty = parseFloat(input.value) || 0;
+                const cf = parseFloat(input.dataset.conversionFactor) || 1;
+                totalQty += qty * cf;
+            });
+            const price = parseFloat(row.querySelector('.price-cell input').value) || 0;
+            calculateRowAmounts(row, totalQty, price);
+        });
+        extraDiscPercentCell.appendChild(extraDiscPercentInput);
+
         // TO %
-        const toPercentCell = row.insertCell(9);
+        const toPercentCell = row.insertCell(10);
         toPercentCell.className = 'to-percent-cell';
         const toPercentInput = document.createElement('input');
         toPercentInput.type = 'number';
@@ -1459,7 +1486,7 @@ document.addEventListener('DOMContentLoaded', function () {
         toPercentCell.appendChild(toPercentInput);
         
         // TO Amount
-        const toAmountCell = row.insertCell(10);
+        const toAmountCell = row.insertCell(11);
         toAmountCell.className = 'to-amount-cell';
         const toAmountInput = document.createElement('input');
         toAmountInput.type = 'number';
@@ -1470,7 +1497,7 @@ document.addEventListener('DOMContentLoaded', function () {
         toAmountCell.appendChild(toAmountInput);
         
         // Tax %
-        const taxPercentCell = row.insertCell(11);
+        const taxPercentCell = row.insertCell(12);
         taxPercentCell.className = 'tax-percent-cell';
         const taxPercentInput = document.createElement('input');
         taxPercentInput.type = 'number';
@@ -1494,7 +1521,7 @@ document.addEventListener('DOMContentLoaded', function () {
         taxPercentCell.appendChild(taxPercentInput);
         
         // Tax Amount
-        const taxAmountCell = row.insertCell(12);
+        const taxAmountCell = row.insertCell(13);
         taxAmountCell.className = 'tax-amount-cell';
         const taxAmountInput = document.createElement('input');
         taxAmountInput.type = 'number';
@@ -1506,7 +1533,7 @@ document.addEventListener('DOMContentLoaded', function () {
         taxAmountCell.appendChild(taxAmountInput);
         
         // FOC Qty
-        const focCell = row.insertCell(13);
+        const focCell = row.insertCell(14);
         focCell.className = 'foc-cell';
         const focInput = document.createElement('input');
         focInput.type = 'number';
@@ -1517,7 +1544,7 @@ document.addEventListener('DOMContentLoaded', function () {
         focCell.appendChild(focInput);
         
         // Net Amount
-        const netCell = row.insertCell(14);
+        const netCell = row.insertCell(15);
         netCell.className = 'net-cell';
         const netInput = document.createElement('input');
         netInput.type = 'text';
@@ -1528,7 +1555,7 @@ document.addEventListener('DOMContentLoaded', function () {
         netCell.appendChild(netInput);
         
         // Actions
-        const actionsCell = row.insertCell(15);
+        const actionsCell = row.insertCell(16);
         const deleteBtn = document.createElement('button');
         deleteBtn.type = 'button';
         deleteBtn.className = 'btn btn-danger btn-sm';
@@ -1556,6 +1583,7 @@ document.addEventListener('DOMContentLoaded', function () {
             enableSize: localStorage.getItem('enableSize') === 'true',
             enableBatchNo: localStorage.getItem('enableBatchNo') === 'true',
             enableBatchExpiry: localStorage.getItem('enableBatchExpiry') === 'true',
+            enableExtraDiscount: localStorage.getItem('enableExtraDiscount') === 'true',
             enableTradeOffer: localStorage.getItem('enableTradeOffer') === 'true',
             enableTradeOfferAmount: localStorage.getItem('enableTradeOfferAmount') === 'true',
             enableFOC: localStorage.getItem('enableFOC') === 'true',
@@ -1615,7 +1643,8 @@ document.addEventListener('DOMContentLoaded', function () {
         
         function updateSelectionDynamic(visibleOptions) {
             visibleOptions.forEach((option, index) => {
-                option.style.backgroundColor = index === selectedIndex ? 'var(--surface-1)' : '';
+                option.style.backgroundColor = index === selectedIndex ? '#1a6cdc' : '';
+            option.style.color = index === selectedIndex ? 'white' : '';
             });
         }
         
@@ -1674,14 +1703,15 @@ document.addEventListener('DOMContentLoaded', function () {
             for (let i = 0; i < options.length; i++) {
                 const option = options[i];
                 const text = option.textContent.toLowerCase();
-                
-                if (text.includes(searchTerm)) {
-                    option.style.display = 'block';
-                    option.style.backgroundColor = '';
-                } else {
-                    option.style.display = 'none';
-                }
+                option.style.display = text.includes(searchTerm) ? 'block' : 'none';
             }
+            // Re-apply highlight after filtering
+            const visibleOpts = Array.from(optionsContainer.getElementsByClassName('dropdown-option'))
+                .filter(o => o.style.display !== 'none');
+            visibleOpts.forEach((o, i) => {
+                o.style.backgroundColor = i === selectedIndex ? '#1a6cdc' : '';
+                o.style.color = i === selectedIndex ? 'white' : '';
+            });
         }
     }
 
@@ -1744,7 +1774,8 @@ document.addEventListener('DOMContentLoaded', function () {
 
         function updateSelection(visibleOptions) {
             visibleOptions.forEach((option, index) => {
-                option.style.backgroundColor = index === selectedIndex ? 'var(--surface-1)' : '';
+                option.style.backgroundColor = index === selectedIndex ? '#1a6cdc' : '';
+            option.style.color = index === selectedIndex ? 'white' : '';
             });
         }
 
@@ -2149,6 +2180,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     grossAmount: parseFloat(row.querySelector('.gross-cell input').value),
                     discountPercent: parseFloat(row.querySelector('.disc-percent-cell input').value) || 0,
                     discountAmount: parseFloat(row.querySelector('.disc-amount-cell input').value),
+                    extraDiscountPercent: parseFloat(row.querySelector('.extra-disc-percent-cell input')?.value) || 0,
                     tradeOfferPercent: parseFloat(row.querySelector('.to-percent-cell input').value) || 0,
                     tradeOfferAmount: parseFloat(row.querySelector('.to-amount-cell input').value) || 0,
                     taxPercent: parseFloat(row.querySelector('.tax-percent-cell input').value) || 0,
@@ -2340,6 +2372,7 @@ document.addEventListener('DOMContentLoaded', function () {
         document.getElementById('enableSize').checked = localStorage.getItem('enableSize') === 'true';
         document.getElementById('enableBatchNo').checked = localStorage.getItem('enableBatchNo') === 'true';
         document.getElementById('enableBatchExpiry').checked = localStorage.getItem('enableBatchExpiry') === 'true';
+        document.getElementById('enableExtraDiscount').checked = localStorage.getItem('enableExtraDiscount') === 'true';
                 document.getElementById('enableTradeOffer').checked = localStorage.getItem('enableTradeOffer') === 'true';
         document.getElementById('enableTradeOfferAmount').checked = localStorage.getItem('enableTradeOfferAmount') === 'true';
         document.getElementById('enableFOC').checked = localStorage.getItem('enableFOC') === 'true';
@@ -2373,6 +2406,7 @@ document.addEventListener('DOMContentLoaded', function () {
         localStorage.setItem('enableSize', document.getElementById('enableSize').checked);
         localStorage.setItem('enableBatchNo', document.getElementById('enableBatchNo').checked);
         localStorage.setItem('enableBatchExpiry', document.getElementById('enableBatchExpiry').checked);
+        localStorage.setItem('enableExtraDiscount', document.getElementById('enableExtraDiscount').checked);
                 localStorage.setItem('enableTradeOffer', document.getElementById('enableTradeOffer').checked);
         localStorage.setItem('enableTradeOfferAmount', document.getElementById('enableTradeOfferAmount').checked);
         localStorage.setItem('enableFOC', document.getElementById('enableFOC').checked);
@@ -2414,6 +2448,7 @@ document.addEventListener('DOMContentLoaded', function () {
         const enableTaxation = localStorage.getItem('enableTaxation') === 'true';
         const enableInlineCashDiscount = localStorage.getItem('enableInlineCashDiscount') === 'true';
         const enableInlineCashDiscountAmount = localStorage.getItem('enableInlineCashDiscountAmount') === 'true';
+        const enableExtraDiscount = localStorage.getItem('enableExtraDiscount') === 'true';
         const enableInvoiceCashDiscount = localStorage.getItem('enableInvoiceCashDiscount') === 'true';
         const enableInvoiceCashDiscountAmount = localStorage.getItem('enableInvoiceCashDiscountAmount') === 'true';
         const enableShippingFees = localStorage.getItem('enableShippingFees') === 'true';
@@ -2451,6 +2486,7 @@ document.addEventListener('DOMContentLoaded', function () {
             { col: 'batch-expiry',  show: enableBatchExpiry },
             { col: 'disc-percent',  show: enableInlineCashDiscount },
             { col: 'disc-amount',   show: enableInlineCashDiscountAmount },
+            { col: 'extra-disc-percent', show: enableExtraDiscount },
             { col: 'to-percent',    show: enableTradeOffer },
             { col: 'to-amount',     show: enableTradeOfferAmount },
             { col: 'tax-percent',   show: enableTaxation },
@@ -2466,7 +2502,7 @@ document.addEventListener('DOMContentLoaded', function () {
         // Show/hide cells in all existing rows
                 const rows = document.getElementById('itemsTable').getElementsByTagName('tbody')[0].rows;
         for (let row of rows) {
-            applySettingsToRow(row, { enableSize, enableBatchNo, enableBatchExpiry, enableTradeOffer, enableTradeOfferAmount, enableFOC, enableTaxation, enableInlineCashDiscount, enableInlineCashDiscountAmount });
+            applySettingsToRow(row, { enableSize, enableBatchNo, enableBatchExpiry, enableExtraDiscount, enableTradeOffer, enableTradeOfferAmount, enableFOC, enableTaxation, enableInlineCashDiscount, enableInlineCashDiscountAmount });
         }
 
         // Hide/show invoice summary fields
@@ -2484,13 +2520,15 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
        function applySettingsToRow(row, settings) {
-        const { enableSize, enableBatchNo, enableBatchExpiry, enableTradeOffer, enableTradeOfferAmount, enableFOC, enableTaxation, enableInlineCashDiscount, enableInlineCashDiscountAmount } = settings;
+        const { enableSize, enableBatchNo, enableBatchExpiry, enableExtraDiscount, enableTradeOffer, enableTradeOfferAmount, enableFOC, enableTaxation, enableInlineCashDiscount, enableInlineCashDiscountAmount } = settings;
         const sizeCell = row.querySelector('.size-cell');
         if (sizeCell) sizeCell.style.display = enableSize ? '' : 'none';
         const batchNoCell = row.querySelector('.batch-no-cell');
         if (batchNoCell) batchNoCell.style.display = enableBatchNo ? '' : 'none';
         const batchExpiryCell = row.querySelector('.batch-expiry-cell');
         if (batchExpiryCell) batchExpiryCell.style.display = enableBatchExpiry ? '' : 'none';
+        const extraDiscPercentCell = row.querySelector('.extra-disc-percent-cell');
+        if (extraDiscPercentCell) extraDiscPercentCell.style.display = enableExtraDiscount ? '' : 'none';
         const toPercentCell = row.querySelector('.to-percent-cell');
         const toAmountCell = row.querySelector('.to-amount-cell');
         const focCell = row.querySelector('.foc-cell');

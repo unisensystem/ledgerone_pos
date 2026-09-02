@@ -3,7 +3,9 @@ const API_URL = '../../../../server/api/financial_reports/sales_officer_recovery
 const COMPANIES_API_URL = '../../../../server/api/companies/get-companies.php';
 
 // Store fetched data
-let reportData = [];
+let reportData = [];      // raw API data
+let displayData = [];     // raw or auto-cleared
+let autoClearMode = false;
 let currentPage = 1;
 const itemsPerPage = 10;
 
@@ -30,6 +32,53 @@ function getStatusBadge(status) {
         default:
             return '<span class="badge">Unknown</span>';
     }
+}
+
+// ── Auto-Clear simulation ───────────────────────────────────────
+// Per officer → per customer: sort bills oldest-first, distribute
+// that customer's totalRecovery FIFO, hide fully-cleared bills.
+function simulateAutoClear(data) {
+    return data.map(officer => {
+        // Group transactions by customer
+        const customerMap = {};
+        officer.transactions.forEach(txn => {
+            if (!customerMap[txn.customerName]) customerMap[txn.customerName] = [];
+            customerMap[txn.customerName].push(Object.assign({}, txn));
+        });
+
+        const clearedTxns = [];
+        Object.values(customerMap).forEach(bills => {
+            // Sort oldest bill first
+            bills.sort((a, b) => new Date(a.billDate) - new Date(b.billDate));
+            // Total recovery for this customer across all their bills
+            const totalRecovery = bills.reduce((s, b) => s + b.totalRecovery, 0);
+            let remaining = totalRecovery;
+
+            bills.forEach(bill => {
+                const cleared = Math.min(remaining, bill.billAmount - bill.returnAmount);
+                remaining = Math.max(0, remaining - cleared);
+                const simRemaining = Math.max(0, bill.billAmount - bill.returnAmount - cleared);
+                // Only include bills that still have a balance
+                if (simRemaining > 0.001) {
+                    bill.remainingBalance = simRemaining;
+                    bill.totalRecovery    = cleared;
+                    bill.status          = cleared > 0 ? 'partial' : 'overdue';
+                    clearedTxns.push(bill);
+                }
+            });
+        });
+
+        // Recalculate officer totals
+        const totalRecovery  = clearedTxns.reduce((s, t) => s + t.totalRecovery, 0);
+        const totalRemaining = clearedTxns.reduce((s, t) => s + t.remainingBalance, 0);
+
+        return Object.assign({}, officer, {
+            transactions:  clearedTxns,
+            totalBills:    clearedTxns.length,
+            totalRecovery,
+            totalRemaining
+        });
+    }).filter(o => o.transactions.length > 0);
 }
 
 // Render hierarchical table
@@ -147,18 +196,17 @@ function renderPagination(totalItems) {
 
 // Change page
 function changePage(page) {
-    const totalPages = Math.ceil(reportData.length / itemsPerPage);
+    const totalPages = Math.ceil(displayData.length / itemsPerPage);
     if (page < 1 || page > totalPages) return;
-    
     currentPage = page;
-    renderHierarchicalTable(reportData);
+    renderHierarchicalTable(displayData);
     updateFooterText();
 }
 
 // Update footer text
 function updateFooterText() {
-    const totalOfficers = reportData.length;
-    const totalBills = reportData.reduce((sum, officer) => sum + officer.totalBills, 0);
+    const totalOfficers = displayData.length;
+    const totalBills = displayData.reduce((sum, officer) => sum + officer.totalBills, 0);
     const startIndex = (currentPage - 1) * itemsPerPage + 1;
     const endIndex = Math.min(currentPage * itemsPerPage, totalOfficers);
     
@@ -350,6 +398,15 @@ function collapseAllOfficers() {
     });
 }
 
+// Apply auto-clear if needed and re-render
+function applyAndRender() {
+    displayData = autoClearMode ? simulateAutoClear(reportData) : reportData;
+    currentPage = 1;
+    renderHierarchicalTable(displayData);
+    updateSummaryCards(displayData);
+    updateFooterText();
+}
+
 // Fetch data from API
 async function fetchData() {
     const dateFrom = document.getElementById('date-from').value;
@@ -381,10 +438,7 @@ async function fetchData() {
         
         if (result.success) {
             reportData = result.data;
-            currentPage = 1;
-            renderHierarchicalTable(reportData);
-            updateSummaryCards(reportData);
-            updateFooterText();
+            applyAndRender();
         } else {
             console.error('Error:', result.message);
             alert('Failed to fetch data: ' + result.message);
@@ -477,6 +531,20 @@ document.addEventListener('DOMContentLoaded', function () {
         placeholder: 'All Customers',
         allowClear: true
     });
+
+    // Auto-Clear toggle
+    const autoClearToggle = document.getElementById('autoClearToggle');
+    const autoClearLabel  = document.getElementById('autoClearLabel');
+    if (autoClearToggle) {
+        autoClearLabel.style.opacity = '0.5';
+        autoClearToggle.addEventListener('change', function () {
+            autoClearMode = this.checked;
+            autoClearLabel.style.opacity    = autoClearMode ? '1' : '0.5';
+            autoClearLabel.style.color      = autoClearMode ? 'var(--primary)' : '';
+            autoClearLabel.style.fontWeight = autoClearMode ? '600' : '';
+            applyAndRender();
+        });
+    }
 
     // Fetch companies
     fetchCompanies();

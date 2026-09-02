@@ -213,7 +213,15 @@ $areas = $stmt->fetchAll();
                         <i class="fas fa-compress-alt"></i> Collapse All Officers
                     </button>
                 </div>
-                <div class="right-actions">
+                <div class="right-actions" style="display:flex; align-items:center; gap:16px;">
+                    <div class="view-toggle-wrapper" id="autoClearWrapper">
+                        <span class="view-toggle-label">Standard</span>
+                        <label class="toggle-switch" title="Distribute each customer's total recovery FIFO across oldest bills first">
+                            <input type="checkbox" id="autoClearToggle">
+                            <span class="toggle-slider"></span>
+                        </label>
+                        <span class="view-toggle-label" id="autoClearLabel">Auto-Clear</span>
+                    </div>
                     <button class="btn btn-primary" id="view-analytics-btn"><i class="fas fa-chart-pie"></i> View Analytics</button>
                 </div>
             </div>

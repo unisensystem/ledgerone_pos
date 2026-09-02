@@ -142,6 +142,7 @@ $currency_symbol = $currency['symbol'] ?? '$';
                         <tr>
                             <th>Payroll ID</th>
                             <th>Date</th>
+                            <th>Company</th>
                             <th>Employee</th>
                             <th>Type</th>
                             <th>Amount</th>

@@ -28,6 +28,7 @@ try {
     $payroll_id = $data['payroll_id'] ?? null;
     $payroll_date = $data['payroll_date'] ?? null;
     $payroll_code = $data['payroll_code'] ?? null;
+    $company_id = $data['company_id'] ?? null;
     $items = $data['items'] ?? [];
     
     if (!$payroll_id || !$payroll_date || !$payroll_code || empty($items)) {
@@ -42,10 +43,10 @@ try {
     // Update payroll entry
     $stmt = $pdo->prepare("
         UPDATE payroll_entries 
-        SET payroll_date = ?, total_amount = ?
+        SET payroll_date = ?, total_amount = ?, company_id = ?
         WHERE id = ? AND tenant_id = ?
     ");
-    $stmt->execute([$payroll_date, $total_amount, $payroll_id, $tenant_id]);
+    $stmt->execute([$payroll_date, $total_amount, $company_id, $payroll_id, $tenant_id]);
     
     // Delete old accounting entries
     $stmt = $pdo->prepare("DELETE FROM accounting_ledger WHERE tenant_id = ? AND transaction_type = 'payroll' AND reference_table = 'payroll_entries' AND reference_id = ?");

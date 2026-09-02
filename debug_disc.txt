@@ -1,0 +1,5 @@
+discPercentInput listener at: 306639
+b"discPercentInput.addEventListener('input', function() {\r\n        const unitInputs = row.querySelectorAll('.unit-input');\r\n        let totalQty = 0;\r\n        unitInputs.forEach(input => {\r\n            const qty = parseFloat(input.value) || 0;\r\n            const cf = parseFloat(input.dataset.conversionFactor) || 1;\r\n            totalQty = totalQty + (qty * cf);\r\n        });\r\n        const price = pa"
+
+extraDiscInput listener at: 309079
+b"extraDiscInput.addEventListener('input', function() {\r\n            const unitInputs = row.querySelectorAll('.unit-input');\r\n            let totalQty = 0;\r\n            unitInputs.forEach(input => {\r\n                const qty = parseFloat(input.value) || 0;\r\n                const cf = parseFloat(input.dataset.conversionFactor) || 1;\r\n                totalQty = totalQty + (qty * cf);\r\n            });"

@@ -13,7 +13,8 @@ if (!$tenant_id) {
 }
 
 try {
-    $sql = "SELECT pe.id, pe.payroll_code, pe.payroll_date, pe.total_amount,
+    $sql = "SELECT pe.id, pe.payroll_code, pe.payroll_date, pe.total_amount, pe.company_id,
+                   COALESCE(co.company_name, '') as company_name,
                    pei.employee_id, e.full_name as employee_name,
                    pei.type, pei.amount,
                    a.name as payment_method
@@ -21,6 +22,7 @@ try {
             JOIN payroll_entries_items pei ON pe.id = pei.payroll_id
             LEFT JOIN employees e ON pei.employee_id COLLATE utf8mb4_unicode_ci = e.employee_id COLLATE utf8mb4_unicode_ci AND e.tenant_id = ?
             LEFT JOIN accounts a ON pei.payment_method_id = a.id
+            LEFT JOIN companies co ON pe.company_id = co.id
             WHERE pe.tenant_id = ?
             ORDER BY pe.payroll_date DESC, pe.id DESC";
     

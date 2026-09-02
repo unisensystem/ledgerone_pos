@@ -2,18 +2,20 @@
 let payrollData = [];
 
 // Fetch payroll data
-fetch('../../../../server/api/hrm/payroll/payroll-list.php')
-    .then(res => res.json())
-    .then(data => {
-        if (data.success) {
-            payrollData = data.payrolls || [];
-            currentData = [...payrollData];
-            renderTable();
-            updateStats();
-            populateEmployeeFilter();
-        }
-    })
-    .catch(err => console.error('Error fetching payroll data:', err));
+function fetchPayrollData() {
+    fetch('../../../../server/api/hrm/payroll/payroll-list.php')
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                payrollData = data.payrolls || [];
+                populateEmployeeFilter();
+                applyFilters();
+            }
+        })
+        .catch(err => console.error('Error fetching payroll data:', err));
+}
+
+fetchPayrollData();
 
 // Populate employee filter
 function populateEmployeeFilter() {
@@ -152,8 +154,6 @@ let deleteId = null;
 
 // Initialize the page
 function initializePage() {
-    renderTable();
-    updateStats();
     addEventListeners();
 }
 
@@ -220,13 +220,14 @@ function renderTable() {
         row.innerHTML = `
                     <td><strong>${item.payroll_code}</strong></td>
                     <td>${formattedDate}</td>
+                    <td>${item.company_name || '-'}</td>
                     <td>
-                        <div>${item.employee_name}</div>
+                        <div>${item.employee_name || '-'}</div>
                         <div style="font-size: 12px; color: #6B7280;">${item.employee_id}</div>
                     </td>
                     <td>${item.type}</td>
                     <td><strong>${formattedAmount}</strong></td>
-                    <td>${item.payment_method}</td>
+                    <td>${item.payment_method || '-'}</td>
                     <td>
                         <div class="action-buttons">
                             <button class="action-btn view" title="View" data-id="${item.id}">

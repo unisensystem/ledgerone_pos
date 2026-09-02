@@ -99,11 +99,11 @@ try {
         INSERT INTO purchase_invoice_items (
             tenant_id, purchase_invoice_id, product_id, uom_id,
             quantity, purchase_price, gross_amount, discount_percent,
-            discount_amount, trade_offer_percent, trade_offer_amount,
+            discount_amount, extra_discount_percent, trade_offer_percent, trade_offer_amount,
             tax_percent, tax_amount, foc_quantity, net_amount, size,
             batch_no, batch_expiry_date,
             created_by, updated_by
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ");
     
     foreach ($input['items'] as $item) {
@@ -120,6 +120,7 @@ try {
                 $isFirstEntry ? $item['grossAmount'] : 0,
                 $item['discountPercent'] ?? 0.00,
                 $isFirstEntry ? $item['discountAmount'] : 0,
+                $item['extraDiscountPercent'] ?? 0.00,
                 $item['tradeOfferPercent'] ?? 0.00,
                 $isFirstEntry ? $item['tradeOfferAmount'] : 0,
                 $item['taxPercent'] ?? 0.00,

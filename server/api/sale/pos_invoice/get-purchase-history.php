@@ -29,6 +29,9 @@ try {
             pi.purchase_date,
             pii.purchase_price,
             pii.quantity,
+            pii.discount_percent,
+            pii.extra_discount_percent,
+            pii.batch_no,
             cur.symbol as currency_symbol
         FROM purchase_invoice_items pii
         JOIN purchase_invoice pi ON pii.purchase_invoice_id = pi.id

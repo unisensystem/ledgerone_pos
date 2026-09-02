@@ -9,6 +9,7 @@
         @media print {
             body { margin: 0; }
             .no-print { display: none; }
+            .invoice-container { box-shadow: none !important; border: none !important; margin: 0 !important; max-width: 100% !important; }
         }
 
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -99,7 +100,6 @@
             padding: 3px 4px;
         }
         .items-table thead th {
-            background: #f0f0f0;
             font-weight: bold;
             font-size: 10px;
             text-align: center;
@@ -116,11 +116,9 @@
         }
         .group-total-row td {
             font-weight: bold;
-            background: #f7f7f7;
         }
         .grand-total-row td {
             font-weight: bold;
-            background: #eee;
             border-top: 2px solid #333;
         }
 
@@ -200,6 +198,7 @@
         body.a5-mode .invoice-container { max-width: 650px; padding: 10px; }
         body.a6-mode { font-size: 7px; }
         body.a6-mode .invoice-container { max-width: 400px; padding: 6px; }
+        .warranty-section.hidden { display: none; }
     </style>
 </head>
 
@@ -210,6 +209,7 @@
         <button class="print-btn" onclick="setPaperSize('A5')" id="btnA5">A5</button>
         <button class="print-btn" onclick="setPaperSize('A6')" id="btnA6">A6</button>
         <button class="print-btn" id="downloadPdfBtn" onclick="downloadAsPdf()" style="background:#28a745;">&#8595; Download PDF</button>
+        <button class="print-btn" id="warrantyToggleBtn" onclick="toggleWarranty()">Hide Warranty</button>
     </div>
 
     <div class="invoice-container" id="invoiceContainer">
@@ -412,7 +412,7 @@
         }
 
         function fmt(n) {
-            return parseFloat(n || 0).toLocaleString('en-US', { minimumFractionDigits: 3, maximumFractionDigits: 3 });
+            const v = parseFloat(n || 0); return v.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 3 });
         }
         function fmtDate(d) {
             if (!d) return '-';
@@ -614,19 +614,27 @@
             btn.textContent = 'Generating...';
             document.querySelectorAll('.no-print').forEach(el => el.style.setProperty('display', 'none', 'important'));
 
+            const container = document.getElementById('invoiceContainer');
+            const prevStyle = container.getAttribute('style') || '';
+            container.style.cssText = 'max-width:100% !important; margin:0 !important; padding:10px !important; box-shadow:none !important; border:none !important;';
+
             const invoiceNo = document.getElementById('invoiceNo').textContent || 'Invoice';
             const paperSize = localStorage.getItem('invoicePaperSize') || 'A4';
             const sizeMap = { A4: 'a4', A5: 'a5', A6: [105, 148] };
             const format = sizeMap[paperSize] || 'a4';
+            const widthMap = { A4: 794, A5: 559, A6: 397 };
+            const pxWidth = widthMap[paperSize] || 794;
 
             await html2pdf().set({
-                margin: 8,
+                margin: [5, 5, 5, 5],
                 filename: `Invoice-${invoiceNo}.pdf`,
                 image: { type: 'jpeg', quality: 0.98 },
-                html2canvas: { scale: 2, useCORS: true, allowTaint: true, logging: false },
-                jsPDF: { unit: 'mm', format: format, orientation: 'portrait' }
-            }).from(document.getElementById('invoiceContainer')).save();
+                html2canvas: { scale: 2, useCORS: true, allowTaint: true, logging: false, windowWidth: pxWidth },
+                jsPDF: { unit: 'mm', format: format, orientation: 'portrait' },
+                pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
+            }).from(container).save();
 
+            container.setAttribute('style', prevStyle);
             document.querySelectorAll('.no-print').forEach(el => el.style.removeProperty('display'));
             btn.disabled = false;
             btn.textContent = '\u2193 Download PDF';
@@ -662,6 +670,24 @@
             }
             return result.trim();
         }
+
+        function toggleWarranty() {
+            const sec = document.querySelector('.warranty-section');
+            const btn = document.getElementById('warrantyToggleBtn');
+            const hidden = sec.classList.toggle('hidden');
+            btn.textContent = hidden ? 'Show Warranty' : 'Hide Warranty';
+            btn.style.background = hidden ? '#6c757d' : '';
+            localStorage.setItem('warrantyHidden_print1', hidden ? '1' : '0');
+        }
+        document.addEventListener('DOMContentLoaded', function() {
+            if (localStorage.getItem('warrantyHidden_print1') === '1') {
+                const sec = document.querySelector('.warranty-section');
+                const btn = document.getElementById('warrantyToggleBtn');
+                sec.classList.add('hidden');
+                btn.textContent = 'Show Warranty';
+                btn.style.background = '#6c757d';
+            }
+        });
 
         loadData();
     </script>

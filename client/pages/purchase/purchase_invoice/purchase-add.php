@@ -171,6 +171,7 @@ if (!$user_id) {
                                 <th width="8%"><span id="grossAmountLabel">Gross Amount</span></th>
                                 <th width="5%" data-col="disc-percent">Disc %</th>
                                 <th width="8%" data-col="disc-amount"><span id="discountAmountLabel">Disc Amt</span></th>
+                                <th width="5%" data-col="extra-disc-percent">Extra Disc %</th>
                                 <th width="5%" data-col="to-percent">TO %</th>
                                 <th width="8%" data-col="to-amount">TO Amt</th>
                                 <th width="5%" data-col="tax-percent"><span id="taxPercentLabel">Tax %</span></th>
@@ -194,6 +195,7 @@ if (!$user_id) {
                                 <th id="totalGrossAmount">0.000</th>
                                 <th data-col="disc-percent"></th>
                                 <th id="totalDiscountAmountItems" data-col="disc-amount">0.000</th>
+                                <th data-col="extra-disc-percent"></th>
                                 <th data-col="to-percent"></th>
                                 <th id="totalTradeOfferAmountItems" data-col="to-amount">0.000</th>
                                 <th data-col="tax-percent"></th>
@@ -328,6 +330,7 @@ if (!$user_id) {
 <div class="settings-item"><input type="checkbox" id="enableSize"><label for="enableSize">Enable Size Column</label></div>
 <div class="settings-item"><input type="checkbox" id="enableBatchNo"><label for="enableBatchNo">Enable Batch No Column</label></div>
 <div class="settings-item"><input type="checkbox" id="enableBatchExpiry"><label for="enableBatchExpiry">Enable Expiry Date Column</label></div>
+                    <div class="settings-item"><input type="checkbox" id="enableExtraDiscount"><label for="enableExtraDiscount">Extra Discount %</label></div>
                     <div class="settings-item"><input type="checkbox" id="enableTradeOffer"><label for="enableTradeOffer">Inline Trade Offer Discount %</label></div>
                     <div class="settings-item"><input type="checkbox" id="enableTradeOfferAmount"><label for="enableTradeOfferAmount">Inline Trade Offer Amount</label></div>
                     <div class="settings-item"><input type="checkbox" id="enableFOC"><label for="enableFOC">Free Of Cost (FOC) Quantity</label></div>

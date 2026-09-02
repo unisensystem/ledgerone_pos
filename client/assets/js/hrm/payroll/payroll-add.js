@@ -2,6 +2,25 @@
 let employees = [];
 let paymentMethods = [];
 let bankAccounts = [];
+let companies = [];
+
+// Fetch companies
+fetch('../../../../server/api/financial_reports/cash_flow/get-companies.php')
+    .then(res => res.json())
+    .then(data => {
+        if (data.success) {
+            companies = data.data || [];
+            const sel = document.getElementById('companyId');
+            companies.forEach(c => {
+                const opt = document.createElement('option');
+                opt.value = c.id;
+                opt.textContent = c.company_name;
+                sel.appendChild(opt);
+            });
+            if (companies.length === 1) sel.value = companies[0].id;
+        }
+    })
+    .catch(err => console.error('Error fetching companies:', err));
 
 // Fetch employees
 fetch('../../../../server/api/hrm/employees/employee-list.php')
@@ -101,6 +120,9 @@ function loadPayrollData(id, isViewMode) {
                 const payroll = data.payroll;
                 dateInput.value = payroll.payroll_date;
                 payrollIdInput.value = payroll.payroll_code;
+                if (payroll.company_id) {
+                    document.getElementById('companyId').value = payroll.company_id;
+                }
                 
                 // Wait for data to load
                 setTimeout(() => {
@@ -483,6 +505,7 @@ function submitPayroll() {
     const payload = {
         payroll_date: dateInput.value,
         payroll_code: payrollIdInput.value,
+        company_id: document.getElementById('companyId').value || null,
         items: items
     };
 

@@ -52,6 +52,7 @@ async function fetchCashFlowData() {
             // Log debug info
             if (result.debug) {
                 console.log('=== CASH FLOW DEBUG INFO ===');
+                console.log('Query debug:', result.debug.query);
                 console.log('Bank Opening (raw):', result.debug.bank_opening_raw);
                 console.log('Bank Credit (raw):', result.debug.bank_credit_raw);
                 console.log('Bank Opening Balance (calculated):', result.debug.bank_opening_balance);
@@ -248,11 +249,11 @@ function updateBalances(balances) {
     
     const net = (balances.total_inflow || 0) - (balances.total_outflow || 0);
     
-    if (openingBalance) openingBalance.textContent = formatCurrency(balances.opening_balance);
-    if (totalInflow) totalInflow.textContent = formatCurrency(balances.total_inflow);
-    if (totalOutflow) totalOutflow.textContent = formatCurrency(balances.total_outflow);
+    if (openingBalance) openingBalance.textContent = formatCurrency(balances.opening_balance || 0);
+    if (totalInflow) totalInflow.textContent = formatCurrency(balances.total_inflow || 0);
+    if (totalOutflow) totalOutflow.textContent = formatCurrency(balances.total_outflow || 0);
     if (netFlow) netFlow.textContent = formatCurrency(net);
-    if (closingBalance) closingBalance.textContent = formatCurrency(balances.closing_balance);
+    if (closingBalance) closingBalance.textContent = formatCurrency(balances.closing_balance || 0);
 }
 
 // Show notification

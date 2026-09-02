@@ -75,6 +75,13 @@ $currency_symbol = $currency['symbol'] ?? '$';
                         <input type="text" id="payrollId" readonly>
                         <div class="helper-text">Auto-generated</div>
                     </div>
+
+                    <div class="form-field">
+                        <label for="companyId" class="required">Company</label>
+                        <select id="companyId">
+                            <option value="">Select Company</option>
+                        </select>
+                    </div>
                 </div>
             </div>
 

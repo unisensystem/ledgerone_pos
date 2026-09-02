@@ -330,11 +330,15 @@ function calculateRowAmounts(row, qty, price) {
 
     const afterDiscount = gross - discAmount;
 
+    const extraDiscPercentCell = row.querySelector('.extra-disc-percent-cell');
+    const extraDiscPercent = extraDiscPercentCell ? (parseFloat(extraDiscPercentCell.querySelector('input').value) || 0) : 0;
+    const afterExtraDiscount = afterDiscount - (afterDiscount * extraDiscPercent / 100);
+
     const toPercent = parseFloat(toPercentCell.querySelector('input').value) || 0;
-    const toAmount = afterDiscount * (toPercent / 100);
+    const toAmount = afterExtraDiscount * (toPercent / 100);
     toAmountCell.querySelector('input').value = toAmount.toFixed(3);
 
-    const afterTO = afterDiscount - toAmount;
+    const afterTO = afterExtraDiscount - toAmount;
 
     const taxPercent = parseFloat(taxPercentCell.querySelector('input').value) || 0;
     const taxAmount = afterTO * (taxPercent / 100);

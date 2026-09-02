@@ -164,7 +164,7 @@ $currency_symbol = $currency['symbol'];
             <div class="balance-card net-flow">
                 <div>
                     <div class="balance-label">Net Cash Flow <span style="font-weight: 400; opacity: 0.7;">(Inflow - Outflow)</span></div>
-                    <div class="balance-value">Rs 3,280.50</div>
+                    <div class="balance-value">₨ 0.00</div>
                 </div>
                 <i class="fas fa-exchange-alt" style="color: var(--primary); font-size: 24px;"></i>
             </div>

@@ -90,6 +90,7 @@
                     <th width="10%" class="text-right">Gross Amt</th>
                     <th width="7%" class="text-right" data-col="disc_pct">Disc %</th>
                     <th width="10%" class="text-right" data-col="disc_amt">Disc Amt</th>
+                    <th width="7%" class="text-right" data-col="extra_disc_pct">Extra Disc %</th>
                     <th width="7%" class="text-right" data-col="to_pct">TO %</th>
                     <th width="10%" class="text-right" data-col="to_amt">TO Amt</th>
                     <th width="5%" class="text-right" data-col="tax_pct">Tax %</th>
@@ -111,6 +112,7 @@
                     <th class="text-right" id="totalGrossAmount">0.000</th>
                     <th data-col="disc_pct"></th>
                     <th class="text-right" data-col="disc_amt" id="totalDiscountAmountItems">0.000</th>
+                    <th data-col="extra_disc_pct"></th>
                     <th data-col="to_pct"></th>
                     <th class="text-right" data-col="to_amt" id="totalTradeOfferAmountItems">0.000</th>
                     <th data-col="tax_pct"></th>
@@ -184,6 +186,7 @@
         const enableSize                    = localStorage.getItem('enableSize') === 'true';
         const enableInlineCashDiscount      = localStorage.getItem('enableInlineCashDiscount') === 'true';
         const enableInlineCashDiscountAmount= localStorage.getItem('enableInlineCashDiscountAmount') === 'true';
+        const enableExtraDiscount           = localStorage.getItem('enableExtraDiscount') === 'true';
         const enableTradeOffer              = localStorage.getItem('enableTradeOffer') === 'true';
         const enableTradeOfferAmount        = localStorage.getItem('enableTradeOfferAmount') === 'true';
         const enableFOC                     = localStorage.getItem('enableFOC') === 'true';
@@ -202,6 +205,7 @@
         setColVisible('size',     enableSize);
         setColVisible('disc_pct', enableInlineCashDiscount);
         setColVisible('disc_amt', enableInlineCashDiscountAmount);
+        setColVisible('extra_disc_pct', enableExtraDiscount);
         setColVisible('to_pct',   enableTradeOffer);
         setColVisible('to_amt',   enableTradeOfferAmount);
         setColVisible('tax_pct',  enableTaxation);
@@ -292,6 +296,7 @@
                     <td class="text-right">${currencySymbol} ${parseFloat(item.gross_amount).toFixed(3)}</td>
                     <td class="text-right" data-col="disc_pct" style="display:${enableInlineCashDiscount ? '' : 'none'}">${parseFloat(item.discount_percent || 0).toFixed(3)}%</td>
                     <td class="text-right" data-col="disc_amt" style="display:${enableInlineCashDiscountAmount ? '' : 'none'}">${currencySymbol} ${parseFloat(item.discount_amount || 0).toFixed(3)}</td>
+                    <td class="text-right" data-col="extra_disc_pct" style="display:${enableExtraDiscount ? '' : 'none'}">${parseFloat(item.extra_discount_percent || 0).toFixed(3)}%</td>
                     <td class="text-right" data-col="to_pct" style="display:${enableTradeOffer ? '' : 'none'}">${parseFloat(item.trade_offer_percent || 0).toFixed(3)}%</td>
                     <td class="text-right" data-col="to_amt" style="display:${enableTradeOfferAmount ? '' : 'none'}">${currencySymbol} ${parseFloat(item.trade_offer_amount || 0).toFixed(3)}</td>
                     <td class="text-right" data-col="tax_pct" style="display:${enableTaxation ? '' : 'none'}">${parseFloat(item.tax_percent || 0).toFixed(3)}%</td>
@@ -384,7 +389,7 @@
         }
 
         function hideEmptyTableColumns() {
-            const cols = ['disc_pct','disc_amt','to_pct','to_amt','tax_pct','tax_amt','foc','size'];
+            const cols = ['disc_pct','disc_amt','extra_disc_pct','to_pct','to_amt','tax_pct','tax_amt','foc','size'];
             const tbody = document.getElementById('itemsTableBody');
             const rows = Array.from(tbody.rows);
 

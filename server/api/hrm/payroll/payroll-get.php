@@ -22,7 +22,7 @@ if (!$payroll_id) {
 
 try {
     // Get payroll entry
-    $stmt = $pdo->prepare("SELECT * FROM payroll_entries WHERE id = ? AND tenant_id = ?");
+    $stmt = $pdo->prepare("SELECT pe.*, COALESCE(co.company_name, '') as company_name FROM payroll_entries pe LEFT JOIN companies co ON pe.company_id = co.id WHERE pe.id = ? AND pe.tenant_id = ?");
     $stmt->execute([$payroll_id, $tenant_id]);
     $payroll = $stmt->fetch(PDO::FETCH_ASSOC);
     
