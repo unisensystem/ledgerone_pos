@@ -21,13 +21,19 @@ if (!$user_id || !$tenant_id) {
 
 try {
     $stmt = $pdo->prepare("
-        SELECT 
+        SELECT
             a.id as account_id,
             a.name as account_name,
             a.sub_account_id,
             sa.id as sub_id,
             sa.name as sub_name,
             sa.parent_id,
+            sa2.id as sa2_id,
+            sa2.name as sa2_name,
+            sa2.parent_id as sa2_parent_id,
+            sa3.id as sa3_id,
+            sa3.name as sa3_name,
+            sa3.parent_id as sa3_parent_id,
             COALESCE(sa.account_head_id, sa2.account_head_id, sa3.account_head_id) as head_id,
             ah.name as head_name,
             COALESCE(SUM(l.debit), 0) as total_debit,
@@ -39,7 +45,9 @@ try {
         LEFT JOIN sub_accounts sa3 ON sa2.parent_id = sa3.id AND sa3.id != 1 AND (sa3.tenant_id = ? OR sa3.tenant_id = 0)
         LEFT JOIN accounts_head ah ON COALESCE(sa.account_head_id, sa2.account_head_id, sa3.account_head_id) = ah.id AND (ah.tenant_id = ? OR ah.tenant_id = 0)
         WHERE l.tenant_id = ? AND (a.sub_account_id IS NULL OR a.sub_account_id != 1)
-        GROUP BY a.id, a.name, a.sub_account_id, sa.id, sa.name, sa.parent_id, sa.account_head_id, sa2.account_head_id, sa3.account_head_id, ah.name
+        GROUP BY a.id, a.name, a.sub_account_id, sa.id, sa.name, sa.parent_id, sa.account_head_id,
+                 sa2.id, sa2.name, sa2.parent_id, sa2.account_head_id,
+                 sa3.id, sa3.name, sa3.parent_id, sa3.account_head_id, ah.name
         ORDER BY ah.id, sa.id, a.id
     ");
     $stmt->execute([$tenant_id, $tenant_id, $tenant_id, $tenant_id, $tenant_id, $tenant_id]);
@@ -65,11 +73,46 @@ try {
         }
 
         $subId = $row['sub_id'] ?: 0;
-        
+
+        // Ensure all intermediate sub-accounts are in subMap (sa3 → sa2 → sa)
+        if ($row['sa3_id'] && !isset($subMap[$row['sa3_id']])) {
+            $subMap[$row['sa3_id']] = [
+                'code' => str_pad($row['sa3_id'], 4, '0', STR_PAD_LEFT),
+                'name' => $row['sa3_name'] ?: 'Uncategorized',
+                'level' => $row['sa3_parent_id'] ? 2 : 1,
+                'debit' => 0,
+                'credit' => 0,
+                'isParent' => true,
+                'head_id' => $headId,
+                'parent_id' => $row['sa3_parent_id'],
+                'children' => []
+            ];
+        }
+
+        if ($row['sa2_id'] && !isset($subMap[$row['sa2_id']])) {
+            $subMap[$row['sa2_id']] = [
+                'code' => str_pad($row['sa2_id'], 4, '0', STR_PAD_LEFT),
+                'name' => $row['sa2_name'] ?: 'Uncategorized',
+                'level' => $row['sa2_parent_id'] ? 2 : 1,
+                'debit' => 0,
+                'credit' => 0,
+                'isParent' => true,
+                'head_id' => $headId,
+                'parent_id' => $row['sa2_parent_id'],
+                'children' => []
+            ];
+        }
+
         if ($subId) {
-            
             if (!isset($subMap[$subId])) {
-                $level = $row['parent_id'] ? 2 : 1;
+                // Level of sa: 3 if it has a grandparent (sa3), 2 if it has a parent (sa2), 1 if root
+                if ($row['sa3_id']) {
+                    $level = 3;
+                } elseif ($row['parent_id']) {
+                    $level = 2;
+                } else {
+                    $level = 1;
+                }
                 $subMap[$subId] = [
                     'code' => str_pad($subId, 4, '0', STR_PAD_LEFT),
                     'name' => $row['sub_name'] ?: 'Uncategorized',
@@ -87,7 +130,7 @@ try {
                 $accountId = $row['account_id'];
                 $debit = (float)$row['total_debit'];
                 $credit = (float)$row['total_credit'];
-                
+
                 if (!isset($accountMap[$accountId])) {
                     $accountMap[$accountId] = [
                         'code' => str_pad($row['account_id'], 4, '0', STR_PAD_LEFT),
@@ -101,6 +144,15 @@ try {
 
                     $subMap[$subId]['debit'] += $debit;
                     $subMap[$subId]['credit'] += $credit;
+                    // Bubble totals up through intermediate sub-accounts
+                    if ($row['sa2_id']) {
+                        $subMap[$row['sa2_id']]['debit'] += $debit;
+                        $subMap[$row['sa2_id']]['credit'] += $credit;
+                    }
+                    if ($row['sa3_id']) {
+                        $subMap[$row['sa3_id']]['debit'] += $debit;
+                        $subMap[$row['sa3_id']]['credit'] += $credit;
+                    }
                     $headMap[$headId]['debit'] += $debit;
                     $headMap[$headId]['credit'] += $credit;
                 }
@@ -159,17 +211,32 @@ try {
                     }
                 }
                 
-                // Add child sub-accounts
+                // Add child sub-accounts (level 2)
                 foreach ($subMap as $childSubId => $childSub) {
                     if ($childSub['parent_id'] === $subId && !isset($added['s_' . $childSubId])) {
                         $final[] = $childSub;
                         $added['s_' . $childSubId] = true;
-                        
+
                         // Add accounts under child sub
                         foreach ($accountMap as $accountId => $account) {
                             if (array_key_exists('sub_id', $account) && $account['sub_id'] === $childSubId && !isset($added['a_' . $accountId])) {
                                 $final[] = $account;
                                 $added['a_' . $accountId] = true;
+                            }
+                        }
+
+                        // Add grandchild sub-accounts (level 3)
+                        foreach ($subMap as $grandSubId => $grandSub) {
+                            if ($grandSub['parent_id'] === $childSubId && !isset($added['s_' . $grandSubId])) {
+                                $final[] = $grandSub;
+                                $added['s_' . $grandSubId] = true;
+
+                                foreach ($accountMap as $accountId => $account) {
+                                    if (array_key_exists('sub_id', $account) && $account['sub_id'] === $grandSubId && !isset($added['a_' . $accountId])) {
+                                        $final[] = $account;
+                                        $added['a_' . $accountId] = true;
+                                    }
+                                }
                             }
                         }
                     }
