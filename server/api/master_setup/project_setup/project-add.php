@@ -16,8 +16,8 @@ if (!$tenant_id || !$user_id) {
 
 $input = json_decode(file_get_contents('php://input'), true);
 
-if (empty($input['project_name']) || empty($input['start_date']) || empty($input['end_date']) || empty($input['company_id'])) {
-    echo json_encode(['success' => false, 'message' => 'Project name, company, start date and end date are required']); exit;
+if (empty($input['project_name']) || empty($input['company_id'])) {
+    echo json_encode(['success' => false, 'message' => 'Project name and company are required']); exit;
 }
 
 try {
@@ -36,8 +36,8 @@ try {
         $project_code,
         $input['project_name'],
         $input['city_id'] ?: null,
-        $input['start_date'],
-        $input['end_date'],
+        $input['start_date'] ?: null,
+        $input['end_date'] ?: null,
         $input['project_manager_id'] ?: null,
         $input['team_leader_id'] ?: null,
         $input['status'] ?? 'active',

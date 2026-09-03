@@ -7,10 +7,6 @@
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { background: #f0f0f0; font-family: Arial, sans-serif; }
 
-        /* Default before JS runs, so a print triggered before DOMContentLoaded
-           still has a sane fallback page size. */
-        :root { --page-size: A4; }
-
         .no-print {
             padding: 16px 24px;
             background: #fff;
@@ -91,14 +87,28 @@
             .no-print { display: none; }
             body { background: white; }
             iframe { height: auto; }
-
-            /* IMPORTANT: each invoice iframe sets its own @page size internally,
-               but that's ignored once this parent page is what gets printed —
-               the browser reads paper size from the TOP document's @page rule,
-               not from nested iframes. Without this, A3/A5/A6 selection had no
-               effect on the actual printed/PDF paper size in bulk print. */
-            @page { size: var(--page-size); }
         }
+    </style>
+
+    <!--
+        Default @page BEFORE JS runs, so a print triggered before
+        DOMContentLoaded still has a sane fallback page size.
+
+        IMPORTANT: this used to be `@page { size: var(--page-size); }` with
+        --page-size set on :root. That is the root cause of the blank
+        leading pages: CSS custom properties (var()) are NOT reliably
+        resolved inside @page rules across browsers/versions — many builds
+        silently DROP the whole @page block when it references a var(),
+        and fall back to the UA default paper size (commonly Letter/8.5x11)
+        while the invoice content inside the iframes is laid out for A4/A5/
+        A3/A6. That size mismatch between the printed page box and the
+        actual content is what produced empty/blank pages at the start of
+        the print job. Fix: always write the @page rule with a literal
+        value (never a var()) into this <style> tag, and have
+        setPaperSize() below replace its content directly.
+    -->
+    <style id="pageSizeStyle">
+        @page { size: A4; margin: 0; }
     </style>
 </head>
 <body>
@@ -127,6 +137,21 @@
 
     let loadedCount = 0;
     const container = document.getElementById('framesContainer');
+
+    // Tracks whatever paper size is currently selected, so any iframe can be
+    // synced to it the moment it finishes loading — see the 'load' handler
+    // below for why this matters.
+    let currentPaperSize = localStorage.getItem('invoicePaperSize') || 'A4';
+
+    // Portrait width (mm) for each supported size — used to lock each
+    // iframe's PRINT-time width to the real physical page width. Without
+    // this, iframes keep rendering at full desktop width even while @page
+    // is set to something much narrower (worst case: A6 at 105mm), and the
+    // browser generates extra "overflow" pages to cover that leftover
+    // width — most of which come out visually blank. This mismatch is much
+    // more severe at A6 than at A3/A4/A5 simply because the size gap
+    // (desktop width vs 105mm) is largest there.
+    const PAGE_WIDTH_MM = { A3: '297mm', A4: '210mm', A5: '148mm', A6: '105mm' };
 
     // Measures the REAL height of an invoice iframe's rendered content.
     //
@@ -198,6 +223,24 @@
             // Hide the print buttons inside the iframe
             doc.querySelectorAll('.no-print').forEach(el => el.style.display = 'none');
 
+            // Apply the CURRENTLY selected paper size to this iframe right away.
+            //
+            // This is the actual fix for the "first pages come out blank"
+            // complaint: the DOMContentLoaded handler below also propagates the
+            // saved size to every iframe, but it only reaches iframes that have
+            // ALREADY loaded by that moment. Iframes are created in a tight
+            // synchronous loop, so the first one or two can (depending on
+            // network/render timing) finish loading only slightly after
+            // DOMContentLoaded fires — those iframes never received the size
+            // propagation and stayed on invoice-print.php's own internal
+            // default. That mismatch between the outer @page size and that
+            // iframe's internal layout is exactly what produced blank/broken
+            // pages for specifically the first invoice(s) while later ones
+            // (loaded after the sync completed) printed fine. Calling it here,
+            // on every single iframe's own 'load' event, makes each iframe
+            // self-sufficient regardless of load timing.
+            try { win.setPaperSize(currentPaperSize); } catch (e) {}
+
             const syncHeight = () => {
                 const h = measureContentHeight(doc);
                 iframe.style.height = h + 'px';
@@ -241,6 +284,22 @@
         container.appendChild(wrapper);
     });
 
+    // Fires the moment the browser switches into print rendering — at this
+    // exact point, the @media print rules (including the print-only iframe
+    // width we inject in setPaperSize() below) are ALREADY active, so every
+    // iframe's inner document has already reflowed to the real physical
+    // page width. Screen-time height measurements (taken back when the
+    // iframe was still full desktop width) do NOT represent this reflowed
+    // layout — the gap is small at A3/A4/A5 but becomes large at A6, where
+    // rows that used to sit side by side now wrap and need far more
+    // vertical space. Re-measuring here, with the real print width already
+    // in effect, is what actually fixes the extra/blank-page problem.
+    window.addEventListener('beforeprint', () => {
+        document.querySelectorAll('.invoice-frame-wrapper iframe').forEach(iframe => {
+            if (typeof iframe._syncHeight === 'function') iframe._syncHeight();
+        });
+    });
+
     function printAll() {
         if (printBtn.disabled) return;
 
@@ -260,10 +319,16 @@
 
     function setPaperSize(size) {
         localStorage.setItem('invoicePaperSize', size);
+        currentPaperSize = size;
+
         // 'A6' isn't a valid CSS @page size keyword — use explicit physical
         // dimensions, same mapping invoice-print.php uses for its own @page.
         const pageSizeValue = size === 'A6' ? '105mm 148mm' : size;
-        document.documentElement.style.setProperty('--page-size', pageSizeValue);
+
+        // Write a LITERAL @page rule (never var()) — see the comment on the
+        // #pageSizeStyle tag in <head> for why this matters.
+        const styleTag = document.getElementById('pageSizeStyle');
+        styleTag.textContent = `@page { size: ${pageSizeValue}; margin: 0; }`;
 
         document.querySelectorAll('.size-btn').forEach(btn => btn.classList.remove('active'));
         document.getElementById('btn' + size).classList.add('active');
@@ -271,6 +336,8 @@
         // Propagate to all loaded iframes so each invoice's own a5-mode/a6-mode
         // styling switches too (this also triggers the ResizeObserver above to
         // resync each iframe's height for the new, differently-sized content).
+        // Iframes that haven't loaded yet will pick up `currentPaperSize` on
+        // their own 'load' event above, so this is just for already-loaded ones.
         document.querySelectorAll('iframe').forEach(iframe => {
             try {
                 iframe.contentWindow.setPaperSize(size);
@@ -279,8 +346,7 @@
     }
 
     // Apply saved size on load
-    const savedSize = localStorage.getItem('invoicePaperSize') || 'A4';
-    document.addEventListener('DOMContentLoaded', () => setPaperSize(savedSize));
+    document.addEventListener('DOMContentLoaded', () => setPaperSize(currentPaperSize));
 </script>
 </body>
 </html>

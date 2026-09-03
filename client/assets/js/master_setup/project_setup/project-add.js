@@ -143,8 +143,6 @@ function validate() {
     let ok = true;
     const checks = [
         ['projectName', 'projectNameError'],
-        ['startDate',   'startDateError'],
-        ['endDate',     'endDateError'],
     ];
     checks.forEach(([fid, eid]) => {
         const f = document.getElementById(fid);

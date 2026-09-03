@@ -225,20 +225,20 @@ document.addEventListener('DOMContentLoaded', function () {
             });
     }
 
-    function loadProjects() {
-        fetch('../../../../server/api/master_setup/project_setup/get-projects-dropdown.php')
-            .then(response => response.json())
-            .then(data => {
-                if (data.success && Array.isArray(data.data)) {
-                    const sel = document.getElementById('project');
-                    data.data.forEach(p => {
-                        const label = `${p.project_code} - ${p.project_name}${p.city_name ? ' - ' + p.city_name : ''}`;
-                        sel.appendChild(new Option(label, p.id));
-                    });
-                }
-            })
-            .catch(err => console.error('loadProjects error:', err));
-    }
+   function loadProjects() {
+    fetch('../../../../server/api/customer_supplier/suppliers/get-projects-dropdown.php')
+        .then(response => response.json())
+        .then(data => {
+            if (data.success && Array.isArray(data.data)) {
+                const sel = document.getElementById('project');
+                data.data.forEach(p => {
+                    const label = `${p.project_code} - ${p.project_name}${p.city_name ? ' - ' + p.city_name : ''}`;
+                    sel.appendChild(new Option(label, p.id));
+                });
+            }
+        })
+        .catch(err => console.error('loadProjects error:', err));
+}
 
     function loadCities() {
         fetch('../../../../server/api/customer_supplier/suppliers/get-cities.php')

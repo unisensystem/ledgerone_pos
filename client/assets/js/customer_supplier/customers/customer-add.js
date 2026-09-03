@@ -859,21 +859,20 @@ document.addEventListener('DOMContentLoaded', function () {
             });
     }
 
-    function loadProjects() {
-        fetch('../../../../server/api/master_setup/project_setup/get-projects-dropdown.php')
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    data.data.forEach(project => {
-                        const label = `${project.project_code} - ${project.project_name}${project.city_name ? ' - ' + project.city_name : ''}`;
-                        const option = new Option(label, project.id);
-                        $('#project').append(option);
-                    });
-                    $('#project').trigger('change');
-                }
-            });
-    }
-
+   function loadProjects() {
+    fetch('../../../../server/api/customer_supplier/customers/get-projects-dropdown.php')
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                data.data.forEach(project => {
+                    const label = `${project.project_code} - ${project.project_name}${project.city_name ? ' - ' + project.city_name : ''}`;
+                    const option = new Option(label, project.id);
+                    $('#project').append(option);
+                });
+                $('#project').trigger('change');
+            }
+        });
+}
     function loadBrands() {
         fetch('../../../../server/api/customer_supplier/customers/get-brands.php')
             .then(response => response.json())

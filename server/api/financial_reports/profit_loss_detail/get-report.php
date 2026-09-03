@@ -199,6 +199,31 @@ try {
             $total_cost += $cost;
             $total_qty += $purchase['quantity'];
         }
+
+        // Add stock-in from Stock Adjustments (increase type) - base currency
+        $stmt = $pdo->prepare("
+            SELECT sai.qty, sai.rate
+            FROM stock_adjustment_items sai
+            JOIN stock_adjustment sa ON sa.id = sai.adjustment_id
+            WHERE sai.product_id = ?
+            AND sai.tenant_id = ?
+            AND sa.adjustment_type = 'increase'
+            AND sa.date <= ?
+            " . ($company_id ? " AND sa.company_id = ?" : "") . "
+        ");
+        $params_adj = [$item['product_id'], $tenant_id, $end_date];
+        if ($company_id) $params_adj[] = $company_id;
+        $stmt->execute($params_adj);
+        $adjustment_data = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        foreach ($adjustment_data as $adj) {
+            $adj_cost = $adj['rate'] * $adj['qty'];
+            if ($base_currency_id != $target_currency_id) {
+                $adj_cost = $converter->convert($adj_cost, $base_currency_id, $target_currency_id);
+            }
+            $total_cost += $adj_cost;
+            $total_qty += $adj['qty'];
+        }
         
         // Add opening stock (base currency)
         $stock_opening_filter = $company_id ? " AND so.product_id IN (SELECT id FROM products WHERE company_id = ?)" : "";
@@ -272,7 +297,7 @@ try {
     
     $categorywise_data = array_values($category_map);
 
-    // ==================== INVOICE-WISE PROFIT & LOSS ====================
+    // ==================== CUSTOMER-WISE PROFIT & LOSS ====================
     
     // Get customer sales summary with currency
     $sql = "
@@ -383,6 +408,31 @@ try {
                 }
                 $total_cost += $cost;
                 $total_qty += $purchase['quantity'];
+            }
+
+            // Add stock-in from Stock Adjustments (increase type) - base currency
+            $stmt2 = $pdo->prepare("
+                SELECT sai.qty, sai.rate
+                FROM stock_adjustment_items sai
+                JOIN stock_adjustment sa ON sa.id = sai.adjustment_id
+                WHERE sai.product_id = ?
+                AND sai.tenant_id = ?
+                AND sa.adjustment_type = 'increase'
+                AND sa.date <= ?
+                " . ($company_id ? " AND sa.company_id = ?" : "") . "
+            ");
+            $params_adj = [$prod['product_id'], $tenant_id, $end_date];
+            if ($company_id) $params_adj[] = $company_id;
+            $stmt2->execute($params_adj);
+            $adjustment_data = $stmt2->fetchAll(PDO::FETCH_ASSOC);
+
+            foreach ($adjustment_data as $adj) {
+                $adj_cost = $adj['rate'] * $adj['qty'];
+                if ($base_currency_id != $target_currency_id) {
+                    $adj_cost = $converter->convert($adj_cost, $base_currency_id, $target_currency_id);
+                }
+                $total_cost += $adj_cost;
+                $total_qty += $adj['qty'];
             }
             
             // Add opening stock
@@ -528,6 +578,31 @@ try {
                 }
                 $total_cost += $cost;
                 $total_qty += $purchase['quantity'];
+            }
+
+            // Add stock-in from Stock Adjustments (increase type) - base currency
+            $stmt2 = $pdo->prepare("
+                SELECT sai.qty, sai.rate
+                FROM stock_adjustment_items sai
+                JOIN stock_adjustment sa ON sa.id = sai.adjustment_id
+                WHERE sai.product_id = ?
+                AND sai.tenant_id = ?
+                AND sa.adjustment_type = 'increase'
+                AND sa.date <= ?
+                " . ($company_id ? " AND sa.company_id = ?" : "") . "
+            ");
+            $params_adj = [$prod['product_id'], $tenant_id, $invoice['sale_date']];
+            if ($company_id) $params_adj[] = $company_id;
+            $stmt2->execute($params_adj);
+            $adjustment_data = $stmt2->fetchAll(PDO::FETCH_ASSOC);
+
+            foreach ($adjustment_data as $adj) {
+                $adj_cost = $adj['rate'] * $adj['qty'];
+                if ($base_currency_id != $target_currency_id) {
+                    $adj_cost = $converter->convert($adj_cost, $base_currency_id, $target_currency_id);
+                }
+                $total_cost += $adj_cost;
+                $total_qty += $adj['qty'];
             }
             
             // Add opening stock
