@@ -1,4 +1,4 @@
-(function() {
+﻿(function() {
     // Current page ka URL check karke decide karo ke ye normal POS hai ya Med POS
     const prefix = window.location.pathname.includes('med_pos_invoice') ? 'med_' : 'pos_';
     
@@ -46,7 +46,7 @@
 
 
 // Item/invoice-level taxation is opt-in per page: ON by default on the medical
-// POS invoice (med_pos_invoice), OFF by default on the regular POS invoice —
+// POS invoice (med_pos_invoice), OFF by default on the regular POS invoice â€”
 // this preserves existing pos_invoice behavior (tax columns/regimes stay hidden
 // and inert there) while giving med_pos_invoice full tax functionality. Users
 // can still flip it either way via Invoice Settings if the "Taxation" checkbox
@@ -117,7 +117,7 @@ function getCustomerDisplayText(customer) {
 // store a rounded-to-3-decimals per-Piece rate for general use, PLUS the exact
 // originally-typed value and unit. Recomputing live here (full floating-point
 // precision, only rounded at the final Gross/Net amount) avoids a whole-Carton
-// sale totalling 1999.992 instead of 2000 — see calculateRowAmounts's
+// sale totalling 1999.992 instead of 2000 â€” see calculateRowAmounts's
 // gross.toFixed(3), which absorbs the tiny float epsilon correctly.
 function getEffectivePriceValue(product, salePriceSetting) {
     const flatPrice = salePriceSetting === 'mrp' ? (product.mrp || 0) : (product.trade_price || 0);
@@ -255,8 +255,8 @@ const invoiceSettingCheckboxes = [
     'enableAmountPaidPaymentMethod',
     'enableBatchNo',        // NEW
     'enableExpiryDate',     // NEW
-    'enableTaxation',       // NEW — only exists on med_pos_invoice's settings modal
-    'enableExtraDiscountItem' // NEW — only exists on med_pos_invoice's settings modal
+    'enableTaxation',       // NEW â€” only exists on med_pos_invoice's settings modal
+    'enableExtraDiscountItem' // NEW â€” only exists on med_pos_invoice's settings modal
 ];
 
     invoiceSettingCheckboxes.forEach(checkboxId => {
@@ -547,7 +547,7 @@ const invoiceSettingCheckboxes = [
         }
     });
 
-    // Tab from customerCodeSearch → first product row search input
+    // Tab from customerCodeSearch â†’ first product row search input
     document.getElementById('customerCodeSearch').addEventListener('keydown', function (e) {
         if (e.key === 'Tab' && !e.shiftKey) {
             const firstRowSearch = itemsTable.rows[0]?.cells[1]?.querySelector('.search-input');
@@ -1647,7 +1647,7 @@ const invoiceSettingCheckboxes = [
                 data.items.forEach(item => {
                     if (!item.parent_row_id) {
                         // Same product sold across multiple rows (e.g. different batches) must stay
-                        // separate rows on edit — only merge units that truly belong to one row
+                        // separate rows on edit â€” only merge units that truly belong to one row
                         // (same product + same batch, split across Carton/Dozen/Piece unit columns).
                         const key = item.product_id + '_' + (item.batch_no || '');
                         if (!itemsByProduct[key]) {
@@ -1668,6 +1668,7 @@ const invoiceSettingCheckboxes = [
                     const item = productGroup.baseItem;
                     await addRowDynamic();
                     const lastRow = itemsTable.rows[itemsTable.rows.length - 1];
+                    itemIdToRowMap[item.id] = lastRow;
 
                     lastRow.cells[1].querySelector('.search-input').value = item.product_name;
                     lastRow.cells[1].querySelector('.item-code').value = item.product_id;
@@ -1689,7 +1690,7 @@ const invoiceSettingCheckboxes = [
                     }
 
                     // Restore saved batch no / expiry date instead of re-fetching current stock batch.
-                    // The dropdown must actually be populated first (loadProductBatches) — just setting
+                    // The dropdown must actually be populated first (loadProductBatches) â€” just setting
                     // .value on an empty <select> silently no-ops since there's no matching <option>.
                     // The saved batch may no longer appear in the "available" list (e.g. fully consumed
                     // since this sale), so add it as a fallback option to guarantee it stays selectable.
@@ -1717,7 +1718,7 @@ const invoiceSettingCheckboxes = [
                     if (discPercentInput) discPercentInput.value = item.discount_percent;
                     const discAmountInput = lastRow.querySelector('.disc-amount-cell input');
                     if (discAmountInput) discAmountInput.value = item.discount_amount;
-                    // Extra Discount field holds a %, but what's saved is the amount —
+                    // Extra Discount field holds a %, but what's saved is the amount â€”
                     // back-derive the percent from the amount that was actually invoiced.
                     const extraDiscAmountInput = lastRow.querySelector('.extra-disc-cell input');
                     if (extraDiscAmountInput) {
@@ -1729,7 +1730,7 @@ const invoiceSettingCheckboxes = [
                     if (toAmountInput) toAmountInput.value = item.trade_offer_amount || 0;
 
                     // Restore the tax dataset (formula/base/inclusive flag) via a fresh lookup so any
-                    // FUTURE recalculation (qty/price edited later) uses the correct regime — then
+                    // FUTURE recalculation (qty/price edited later) uses the correct regime â€” then
                     // overwrite the visible tax_percent/tax_amount with the SAVED historical values,
                     // since a fresh lookup can legitimately differ from what was actually invoiced.
                     if (typeof loadTaxForNewProduct === 'function' && invoice.customer_id) {
@@ -1744,7 +1745,7 @@ const invoiceSettingCheckboxes = [
                     const netInput = lastRow.querySelector('.net-cell input');
                     if (netInput) netInput.value = item.net_amount;
 
-                    // Set scheme — this recalculates the row from current inputs/dataset (to correctly
+                    // Set scheme â€” this recalculates the row from current inputs/dataset (to correctly
                     // toggle T.O Amt/FOC readonly state for the scheme), which would clobber the
                     // historical values just restored above. Re-apply them afterward so the row
                     // displays exactly what was invoiced, not a fresh recalculation. Called directly
@@ -1769,6 +1770,8 @@ const invoiceSettingCheckboxes = [
                     if (taxAmountInput) taxAmountInput.value = item.tax_amount || 0;
                     if (focInput) focInput.value = item.foc_quantity || 0;
                     if (netInput) netInput.value = item.net_amount;
+
+                    checkAndShowVariantsButton(lastRow, item.product_id);
                 }
 
                 // Load child items
@@ -1796,6 +1799,7 @@ const invoiceSettingCheckboxes = [
                         product_name: child.product_name,
                         uom_id: child.uom_id,
                         quantity: child.quantity,
+                        sale_price: child.sale_price,
                         stock_affects: child.stock_affects || 0,
                         invoice_affects: child.invoice_affects || 0
                     });
@@ -1807,7 +1811,7 @@ const invoiceSettingCheckboxes = [
                 document.getElementById('totalDiscountPercent').value = invoice.total_discount_percent;
                 document.getElementById('totalDiscountAmount').value = invoice.total_discount_amount;
                 // pos-edit.php returns 'Cash' / 'Bank Transfer' (display casing, used by
-                // print pages) — normalize to the select's lowercase option values.
+                // print pages) â€” normalize to the select's lowercase option values.
                 const paymentMethodValue = invoice.payment_method === 'Bank Transfer' ? 'bank_transfer'
                     : (invoice.payment_method === 'Cash' ? 'cash' : '');
                 document.getElementById('paymentMethod').value = paymentMethodValue;
@@ -1859,7 +1863,7 @@ const invoiceSettingCheckboxes = [
                 // Apply invoice settings after loading data
                 applyInvoiceSettings();
 
-                // Re-populate extra discount values AFTER applyInvoiceSettings �
+                // Re-populate extra discount values AFTER applyInvoiceSettings ï¿½
                 // it resets disabled inputs to '0' when the feature is off in localStorage.
                 document.getElementById('extraDiscount1Percent').value = invoice.extra_discount_1_percent || 0;
                 document.getElementById('extraDiscount1Amount').value  = invoice.extra_discount_1_amount  || 0;
@@ -1960,10 +1964,12 @@ const invoiceSettingCheckboxes = [
                     itemsByProduct[item.product_id].units.push({ uom_id: item.uom_id, quantity: item.quantity });
                 });
 
+                const itemIdToRowMap = {};
                 for (const productGroup of Object.values(itemsByProduct)) {
                     const item = productGroup.baseItem;
                     await addRowDynamic();
                     const lastRow = itemsTable.rows[itemsTable.rows.length - 1];
+                    itemIdToRowMap[item.id] = lastRow;
 
                     lastRow.cells[1].querySelector('.search-input').value = item.product_name;
                     lastRow.cells[1].querySelector('.item-code').value = item.product_id;
@@ -2022,10 +2028,7 @@ const invoiceSettingCheckboxes = [
                 // Store child items in parent dataset
                 const childItems = data.items.filter(item => item.parent_row_id);
                 childItems.forEach(child => {
-                    // find parent row by product_id match
-                    const parentRow = Array.from(itemsTable.rows).find(r =>
-                        r.cells[1]?.querySelector('.item-code')?.value == child.parent_row_id
-                    );
+                    const parentRow = itemIdToRowMap[child.parent_row_id];
                     if (!parentRow) return;
                     if (!parentRow.dataset.childProducts) parentRow.dataset.childProducts = JSON.stringify([]);
                     const childProducts = JSON.parse(parentRow.dataset.childProducts);
@@ -2034,6 +2037,7 @@ const invoiceSettingCheckboxes = [
                         product_name: child.product_name,
                         uom_id: child.uom_id,
                         quantity: child.quantity,
+                        sale_price: child.sale_price,
                         stock_affects: child.stock_affects || 0,
                         invoice_affects: child.invoice_affects || 0
                     });
@@ -3258,7 +3262,7 @@ const invoiceSettingCheckboxes = [
             document.getElementById('totalDiscountAmountItems').textContent = totalDiscountAmountItems.toFixed(3);
             document.getElementById('totalTradeOfferAmount').textContent = totalTradeOfferAmount.toFixed(3);
             document.getElementById('totalTaxAmount').textContent = totalTaxAmount.toFixed(3);
-            const itemTaxAmountSummaryEl = document.getElementById('itemTaxAmountSummary'); // NEW — med_pos_invoice only
+            const itemTaxAmountSummaryEl = document.getElementById('itemTaxAmountSummary'); // NEW â€” med_pos_invoice only
             if (itemTaxAmountSummaryEl) itemTaxAmountSummaryEl.textContent = totalTaxAmount.toFixed(3);
             document.getElementById('totalFocQty').textContent = totalFocQty.toFixed(3);
             document.getElementById('totalNetAmountItems').textContent = totalNetAmountItems.toFixed(3);
@@ -3278,7 +3282,7 @@ const invoiceSettingCheckboxes = [
 
             const afterMainDiscount = totalNetAmountItems - invoiceDiscountAmount;
 
-            // Extra Discount 1 � base: amount after main invoice discount
+            // Extra Discount 1 ï¿½ base: amount after main invoice discount
             let extraDiscount1Amount = parseFloat(document.getElementById('extraDiscount1Amount')?.value) || 0;
             const extraDiscount1Percent = parseFloat(document.getElementById('extraDiscount1Percent')?.value) || 0;
             if (extraDiscount1Percent > 0) {
@@ -3292,7 +3296,7 @@ const invoiceSettingCheckboxes = [
             }
             const afterExtraDiscount1 = afterMainDiscount - extraDiscount1Amount;
 
-            // Extra Discount 2 � base: amount after extra discount 1
+            // Extra Discount 2 ï¿½ base: amount after extra discount 1
             let extraDiscount2Amount = parseFloat(document.getElementById('extraDiscount2Amount')?.value) || 0;
             const extraDiscount2Percent = parseFloat(document.getElementById('extraDiscount2Percent')?.value) || 0;
             if (extraDiscount2Percent > 0) {
@@ -3371,7 +3375,7 @@ const invoiceSettingCheckboxes = [
             // Re-run taxes so phase-2 uses the updated amountPaid as its base input.
             calculateInvoiceLevelTaxes();
             // The remaining balance field must show the pre-remaining-balance-tax outstanding
-            // amount (interimNetReceivable − amountPaid), not the post-tax final receivable.
+            // amount (interimNetReceivable âˆ’ amountPaid), not the post-tax final receivable.
             // Using the post-tax value would silently inflate the displayed balance by the tax
             // itself, making the field inconsistent with what the user sees as "owed before tax".
             const interim = window.invoiceLevelInterimNetReceivable
@@ -3386,7 +3390,7 @@ const invoiceSettingCheckboxes = [
         document.getElementById('remainingBalance').value = remainingBalance.toFixed(3);
     }
 
-    // loadInvoiceLevelTaxRegimes intentionally NOT redeclared here — removing this
+    // loadInvoiceLevelTaxRegimes intentionally NOT redeclared here â€” removing this
     // local stub lets calls made from within initializePage() fall through the
     // scope chain to the real global implementation in invoice-level-taxes-dynamic.js,
     // which is gated by isTaxationEnabled() (stays a no-op on the regular POS page).
@@ -3425,7 +3429,7 @@ const invoiceSettingCheckboxes = [
         totalTaxAmountSummary.addEventListener('input', updateInvoiceSummaryFromTaxAmount);
     }
 
-    // Extra Discount 1 � percent drives amount; amount drives percent
+    // Extra Discount 1 ï¿½ percent drives amount; amount drives percent
     const extraDiscount1PercentEl = document.getElementById('extraDiscount1Percent');
     if (extraDiscount1PercentEl) {
         extraDiscount1PercentEl.addEventListener('input', function () {
@@ -3445,7 +3449,7 @@ const invoiceSettingCheckboxes = [
         });
     }
 
-    // Extra Discount 2 � percent drives amount; amount drives percent
+    // Extra Discount 2 ï¿½ percent drives amount; amount drives percent
     const extraDiscount2PercentEl = document.getElementById('extraDiscount2Percent');
     if (extraDiscount2PercentEl) {
         extraDiscount2PercentEl.addEventListener('input', function () {
@@ -4434,7 +4438,12 @@ function saveInvoice(status = 'Posted') {
 
         // Get product ID
         const productId = row.cells[1].querySelector('.item-code').value;
-        
+
+        // Fixed 1-based position this row's first item will occupy in formData.items —
+        // captured once so every variant child below points at the parent, not at a sibling
+        // pushed earlier (formData.items.length drifts as siblings are added).
+        const parentItemIndex = formData.items.length + 1;
+
         // Get all unit inputs with quantities
         const unitInputs = row.querySelectorAll('.unit-input');
         const unitsWithQty = [];
@@ -4464,7 +4473,7 @@ function saveInvoice(status = 'Posted') {
         const grossAmount = parseFloat(grossInput.value);
         const discountPercent = parseFloat(discPercentInput.value) || 0;
         const discountAmount = parseFloat(discAmountInput.value);
-        // Extra Discount is entered as a % (see calculateRowAmounts) — the computed
+        // Extra Discount is entered as a % (see calculateRowAmounts) â€” the computed
         // amount is cached on the row's dataset, not read straight from the input.
         const extraDiscountAmount = parseFloat(row.dataset.extraDiscountAmount) || 0;
         const tradeOfferAmount = parseFloat(toAmountInput.value) || 0;
@@ -4480,7 +4489,7 @@ const scheme = schemeSelect ? schemeSelect.value : 'sale_on_tp';
     const isFirstUnit = index === 0;
 
     // Map quantity to correct piece/carton/dozen field based on 
-    // actual unit id (9=Piece, 10=Dozen, 16=Carton — same IDs
+    // actual unit id (9=Piece, 10=Dozen, 16=Carton â€” same IDs
     // already used in getConversionFactor()/convertToPieces())
     const unitIdNum = parseInt(unit.uom_id);
     let pieceVal = 0, cartonVal = 0, dozenVal = 0;
@@ -4532,7 +4541,7 @@ const scheme = schemeSelect ? schemeSelect.value : 'sale_on_tp';
                     piece: 0,
                     carton: 0,
                     dozen: 0,
-                    salePrice: 0,
+                    salePrice: parseFloat(child.sale_price) || 0,
                     grossAmount: 0,
                     discountPercent: 0,
                     discountAmount: 0,
@@ -4541,7 +4550,7 @@ const scheme = schemeSelect ? schemeSelect.value : 'sale_on_tp';
                     taxAmount: 0,
                     focQty: 0,
                     netAmount: 0,
-                    parentRowId: formData.items.length,
+                    parentRowId: parentItemIndex,
                     stockAffects: parseInt(child.stock_affects) || 0,
                     invoiceAffects: parseInt(child.invoice_affects) || 0,
                     scheme: 'sale_on_tp'
@@ -4725,7 +4734,7 @@ function loadInvoiceSettings() {
     document.getElementById('enableExtraDiscount1').checked = localStorage.getItem('enableExtraDiscount1') === 'true';
     document.getElementById('enableExtraDiscount2').checked = localStorage.getItem('enableExtraDiscount2') === 'true';
     // Taxation / Extra Discount / Batch No / Expiry Date checkboxes only exist on
-    // med_pos_invoice's settings modal — guard their absence on the regular POS
+    // med_pos_invoice's settings modal â€” guard their absence on the regular POS
     // invoice page, which doesn't have these controls.
     const enableTaxationCheckbox = document.getElementById('enableTaxation');
     if (enableTaxationCheckbox) enableTaxationCheckbox.checked = isTaxationEnabled();
@@ -4774,7 +4783,7 @@ function saveInvoiceSettings() {
     localStorage.setItem('enablePrintQRCode', document.getElementById('enablePrintQRCode').checked);
     localStorage.setItem('enableAmountPaidPaymentMethod', document.getElementById('enableAmountPaidPaymentMethod').checked);
     // Taxation / Extra Discount / Batch No / Expiry Date checkboxes only exist on
-    // med_pos_invoice's settings modal — guard their absence on the regular POS
+    // med_pos_invoice's settings modal â€” guard their absence on the regular POS
     // invoice page, which doesn't have these controls.
     const enableTaxationCheckbox = document.getElementById('enableTaxation');
     if (enableTaxationCheckbox) localStorage.setItem('enableTaxation', enableTaxationCheckbox.checked);
@@ -5305,8 +5314,8 @@ async function loadPriceHistory(productId) {
             const content = data.history.map((item, index) => {
                 const date = new Date(item.sale_date).toLocaleDateString();
 
-                // Extra Disc % isn't stored directly — only the resulting amount is
-                // saved — so back-derive the % (on the post-main-discount amount),
+                // Extra Disc % isn't stored directly â€” only the resulting amount is
+                // saved â€” so back-derive the % (on the post-main-discount amount),
                 // same as the invoice print pages and Daily Sale Report do.
                 const grossAmount = parseFloat(item.gross_amount || 0);
                 const discAmount = parseFloat(item.discount_amount || 0);
@@ -5347,10 +5356,10 @@ function validateSalePriceVsPurchase(row) {
             warningEl = document.createElement('div');
             warningEl.className = 'below-purchase-warning';
             warningEl.style.cssText = 'font-size:11px;color:#e67e00;font-weight:600;margin-top:2px;';
-            warningEl.textContent = `⚠️  Below purchase price (${latestPurchasePrice.toFixed(3)})`;
+            warningEl.textContent = `âš ï¸Â  Below purchase price (${latestPurchasePrice.toFixed(3)})`;
             priceInput.parentElement.appendChild(warningEl);
         } else {
-            warningEl.textContent = `⚠️  Below purchase price (${latestPurchasePrice.toFixed(3)})`;
+            warningEl.textContent = `âš ï¸Â  Below purchase price (${latestPurchasePrice.toFixed(3)})`;
         }
     } else {
         row.style.backgroundColor = '';
@@ -5461,7 +5470,7 @@ async function loadProductStock(productId) {
 // Validate stock for a row. When the product has batch tracking (a batch
 // is selected in the Batch No dropdown), validation and the "Available
 // Stock" display use that specific batch's remaining qty instead of the
-// product's total stock across all batches — selling more than one batch
+// product's total stock across all batches â€” selling more than one batch
 // has left should fail even if other batches of the same product have
 // plenty of stock; the user must switch batches instead.
 function validateStockForRow(row) {
@@ -5641,7 +5650,7 @@ async function checkAndShowVariantsButton(row, productId) {
         const response = await fetch(`../../../../server/api/sale/pos_invoice/get-child-products.php?parent_id=${productId}`);
         const data = await response.json();
         if (data.success && data.children.length > 0) {
-            const variantsBtn = row.cells[17].querySelector('.btn-secondary');
+            const variantsBtn = row.querySelector('.btn-secondary[title="Add Variants"]');
             if (variantsBtn) variantsBtn.style.display = '';
         }
     } catch (error) {
@@ -5675,20 +5684,31 @@ function showVariantsModal(parentRow, children) {
     modal.className = 'modal';
     modal.style.display = 'flex';
 
-    const savedVariants = localStorage.getItem(`variants_${parentRow.dataset.productId}`);
-    const savedData = savedVariants ? JSON.parse(savedVariants) : [];
+    // Prefer the row's actual current selection (e.g. loaded from a saved invoice in edit
+    // mode) over the localStorage cache, which only reflects the last selection made in
+    // this browser and would otherwise show an edited invoice's real variants as unchecked.
+    let savedData = [];
+    if (parentRow.dataset.childProducts) {
+        const childProducts = JSON.parse(parentRow.dataset.childProducts);
+        savedData = childProducts.map(c => ({ id: c.product_id, qty: c.quantity, price: c.sale_price }));
+    } else {
+        const savedVariants = localStorage.getItem(`variants_${parentRow.dataset.productId}`);
+        savedData = savedVariants ? JSON.parse(savedVariants) : [];
+    }
 
     const childrenHtml = children.map(child => {
         const saved = savedData.find(s => s.id == child.id);
         const isChecked = saved ? 'checked' : '';
         const savedQty = saved ? saved.qty : 0;
+        const savedPrice = saved ? (saved.price || 0) : 0;
         const isDisabled = saved ? '' : 'disabled';
-        
+
         return `
         <div style="display: flex; align-items: center; gap: 12px; padding: 8px; border-bottom: 1px solid var(--border-default);">
             <input type="checkbox" class="variant-checkbox" data-id="${child.id}" data-name="${child.name}" data-code="${child.code}" data-unit="${child.default_unit_id}" data-stock-affects="${child.stock_affects}" data-invoice-affects="${child.invoice_affects}" style="width: auto;" ${isChecked}>
             <span style="flex: 1; cursor: pointer;" class="variant-label" data-id="${child.id}">${child.code} - ${child.name}</span>
             <input type="number" class="variant-qty table-input" data-id="${child.id}" min="0" step="0.001" value="${savedQty}" placeholder="Qty" style="width: 80px;" ${isDisabled}>
+            <input type="number" class="variant-price table-input" data-id="${child.id}" min="0" step="0.01" value="${savedPrice}" placeholder="Price" style="width: 100px;" ${isDisabled}>
         </div>
     `;
     }).join('');
@@ -5723,11 +5743,13 @@ function showVariantsModal(parentRow, children) {
         });
     });
 
-    // Enable/disable qty input based on checkbox
+    // Enable/disable qty and price inputs based on checkbox
     modal.querySelectorAll('.variant-checkbox').forEach(checkbox => {
         checkbox.addEventListener('change', function () {
             const qtyInput = modal.querySelector(`.variant-qty[data-id="${this.dataset.id}"]`);
+            const priceInput = modal.querySelector(`.variant-price[data-id="${this.dataset.id}"]`);
             qtyInput.disabled = !this.checked;
+            priceInput.disabled = !this.checked;
             if (this.checked && qtyInput.value == 0) qtyInput.value = 1;
         });
     });
@@ -5748,7 +5770,9 @@ function showVariantsModal(parentRow, children) {
         const selected = [];
         modal.querySelectorAll('.variant-checkbox:checked').forEach(checkbox => {
             const qtyInput = modal.querySelector(`.variant-qty[data-id="${checkbox.dataset.id}"]`);
+            const priceInput = modal.querySelector(`.variant-price[data-id="${checkbox.dataset.id}"]`);
             const qty = parseFloat(qtyInput.value) || 0;
+            const price = parseFloat(priceInput.value) || 0;
             if (qty > 0) {
                 selected.push({
                     id: checkbox.dataset.id,
@@ -5756,6 +5780,7 @@ function showVariantsModal(parentRow, children) {
                     code: checkbox.dataset.code,
                     unitId: checkbox.dataset.unit,
                     qty: qty,
+                    price: price,
                     stockAffects: checkbox.dataset.stockAffects,
                     invoiceAffects: checkbox.dataset.invoiceAffects
                 });
@@ -5782,10 +5807,19 @@ function addChildRows(parentRow, children) {
     const parentRowIndex = parentRow.rowIndex - 1;
     const itemsTable = document.getElementById('itemsTable').getElementsByTagName('tbody')[0];
 
-    // Sum child quantities and update parent
+    // Sum child quantities and value, then update parent qty and price. Price is
+    // the qty-weighted average of the selected variants' own prices, so the
+    // parent's gross (qty × price) always equals the real combined variant value —
+    // pricing lives on each variant (they can genuinely differ), the parent's price
+    // is just a derived display/calculation convenience, not entered separately.
     const totalChildQty = children.reduce((sum, child) => sum + child.qty, 0);
+    const totalChildValue = children.reduce((sum, child) => sum + child.qty * (child.price || 0), 0);
+    const avgPrice = totalChildQty > 0 ? totalChildValue / totalChildQty : 0;
+
     const parentQtyInput = parentRow.cells[3].querySelector('input');
     parentQtyInput.value = totalChildQty.toFixed(3);
+    const parentPriceInput = parentRow.querySelector('.price-cell input');
+    if (parentPriceInput) parentPriceInput.value = avgPrice.toFixed(4);
     parentQtyInput.dispatchEvent(new Event('input'));
 
     // Store children in parent row dataset instead of creating visible rows
@@ -5798,6 +5832,7 @@ function addChildRows(parentRow, children) {
         product_code: child.code,
         uom_id: child.unitId,
         quantity: child.qty,
+        sale_price: child.price,
         stock_affects: child.stockAffects,
         invoice_affects: child.invoiceAffects
     }));
@@ -5812,22 +5847,13 @@ function addChildRows(parentRow, children) {
 // Apply on load
 applyCompactMode();
 
-// Update parent quantity from children
+// Update parent quantity from children — variants live in parentRow.dataset.childProducts
+// (see addChildRows), never as separate .child-row DOM rows, so sum from there.
 function updateParentQtyFromChildren(parentRow) {
-    const parentRowIndex = parentRow.rowIndex - 1;
-    const itemsTable = document.getElementById('itemsTable').getElementsByTagName('tbody')[0];
-    const rows = itemsTable.rows;
+    const childProducts = parentRow.dataset.childProducts ? JSON.parse(parentRow.dataset.childProducts) : [];
+    const totalChildQty = childProducts.reduce((sum, child) => sum + (parseFloat(child.quantity) || 0), 0);
 
-    let totalChildQty = 0;
-    for (let i = 0; i < rows.length; i++) {
-        const row = rows[i];
-        if (row.classList.contains('child-row') && row.dataset.parentRowIndex == parentRowIndex) {
-            const qtyInput = row.cells[3].querySelector('input');
-            totalChildQty += parseFloat(qtyInput.value) || 0;
-        }
-    }
-
-    const parentQtyInput = parentRow.cells[3].querySelector('input');
+    const parentQtyInput = parentRow.querySelector('.unit-input') || parentRow.cells[3].querySelector('input');
     parentQtyInput.value = totalChildQty.toFixed(3);
     parentQtyInput.dispatchEvent(new Event('input'));
 }
@@ -6233,12 +6259,12 @@ async function addRowDynamic() {
     const schemeDropdown = createSchemeCell(row);
     schemeCell.appendChild(schemeDropdown);
 
-   // Batch No / Expiry Date — med_pos_invoice only: the column doesn't exist
+   // Batch No / Expiry Date â€” med_pos_invoice only: the column doesn't exist
     // in the regular POS invoice's table markup, so inserting it there would
     // leave headerless/footerless cells (same pattern as Extra Discount below).
     const batchOffset = isMedInvoicePage ? 2 : 0;
     if (isMedInvoicePage) {
-        // Batch No (dropdown — auto-selects FEFO batch, user can pick another; inserted at fixed index 3)
+        // Batch No (dropdown â€” auto-selects FEFO batch, user can pick another; inserted at fixed index 3)
         const batchNoCell = row.insertCell(3);
         batchNoCell.className = 'batch-no-cell';
         const batchNoInput = document.createElement('select');
@@ -6273,7 +6299,7 @@ async function addRowDynamic() {
     priceInput.type = 'number';
     priceInput.className = 'table-input';
     priceInput.min = '0';
-    // 'any' (not '0.001') — a product priced via a non-Piece entry unit (see
+    // 'any' (not '0.001') â€” a product priced via a non-Piece entry unit (see
     // getEffectivePriceValue) can auto-fill a 6-decimal per-Piece rate here;
     // a stricter step would fail native validation and block Save.
     priceInput.step = 'any';
@@ -6371,7 +6397,7 @@ async function addRowDynamic() {
     });
     discAmountCell.appendChild(discAmountInput);
 
-    // Extra Discount — item-row-level, applied after the normal discount and
+    // Extra Discount â€” item-row-level, applied after the normal discount and
     // before trade offer/tax (see calculateRowAmounts). med_pos_invoice only:
     // the column doesn't exist in the regular POS invoice's table markup, so
     // inserting it there would leave a headerless/footerless cell.
@@ -6477,6 +6503,21 @@ async function addRowDynamic() {
     
     // Actions
     const actionsCell = row.insertCell(12 + batchOffset + extraDiscOffset);
+    const actionsDiv = document.createElement('div');
+    actionsDiv.style.display = 'flex';
+    actionsDiv.style.gap = '4px';
+
+    const addVariantsBtn = document.createElement('button');
+    addVariantsBtn.type = 'button';
+    addVariantsBtn.className = 'btn btn-secondary btn-sm';
+    addVariantsBtn.innerHTML = '<i class="fas fa-boxes"></i>';
+    addVariantsBtn.title = 'Add Variants';
+    addVariantsBtn.tabIndex = -1;
+    addVariantsBtn.style.display = 'none';
+    addVariantsBtn.addEventListener('click', function() {
+        openVariantsModal(row);
+    });
+
     const deleteBtn = document.createElement('button');
     deleteBtn.type = 'button';
     deleteBtn.className = 'btn btn-danger btn-sm';
@@ -6499,7 +6540,9 @@ async function addRowDynamic() {
             alert('Cannot delete the only row.');
         }
     });
-    actionsCell.appendChild(deleteBtn);
+    actionsDiv.appendChild(addVariantsBtn);
+    actionsDiv.appendChild(deleteBtn);
+    actionsCell.appendChild(actionsDiv);
     
     // Apply invoice settings to this new row
     applyInvoiceSettingsToRow(row);
@@ -6605,7 +6648,7 @@ function initTableDropdownDynamic(container, row) {
                 if (!isNextField) {
                     visibleOptions[0].click();
                 } else {
-                    // Enter is nextField � close dropdown and let the global handler navigate
+                    // Enter is nextField ï¿½ close dropdown and let the global handler navigate
                     optionsContainer.style.display = 'none';
                 }
             }
@@ -6642,7 +6685,7 @@ function initTableDropdownDynamic(container, row) {
             row.dataset.productUomData = JSON.stringify(uomDetails);
             row.dataset.productId = product.id;
 
-            // Load available batches for this product (FIFO order) — auto-fills, no dropdown
+            // Load available batches for this product (FIFO order) â€” auto-fills, no dropdown
             loadProductBatches(row, product.id);
             
             
@@ -6721,7 +6764,7 @@ function initTableDropdownDynamic(container, row) {
                 loadPriceHistory(product.id);
             }
             loadProductStock(product.id);
-            
+            checkAndShowVariantsButton(row, product.id);
             // Focus first unit input after DOM settles
             setTimeout(() => {
                 const firstUnitInput = row.querySelector('.unit-input');

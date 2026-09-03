@@ -1,7 +1,0 @@
-OK: get-purchase-history.php: add discount fields
-OK: pos-add.js hide purchaseHistoryInner
-OK: pos-add.js store disc data from history
-OK: pos-add.js store disc on row dataset
-FAIL: pos-add.js disc% input validation call
-FAIL: pos-add.js extraDisc% input validation call
-OK: pos-add.js validateDiscVsPurchase function added

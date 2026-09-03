@@ -1,7 +1,0 @@
-OK: purchase-add.js save item
-OK: purchase-add.js edit load
-OK: purchase-add.php INSERT cols
-OK: purchase-add.php INSERT vals
-OK: purchase-edit.php INSERT cols
-OK: purchase-edit.php INSERT vals
-OK: purchase-edit.php GET grouped

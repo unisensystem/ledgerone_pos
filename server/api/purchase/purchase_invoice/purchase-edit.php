@@ -75,36 +75,63 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
         
         // Get invoice items grouped by product
         $itemStmt = $pdo->prepare("
-            SELECT 
+            SELECT
                 pii.*,
                 p.name as product_name,
                 p.code as product_code,
                 p.uom_type,
                 p.uom_group_id,
                 p.default_unit_id,
+                p.stock_affects,
+                p.invoice_affects,
                 u.uom_name
             FROM purchase_invoice_items pii
             LEFT JOIN products p ON pii.product_id = p.id
             LEFT JOIN uom u ON pii.uom_id = u.id
             WHERE pii.purchase_invoice_id = ? AND pii.tenant_id = ?
-            ORDER BY pii.id
+            ORDER BY COALESCE(pii.parent_row_id, pii.id), pii.id
         ");
         $itemStmt->execute([$invoice_id, $tenant_id]);
         $rawItems = $itemStmt->fetchAll(PDO::FETCH_ASSOC);
         
         if (!$rawItems) {
             $items = [];
+            $children = [];
         } else {
-            // Group items: merge all entries with same product_id
-            $productGroups = [];
+            // Variant children (parent_row_id set) are kept separate from the grouped
+            // parent rows below — they attach to a parent row client-side instead of
+            // becoming their own editable line, mirroring how they were added.
+            $children = [];
+            $parentRawItems = [];
             foreach ($rawItems as $item) {
+                if (!empty($item['parent_row_id'])) {
+                    $children[] = [
+                        'id' => $item['id'],
+                        'parent_row_id' => $item['parent_row_id'],
+                        'product_id' => $item['product_id'],
+                        'product_name' => $item['product_name'] ?? 'Unknown',
+                        'product_code' => $item['product_code'] ?? '',
+                        'uom_id' => $item['uom_id'],
+                        'quantity' => floatval($item['quantity'] ?? 0),
+                        'purchase_price' => floatval($item['purchase_price'] ?? 0),
+                        'stock_affects' => $item['stock_affects'] ?? 1,
+                        'invoice_affects' => $item['invoice_affects'] ?? 1
+                    ];
+                } else {
+                    $parentRawItems[] = $item;
+                }
+            }
+
+            // Group parent items: merge all entries with same product_id
+            $productGroups = [];
+            foreach ($parentRawItems as $item) {
                 if (!$item['product_id']) continue;
                 $productGroups[$item['product_id']][] = $item;
             }
-            
+
             $groupedItems = [];
             $itemIndex = 0;
-            
+
             foreach ($productGroups as $productId => $items_group) {
                 $uomMap = [];
                 $firstItem = null;
@@ -141,6 +168,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
                 if ($firstItem) {
                     $itemIndex++;
                     $groupedItems[$itemIndex] = [
+                        'id' => $firstItem['id'],
                         'product_id' => $productId,
                         'product_name' => $firstItem['product_name'] ?? 'Unknown',
                         'product_code' => $firstItem['product_code'] ?? '',
@@ -175,6 +203,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
             'success' => true,
             'invoice' => $invoice,
             'items'   => $items ?? [],
+            'children' => $children ?? [],
             'invoice_taxes' => $taxes
         ]);
         
@@ -249,12 +278,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
                 quantity, purchase_price, gross_amount, discount_percent,
                 discount_amount, extra_discount_percent, trade_offer_percent, trade_offer_amount,
                 tax_percent, tax_amount, foc_quantity, net_amount, size,
-                batch_no, batch_expiry_date,
+                batch_no, batch_expiry_date, parent_row_id,
                 created_by, updated_by
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ");
-        
+
+        $itemRowCounter = 0;
+        $itemIdMap = [];
+
         foreach ($input['items'] as $item) {
+            $itemRowCounter++;
+
+            $parentRowId = null;
+            if (isset($item['parentRowId']) && $item['parentRowId'] !== null) {
+                $parentRowId = $itemIdMap[$item['parentRowId']] ?? null;
+            }
+
             $isFirstEntry = true;
             foreach ($item['unitEntries'] as $unitEntry) {
                 $item_stmt->execute([
@@ -277,10 +316,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
                     $item['size'] ?? null,
                     $item['batchNo'] ?? null,
                     $item['batchExpiryDate'] ?? null,
+                    $parentRowId,
                     $user_id,
                     $user_id
                 ]);
-                
+
+                if ($isFirstEntry) {
+                    $itemIdMap[$itemRowCounter] = $pdo->lastInsertId();
+                }
+
                 $stockAffects = $item['stockAffects'] ?? 1;
                 if ($stockAffects == 1) {
                     $product_stmt = $pdo->prepare("SELECT inventory_account_id FROM products WHERE id = ?");

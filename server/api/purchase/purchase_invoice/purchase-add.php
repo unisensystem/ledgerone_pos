@@ -101,12 +101,24 @@ try {
             quantity, purchase_price, gross_amount, discount_percent,
             discount_amount, extra_discount_percent, trade_offer_percent, trade_offer_amount,
             tax_percent, tax_amount, foc_quantity, net_amount, size,
-            batch_no, batch_expiry_date,
+            batch_no, batch_expiry_date, parent_row_id,
             created_by, updated_by
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ");
-    
+
+    $itemRowCounter = 0;
+    $itemIdMap = [];
+
     foreach ($input['items'] as $item) {
+        $itemRowCounter++;
+
+        // Map parent_row_id (1-based position of the parent row in $input['items'])
+        // to the actual DB id of that row's first inserted unit entry
+        $parentRowId = null;
+        if (isset($item['parentRowId']) && $item['parentRowId'] !== null) {
+            $parentRowId = $itemIdMap[$item['parentRowId']] ?? null;
+        }
+
         // Each item can have multiple unit entries
         $isFirstEntry = true;
         foreach ($item['unitEntries'] as $unitEntry) {
@@ -130,10 +142,15 @@ try {
                 $item['size'] ?? null,
                 $item['batchNo'] ?? null,
                 $item['batchExpiryDate'] ?? null,
+                $parentRowId,
                 $user_id,
                 $user_id
             ]);
-            
+
+            if ($isFirstEntry) {
+                $itemIdMap[$itemRowCounter] = $pdo->lastInsertId();
+            }
+
             // Stock ledger entry for each unit
             $stockAffects = $item['stockAffects'] ?? 1;
             if ($stockAffects == 1) {

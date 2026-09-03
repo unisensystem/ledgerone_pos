@@ -600,11 +600,13 @@ document.addEventListener('DOMContentLoaded', function () {
                 }
 
                 // Load items with dynamic UOM
+                const itemIdToRowMap = {};
                 if (items && items.length > 0) {
                     // First pass: add all rows and set productUomData
                     items.forEach(item => {
                         addRowDynamic();
                         const lastRow = itemsTable.rows[itemsTable.rows.length - 1];
+                        itemIdToRowMap[item.id] = lastRow;
 
                         lastRow.cells[1].querySelector('.search-input').value = `${item.product_code || ''} - ${item.product_name || ''}`;
                         lastRow.cells[1].querySelector('.item-code').value = item.product_id || '';
@@ -680,6 +682,30 @@ document.addEventListener('DOMContentLoaded', function () {
                                 if (unitInput) unitInput.value = entry.quantity || 0;
                             });
                         }
+
+                        checkAndShowVariantsButton(row, item.product_id);
+                    });
+
+                    // Restore variant children onto their parent row's dataset (see
+                    // addChildProducts) — the parent's own saved quantity already reflects
+                    // the children's total, so no recalculation is needed here.
+                    const children = data.children || [];
+                    children.forEach(child => {
+                        const parentRow = itemIdToRowMap[child.parent_row_id];
+                        if (!parentRow) return;
+                        if (!parentRow.dataset.childProducts) parentRow.dataset.childProducts = JSON.stringify([]);
+                        const childProducts = JSON.parse(parentRow.dataset.childProducts);
+                        childProducts.push({
+                            product_id: child.product_id,
+                            product_name: child.product_name,
+                            product_code: child.product_code,
+                            uom_id: child.uom_id,
+                            quantity: child.quantity,
+                            purchase_price: child.purchase_price,
+                            stock_affects: child.stock_affects,
+                            invoice_affects: child.invoice_affects
+                        });
+                        parentRow.dataset.childProducts = JSON.stringify(childProducts);
                     });
                 } else {
                     addRowDynamic();
@@ -1556,6 +1582,21 @@ document.addEventListener('DOMContentLoaded', function () {
         
         // Actions
         const actionsCell = row.insertCell(16);
+        const actionsDiv = document.createElement('div');
+        actionsDiv.style.display = 'flex';
+        actionsDiv.style.gap = '4px';
+
+        const addVariantsBtn = document.createElement('button');
+        addVariantsBtn.type = 'button';
+        addVariantsBtn.className = 'btn btn-secondary btn-sm';
+        addVariantsBtn.innerHTML = '<i class="fas fa-boxes"></i>';
+        addVariantsBtn.title = 'Add Variants';
+        addVariantsBtn.tabIndex = -1;
+        addVariantsBtn.style.display = 'none';
+        addVariantsBtn.addEventListener('click', function() {
+            openVariantsModal(row);
+        });
+
         const deleteBtn = document.createElement('button');
         deleteBtn.type = 'button';
         deleteBtn.className = 'btn btn-danger btn-sm';
@@ -1576,7 +1617,9 @@ document.addEventListener('DOMContentLoaded', function () {
                 alert('Cannot delete the only row.');
             }
         });
-        actionsCell.appendChild(deleteBtn);
+        actionsDiv.appendChild(addVariantsBtn);
+        actionsDiv.appendChild(deleteBtn);
+        actionsCell.appendChild(actionsDiv);
 
         // Apply current settings to this new row
         applySettingsToRow(row, {
@@ -1663,7 +1706,10 @@ document.addEventListener('DOMContentLoaded', function () {
                 const uomDetails = getProductUOMDetails(product);
                 row.dataset.productUomData = JSON.stringify(uomDetails);
                 row.dataset.productId = product.id;
-                
+
+                // Show Add Variants button if product has children
+                checkAndShowVariantsButton(row, product.id);
+
                 // Set price - use purchase_price or trade_price
                 const purchasePrice = parseFloat(product.purchase_price) || parseFloat(product.trade_price) || 0;
                 row.querySelector('.price-cell input').value = purchasePrice.toFixed(4);
@@ -2170,7 +2216,11 @@ document.addEventListener('DOMContentLoaded', function () {
             });
             
             if (unitEntries.length > 0) {
-                               const item = {
+                // Fixed 1-based position this row will occupy in formData.items — captured
+                // once so every variant child below points at this parent row consistently.
+                const parentItemIndex = formData.items.length + 1;
+
+                const item = {
                     productId: row.cells[1].querySelector('.item-code').value,
                     size: row.querySelector('.size-cell input')?.value || '',
                     batchNo: row.querySelector('.batch-no-input')?.value || null,
@@ -2189,6 +2239,35 @@ document.addEventListener('DOMContentLoaded', function () {
                     netAmount: parseFloat(row.querySelector('.net-cell input').value)
                 };
                 formData.items.push(item);
+
+                // Add variant children from dataset (see addChildProducts) — each becomes
+                // its own item row linked back to the parent via parentRowId.
+                if (row.dataset.childProducts) {
+                    const children = JSON.parse(row.dataset.childProducts);
+                    children.forEach(child => {
+                        formData.items.push({
+                            productId: child.product_id,
+                            size: '',
+                            batchNo: null,
+                            batchExpiryDate: null,
+                            unitEntries: [{ uomId: child.uom_id, quantity: parseFloat(child.quantity) }],
+                            purchasePrice: parseFloat(child.purchase_price) || 0,
+                            grossAmount: 0,
+                            discountPercent: 0,
+                            discountAmount: 0,
+                            extraDiscountPercent: 0,
+                            tradeOfferPercent: 0,
+                            tradeOfferAmount: 0,
+                            taxPercent: 0,
+                            taxAmount: 0,
+                            focQty: 0,
+                            netAmount: 0,
+                            parentRowId: parentItemIndex,
+                            stockAffects: parseInt(child.stock_affects) || 0,
+                            invoiceAffects: parseInt(child.invoice_affects) || 0
+                        });
+                    });
+                }
             }
         }
 
@@ -2603,7 +2682,7 @@ async function checkAndShowVariantsButton(row, productId) {
         const response = await fetch(`../../../../server/api/purchase/purchase_invoice/get-child-products.php?parent_id=${productId}`);
         const data = await response.json();
         if (data.success && data.children.length > 0) {
-            const variantsBtn = row.cells[17].querySelector('.btn-secondary');
+            const variantsBtn = row.querySelector('.btn-secondary[title="Add Variants"]');
             if (variantsBtn) variantsBtn.style.display = '';
         }
     } catch (error) {
@@ -2635,14 +2714,26 @@ function showVariantsModal(parentRow, children) {
     modal.className = 'modal';
     modal.style.display = 'flex';
 
-    const childrenHtml = children.map(child => `
+    // Pre-fill from the row's actual current selection (e.g. loaded from a saved
+    // invoice in edit mode), not a blank slate — otherwise reopening this modal
+    // would look like no variants are attached even though they are.
+    const savedData = parentRow.dataset.childProducts ? JSON.parse(parentRow.dataset.childProducts) : [];
+
+    const childrenHtml = children.map(child => {
+        const saved = savedData.find(s => s.product_id == child.id);
+        const isChecked = saved ? 'checked' : '';
+        const savedQty = saved ? saved.quantity : 0;
+        const savedPrice = saved ? saved.purchase_price : 0;
+        const isDisabled = saved ? '' : 'disabled';
+        return `
             <div style="display: flex; align-items: center; gap: 12px; padding: 8px; border-bottom: 1px solid var(--border-default);">
-                <input type="checkbox" class="variant-checkbox" data-id="${child.id}" data-name="${child.name}" data-code="${child.code}" data-unit="${child.default_unit_id}" data-stock-affects="${child.stock_affects}" data-invoice-affects="${child.invoice_affects}" style="width: auto;">
+                <input type="checkbox" class="variant-checkbox" data-id="${child.id}" data-name="${child.name}" data-code="${child.code}" data-unit="${child.default_unit_id}" data-stock-affects="${child.stock_affects}" data-invoice-affects="${child.invoice_affects}" style="width: auto;" ${isChecked}>
                 <span style="flex: 1;">${child.code} - ${child.name}</span>
-                <input type="number" class="variant-qty table-input" data-id="${child.id}" min="0" step="0.01" value="0" placeholder="Qty" style="width: 80px;" disabled>
-                <input type="number" class="variant-price table-input" data-id="${child.id}" min="0" step="0.01" value="0" placeholder="Price" style="width: 100px;" disabled>
+                <input type="number" class="variant-qty table-input" data-id="${child.id}" min="0" step="0.01" value="${savedQty}" placeholder="Qty" style="width: 80px;" ${isDisabled}>
+                <input type="number" class="variant-price table-input" data-id="${child.id}" min="0" step="0.01" value="${savedPrice}" placeholder="Price" style="width: 100px;" ${isDisabled}>
             </div>
-        `).join('');
+        `;
+    }).join('');
 
     modal.innerHTML = `
             <div class="modal-content" style="max-width: 700px; max-height: 80vh; overflow-y: auto;">
@@ -2719,9 +2810,17 @@ function showVariantsModal(parentRow, children) {
 }
 
 function addChildProducts(parentRow, children) {
+    // Price lives on each variant (they can genuinely cost differently); the parent's
+    // price is the qty-weighted average of them, so qty × price still equals the real
+    // combined value instead of being entered separately and disconnected from it.
     const totalChildQty = children.reduce((sum, child) => sum + child.qty, 0);
-    const parentQtyInput = parentRow.cells[3].querySelector('input');
+    const totalChildValue = children.reduce((sum, child) => sum + child.qty * (child.price || 0), 0);
+    const avgPrice = totalChildQty > 0 ? totalChildValue / totalChildQty : 0;
+
+    const parentQtyInput = parentRow.querySelector('.unit-input');
     parentQtyInput.value = totalChildQty.toFixed(3);
+    const parentPriceInput = parentRow.querySelector('.price-cell input');
+    if (parentPriceInput) parentPriceInput.value = avgPrice.toFixed(4);
     parentQtyInput.dispatchEvent(new Event('input'));
 
     const childProducts = children.map(child => ({

@@ -99,14 +99,26 @@
         /* ===== ITEMS TABLE ===== */
         .items-table {
             width: 100%;
-            border-collapse: collapse;
+            /* IMPORTANT: border-collapse: collapse breaks the browser's/html2canvas's
+               page-break-inside/break-inside: avoid handling on <tr> in Chromium — that's
+               why long item lists get a row sliced in half across PDF pages. separate +
+               border-spacing:0 + per-cell borders below keeps the same visual look while
+               letting row-level page breaks actually work (see page-break-control below). */
+            border-collapse: separate;
+            border-spacing: 0;
             margin-bottom: 6px;
         }
         .items-table th, .items-table td {
-            border: 1px solid #999;
+            border: none;
+            border-right: 1px solid #999;
+            border-bottom: 1px solid #999;
             padding: 3px 4px;
         }
+        .items-table th:first-child, .items-table td:first-child {
+            border-left: 1px solid #999;
+        }
         .items-table thead th {
+            border-top: 1px solid #999;
             font-weight: bold;
             font-size: 10px;
             text-align: center;
@@ -114,6 +126,20 @@
         .items-table td { font-size: 10.5px; }
         .items-table .text-right { text-align: right; }
         .items-table .text-center { text-align: center; }
+
+        /* ---- Page-break control (fixes rows/sections being sliced across pages) ---- */
+        /* Applies to both browser "Print" (native @page pagination) and the html2pdf.js
+           download flow (pagebreak.mode includes 'css' below). Only works reliably
+           because .items-table uses border-collapse: separate above. */
+        .items-table thead { display: table-header-group; }
+        .items-table tfoot { display: table-footer-group; }
+        .items-table tr,
+        .meta-grid,
+        .summary-box,
+        .warranty-section {
+            page-break-inside: avoid;
+            break-inside: avoid;
+        }
 
         .group-header-row td {
             background: #e8e8e8;
@@ -639,27 +665,29 @@
             btn.textContent = 'Generating...';
             document.querySelectorAll('.no-print').forEach(el => el.style.setProperty('display', 'none', 'important'));
 
+            // Capture the container as-is — .a5-mode/.a6-mode on <body> (see setPaperSize)
+            // already shrink .invoice-container's max-width/padding/font-size to match the
+            // selected paper, so no extra width override is needed here. Forcing
+            // max-width:100% plus html2canvas's windowWidth (as this used to do) fought that
+            // existing sizing and cropped the left portion off the rendered PDF.
             const container = document.getElementById('invoiceContainer');
-            const prevStyle = container.getAttribute('style') || '';
-            container.style.cssText = 'max-width:100% !important; margin:0 !important; padding:10px !important; box-shadow:none !important; border:none !important;';
 
             const invoiceNo = document.getElementById('invoiceNo').textContent || 'Invoice';
             const paperSize = localStorage.getItem('invoicePaperSize') || 'A4';
             const sizeMap = { A4: 'a4', A5: 'a5', A6: [105, 148] };
             const format = sizeMap[paperSize] || 'a4';
-            const widthMap = { A4: 794, A5: 559, A6: 397 };
-            const pxWidth = widthMap[paperSize] || 794;
 
             await html2pdf().set({
                 margin: [5, 5, 5, 5],
                 filename: `Invoice-${invoiceNo}.pdf`,
                 image: { type: 'jpeg', quality: 0.98 },
-                html2canvas: { scale: 2, useCORS: true, allowTaint: true, logging: false, windowWidth: pxWidth },
+                html2canvas: { scale: 2, useCORS: true, allowTaint: true, logging: false },
                 jsPDF: { unit: 'mm', format: format, orientation: 'portrait' },
-                pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
+                // 'css' mode makes html2pdf respect the page-break-inside/avoid rules defined
+                // in <style> instead of just slicing the rendered canvas at a fixed page height.
+                pagebreak: { mode: ['css', 'legacy'], avoid: ['tr', '.meta-grid', '.summary-box', '.warranty-section'] }
             }).from(container).save();
 
-            container.setAttribute('style', prevStyle);
             document.querySelectorAll('.no-print').forEach(el => el.style.removeProperty('display'));
             btn.disabled = false;
             btn.textContent = '\u2193 Download PDF';

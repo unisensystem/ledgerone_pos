@@ -1,2 +1,0 @@
-REPR:
-b"discPercentInput.addEventListener('input', function() {\r\n        const unitInputs = row.querySelectorAll('.unit-input');\r\n        let totalQty = 0;\r\n        unitInputs.forEach(input => {\r\n            const qty = parseFloat(input.value) || 0;\r\n            const cf = parseFloat(input.dataset.conversionFactor) || 1;\r\n            totalQty = totalQty + (qty * cf);\r\n        });\r\n        const price = parseFloat(row.querySelector('.price-cell input').value) || 0;\r\n        calculateRowAmounts(row, totalQty, price);\r\n    });\r\n"

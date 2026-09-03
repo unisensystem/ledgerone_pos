@@ -1,7 +1,0 @@
-size: 16907
-has CRLF: False
-has LF only: False
-afterDiscount pos: 13741
-b"afterDiscount = gross - discAmount;\r\n\r\n    const extraDiscPercentCell = row.querySelector('.extra-disc-percent-cell');\r\n    const extraDiscPercent = extraDiscPercentCell ? (parseFloat(extraDiscPercentCell.querySelector('input').value) || 0) : 0;\r\n    const afterExtraDiscount = afterDiscount - (after"
-calculateRowAmounts pos: 12545
-b"calculateRowAmounts(row, totalQty, price);\r\n    }\r\n\r\n    updateFooterTotals();\r\n}\r\n\r\n// Calculate row amounts\r\nfunction calculateRowAmounts(row, qty, price) {\r\n    const grossCell = row.querySelector('.gross-cell');\r\n    const discPercentCell = row.querySelector('.disc-percent-cell');\r\n    const discAmountCell = row.querySelector('.disc-amount-cell');\r\n    const toPercentCell = row.querySelector('"
