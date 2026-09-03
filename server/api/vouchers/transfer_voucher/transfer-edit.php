@@ -115,17 +115,23 @@ try {
         INSERT INTO accounting_ledger (tenant_id, transaction_type, reference_table, reference_id, account_id, date, description, debit, credit)
         VALUES (?, 'Transfer Voucher', 'transfer_voucher', ?, ?, ?, ?, ?, ?)
     ");
-    if ($from_type === 'customer') {
+   if ($from_type === 'customer') {
         $ledger->execute([$tenant_id, $voucher_id, $from_account_id, $voucher_date, $desc, 0.00, $amount]);
+        $from_side = 'credit';
     } else {
         $ledger->execute([$tenant_id, $voucher_id, $from_account_id, $voucher_date, $desc, $amount, 0.00]);
+        $from_side = 'debit';
     }
     $ledger->execute([$tenant_id, $voucher_id, $payment_account_id, $voucher_date, $desc, 0.00,   $amount]);
     $ledger->execute([$tenant_id, $voucher_id, $payment_account_id, $voucher_date, $desc, $amount, 0.00]);
-    if ($to_type === 'customer') {
-        $ledger->execute([$tenant_id, $voucher_id, $to_account_id, $voucher_date, $desc, $amount, 0.00]);
+
+    // Entry 4 direction MUST be opposite of Entry 1's direction — NOT derived
+    // independently from to_type — otherwise mismatched from/to party types
+    // (e.g. customer -> supplier) break the ledger balance.
+    if ($from_side === 'credit') {
+        $ledger->execute([$tenant_id, $voucher_id, $to_account_id, $voucher_date, $desc, $amount, 0.00]); // DR TO
     } else {
-        $ledger->execute([$tenant_id, $voucher_id, $to_account_id, $voucher_date, $desc, 0.00, $amount]);
+        $ledger->execute([$tenant_id, $voucher_id, $to_account_id, $voucher_date, $desc, 0.00, $amount]); // CR TO
     }
 
     $pdo->commit();
