@@ -1334,7 +1334,7 @@ td .unit-input {
 
 td:has(+ td):not(:has(.unit-input)) {
 
-  background: repeating-linear-gradient(
+  /* background: repeating-linear-gradient(
 
     45deg,
 
@@ -1346,7 +1346,7 @@ td:has(+ td):not(:has(.unit-input)) {
 
     var(--surface-1) 20px
 
-  );
+  ); */
 
   text-align: center;
 

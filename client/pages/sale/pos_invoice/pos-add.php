@@ -243,7 +243,7 @@ if (!$user_id) {
                         <thead>
                             <tr>
                                 <th width="3%">S#</th>
-                                <th width="15%">Product Code / Name</th>
+                                <th width="18%">Product Code / Name</th>
                                 <th width="10%">Scheme</th>
                                 <!-- Dynamic unit columns will be inserted here -->
                                 <th width="8%" class="price-cell"><span id="salePriceLabel">Sale Price</span></th>

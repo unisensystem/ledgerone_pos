@@ -1092,6 +1092,8 @@ tbody.innerHTML = pageData.map(entry => `
     <tr>
         <td>${entry.transaction_date}</td>
         <td>${escLedger(entry.invoice_number || '-')}</td>
+                <td>${escLedger(entry.customer_name || '-')}</td>
+
         <td>${escLedger(entry.product_name)}</td>
         <td>${escLedger(entry.branch_name)}</td>
         <td><span class="transaction-badge transaction-${entry.transaction_type.toLowerCase().replace(' ', '-')}">${escLedger(entry.transaction_type)}</span></td>
@@ -1105,7 +1107,7 @@ tbody.innerHTML = pageData.map(entry => `
     </tr>
 `).join('') + `
     <tr style="font-weight: bold; background-color: var(--table-header);">
-        <td colspan="7">Total (${allCustomerEntries.length} transactions)</td>
+        <td colspan="8">Total (${allCustomerEntries.length} transactions)</td>
         <td>${totalQtyIn.toFixed(2)} ${escLedger(allCustomerEntries[0]?.unit_symbol || 'L')}</td>
         <td>${totalQtyOut.toFixed(2)} ${escLedger(allCustomerEntries[0]?.unit_symbol || 'L')}</td>
         <td>-</td>

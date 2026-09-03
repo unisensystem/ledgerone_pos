@@ -1308,25 +1308,27 @@ try {
             // narrowing filters, so that requirement was removed.
 
             $sql = "SELECT 
-                        sl.transaction_date,
-                        si.bill_no as invoice_number,
-                        p.name as product_name,
-                        COALESCE(b.branch_name, 'No Branch') as branch_name,
-                        sl.transaction_type,
-                        sl.batch_no,
-                        sl.expiry_date AS batch_expiry_date,
-                        sl.qty_in * COALESCE(CASE WHEN u.unit_scope = 'universal' THEN u.conversion_factor ELSE puc.conversion_factor END, 1) as qty_in,
-                        sl.qty_out * COALESCE(CASE WHEN u.unit_scope = 'universal' THEN u.conversion_factor ELSE puc.conversion_factor END, 1) as qty_out,
-                        sl.unit_cost,
-                        COALESCE(base_u.uom_name, u.uom_name, 'L') as unit_symbol
-                    FROM stock_ledger sl
-                    JOIN products p ON sl.product_id = p.id
-                    LEFT JOIN branches b ON sl.branch_id = b.id
-                    LEFT JOIN uom u ON sl.unit_id = u.id
-                    LEFT JOIN uom base_u ON COALESCE(u.base_unit_id, u.id) = base_u.id
-                    LEFT JOIN product_uom_conversions puc ON p.id = puc.product_id AND sl.unit_id = puc.uom_id
-                    JOIN sale_invoice si ON sl.reference_table = 'sale_invoice' AND sl.reference_id = si.id
-                    WHERE sl.tenant_id = ? AND p.product_type = 'physical'";
+            sl.transaction_date,
+            si.bill_no as invoice_number,
+            p.name as product_name,
+            COALESCE(b.branch_name, 'No Branch') as branch_name,
+            sl.transaction_type,
+            sl.batch_no,
+            sl.expiry_date AS batch_expiry_date,
+            c.customer_name,
+            sl.qty_in * COALESCE(CASE WHEN u.unit_scope = 'universal' THEN u.conversion_factor ELSE puc.conversion_factor END, 1) as qty_in,
+            sl.qty_out * COALESCE(CASE WHEN u.unit_scope = 'universal' THEN u.conversion_factor ELSE puc.conversion_factor END, 1) as qty_out,
+            sl.unit_cost,
+            COALESCE(base_u.uom_name, u.uom_name, 'L') as unit_symbol
+        FROM stock_ledger sl
+        JOIN products p ON sl.product_id = p.id
+        LEFT JOIN branches b ON sl.branch_id = b.id
+        LEFT JOIN uom u ON sl.unit_id = u.id
+        LEFT JOIN uom base_u ON COALESCE(u.base_unit_id, u.id) = base_u.id
+        LEFT JOIN product_uom_conversions puc ON p.id = puc.product_id AND sl.unit_id = puc.uom_id
+        JOIN sale_invoice si ON sl.reference_table = 'sale_invoice' AND sl.reference_id = si.id
+        LEFT JOIN customers c ON si.customer_id = c.id
+        WHERE sl.tenant_id = ? AND p.product_type = 'physical'";
 
             $params = [$tenant_id];
 

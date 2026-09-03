@@ -666,13 +666,13 @@ td .unit-input {
 
 /* Disabled unit cells (product doesn't have this unit) */
 td:has(+ td):not(:has(.unit-input)) {
-  background: repeating-linear-gradient(
+  /* background: repeating-linear-gradient(
     45deg,
     var(--surface-2),
     var(--surface-2) 10px,
     var(--surface-1) 10px,
     var(--surface-1) 20px
-  );
+  ); */
   text-align: center;
   color: var(--subtext);
   font-size: 14px;

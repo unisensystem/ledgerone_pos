@@ -243,7 +243,7 @@ if (!$user_id) {
                         <thead>
                             <tr>
                                 <th width="3%">S#</th>
-                                <th width="15%">Product Code / Name</th>
+                                <th width="22%">Product Code / Name</th>
                                 <th width="10%">Scheme</th>
                              <!-- AFTER -->
 <th width="8%" class="batch-no-cell">Batch No</th>

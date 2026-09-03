@@ -504,22 +504,23 @@ $currency_symbol = $currency['symbol'];
                 </div>
                 <div class="table-container">
                     <table class="table">
-                        <thead>
-                            <tr>
-                                <th>Date</th>
-                                <th>Invoice #</th>
-                                <th>Product</th>
-                                <th>Branch</th>
-                                <th>Transaction</th>
-                                <th>Batch No</th>
-                                <th>Expiry Date</th>
-                                <th>Qty In</th>
-                                <th>Qty Out</th>
-                                <th>Balance</th>
-                                <th>Unit Cost</th>
-                                <th>Value</th>
-                            </tr>
-                        </thead>
+                      <thead>
+    <tr>
+        <th>Date</th>
+        <th>Invoice #</th>
+        <th>Customer</th>
+        <th>Product</th>
+        <th>Branch</th>
+        <th>Transaction</th>
+        <th>Batch No</th>
+        <th>Expiry Date</th>
+        <th>Qty In</th>
+        <th>Qty Out</th>
+        <th>Balance</th>
+        <th>Unit Cost</th>
+        <th>Value</th>
+    </tr>
+</thead>
                         <tbody></tbody>
                     </table>
                     <div class="pagination-container">
