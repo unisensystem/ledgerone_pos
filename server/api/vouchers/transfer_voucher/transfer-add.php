@@ -243,27 +243,31 @@ try {
 
     $desc = $description ?? "Transfer: {$from_party_code} to {$to_party_code}";
 
-    // Entry 1: FROM party balance reduces (they paid out)
-    // Customer = Debit normal → Credit to reduce | Supplier = Credit normal → Debit to reduce
-    if ($from_type === 'customer') {
-        $ledger->execute([$tenant_id, $voucher_id, $from_account_id, $voucher_date, $desc, 0.00, $amount]); // CR customer
-    } else {
-        $ledger->execute([$tenant_id, $voucher_id, $from_account_id, $voucher_date, $desc, $amount, 0.00]); // DR supplier
-    }
+   // Entry 1: FROM party balance reduces (they paid out)
+// Customer = Debit normal → Credit to reduce | Supplier = Credit normal → Debit to reduce
+if ($from_type === 'customer') {
+    $ledger->execute([$tenant_id, $voucher_id, $from_account_id, $voucher_date, $desc, 0.00, $amount]); // CR customer
+    $from_side = 'credit';
+} else {
+    $ledger->execute([$tenant_id, $voucher_id, $from_account_id, $voucher_date, $desc, $amount, 0.00]); // DR supplier
+    $from_side = 'debit';
+}
 
-    // Entry 2: CREDIT payment method account (money left via cash/bank/cheque)
-    $ledger->execute([$tenant_id, $voucher_id, $payment_account_id, $voucher_date, $desc, 0.00, $amount]);
+// Entry 2: CREDIT payment method account (money left via cash/bank/cheque)
+$ledger->execute([$tenant_id, $voucher_id, $payment_account_id, $voucher_date, $desc, 0.00, $amount]);
 
-    // Entry 3: DEBIT payment method account (money arrived via cash/bank/cheque)
-    $ledger->execute([$tenant_id, $voucher_id, $payment_account_id, $voucher_date, $desc, $amount, 0.00]);
+// Entry 3: DEBIT payment method account (money arrived via cash/bank/cheque)
+$ledger->execute([$tenant_id, $voucher_id, $payment_account_id, $voucher_date, $desc, $amount, 0.00]);
 
-    // Entry 4: TO party balance increases (they received)
-    // Customer = Debit normal → Debit to increase | Supplier = Credit normal → Credit to increase
-    if ($to_type === 'customer') {
-        $ledger->execute([$tenant_id, $voucher_id, $to_account_id, $voucher_date, $desc, $amount, 0.00]); // DR customer
-    } else {
-        $ledger->execute([$tenant_id, $voucher_id, $to_account_id, $voucher_date, $desc, 0.00, $amount]); // CR supplier
-    }
+// Entry 4: TO party balance increases (they received)
+// Direction MUST be the opposite of Entry 1's direction — NOT derived independently
+// from to_type — otherwise mismatched from/to party types (e.g. customer -> supplier)
+// produce two debits or two credits instead of one of each, breaking the ledger balance.
+if ($from_side === 'credit') {
+    $ledger->execute([$tenant_id, $voucher_id, $to_account_id, $voucher_date, $desc, $amount, 0.00]); // DR TO
+} else {
+    $ledger->execute([$tenant_id, $voucher_id, $to_account_id, $voucher_date, $desc, 0.00, $amount]); // CR TO
+}
 
     $pdo->commit();
 
