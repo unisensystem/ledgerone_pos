@@ -64,31 +64,34 @@ function setupSalesOfficerListener() {
 function setupCustomerListener() {
     document.addEventListener('click', function(e) {
         if (e.target.classList.contains('dropdown-option') && e.target.closest('#customerCodeOptions')) {
-            const supplierMan = e.target.getAttribute('data-supplier-man');
-            console.log('Customer clicked, data-supplier-man:', supplierMan);
-            
-            if (supplierMan && supplierMan !== 'null' && supplierMan !== '') {
+            // Was reading data-supplier-man here, which overwrote the Sales Officer field
+            // with the customer's Supplier Man id — a different person — silently clobbering
+            // whatever the user had actually selected as Sales Officer.
+            const salesOfficerId = e.target.getAttribute('data-sales-officer');
+            console.log('Customer clicked, data-sales-officer:', salesOfficerId);
+
+            if (salesOfficerId && salesOfficerId !== 'null' && salesOfficerId !== '') {
                 const salesOfficer = document.getElementById('salesOfficer');
                 if (salesOfficer) {
-                    console.log('Setting Sales Officer to:', supplierMan);
-                    salesOfficer.value = supplierMan;
-                    localStorage.setItem('lastSelectedSalesOfficer', supplierMan);
-                    currentSalesOfficerId = supplierMan;
-                    console.log('Auto-populated Sales Officer:', supplierMan, 'Mode:', productFilteringMode);
-                    
+                    console.log('Setting Sales Officer to:', salesOfficerId);
+                    salesOfficer.value = salesOfficerId;
+                    localStorage.setItem('lastSelectedSalesOfficer', salesOfficerId);
+                    currentSalesOfficerId = salesOfficerId;
+                    console.log('Auto-populated Sales Officer:', salesOfficerId, 'Mode:', productFilteringMode);
+
                     // Directly apply filter if mode is salesOfficerFilter
                     if (productFilteringMode === 'salesOfficerFilter') {
                         console.log('Mode is salesOfficerFilter, calling applyFilter');
-                        applyFilter(supplierMan);
+                        applyFilter(salesOfficerId);
                     } else {
                         console.log('Mode is showAll, calling showAllProducts');
                         showAllProducts();
                     }
-                    
+
                     salesOfficer.dispatchEvent(new Event('change'));
                 }
             } else {
-                console.log('No supplier man found or empty');
+                console.log('No sales officer found or empty');
             }
         }
     });

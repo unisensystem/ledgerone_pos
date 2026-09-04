@@ -1525,6 +1525,8 @@ function initializePage(permissions) {
                 const pageTitleEl = document.querySelector('.page-title');
                 if (pageTitleEl) pageTitleEl.textContent = `Edit Sale Invoice - ${invoice.bill_no}`;
 
+                repositionPriceHistoryPanel();
+
             } else {
                 alert('Error loading invoice: ' + data.message);
                 window.location.href = 'pos-add.php';
@@ -4100,6 +4102,8 @@ function loadInvoiceSettings() {
     document.getElementById('enableShippingFees').checked = localStorage.getItem('enableShippingFees') === 'true';
     document.getElementById('enablePrintQRCode').checked = localStorage.getItem('enablePrintQRCode') === 'true';
     document.getElementById('enableAmountPaidPaymentMethod').checked = localStorage.getItem('enableAmountPaidPaymentMethod') === 'true';
+    const enableSmartPriceHistoryPositionCheckbox = document.getElementById('enableSmartPriceHistoryPosition');
+    if (enableSmartPriceHistoryPositionCheckbox) enableSmartPriceHistoryPositionCheckbox.checked = localStorage.getItem('smartPriceHistoryPosition') !== 'false';
 }
 
 // Save invoice settings to localStorage
@@ -4126,6 +4130,9 @@ function saveInvoiceSettings() {
     localStorage.setItem('enableShippingFees', document.getElementById('enableShippingFees').checked);
     localStorage.setItem('enablePrintQRCode', document.getElementById('enablePrintQRCode').checked);
     localStorage.setItem('enableAmountPaidPaymentMethod', document.getElementById('enableAmountPaidPaymentMethod').checked);
+    const enableSmartPriceHistoryPositionCheckbox = document.getElementById('enableSmartPriceHistoryPosition');
+    if (enableSmartPriceHistoryPositionCheckbox) localStorage.setItem('smartPriceHistoryPosition', enableSmartPriceHistoryPositionCheckbox.checked);
+    if (typeof repositionPriceHistoryPanel === 'function') repositionPriceHistoryPanel();
     alert('Invoice settings saved successfully!');
 }
 
@@ -4466,11 +4473,60 @@ function loadPriceHistoryForAllRows() {
     }
 }
 
+// With a long item list, the price-history/stock panels (fixed at the top of
+// the Items card) scroll out of view while working on later rows, forcing a
+// scroll back up on every product pick. Once past 5 rows, move both (not
+// duplicate them) to sit right above the "Add Item" button instead, where the
+// user is actually working — inline on the same line (panels left, button
+// right); below that threshold — or once the list shrinks back — they return
+// to their normal spot via the #priceHistoryAnchor placeholder. Toggle:
+// Invoice Settings > Item Display Options > "Auto-Move Price History (5+ Items)".
+function repositionPriceHistoryPanel() {
+    const priceContainer = document.getElementById('priceHistoryContainer');
+    const stockContainer = document.getElementById('stockContainer');
+    const anchor = document.getElementById('priceHistoryAnchor');
+    const addRowBtn = document.getElementById('addRowBtn');
+    if (!priceContainer || !stockContainer || !anchor || !addRowBtn) return;
+
+    const bottomActionsDiv = addRowBtn.closest('.actions');
+    if (!bottomActionsDiv) return;
+
+    const itemsTableBody = document.getElementById('itemsTable')?.getElementsByTagName('tbody')[0];
+    const rowCount = itemsTableBody ? itemsTableBody.rows.length : 0;
+    const smartPositionEnabled = localStorage.getItem('smartPriceHistoryPosition') !== 'false';
+    const shouldMoveDown = smartPositionEnabled && rowCount > 5;
+
+    if (shouldMoveDown) {
+        // First two children of the same flex row as "Add Item" — panels on
+        // the left, button on the right, one line (see .price-history-inline).
+        if (bottomActionsDiv.firstElementChild !== priceContainer) {
+            bottomActionsDiv.insertBefore(priceContainer, bottomActionsDiv.firstChild);
+        }
+        if (priceContainer.nextElementSibling !== stockContainer) {
+            bottomActionsDiv.insertBefore(stockContainer, priceContainer.nextSibling);
+        }
+        bottomActionsDiv.classList.add('price-history-inline');
+        priceContainer.classList.add('price-history-bottom');
+        stockContainer.classList.add('price-history-bottom');
+    } else {
+        if (priceContainer.previousElementSibling !== anchor) {
+            anchor.parentNode.insertBefore(priceContainer, anchor.nextSibling);
+        }
+        if (priceContainer.nextElementSibling !== stockContainer) {
+            priceContainer.parentNode.insertBefore(stockContainer, priceContainer.nextSibling);
+        }
+        bottomActionsDiv.classList.remove('price-history-inline');
+        priceContainer.classList.remove('price-history-bottom');
+        stockContainer.classList.remove('price-history-bottom');
+    }
+}
+
 // Load price history
 async function loadPriceHistory(productId) {
     const customerId = document.getElementById('customerCode').value;
     if (!customerId || !productId) {
         document.getElementById('priceHistoryContainer').style.display = 'none';
+        repositionPriceHistoryPanel();
         return;
     }
 
@@ -4506,6 +4562,7 @@ async function loadPriceHistory(productId) {
         console.error('Error loading price history:', error);
         document.getElementById('priceHistoryContainer').style.display = 'none';
     }
+    repositionPriceHistoryPanel();
 }
 
 // Load product stock
@@ -4513,6 +4570,7 @@ async function loadProductStock(productId) {
     const companyId = document.getElementById('company')?.value;
     if (!productId) {
         document.getElementById('stockContainer').style.display = 'none';
+        repositionPriceHistoryPanel();
         return;
     }
 
@@ -4559,6 +4617,7 @@ async function loadProductStock(productId) {
         console.error('Error loading stock:', error);
         document.getElementById('stockContainer').style.display = 'none';
     }
+    repositionPriceHistoryPanel();
 }
 
 // Validate stock for a row
@@ -5596,6 +5655,8 @@ async function addRowDynamic() {
     
     // Apply invoice settings to this new row
     applyInvoiceSettingsToRow(row);
+
+    repositionPriceHistoryPanel();
 }
 
 // Apply invoice settings to a specific row
@@ -5823,6 +5884,7 @@ function updateSerialNumbers() {
     for (let i = 0; i < rows.length; i++) {
         rows[i].cells[0].textContent = i + 1;
     }
+    repositionPriceHistoryPanel();
 }
 
 // Success Modal Countdown

@@ -153,6 +153,22 @@ select:read-only {
   overflow-y: visible;
 }
 
+/* Applied by repositionPriceHistoryPanel() (pos-add.js): the price-history and
+   stock panels become the first two children of the same .actions row as the
+   "Add Item" button, sitting on one line together — so their default
+   margin-bottom (meant for when stacked above the button) is neutralized;
+   .actions' existing margin-top:24px already separates the row from the
+   table's Totals line above it. */
+#priceHistoryContainer.price-history-bottom,
+#stockContainer.price-history-bottom {
+  margin: 0;
+}
+.actions.price-history-inline {
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
 table {
   width: 100%;
   border-collapse: collapse;

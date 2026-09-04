@@ -306,6 +306,20 @@ select:read-only {
 
 }
 
+/* Applied by repositionPriceHistoryPanel() (pos-add.js): the panel becomes the
+   first child of the same .actions row as the "Add Item" button, sitting on one
+   line together — so its own default margin-bottom (meant for when it sits
+   stacked above the button) is neutralized; .actions' existing margin-top:24px
+   already separates the row from the table's Totals line above it. */
+#priceHistoryContainer.price-history-bottom {
+  margin: 0;
+}
+.actions.price-history-inline {
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
 
 
 table {
@@ -2137,6 +2151,17 @@ td:has(.unit-label) .unit-input {
   border-width: 1px;
 
   border-radius: 5px;
+
+}
+
+/* Previous Balance box (mirrors the top-right toast — see updatePreviousBalanceDisplay()
+   in pos-add.js) — a highlighted border makes it stand out from the rest of the
+   summary grid so it's not mistaken for just another figure. */
+.med-invoice-page .summary-item.previous-balance-highlight {
+
+  border-width: 2px;
+
+  border-color: var(--primary);
 
 }
 

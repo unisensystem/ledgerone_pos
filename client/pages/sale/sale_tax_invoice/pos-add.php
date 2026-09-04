@@ -176,6 +176,10 @@ if (!$user_id) {
 
             <div class="card">
                 <h2 class="card-title">Items</h2>
+                <!-- Anchor marking the panels' default (top) slot — repositionPriceHistoryPanel()
+                     in pos-add.js moves #priceHistoryContainer + #stockContainer down next to
+                     "Add Item" once the list grows past 5 rows, and back here when it shrinks back. -->
+                <div id="priceHistoryAnchor"></div>
                 <div id="priceHistoryContainer" style="display: none; margin-bottom: 16px; padding: 8px 12px; background: var(--surface-2); border-radius: var(--radius); border-left: 4px solid var(--primary); width: fit-content;">
                     <strong style="color: var(--heading); font-size: 12px;">Last 3 Sale Prices:</strong>
                     <div id="priceHistoryContent" style="margin-top: 4px; font-size: 13px; color: var(--body);"></div>
@@ -533,6 +537,10 @@ if (!$user_id) {
                         <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 8px; background: var(--surface-1); border-radius: 6px; transition: all 0.2s;" onmouseover="this.style.background='var(--surface-0)'" onmouseout="this.style.background='var(--surface-1)'">
                             <input type="checkbox" id="enableCashDiscountAmount" style="width: auto;">
                             <span style="font-size: 13px;">Cash Discount Amt</span>
+                        </label>
+                        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 8px; background: var(--surface-1); border-radius: 6px; transition: all 0.2s;" onmouseover="this.style.background='var(--surface-0)'" onmouseout="this.style.background='var(--surface-1)'">
+                            <input type="checkbox" id="enableSmartPriceHistoryPosition" style="width: auto;">
+                            <span style="font-size: 13px;">Auto-Move Price History (5+ Items)</span>
                         </label>
                     </div>
                 </div>

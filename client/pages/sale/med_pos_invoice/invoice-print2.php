@@ -278,11 +278,11 @@
             <div class="row"><span class="lbl">Region:</span> <span id="customerArea">-</span></div>
             <div class="row meta-hidden"><span class="lbl">NTN #:</span> <span id="customerNtn">-</span></div>
 
-            <div class="row"><span class="lbl">Booking Man:</span> <span id="supplierMan">-</span></div>
+            <div class="row"><span class="lbl">Booking Man:</span> <span id="salesOfficer">-</span></div>
             <div class="row"><span class="lbl">Address:</span> <span id="customerAddress">Loading...</span></div>
             <div class="row meta-hidden"><span class="lbl">GST #:</span> <span id="customerGst">-</span></div>
 
-            <div class="row"><span class="lbl">Delivery Man:</span> <span id="salesOfficer">-</span></div>
+            <div class="row"><span class="lbl">Delivery Man:</span> <span id="supplierMan">-</span></div>
             <div class="row"><span class="lbl">Phone:</span> <span id="customerPhone">-</span></div>
             <div class="row meta-hidden"><span class="lbl">CNIC #:</span> <span id="customerCnic">-</span></div>
 
@@ -339,6 +339,9 @@
 
             <div class="left-col" id="whTaxLabel">Advance WHTax:</div>
             <div class="right-col" id="summaryWhTax">0.00</div>
+
+            <div class="left-col">Previous Balance:</div>
+            <div class="right-col" id="summaryPreviousBalance">-</div>
 
             <div class="net-total-row">
                 <span>Net Total:</span>
@@ -626,6 +629,18 @@
             document.getElementById('summaryDiscountAmount').textContent = `${currencySymbol} ${fmt(discountAmount)}`;
             document.getElementById('whTaxLabel').textContent = 'Advance WHTax:';
             document.getElementById('summaryWhTax').textContent = `${currencySymbol} ${fmt(whTaxAmount)}`;
+
+            // Previous Balance — customer's outstanding balance before this invoice
+            // (stored on sale_invoice.previous_balance, same value shown on the add/edit
+            // screen's Invoice Summary and the top-right toast when the customer is picked).
+            const prevBalanceRaw = parseFloat(invoice.previous_balance);
+            const summaryPreviousBalanceEl = document.getElementById('summaryPreviousBalance');
+            if (summaryPreviousBalanceEl) {
+                summaryPreviousBalanceEl.textContent = isNaN(prevBalanceRaw)
+                    ? '-'
+                    : `${prevBalanceRaw >= 0 ? 'Dr' : 'Cr'} ${currencySymbol} ${fmt(Math.abs(prevBalanceRaw))}`;
+            }
+
             document.getElementById('summaryNetTotal').textContent = `${currencySymbol} ${fmt(netTotalDisplay)}`;
 
             // Amount in words

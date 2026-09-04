@@ -27,6 +27,7 @@ if (!$customer_id || !$product_id) {
 try {
     $sql = "
         SELECT
+            si.bill_no,
             si.sale_date,
             sii.sale_price,
             sii.quantity,

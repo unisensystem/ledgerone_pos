@@ -923,6 +923,18 @@ const invoiceSettingCheckboxes = [
         if (notification) notification.remove();
     }
 
+    // Mirrors the top-right balance toast (which disappears once dismissed/on
+    // save) into a permanent line inside Invoice Summary, so the previous
+    // balance stays visible while filling in the rest of the form further down
+    // the page. Reads from the #previousBalance hidden field, kept in sync at
+    // every point that field is set (customer select, edit mode, sale order load).
+    function updatePreviousBalanceDisplay() {
+        const displayEl = document.getElementById('previousBalanceDisplay');
+        if (!displayEl) return;
+        const prevBalanceEl = document.getElementById('previousBalance');
+        displayEl.textContent = (prevBalanceEl && prevBalanceEl.value) ? prevBalanceEl.value : '-';
+    }
+
     // Load customers from API
     async function loadCustomersLocal() {
         const companyId = document.getElementById('company').value;
@@ -1434,6 +1446,7 @@ const invoiceSettingCheckboxes = [
                     document.getElementById('invoiceForm').appendChild(prevBalanceEl);
                 }
                 prevBalanceEl.value = balanceText;
+                updatePreviousBalanceDisplay();
             }
         } catch (error) {
             console.error('Error fetching customer balance:', error);
@@ -1548,6 +1561,11 @@ const invoiceSettingCheckboxes = [
                 document.getElementById('currency').value = invoice.currency_id;
                 const prevBalanceEl = document.getElementById('previousBalance');
                 if (prevBalanceEl) prevBalanceEl.value = invoice.previous_balance;
+                const displayEl = document.getElementById('previousBalanceDisplay');
+                if (displayEl) {
+                    const pb = parseFloat(invoice.previous_balance) || 0;
+                    displayEl.textContent = `${pb >= 0 ? 'Dr' : 'Cr'} ${Math.abs(pb).toFixed(3)}`;
+                }
                 const remarksEl = document.getElementById('remarks');
                 if (remarksEl) remarksEl.value = invoice.remarks || '';
                 const salesOfficerEl = document.getElementById('salesOfficer');
@@ -1872,6 +1890,8 @@ const invoiceSettingCheckboxes = [
                 const pageTitleEl = document.querySelector('.page-title');
                 if (pageTitleEl) pageTitleEl.textContent = `Edit Sale Invoice - ${invoice.bill_no}`;
 
+                repositionPriceHistoryPanel();
+
             } else {
                 alert('Error loading invoice: ' + data.message);
                 window.location.href = 'pos-add.php';
@@ -1906,6 +1926,7 @@ const invoiceSettingCheckboxes = [
                 document.getElementById('currency').value = order.currency_id;
                 const prevBalanceEl = document.getElementById('previousBalance');
                 if (prevBalanceEl) prevBalanceEl.value = `${order.current_balance >= 0 ? 'Dr' : 'Cr'} ${Math.abs(order.current_balance).toFixed(3)}`;
+                updatePreviousBalanceDisplay();
                 const salesOfficerEl = document.getElementById('salesOfficer');
                 const salesOfficerSearchEl = document.getElementById('salesOfficerSearch');
                 if (salesOfficerEl) {
@@ -2144,7 +2165,17 @@ const invoiceSettingCheckboxes = [
                 // Update related fields for customer selection
                 if (hiddenInputId === 'customerCode') {
                     const balance = parseFloat(e.target.getAttribute('data-balance'));
-                    showBalanceNotification(`${balance >= 0 ? 'Dr' : 'Cr'} ${Math.abs(balance).toFixed(3)}`);
+                    const balanceText = `${balance >= 0 ? 'Dr' : 'Cr'} ${Math.abs(balance).toFixed(3)}`;
+                    showBalanceNotification(balanceText);
+                    let prevBalanceEl = document.getElementById('previousBalance');
+                    if (!prevBalanceEl) {
+                        prevBalanceEl = document.createElement('input');
+                        prevBalanceEl.type = 'hidden';
+                        prevBalanceEl.id = 'previousBalance';
+                        document.getElementById('invoiceForm').appendChild(prevBalanceEl);
+                    }
+                    prevBalanceEl.value = balanceText;
+                    updatePreviousBalanceDisplay();
 
                     // Update customer address
                     const address = e.target.getAttribute('data-address');
@@ -3726,6 +3757,11 @@ const invoiceSettingCheckboxes = [
         if (totalDiscountAmount) totalDiscountAmount.value = '0.00';
         if (netAmount) netAmount.textContent = '0.00';
 
+        const previousBalanceHidden = document.getElementById('previousBalance');
+        if (previousBalanceHidden) previousBalanceHidden.value = '';
+        updatePreviousBalanceDisplay();
+        hideBalanceNotification();
+
         ['extraDiscount1Percent','extraDiscount1Amount','extraDiscount2Percent','extraDiscount2Amount'].forEach(id => {
             const el = document.getElementById(id);
             if (el) el.value = '0';
@@ -4730,6 +4766,8 @@ function loadInvoiceSettings() {
     if (enableBatchNoCheckbox) enableBatchNoCheckbox.checked = localStorage.getItem('enableBatchNo') !== 'false';
     const enableExpiryDateCheckbox = document.getElementById('enableExpiryDate');
     if (enableExpiryDateCheckbox) enableExpiryDateCheckbox.checked = localStorage.getItem('enableExpiryDate') !== 'false';
+    const enableSmartPriceHistoryPositionCheckbox = document.getElementById('enableSmartPriceHistoryPosition');
+    if (enableSmartPriceHistoryPositionCheckbox) enableSmartPriceHistoryPositionCheckbox.checked = localStorage.getItem('smartPriceHistoryPosition') !== 'false';
 }
 
 // Save invoice settings to localStorage
@@ -4779,6 +4817,9 @@ function saveInvoiceSettings() {
     if (enableBatchNoCheckbox) localStorage.setItem('enableBatchNo', enableBatchNoCheckbox.checked);
     const enableExpiryDateCheckbox = document.getElementById('enableExpiryDate');
     if (enableExpiryDateCheckbox) localStorage.setItem('enableExpiryDate', enableExpiryDateCheckbox.checked);
+    const enableSmartPriceHistoryPositionCheckbox = document.getElementById('enableSmartPriceHistoryPosition');
+    if (enableSmartPriceHistoryPositionCheckbox) localStorage.setItem('smartPriceHistoryPosition', enableSmartPriceHistoryPositionCheckbox.checked);
+    if (typeof repositionPriceHistoryPanel === 'function') repositionPriceHistoryPanel();
     alert('Invoice settings saved successfully!');
 
     // Refresh product dropdowns if display mode changed
@@ -5278,6 +5319,45 @@ function updatePriceHistoryContainerVisibility() {
     const hasPurchase = purchaseEl && purchaseEl.style.display !== 'none';
     const hasStock = stockEl && stockEl.style.display !== 'none';
     container.style.display = (hasSale || hasPurchase || hasStock) ? 'block' : 'none';
+    repositionPriceHistoryPanel();
+}
+
+// With a long item list, the price-history/stock panel (fixed at the top of the
+// Items card) scrolls out of view while working on later rows, forcing a scroll
+// back up on every product pick. Once past 5 rows, move it (not duplicate it) to
+// sit right above the "Add Item" button instead, where the user is actually
+// working; below that threshold — or once the list shrinks back — it returns to
+// its normal spot via the #priceHistoryAnchor placeholder. Toggle: Invoice
+// Settings > Item Display Options > "Move Price History Near Add Item...".
+function repositionPriceHistoryPanel() {
+    const container = document.getElementById('priceHistoryContainer');
+    const anchor = document.getElementById('priceHistoryAnchor');
+    const addRowBtn = document.getElementById('addRowBtn');
+    if (!container || !anchor || !addRowBtn) return;
+
+    const bottomActionsDiv = addRowBtn.closest('.actions');
+    if (!bottomActionsDiv) return;
+
+    const itemsTableBody = document.getElementById('itemsTable')?.getElementsByTagName('tbody')[0];
+    const rowCount = itemsTableBody ? itemsTableBody.rows.length : 0;
+    const smartPositionEnabled = localStorage.getItem('smartPriceHistoryPosition') !== 'false';
+    const shouldMoveDown = smartPositionEnabled && rowCount > 5;
+
+    if (shouldMoveDown) {
+        // First child of the same flex row as "Add Item" — panel on the left,
+        // button on the right, one line (see .actions.price-history-inline).
+        if (container.parentNode !== bottomActionsDiv || bottomActionsDiv.firstElementChild !== container) {
+            bottomActionsDiv.insertBefore(container, bottomActionsDiv.firstChild);
+        }
+        bottomActionsDiv.classList.add('price-history-inline');
+        container.classList.add('price-history-bottom');
+    } else {
+        if (container.previousElementSibling !== anchor) {
+            anchor.parentNode.insertBefore(container, anchor.nextSibling);
+        }
+        bottomActionsDiv.classList.remove('price-history-inline');
+        container.classList.remove('price-history-bottom');
+    }
 }
 
 // Load price history
@@ -5311,7 +5391,7 @@ async function loadPriceHistory(productId) {
                 const discPercent = parseFloat(item.discount_percent || 0);
                 const bonusQty = parseFloat(item.foc_quantity || 0);
 
-                return `<div>${index + 1}. ${date} - ${item.currency_symbol}${parseFloat(item.sale_price).toFixed(3)} (Qty: ${item.quantity})`
+                return `<div>${index + 1}. ${date} (${item.bill_no || '-'}) - ${item.currency_symbol}${parseFloat(item.sale_price).toFixed(3)} (Qty: ${item.quantity})`
                     + `<br><span style="font-size: 11px; color: var(--subtext);">Disc %: ${discPercent.toFixed(2)} | Extra Disc %: ${extraDiscPercent.toFixed(2)} | Bonus: ${bonusQty.toFixed(3)}</span></div>`;
             }).join('');
 
@@ -6547,6 +6627,8 @@ async function addRowDynamic() {
     
     // Apply invoice settings to this new row
     applyInvoiceSettingsToRow(row);
+
+    repositionPriceHistoryPanel();
 }
 
 // Apply invoice settings to a specific row
@@ -6818,6 +6900,7 @@ function updateSerialNumbers() {
     for (let i = 0; i < rows.length; i++) {
         rows[i].cells[0].textContent = i + 1;
     }
+    repositionPriceHistoryPanel();
 }
 
 async function quickAddCustomer() {
