@@ -112,6 +112,21 @@ $zoneCondition     = $zone_id     ? ' AND c.city_zone_id = ?' : '';
                     )
                 ), 0) as unallocated_transfer";
 
+    // Total UNBILLED sale returns for this customer (no sale_invoice_no linked
+    // yet). Billed returns are still subtracted per-invoice via the existing
+    // sale_return JOIN below; this customer-level total covers the ones that
+    // aren't tied to any invoice, so they always get netted off as well
+    // (via the Auto-Clear pool on the frontend) regardless of bill_no.
+    $returnSubquery = "
+                COALESCE((
+                    SELECT SUM(sr2.net_amount)
+                    FROM sale_return sr2
+                    WHERE sr2.customer_id = c.id
+                    AND sr2.tenant_id = ?
+                    AND sr2.status = 'Posted'
+                    AND (sr2.sale_invoice_no IS NULL OR sr2.sale_invoice_no = '')
+                ), 0) as unallocated_sale_return";
+
     // ---- Unbilled view: Receive Vouchers + Sale Returns with no bill_no ----
     if ($view_mode === 'unbilled') {
         // NOTE: assumes receive_voucher has columns (id, rv_no, customer_id, tenant_id,
@@ -243,6 +258,7 @@ $zoneCondition     = $zone_id     ? ' AND c.city_zone_id = ?' : '';
                 AND rv2.tenant_id = ?
                 AND (rv2.bill_no IS NULL OR rv2.bill_no = '' OR rv2.bill_no = 'null')
             ), 0) as unallocated_received,
+{$returnSubquery},
 {$transferSubquery}
         FROM sale_invoice si
         JOIN customers c ON si.customer_id = c.id
@@ -276,6 +292,7 @@ $zoneCondition     = $zone_id     ? ' AND c.city_zone_id = ?' : '';
                 AND rv2.tenant_id = ?
                 AND (rv2.bill_no IS NULL OR rv2.bill_no = '' OR rv2.bill_no = 'null')
             ), 0) as unallocated_received,
+{$returnSubquery},
 {$transferSubquery}
         FROM opening_balance_invoices obi
         JOIN customers c ON obi.customer_id = c.id
@@ -291,14 +308,17 @@ $zoneCondition     = $zone_id     ? ' AND c.city_zone_id = ?' : '';
     ";
 
     // sale_invoice branch params, in exact order they appear in the query:
-    // unallocated_subquery.tenant_id, transfer_subquery.tenant_id, rv.tenant_id, sr.tenant_id, si.tenant_id, [dateParams], [company_id], [sharedFilterParams]
-    $params = [$tenant_id, $tenant_id, $tenant_id, $tenant_id, $tenant_id];
+    // unallocated_received.tenant_id, unallocated_sale_return.tenant_id, transfer_subquery.tenant_id,
+    // rv.tenant_id, sr.tenant_id, si.tenant_id, [dateParams], [company_id], [sharedFilterParams]
+    $params = [$tenant_id, $tenant_id, $tenant_id, $tenant_id, $tenant_id, $tenant_id];
     $params = array_merge($params, $dateParams);
     if ($company_id) $params[] = $company_id;
     $params = array_merge($params, $sharedFilterParams);
 
     // opening_balance branch params:
-    // unallocated_subquery.tenant_id, transfer_subquery.tenant_id, rv.tenant_id, obi.tenant_id, [dateParams], [company_id], [sharedFilterParams]
+    // unallocated_received.tenant_id, unallocated_sale_return.tenant_id, transfer_subquery.tenant_id,
+    // rv.tenant_id, obi.tenant_id, [dateParams], [company_id], [sharedFilterParams]
+    $params[] = $tenant_id;
     $params[] = $tenant_id;
     $params[] = $tenant_id;
     $params[] = $tenant_id;
@@ -356,6 +376,7 @@ $zoneCondition     = $zone_id     ? ' AND c.city_zone_id = ?' : '';
             'outstandingRaw'      => $outstanding,
             'unallocatedReceived' => (float)$invoice['unallocated_received'],
             'unallocatedTransfer' => (float)$invoice['unallocated_transfer'],
+            'unallocatedSaleReturn' => (float)$invoice['unallocated_sale_return'],
             'daysOverdue'         => $days,
             'bucket'              => $bucket
         ];

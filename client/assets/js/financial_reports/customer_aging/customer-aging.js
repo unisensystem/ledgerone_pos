@@ -53,6 +53,15 @@ function setupAutoClearToggle() {
     const toggle = document.getElementById('autoClearToggle');
     const label  = document.getElementById('autoClearLabel');
     if (!toggle) return;
+
+    // Auto-Clear is ON by default: unbilled Sale Returns and Transfer
+    // Vouchers must always be netted against outstanding invoices,
+    // whether or not they carry a bill_no / sale_invoice_no. The toggle
+    // is kept so "Standard" (raw, non-netted) view is still available
+    // if needed.
+    toggle.checked = true;
+    state.autoClearMode = true;
+
     toggle.addEventListener('change', function () {
         state.autoClearMode = this.checked;
         if (label) {
@@ -62,7 +71,12 @@ function setupAutoClearToggle() {
         }
         applyAndRender();
     });
-    if (label) label.style.opacity = '0.5';
+
+    if (label) {
+        label.style.opacity = '1';
+        label.style.color   = 'var(--primary)';
+        label.style.fontWeight = '600';
+    }
 }
 
 // ---------- View mode: All Invoices vs Unbilled RV/SR ----------
@@ -413,7 +427,10 @@ function simulateAutoClear(rows) {
     rows.forEach(row => {
         const key = row.customerName;
         if (!customerMap[key]) {
-            customerMap[key] = { unallocated: (row.unallocatedReceived || 0) + (row.unallocatedTransfer || 0), bills: [] };
+            customerMap[key] = {
+                unallocated: (row.unallocatedReceived || 0) + (row.unallocatedTransfer || 0) + (row.unallocatedSaleReturn || 0),
+                bills: []
+            };
         }
         customerMap[key].bills.push(Object.assign({}, row));
     });
