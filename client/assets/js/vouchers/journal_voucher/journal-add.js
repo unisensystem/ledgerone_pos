@@ -1,6 +1,9 @@
-        // Account data from database
+// Account data from database
         let accountOptions = [];
         let companies = [];
+
+        // Tracks which voucher is being edited (null = new voucher)
+        let currentVoucherId = null;
 
         // Initialize with current date
         document.addEventListener('DOMContentLoaded', async function() {
@@ -18,7 +21,9 @@
             const reverseId = urlParams.get('reverse');
             
             if (editId) {
+                currentVoucherId = editId;
                 await loadEditEntry(editId);
+                setEditModeUI();
             } else if (reverseId) {
                 await generateVoucherNumber();
                 await loadReverseEntry(reverseId);
@@ -31,6 +36,14 @@
             // Update totals
             updateTotals();
         });
+
+        // Reflect edit mode in the UI (button labels)
+        function setEditModeUI() {
+            const draftBtn = document.getElementById('saveDraftBtn');
+            const postBtn = document.getElementById('postVoucherBtn');
+            if (draftBtn) draftBtn.innerHTML = '<i class="fas fa-save"></i> Update Draft';
+            if (postBtn) postBtn.innerHTML = '<i class="fas fa-check-circle"></i> Update & Post';
+        }
 
         // Fetch companies from database
         async function fetchCompanies() {
@@ -103,6 +116,9 @@
                     document.getElementById('date').value = voucher.voucher_date;
                     document.getElementById('voucher').value = voucher.voucher_number;
                     document.getElementById('description').value = voucher.description;
+                    if (voucher.company_id) {
+                        document.getElementById('company').value = voucher.company_id;
+                    }
                     
                     // Add entries
                     voucher.entries.forEach(entry => {
@@ -427,12 +443,13 @@
             }, 5000);
         }
 
-        // Save voucher (draft or posted)
+        // Save voucher (draft or posted) — creates a new voucher, or updates the one being edited
         async function saveVoucher(status) {
             if (!validateForm()) {
                 return;
             }
             
+            const isEditMode = !!currentVoucherId;
             const btn = status === 'draft' ? document.getElementById('saveDraftBtn') : document.getElementById('postVoucherBtn');
             const originalHtml = btn.innerHTML;
             btn.disabled = true;
@@ -467,9 +484,17 @@
                 totalCredit: parseFloat(document.getElementById('totalCredit').textContent),
                 status: status
             };
+
+            if (isEditMode) {
+                voucherData.id = currentVoucherId;
+            }
+
+            const endpoint = isEditMode
+                ? '../../../../server/api/vouchers/journal_voucher/journal-edit.php'
+                : '../../../../server/api/vouchers/journal_voucher/journal-add.php';
             
             try {
-                const response = await fetch('../../../../server/api/vouchers/journal_voucher/journal-add.php', {
+                const response = await fetch(endpoint, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
@@ -480,6 +505,15 @@
                 const result = await response.json();
                 
                 if (response.ok && result.success) {
+                    if (isEditMode) {
+                        showValidationMessage(result.message || 'Voucher updated successfully!', "success");
+                        // Redirect back to the list after a short delay so the message is visible
+                        setTimeout(() => {
+                            window.location.href = 'journal-list.php';
+                        }, 1200);
+                        return;
+                    }
+
                     const message = status === 'draft' 
                         ? "Voucher saved as draft successfully!" 
                         : "Voucher posted successfully! Journal entry has been recorded.";

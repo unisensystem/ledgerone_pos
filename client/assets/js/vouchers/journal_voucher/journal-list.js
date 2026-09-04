@@ -180,16 +180,17 @@ function renderTable() {
                 break;
         }
 
-        // Action buttons - show delete for all entries
+        // Action buttons - view + edit are always available; post-draft only for drafts,
+        // reverse only for already-posted/pending/rejected; delete for all entries
         let actionButtons = `<button class="table-action-btn view" onclick="viewEntry(${entry.id})" title="View">
                    <i class="fas fa-eye"></i>
+               </button>
+               <button class="table-action-btn edit" onclick="editEntry(${entry.id})" title="Edit">
+                   <i class="fas fa-edit"></i>
                </button>`;
         
         if (entry.status === 'draft') {
             actionButtons += `
-               <button class="table-action-btn edit" onclick="editEntry(${entry.id})" title="Edit">
-                   <i class="fas fa-edit"></i>
-               </button>
                <button class="table-action-btn" style="color: #2FBF71;" onclick="confirmPostDraft(${entry.id})" title="Post Voucher">
                    <i class="fas fa-check-circle"></i>
                </button>`;
