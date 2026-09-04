@@ -267,10 +267,10 @@ function handleDelete($input) {
                 
             case 'account':
                 $pdo->beginTransaction();
-                
+
                 try {
-                    // Delete all ledger entries for this account (primary + contra) by reference
-                    $stmt = $pdo->prepare("DELETE FROM accounting_ledger WHERE reference_table = 'accounts' AND reference_id = ? AND tenant_id = ?");
+                    // Delete all ledger entries that reference this account as account_id (all transaction types)
+                    $stmt = $pdo->prepare("DELETE FROM accounting_ledger WHERE account_id = ? AND tenant_id = ?");
                     $stmt->execute([$id, $tenant_id]);
 
                     // Delete account
