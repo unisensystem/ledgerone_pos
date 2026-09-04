@@ -30,6 +30,32 @@ $area_id             = !empty($_GET['area_id'])             ? (int)$_GET['area_i
 $company_id          = !empty($_GET['company_id'])          ? (int)$_GET['company_id']          : null;
 $customer_id         = !empty($_GET['customer_id'])          ? (int)$_GET['customer_id']         : null;
 
+// Signed net transfer-voucher amount for a customer (c.id), reused in both
+// UNION halves. Sign convention: POSITIVE reduces the customer's balance
+// (they paid out, or someone paid in on their behalf), NEGATIVE increases it
+// (a customer-to-customer transfer landed on them as a new charge).
+//   - customer is FROM party                              -> +amount (paid out)
+//   - customer is TO party, other side is a supplier       -> +amount (received/settled)
+//   - customer is TO party, other side is another customer -> -amount (new debt)
+$transferSubquery = "
+    COALESCE((
+        SELECT SUM(
+            CASE 
+                WHEN tv.from_type = 'customer' AND tv.from_customer_id = c.id THEN tv.amount
+                WHEN tv.to_type = 'customer' AND tv.to_customer_id = c.id AND tv.from_type = 'supplier' THEN tv.amount
+                WHEN tv.to_type = 'customer' AND tv.to_customer_id = c.id AND tv.from_type = 'customer' THEN -tv.amount
+                ELSE 0
+            END
+        )
+        FROM transfer_voucher tv
+        WHERE tv.tenant_id = ?
+        AND (
+            (tv.from_type = 'customer' AND tv.from_customer_id = c.id)
+            OR (tv.to_type = 'customer' AND tv.to_customer_id = c.id)
+        )
+    ), 0) as unallocated_transfer
+";
+
 try {
     $query = "
        SELECT 
@@ -79,7 +105,8 @@ try {
                 AND sr.tenant_id = ?
                 AND sr.status = 'Posted'
                 AND (sr.sale_invoice_no IS NULL OR sr.sale_invoice_no = 0)
-            ), 0) as unallocated_returns
+            ), 0) as unallocated_returns,
+            {$transferSubquery}
         FROM opening_balance_invoices obi
         JOIN customers c ON obi.customer_id = c.id
         WHERE obi.tenant_id = ?
@@ -148,7 +175,8 @@ try {
                 AND sr.tenant_id = ?
                 AND sr.status = 'Posted'
                 AND (sr.sale_invoice_no IS NULL OR sr.sale_invoice_no = 0)
-            ), 0) as unallocated_returns
+            ), 0) as unallocated_returns,
+            {$transferSubquery}
         FROM sale_invoice si
         JOIN customers c ON si.customer_id = c.id
         WHERE si.tenant_id = ?
@@ -188,6 +216,8 @@ try {
     $params[] = $tenant_id;
     // unallocated_returns subquery: sr.tenant_id
     $params[] = $tenant_id;
+    // unallocated_transfer subquery: tv.tenant_id
+    $params[] = $tenant_id;
     // WHERE: obi.tenant_id, territory filters
     $params[] = $tenant_id;
     if ($company_id) $params[] = $company_id;
@@ -214,6 +244,8 @@ try {
     // unallocated_received subquery: rv.tenant_id
     $params[] = $tenant_id;
     // unallocated_returns subquery: sr.tenant_id
+    $params[] = $tenant_id;
+    // unallocated_transfer subquery: tv.tenant_id
     $params[] = $tenant_id;
     // WHERE: si.tenant_id, sale_officer_id, sale_date range, territory filters
     $params[] = $tenant_id;

@@ -86,6 +86,32 @@ $zoneCondition     = $zone_id     ? ' AND c.city_zone_id = ?' : '';
     if ($zone_id)     $sharedFilterParams[] = $zone_id;
     if ($area_id)     $sharedFilterParams[] = $area_id;
 
+    // Signed net transfer-voucher amount for a customer (c.id), reused in both
+    // branches of the default view. Sign convention: POSITIVE reduces the
+    // customer's balance (they paid out, or someone paid in on their behalf),
+    // NEGATIVE increases it (a customer-to-customer transfer landed on them
+    // as a new charge).
+    //   - customer is FROM party                              -> +amount (paid out)
+    //   - customer is TO party, other side is a supplier       -> +amount (received/settled)
+    //   - customer is TO party, other side is another customer -> -amount (new debt)
+    $transferSubquery = "
+                COALESCE((
+                    SELECT SUM(
+                        CASE 
+                            WHEN tv.from_type = 'customer' AND tv.from_customer_id = c.id THEN tv.amount
+                            WHEN tv.to_type = 'customer' AND tv.to_customer_id = c.id AND tv.from_type = 'supplier' THEN tv.amount
+                            WHEN tv.to_type = 'customer' AND tv.to_customer_id = c.id AND tv.from_type = 'customer' THEN -tv.amount
+                            ELSE 0
+                        END
+                    )
+                    FROM transfer_voucher tv
+                    WHERE tv.tenant_id = ?
+                    AND (
+                        (tv.from_type = 'customer' AND tv.from_customer_id = c.id)
+                        OR (tv.to_type = 'customer' AND tv.to_customer_id = c.id)
+                    )
+                ), 0) as unallocated_transfer";
+
     // ---- Unbilled view: Receive Vouchers + Sale Returns with no bill_no ----
     if ($view_mode === 'unbilled') {
         // NOTE: assumes receive_voucher has columns (id, rv_no, customer_id, tenant_id,
@@ -216,7 +242,8 @@ $zoneCondition     = $zone_id     ? ' AND c.city_zone_id = ?' : '';
                 WHERE rv2.customer_id = c.id
                 AND rv2.tenant_id = ?
                 AND (rv2.bill_no IS NULL OR rv2.bill_no = '' OR rv2.bill_no = 'null')
-            ), 0) as unallocated_received
+            ), 0) as unallocated_received,
+{$transferSubquery}
         FROM sale_invoice si
         JOIN customers c ON si.customer_id = c.id
         LEFT JOIN receive_voucher rv ON rv.bill_no = si.bill_no AND rv.tenant_id = ?
@@ -248,7 +275,8 @@ $zoneCondition     = $zone_id     ? ' AND c.city_zone_id = ?' : '';
                 WHERE rv2.customer_id = c.id
                 AND rv2.tenant_id = ?
                 AND (rv2.bill_no IS NULL OR rv2.bill_no = '' OR rv2.bill_no = 'null')
-            ), 0) as unallocated_received
+            ), 0) as unallocated_received,
+{$transferSubquery}
         FROM opening_balance_invoices obi
         JOIN customers c ON obi.customer_id = c.id
         LEFT JOIN receive_voucher rv ON rv.bill_no = obi.invoice_number AND rv.tenant_id = ?
@@ -263,14 +291,15 @@ $zoneCondition     = $zone_id     ? ' AND c.city_zone_id = ?' : '';
     ";
 
     // sale_invoice branch params, in exact order they appear in the query:
-    // unallocated_subquery.tenant_id, rv.tenant_id, sr.tenant_id, si.tenant_id, [dateParams], [company_id], [sharedFilterParams]
-    $params = [$tenant_id, $tenant_id, $tenant_id, $tenant_id];
+    // unallocated_subquery.tenant_id, transfer_subquery.tenant_id, rv.tenant_id, sr.tenant_id, si.tenant_id, [dateParams], [company_id], [sharedFilterParams]
+    $params = [$tenant_id, $tenant_id, $tenant_id, $tenant_id, $tenant_id];
     $params = array_merge($params, $dateParams);
     if ($company_id) $params[] = $company_id;
     $params = array_merge($params, $sharedFilterParams);
 
     // opening_balance branch params:
-    // unallocated_subquery.tenant_id, rv.tenant_id, obi.tenant_id, [dateParams], [company_id], [sharedFilterParams]
+    // unallocated_subquery.tenant_id, transfer_subquery.tenant_id, rv.tenant_id, obi.tenant_id, [dateParams], [company_id], [sharedFilterParams]
+    $params[] = $tenant_id;
     $params[] = $tenant_id;
     $params[] = $tenant_id;
     $params[] = $tenant_id;
@@ -326,6 +355,7 @@ $zoneCondition     = $zone_id     ? ' AND c.city_zone_id = ?' : '';
             'amount'              => $currency_symbol . number_format($outstanding, 2),
             'outstandingRaw'      => $outstanding,
             'unallocatedReceived' => (float)$invoice['unallocated_received'],
+            'unallocatedTransfer' => (float)$invoice['unallocated_transfer'],
             'daysOverdue'         => $days,
             'bucket'              => $bucket
         ];

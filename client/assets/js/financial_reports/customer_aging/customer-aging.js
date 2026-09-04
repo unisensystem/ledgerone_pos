@@ -413,7 +413,7 @@ function simulateAutoClear(rows) {
     rows.forEach(row => {
         const key = row.customerName;
         if (!customerMap[key]) {
-            customerMap[key] = { unallocated: row.unallocatedReceived || 0, bills: [] };
+            customerMap[key] = { unallocated: (row.unallocatedReceived || 0) + (row.unallocatedTransfer || 0), bills: [] };
         }
         customerMap[key].bills.push(Object.assign({}, row));
     });

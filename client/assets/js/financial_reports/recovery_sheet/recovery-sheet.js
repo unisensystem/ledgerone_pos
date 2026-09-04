@@ -301,9 +301,10 @@ document.addEventListener('DOMContentLoaded', function () {
                     total_balance: 0,
                     total_received: parseFloat(row.total_received) || 0,
                     total_returns: parseFloat(row.total_returns) || 0,
-                    unallocated_received: parseFloat(row.unallocated_received) || 0,
-                    unallocated_returns: parseFloat(row.unallocated_returns) || 0,
-                    bills: []
+                  unallocated_received: parseFloat(row.unallocated_received) || 0,
+unallocated_returns: parseFloat(row.unallocated_returns) || 0,
+unallocated_transfer: parseFloat(row.unallocated_transfer) || 0,
+bills: []
                 };
             }
             map[key].total_balance += parseFloat(row.current_balance) || 0;
@@ -392,7 +393,7 @@ document.addEventListener('DOMContentLoaded', function () {
         const grouped = groupByCustomer(rows);
 
         grouped.forEach((customer, i) => {
-            const bal      = customer.total_balance - customer.unallocated_received - customer.unallocated_returns;
+const bal      = customer.total_balance - customer.unallocated_received - customer.unallocated_returns - customer.unallocated_transfer;
             const balClass = bal > 0 ? 'balance-positive' : bal < 0 ? 'balance-negative' : '';
             const balText  = (bal < 0 ? '-' : '') + currencySymbol + Math.abs(bal).toFixed(2);
             const oldestDays = customer.bills[0]?.days_overdue ?? '';
@@ -494,7 +495,7 @@ document.addEventListener('DOMContentLoaded', function () {
         if (customerViewMode) {
             rows = [['S#', 'Customer Name', 'Address', 'Primary Phone No', 'Total Balance', 'Received Amount', 'Sales Return', 'Days Overdue']];
             groupByCustomer(lastRecoveryData).forEach((c, i) => {
-                const netBal = c.total_balance - c.unallocated_received - c.unallocated_returns;
+const netBal = c.total_balance - c.unallocated_received - c.unallocated_returns - c.unallocated_transfer;
                 rows.push([
                     i + 1,
                     c.customer_name,
