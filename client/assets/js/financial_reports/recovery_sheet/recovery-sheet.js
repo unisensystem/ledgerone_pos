@@ -30,7 +30,7 @@ document.addEventListener('DOMContentLoaded', function () {
     if (dateInputs[1]) dateInputs[1].value = fmt(lastDay);
 
     // Initialize Select2
-    $('#recoveryOfficer, #countryFilter, #regionFilter, #cityFilter, #cityZoneFilter, #areaFilter, #companyFilter').select2({
+    $('#recoveryOfficer, #countryFilter, #regionFilter, #cityFilter, #cityZoneFilter, #areaFilter, #companyFilter, #customerFilter').select2({
         width: '100%',
         placeholder: 'Select an option'
     });
@@ -45,6 +45,9 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // Company
     $('#companyFilter').on('change', loadRecoveryData);
+
+    // Customer
+    $('#customerFilter').on('change', loadRecoveryData);
 
     // Country → load regions, then reload data
     $('#countryFilter').on('change', function () {
@@ -152,6 +155,7 @@ document.addEventListener('DOMContentLoaded', function () {
             const zoneId     = document.querySelector('#cityZoneFilter')?.value;
             const areaId     = document.querySelector('#areaFilter')?.value;
             const companyId  = document.querySelector('#companyFilter')?.value;
+            const customerId = document.querySelector('#customerFilter')?.value;
 
             let url = `print.php?date_from=${dateFrom}&date_to=${dateTo}`;
             if (officer   && officer   !== 'all') url += `&recovery_officer_id=${officer}`;
@@ -161,6 +165,7 @@ document.addEventListener('DOMContentLoaded', function () {
             if (zoneId    && zoneId    !== 'all') url += `&city_zone_id=${zoneId}`;
             if (areaId    && areaId    !== 'all') url += `&area_id=${areaId}`;
             if (companyId) url += `&company_id=${companyId}`;
+            if (customerId) url += `&customer_id=${customerId}`;
             if (customerViewMode) url += `&view=customer`;
             window.open(url, '_blank');
         });
@@ -174,6 +179,7 @@ document.addEventListener('DOMContentLoaded', function () {
             dateInputs[1].value = fmt(lastDay);
             $('#recoveryOfficer').val('all').trigger('change.select2');
             $('#companyFilter').val('').trigger('change.select2');
+            $('#customerFilter').val('').trigger('change.select2');
             $('#countryFilter').val('all').trigger('change'); // triggers cascade + reload
         });
     }
@@ -196,16 +202,30 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
+    async function loadCustomers() {
+        try {
+            const res    = await fetch('../../../../server/api/financial_reports/recovery_sheet/get-customers.php');
+            const result = await res.json();
+            if (result.success) {
+                $('#customerFilter').empty().append('<option value="">All Customers</option>');
+                result.data.forEach(c => $('#customerFilter').append(`<option value="${c.id}">${c.customer_name}</option>`));
+            }
+        } catch (e) {
+            console.error('Error loading customers:', e);
+        }
+    }
+
     function loadRecoveryData() {
-        const dateFrom  = dateInputs[0]?.value;
-        const dateTo    = dateInputs[1]?.value;
-        const officer   = document.querySelector('#recoveryOfficer')?.value;
-        const countryId = document.querySelector('#countryFilter')?.value;
-        const regionId  = document.querySelector('#regionFilter')?.value;
-        const cityId    = document.querySelector('#cityFilter')?.value;
-        const zoneId    = document.querySelector('#cityZoneFilter')?.value;
-        const areaId    = document.querySelector('#areaFilter')?.value;
-        const companyId = document.querySelector('#companyFilter')?.value;
+        const dateFrom   = dateInputs[0]?.value;
+        const dateTo     = dateInputs[1]?.value;
+        const officer    = document.querySelector('#recoveryOfficer')?.value;
+        const countryId  = document.querySelector('#countryFilter')?.value;
+        const regionId   = document.querySelector('#regionFilter')?.value;
+        const cityId     = document.querySelector('#cityFilter')?.value;
+        const zoneId     = document.querySelector('#cityZoneFilter')?.value;
+        const areaId     = document.querySelector('#areaFilter')?.value;
+        const companyId  = document.querySelector('#companyFilter')?.value;
+        const customerId = document.querySelector('#customerFilter')?.value;
 
         const btn = document.querySelector('.fa-sync-alt')?.closest('.btn');
         if (btn) { btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Loading...'; btn.disabled = true; }
@@ -218,6 +238,7 @@ document.addEventListener('DOMContentLoaded', function () {
         if (zoneId    && zoneId    !== 'all') url += `&city_zone_id=${zoneId}`;
         if (areaId    && areaId    !== 'all') url += `&area_id=${areaId}`;
         if (companyId) url += `&company_id=${companyId}`;
+        if (customerId) url += `&customer_id=${customerId}`;
 
         fetch(url)
             .then(r => r.json())
@@ -502,5 +523,5 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     // ── Init ────────────────────────────────────────────────────────
-    loadCompanies().then(() => loadRecoveryData());
+    Promise.all([loadCompanies(), loadCustomers()]).then(() => loadRecoveryData());
 });

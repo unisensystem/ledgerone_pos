@@ -1,7 +1,7 @@
 // customer-aging.js
-// Handles: filter bar (company, customer, country/region/city/zone/area),
-// view mode (all invoices vs unbilled RV/SR), data loading, table + summary
-// rendering, pagination, and exports.
+// Handles: filter bar (company, customer, country/region/city/zone/area) as
+// searchable type-to-filter comboboxes, view mode (all invoices vs unbilled
+// RV/SR), data loading, table + summary rendering, pagination, and exports.
 
 const DATA_ENDPOINT = '../../../../server/api/financial_reports/customer_aging/customer-aging.php';
 const FILTERS_ENDPOINT = '../../../../server/api/financial_reports/customer_aging/location_filters.php';
@@ -26,11 +26,12 @@ const state = {
     }
 };
 
+let companyCombo, customerCombo, countryCombo, regionCombo, cityCombo, zoneCombo, areaCombo;
+
 document.addEventListener('DOMContentLoaded', () => {
+    initCombos();
     loadCompanies();
     loadCountries();
-    setupCascadingFilters();
-    setupCustomerCombo();
     setupButtons();
     setupAutoClearToggle();
     setupViewModeToggle();
@@ -113,180 +114,230 @@ function updateViewModeUI() {
     }
 }
 
-// ---------- Lookup loaders ----------
+// ---------- Generic searchable combobox ----------
+// Reused for Company / Customer / Country / Region / City / Zone / Area.
+// `fetchItems(query)` must return a Promise resolving to [{id, label}].
 
-async function loadCompanies() {
-    const rows = await fetchLookup('companies');
-    const select = document.getElementById('companyFilter');
-    resetSelect(select, 'All Companies');
-    rows.forEach(r => select.appendChild(makeOption(r.id, r.company_name)));
-
-    if (rows.length === 1) {
-        select.value = rows[0].id;
-        state.filters.company_id = rows[0].id;
-    }
-}
-
-async function loadCountries() {
-    const rows = await fetchLookup('countries');
-    const select = document.getElementById('countryFilter');
-    resetSelect(select, 'All Countries');
-    rows.forEach(r => select.appendChild(makeOption(r.id, r.country_name)));
-}
-
-async function loadRegions(countryId) {
-    const select = document.getElementById('regionFilter');
-    resetSelect(select, 'All Regions');
-    if (!countryId) {
-        select.disabled = true;
-        return;
-    }
-    const rows = await fetchLookup('regions', { country_id: countryId });
-    rows.forEach(r => select.appendChild(makeOption(r.id, r.region_name)));
-    select.disabled = false;
-}
-
-async function loadCities(regionId) {
-    const select = document.getElementById('cityFilter');
-    resetSelect(select, 'All Cities');
-    if (!regionId) {
-        select.disabled = true;
-        return;
-    }
-    const rows = await fetchLookup('cities', { region_id: regionId });
-    rows.forEach(r => select.appendChild(makeOption(r.id, r.city_name)));
-    select.disabled = false;
-}
-
-async function loadZones(cityId) {
-    const select = document.getElementById('zoneFilter');
-    resetSelect(select, 'All Zones');
-    if (!cityId) {
-        select.disabled = true;
-        return;
-    }
-    const rows = await fetchLookup('zones', { city_id: cityId });
-    rows.forEach(r => select.appendChild(makeOption(r.id, r.city_zone_name)));
-    select.disabled = false;
-}
-
-async function loadAreas(zoneId) {
-    const select = document.getElementById('areaFilter');
-    resetSelect(select, 'All Areas');
-    if (!zoneId) {
-        select.disabled = true;
-        return;
-    }
-    const rows = await fetchLookup('areas', { zone_id: zoneId });
-    rows.forEach(r => select.appendChild(makeOption(r.id, r.area_name)));
-    select.disabled = false;
-}
-
-function setupCascadingFilters() {
-    document.getElementById('countryFilter').addEventListener('change', async (e) => {
-        state.filters.country_id = e.target.value;
-        state.filters.region_id = state.filters.city_id = state.filters.zone_id = state.filters.area_id = '';
-        await loadRegions(e.target.value);
-        resetSelect(document.getElementById('cityFilter'), 'All Cities');
-        document.getElementById('cityFilter').disabled = true;
-        resetSelect(document.getElementById('zoneFilter'), 'All Zones');
-        document.getElementById('zoneFilter').disabled = true;
-        resetSelect(document.getElementById('areaFilter'), 'All Areas');
-        document.getElementById('areaFilter').disabled = true;
-    });
-
-    document.getElementById('regionFilter').addEventListener('change', async (e) => {
-        state.filters.region_id = e.target.value;
-        state.filters.city_id = state.filters.zone_id = state.filters.area_id = '';
-        await loadCities(e.target.value);
-        resetSelect(document.getElementById('zoneFilter'), 'All Zones');
-        document.getElementById('zoneFilter').disabled = true;
-        resetSelect(document.getElementById('areaFilter'), 'All Areas');
-        document.getElementById('areaFilter').disabled = true;
-    });
-
-    document.getElementById('cityFilter').addEventListener('change', async (e) => {
-        state.filters.city_id = e.target.value;
-        state.filters.zone_id = state.filters.area_id = '';
-        await loadZones(e.target.value);
-        resetSelect(document.getElementById('areaFilter'), 'All Areas');
-        document.getElementById('areaFilter').disabled = true;
-    });
-
-    document.getElementById('zoneFilter').addEventListener('change', async (e) => {
-        state.filters.zone_id = e.target.value;
-        state.filters.area_id = '';
-        await loadAreas(e.target.value);
-    });
-
-    document.getElementById('areaFilter').addEventListener('change', (e) => {
-        state.filters.area_id = e.target.value;
-    });
-
-    document.getElementById('companyFilter').addEventListener('change', (e) => {
-        state.filters.company_id = e.target.value;
-    });
-}
-
-// ---------- Customer: dropdown + type-to-search combobox ----------
-
-function setupCustomerCombo() {
-    const input = document.getElementById('customerFilterInput');
-    const hidden = document.getElementById('customerFilter');
-    const dropdown = document.getElementById('customerDropdown');
+function createSearchableCombo({ comboId, inputId, hiddenId, dropdownId, placeholder, fetchItems, onSelect }) {
+    const input = document.getElementById(inputId);
+    const hidden = document.getElementById(hiddenId);
+    const dropdown = document.getElementById(dropdownId);
     let debounceTimer = null;
 
     async function openWithResults(query) {
-        const rows = await fetchLookup('customers', query ? { q: query } : {});
+        const items = await fetchItems(query);
         dropdown.innerHTML = '';
 
         const allOption = document.createElement('div');
         allOption.className = 'combo-option';
-        allOption.textContent = 'All Customers';
-        allOption.addEventListener('click', () => selectCustomer('', ''));
+        allOption.textContent = placeholder;
+        allOption.addEventListener('click', () => select('', ''));
         dropdown.appendChild(allOption);
 
-        if (rows.length === 0) {
+        if (items.length === 0) {
             const empty = document.createElement('div');
             empty.className = 'combo-empty';
-            empty.textContent = 'No matching customers';
+            empty.textContent = 'No matches';
             dropdown.appendChild(empty);
         } else {
-            rows.forEach(r => {
+            items.forEach(item => {
                 const opt = document.createElement('div');
                 opt.className = 'combo-option';
-                opt.textContent = `${r.customer_code} — ${r.customer_name}`;
-                opt.addEventListener('click', () => selectCustomer(r.id, `${r.customer_code} — ${r.customer_name}`));
+                opt.textContent = item.label;
+                opt.addEventListener('click', () => select(item.id, item.label));
                 dropdown.appendChild(opt);
             });
         }
         dropdown.classList.add('open');
     }
 
-    function selectCustomer(id, label) {
+    function select(id, label) {
         hidden.value = id;
         input.value = label;
         input.dataset.selectedLabel = label;
-        state.filters.customer_id = id;
         dropdown.classList.remove('open');
+        onSelect(id);
     }
 
-    input.addEventListener('focus', () => openWithResults(input.value.trim()));
+    function clear(disable) {
+        select('', '');
+        if (disable !== undefined) input.disabled = disable;
+    }
+
+    function enable() {
+        input.disabled = false;
+    }
+
+    input.addEventListener('focus', () => {
+        if (input.disabled) return;
+        openWithResults(input.value.trim());
+    });
+
     input.addEventListener('input', () => {
+        if (input.disabled) return;
         clearTimeout(debounceTimer);
         const q = input.value.trim();
         if (hidden.value && q !== input.dataset.selectedLabel) {
             hidden.value = '';
-            state.filters.customer_id = '';
+            onSelect('');
         }
-        debounceTimer = setTimeout(() => openWithResults(q), 250);
+        debounceTimer = setTimeout(() => openWithResults(q), 200);
     });
 
     document.addEventListener('click', (e) => {
-        if (!document.getElementById('customerCombo').contains(e.target)) {
+        if (!document.getElementById(comboId).contains(e.target)) {
             dropdown.classList.remove('open');
         }
     });
+
+    return { select, clear, enable };
+}
+
+// Backs a combo whose full option list is fetched once (or per cascade step)
+// and then filtered client-side as the user types.
+function makeListFetcher() {
+    let rows = [];
+    const fetcher = (query) => {
+        const q = query.trim().toLowerCase();
+        return q ? rows.filter(r => r.label.toLowerCase().includes(q)) : rows;
+    };
+    return { fetcher, setRows: (r) => { rows = r; } };
+}
+
+function initCombos() {
+    const companyList = makeListFetcher();
+    companyCombo = createSearchableCombo({
+        comboId: 'companyCombo', inputId: 'companyFilterInput', hiddenId: 'companyFilter',
+        dropdownId: 'companyDropdown', placeholder: 'All Companies',
+        fetchItems: companyList.fetcher,
+        onSelect: (id) => { state.filters.company_id = id; }
+    });
+    companyCombo._setRows = companyList.setRows;
+
+    customerCombo = createSearchableCombo({
+        comboId: 'customerCombo', inputId: 'customerFilterInput', hiddenId: 'customerFilter',
+        dropdownId: 'customerDropdown', placeholder: 'All Customers',
+        fetchItems: async (query) => {
+            const rows = await fetchLookup('customers', query ? { q: query } : {});
+            return rows.map(r => ({ id: r.id, label: `${r.customer_code} — ${r.customer_name}` }));
+        },
+        onSelect: (id) => { state.filters.customer_id = id; }
+    });
+
+    const countryList = makeListFetcher();
+    countryCombo = createSearchableCombo({
+        comboId: 'countryCombo', inputId: 'countryFilterInput', hiddenId: 'countryFilter',
+        dropdownId: 'countryDropdown', placeholder: 'All Countries',
+        fetchItems: countryList.fetcher,
+        onSelect: (id) => {
+            state.filters.country_id = id;
+            state.filters.region_id = state.filters.city_id = state.filters.zone_id = state.filters.area_id = '';
+            regionCombo.clear(true);
+            cityCombo.clear(true);
+            zoneCombo.clear(true);
+            areaCombo.clear(true);
+            loadRegions(id);
+        }
+    });
+    countryCombo._setRows = countryList.setRows;
+
+    const regionList = makeListFetcher();
+    regionCombo = createSearchableCombo({
+        comboId: 'regionCombo', inputId: 'regionFilterInput', hiddenId: 'regionFilter',
+        dropdownId: 'regionDropdown', placeholder: 'All Regions',
+        fetchItems: regionList.fetcher,
+        onSelect: (id) => {
+            state.filters.region_id = id;
+            state.filters.city_id = state.filters.zone_id = state.filters.area_id = '';
+            cityCombo.clear(true);
+            zoneCombo.clear(true);
+            areaCombo.clear(true);
+            loadCities(id);
+        }
+    });
+    regionCombo._setRows = regionList.setRows;
+
+    const cityList = makeListFetcher();
+    cityCombo = createSearchableCombo({
+        comboId: 'cityCombo', inputId: 'cityFilterInput', hiddenId: 'cityFilter',
+        dropdownId: 'cityDropdown', placeholder: 'All Cities',
+        fetchItems: cityList.fetcher,
+        onSelect: (id) => {
+            state.filters.city_id = id;
+            state.filters.zone_id = state.filters.area_id = '';
+            zoneCombo.clear(true);
+            areaCombo.clear(true);
+            loadZones(id);
+        }
+    });
+    cityCombo._setRows = cityList.setRows;
+
+    const zoneList = makeListFetcher();
+    zoneCombo = createSearchableCombo({
+        comboId: 'zoneCombo', inputId: 'zoneFilterInput', hiddenId: 'zoneFilter',
+        dropdownId: 'zoneDropdown', placeholder: 'All Zones',
+        fetchItems: zoneList.fetcher,
+        onSelect: (id) => {
+            state.filters.zone_id = id;
+            state.filters.area_id = '';
+            areaCombo.clear(true);
+            loadAreas(id);
+        }
+    });
+    zoneCombo._setRows = zoneList.setRows;
+
+    const areaList = makeListFetcher();
+    areaCombo = createSearchableCombo({
+        comboId: 'areaCombo', inputId: 'areaFilterInput', hiddenId: 'areaFilter',
+        dropdownId: 'areaDropdown', placeholder: 'All Areas',
+        fetchItems: areaList.fetcher,
+        onSelect: (id) => { state.filters.area_id = id; }
+    });
+    areaCombo._setRows = areaList.setRows;
+}
+
+// ---------- Lookup loaders ----------
+
+async function loadCompanies() {
+    const rows = await fetchLookup('companies');
+    const items = rows.map(r => ({ id: r.id, label: r.company_name }));
+    companyCombo._setRows(items);
+    if (items.length === 1) {
+        companyCombo.select(items[0].id, items[0].label);
+    }
+}
+
+async function loadCountries() {
+    const rows = await fetchLookup('countries');
+    countryCombo._setRows(rows.map(r => ({ id: r.id, label: r.country_name })));
+}
+
+async function loadRegions(countryId) {
+    if (!countryId) { regionCombo.clear(true); return; }
+    const rows = await fetchLookup('regions', { country_id: countryId });
+    regionCombo._setRows(rows.map(r => ({ id: r.id, label: r.region_name })));
+    regionCombo.enable();
+}
+
+async function loadCities(regionId) {
+    if (!regionId) { cityCombo.clear(true); return; }
+    const rows = await fetchLookup('cities', { region_id: regionId });
+    cityCombo._setRows(rows.map(r => ({ id: r.id, label: r.city_name })));
+    cityCombo.enable();
+}
+
+async function loadZones(cityId) {
+    if (!cityId) { zoneCombo.clear(true); return; }
+    const rows = await fetchLookup('zones', { city_id: cityId });
+    zoneCombo._setRows(rows.map(r => ({ id: r.id, label: r.city_zone_name })));
+    zoneCombo.enable();
+}
+
+async function loadAreas(zoneId) {
+    if (!zoneId) { areaCombo.clear(true); return; }
+    const rows = await fetchLookup('areas', { zone_id: zoneId });
+    areaCombo._setRows(rows.map(r => ({ id: r.id, label: r.area_name })));
+    areaCombo.enable();
 }
 
 // ---------- Buttons ----------
@@ -302,15 +353,13 @@ function setupButtons() {
             company_id: '', customer_id: '', country_id: '',
             region_id: '', city_id: '', zone_id: '', area_id: ''
         };
-        document.getElementById('companyFilter').value = '';
-        document.getElementById('customerFilterInput').value = '';
-        document.getElementById('customerFilter').value = '';
-        document.getElementById('countryFilter').value = '';
-        ['regionFilter', 'cityFilter', 'zoneFilter', 'areaFilter'].forEach(id => {
-            const el = document.getElementById(id);
-            resetSelect(el, `All ${id.replace('Filter', 's').replace(/^./, c => c.toUpperCase())}`);
-            el.disabled = true;
-        });
+        companyCombo.clear();
+        customerCombo.clear();
+        countryCombo.clear();
+        regionCombo.clear(true);
+        cityCombo.clear(true);
+        zoneCombo.clear(true);
+        areaCombo.clear(true);
         state.page = 1;
         loadReportData();
     });
@@ -557,18 +606,6 @@ async function fetchLookup(type, extraParams = {}) {
     const res = await fetch(`${FILTERS_ENDPOINT}?${params.toString()}`);
     const json = await res.json();
     return json.success ? json.data : [];
-}
-
-function makeOption(value, label) {
-    const opt = document.createElement('option');
-    opt.value = value;
-    opt.textContent = label;
-    return opt;
-}
-
-function resetSelect(select, placeholderLabel) {
-    select.innerHTML = '';
-    select.appendChild(makeOption('', placeholderLabel));
 }
 
 function escapeHtml(str) {

@@ -28,6 +28,7 @@ $city_id             = !empty($_GET['city_id'])             ? (int)$_GET['city_i
 $city_zone_id        = !empty($_GET['city_zone_id'])        ? (int)$_GET['city_zone_id']        : null;
 $area_id             = !empty($_GET['area_id'])             ? (int)$_GET['area_id']             : null;
 $company_id          = !empty($_GET['company_id'])          ? (int)$_GET['company_id']          : null;
+$customer_id         = !empty($_GET['customer_id'])          ? (int)$_GET['customer_id']         : null;
 
 try {
     $query = "
@@ -85,6 +86,7 @@ try {
         AND c.status = 'ACTIVE'
         AND obi.debit > 0
         " . ($company_id ? " AND c.company_id = ?" : "") . "
+        " . ($customer_id ? " AND c.id = ?" : "") . "
         " . ($country_id ? " AND c.country_id = ?" : "") . "
         " . ($region_id ? " AND c.region_id = ?" : "") . "
         " . ($city_id ? " AND c.city_id = ?" : "") . "
@@ -157,6 +159,7 @@ try {
         " . ($date_from ? " AND si.sale_date >= ?" : "") . "
         " . ($date_to ? " AND si.sale_date <= ?" : "") . "
         " . ($company_id ? " AND si.company_id = ?" : "") . "
+        " . ($customer_id ? " AND c.id = ?" : "") . "
         " . ($country_id ? " AND c.country_id = ?" : "") . "
         " . ($region_id ? " AND c.region_id = ?" : "") . "
         " . ($city_id ? " AND c.city_id = ?" : "") . "
@@ -188,6 +191,7 @@ try {
     // WHERE: obi.tenant_id, territory filters
     $params[] = $tenant_id;
     if ($company_id) $params[] = $company_id;
+    if ($customer_id) $params[] = $customer_id;
     if ($country_id) $params[] = $country_id;
     if ($region_id) $params[] = $region_id;
     if ($city_id) $params[] = $city_id;
@@ -217,6 +221,7 @@ try {
     if ($date_from) $params[] = $date_from;
     if ($date_to) $params[] = $date_to;
     if ($company_id) $params[] = $company_id;
+    if ($customer_id) $params[] = $customer_id;
     if ($country_id) $params[] = $country_id;
     if ($region_id) $params[] = $region_id;
     if ($city_id) $params[] = $city_id;

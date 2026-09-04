@@ -83,7 +83,7 @@ $currency_symbol = $currency['symbol'];
     color: var(--subtext, #94a3b8);
 }
 
-select.form-select:disabled {
+.form-select:disabled {
     opacity: 0.55;
     cursor: not-allowed;
 }
@@ -116,108 +116,117 @@ select.form-select:disabled {
                 </div>
             </div>
             
-            <div class="filter-bar">
-                <div class="form-group">
-                    <label class="form-label">Company</label>
-                    <select class="form-select" id="companyFilter">
-                        <option value="">All Companies</option>
-                    </select>
-                </div>
+           <div class="filter-bar">
+    <div class="form-group">
+        <label class="form-label">Company</label>
+        <div class="combo-select" id="companyCombo">
+            <input type="text" class="form-select" id="companyFilterInput" placeholder="All Companies" autocomplete="off">
+            <input type="hidden" id="companyFilter" value="">
+            <div class="combo-dropdown" id="companyDropdown"></div>
+        </div>
+    </div>
 
-                <!-- Customer: dropdown + type-to-search combobox in one control -->
-                <div class="form-group">
-                    <label class="form-label">Customer</label>
-                    <div class="combo-select" id="customerCombo">
-                        <input type="text" class="form-select" id="customerFilterInput"
-                               placeholder="All Customers" autocomplete="off">
-                        <input type="hidden" id="customerFilter" value="">
-                        <div class="combo-dropdown" id="customerDropdown"></div>
-                    </div>
-                </div>
+    <div class="form-group">
+        <label class="form-label">Customer</label>
+        <div class="combo-select" id="customerCombo">
+            <input type="text" class="form-select" id="customerFilterInput" placeholder="All Customers" autocomplete="off">
+            <input type="hidden" id="customerFilter" value="">
+            <div class="combo-dropdown" id="customerDropdown"></div>
+        </div>
+    </div>
 
-                <div class="form-group">
-                    <label class="form-label">Country</label>
-                    <select class="form-select" id="countryFilter">
-                        <option value="">All Countries</option>
-                    </select>
-                </div>
+    <div class="form-group">
+        <label class="form-label">Country</label>
+        <div class="combo-select" id="countryCombo">
+            <input type="text" class="form-select" id="countryFilterInput" placeholder="All Countries" autocomplete="off">
+            <input type="hidden" id="countryFilter" value="">
+            <div class="combo-dropdown" id="countryDropdown"></div>
+        </div>
+    </div>
 
-                <div class="form-group">
-                    <label class="form-label">Region</label>
-                    <select class="form-select" id="regionFilter" disabled>
-                        <option value="">All Regions</option>
-                    </select>
-                </div>
+    <div class="form-group">
+        <label class="form-label">Region</label>
+        <div class="combo-select" id="regionCombo">
+            <input type="text" class="form-select" id="regionFilterInput" placeholder="All Regions" autocomplete="off" disabled>
+            <input type="hidden" id="regionFilter" value="">
+            <div class="combo-dropdown" id="regionDropdown"></div>
+        </div>
+    </div>
 
-                <div class="form-group">
-                    <label class="form-label">City</label>
-                    <select class="form-select" id="cityFilter" disabled>
-                        <option value="">All Cities</option>
-                    </select>
-                </div>
+    <div class="form-group">
+        <label class="form-label">City</label>
+        <div class="combo-select" id="cityCombo">
+            <input type="text" class="form-select" id="cityFilterInput" placeholder="All Cities" autocomplete="off" disabled>
+            <input type="hidden" id="cityFilter" value="">
+            <div class="combo-dropdown" id="cityDropdown"></div>
+        </div>
+    </div>
 
-                <div class="form-group">
-                    <label class="form-label">Zone</label>
-                    <select class="form-select" id="zoneFilter" disabled>
-                        <option value="">All Zones</option>
-                    </select>
-                </div>
+    <div class="form-group">
+        <label class="form-label">Zone</label>
+        <div class="combo-select" id="zoneCombo">
+            <input type="text" class="form-select" id="zoneFilterInput" placeholder="All Zones" autocomplete="off" disabled>
+            <input type="hidden" id="zoneFilter" value="">
+            <div class="combo-dropdown" id="zoneDropdown"></div>
+        </div>
+    </div>
 
-                <div class="form-group">
-                    <label class="form-label">Area</label>
-                    <select class="form-select" id="areaFilter" disabled>
-                        <option value="">All Areas</option>
-                    </select>
-                </div>
-                
-                <div class="form-group">
-                    <label class="form-label">Date Range</label>
-                    <select class="form-select">
-                        <option value="all">All Time</option>
-                        <option value="30days" selected>Last 30 Days</option>
-                        <option value="90days">Last 90 Days</option>
-                        <option value="custom">Custom Range</option>
-                    </select>
-                </div>
-                
-                <div class="form-group">
-                    <label class="form-label">Customer Type</label>
-                    <select class="form-select">
-                        <option value="all">All Customers</option>
-                        <option value="regular">Regular</option>
-                        <option value="vip">VIP</option>
-                        <option value="new">New</option>
-                    </select>
-                </div>
-                
-                <div class="form-group">
-                    <label class="form-label">Overdue Bucket</label>
-                    <select class="form-select">
-                        <option value="all">All Buckets</option>
-                        <option value="15+">15+ Days</option>
-                        <option value="25+">25+ Days</option>
-                        <option value="35+">35+ Days</option>
-                        <option value="45+">45+ Days</option>
-                    </select>
-                </div>
+    <div class="form-group">
+        <label class="form-label">Area</label>
+        <div class="combo-select" id="areaCombo">
+            <input type="text" class="form-select" id="areaFilterInput" placeholder="All Areas" autocomplete="off" disabled>
+            <input type="hidden" id="areaFilter" value="">
+            <div class="combo-dropdown" id="areaDropdown"></div>
+        </div>
+    </div>
 
-                <!-- View Mode: All Invoices vs Unbilled RV & SR (bill_no / sale_invoice_no is null) -->
-                <div class="form-group">
-                    <label class="form-label">View Mode</label>
-                    <div class="view-toggle-wrapper">
-                        <span class="view-toggle-label">All Invoices</span>
-                        <label class="toggle-switch" title="Show only Receive Vouchers / Sale Returns that have no bill_no yet">
-                            <input type="checkbox" id="viewModeToggle">
-                            <span class="toggle-slider"></span>
-                        </label>
-                        <span class="view-toggle-label" id="viewModeLabel">Unbilled RV/SR</span>
-                    </div>
-                </div>
-                
-                <button class="btn btn-ghost" id="resetFiltersBtn">
-                    <i class="fas fa-redo"></i> Reset Filters
-                </button>
-            </div>
+    <div class="form-group">
+        <label class="form-label">Date Range</label>
+        <select class="form-select">
+            <option value="all">All Time</option>
+            <option value="30days" selected>Last 30 Days</option>
+            <option value="90days">Last 90 Days</option>
+            <option value="custom">Custom Range</option>
+        </select>
+    </div>
+
+    <div class="form-group">
+        <label class="form-label">Customer Type</label>
+        <select class="form-select">
+            <option value="all">All Customers</option>
+            <option value="regular">Regular</option>
+            <option value="vip">VIP</option>
+            <option value="new">New</option>
+        </select>
+    </div>
+
+    <div class="form-group">
+        <label class="form-label">Overdue Bucket</label>
+        <select class="form-select">
+            <option value="all">All Buckets</option>
+            <option value="15+">15+ Days</option>
+            <option value="25+">25+ Days</option>
+            <option value="35+">35+ Days</option>
+            <option value="45+">45+ Days</option>
+        </select>
+    </div>
+
+    <div class="form-group">
+        <label class="form-label">View Mode</label>
+        <div class="view-toggle-wrapper">
+            <span class="view-toggle-label">All Invoices</span>
+            <label class="toggle-switch" title="Show only Receive Vouchers / Sale Returns that have no bill_no yet">
+                <input type="checkbox" id="viewModeToggle">
+                <span class="toggle-slider"></span>
+            </label>
+            <span class="view-toggle-label" id="viewModeLabel">Unbilled RV/SR</span>
+        </div>
+    </div>
+
+    <button class="btn btn-ghost" id="resetFiltersBtn">
+        <i class="fas fa-redo"></i> Reset Filters
+    </button>
+</div>
         </div>
         
         <!-- Buckets Summary (hidden in Unbilled RV/SR view mode) -->

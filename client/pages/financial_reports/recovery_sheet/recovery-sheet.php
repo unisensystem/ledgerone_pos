@@ -77,6 +77,12 @@ $currency_symbol = $currency['symbol'];
                             </select>
                         </div>
                         <div class="filter-item">
+    <label class="filter-label">Customer</label>
+    <select class="filter-input" id="customerFilter">
+        <option value="">All Customers</option>
+    </select>
+</div>
+                        <div class="filter-item">
                             <label class="filter-label">Date Range</label>
                             <input type="date" class="filter-input" value="2023-10-01">
                         </div>
