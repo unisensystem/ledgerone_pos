@@ -301,11 +301,11 @@ document.addEventListener('DOMContentLoaded', function () {
                     total_balance: 0,
                     total_received: parseFloat(row.total_received) || 0,
                     total_returns: parseFloat(row.total_returns) || 0,
-                  unallocated_received: parseFloat(row.unallocated_received) || 0,
-unallocated_returns: parseFloat(row.unallocated_returns) || 0,
-unallocated_transfer: parseFloat(row.unallocated_transfer) || 0,
-unallocated_adjustment: parseFloat(row.unallocated_adjustment) || 0,
-bills: []
+                    unallocated_received: parseFloat(row.unallocated_received) || 0,
+                    unallocated_returns: parseFloat(row.unallocated_returns) || 0,
+                    unallocated_transfer: parseFloat(row.unallocated_transfer) || 0,
+                    unallocated_adjustment: parseFloat(row.unallocated_adjustment) || 0,
+                    bills: []
                 };
             }
             map[key].total_balance += parseFloat(row.current_balance) || 0;
@@ -322,6 +322,26 @@ bills: []
         });
 
         return Object.values(map).sort((a, b) => a.customer_name.localeCompare(b.customer_name));
+    }
+
+    // Net balance for a grouped customer.
+    //
+    // BUG FIX: previously this subtracted unallocated_received AND
+    // unallocated_returns on top of total_balance, which double-counted
+    // those amounts. Unbilled Receive Vouchers and unbilled Sale Returns
+    // already appear as their own rows in the API response (see
+    // recovery-sheet.php UNION parts 3 & 4), so their value is already
+    // baked into total_balance (the sum of current_balance across all of
+    // a customer's rows). Subtracting unallocated_received/returns again
+    // here counted the same voucher twice (e.g. an unbilled receipt of
+    // 10000 showed up as -20000 instead of -10000).
+    //
+    // unallocated_transfer and unallocated_adjustment have NO dedicated
+    // row of their own anywhere in the API response - they only ever
+    // appear as extra columns tacked onto every row - so they still need
+    // to be subtracted here exactly once per customer.
+    function computeNetBalance(customer) {
+        return customer.total_balance - customer.unallocated_transfer - customer.unallocated_adjustment;
     }
 
     function simulateAutoClear(bills, totalReceived) {
@@ -394,7 +414,7 @@ bills: []
         const grouped = groupByCustomer(rows);
 
         grouped.forEach((customer, i) => {
-const bal      = customer.total_balance - customer.unallocated_received - customer.unallocated_returns - customer.unallocated_transfer - customer.unallocated_adjustment;
+            const bal      = computeNetBalance(customer);
             const balClass = bal > 0 ? 'balance-positive' : bal < 0 ? 'balance-negative' : '';
             const balText  = (bal < 0 ? '-' : '') + currencySymbol + Math.abs(bal).toFixed(2);
             const oldestDays = customer.bills[0]?.days_overdue ?? '';
@@ -496,7 +516,7 @@ const bal      = customer.total_balance - customer.unallocated_received - custom
         if (customerViewMode) {
             rows = [['S#', 'Customer Name', 'Address', 'Primary Phone No', 'Total Balance', 'Received Amount', 'Sales Return', 'Days Overdue']];
             groupByCustomer(lastRecoveryData).forEach((c, i) => {
-const netBal = c.total_balance - c.unallocated_received - c.unallocated_returns - c.unallocated_transfer - c.unallocated_adjustment;
+                const netBal = computeNetBalance(c);
                 rows.push([
                     i + 1,
                     c.customer_name,
