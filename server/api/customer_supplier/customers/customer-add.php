@@ -203,23 +203,51 @@ try {
                 $stmt->execute([$tenant_id, 'customer_opening', 'customers', $new_id, 2, $invoice_date, $description, 0, $inv_credit]);
             }
         }
-    } else {
-        if ($data['opening_debit_amount'] > 0) {
-            // Single opening debit entry
-            $ledger_sql = "INSERT INTO accounting_ledger (tenant_id, transaction_type, reference_table, reference_id, account_id, date, description, debit, credit) VALUES (?, ?, ?, ?, ?, CURDATE(), ?, ?, ?)";
-            $stmt = $pdo->prepare($ledger_sql);
-            $stmt->execute([$tenant_id, 'customer_opening', 'customers', $new_id, 2, 'Customer opening debit balance', $data['opening_debit_amount'], 0]);
-            $stmt->execute([$tenant_id, 'customer_opening', 'customers', $new_id, 90, 'Customer opening debit balance', 0, $data['opening_debit_amount']]);
-        }
+  } else {
+    if ($data['opening_debit_amount'] > 0) {
+        // Insert into opening_balance_invoices so it shows up in Aging / Recovery reports
+        $invoice_sql = "INSERT INTO opening_balance_invoices (tenant_id, customer_id, distribution_id, employee_id, invoice_number, debit, credit, invoice_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
+        $stmt = $pdo->prepare($invoice_sql);
+        $stmt->execute([
+            $tenant_id,
+            $new_id,
+            null,
+            null,
+            'OB-' . $customer_code,
+            $data['opening_debit_amount'],
+            0,
+            date('Y-m-d')
+        ]);
 
-        if ($data['opening_credit_amount'] > 0) {
-            // Opening Balance Equity (90) = Debit, Trade Debtors (2) = Credit
-            $ledger_sql = "INSERT INTO accounting_ledger (tenant_id, transaction_type, reference_table, reference_id, account_id, date, description, debit, credit) VALUES (?, ?, ?, ?, ?, CURDATE(), ?, ?, ?)";
-            $stmt = $pdo->prepare($ledger_sql);
-            $stmt->execute([$tenant_id, 'customer_opening', 'customers', $new_id, 90, 'Customer opening credit balance', $data['opening_credit_amount'], 0]);
-            $stmt->execute([$tenant_id, 'customer_opening', 'customers', $new_id, 2, 'Customer opening credit balance', 0, $data['opening_credit_amount']]);
-        }
+        // Single opening debit entry
+        $ledger_sql = "INSERT INTO accounting_ledger (tenant_id, transaction_type, reference_table, reference_id, account_id, date, description, debit, credit) VALUES (?, ?, ?, ?, ?, CURDATE(), ?, ?, ?)";
+        $stmt = $pdo->prepare($ledger_sql);
+        $stmt->execute([$tenant_id, 'customer_opening', 'customers', $new_id, 2, 'Customer opening debit balance', $data['opening_debit_amount'], 0]);
+        $stmt->execute([$tenant_id, 'customer_opening', 'customers', $new_id, 90, 'Customer opening debit balance', 0, $data['opening_debit_amount']]);
     }
+
+    if ($data['opening_credit_amount'] > 0) {
+        // Insert into opening_balance_invoices as well (credit side)
+        $invoice_sql = "INSERT INTO opening_balance_invoices (tenant_id, customer_id, distribution_id, employee_id, invoice_number, debit, credit, invoice_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
+        $stmt = $pdo->prepare($invoice_sql);
+        $stmt->execute([
+            $tenant_id,
+            $new_id,
+            null,
+            null,
+            'OB-' . $customer_code,
+            0,
+            $data['opening_credit_amount'],
+            date('Y-m-d')
+        ]);
+
+        // Opening Balance Equity (90) = Debit, Trade Debtors (2) = Credit
+        $ledger_sql = "INSERT INTO accounting_ledger (tenant_id, transaction_type, reference_table, reference_id, account_id, date, description, debit, credit) VALUES (?, ?, ?, ?, ?, CURDATE(), ?, ?, ?)";
+        $stmt = $pdo->prepare($ledger_sql);
+        $stmt->execute([$tenant_id, 'customer_opening', 'customers', $new_id, 90, 'Customer opening credit balance', $data['opening_credit_amount'], 0]);
+        $stmt->execute([$tenant_id, 'customer_opening', 'customers', $new_id, 2, 'Customer opening credit balance', 0, $data['opening_credit_amount']]);
+    }
+}
     
     // Insert sub accounts
     $sub_accounts = $input['subAccounts'] ?? [];
