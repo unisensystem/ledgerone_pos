@@ -95,7 +95,7 @@ try {
             obi.invoice_number as bill_no,
             obi.invoice_date,
             DATEDIFF(CURDATE(), obi.invoice_date) as days_overdue,
-            obi.debit - COALESCE((
+            (obi.debit - obi.credit) - COALESCE((
                 SELECT SUM(rv.amount)
                 FROM receive_voucher rv
                 WHERE rv.bill_no = obi.invoice_number
@@ -142,7 +142,7 @@ try {
         JOIN customers c ON obi.customer_id = c.id
         WHERE obi.tenant_id = ?
         AND c.status = 'ACTIVE'
-        AND obi.debit > 0
+        AND (obi.debit > 0 OR obi.credit > 0)
         " . ($company_id ? " AND c.company_id = ?" : "") . "
         " . ($customer_id ? " AND c.id = ?" : "") . "
         " . ($country_id ? " AND c.country_id = ?" : "") . "
@@ -229,8 +229,9 @@ try {
         ORDER BY customer_name
     ";
 
-    // wrap in outer query to filter out zero/negative balances
-    $query = "SELECT * FROM ($query) AS recovery_data WHERE current_balance > 0";
+    // wrap in outer query to filter out zero balances (both positive
+    // receivable rows and negative/credit rows are kept)
+    $query = "SELECT * FROM ($query) AS recovery_data WHERE current_balance <> 0";
 
     // UNION Part 1: opening_balance_invoices
     // balance subquery: rv.tenant_id
