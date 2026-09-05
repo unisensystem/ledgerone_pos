@@ -4,6 +4,89 @@ let employees = [];
 let allBranches = [];
 let stats = { total: 0, active: 0, blocked: 0 };
 
+// ========== PROGRESS BAR HELPER FUNCTIONS ==========
+
+// Format bytes to MB/GB
+function formatBytes(bytes) {
+    if (bytes === 0) return '0 MB';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i];
+}
+
+// Show progress overlay
+function showRestoreProgress(title = 'Restoring Database') {
+    const overlay = document.getElementById('restoreProgressOverlay');
+    if (overlay) {
+        document.getElementById('restoreProgressTitle').textContent = title;
+        document.getElementById('restoreProgressPercentage').textContent = '0%';
+        document.getElementById('restoreProgressBarFill').style.width = '0%';
+        document.getElementById('restoreProgressStatus').textContent = 'Preparing to restore...';
+        document.getElementById('restoreUploadedSize').textContent = '0 MB';
+        document.getElementById('restoreUploadSpeed').textContent = '0 MB/s';
+        overlay.classList.remove('success', 'error');
+        overlay.classList.add('active');
+    }
+}
+
+// Update progress bar
+function updateRestoreProgress(percentage, status = null, uploaded = null, total = null, speed = null) {
+    const overlay = document.getElementById('restoreProgressOverlay');
+    if (!overlay) return;
+    
+    percentage = Math.min(percentage, 100);
+    document.getElementById('restoreProgressPercentage').textContent = Math.round(percentage) + '%';
+    document.getElementById('restoreProgressBarFill').style.width = percentage + '%';
+    
+    if (status) {
+        document.getElementById('restoreProgressStatus').textContent = status;
+    }
+    if (uploaded) {
+        document.getElementById('restoreUploadedSize').textContent = formatBytes(uploaded);
+    }
+    if (total) {
+        document.getElementById('restoreTotalSize').textContent = formatBytes(total);
+    }
+    if (speed) {
+        document.getElementById('restoreUploadSpeed').textContent = speed;
+    }
+}
+
+// Show success state
+function showRestoreSuccess(message = 'Database Restored Successfully!') {
+    const overlay = document.getElementById('restoreProgressOverlay');
+    if (overlay) {
+        overlay.classList.remove('error');
+        overlay.classList.add('success');
+        document.getElementById('restoreProgressTitle').textContent = message;
+        document.getElementById('restoreProgressPercentage').textContent = '100%';
+        document.getElementById('restoreProgressBarFill').style.width = '100%';
+        document.getElementById('restoreProgressStatus').textContent = 'Completed';
+    }
+}
+
+// Show error state
+function showRestoreError(message = 'Restore Failed') {
+    const overlay = document.getElementById('restoreProgressOverlay');
+    if (overlay) {
+        overlay.classList.remove('success');
+        overlay.classList.add('error');
+        document.getElementById('restoreProgressTitle').textContent = message;
+        document.getElementById('restoreProgressStatus').textContent = 'An error occurred';
+    }
+}
+
+// Hide progress overlay
+function hideRestoreProgress() {
+    const overlay = document.getElementById('restoreProgressOverlay');
+    if (overlay) {
+        overlay.classList.remove('active');
+    }
+}
+
+// ========== END PROGRESS BAR FUNCTIONS ==========
+
 // Fetch branches from API
 async function fetchBranches() {
     try {
@@ -133,26 +216,6 @@ function renderUsersTable() {
 
 // ─── Branch Multi-Select Helper ────────────────────────────────────────────
 
-/**
- * Initialise a searchable multi-select branch picker.
- * @param {string} searchId   - id of the text input used for searching
- * @param {string} dropdownId - id of the dropdown list container
- * @param {string} tagsId     - id of the selected-tags container
- * @param {string} hiddenId   - id of the hidden input that stores selected IDs
- * @param {number[]} preselected - array of branch IDs to pre-select
- */
-/**
- * Generic multi-select picker.
- * @param {string} searchId
- * @param {string} dropdownId
- * @param {string} tagsId
- * @param {string} hiddenId
- * @param {Array}  allItems      - array of objects with id + display fields
- * @param {Function} getLabel   - fn(item) => display string
- * @param {Function} getTag     - fn(item) => short tag string
- * @param {number[]} preselected
- * @param {string} emptyHint
- */
 function initPicker(searchId, dropdownId, tagsId, hiddenId, allItems, getLabel, getTag, preselected = [], emptyHint = '') {
     const searchInput   = document.getElementById(searchId);
     const dropdown      = document.getElementById(dropdownId);
@@ -388,7 +451,6 @@ function renderPermissionsTree(permissions) {
         const hasSubPerms = !noSubPermCategories.includes(category) && forms.length > 0;
         
         if (forms.length === 0) {
-            // Category without forms - treat as standalone
             const key = `${category}|${category}|Coming Soon`;
             const perm = permMap[key];
             const isChecked = perm && parseInt(perm.allowed) === 1 ? 'checked' : '';
@@ -457,8 +519,6 @@ function toggleCategory(header) {
     icon.className = content.style.display === 'none' ? 'fas fa-chevron-right' : 'fas fa-chevron-down';
 }
 
-
-
 function openFormatModal() {
     document.getElementById('formatModal').style.display = 'flex';
     const confirmInput = document.getElementById('confirmFormat');
@@ -509,6 +569,7 @@ function closeRestoreModal() {
     document.getElementById('restoreFile').value = '';
 }
 
+// ⭐ UPDATED RESTORE FUNCTION WITH PROGRESS TRACKING
 async function restoreDatabase() {
     const fileInput = document.getElementById('restoreFile');
     const file = fileInput.files[0];
@@ -530,22 +591,150 @@ async function restoreDatabase() {
     const formData = new FormData();
     formData.append('backup_file', file);
     
+    closeRestoreModal();
+    showRestoreProgress('Restoring Database');
+    updateRestoreProgress(5, 'Uploading file...');
+    
     try {
-        const response = await fetch('../../../../server/api/backup/restore_backup.php', {
-            method: 'POST',
-            body: formData
+        const xhr = new XMLHttpRequest();
+        const startTime = Date.now();
+        
+        xhr.upload.addEventListener('progress', (e) => {
+            if (e.lengthComputable) {
+                const percentComplete = (e.loaded / e.total) * 50;
+                const speed = (e.loaded / 1024 / 1024) / ((Date.now() - startTime) / 1000);
+                updateRestoreProgress(
+                    5 + percentComplete,
+                    'Uploading file...',
+                    e.loaded,
+                    e.total,
+                    speed.toFixed(2) + ' MB/s'
+                );
+            }
         });
         
-        const data = await response.json();
-        if (data.success) {
-            alert('Database restored successfully!');
-            closeRestoreModal();
-            location.reload();
-        } else {
-            alert('Error: ' + data.message);
-        }
+        xhr.addEventListener('loadend', async () => {
+            if (xhr.status === 200) {
+                try {
+                    const data = JSON.parse(xhr.responseText);
+                    updateRestoreProgress(75, 'Processing data...');
+                    
+                    await new Promise(resolve => setTimeout(resolve, 500));
+                    updateRestoreProgress(90, 'Finalizing...');
+                    
+                    await new Promise(resolve => setTimeout(resolve, 500));
+                    
+                    if (data.success) {
+                        showRestoreSuccess('Database Restored Successfully!');
+                        setTimeout(() => {
+                            hideRestoreProgress();
+                            alert('Database restored successfully!');
+                            location.reload();
+                        }, 1500);
+                    } else {
+                        showRestoreError('Restore Failed: ' + data.message);
+                        setTimeout(() => {
+                            hideRestoreProgress();
+                            alert('Error: ' + data.message);
+                        }, 2000);
+                    }
+                } catch (e) {
+                    showRestoreError('Error processing response');
+                    setTimeout(() => {
+                        hideRestoreProgress();
+                        alert('Error: Invalid server response');
+                    }, 2000);
+                }
+            }
+        });
+        
+        xhr.addEventListener('error', () => {
+            showRestoreError('Connection Error');
+            setTimeout(() => {
+                hideRestoreProgress();
+                alert('Error: Could not connect to server');
+            }, 2000);
+        });
+        
+        xhr.open('POST', '../../../../server/api/backup/restore_backup.php');
+        xhr.send(formData);
+        
     } catch (error) {
-        alert('Error restoring database');
+        showRestoreError('Error');
+        setTimeout(() => {
+            hideRestoreProgress();
+            alert('Error: ' + error.message);
+        }, 2000);
+    }
+}
+
+// ⭐ UPDATED BACKUP FUNCTION WITH PROGRESS TRACKING
+async function createBackup() {
+    const backupName = document.getElementById('backupName').value;
+    const location = document.querySelector('#backupModal select').value;
+
+    if (!backupName) {
+        alert('Please enter a backup name');
+        return;
+    }
+
+    if (location === 'external') {
+        closeBackupModal();
+        showRestoreProgress('Creating Backup');
+        updateRestoreProgress(10, 'Preparing database...');
+        
+        try {
+            const startTime = Date.now();
+            const response = await fetch(`../../../../server/api/backup/generate_backup.php?name=${encodeURIComponent(backupName)}`);
+
+            if (!response.ok) {
+                const err = await response.json().catch(() => null);
+                showRestoreError('Backup Failed: ' + (err?.message || response.statusText));
+                setTimeout(hideRestoreProgress, 2000);
+                return;
+            }
+
+            const contentType = response.headers.get('Content-Type') || '';
+            if (contentType.includes('application/json')) {
+                const err = await response.json();
+                showRestoreError('Backup Failed: ' + (err?.message || 'Unknown error'));
+                setTimeout(hideRestoreProgress, 2000);
+                return;
+            }
+
+            updateRestoreProgress(50, 'Downloading backup...');
+            
+            const blob = await response.blob();
+            const fileSize = blob.size;
+            
+            updateRestoreProgress(90, 'Saving file...');
+            
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `${backupName}.sql`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+
+            const elapsed = (Date.now() - startTime) / 1000;
+            const speed = (fileSize / 1024 / 1024) / elapsed;
+            
+            updateRestoreProgress(100, 'Backup complete!', fileSize, fileSize, speed.toFixed(2) + ' MB/s');
+            showRestoreSuccess('Backup Created Successfully!');
+            
+            setTimeout(() => {
+                hideRestoreProgress();
+                alert('Backup downloaded successfully. Check your Downloads folder.');
+            }, 1500);
+        } catch (error) {
+            showRestoreError('Backup Failed: ' + error.message);
+            setTimeout(hideRestoreProgress, 2000);
+        }
+    } else {
+        alert(`Backup "${backupName}" created successfully in cloud storage!`);
+        closeBackupModal();
     }
 }
 
@@ -779,7 +968,7 @@ async function saveAccessSettings() {
     const creates = [];
     
     checkboxes.forEach(cb => {
-        if (!cb.dataset.sub) return; // Skip form header checkboxes
+        if (!cb.dataset.sub) return;
         if (cb.dataset.id) {
             updates.push({ id: cb.dataset.id, allowed: cb.checked ? 1 : 0 });
         } else if (cb.checked) {
@@ -826,127 +1015,6 @@ async function saveAccessSettings() {
     }
 }
 
-function openAddPermissionModal() {
-    const roleId = document.getElementById('roleSelect').value;
-    if (!roleId) {
-        alert('Please select a role first');
-        return;
-    }
-    
-    const permissionsStructure = {
-        'Dashboard': [],
-        'Customer / Supplier': ['New Customer', 'New Supplier', 'New Customer + Supplier (Both)', 'Leads'],
-        'Sale': ['Sale Order', 'Create Quotation', 'Sale Invoice', 'Med Sale Invoice', 'Sale Tax Invoice', 'Meter Invoice', 'POS Invoice', 'Issue Delivery Challan', 'Sale Reports', 'Discount Report', 'Daily Sale Report', 'Daily Sales Report (DSR) - Multiple Unit', 'Daily Product Sale', 'Sale Return'],
-        'Purchase': ['Record Purchase Order', 'New Purchase', 'Purchase Tax Invoice', 'Purchase Reports', 'Purchase Return', 'Project Product Rates'],
-        'Inventory': ['New Product', 'Stock Adjustment', 'Stock Transfer', 'Stock Position', 'Inward Gatepass', 'Outward Gatepass', 'Container Setup'],
-        'Manufacturing': ['Bill of Materials (BOM)', 'Unit Measurement', 'Machine Setup', 'Production Order', 'WIP Management', 'Production Completion', 'Production Expenses', 'Production Wastage', 'Production Report'],
-        'Vouchers': ['Receive Voucher', 'Payment Voucher', 'Transfer Voucher', 'Expense Voucher', 'Journal Entry', 'Cash Opening'],
-        'Banking': ['New Bank', 'Post Dated Cheques (PDCs)'],
-        'Rent Management': ['Issue Rent', 'Rent List'],
-        'Chart of Accounts': [],
-'Financial Reports': ['General Ledger', 'Customer Ledger', 'Supplier Ledger', 'Both (Customer + Supplier) Ledger', 'Customer Aging', 'Supplier Aging', 'Recovery Sheet', 'Customer Summary Division Report (CSDR)', 'Sales Officer-wise Recovery', 'Trial Balance', 'Balance Sheet', 'Profit & Loss Statement', 'Cash Flow', 'Financial Summary', 'Pending DSR Sheet', 'Project Tracking', 'Container Tracking'],
-        'HRM': ['New Employee', 'Record Attendance', 'New Payroll', 'Employees Ledger'],
-        'Master Setup': ['Branch Setup', 'Territory Setup', 'Rate List Setup', 'Tax Rates Setup', 'Tax Regimes Setup', 'Project Setup'],
-        'System Setup': ['Company Profile', 'Admin Panel', 'Currency Setup', 'Software Info']
-    };
-
-    const modal = document.createElement('div');
-    modal.id = 'addPermissionModal';
-    modal.className = 'modal-overlay';
-    modal.style.display = 'flex';
-    modal.innerHTML = `
-        <div class="modal" style="max-width: 600px;">
-            <div class="modal-header">
-                <div class="modal-title">Add Permissions</div>
-                <button class="modal-close" onclick="closeAddPermissionModal()">&times;</button>
-            </div>
-            <div class="modal-body" style="max-height: 70vh; overflow-y: auto;">
-                ${Object.keys(permissionsStructure).map(category => `
-                    <div style="margin-bottom: 20px;">
-                        <label style="display: flex; align-items: center; gap: 8px; font-weight: 600; margin-bottom: 8px;">
-                            <input type="checkbox" class="category-check" data-category="${category}" onchange="toggleCategoryForms(this)">
-                            ${category}
-                        </label>
-                        <div style="padding-left: 28px;">
-                            ${permissionsStructure[category].length > 0 ? permissionsStructure[category].map(form => `
-                                <label style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;">
-                                    <input type="checkbox" class="form-check" data-category="${category}" data-form="${form}" onchange="updateCategoryCheck()">
-                                    ${form}
-                                </label>
-                            `).join('') : '<span style="color: var(--subtext); font-size: 13px;">No forms available</span>'}
-                        </div>
-                    </div>
-                `).join('')}
-            </div>
-            <div class="modal-footer">
-                <button class="btn btn-secondary" onclick="closeAddPermissionModal()">Cancel</button>
-                <button class="btn btn-primary" onclick="addNewPermissions()">Add Permissions</button>
-            </div>
-        </div>
-    `;
-    document.body.appendChild(modal);
-}
-
-function toggleCategoryForms(checkbox) {
-    const category = checkbox.dataset.category;
-    const forms = document.querySelectorAll(`.form-check[data-category="${category}"]`);
-    forms.forEach(f => f.checked = checkbox.checked);
-}
-
-function updateCategoryCheck() {
-    const categories = document.querySelectorAll('.category-check');
-    categories.forEach(cat => {
-        const forms = document.querySelectorAll(`.form-check[data-category="${cat.dataset.category}"]`);
-        if (forms.length > 0) {
-            cat.checked = Array.from(forms).every(f => f.checked);
-        }
-    });
-}
-
-function closeAddPermissionModal() {
-    const modal = document.getElementById('addPermissionModal');
-    if (modal) modal.remove();
-}
-
-async function addNewPermissions() {
-    const roleId = document.getElementById('roleSelect').value;
-    const selectedForms = document.querySelectorAll('.form-check:checked');
-    
-    if (selectedForms.length === 0) {
-        alert('Please select at least one form');
-        return;
-    }
-    
-    const permissions = [];
-    selectedForms.forEach(form => {
-        permissions.push({
-            category: form.dataset.category,
-            form_name: form.dataset.form,
-            sub_permission: 'Coming Soon',
-            allowed: 0
-        });
-    });
-    
-    try {
-        const response = await fetch('../../../../server/api/system_setup/admin_panel/permissions.php', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ role_id: roleId, permissions })
-        });
-        
-        const data = await response.json();
-        if (data.success) {
-            alert('Permissions added successfully!');
-            closeAddPermissionModal();
-            loadRolePermissions();
-        } else {
-            alert('Error: ' + data.message);
-        }
-    } catch (error) {
-        alert('Error adding permissions');
-    }
-}
-
 async function formatDatabase() {
     if (confirm('This will permanently delete ALL data. Are you absolutely sure?')) {
         try {
@@ -965,79 +1033,6 @@ async function formatDatabase() {
         }
         closeFormatModal();
     }
-}
-
-async function createBackup() {
-    const backupName = document.getElementById('backupName').value;
-    const location = document.querySelector('#backupModal select').value;
-
-    if (!backupName) {
-        alert('Please enter a backup name');
-        return;
-    }
-
-    if (location === 'external') {
-        try {
-            const response = await fetch(`../../../../server/api/backup/generate_backup.php?name=${encodeURIComponent(backupName)}`);
-
-            if (!response.ok) {
-                const err = await response.json().catch(() => null);
-                alert('Backup failed: ' + (err?.message || response.statusText));
-                return;
-            }
-
-            const contentType = response.headers.get('Content-Type') || '';
-            if (contentType.includes('application/json')) {
-                const err = await response.json();
-                alert('Backup failed: ' + (err?.message || 'Unknown error'));
-                return;
-            }
-
-            const blob = await response.blob();
-            const url = URL.createObjectURL(blob);
-            const link = document.createElement('a');
-            link.href = url;
-            link.download = `${backupName}.sql`;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            URL.revokeObjectURL(url);
-
-            alert('Backup download started. Check your Downloads folder.');
-            closeBackupModal();
-        } catch (error) {
-            alert('Backup failed: ' + error.message);
-        }
-    } else {
-        alert(`Backup "${backupName}" created successfully in cloud storage!`);
-        closeBackupModal();
-    }
-}
-
-// Image preview function
-function previewImage(input) {
-    const preview = document.getElementById('preview');
-    const previewContainer = document.getElementById('imagePreview');
-    
-    if (input.files && input.files[0]) {
-        const reader = new FileReader();
-        reader.onload = function(e) {
-            preview.src = e.target.result;
-            previewContainer.style.display = 'block';
-        };
-        reader.readAsDataURL(input.files[0]);
-    } else {
-        previewContainer.style.display = 'none';
-    }
-}
-
-// Remove image function
-function removeImage() {
-    const fileInput = document.querySelector('input[name="profile_picture"]');
-    const previewContainer = document.getElementById('imagePreview');
-    
-    fileInput.value = '';
-    previewContainer.style.display = 'none';
 }
 
 // Roles management
@@ -1201,6 +1196,32 @@ async function deleteRole(roleId) {
     }
 }
 
+// Image preview function
+function previewImage(input) {
+    const preview = document.getElementById('preview');
+    const previewContainer = document.getElementById('imagePreview');
+    
+    if (input.files && input.files[0]) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            preview.src = e.target.result;
+            previewContainer.style.display = 'block';
+        };
+        reader.readAsDataURL(input.files[0]);
+    } else {
+        previewContainer.style.display = 'none';
+    }
+}
+
+// Remove image function
+function removeImage() {
+    const fileInput = document.querySelector('input[name="profile_picture"]');
+    const previewContainer = document.getElementById('imagePreview');
+    
+    fileInput.value = '';
+    previewContainer.style.display = 'none';
+}
+
 // Initialize
 document.addEventListener('DOMContentLoaded', function () {
     fetchUsers();
@@ -1216,6 +1237,4 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         });
     });
-
-
 });

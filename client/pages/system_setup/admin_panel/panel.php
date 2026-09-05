@@ -24,6 +24,169 @@ if (!$user_id) {
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="../../../assets/css/system_setup/admin_panel/panel.css">
 </head>
+<style>
+/* ========== PROGRESS BAR STYLES ========== */
+
+.restore-progress-overlay {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 10000;
+    justify-content: center;
+    align-items: center;
+}
+
+.restore-progress-overlay.active {
+    display: flex;
+}
+
+.restore-progress-container {
+    background: var(--surface-card);
+    border-radius: var(--radius);
+    padding: 40px;
+    text-align: center;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    max-width: 400px;
+    min-width: 300px;
+    background-color: white;
+}
+
+.restore-progress-title {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--heading);
+    margin-bottom: 24px;
+}
+
+.restore-progress-bar-container {
+    width: 100%;
+    height: 8px;
+    background: var(--border-default);
+    border-radius: 4px;
+    overflow: hidden;
+    margin-bottom: 12px;
+}
+
+.restore-progress-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--primary), var(--success));
+    width: 0%;
+    transition: width 0.3s ease;
+    border-radius: 4px;
+    position: relative;
+}
+
+.restore-progress-bar-fill::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+    animation: shimmer 2s infinite;
+}
+
+@keyframes shimmer {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(100%); }
+}
+
+.restore-progress-percentage {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--primary);
+    margin-bottom: 16px;
+}
+
+.restore-progress-status {
+    font-size: 13px;
+    color: var(--subtext);
+    margin-bottom: 8px;
+    min-height: 18px;
+}
+
+.restore-progress-info {
+    font-size: 12px;
+    color: var(--subtext);
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    margin-top: 12px;
+}
+
+.restore-progress-info-item {
+    flex: 1;
+}
+
+.restore-progress-info-label {
+    display: block;
+    font-size: 11px;
+    color: var(--subtext);
+    opacity: 0.7;
+    margin-bottom: 2px;
+}
+
+.restore-progress-info-value {
+    display: block;
+    font-weight: 600;
+    color: var(--heading);
+    font-size: 13px;
+}
+
+.restore-progress-dot {
+    display: inline-block;
+    width: 4px;
+    height: 4px;
+    background: var(--primary);
+    border-radius: 50%;
+    margin: 0 2px;
+    animation: dotAnimation 1.4s infinite;
+}
+
+.restore-progress-dot:nth-child(1) {
+    animation-delay: 0s;
+}
+
+.restore-progress-dot:nth-child(2) {
+    animation-delay: 0.2s;
+}
+
+.restore-progress-dot:nth-child(3) {
+    animation-delay: 0.4s;
+}
+
+@keyframes dotAnimation {
+    0%, 60%, 100% {
+        opacity: 0.3;
+        transform: translateY(0);
+    }
+    30% {
+        opacity: 1;
+        transform: translateY(-8px);
+    }
+}
+
+.restore-progress-overlay.success .restore-progress-bar-fill {
+    background: linear-gradient(90deg, var(--success), var(--success));
+}
+
+.restore-progress-overlay.success .restore-progress-percentage {
+    color: var(--success);
+}
+
+.restore-progress-overlay.error .restore-progress-bar-fill {
+    background: linear-gradient(90deg, var(--error), var(--error));
+}
+
+.restore-progress-overlay.error .restore-progress-percentage {
+    color: var(--error);
+}
+</style>
 
 <body>
     <div class="app-container">
@@ -338,8 +501,7 @@ if (!$user_id) {
             </div>
             <div class="modal-footer">
                 <button class="btn btn-secondary" onclick="closeFormatModal()">Cancel</button>
-                <button class="btn btn-error" onclick="formatDatabase()" id="formatBtn" disabled>Format
-                    Database</button>
+                <button class="btn btn-error" onclick="formatDatabase()" id="formatBtn" disabled>Format Database</button>
             </div>
         </div>
     </div>
@@ -397,8 +559,7 @@ if (!$user_id) {
             <div class="modal-body">
                 <div class="form-group">
                     <label class="form-label">Backup Name</label>
-                    <input type="text" class="form-input" id="backupName" placeholder="backup_2023_10_15"
-                        value="backup_">
+                    <input type="text" class="form-input" id="backupName" placeholder="backup_2023_10_15" value="backup_">
                 </div>
                 <div class="form-group">
                     <label class="form-label">Backup Location</label>
@@ -410,6 +571,42 @@ if (!$user_id) {
             <div class="modal-footer">
                 <button class="btn btn-secondary" onclick="closeBackupModal()">Cancel</button>
                 <button class="btn btn-primary" onclick="createBackup()">Create Backup</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ⭐ PROGRESS OVERLAY (REPLACES OLD SPINNER) -->
+    <div class="restore-progress-overlay" id="restoreProgressOverlay">
+        <div class="restore-progress-container">
+            <div class="restore-progress-title" id="restoreProgressTitle">
+                Restoring Database
+            </div>
+            
+            <div class="restore-progress-bar-container">
+                <div class="restore-progress-bar-fill" id="restoreProgressBarFill"></div>
+            </div>
+            
+            <div class="restore-progress-percentage" id="restoreProgressPercentage">
+                0%
+            </div>
+            
+            <div class="restore-progress-status" id="restoreProgressStatus">
+                Preparing to restore...
+            </div>
+            
+            <div class="restore-progress-info" id="restoreProgressInfo">
+                <div class="restore-progress-info-item">
+                    <span class="restore-progress-info-label">Uploaded</span>
+                    <span class="restore-progress-info-value" id="restoreUploadedSize">0 MB</span>
+                </div>
+                <div class="restore-progress-info-item">
+                    <span class="restore-progress-info-label">Total Size</span>
+                    <span class="restore-progress-info-value" id="restoreTotalSize">0 MB</span>
+                </div>
+                <div class="restore-progress-info-item">
+                    <span class="restore-progress-info-label">Speed</span>
+                    <span class="restore-progress-info-value" id="restoreUploadSpeed">0 MB/s</span>
+                </div>
             </div>
         </div>
     </div>

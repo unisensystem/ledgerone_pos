@@ -17,6 +17,11 @@ if (!$user_id || !$tenant_id) {
 ini_set('memory_limit', '512M');
 set_time_limit(300); // 5 minutes
 
+// How many rows to pack into a single multi-row INSERT statement.
+// This is what keeps the restore fast later - 500 rows in one INSERT
+// instead of 500 separate round trips to MySQL.
+const BATCH_SIZE = 500;
+
 $backupName = $_GET['name'] ?? 'backup_' . date('Y_m_d_H_i_s');
 $backupName = preg_replace('/[^a-zA-Z0-9_-]/', '', $backupName);
 $filename = $backupName . '.sql';
@@ -56,39 +61,55 @@ try {
     }
 
     $buffer = '';
-    backup_write($buffer, "-- Database Backup for Tenant ID: {$tenant_id}\n");
-    backup_write($buffer, "-- Generated: " . date('Y-m-d H:i:s') . "\n\n");
+    backup_write($buffer, "-- Tenant-scoped Database Backup for Tenant ID: {$tenant_id}\n");
+    backup_write($buffer, "-- Generated: " . date('Y-m-d H:i:s') . "\n");
+    backup_write($buffer, "-- NOTE: This backup contains DATA ROWS ONLY for this tenant.\n");
+    backup_write($buffer, "-- It intentionally does NOT drop or recreate any tables, and does\n");
+    backup_write($buffer, "-- NOT include shared/global tables that other tenants also use.\n");
+    backup_write($buffer, "-- It must be restored into a database that already has the schema.\n\n");
 
     // Only get BASE TABLES, skip views (views cause definer errors)
     $stmt = $pdo->query("SHOW FULL TABLES WHERE Table_type = 'BASE TABLE'");
     $tables = $stmt->fetchAll(PDO::FETCH_COLUMN);
 
     foreach ($tables as $table) {
-        $stmt = $pdo->query("SHOW CREATE TABLE `{$table}`");
-        $row = $stmt->fetch(PDO::FETCH_NUM);
-        backup_write($buffer, "\n\n-- Table: {$table}\n");
-        backup_write($buffer, "DROP TABLE IF EXISTS `{$table}`;\n");
-        backup_write($buffer, $row[1] . ";\n\n");
-
         $stmt = $pdo->query("SHOW COLUMNS FROM `{$table}` LIKE 'tenant_id'");
         $hasTenantId = $stmt->rowCount() > 0;
 
-        if ($hasTenantId) {
-            $stmt = $pdo->prepare("SELECT * FROM `{$table}` WHERE tenant_id = ?");
-            $stmt->execute([$tenant_id]);
-        } else {
-            $stmt = $pdo->query("SELECT * FROM `{$table}`");
+        // Skip tables that aren't tenant-scoped entirely. A tenant backup
+        // should never touch shared/global tables (roles, settings, other
+        // tenants' data, etc.) - restoring those would either duplicate-key
+        // error or silently overwrite data that belongs to everyone.
+        if (!$hasTenantId) {
+            continue;
         }
 
-        // Use unbuffered-style row-by-row processing so we never hold the
-        // whole table's result set as one big PHP array in memory.
+        $stmt = $pdo->prepare("SELECT * FROM `{$table}` WHERE tenant_id = ?");
+        $stmt->execute([$tenant_id]);
+
+        $columns = null;
+        $batch = [];
+        $rowCount = 0;
+
         while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
-            $insert = "INSERT INTO `{$table}` (";
-            $insert .= implode(', ', array_map(fn($col) => "`{$col}`", array_keys($row)));
-            $insert .= ") VALUES (";
-            $insert .= implode(', ', array_map(fn($val) => backup_quote_value($pdo, $val), array_values($row)));
-            $insert .= ");\n";
-            backup_write($buffer, $insert);
+            if ($columns === null) {
+                $columns = array_keys($row);
+                backup_write($buffer, "\n-- Table: {$table}\n");
+            }
+
+            $values = implode(', ', array_map(fn($val) => backup_quote_value($pdo, $val), array_values($row)));
+            $batch[] = "({$values})";
+            $rowCount++;
+
+            if (count($batch) >= BATCH_SIZE) {
+                backup_write($buffer, buildInsert($table, $columns, $batch));
+                $batch = [];
+            }
+        }
+
+        // Flush any remaining rows for this table
+        if (!empty($batch)) {
+            backup_write($buffer, buildInsert($table, $columns, $batch));
         }
     }
 
@@ -113,3 +134,9 @@ try {
     echo json_encode(['success' => false, 'message' => 'Backup failed: ' . $e->getMessage()]);
 }
 exit;
+
+/** Builds one multi-row INSERT statement from a batch of pre-quoted value tuples. */
+function buildInsert(string $table, array $columns, array $valueTuples): string {
+    $colList = implode(', ', array_map(fn($col) => "`{$col}`", $columns));
+    return "INSERT INTO `{$table}` ({$colList}) VALUES\n" . implode(",\n", $valueTuples) . ";\n";
+}
