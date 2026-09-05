@@ -26,6 +26,45 @@ if (!$user_id) {
     <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
     <link rel="stylesheet" href="../../../assets/css/customer_supplier/customers/opening-balance-invoices-add.css">
 </head>
+<style>
+.switch-wrapper {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px 16px;
+    background: var(--surface-2, #f5f5f5);
+    border-radius: 8px;
+    margin-top: 10px;
+}
+.switch {
+    position: relative;
+    display: inline-block;
+    width: 46px;
+    height: 24px;
+    flex-shrink: 0;
+}
+.switch input { opacity: 0; width: 0; height: 0; }
+.slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background-color: #ccc;
+    transition: .3s;
+    border-radius: 24px;
+}
+.slider:before {
+    position: absolute;
+    content: "";
+    height: 18px; width: 18px;
+    left: 3px; bottom: 3px;
+    background-color: white;
+    transition: .3s;
+    border-radius: 50%;
+}
+.switch input:checked + .slider { background-color: #4CAF50; }
+.switch input:checked + .slider:before { transform: translateX(22px); }
+</style>
 
 <body class="light-mode">
     <div class="container">
@@ -45,6 +84,18 @@ if (!$user_id) {
                 <i class="fas fa-info-circle"></i>
                 <span>Add multiple opening balance invoices at once. Opening Debit will be auto-calculated from invoice totals.</span>
             </div>
+            <!-- NAYA TOGGLE -->
+<div class="switch-wrapper">
+    <div style="display:flex; align-items:center; gap:8px;">
+        <i class="fas fa-user-tie"></i>
+        <span>Auto-fill Sales Officer for new rows</span>
+        <small id="autoFillStatusText" style="color: var(--text-muted, #888);"></small>
+    </div>
+    <label class="switch">
+        <input type="checkbox" id="autoFillOfficerToggle">
+        <span class="slider"></span>
+    </label>
+</div>
 
             <form id="openingInvoicesForm">
                 <div class="table-wrapper">

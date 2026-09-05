@@ -3,13 +3,31 @@ let rowCounter = 0;
 let customersData = [];
 let distributionsData = [];
 let employeesData = [];
+let autoFillOfficerEnabled = false;
+let defaultOfficerId = null;
+let defaultOfficerName = null;
 
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', function () {
     console.log('🚀 Opening Balance Invoices form loading...');
     
     const form = document.getElementById('openingInvoicesForm');
-    
+    // NAYA: Auto-fill officer toggle listener
+    const autoFillToggle = document.getElementById('autoFillOfficerToggle');
+    const autoFillStatusText = document.getElementById('autoFillStatusText');
+    if (autoFillToggle) {
+        autoFillToggle.addEventListener('change', function () {
+            autoFillOfficerEnabled = this.checked;
+            if (!this.checked) {
+                // switch off hote hi default reset — dobara on karne par fresh selection lega
+                defaultOfficerId = null;
+                defaultOfficerName = null;
+                if (autoFillStatusText) autoFillStatusText.textContent = '';
+            } else {
+                if (autoFillStatusText) autoFillStatusText.textContent = '(select an officer in any row)';
+            }
+        });
+    }
     // Load all data first
     Promise.all([
         loadCustomersData(),
@@ -203,9 +221,30 @@ function addInvoiceRow() {
     document.body.appendChild(officerOptionsDiv);
     
     // Initialize searchable dropdowns for this row
+        // Initialize searchable dropdowns for this row
     initSearchableDropdown(customerSearchId, customerOptionsId, customerInputId);
     initSearchableDropdown(distributionSearchId, distributionOptionsId, distributionInputId);
-    initSearchableDropdown(officerSearchId, officerOptionsId, officerInputId);
+    
+    // Officer dropdown — callback ke sath jo "first selection" ko capture karega
+    initSearchableDropdown(officerSearchId, officerOptionsId, officerInputId, function (value, displayText) {
+        if (autoFillOfficerEnabled && !defaultOfficerId) {
+            defaultOfficerId = value;
+            defaultOfficerName = displayText;
+            const statusText = document.getElementById('autoFillStatusText');
+            if (statusText) statusText.textContent = `(default: ${displayText})`;
+        }
+    });
+
+    // NAYA: agar auto-fill ON hai aur default officer set ho chuka hai,
+    // to naye row mein by default wahi officer fill kar dein (changeable rahega)
+    if (autoFillOfficerEnabled && defaultOfficerId) {
+        const officerSearchInput = document.getElementById(officerSearchId);
+        const officerHiddenInput = document.getElementById(officerInputId);
+        if (officerSearchInput && officerHiddenInput) {
+            officerSearchInput.value = defaultOfficerName;
+            officerHiddenInput.value = defaultOfficerId;
+        }
+    }
     
     // Add event listeners for action buttons
     const addBtn = row.querySelector('.add-row-btn');
@@ -333,8 +372,8 @@ function updateTotals() {
 }
 
 // Initialize searchable dropdown
-function initSearchableDropdown(searchInputId, optionsContainerId, hiddenInputId) {
-    const searchInput = document.getElementById(searchInputId);
+function initSearchableDropdown(searchInputId, optionsContainerId, hiddenInputId, onSelectCallback) {
+        const searchInput = document.getElementById(searchInputId);
     const optionsContainer = document.getElementById(optionsContainerId);
     const hiddenInput = document.getElementById(hiddenInputId);
     let selectedIndex = -1;
@@ -407,6 +446,7 @@ function initSearchableDropdown(searchInputId, optionsContainerId, hiddenInputId
     });
 
     // Select option
+      // Select option
     optionsContainer.addEventListener('click', function (e) {
         if (e.target.classList.contains('dropdown-option')) {
             const value = e.target.getAttribute('data-value');
@@ -416,9 +456,13 @@ function initSearchableDropdown(searchInputId, optionsContainerId, hiddenInputId
             hiddenInput.value = value;
             optionsContainer.style.display = 'none';
             selectedIndex = -1;
+
+            // NAYA: callback fire karein (sirf officer dropdown ke liye pass hoga)
+            if (typeof onSelectCallback === 'function') {
+                onSelectCallback(value, displayText);
+            }
         }
     });
-
     // Hide on click outside
     document.addEventListener('click', function (e) {
         if (e.target !== searchInput && !optionsContainer.contains(e.target)) {

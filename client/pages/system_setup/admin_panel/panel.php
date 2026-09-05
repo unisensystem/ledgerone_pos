@@ -309,12 +309,12 @@ if (!$user_id) {
                                 <button class="btn btn-warning" onclick="openFormatModal()">
                                     <i class="fas fa-eraser"></i> Format Database
                                 </button>
-                                <button class="btn btn-secondary" onclick="openBackupModal()">
+                                <!-- <button class="btn btn-secondary" onclick="openBackupModal()">
                                     <i class="fas fa-download"></i> Backup Database
                                 </button>
                                 <button class="btn btn-secondary" onclick="openRestoreModal()">
                                     <i class="fas fa-upload"></i> Restore Database
-                                </button>
+                                </button> -->
                             </div>
                         </div>
                         <div>
