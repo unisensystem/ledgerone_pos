@@ -56,6 +56,36 @@ $transferSubquery = "
     ), 0) as unallocated_transfer
 ";
 
+// Net Journal Voucher adjustment for this customer (single + cross-party),
+// same logic used in customer-ledger.php / customer-aging.php. Sign is
+// flipped to match the "positive reduces balance" convention used by the
+// other unallocated_* subqueries above: a net CREDIT adjustment (money owed
+// reduced) is positive here and nets off the balance; a net DEBIT adjustment
+// (new charge added) is negative and increases it.
+$adjustmentSubquery = "
+    COALESCE((
+        SELECT SUM(
+            CASE
+                WHEN jv.adj_mode = 'single'
+                    OR (jv.adj_mode = 'cross' AND jv.party_type = 'customer' AND jv.party_id = c.id
+                        AND jvl.id = (SELECT MIN(id) FROM journal_voucher_line WHERE voucher_id = jv.id AND account_id = 2))
+                    OR (jv.adj_mode = 'cross' AND jv.party_type2 = 'customer' AND jv.party_id2 = c.id
+                        AND jvl.id = (SELECT MAX(id) FROM journal_voucher_line WHERE voucher_id = jv.id AND account_id = 2))
+                THEN jvl.credit - jvl.debit
+                ELSE 0
+            END
+        )
+        FROM journal_voucher jv
+        JOIN journal_voucher_line jvl ON jvl.voucher_id = jv.id AND jvl.account_id = 2
+        WHERE jv.tenant_id = ? AND jv.status = 'posted'
+        AND (
+            (jv.adj_mode = 'single' AND jv.party_type = 'customer' AND jv.party_id = c.id)
+            OR (jv.adj_mode = 'cross' AND jv.party_type = 'customer' AND jv.party_id = c.id)
+            OR (jv.adj_mode = 'cross' AND jv.party_type2 = 'customer' AND jv.party_id2 = c.id)
+        )
+    ), 0) as unallocated_adjustment
+";
+
 try {
     $query = "
        SELECT 
@@ -106,6 +136,7 @@ try {
                 AND sr.status = 'Posted'
                 AND (sr.sale_invoice_no IS NULL OR sr.sale_invoice_no = 0)
             ), 0) as unallocated_returns,
+            {$adjustmentSubquery},
             {$transferSubquery}
         FROM opening_balance_invoices obi
         JOIN customers c ON obi.customer_id = c.id
@@ -176,6 +207,7 @@ try {
                 AND sr.status = 'Posted'
                 AND (sr.sale_invoice_no IS NULL OR sr.sale_invoice_no = 0)
             ), 0) as unallocated_returns,
+            {$adjustmentSubquery},
             {$transferSubquery}
         FROM sale_invoice si
         JOIN customers c ON si.customer_id = c.id
@@ -216,6 +248,8 @@ try {
     $params[] = $tenant_id;
     // unallocated_returns subquery: sr.tenant_id
     $params[] = $tenant_id;
+    // unallocated_adjustment subquery: jv.tenant_id
+    $params[] = $tenant_id;
     // unallocated_transfer subquery: tv.tenant_id
     $params[] = $tenant_id;
     // WHERE: obi.tenant_id, territory filters
@@ -244,6 +278,8 @@ try {
     // unallocated_received subquery: rv.tenant_id
     $params[] = $tenant_id;
     // unallocated_returns subquery: sr.tenant_id
+    $params[] = $tenant_id;
+    // unallocated_adjustment subquery: jv.tenant_id
     $params[] = $tenant_id;
     // unallocated_transfer subquery: tv.tenant_id
     $params[] = $tenant_id;

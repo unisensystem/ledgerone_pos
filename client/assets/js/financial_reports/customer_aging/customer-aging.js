@@ -27,6 +27,7 @@ const state = {
 };
 
 let companyCombo, customerCombo, countryCombo, regionCombo, cityCombo, zoneCombo, areaCombo;
+let activeRequestId = 0; // guards against a slow, stale response overwriting a newer one
 
 document.addEventListener('DOMContentLoaded', () => {
     initCombos();
@@ -235,7 +236,11 @@ function initCombos() {
             const rows = await fetchLookup('customers', query ? { q: query } : {});
             return rows.map(r => ({ id: r.id, label: `${r.customer_code} — ${r.customer_name}` }));
         },
-        onSelect: (id) => { state.filters.customer_id = id; }
+        onSelect: (id) => {
+            state.filters.customer_id = id;
+            state.page = 1;
+            loadReportData();
+        }
     });
 
     const countryList = makeListFetcher();
@@ -394,9 +399,18 @@ async function loadReportData() {
     });
     params.append('view_mode', state.viewMode);
 
+    // Tag this request. If the user toggles View Mode (or changes any
+    // filter) again before this one finishes, a newer request id will be
+    // active by the time this response arrives — so we discard it instead
+    // of letting a slow, stale response overwrite the latest filter state.
+    const requestId = ++activeRequestId;
+
     try {
         const res = await fetch(`${DATA_ENDPOINT}?${params.toString()}`);
         const json = await res.json();
+
+        if (requestId !== activeRequestId) return; // stale response, ignore
+
         if (!json.success) {
             console.error(json.message);
             return;
@@ -405,6 +419,7 @@ async function loadReportData() {
         state.currencySymbol = json.currency_symbol || '';
         applyAndRender(json.summary);
     } catch (err) {
+        if (requestId !== activeRequestId) return; // stale response, ignore
         console.error('Failed to load aging report:', err);
     }
 }
@@ -428,7 +443,7 @@ function simulateAutoClear(rows) {
         const key = row.customerName;
         if (!customerMap[key]) {
             customerMap[key] = {
-                unallocated: (row.unallocatedReceived || 0) + (row.unallocatedTransfer || 0) + (row.unallocatedSaleReturn || 0),
+                unallocated: (row.unallocatedReceived || 0) + (row.unallocatedTransfer || 0) + (row.unallocatedSaleReturn || 0) + (row.unallocatedAdjustment || 0),
                 bills: []
             };
         }

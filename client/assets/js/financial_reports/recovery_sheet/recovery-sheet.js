@@ -304,6 +304,7 @@ document.addEventListener('DOMContentLoaded', function () {
                   unallocated_received: parseFloat(row.unallocated_received) || 0,
 unallocated_returns: parseFloat(row.unallocated_returns) || 0,
 unallocated_transfer: parseFloat(row.unallocated_transfer) || 0,
+unallocated_adjustment: parseFloat(row.unallocated_adjustment) || 0,
 bills: []
                 };
             }
@@ -393,7 +394,7 @@ bills: []
         const grouped = groupByCustomer(rows);
 
         grouped.forEach((customer, i) => {
-const bal      = customer.total_balance - customer.unallocated_received - customer.unallocated_returns - customer.unallocated_transfer;
+const bal      = customer.total_balance - customer.unallocated_received - customer.unallocated_returns - customer.unallocated_transfer - customer.unallocated_adjustment;
             const balClass = bal > 0 ? 'balance-positive' : bal < 0 ? 'balance-negative' : '';
             const balText  = (bal < 0 ? '-' : '') + currencySymbol + Math.abs(bal).toFixed(2);
             const oldestDays = customer.bills[0]?.days_overdue ?? '';
@@ -495,7 +496,7 @@ const bal      = customer.total_balance - customer.unallocated_received - custom
         if (customerViewMode) {
             rows = [['S#', 'Customer Name', 'Address', 'Primary Phone No', 'Total Balance', 'Received Amount', 'Sales Return', 'Days Overdue']];
             groupByCustomer(lastRecoveryData).forEach((c, i) => {
-const netBal = c.total_balance - c.unallocated_received - c.unallocated_returns - c.unallocated_transfer;
+const netBal = c.total_balance - c.unallocated_received - c.unallocated_returns - c.unallocated_transfer - c.unallocated_adjustment;
                 rows.push([
                     i + 1,
                     c.customer_name,

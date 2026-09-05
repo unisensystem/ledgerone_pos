@@ -127,6 +127,35 @@ $zoneCondition     = $zone_id     ? ' AND c.city_zone_id = ?' : '';
                     AND (sr2.sale_invoice_no IS NULL OR sr2.sale_invoice_no = '')
                 ), 0) as unallocated_sale_return";
 
+    // Net Journal Voucher adjustment for this customer (single + cross-party),
+    // same logic as customer-ledger.php. Sign is flipped to match the
+    // "positive reduces balance" convention used by the other unallocated_*
+    // subqueries above: a net CREDIT adjustment (money owed reduced) is
+    // positive here and nets off outstanding; a net DEBIT adjustment (new
+    // charge added) is negative and increases it.
+    $adjustmentSubquery = "
+                COALESCE((
+                    SELECT SUM(
+                        CASE
+                            WHEN jv.adj_mode = 'single'
+                                OR (jv.adj_mode = 'cross' AND jv.party_type = 'customer' AND jv.party_id = c.id
+                                    AND jvl.id = (SELECT MIN(id) FROM journal_voucher_line WHERE voucher_id = jv.id AND account_id = 2))
+                                OR (jv.adj_mode = 'cross' AND jv.party_type2 = 'customer' AND jv.party_id2 = c.id
+                                    AND jvl.id = (SELECT MAX(id) FROM journal_voucher_line WHERE voucher_id = jv.id AND account_id = 2))
+                            THEN jvl.credit - jvl.debit
+                            ELSE 0
+                        END
+                    )
+                    FROM journal_voucher jv
+                    JOIN journal_voucher_line jvl ON jvl.voucher_id = jv.id AND jvl.account_id = 2
+                    WHERE jv.tenant_id = ? AND jv.status = 'posted'
+                    AND (
+                        (jv.adj_mode = 'single' AND jv.party_type = 'customer' AND jv.party_id = c.id)
+                        OR (jv.adj_mode = 'cross' AND jv.party_type = 'customer' AND jv.party_id = c.id)
+                        OR (jv.adj_mode = 'cross' AND jv.party_type2 = 'customer' AND jv.party_id2 = c.id)
+                    )
+                ), 0) as unallocated_adjustment";
+
     // ---- Unbilled view: Receive Vouchers + Sale Returns with no bill_no ----
     if ($view_mode === 'unbilled') {
         // NOTE: assumes receive_voucher has columns (id, rv_no, customer_id, tenant_id,
@@ -259,6 +288,7 @@ $zoneCondition     = $zone_id     ? ' AND c.city_zone_id = ?' : '';
                 AND (rv2.bill_no IS NULL OR rv2.bill_no = '' OR rv2.bill_no = 'null')
             ), 0) as unallocated_received,
 {$returnSubquery},
+{$adjustmentSubquery},
 {$transferSubquery}
         FROM sale_invoice si
         JOIN customers c ON si.customer_id = c.id
@@ -293,6 +323,7 @@ $zoneCondition     = $zone_id     ? ' AND c.city_zone_id = ?' : '';
                 AND (rv2.bill_no IS NULL OR rv2.bill_no = '' OR rv2.bill_no = 'null')
             ), 0) as unallocated_received,
 {$returnSubquery},
+{$adjustmentSubquery},
 {$transferSubquery}
         FROM opening_balance_invoices obi
         JOIN customers c ON obi.customer_id = c.id
@@ -308,16 +339,17 @@ $zoneCondition     = $zone_id     ? ' AND c.city_zone_id = ?' : '';
     ";
 
     // sale_invoice branch params, in exact order they appear in the query:
-    // unallocated_received.tenant_id, unallocated_sale_return.tenant_id, transfer_subquery.tenant_id,
-    // rv.tenant_id, sr.tenant_id, si.tenant_id, [dateParams], [company_id], [sharedFilterParams]
-    $params = [$tenant_id, $tenant_id, $tenant_id, $tenant_id, $tenant_id, $tenant_id];
+    // unallocated_received.tenant_id, unallocated_sale_return.tenant_id, unallocated_adjustment.tenant_id,
+    // transfer_subquery.tenant_id, rv.tenant_id, sr.tenant_id, si.tenant_id, [dateParams], [company_id], [sharedFilterParams]
+    $params = [$tenant_id, $tenant_id, $tenant_id, $tenant_id, $tenant_id, $tenant_id, $tenant_id];
     $params = array_merge($params, $dateParams);
     if ($company_id) $params[] = $company_id;
     $params = array_merge($params, $sharedFilterParams);
 
     // opening_balance branch params:
-    // unallocated_received.tenant_id, unallocated_sale_return.tenant_id, transfer_subquery.tenant_id,
-    // rv.tenant_id, obi.tenant_id, [dateParams], [company_id], [sharedFilterParams]
+    // unallocated_received.tenant_id, unallocated_sale_return.tenant_id, unallocated_adjustment.tenant_id,
+    // transfer_subquery.tenant_id, rv.tenant_id, obi.tenant_id, [dateParams], [company_id], [sharedFilterParams]
+    $params[] = $tenant_id;
     $params[] = $tenant_id;
     $params[] = $tenant_id;
     $params[] = $tenant_id;
@@ -377,6 +409,7 @@ $zoneCondition     = $zone_id     ? ' AND c.city_zone_id = ?' : '';
             'unallocatedReceived' => (float)$invoice['unallocated_received'],
             'unallocatedTransfer' => (float)$invoice['unallocated_transfer'],
             'unallocatedSaleReturn' => (float)$invoice['unallocated_sale_return'],
+            'unallocatedAdjustment' => (float)$invoice['unallocated_adjustment'],
             'daysOverdue'         => $days,
             'bucket'              => $bucket
         ];
