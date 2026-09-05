@@ -1193,6 +1193,8 @@ if (!$currencySymbol) {
 
     <!-- Lists -->
     <option value="sale-invoice" data-label="Sale Invoice List">Sale Invoice List</option>
+    <option value="med-sale-invoice" data-label="Med Sale Invoice List">Med Sale Invoice </option>
+<option value="sale-tax-invoice" data-label="Sale Tax Invoice List">Sale Tax Invoice </option>
     <option value="purchase-invoice" data-label="Purchase Invoice List">Purchase Invoice List</option>
     <option value="receive-voucher" data-label="Receive Voucher List">Receive Voucher List</option>
     <option value="payment-voucher" data-label="Payment Voucher List">Payment Voucher List</option>
@@ -2583,7 +2585,7 @@ if (!$currencySymbol) {
                             onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background='white'">
                             <div>
                                 <div style="font-size:11px; color:#3b82f6; font-weight:600; text-transform:uppercase;">${item.module}</div>
-                                <div style="font-size:14px; color:#0f172a; font-weight:600;">${item.number}${item.party ? ' — ' + item.party : ''}</div>
+                                <div style="font-size:14px; color:#0f172a; font-weight:600;">${item.number}${item.party ? ' ï¿½ ' + item.party : ''}</div>
                                 ${item.date ? `<div style="font-size:12px; color:#94a3b8;">${item.date}</div>` : ''}
                             </div>
                             <div style="font-size:14px; font-weight:700; color:#16a34a;">

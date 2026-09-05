@@ -225,6 +225,129 @@ try {
         " . ($city_id ? " AND c.city_id = ?" : "") . "
         " . ($city_zone_id ? " AND c.city_zone_id = ?" : "") . "
         " . ($area_id ? " AND c.area_id = ?" : "") . "
+
+        UNION ALL
+
+        -- Unbilled Receive Vouchers (advance/unlinked receipts) shown as
+        -- their own credit row, same treatment as an opening credit balance.
+       SELECT
+            c.customer_name,
+            c.address,
+            c.primary_phone,
+            rv.voucher_number as bill_no,
+            rv.voucher_date as invoice_date,
+            DATEDIFF(CURDATE(), rv.voucher_date) as days_overdue,
+            -rv.amount as current_balance,
+            0 as total_sales,
+            COALESCE((
+                SELECT SUM(rv2.amount)
+                FROM receive_voucher rv2
+                WHERE rv2.customer_id = c.id 
+                AND rv2.tenant_id = ?
+                " . ($date_from ? " AND rv2.voucher_date >= ?" : "") . "
+                " . ($date_to ? " AND rv2.voucher_date <= ?" : "") . "
+                " . ($recovery_officer_id ? " AND rv2.recovery_officer_id = ?" : "") . "
+            ), 0) as total_received,
+            COALESCE((
+                SELECT SUM(sr2.net_amount)
+                FROM sale_return sr2
+                WHERE sr2.customer_id = c.id
+                AND sr2.tenant_id = ?
+                AND sr2.status = 'Posted'
+                " . ($date_from ? " AND sr2.sale_date >= ?" : "") . "
+                " . ($date_to ? " AND sr2.sale_date <= ?" : "") . "
+            ), 0) as total_returns,
+            COALESCE((
+                SELECT SUM(rv3.amount)
+                FROM receive_voucher rv3
+                WHERE rv3.customer_id = c.id
+                AND rv3.tenant_id = ?
+                AND (rv3.bill_no IS NULL OR rv3.bill_no = '' OR rv3.bill_no = 'null')
+            ), 0) as unallocated_received,
+            COALESCE((
+                SELECT SUM(sr3.net_amount)
+                FROM sale_return sr3
+                WHERE sr3.customer_id = c.id
+                AND sr3.tenant_id = ?
+                AND sr3.status = 'Posted'
+                AND (sr3.sale_invoice_no IS NULL OR sr3.sale_invoice_no = 0)
+            ), 0) as unallocated_returns,
+            {$adjustmentSubquery},
+            {$transferSubquery}
+        FROM receive_voucher rv
+        JOIN customers c ON rv.customer_id = c.id
+        WHERE rv.tenant_id = ?
+        AND c.status = 'ACTIVE'
+        AND (rv.bill_no IS NULL OR rv.bill_no = '' OR rv.bill_no = 'null')
+        " . ($company_id ? " AND c.company_id = ?" : "") . "
+        " . ($customer_id ? " AND c.id = ?" : "") . "
+        " . ($country_id ? " AND c.country_id = ?" : "") . "
+        " . ($region_id ? " AND c.region_id = ?" : "") . "
+        " . ($city_id ? " AND c.city_id = ?" : "") . "
+        " . ($city_zone_id ? " AND c.city_zone_id = ?" : "") . "
+        " . ($area_id ? " AND c.area_id = ?" : "") . "
+
+        UNION ALL
+
+        -- Unbilled Sale Returns (not linked to any sale invoice) shown as
+        -- their own credit row, same treatment as an opening credit balance.
+       SELECT
+            c.customer_name,
+            c.address,
+            c.primary_phone,
+            sr.bill_no as bill_no,
+            sr.sale_date as invoice_date,
+            DATEDIFF(CURDATE(), sr.sale_date) as days_overdue,
+            -sr.net_amount as current_balance,
+            0 as total_sales,
+            COALESCE((
+                SELECT SUM(rv.amount)
+                FROM receive_voucher rv
+                WHERE rv.customer_id = c.id 
+                AND rv.tenant_id = ?
+                " . ($date_from ? " AND rv.voucher_date >= ?" : "") . "
+                " . ($date_to ? " AND rv.voucher_date <= ?" : "") . "
+                " . ($recovery_officer_id ? " AND rv.recovery_officer_id = ?" : "") . "
+            ), 0) as total_received,
+            COALESCE((
+                SELECT SUM(sr2.net_amount)
+                FROM sale_return sr2
+                WHERE sr2.customer_id = c.id
+                AND sr2.tenant_id = ?
+                AND sr2.status = 'Posted'
+                " . ($date_from ? " AND sr2.sale_date >= ?" : "") . "
+                " . ($date_to ? " AND sr2.sale_date <= ?" : "") . "
+            ), 0) as total_returns,
+            COALESCE((
+                SELECT SUM(rv2.amount)
+                FROM receive_voucher rv2
+                WHERE rv2.customer_id = c.id
+                AND rv2.tenant_id = ?
+                AND (rv2.bill_no IS NULL OR rv2.bill_no = '' OR rv2.bill_no = 'null')
+            ), 0) as unallocated_received,
+            COALESCE((
+                SELECT SUM(sr3.net_amount)
+                FROM sale_return sr3
+                WHERE sr3.customer_id = c.id
+                AND sr3.tenant_id = ?
+                AND sr3.status = 'Posted'
+                AND (sr3.sale_invoice_no IS NULL OR sr3.sale_invoice_no = 0)
+            ), 0) as unallocated_returns,
+            {$adjustmentSubquery},
+            {$transferSubquery}
+        FROM sale_return sr
+        JOIN customers c ON sr.customer_id = c.id
+        WHERE sr.tenant_id = ?
+        AND c.status = 'ACTIVE'
+        AND sr.status = 'Posted'
+        AND (sr.sale_invoice_no IS NULL OR sr.sale_invoice_no = 0)
+        " . ($company_id ? " AND c.company_id = ?" : "") . "
+        " . ($customer_id ? " AND c.id = ?" : "") . "
+        " . ($country_id ? " AND c.country_id = ?" : "") . "
+        " . ($region_id ? " AND c.region_id = ?" : "") . "
+        " . ($city_id ? " AND c.city_id = ?" : "") . "
+        " . ($city_zone_id ? " AND c.city_zone_id = ?" : "") . "
+        " . ($area_id ? " AND c.area_id = ?" : "") . "
         
         ORDER BY customer_name
     ";
@@ -289,6 +412,62 @@ try {
     if ($recovery_officer_id) $params[] = $recovery_officer_id;
     if ($date_from) $params[] = $date_from;
     if ($date_to) $params[] = $date_to;
+    if ($company_id) $params[] = $company_id;
+    if ($customer_id) $params[] = $customer_id;
+    if ($country_id) $params[] = $country_id;
+    if ($region_id) $params[] = $region_id;
+    if ($city_id) $params[] = $city_id;
+    if ($city_zone_id) $params[] = $city_zone_id;
+    if ($area_id) $params[] = $area_id;
+
+    // UNION Part 3: unbilled Receive Vouchers
+    // total_received subquery: rv2.tenant_id, date_from, date_to, recovery_officer_id
+    $params[] = $tenant_id;
+    if ($date_from) $params[] = $date_from;
+    if ($date_to) $params[] = $date_to;
+    if ($recovery_officer_id) $params[] = $recovery_officer_id;
+    // total_returns subquery: sr2.tenant_id, date_from, date_to
+    $params[] = $tenant_id;
+    if ($date_from) $params[] = $date_from;
+    if ($date_to) $params[] = $date_to;
+    // unallocated_received subquery: rv3.tenant_id
+    $params[] = $tenant_id;
+    // unallocated_returns subquery: sr3.tenant_id
+    $params[] = $tenant_id;
+    // unallocated_adjustment subquery: jv.tenant_id
+    $params[] = $tenant_id;
+    // unallocated_transfer subquery: tv.tenant_id
+    $params[] = $tenant_id;
+    // WHERE: rv.tenant_id, territory filters
+    $params[] = $tenant_id;
+    if ($company_id) $params[] = $company_id;
+    if ($customer_id) $params[] = $customer_id;
+    if ($country_id) $params[] = $country_id;
+    if ($region_id) $params[] = $region_id;
+    if ($city_id) $params[] = $city_id;
+    if ($city_zone_id) $params[] = $city_zone_id;
+    if ($area_id) $params[] = $area_id;
+
+    // UNION Part 4: unbilled Sale Returns
+    // total_received subquery: rv.tenant_id, date_from, date_to, recovery_officer_id
+    $params[] = $tenant_id;
+    if ($date_from) $params[] = $date_from;
+    if ($date_to) $params[] = $date_to;
+    if ($recovery_officer_id) $params[] = $recovery_officer_id;
+    // total_returns subquery: sr2.tenant_id, date_from, date_to
+    $params[] = $tenant_id;
+    if ($date_from) $params[] = $date_from;
+    if ($date_to) $params[] = $date_to;
+    // unallocated_received subquery: rv2.tenant_id
+    $params[] = $tenant_id;
+    // unallocated_returns subquery: sr3.tenant_id
+    $params[] = $tenant_id;
+    // unallocated_adjustment subquery: jv.tenant_id
+    $params[] = $tenant_id;
+    // unallocated_transfer subquery: tv.tenant_id
+    $params[] = $tenant_id;
+    // WHERE: sr.tenant_id, territory filters
+    $params[] = $tenant_id;
     if ($company_id) $params[] = $company_id;
     if ($customer_id) $params[] = $customer_id;
     if ($country_id) $params[] = $country_id;

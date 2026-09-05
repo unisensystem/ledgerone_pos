@@ -86,17 +86,6 @@ $zoneCondition     = $zone_id     ? ' AND c.city_zone_id = ?' : '';
     if ($zone_id)     $sharedFilterParams[] = $zone_id;
     if ($area_id)     $sharedFilterParams[] = $area_id;
 
-    // Company-scoped conditions for the "unallocated_*" subqueries below.
-    // Without these, a customer's unbilled receive vouchers / returns /
-    // adjustments / transfers from OTHER companies were being netted
-    // against the outstanding invoices of the currently filtered company,
-    // sometimes clearing everything out under Auto-Clear even though the
-    // filtered company's invoices were still genuinely outstanding.
-    $rv2CompanyCond = $company_id ? ' AND rv2.company_id = ?' : '';
-    $sr2CompanyCond = $company_id ? ' AND sr2.company_id = ?' : '';
-    $jvCompanyCond  = $company_id ? ' AND jv.company_id = ?'  : '';
-    $tvCompanyCond  = $company_id ? ' AND tv.company_id = ?'  : '';
-
     // Signed net transfer-voucher amount for a customer (c.id), reused in both
     // branches of the default view. Sign convention: POSITIVE reduces the
     // customer's balance (they paid out, or someone paid in on their behalf),
@@ -116,7 +105,7 @@ $zoneCondition     = $zone_id     ? ' AND c.city_zone_id = ?' : '';
                         END
                     )
                     FROM transfer_voucher tv
-                    WHERE tv.tenant_id = ?{$tvCompanyCond}
+                    WHERE tv.tenant_id = ?
                     AND (
                         (tv.from_type = 'customer' AND tv.from_customer_id = c.id)
                         OR (tv.to_type = 'customer' AND tv.to_customer_id = c.id)
@@ -134,7 +123,7 @@ $zoneCondition     = $zone_id     ? ' AND c.city_zone_id = ?' : '';
                     FROM sale_return sr2
                     WHERE sr2.customer_id = c.id
                     AND sr2.tenant_id = ?
-                    AND sr2.status = 'Posted'{$sr2CompanyCond}
+                    AND sr2.status = 'Posted'
                     AND (sr2.sale_invoice_no IS NULL OR sr2.sale_invoice_no = '')
                 ), 0) as unallocated_sale_return";
 
@@ -159,7 +148,7 @@ $zoneCondition     = $zone_id     ? ' AND c.city_zone_id = ?' : '';
                     )
                     FROM journal_voucher jv
                     JOIN journal_voucher_line jvl ON jvl.voucher_id = jv.id AND jvl.account_id = 2
-                    WHERE jv.tenant_id = ? AND jv.status = 'posted'{$jvCompanyCond}
+                    WHERE jv.tenant_id = ? AND jv.status = 'posted'
                     AND (
                         (jv.adj_mode = 'single' AND jv.party_type = 'customer' AND jv.party_id = c.id)
                         OR (jv.adj_mode = 'cross' AND jv.party_type = 'customer' AND jv.party_id = c.id)
@@ -169,22 +158,20 @@ $zoneCondition     = $zone_id     ? ' AND c.city_zone_id = ?' : '';
 
     // ---- Unbilled view: Receive Vouchers + Sale Returns with no bill_no ----
     if ($view_mode === 'unbilled') {
-        // NOTE: assumes receive_voucher has columns (id, rv_no, customer_id, tenant_id,
-        // company_id, amount, voucher_date, bill_no) and sale_return has (id, return_no,
-        // customer_id, tenant_id, company_id, net_amount, return_date, sale_invoice_no,
-        // status). Both are assumed to carry their own customer_id (not just a link via
-        // the sale invoice), since an unbilled row by definition has no invoice to join
-        // through. Rename the column references below if the real schema differs.
+        // receive_voucher columns used: id, voucher_number, customer_id, tenant_id,
+        // company_id, amount, voucher_date, bill_no. sale_return columns used: id,
+        // bill_no, customer_id, tenant_id, company_id, net_amount, sale_date,
+        // sale_invoice_no, status (confirmed against customer-ledger.php).
 
         $rvDateCond = str_replace('{date_col}', 'rv.voucher_date', $dateCondition);
-        $srDateCond = str_replace('{date_col}', 'sr.return_date', $dateCondition);
+        $srDateCond = str_replace('{date_col}', 'sr.sale_date', $dateCondition);
         $rvCompCond = str_replace('{company_col}', 'c.company_id', $companyCondition);
         $srCompCond = str_replace('{company_col}', 'c.company_id', $companyCondition);
 
         $sql = "
             SELECT
                 rv.id,
-                rv.rv_no as ref_no,
+                rv.voucher_number as ref_no,
                 rv.voucher_date as ref_date,
                 rv.amount as net_amount,
                 c.customer_code,
@@ -203,8 +190,8 @@ $zoneCondition     = $zone_id     ? ' AND c.city_zone_id = ?' : '';
 
             SELECT
                 sr.id,
-                sr.return_no as ref_no,
-                sr.return_date as ref_date,
+                sr.bill_no as ref_no,
+                sr.sale_date as ref_date,
                 sr.net_amount,
                 c.customer_code,
                 c.customer_name,
@@ -277,6 +264,14 @@ $zoneCondition     = $zone_id     ? ' AND c.city_zone_id = ?' : '';
     $obiDateCond = str_replace('{date_col}', 'obi.invoice_date', $dateCondition);
     $siCompCond = str_replace('{company_col}', 'si.company_id', $companyCondition);
     $obiCompCond = str_replace('{company_col}', 'c.company_id', $companyCondition);
+    // Unbilled Receive Voucher / Sale Return rows, folded into the default
+    // list as their own credit rows (same treatment as opening credit above)
+    // so a customer's advance/unbilled receipts show up in Aging/Recovery
+    // without needing the separate view_mode=unbilled toggle.
+    $rvDateCond = str_replace('{date_col}', 'rv.voucher_date', $dateCondition);
+    $srDateCond = str_replace('{date_col}', 'sr.sale_date', $dateCondition);
+    $rvCompCond = str_replace('{company_col}', 'c.company_id', $companyCondition);
+    $srCompCond = str_replace('{company_col}', 'c.company_id', $companyCondition);
 
     $sql = "
         SELECT
@@ -295,7 +290,7 @@ $zoneCondition     = $zone_id     ? ' AND c.city_zone_id = ?' : '';
                 SELECT SUM(rv2.amount)
                 FROM receive_voucher rv2
                 WHERE rv2.customer_id = c.id
-                AND rv2.tenant_id = ?{$rv2CompanyCond}
+                AND rv2.tenant_id = ?
                 AND (rv2.bill_no IS NULL OR rv2.bill_no = '' OR rv2.bill_no = 'null')
             ), 0) as unallocated_received,
 {$returnSubquery},
@@ -330,7 +325,7 @@ $zoneCondition     = $zone_id     ? ' AND c.city_zone_id = ?' : '';
                 SELECT SUM(rv2.amount)
                 FROM receive_voucher rv2
                 WHERE rv2.customer_id = c.id
-                AND rv2.tenant_id = ?{$rv2CompanyCond}
+                AND rv2.tenant_id = ?
                 AND (rv2.bill_no IS NULL OR rv2.bill_no = '' OR rv2.bill_no = 'null')
             ), 0) as unallocated_received,
 {$returnSubquery},
@@ -346,24 +341,77 @@ $zoneCondition     = $zone_id     ? ' AND c.city_zone_id = ?' : '';
         GROUP BY obi.id
         HAVING (net_amount - paid_amount) <> 0
 
+        UNION ALL
+
+        SELECT
+            rv.id,
+            rv.voucher_number as bill_no,
+            rv.voucher_date as invoice_date,
+            -rv.amount as net_amount,
+            c.customer_code,
+            c.customer_name,
+            c.address,
+            0 as paid_amount,
+            0 as returned_amount,
+            DATEDIFF(CURDATE(), rv.voucher_date) as days_overdue,
+            'Unbilled Receipt (Credit)' as invoice_type,
+            COALESCE((
+                SELECT SUM(rv2.amount)
+                FROM receive_voucher rv2
+                WHERE rv2.customer_id = c.id
+                AND rv2.tenant_id = ?
+                AND (rv2.bill_no IS NULL OR rv2.bill_no = '' OR rv2.bill_no = 'null')
+            ), 0) as unallocated_received,
+{$returnSubquery},
+{$adjustmentSubquery},
+{$transferSubquery}
+        FROM receive_voucher rv
+        JOIN customers c ON rv.customer_id = c.id
+        WHERE rv.tenant_id = ?
+        AND (rv.bill_no IS NULL OR rv.bill_no = '' OR rv.bill_no = 'null')
+        {$rvDateCond}
+        {$rvCompCond}
+        {$sharedFilterSql}
+
+        UNION ALL
+
+        SELECT
+            sr.id,
+            sr.bill_no as bill_no,
+            sr.sale_date as invoice_date,
+            -sr.net_amount as net_amount,
+            c.customer_code,
+            c.customer_name,
+            c.address,
+            0 as paid_amount,
+            0 as returned_amount,
+            DATEDIFF(CURDATE(), sr.sale_date) as days_overdue,
+            'Unbilled Return (Credit)' as invoice_type,
+            COALESCE((
+                SELECT SUM(rv2.amount)
+                FROM receive_voucher rv2
+                WHERE rv2.customer_id = c.id
+                AND rv2.tenant_id = ?
+                AND (rv2.bill_no IS NULL OR rv2.bill_no = '' OR rv2.bill_no = 'null')
+            ), 0) as unallocated_received,
+{$returnSubquery},
+{$adjustmentSubquery},
+{$transferSubquery}
+        FROM sale_return sr
+        JOIN customers c ON sr.customer_id = c.id
+        WHERE sr.tenant_id = ? AND sr.status = 'Posted'
+        AND (sr.sale_invoice_no IS NULL OR sr.sale_invoice_no = '')
+        {$srDateCond}
+        {$srCompCond}
+        {$sharedFilterSql}
+
         ORDER BY days_overdue DESC
     ";
 
     // sale_invoice branch params, in exact order they appear in the query:
-    // unallocated_received.tenant_id[+company_id], unallocated_sale_return.tenant_id[+company_id],
-    // unallocated_adjustment.tenant_id[+company_id], transfer_subquery.tenant_id[+company_id],
-    // rv.tenant_id, sr.tenant_id, si.tenant_id, [dateParams], [company_id], [sharedFilterParams]
-    $params = [$tenant_id];
-    if ($company_id) $params[] = $company_id;
-    $params[] = $tenant_id;
-    if ($company_id) $params[] = $company_id;
-    $params[] = $tenant_id;
-    if ($company_id) $params[] = $company_id;
-    $params[] = $tenant_id;
-    if ($company_id) $params[] = $company_id;
-    $params[] = $tenant_id;
-    $params[] = $tenant_id;
-    $params[] = $tenant_id;
+    // unallocated_received.tenant_id, unallocated_sale_return.tenant_id, unallocated_adjustment.tenant_id,
+    // transfer_subquery.tenant_id, rv.tenant_id, sr.tenant_id, si.tenant_id, [dateParams], [company_id], [sharedFilterParams]
+    $params = [$tenant_id, $tenant_id, $tenant_id, $tenant_id, $tenant_id, $tenant_id, $tenant_id];
     $params = array_merge($params, $dateParams);
     if ($company_id) $params[] = $company_id;
     $params = array_merge($params, $sharedFilterParams);
@@ -372,6 +420,30 @@ $zoneCondition     = $zone_id     ? ' AND c.city_zone_id = ?' : '';
     // unallocated_received.tenant_id, unallocated_sale_return.tenant_id, unallocated_adjustment.tenant_id,
     // transfer_subquery.tenant_id, rv.tenant_id, obi.tenant_id, [dateParams], [company_id], [sharedFilterParams]
     $params[] = $tenant_id;
+    $params[] = $tenant_id;
+    $params[] = $tenant_id;
+    $params[] = $tenant_id;
+    $params[] = $tenant_id;
+    $params[] = $tenant_id;
+    $params = array_merge($params, $dateParams);
+    if ($company_id) $params[] = $company_id;
+    $params = array_merge($params, $sharedFilterParams);
+
+    // unbilled Receive Voucher branch params:
+    // unallocated_received.tenant_id, unallocated_sale_return.tenant_id, unallocated_adjustment.tenant_id,
+    // transfer_subquery.tenant_id, rv.tenant_id (WHERE), [dateParams], [company_id], [sharedFilterParams]
+    $params[] = $tenant_id;
+    $params[] = $tenant_id;
+    $params[] = $tenant_id;
+    $params[] = $tenant_id;
+    $params[] = $tenant_id;
+    $params = array_merge($params, $dateParams);
+    if ($company_id) $params[] = $company_id;
+    $params = array_merge($params, $sharedFilterParams);
+
+    // unbilled Sale Return branch params: same pattern
+    // unallocated_received.tenant_id, unallocated_sale_return.tenant_id, unallocated_adjustment.tenant_id,
+    // transfer_subquery.tenant_id, sr.tenant_id (WHERE), [dateParams], [company_id], [sharedFilterParams]
     $params[] = $tenant_id;
     $params[] = $tenant_id;
     $params[] = $tenant_id;

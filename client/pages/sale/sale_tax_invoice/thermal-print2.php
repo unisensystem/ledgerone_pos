@@ -40,7 +40,7 @@
         }
 
         .text-right {
-            text-align: right;
+            text-align: center;
         }
 
         .bold {
@@ -91,13 +91,12 @@
             font-size: 12px;
             font-weight: bold;
             border-collapse: collapse;
-            table-layout: fixed;
         }
 
         .items-table th {
             border-bottom: 1px solid #000;
             padding: 4px 0;
-            text-align: left;
+            text-align: center;
             font-weight: bold;
         }
 
@@ -105,19 +104,12 @@
             padding: 4px 0;
             border-bottom: 1px solid #000;
             font-weight: bold;
+            text-align: center;
         }
 
         /* Gap between the Ctn/Dz/Pcs numbers and the Item name column */
         .item-col {
             padding-left: 10px !important;
-        }
-
-        /* Keep Ctn/Dz/Pcs quantity numbers locked directly under their headers */
-        .ctn-col, .dz-col, .pc-col {
-            font-variant-numeric: tabular-nums;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: clip;
         }
 
         .total-row {
@@ -478,13 +470,17 @@
             if (val === null || val === undefined || isNaN(num) || num === 0) {
                 return '-';
             }
-            return Math.round(num).toString();
+            return (num % 1 === 0) ? num.toFixed(0) : num.toFixed(2);
         }
 
-        // Format a money value with no decimal places (no ".00")
+        // Format a money amount: drop the ".00" for whole numbers, keep 2
+        // decimals only when the amount actually has cents/paisa.
         function formatMoney(val) {
-            const num = parseFloat(val) || 0;
-            return Math.round(num).toString();
+            const num = parseFloat(val);
+            if (val === null || val === undefined || isNaN(num)) {
+                return '0';
+            }
+            return (num % 1 === 0) ? num.toFixed(0) : num.toFixed(2);
         }
 
         // Same unit IDs used app-wide for Sale Invoice (9=Piece, 10=Dozen, 16=Carton)
@@ -635,7 +631,7 @@
 
             // Previous balance - always shown now (even if 0), like FoxPro
             const previousBalance = parseFloat(invoice.previous_balance || 0);
-            document.getElementById('previousBalance').textContent = formatMoney(previousBalance);
+            document.getElementById('previousBalance').textContent = `${formatMoney(previousBalance)}`;
 
             const currencySymbol = '';
 
@@ -667,7 +663,7 @@
                     let childrenText = '';
                     if (children.length > 0) {
                         childrenText = '<br><span style="font-size: 10px; color: #666;">(' +
-                            children.map(c => `${c.product_name}: ${formatMoney(c.quantity)}`).join(' | ') +
+                            children.map(c => `${c.product_name}: ${parseFloat(c.quantity).toFixed(2)}`).join(' | ') +
                             ')</span>';
                     }
 
@@ -740,9 +736,9 @@
             const totalsDiscCell = (!enableCashDiscountAmount && !enableTradeOfferAmount) ? '' : `<td class="text-right disc-col"></td>`;
 
             totalsRow.innerHTML = `
-                <td class="text-right ctn-col">${totalCarton > 0 ? Math.round(totalCarton).toString() : '-'}</td>
-                <td class="text-right dz-col">${totalDozen > 0 ? Math.round(totalDozen).toString() : '-'}</td>
-                <td class="text-right pc-col">${totalPiece > 0 ? Math.round(totalPiece).toString() : '-'}</td>
+                <td class="text-right ctn-col">${totalCarton > 0 ? totalCarton.toFixed(0) : '-'}</td>
+                <td class="text-right dz-col">${totalDozen > 0 ? totalDozen.toFixed(0) : '-'}</td>
+                <td class="text-right pc-col">${totalPiece > 0 ? totalPiece.toFixed(0) : '-'}</td>
                 <td class="item-col">TOTALS</td>
                 <td class="text-right"></td>
                 ${totalsDiscCell}
