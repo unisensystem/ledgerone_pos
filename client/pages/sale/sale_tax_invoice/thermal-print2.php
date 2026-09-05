@@ -91,6 +91,7 @@
             font-size: 12px;
             font-weight: bold;
             border-collapse: collapse;
+            table-layout: fixed;
         }
 
         .items-table th {
@@ -109,6 +110,14 @@
         /* Gap between the Ctn/Dz/Pcs numbers and the Item name column */
         .item-col {
             padding-left: 10px !important;
+        }
+
+        /* Keep Ctn/Dz/Pcs quantity numbers locked directly under their headers */
+        .ctn-col, .dz-col, .pc-col {
+            font-variant-numeric: tabular-nums;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: clip;
         }
 
         .total-row {
@@ -469,7 +478,13 @@
             if (val === null || val === undefined || isNaN(num) || num === 0) {
                 return '-';
             }
-            return (num % 1 === 0) ? num.toFixed(0) : num.toFixed(2);
+            return Math.round(num).toString();
+        }
+
+        // Format a money value with no decimal places (no ".00")
+        function formatMoney(val) {
+            const num = parseFloat(val) || 0;
+            return Math.round(num).toString();
         }
 
         // Same unit IDs used app-wide for Sale Invoice (9=Piece, 10=Dozen, 16=Carton)
@@ -620,7 +635,7 @@
 
             // Previous balance - always shown now (even if 0), like FoxPro
             const previousBalance = parseFloat(invoice.previous_balance || 0);
-            document.getElementById('previousBalance').textContent = `${previousBalance.toFixed(2)}`;
+            document.getElementById('previousBalance').textContent = formatMoney(previousBalance);
 
             const currencySymbol = '';
 
@@ -652,22 +667,22 @@
                     let childrenText = '';
                     if (children.length > 0) {
                         childrenText = '<br><span style="font-size: 10px; color: #666;">(' +
-                            children.map(c => `${c.product_name}: ${parseFloat(c.quantity).toFixed(2)}`).join(' | ') +
+                            children.map(c => `${c.product_name}: ${formatMoney(c.quantity)}`).join(' | ') +
                             ')</span>';
                     }
 
                     const totalDisc = group.discount_amount + group.trade_offer_amount;
 
-                    const discCell = (!enableCashDiscountAmount && !enableTradeOfferAmount) ? '' : `<td class="text-right disc-col">${currencySymbol + totalDisc.toFixed(2)}</td>`;
+                    const discCell = (!enableCashDiscountAmount && !enableTradeOfferAmount) ? '' : `<td class="text-right disc-col">${currencySymbol + formatMoney(totalDisc)}</td>`;
 
                     row.innerHTML = `
                         <td class="text-right ctn-col">${formatUnitCell(group.carton)}</td>
                         <td class="text-right dz-col">${formatUnitCell(group.dozen)}</td>
                         <td class="text-right pc-col">${formatUnitCell(group.piece)}</td>
                         <td class="item-col">${group.product_name}${childrenText}</td>
-                        <td class="text-right">${currencySymbol + parseFloat(group.sale_price).toFixed(2)}</td>
+                        <td class="text-right">${currencySymbol + formatMoney(group.sale_price)}</td>
                         ${discCell}
-                        <td class="text-right">${currencySymbol + group.net_amount.toFixed(2)}</td>
+                        <td class="text-right">${currencySymbol + formatMoney(group.net_amount)}</td>
                     `;
                 });
             } else {
@@ -677,16 +692,16 @@
 
                     const totalDisc = group.discount_amount + group.trade_offer_amount;
 
-                    const discCell = (!enableCashDiscountAmount && !enableTradeOfferAmount) ? '' : `<td class="text-right disc-col">${currencySymbol + totalDisc.toFixed(2)}</td>`;
+                    const discCell = (!enableCashDiscountAmount && !enableTradeOfferAmount) ? '' : `<td class="text-right disc-col">${currencySymbol + formatMoney(totalDisc)}</td>`;
 
                     row.innerHTML = `
                         <td class="text-right ctn-col">${formatUnitCell(group.carton)}</td>
                         <td class="text-right dz-col">${formatUnitCell(group.dozen)}</td>
                         <td class="text-right pc-col">${formatUnitCell(group.piece)}</td>
                         <td class="item-col">${group.product_name}</td>
-                        <td class="text-right">${currencySymbol + parseFloat(group.sale_price).toFixed(2)}</td>
+                        <td class="text-right">${currencySymbol + formatMoney(group.sale_price)}</td>
                         ${discCell}
-                        <td class="text-right">${currencySymbol + group.net_amount.toFixed(2)}</td>
+                        <td class="text-right">${currencySymbol + formatMoney(group.net_amount)}</td>
                     `;
 
                     childrenOf(group).forEach((child) => {
@@ -725,13 +740,13 @@
             const totalsDiscCell = (!enableCashDiscountAmount && !enableTradeOfferAmount) ? '' : `<td class="text-right disc-col"></td>`;
 
             totalsRow.innerHTML = `
-                <td class="text-right ctn-col">${totalCarton > 0 ? totalCarton.toFixed(0) : '-'}</td>
-                <td class="text-right dz-col">${totalDozen > 0 ? totalDozen.toFixed(0) : '-'}</td>
-                <td class="text-right pc-col">${totalPiece > 0 ? totalPiece.toFixed(0) : '-'}</td>
+                <td class="text-right ctn-col">${totalCarton > 0 ? Math.round(totalCarton).toString() : '-'}</td>
+                <td class="text-right dz-col">${totalDozen > 0 ? Math.round(totalDozen).toString() : '-'}</td>
+                <td class="text-right pc-col">${totalPiece > 0 ? Math.round(totalPiece).toString() : '-'}</td>
                 <td class="item-col">TOTALS</td>
                 <td class="text-right"></td>
                 ${totalsDiscCell}
-                <td class="text-right">${currencySymbol}${totalAmount.toFixed(2)}</td>
+                <td class="text-right">${currencySymbol}${formatMoney(totalAmount)}</td>
             `;
 
             // Hide a Ctn/Dz/Pc column entirely when none of this invoice's items use that unit
@@ -741,7 +756,7 @@
 
             // Discount - always shown now (even if 0), like FoxPro
             const discountAmt = parseFloat(invoice.total_discount_amount || 0);
-            document.getElementById('discountAmount').textContent = `${currencySymbol}${discountAmt.toFixed(2)}`;
+            document.getElementById('discountAmount').textContent = `${currencySymbol}${formatMoney(discountAmt)}`;
 
             // Calculate total GST from items
             let totalGst = 0;
@@ -750,7 +765,7 @@
             });
             if (totalGst > 0) {
                 document.getElementById('gstRow').style.display = 'flex';
-                document.getElementById('gstAmount').textContent = `${currencySymbol}${totalGst.toFixed(2)}`;
+                document.getElementById('gstAmount').textContent = `${currencySymbol}${formatMoney(totalGst)}`;
             }
 
             // Adv. Tax - total of each item line's own tax_amount (item-level tax)
@@ -758,9 +773,9 @@
             items.forEach(item => {
                 totalItemTax += parseFloat(item.tax_amount || 0);
             });
-            document.getElementById('advTaxAmount').textContent = `${currencySymbol}${totalItemTax.toFixed(2)}`;
+            document.getElementById('advTaxAmount').textContent = `${currencySymbol}${formatMoney(totalItemTax)}`;
 
-            document.getElementById('netAmount').textContent = `${currencySymbol}${parseFloat(invoice.net_amount).toFixed(2)}`;
+            document.getElementById('netAmount').textContent = `${currencySymbol}${formatMoney(invoice.net_amount)}`;
 
             // Calculate received and balance (Returned not shown/used on Sale Invoice print)
             const amountPaid = parseFloat(invoice.amount_paid) || 0;
@@ -768,8 +783,8 @@
             const remainingBalance = parseFloat(invoice.net_amount) - amountPaid + amountReturned;
             const payableAmount = previousBalance + remainingBalance;
 
-            document.getElementById('amountPaid').textContent = `${currencySymbol}${amountPaid.toFixed(2)}`;
-            document.getElementById('payableAmount').textContent = `${currencySymbol}${payableAmount.toFixed(2)}`;
+            document.getElementById('amountPaid').textContent = `${currencySymbol}${formatMoney(amountPaid)}`;
+            document.getElementById('payableAmount').textContent = `${currencySymbol}${formatMoney(payableAmount)}`;
 
             document.getElementById('paymentMethod').textContent = invoice.payment_method || '-';
 
