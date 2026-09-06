@@ -62,6 +62,42 @@ function initRowControls(tr) {
         debounce = setTimeout(() => searchProducts(q, dropdownList, tr), 280);
     });
 
+    // keyboard navigation: ArrowUp/ArrowDown to move, Enter to select + focus next field, Escape to close
+    searchInput.addEventListener('keydown', function (e) {
+        if (dropdownList.style.display !== 'block') {
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                searchProducts(this.value.trim(), dropdownList, tr);
+            }
+            return;
+        }
+
+        const items = getSelectableItems(dropdownList);
+        let idx = parseInt(dropdownList.dataset.activeIndex, 10);
+        if (isNaN(idx)) idx = -1;
+
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            idx = idx < items.length - 1 ? idx + 1 : 0;
+            setActiveItem(dropdownList, items, idx);
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            idx = idx > 0 ? idx - 1 : items.length - 1;
+            setActiveItem(dropdownList, items, idx);
+        } else if (e.key === 'Enter') {
+            e.preventDefault();
+            const target = items[idx] || items[0];
+            if (target) {
+                target.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
+                dropdownList.style.display = 'none';
+                const nextInput = tr.querySelector('input[data-field="purchase_price"]');
+                if (nextInput) nextInput.focus();
+            }
+        } else if (e.key === 'Escape') {
+            dropdownList.style.display = 'none';
+        }
+    });
+
     document.addEventListener('click', function (e) {
         if (!tr.contains(e.target)) dropdownList.style.display = 'none';
     });
@@ -84,11 +120,25 @@ function initRowControls(tr) {
     });
 }
 
+function getSelectableItems(dropdownList) {
+    return Array.from(dropdownList.querySelectorAll('.dropdown-item.selectable'));
+}
+
+function setActiveItem(dropdownList, items, idx) {
+    items.forEach(i => i.classList.remove('active'));
+    if (items[idx]) {
+        items[idx].classList.add('active');
+        items[idx].scrollIntoView({ block: 'nearest' });
+    }
+    dropdownList.dataset.activeIndex = idx;
+}
+
 function searchProducts(q, dropdownList, tr) {
     fetch('../../../../server/api/inventory/products/search-products.php?q=' + encodeURIComponent(q))
         .then(r => r.json())
         .then(data => {
             dropdownList.innerHTML = '';
+            dropdownList.dataset.activeIndex = -1;
 
             if (!data.success || !data.products || data.products.length === 0) {
                 dropdownList.innerHTML = '<div class="dropdown-item" style="color:#aaa;cursor:default;">No products found</div>';
@@ -104,11 +154,16 @@ function searchProducts(q, dropdownList, tr) {
                     item.innerHTML = `<strong>${p.name}</strong> (${p.code}) <span style="color:#4caf50;font-size:11px;">✓ already added</span>`;
                     item.style.color = '#aaa';
                 } else {
+                    item.classList.add('selectable');
                     item.innerHTML = `<strong>${p.name}</strong> (${p.code})`;
                     item.addEventListener('mousedown', function (e) {
                         e.preventDefault();
                         selectProduct(tr, p);
                         dropdownList.style.display = 'none';
+                    });
+                    item.addEventListener('mouseenter', function () {
+                        const items = getSelectableItems(dropdownList);
+                        setActiveItem(dropdownList, items, items.indexOf(item));
                     });
                 }
 
@@ -128,7 +183,6 @@ function selectProduct(tr, product) {
     const productIdInput = tr.querySelector('.product-id');
     const productInfo    = tr.querySelector('.product-info');
 
-    // remove previous product from tracking if row was reused
     const prevId = productIdInput.value;
     if (prevId) delete addedProducts[prevId];
 
@@ -138,7 +192,6 @@ function selectProduct(tr, product) {
     productInfo.textContent = product.code;
     productInfo.style.display = 'block';
 
-    // fetch current rates and populate
     fetch('../../../../server/api/inventory/products/product-get.php?id=' + product.id)
         .then(r => r.json())
         .then(data => {

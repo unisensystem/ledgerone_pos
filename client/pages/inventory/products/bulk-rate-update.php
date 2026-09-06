@@ -13,7 +13,9 @@ if (!$user_id) { header('Location: ../../auth/login.html'); exit(); }
     <link rel="stylesheet" href="../../../assets/css/inventory/products/product-add.css">
     <style>
         .container { max-width: 1300px; }
-
+.custom-dropdown .dropdown-item.active {
+    background: #e3f2fd;
+}
         .rate-table {
             width: 100%;
             border-collapse: collapse;
