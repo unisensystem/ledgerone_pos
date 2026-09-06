@@ -226,6 +226,7 @@ function groupByInvoice(rows) {
                 invoice_disc_percent: parseFloat(row.invoice_disc_percent || 0),
                 items: [],
                 total_amount: 0,
+                total_discount: 0,
                 total_tax: 0
             });
         }
@@ -234,6 +235,9 @@ function groupByInvoice(rows) {
 
         group.items.push(row);
         group.total_amount += parseFloat(row.net_amount || 0);
+        // Invoice-level discount total = main discount + extra discount,
+        // same components shown as "Discount" on the thermal print.
+        group.total_discount += parseFloat(row.discount_amount || 0) + parseFloat(row.extra_discount_amount || 0);
         group.total_tax += parseFloat(row.tax_amount || 0);
     });
 
@@ -476,7 +480,16 @@ function renderTable() {
             </tr>
         `;
 
-        // Invoice tax row — right under Total
+        // Invoice discount row — under Total, mirrors the "Discount" line on the
+        // thermal print. Toggleable via Columns modal (row-discount / hide-col-discount).
+        html += `
+            <tr class="row-discount" style="font-weight:bold;">
+                <td colspan="10" style="text-align:right;">Discount</td>
+                <td class="col-amount">${currentCurrency}${group.total_discount.toFixed(2)}</td>
+            </tr>
+        `;
+
+        // Invoice tax row
         html += `
             <tr style="font-weight:bold;">
                 <td colspan="10" style="text-align:right;">Tax</td>
@@ -505,6 +518,13 @@ function renderGrandTotal() {
             0
         );
 
+    const grandTotalDiscount =
+        groupedInvoices.reduce(
+            (sum, g) =>
+                sum + g.total_discount,
+            0
+        );
+
     const grandTotalAmount =
         allRows.reduce(
             (sum, r) =>
@@ -520,6 +540,7 @@ function renderGrandTotal() {
             `Grand Total: ${groupedInvoices.length} invoice(s), ` +
             `Qty ${grandTotalQty.toFixed(2)}, ` +
             `FOC ${grandTotalFoc.toFixed(2)}, ` +
+            `Discount ${currentCurrency}${grandTotalDiscount.toFixed(2)}, ` +
             `Amount ${currentCurrency}${grandTotalAmount.toFixed(2)}`;
     }
 }
@@ -681,7 +702,23 @@ function exportToExcel() {
                 group.total_amount.toFixed(2)
         });
 
-        // Tax — right under Total
+        // Discount — right under Total
+        rows.push({
+            'S.No': '',
+            'Code': '',
+            'Detail': '',
+            'Batch No': '',
+            'Expiry Date': '',
+            'Price': '',
+            'Qty': '',
+            'Disc %': '',
+            'Extra Disc %': '',
+            'FOC': 'Discount',
+            'Amount':
+                group.total_discount.toFixed(2)
+        });
+
+        // Tax
         rows.push({
             'S.No': '',
             'Code': '',
@@ -919,7 +956,8 @@ const COLUMN_CONFIG = [
     { key: 'disc',   label: 'Disc %' },
     { key: 'extradisc', label: 'Extra Disc %' },
     { key: 'foc',    label: 'FOC' },
-    { key: 'amount', label: 'Amount' }
+    { key: 'amount', label: 'Amount' },
+    { key: 'discount', label: 'Discount (Invoice Total Row)' }
 ];
 
 function getColumnPrefs() {

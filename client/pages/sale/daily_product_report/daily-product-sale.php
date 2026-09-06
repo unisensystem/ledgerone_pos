@@ -21,6 +21,9 @@ if (!$user_id) {
     <!-- Reuses the same table/card/form classes as the Stock Position module -->
     <link rel="stylesheet" href="../../../assets/css/inventory/stock_position/stock-position.css">
     <style>
+        body.hide-col-discount .row-discount {
+    display: none !important;
+}
         /*
         |--------------------------------------------------------------------------
         | COLUMN VISIBILITY (toggled by JS via body classes)
