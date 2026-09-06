@@ -224,9 +224,9 @@ function groupByInvoice(rows) {
                 zone_name: row.zone_name,
                 invoice_net_amount: parseFloat(row.invoice_net_amount || 0),
                 invoice_disc_percent: parseFloat(row.invoice_disc_percent || 0),
+                invoice_disc_amount: parseFloat(row.invoice_disc_amount || 0),
                 items: [],
                 total_amount: 0,
-                total_discount: 0,
                 total_tax: 0
             });
         }
@@ -235,9 +235,6 @@ function groupByInvoice(rows) {
 
         group.items.push(row);
         group.total_amount += parseFloat(row.net_amount || 0);
-        // Invoice-level discount total = main discount + extra discount,
-        // same components shown as "Discount" on the thermal print.
-        group.total_discount += parseFloat(row.discount_amount || 0) + parseFloat(row.extra_discount_amount || 0);
         group.total_tax += parseFloat(row.tax_amount || 0);
     });
 
@@ -480,12 +477,18 @@ function renderTable() {
             </tr>
         `;
 
-        // Invoice discount row — under Total, mirrors the "Discount" line on the
-        // thermal print. Toggleable via Columns modal (row-discount / hide-col-discount).
+        // Invoice discount row — under Total. Same invoice-level Discount %/Amount
+        // entered in the Invoice Summary section when the invoice was created
+        // (sale_invoice.total_discount_percent/_amount + extra discounts 1 & 2),
+        // not a sum of per-item discounts. Toggleable via Columns modal
+        // (row-discount / hide-col-discount).
+        const discountLabel = group.invoice_disc_percent > 0
+            ? `Discount (${group.invoice_disc_percent.toFixed(2)}%)`
+            : 'Discount';
         html += `
             <tr class="row-discount" style="font-weight:bold;">
-                <td colspan="10" style="text-align:right;">Discount</td>
-                <td class="col-amount">${currentCurrency}${group.total_discount.toFixed(2)}</td>
+                <td colspan="10" style="text-align:right;">${discountLabel}</td>
+                <td class="col-amount">${currentCurrency}${group.invoice_disc_amount.toFixed(2)}</td>
             </tr>
         `;
 
@@ -521,7 +524,7 @@ function renderGrandTotal() {
     const grandTotalDiscount =
         groupedInvoices.reduce(
             (sum, g) =>
-                sum + g.total_discount,
+                sum + g.invoice_disc_amount,
             0
         );
 
@@ -702,7 +705,8 @@ function exportToExcel() {
                 group.total_amount.toFixed(2)
         });
 
-        // Discount — right under Total
+        // Discount — right under Total (invoice-level Discount %/Amount from
+        // Invoice Summary, same value shown on-screen and on the thermal print)
         rows.push({
             'S.No': '',
             'Code': '',
@@ -713,9 +717,11 @@ function exportToExcel() {
             'Qty': '',
             'Disc %': '',
             'Extra Disc %': '',
-            'FOC': 'Discount',
+            'FOC': group.invoice_disc_percent > 0
+                ? `Discount (${group.invoice_disc_percent.toFixed(2)}%)`
+                : 'Discount',
             'Amount':
-                group.total_discount.toFixed(2)
+                group.invoice_disc_amount.toFixed(2)
         });
 
         // Tax

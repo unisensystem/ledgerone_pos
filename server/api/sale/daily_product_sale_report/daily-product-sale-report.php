@@ -210,10 +210,13 @@ try {
         si.customer_id,
         si.branch_id,
 
-        si.net_amount AS invoice_net_amount,
+               si.net_amount AS invoice_net_amount,
         (si.total_discount_percent
             + si.extra_discount_1_percent
             + si.extra_discount_2_percent) AS invoice_disc_percent,
+        (si.total_discount_amount
+            + si.extra_discount_1_amount
+            + si.extra_discount_2_amount) AS invoice_disc_amount,
 
         c.customer_name,
 
@@ -560,8 +563,9 @@ try {
 
                 $row['net_amount'] =
                     (float)($row['net_amount'] ?? 0);
-                    $row['invoice_net_amount']   = (float)($row['invoice_net_amount'] ?? 0);
+                                      $row['invoice_net_amount']   = (float)($row['invoice_net_amount'] ?? 0);
 $row['invoice_disc_percent'] = (float)($row['invoice_disc_percent'] ?? 0);
+$row['invoice_disc_amount']  = (float)($row['invoice_disc_amount'] ?? 0);
 
 
                 $total_qty +=
