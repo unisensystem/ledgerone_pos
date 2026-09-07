@@ -24,7 +24,7 @@ if (!$parent_id) {
 }
 
 try {
-    $stmt = $pdo->prepare("SELECT id, code, name, default_unit_id, stock_affects, invoice_affects FROM products WHERE tenant_id = ? AND parent_product_id = ? AND is_active = 1 ORDER BY name");
+    $stmt = $pdo->prepare("SELECT id, code, name, mrp, trade_price, wholesale_price, default_unit_id, stock_affects, invoice_affects FROM products WHERE tenant_id = ? AND parent_product_id = ? AND is_active = 1 ORDER BY name");
     $stmt->execute([$tenant_id, $parent_id]);
     $children = $stmt->fetchAll(PDO::FETCH_ASSOC);
     

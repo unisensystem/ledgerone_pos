@@ -38,6 +38,21 @@ const defaultShortcuts = {
 let shortcuts = { ...defaultShortcuts };
 let isAddingProduct = false;
 
+// Returns the price to use for a product based on the Price Setting (Trade/Wholesale/MRP), default MRP
+function getEffectivePrice(product) {
+    if (!product) return 0;
+    const setting = localStorage.getItem('counterPriceSetting') || 'mrp';
+    let price;
+    if (setting === 'trade_price') {
+        price = product.trade_price;
+    } else if (setting === 'wholesale_price') {
+        price = product.wholesale_price;
+    } else {
+        price = product.mrp;
+    }
+    return parseFloat(price) || 0;
+}
+
 // Load data on page load
 document.addEventListener('DOMContentLoaded', async function() {
     await Promise.all([
@@ -244,6 +259,15 @@ document.addEventListener('DOMContentLoaded', async function() {
     autoAddCheckbox.addEventListener('change', function() {
         localStorage.setItem('autoAddChildren', this.checked);
     });
+
+    // Price Setting — which product price field to use when adding items (default: MRP)
+    const priceSettingSelect = document.getElementById('priceSetting');
+    if (priceSettingSelect) {
+        priceSettingSelect.value = localStorage.getItem('counterPriceSetting') || 'mrp';
+        priceSettingSelect.addEventListener('change', function() {
+            localStorage.setItem('counterPriceSetting', this.value);
+        });
+    }
 
     // "Buy by Amount" checkbox — optional feature, off by default (not every business wants it)
     // Elements may not be present in all invoice views (e.g. counter-invoice omits this panel)
@@ -608,7 +632,7 @@ document.addEventListener('DOMContentLoaded', async function() {
                 const div = document.createElement('div');
                 div.className = 'suggestion-item';
                 div.style.cssText = 'padding: 8px 12px; cursor: pointer; border-bottom: 1px solid var(--border-default); background: white;';
-                div.innerHTML = `<strong>${product.name}</strong><br><small style="color: var(--subtext);">${product.code} - ${product.trade_price}</small>`;
+                div.innerHTML = `<strong>${product.name}</strong><br><small style="color: var(--subtext);">${product.code} - ${getEffectivePrice(product)}</small>`;
                 div.addEventListener('mouseenter', function() {
                     suggestions.querySelectorAll('.suggestion-item').forEach(el => {
                         el.classList.remove('selected');
@@ -1250,7 +1274,7 @@ function calculateQtyFromAmount() {
     const product = resolveQuickProduct();
     if (!product) return;
 
-    const price = parseFloat(product.mrp);
+    const price = getEffectivePrice(product);
     if (!price || price <= 0) return;
 
     const qty = amount / price;
@@ -1346,7 +1370,7 @@ async function checkStockAndProceed(product) {
                                 id: child.id,
                                 name: child.name,
                                 qty: 1,
-                                price: parseFloat(product.trade_price) / data.children.length,
+                                price: getEffectivePrice(product) / data.children.length,
                                 stock_affects: child.stock_affects,
                                 invoice_affects: child.invoice_affects,
                                 uomId: child.default_unit_id || 9,
@@ -1390,7 +1414,7 @@ function showChildProductModal(parent, children) {
     const childList = content.querySelector('#childProductsList');
     children.forEach(child => {
         const childProduct = productsData.find(p => p.id == child.id);
-        const childPrice = childProduct && parseFloat(childProduct.mrp) > 0 ? parseFloat(childProduct.mrp) : parseFloat(parent.mrp);
+        const childPrice = childProduct && getEffectivePrice(childProduct) > 0 ? getEffectivePrice(childProduct) : getEffectivePrice(parent);
         
         const div = document.createElement('div');
         div.style.cssText = 'padding: 8px; border-bottom: 1px solid var(--border-default); display: grid; grid-template-columns: auto 1fr 100px 100px; gap: 8px; align-items: center;';
@@ -1489,7 +1513,7 @@ function addProductToInvoice(product) {
         unit: uom ? uom.uom_name : 'PCS',
         uomId: product.default_unit_id || 9,
         qty: parseFloat(document.getElementById('quickQty').value) || 1,
-        price: parseFloat(product.mrp),
+        price: getEffectivePrice(product),
         discountPercent: parseFloat(product.default_discount || 0),
         gstPercent: parseFloat(product.sales_tax || 0)
     };

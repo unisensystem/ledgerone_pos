@@ -20,7 +20,7 @@ try {
 
     $sql = "
         SELECT
-            p.id, p.code, p.name, p.mrp, p.trade_price, p.default_unit_id,
+            p.id, p.code, p.name, p.mrp, p.trade_price, p.wholesale_price, p.default_unit_id,
             p.barcode, p.qr_code, p.photo, p.carton_conversion, p.stock_affects,
             p.invoice_affects, p.parent_product_id, p.default_discount,
             p.trade_offer_discount, p.sales_tax, p.sales_tax_type,

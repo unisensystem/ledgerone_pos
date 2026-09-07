@@ -1017,7 +1017,16 @@ $user_employee_id = $user['employee_id'] ?? null;
                         <option value="bank_transfer">Bank Transfer</option>
                     </select>
                 </div>
-                
+
+                <div class="form-group-micro">
+                    <div class="form-label">PRICE TYPE</div>
+                    <select id="priceSetting">
+                        <option value="trade_price">Trade Price (TP)</option>
+                        <option value="wholesale_price">Wholesale Price</option>
+                        <option value="mrp" selected>Maximum Retail Price (MRP)</option>
+                    </select>
+                </div>
+
                 <div class="form-group-micro">
                     <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; margin-top: 8px;">
                         <input type="checkbox" id="autoAddChildren" style="width: auto;">
