@@ -24,6 +24,11 @@ if (!$user_id) {
         body.hide-col-discount .row-discount {
     display: none !important;
 }
+
+body.hide-col-tax .row-tax {
+    display: none !important;
+}
+
         /*
         |--------------------------------------------------------------------------
         | COLUMN VISIBILITY (toggled by JS via body classes)
