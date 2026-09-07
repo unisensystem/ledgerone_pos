@@ -1260,6 +1260,11 @@ if (!$currencySymbol) {
     <span>Todo List</span>
     <span id="todoBadge" class="todo-trigger-badge" style="display:none;">0</span>
 </a>
+
+<a href="../settings/posting_lock/posting-lock.php" class="action-btn">
+    <i class="fas fa-lock"></i>
+    <span>Posting Lock</span>
+</a>
                 </div>
             </div>
 

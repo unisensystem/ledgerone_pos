@@ -1,6 +1,6 @@
 <?php
 require_once '../../../../includes/connection.php';
-
+require_once '../../../../includes/posting_lock.php';
 header('Content-Type: application/json');
 
 if (session_status() == PHP_SESSION_NONE) {
@@ -48,6 +48,11 @@ try {
     // Get form data
     $payment_type = $_POST['payment_type'] ?? 'supplier';
     $voucher_date = $_POST['voucher_date'] ?? '';
+    $lockCheck = checkPostingDateAllowed($pdo, $tenant_id, 'payment_voucher', $voucher_date);
+if (!$lockCheck['allowed']) {
+    echo json_encode(['success' => false, 'error' => $lockCheck['message']]);
+    exit();
+}
     $supplier_code = $_POST['supplier_code'] ?? '';
     $sub_account_id = !empty($_POST['sub_account_id']) ? $_POST['sub_account_id'] : null;
     $bill_no = !empty($_POST['bill_no']) ? $_POST['bill_no'] : null;

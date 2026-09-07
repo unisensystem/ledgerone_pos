@@ -39,11 +39,13 @@ const categoryTableBody = document.getElementById('categoryTableBody');
 const customerTableBody = document.getElementById('customerTableBody');
 const invoiceTableBody = document.getElementById('invoiceTableBody');
 const supplierTableBody = document.getElementById('supplierTableBody');
+const partnerTableBody = document.getElementById('partnerTableBody');
 const reportPeriodItem = document.getElementById('reportPeriodItem');
 const reportPeriodCategory = document.getElementById('reportPeriodCategory');
 const reportPeriodCustomer = document.getElementById('reportPeriodCustomer');
 const reportPeriodInvoice = document.getElementById('reportPeriodInvoice');
 const reportPeriodSupplier = document.getElementById('reportPeriodSupplier');
+const reportPeriodPartner = document.getElementById('reportPeriodPartner');
 
 // Set default dates
 const today = new Date();
@@ -330,6 +332,20 @@ async function fetchReportData(startDate, endDate, branchId, companyId, category
     return result.data;
 }
 
+// Fetch partner-wise breakdown from accounting_ledger based Partner Accounts
+async function fetchPartnerwiseData(startDate, endDate) {
+    const url = `../../../../server/api/financial_reports/profit_loss_detail/get-partnerwise.php?start_date=${startDate}&end_date=${endDate}`;
+
+    const response = await fetch(url);
+    const result = await response.json();
+
+    if (!result.success) {
+        throw new Error(result.message || 'Failed to fetch partner-wise data');
+    }
+
+    return result.data;
+}
+
 // Generate report
 async function generateReport() {
     if (!validateForm()) return;
@@ -388,6 +404,7 @@ async function generateReport() {
         reportPeriodCustomer.textContent = periodText;
         reportPeriodInvoice.textContent = periodText;
         reportPeriodSupplier.textContent = periodText;
+        reportPeriodPartner.textContent = periodText;
 
         // Build item-wise table
         let itemHTML = '';
@@ -607,6 +624,32 @@ async function generateReport() {
 
         supplierTableBody.innerHTML = supplierHTML;
 
+        // Fetch and build partner-wise table (from Partner Accounts + accounting_ledger)
+        const partnerData = await fetchPartnerwiseData(startDateEl.value, endDateEl.value);
+        window.currentPartnerData = partnerData;
+
+        let partnerHTML = '';
+
+        if (partnerData.length === 0) {
+            partnerHTML = '<tr><td colspan="5" style="text-align:center; color: var(--text-subtext); padding: 30px;">No Partner Accounts found for selected period.</td></tr>';
+        } else {
+            partnerData.forEach(account => {
+                account.partners.forEach((partner, index) => {
+                    partnerHTML += `
+                        <tr>
+                            <td>${index === 0 ? account.account_name : ''}</td>
+                            <td>${partner.partner_name}</td>
+                            <td class="amount-cell">${partner.percentage.toFixed(2)}%</td>
+                            <td class="amount-cell">${index === 0 ? formatCurrency(account.total_profit) : ''}</td>
+                            <td class="amount-cell ${partner.profit_share >= 0 ? 'positive' : 'negative'}">${formatCurrency(partner.profit_share)}</td>
+                        </tr>
+                    `;
+                });
+            });
+        }
+
+        partnerTableBody.innerHTML = partnerHTML;
+
         // Show results
         summaryCards.style.display = 'grid';
         reportResults.style.display = 'block';
@@ -675,6 +718,8 @@ function printReport() {
         reportData = window.currentData.invoicewise;
     } else if (activeTab === 'supplierwise') {
         reportData = window.currentData.supplierwise;
+    } else if (activeTab === 'partnerwise') {
+        reportData = window.currentPartnerData;
     }
     
     const dataJson = encodeURIComponent(JSON.stringify(reportData));

@@ -1,5 +1,6 @@
 <?php
 require_once '../../../../includes/connection.php';
+require_once '../../../../includes/posting_lock.php';
 
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
@@ -38,8 +39,16 @@ try {
     }
 
     if (empty($input['items']) || !is_array($input['items'])) {
-        throw new Exception('At least one item is required');
-    }
+    throw new Exception('At least one item is required');
+}
+
+$lockCheck = checkPostingDateAllowed($pdo, $tenant_id, 'sale_return', $input['saleDate']);
+if (!$lockCheck['allowed']) {
+    throw new Exception($lockCheck['message']);
+}
+
+// Generate sequential bill number...
+$pdo->beginTransaction();
 
     // Generate sequential bill number — tenant-wide
     $billStmt = $pdo->prepare("SELECT bill_no FROM sale_return WHERE tenant_id = ? ORDER BY id DESC LIMIT 1");

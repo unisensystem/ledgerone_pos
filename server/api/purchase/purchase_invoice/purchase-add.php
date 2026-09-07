@@ -1,5 +1,7 @@
 <?php
 require_once '../../../../includes/connection.php';
+require_once '../../../../includes/posting_lock.php';
+
 require_once 'purchase-invoice-tax-helper.php';
 
 header('Content-Type: application/json');
@@ -39,10 +41,16 @@ try {
     }
     
     if (empty($input['items']) || !is_array($input['items'])) {
-        throw new Exception('At least one item is required');
-    }
+    throw new Exception('At least one item is required');
+}
+
+$lockCheck = checkPostingDateAllowed($pdo, $tenant_id, 'purchase_invoice', $input['purchaseDate']);
+if (!$lockCheck['allowed']) {
+    throw new Exception($lockCheck['message']);
+}
+
+$pdo->beginTransaction();
     
-    $pdo->beginTransaction();
     
     // Generate sequential bill number tenant-wide
     $billStmt = $pdo->prepare("SELECT MAX(CAST(SUBSTRING(bill_no, 5) AS UNSIGNED)) FROM purchase_invoice WHERE tenant_id = ? AND bill_no LIKE 'PUR-%'");

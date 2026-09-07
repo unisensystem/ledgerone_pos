@@ -1,5 +1,6 @@
 <?php
 require_once '../../../../includes/connection.php';
+require_once '../../../../includes/posting_lock.php';
 
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
@@ -35,7 +36,15 @@ try {
     $remarks = $data['remarks'] ?? null;
     $accounting_treatment = $data['accounting_treatment'];
     $items = $data['items'];
-    $date = date('Y-m-d');
+    $date = $data['date'] ?? date('Y-m-d');
+
+    // Posting lock check
+    $lockCheck = checkPostingDateAllowed($pdo, $tenant_id, 'stock_adjustment', $date);
+    if (!$lockCheck['allowed']) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'message' => $lockCheck['message']]);
+        exit();
+    }
     
     // Calculate totals
     $total_amount = 0;
@@ -169,7 +178,9 @@ try {
     ]);
     
 } catch (Exception $e) {
-    $pdo->rollBack();
+    if ($pdo->inTransaction()) {
+        $pdo->rollBack();
+    }
     http_response_code(500);
     echo json_encode([
         'success' => false,

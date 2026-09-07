@@ -1,5 +1,6 @@
 <?php
 require_once '../../../../includes/connection.php';
+require_once '../../../../includes/posting_lock.php';
 
 header('Content-Type: application/json');
 
@@ -29,7 +30,13 @@ error_log('Recovery officer: ' . ($_POST['recovery_officer'] ?? 'NOT SET'));
 try {
     // Get form data
     $voucher_date = $_POST['voucher_date'] ?? '';
-    $customer_code = $_POST['customer_code'] ?? '';
+    $lockCheck = checkPostingDateAllowed($pdo, $tenant_id, 'receive_voucher', $voucher_date);
+error_log('LOCK CHECK: ' . print_r($lockCheck, true) . ' | voucher_date: ' . $voucher_date);
+
+if (!$lockCheck['allowed']) {
+    echo json_encode(['success' => false, 'error' => $lockCheck['message']]);
+    exit();
+}  $customer_code = $_POST['customer_code'] ?? '';
     $previous_balance = (!empty($_POST['previous_balance']) && $_POST['previous_balance'] !== 'null') ? floatval($_POST['previous_balance']) : 0;
     $sub_account_id = (!empty($_POST['sub_account_id']) && $_POST['sub_account_id'] !== 'null') ? intval($_POST['sub_account_id']) : null;
     $bill_no = (!empty($_POST['bill_no']) && $_POST['bill_no'] !== 'null') ? $_POST['bill_no'] : null;

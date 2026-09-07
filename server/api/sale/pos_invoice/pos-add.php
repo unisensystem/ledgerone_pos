@@ -1,5 +1,7 @@
 <?php
 require_once '../../../../includes/connection.php';
+require_once '../../../../includes/posting_lock.php';
+
 require_once 'invoice-tax-helper.php';
 
 header('Content-Type: application/json');
@@ -42,11 +44,16 @@ try {
         }
     }
 
-    if (empty($input['items']) || !is_array($input['items'])) {
-        throw new Exception('At least one item is required');
-    }
+   if (empty($input['items']) || !is_array($input['items'])) {
+    throw new Exception('At least one item is required');
+}
 
-    $pdo->beginTransaction();
+$lockCheck = checkPostingDateAllowed($pdo, $tenant_id, 'sale_invoice', $input['saleDate']);
+if (!$lockCheck['allowed']) {
+    throw new Exception($lockCheck['message']);
+}
+
+$pdo->beginTransaction();
 
     // Generate sequential bill number tenant-wide
     $billStmt = $pdo->prepare("SELECT MAX(CAST(SUBSTRING(bill_no, 5) AS UNSIGNED)) FROM sale_invoice WHERE tenant_id = ? AND bill_no LIKE 'SAL-%'");

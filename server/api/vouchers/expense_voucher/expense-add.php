@@ -1,6 +1,6 @@
 <?php
 require_once '../../../../includes/connection.php';
-
+require_once '../../../../includes/posting_lock.php';
 header('Content-Type: application/json');
 
 if (session_status() == PHP_SESSION_NONE) {
@@ -36,6 +36,13 @@ $entries = $input['entries'] ?? [];
 if (!$date || !$voucher_number || empty($entries)) {
     http_response_code(400);
     echo json_encode(['error' => 'All fields are required']);
+    exit();
+}
+
+$lockCheck = checkPostingDateAllowed($pdo, $tenant_id, 'expense_voucher', $date);
+if (!$lockCheck['allowed']) {
+    http_response_code(400);
+    echo json_encode(['error' => $lockCheck['message']]);
     exit();
 }
 

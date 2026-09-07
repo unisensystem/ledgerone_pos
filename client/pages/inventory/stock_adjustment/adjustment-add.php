@@ -28,7 +28,7 @@ $adjustment_data = null;
 if ($is_edit) {
     $stmt = $pdo->prepare("
         SELECT sa.adjustment_code, sa.branch_id, b.branch_name, sa.adjustment_type,
-               sa.main_reason, sa.primary_reason, sa.secondary_reason, sa.remarks, sa.company_id
+               sa.main_reason, sa.primary_reason, sa.secondary_reason, sa.remarks, sa.company_id, sa.date
         FROM stock_adjustment sa
         JOIN branches b ON sa.branch_id = b.id
         WHERE sa.tenant_id = ? AND sa.id = ?
@@ -71,6 +71,10 @@ if ($is_edit) {
             <div class="form-section">
                 <h2 class="section-title">Adjustment Details</h2>
                 <div class="form-grid">
+                    <div class="form-field">
+                        <label class="field-label required">Adjustment Date</label>
+                        <input type="date" class="field-input" id="adjustmentDate" required>
+                    </div>
                     <div class="form-field">
                         <label class="field-label required">Adjustment Code</label>
                         <input type="text" class="field-input" id="adjustmentCode" placeholder="Auto-generated" readonly>
@@ -209,8 +213,18 @@ if ($is_edit) {
             'secondary_reason' => $adjustment_data['secondary_reason'],
             'remarks' => $adjustment_data['remarks'],
             'company_id' => $adjustment_data['company_id'],
+            'date' => $adjustment_data['date'],
             'items' => $adjustment_items
         ]) : 'null'; ?>;
+
+        document.addEventListener('DOMContentLoaded', function () {
+            const dateInput = document.getElementById('adjustmentDate');
+            if (dateInput) {
+                dateInput.value = (window.adjustmentData && window.adjustmentData.date)
+                    ? window.adjustmentData.date
+                    : new Date().toISOString().split('T')[0];
+            }
+        });
     </script>
 </body>
 </html>

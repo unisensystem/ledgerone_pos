@@ -50,7 +50,7 @@ require_once '../../../includes/dashboard.php';
                 <div class="help-section">
                     <h3><i class="fas fa-lock"></i> Account Status</h3>
                     <p><strong>System Locked:</strong> Account heads are locked by system and cannot be edited or deleted.</p>
-                    <p><strong>Manageable:</strong> Sub-accounts and posting accounts created by users can be edited or deleted as needed.</p>
+                    <p><strong>Manageable:</strong> Sub-accounts, posting accounts, and partner accounts created by users can be edited or deleted as needed.</p>
                 </div>
                 
                 <div class="help-section">
@@ -61,6 +61,7 @@ require_once '../../../includes/dashboard.php';
                         <li><i class="fas fa-check-circle"></i> You can nest Sub Accounts under other Sub Accounts</li>
                         <li><i class="fas fa-check-circle"></i> Posting Accounts can ONLY be created under Sub Accounts</li>
                         <li><i class="fas fa-check-circle"></i> Posting Accounts cannot be created directly under Account Heads</li>
+                        <li><i class="fas fa-check-circle"></i> Partner Accounts can ONLY be created under Sub Accounts, with one or more partners and a profit % each</li>
                     </ul>
                 </div>
                 
@@ -80,6 +81,9 @@ require_once '../../../includes/dashboard.php';
                         </button>
                         <button class="btn btn-secondary" id="addPostingAccountBtn">
                             <i class="fas fa-file-invoice-dollar"></i> Add Posting Account
+                        </button>
+                        <button class="btn btn-secondary" id="addPartnerAccountBtn">
+                            <i class="fas fa-handshake"></i> Add Partner Account
                         </button>
                     </div>
                 </div>
@@ -277,6 +281,147 @@ require_once '../../../includes/dashboard.php';
             <div class="modal-footer">
                 <button class="btn btn-secondary" id="cancelPostingAccountBtn">Cancel</button>
                 <button class="btn btn-primary" id="savePostingAccountBtn">Save Posting Account</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Partner Account Modal -->
+    <div class="modal-overlay" id="partnerAccountModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h3><i class="fas fa-handshake" style="color: var(--primary); margin-right: 10px;"></i>Add Partner Account</h3>
+                <button class="modal-close" id="closePartnerAccountModalBtn">&times;</button>
+            </div>
+
+            <div class="modal-body">
+                <div class="modal-info">
+                    <p><strong>Important:</strong> Partner Accounts can ONLY be created under Sub Accounts. Add one or more partners and their profit share % — the remaining % is automatically treated as the Self / Owner share.</p>
+                </div>
+
+                <form id="partnerAccountForm">
+                    <div class="form-group">
+                        <label class="form-label" for="partnerAccountParent">Parent Sub Account</label>
+                        <select class="form-input" id="partnerAccountParent" required>
+                            <option value="">Select parent sub account</option>
+                        </select>
+                        <small style="color: var(--subtext); font-size: 12px;">Only Sub Accounts are shown (not Account Heads)</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="partnerAccountName">Account Name</label>
+                        <input type="text" class="form-input" id="partnerAccountName" placeholder="e.g., Carolla Car Venture" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Opening Balance Type</label>
+                        <div class="radio-group">
+                            <label class="radio-option">
+                                <input type="radio" name="partnerBalanceType" value="debit" checked>
+                                <span>Debit</span>
+                            </label>
+                            <label class="radio-option">
+                                <input type="radio" name="partnerBalanceType" value="credit">
+                                <span>Credit</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="partnerBalanceAmount">Opening Balance Amount</label>
+                        <input type="number" class="form-input" id="partnerBalanceAmount" placeholder="0.00" step="0.01" min="0" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Partners</label>
+                        <div id="partnerRowsContainer"></div>
+                        <button type="button" class="btn btn-secondary btn-sm" id="addPartnerRowBtn">
+                            <i class="fas fa-plus"></i> Add Partner
+                        </button>
+                        <div id="remainingPercentageDisplay" style="margin-top: 8px; font-size: 13px; color: var(--subtext);"></div>
+                    </div>
+                </form>
+            </div>
+
+            <div class="modal-footer">
+                <button class="btn btn-secondary" id="cancelPartnerAccountBtn">Cancel</button>
+                <button class="btn btn-primary" id="savePartnerAccountBtn">Save Partner Account</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Partner Account Modal -->
+    <div class="modal-overlay" id="editPartnerAccountModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h3><i class="fas fa-edit" style="color: var(--primary); margin-right: 10px;"></i>Edit Partner Account</h3>
+                <button class="modal-close" id="closeEditPartnerAccountModalBtn">&times;</button>
+            </div>
+
+            <div class="modal-body">
+                <form id="editPartnerAccountForm">
+                    <input type="hidden" id="editPartnerAccountId">
+
+                    <div class="form-group">
+                        <label class="form-label" for="editPartnerAccountParent">Parent Sub Account</label>
+                        <select class="form-input" id="editPartnerAccountParent" required>
+                            <option value="">Select parent sub account</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="editPartnerAccountName">Account Name</label>
+                        <input type="text" class="form-input" id="editPartnerAccountName" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Partners</label>
+                        <div id="editPartnerRowsContainer"></div>
+                        <button type="button" class="btn btn-secondary btn-sm" id="editAddPartnerRowBtn">
+                            <i class="fas fa-plus"></i> Add Partner
+                        </button>
+                        <div id="editRemainingPercentageDisplay" style="margin-top: 8px; font-size: 13px; color: var(--subtext);"></div>
+                    </div>
+                </form>
+            </div>
+
+            <div class="modal-footer">
+                <button class="btn btn-secondary" id="cancelEditPartnerAccountBtn">Cancel</button>
+                <button class="btn btn-primary" id="updatePartnerAccountBtn">Update Partner Account</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Convert to Partner Modal (for an EXISTING Posting Account) -->
+    <div class="modal-overlay" id="convertToPartnerModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h3><i class="fas fa-handshake" style="color: var(--primary); margin-right: 10px;"></i>Add Partners to Account</h3>
+                <button class="modal-close" id="closeConvertToPartnerModalBtn">&times;</button>
+            </div>
+
+            <div class="modal-body">
+                <div class="modal-info">
+                    <p><strong>Note:</strong> This adds partners to an account you already created — its ID, name, opening balance and existing history stay exactly the same. Only the profit-sharing % is added.</p>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Account</label>
+                    <div id="convertToPartnerAccountName" style="font-weight: 600;"></div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Partners</label>
+                    <div id="convertPartnerRowsContainer"></div>
+                    <button type="button" class="btn btn-secondary btn-sm" id="convertAddPartnerRowBtn">
+                        <i class="fas fa-plus"></i> Add Partner
+                    </button>
+                    <div id="convertRemainingPercentageDisplay" style="margin-top: 8px; font-size: 13px; color: var(--subtext);"></div>
+                </div>
+            </div>
+
+            <div class="modal-footer">
+                <button class="btn btn-secondary" id="cancelConvertToPartnerBtn">Cancel</button>
+                <button class="btn btn-primary" id="saveConvertToPartnerBtn">Save Partners</button>
             </div>
         </div>
     </div>

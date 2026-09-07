@@ -223,6 +223,8 @@ $data = $_GET['data'] ?? '';
             echo 'Customer-wise Profit & Loss Report';
         } elseif ($report_type === 'supplierwise') {
             echo 'Supplier-wise Profit & Loss Report';
+        } elseif ($report_type === 'partnerwise') {
+            echo 'Partner-wise Profit & Loss Report';
         } else {
             echo 'Invoice-wise Profit & Loss Report';
         }
@@ -466,6 +468,48 @@ $data = $_GET['data'] ?? '';
                             <td class="text-right ${totalProfit >= 0 ? 'positive' : 'negative'}">${formatCurrency(totalProfit)}</td>
                             <td class="text-right">${totalMargin}%</td>
                         </tr>
+                    </tbody>
+                </table>
+                `;
+
+            } else if (reportType === 'partnerwise') {
+                html = `
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Partner Account</th>
+                                <th>Partner</th>
+                                <th class="text-right">Percentage</th>
+                                <th class="text-right">Total Profit</th>
+                                <th class="text-right">Profit Share</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                `;
+
+                if (!reportData || reportData.length === 0) {
+                    html += `
+                        <tr>
+                            <td colspan="5" style="text-align:center; color:#666; padding: 20px;">No Partner Accounts found for selected period.</td>
+                        </tr>
+                    `;
+                } else {
+                    reportData.forEach(account => {
+                        account.partners.forEach((partner, index) => {
+                            html += `
+                                <tr>
+                                    <td>${index === 0 ? account.account_name : ''}</td>
+                                    <td>${partner.partner_name}</td>
+                                    <td class="text-right">${parseFloat(partner.percentage).toFixed(2)}%</td>
+                                    <td class="text-right">${index === 0 ? formatCurrency(account.total_profit) : ''}</td>
+                                    <td class="text-right ${partner.profit_share >= 0 ? 'positive' : 'negative'}">${formatCurrency(partner.profit_share)}</td>
+                                </tr>
+                            `;
+                        });
+                    });
+                }
+
+                html += `
                     </tbody>
                 </table>
                 `;

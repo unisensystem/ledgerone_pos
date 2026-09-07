@@ -231,6 +231,9 @@ $currency_symbol = $currency['symbol'];
                 <button class="tab-btn" data-tab="supplierwise">
                     <i class="fas fa-truck"></i> Supplier-wise P&L
                 </button>
+                <button class="tab-btn" data-tab="partnerwise">
+                    <i class="fas fa-handshake"></i> Partner-wise P&L
+                </button>
             </div>
 
             <!-- Item-wise Tab -->
@@ -355,6 +358,30 @@ $currency_symbol = $currency['symbol'];
                             </tr>
                         </thead>
                         <tbody id="supplierTableBody">
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Partner-wise Tab -->
+            <div class="tab-content" id="partnerwise">
+                <div class="card-title">
+                    Partner-wise Profit & Loss
+                    <span style="font-size: 14px; font-weight: normal; color: var(--text-subtext); margin-left: 10px;" id="reportPeriodPartner"></span>
+                </div>
+
+                <div class="table-container">
+                    <table id="partnerTable">
+                        <thead>
+                            <tr>
+                                <th style="width: 25%;">Partner Account</th>
+                                <th style="width: 25%;">Partner</th>
+                                <th style="width: 15%;">Percentage</th>
+                                <th style="width: 17%;">Total Profit</th>
+                                <th style="width: 18%;">Profit Share</th>
+                            </tr>
+                        </thead>
+                        <tbody id="partnerTableBody">
                         </tbody>
                     </table>
                 </div>

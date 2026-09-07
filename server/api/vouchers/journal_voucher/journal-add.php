@@ -1,6 +1,6 @@
 <?php
 require_once '../../../../includes/connection.php';
-
+require_once '../../../../includes/posting_lock.php';
 header('Content-Type: application/json');
 
 if (session_status() == PHP_SESSION_NONE) {
@@ -31,6 +31,16 @@ if (!$data) {
 }
 
 $status = $data['status'] ?? 'posted';
+
+// Draft ko lock apply nahi hota, sirf Posted pe
+if ($status === 'posted') {
+    $lockCheck = checkPostingDateAllowed($pdo, $tenant_id, 'journal_voucher', $data['date']);
+    if (!$lockCheck['allowed']) {
+        http_response_code(400);
+        echo json_encode(['error' => $lockCheck['message']]);
+        exit();
+    }
+}
 
 try {
     $pdo->beginTransaction();
