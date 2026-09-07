@@ -332,18 +332,80 @@ async function fetchReportData(startDate, endDate, branchId, companyId, category
     return result.data;
 }
 
-// Fetch partner-wise breakdown from accounting_ledger based Partner Accounts
-async function fetchPartnerwiseData(startDate, endDate) {
-    const url = `../../../../server/api/financial_reports/profit_loss_detail/get-partnerwise.php?start_date=${startDate}&end_date=${endDate}`;
+// Fetch partner accounts and render the Partner-wise distribution table
+// based on the given total profit figure for the period.
+async function renderPartnerTable(totalProfit) {
+    if (!partnerTableBody) return;
 
-    const response = await fetch(url);
-    const result = await response.json();
+    try {
+        const response = await fetch('../../../../server/api/chart_of_accounts/partner-accounts.php');
+        const result = await response.json();
 
-    if (!result.success) {
-        throw new Error(result.message || 'Failed to fetch partner-wise data');
+        if (!result.success) {
+            partnerTableBody.innerHTML = `<tr><td colspan="3" style="text-align:center; color: var(--text-subtext); padding: 30px;">${result.message}</td></tr>`;
+            // Nothing to print in this case; clear any stale partner data.
+            if (window.currentData) window.currentData.partnerwise = { partners: [], totalProfit: totalProfit };
+            return;
+        }
+
+        const partners = result.data;
+
+        if (!partners || partners.length === 0) {
+            partnerTableBody.innerHTML = '<tr><td colspan="3" style="text-align:center; color: var(--text-subtext); padding: 30px;">No partners have been added yet. Use "Add Partner" in Chart of Accounts.</td></tr>';
+            if (window.currentData) window.currentData.partnerwise = { partners: [], totalProfit: totalProfit };
+            return;
+        }
+
+        let partnerHTML = '';
+        let totalPercentage = 0;
+        let totalDistributed = 0;
+
+        partners.forEach(partner => {
+            const percentage = parseFloat(partner.percentage) || 0;
+            const share = totalProfit * (percentage / 100);
+
+            totalPercentage += percentage;
+            totalDistributed += share;
+
+            partnerHTML += `
+                <tr>
+                    <td>${partner.account_name}</td>
+                    <td class="amount-cell">${percentage.toFixed(2)}%</td>
+                    <td class="amount-cell ${share >= 0 ? 'positive' : 'negative'}">${formatCurrency(share)}</td>
+                </tr>
+            `;
+        });
+
+        // Whatever percentage is left over (not assigned to any partner)
+        // is treated as the owner's / remaining share.
+        const ownerPercentage = 100 - totalPercentage;
+        const ownerShare = totalProfit - totalDistributed;
+
+        partnerHTML += `
+            <tr class="total-row">
+                <td><strong>Remaining / Owner's Share</strong></td>
+                <td class="amount-cell">${ownerPercentage.toFixed(2)}%</td>
+                <td class="amount-cell ${ownerShare >= 0 ? 'positive' : 'negative'}">${formatCurrency(ownerShare)}</td>
+            </tr>
+            <tr class="total-row">
+                <td><strong>TOTAL PROFIT</strong></td>
+                <td class="amount-cell">100.00%</td>
+                <td class="amount-cell ${totalProfit >= 0 ? 'positive' : 'negative'}">${formatCurrency(totalProfit)}</td>
+            </tr>
+        `;
+
+        partnerTableBody.innerHTML = partnerHTML;
+
+        // Store partner data so the Print button can send it to print.php
+        // (partner data comes from a separate endpoint, unlike the other tabs).
+        if (window.currentData) {
+            window.currentData.partnerwise = { partners: partners, totalProfit: totalProfit };
+        }
+    } catch (error) {
+        console.error('Error loading partner accounts:', error);
+        partnerTableBody.innerHTML = '<tr><td colspan="3" style="text-align:center; color: var(--text-subtext); padding: 30px;">Error loading partner data.</td></tr>';
+        if (window.currentData) window.currentData.partnerwise = { partners: [], totalProfit: totalProfit };
     }
-
-    return result.data;
 }
 
 // Generate report
@@ -404,7 +466,7 @@ async function generateReport() {
         reportPeriodCustomer.textContent = periodText;
         reportPeriodInvoice.textContent = periodText;
         reportPeriodSupplier.textContent = periodText;
-        reportPeriodPartner.textContent = periodText;
+        if (reportPeriodPartner) reportPeriodPartner.textContent = periodText;
 
         // Build item-wise table
         let itemHTML = '';
@@ -624,31 +686,8 @@ async function generateReport() {
 
         supplierTableBody.innerHTML = supplierHTML;
 
-        // Fetch and build partner-wise table (from Partner Accounts + accounting_ledger)
-        const partnerData = await fetchPartnerwiseData(startDateEl.value, endDateEl.value);
-        window.currentPartnerData = partnerData;
-
-        let partnerHTML = '';
-
-        if (partnerData.length === 0) {
-            partnerHTML = '<tr><td colspan="5" style="text-align:center; color: var(--text-subtext); padding: 30px;">No Partner Accounts found for selected period.</td></tr>';
-        } else {
-            partnerData.forEach(account => {
-                account.partners.forEach((partner, index) => {
-                    partnerHTML += `
-                        <tr>
-                            <td>${index === 0 ? account.account_name : ''}</td>
-                            <td>${partner.partner_name}</td>
-                            <td class="amount-cell">${partner.percentage.toFixed(2)}%</td>
-                            <td class="amount-cell">${index === 0 ? formatCurrency(account.total_profit) : ''}</td>
-                            <td class="amount-cell ${partner.profit_share >= 0 ? 'positive' : 'negative'}">${formatCurrency(partner.profit_share)}</td>
-                        </tr>
-                    `;
-                });
-            });
-        }
-
-        partnerTableBody.innerHTML = partnerHTML;
+        // Build partner-wise distribution table (based on overall Gross Profit)
+        await renderPartnerTable(grossProfit);
 
         // Show results
         summaryCards.style.display = 'grid';
@@ -719,7 +758,13 @@ function printReport() {
     } else if (activeTab === 'supplierwise') {
         reportData = window.currentData.supplierwise;
     } else if (activeTab === 'partnerwise') {
-        reportData = window.currentPartnerData;
+        // Partner data comes from a separate endpoint; renderPartnerTable()
+        // stashes it on window.currentData.partnerwise for printing.
+        if (!window.currentData.partnerwise || !window.currentData.partnerwise.partners || window.currentData.partnerwise.partners.length === 0) {
+            alert('No partner data available to print. Add partners from Chart of Accounts first.');
+            return;
+        }
+        reportData = window.currentData.partnerwise;
     }
     
     const dataJson = encodeURIComponent(JSON.stringify(reportData));

@@ -53,7 +53,6 @@ function handleGet() {
         $account_heads = [];
         $sub_accounts = [];
         $accounts = [];
-        $account_partners = [];
         
         // Get account heads
         $stmt = $pdo->prepare("SELECT id, name, tenant_id FROM accounts_head WHERE tenant_id = ? OR tenant_id = 0");
@@ -65,26 +64,17 @@ function handleGet() {
         $stmt->execute([$tenant_id]);
         $sub_accounts = $stmt->fetchAll(PDO::FETCH_ASSOC);
         
-        // Get accounts (posting accounts + partner accounts)
-        $stmt = $pdo->prepare("SELECT id, sub_account_id, name, debit, credit, tenant_id, is_partner_account FROM accounts WHERE tenant_id = ? OR tenant_id = 0 AND sub_account_id != 1");
+        // Get accounts
+        $stmt = $pdo->prepare("SELECT id, sub_account_id, name, debit, credit, tenant_id FROM accounts WHERE tenant_id = ? OR tenant_id = 0 AND sub_account_id != 1");
         $stmt->execute([$tenant_id]);
         $accounts = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-        // Get partner splits for Partner Accounts
-        $stmt = $pdo->prepare("SELECT ap.id, ap.account_id, ap.partner_name, ap.percentage
-                                FROM account_partners ap
-                                INNER JOIN accounts a ON ap.account_id = a.id
-                                WHERE a.tenant_id = ? OR a.tenant_id = 0");
-        $stmt->execute([$tenant_id]);
-        $account_partners = $stmt->fetchAll(PDO::FETCH_ASSOC);
         
         echo json_encode([
             'success' => true,
             'data' => [
                 'accountHeads' => $account_heads,
                 'subAccounts' => $sub_accounts,
-                'accounts' => $accounts,
-                'accountPartners' => $account_partners
+                'accounts' => $accounts
             ],
             'debug' => [
                 'tenant_id' => $tenant_id
@@ -172,64 +162,6 @@ function handlePost($input) {
                     throw $e;
                 }
                 break;
-
-            case 'partner':
-                $sub_account_id = $input['sub_account_id'] ?? 0;
-                $name = $input['name'] ?? '';
-                $debit = $input['debit'] ?? 0;
-                $credit = $input['credit'] ?? 0;
-                $partners = $input['partners'] ?? [];
-
-                if (empty($name) || !$sub_account_id) {
-                    echo json_encode(['success' => false, 'message' => 'Name and sub-account are required']);
-                    return;
-                }
-
-                $totalPercentage = 0;
-                foreach ($partners as $partner) {
-                    $totalPercentage += (float)($partner['percentage'] ?? 0);
-                }
-
-                if ($totalPercentage > 100) {
-                    echo json_encode(['success' => false, 'message' => 'Total partner percentage cannot exceed 100%']);
-                    return;
-                }
-
-                $pdo->beginTransaction();
-
-                try {
-                    $stmt = $pdo->prepare("INSERT INTO accounts (tenant_id, sub_account_id, name, debit, credit, is_partner_account) VALUES (?, ?, ?, ?, ?, 1)");
-                    $stmt->execute([$tenant_id, $sub_account_id, $name, $debit, $credit]);
-                    $account_id = $pdo->lastInsertId();
-
-                    // Save partner splits (remaining % is always calculated as Self/Owner, never stored)
-                    foreach ($partners as $partner) {
-                        $partner_name = trim($partner['name'] ?? '');
-                        $percentage = (float)($partner['percentage'] ?? 0);
-                        if ($partner_name === '' || $percentage <= 0) continue;
-
-                        $stmt = $pdo->prepare("INSERT INTO account_partners (tenant_id, account_id, partner_name, percentage) VALUES (?, ?, ?, ?)");
-                        $stmt->execute([$tenant_id, $account_id, $partner_name, $percentage]);
-                    }
-
-                    // Create double-entry ledger entries if opening balance > 0 (same as posting account)
-                    if ($debit > 0 || $credit > 0) {
-                        $stmt = $pdo->prepare("INSERT INTO accounting_ledger (tenant_id, transaction_type, reference_table, reference_id, account_id, date, description, debit, credit) VALUES (?, 'Opening Balance', 'accounts', ?, ?, CURDATE(), 'Opening Balance', ?, ?)");
-
-                        // Primary entry for the new account
-                        $stmt->execute([$tenant_id, $account_id, $account_id, $debit, $credit]);
-
-                        // Contra entry against Opening Balance Equity (account_id = 90)
-                        $stmt->execute([$tenant_id, $account_id, 90, $credit, $debit]);
-                    }
-
-                    $pdo->commit();
-                    echo json_encode(['success' => true, 'message' => 'Partner account created successfully', 'id' => $account_id]);
-                } catch (Exception $e) {
-                    $pdo->rollBack();
-                    throw $e;
-                }
-                break;
                 
             default:
                 echo json_encode(['success' => false, 'message' => 'Invalid type']);
@@ -297,98 +229,6 @@ function handlePut($input) {
                 
                 echo json_encode(['success' => true, 'message' => 'Account updated successfully']);
                 break;
-
-            case 'partner':
-                $sub_account_id = $input['sub_account_id'] ?? 0;
-                $name = $input['name'] ?? '';
-                $debit = $input['debit'] ?? 0;
-                $credit = $input['credit'] ?? 0;
-                $partners = $input['partners'] ?? [];
-
-                if (empty($name) || !$sub_account_id) {
-                    echo json_encode(['success' => false, 'message' => 'Name and sub-account are required']);
-                    return;
-                }
-
-                $totalPercentage = 0;
-                foreach ($partners as $partner) {
-                    $totalPercentage += (float)($partner['percentage'] ?? 0);
-                }
-
-                if ($totalPercentage > 100) {
-                    echo json_encode(['success' => false, 'message' => 'Total partner percentage cannot exceed 100%']);
-                    return;
-                }
-
-                $pdo->beginTransaction();
-
-                try {
-                    $stmt = $pdo->prepare("UPDATE accounts SET sub_account_id = ?, name = ?, debit = ?, credit = ? WHERE id = ? AND tenant_id = ?");
-                    $stmt->execute([$sub_account_id, $name, $debit, $credit, $id, $tenant_id]);
-
-                    // Replace partner splits with the latest list from the form
-                    $stmt = $pdo->prepare("DELETE FROM account_partners WHERE account_id = ? AND tenant_id = ?");
-                    $stmt->execute([$id, $tenant_id]);
-
-                    foreach ($partners as $partner) {
-                        $partner_name = trim($partner['name'] ?? '');
-                        $percentage = (float)($partner['percentage'] ?? 0);
-                        if ($partner_name === '' || $percentage <= 0) continue;
-
-                        $stmt = $pdo->prepare("INSERT INTO account_partners (tenant_id, account_id, partner_name, percentage) VALUES (?, ?, ?, ?)");
-                        $stmt->execute([$tenant_id, $id, $partner_name, $percentage]);
-                    }
-
-                    $pdo->commit();
-                    echo json_encode(['success' => true, 'message' => 'Partner account updated successfully']);
-                } catch (Exception $e) {
-                    $pdo->rollBack();
-                    throw $e;
-                }
-                break;
-
-            case 'convert_to_partner':
-                // Turns an existing Posting Account into a Partner Account WITHOUT
-                // changing its id, name, or balance - so existing ledger entries /
-                // references to this account_id stay intact.
-                $partners = $input['partners'] ?? [];
-
-                $totalPercentage = 0;
-                foreach ($partners as $partner) {
-                    $totalPercentage += (float)($partner['percentage'] ?? 0);
-                }
-
-                if ($totalPercentage > 100) {
-                    echo json_encode(['success' => false, 'message' => 'Total partner percentage cannot exceed 100%']);
-                    return;
-                }
-
-                $pdo->beginTransaction();
-
-                try {
-                    $stmt = $pdo->prepare("UPDATE accounts SET is_partner_account = 1 WHERE id = ? AND tenant_id = ?");
-                    $stmt->execute([$id, $tenant_id]);
-
-                    // Remove any old splits (in case it's being re-converted) and save the new ones
-                    $stmt = $pdo->prepare("DELETE FROM account_partners WHERE account_id = ? AND tenant_id = ?");
-                    $stmt->execute([$id, $tenant_id]);
-
-                    foreach ($partners as $partner) {
-                        $partner_name = trim($partner['name'] ?? '');
-                        $percentage = (float)($partner['percentage'] ?? 0);
-                        if ($partner_name === '' || $percentage <= 0) continue;
-
-                        $stmt = $pdo->prepare("INSERT INTO account_partners (tenant_id, account_id, partner_name, percentage) VALUES (?, ?, ?, ?)");
-                        $stmt->execute([$tenant_id, $id, $partner_name, $percentage]);
-                    }
-
-                    $pdo->commit();
-                    echo json_encode(['success' => true, 'message' => 'Account converted to Partner Account successfully']);
-                } catch (Exception $e) {
-                    $pdo->rollBack();
-                    throw $e;
-                }
-                break;
                 
             default:
                 echo json_encode(['success' => false, 'message' => 'Invalid type']);
@@ -429,10 +269,6 @@ function handleDelete($input) {
                 $pdo->beginTransaction();
 
                 try {
-                    // Delete partner splits if this was a Partner Account (no-op otherwise)
-                    $stmt = $pdo->prepare("DELETE FROM account_partners WHERE account_id = ? AND tenant_id = ?");
-                    $stmt->execute([$id, $tenant_id]);
-
                     // Delete all ledger entries that reference this account as account_id (all transaction types)
                     $stmt = $pdo->prepare("DELETE FROM accounting_ledger WHERE account_id = ? AND tenant_id = ?");
                     $stmt->execute([$id, $tenant_id]);

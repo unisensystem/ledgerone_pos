@@ -141,6 +141,12 @@ $data = $_GET['data'] ?? '';
             color: #e34f4f;
         }
 
+        .partner-note {
+            font-size: 11px;
+            color: #555;
+            margin-bottom: 10px;
+        }
+
         .print-footer {
             margin-top: 40px;
             text-align: center;
@@ -224,7 +230,7 @@ $data = $_GET['data'] ?? '';
         } elseif ($report_type === 'supplierwise') {
             echo 'Supplier-wise Profit & Loss Report';
         } elseif ($report_type === 'partnerwise') {
-            echo 'Partner-wise Profit & Loss Report';
+            echo 'Partner-wise Profit Distribution Report';
         } else {
             echo 'Invoice-wise Profit & Loss Report';
         }
@@ -473,43 +479,57 @@ $data = $_GET['data'] ?? '';
                 `;
 
             } else if (reportType === 'partnerwise') {
+                const partners = reportData.partners || [];
+                const totalProfit = parseFloat(reportData.totalProfit) || 0;
+
                 html = `
+                    <div class="partner-note">
+                        Distribution is calculated on the Gross Profit of the selected period (Revenue &minus; COGS).
+                    </div>
                     <table>
                         <thead>
                             <tr>
-                                <th>Partner Account</th>
-                                <th>Partner</th>
-                                <th class="text-right">Percentage</th>
-                                <th class="text-right">Total Profit</th>
+                                <th>Partner (Capital Account)</th>
+                                <th class="text-right">Share %</th>
                                 <th class="text-right">Profit Share</th>
                             </tr>
                         </thead>
                         <tbody>
                 `;
 
-                if (!reportData || reportData.length === 0) {
+                let totalPercentage = 0;
+                let totalDistributed = 0;
+
+                partners.forEach(partner => {
+                    const percentage = parseFloat(partner.percentage) || 0;
+                    const share = totalProfit * (percentage / 100);
+
+                    totalPercentage += percentage;
+                    totalDistributed += share;
+
                     html += `
                         <tr>
-                            <td colspan="5" style="text-align:center; color:#666; padding: 20px;">No Partner Accounts found for selected period.</td>
+                            <td>${partner.account_name}</td>
+                            <td class="text-right">${percentage.toFixed(2)}%</td>
+                            <td class="text-right ${share >= 0 ? 'positive' : 'negative'}">${formatCurrency(share)}</td>
                         </tr>
                     `;
-                } else {
-                    reportData.forEach(account => {
-                        account.partners.forEach((partner, index) => {
-                            html += `
-                                <tr>
-                                    <td>${index === 0 ? account.account_name : ''}</td>
-                                    <td>${partner.partner_name}</td>
-                                    <td class="text-right">${parseFloat(partner.percentage).toFixed(2)}%</td>
-                                    <td class="text-right">${index === 0 ? formatCurrency(account.total_profit) : ''}</td>
-                                    <td class="text-right ${partner.profit_share >= 0 ? 'positive' : 'negative'}">${formatCurrency(partner.profit_share)}</td>
-                                </tr>
-                            `;
-                        });
-                    });
-                }
+                });
+
+                const ownerPercentage = 100 - totalPercentage;
+                const ownerShare = totalProfit - totalDistributed;
 
                 html += `
+                        <tr class="total-row">
+                            <td><strong>Remaining / Owner's Share</strong></td>
+                            <td class="text-right">${ownerPercentage.toFixed(2)}%</td>
+                            <td class="text-right ${ownerShare >= 0 ? 'positive' : 'negative'}">${formatCurrency(ownerShare)}</td>
+                        </tr>
+                        <tr class="total-row">
+                            <td><strong>TOTAL PROFIT</strong></td>
+                            <td class="text-right">100.00%</td>
+                            <td class="text-right ${totalProfit >= 0 ? 'positive' : 'negative'}">${formatCurrency(totalProfit)}</td>
+                        </tr>
                     </tbody>
                 </table>
                 `;

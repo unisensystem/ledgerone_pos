@@ -63,8 +63,9 @@ $currency_symbol = $currency['symbol'];
                 <p>1. Select a date range for the report period.</p>
                 <p>2. Choose filters: Company, Branch, Customer, or Product.</p>
                 <p>3. Click "Generate Report" to view detailed profit analysis.</p>
-                <p>4. Switch between "Item-wise" and "Customer-wise" tabs.</p>
-                <p>5. Export the report in PDF or CSV format.</p>
+                <p>4. Switch between "Item-wise", "Category-wise", "Customer-wise", "Invoice-wise", "Supplier-wise" and "Partner-wise" tabs.</p>
+                <p>5. The "Partner-wise" tab shows each partner's capital account, their % share, and their share of the Gross Profit for the selected period. Partners are managed from the Chart of Accounts page ("Add Partner").</p>
+                <p>6. Export the report in PDF or CSV format.</p>
             </div>
         </div>
 
@@ -366,19 +367,21 @@ $currency_symbol = $currency['symbol'];
             <!-- Partner-wise Tab -->
             <div class="tab-content" id="partnerwise">
                 <div class="card-title">
-                    Partner-wise Profit & Loss
+                    Partner-wise Profit Distribution
                     <span style="font-size: 14px; font-weight: normal; color: var(--text-subtext); margin-left: 10px;" id="reportPeriodPartner"></span>
+                </div>
+
+                <div class="modal-info" style="margin-bottom: 16px;">
+                    <p><strong>Note:</strong> Distribution is calculated on the <strong>Gross Profit</strong> of the selected period (Revenue &minus; COGS). Partners and their % share are managed from the Chart of Accounts &rarr; "Add Partner" screen. Any percentage not assigned to a partner is shown as the remaining/owner's share.</p>
                 </div>
 
                 <div class="table-container">
                     <table id="partnerTable">
                         <thead>
                             <tr>
-                                <th style="width: 25%;">Partner Account</th>
-                                <th style="width: 25%;">Partner</th>
-                                <th style="width: 15%;">Percentage</th>
-                                <th style="width: 17%;">Total Profit</th>
-                                <th style="width: 18%;">Profit Share</th>
+                                <th style="width: 45%;">Partner (Capital Account)</th>
+                                <th style="width: 20%;">Share %</th>
+                                <th style="width: 35%;">Profit Share</th>
                             </tr>
                         </thead>
                         <tbody id="partnerTableBody">

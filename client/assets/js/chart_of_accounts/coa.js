@@ -19,7 +19,6 @@ const expandAllBtn = document.getElementById('expandAllBtn');
 const collapseAllBtn = document.getElementById('collapseAllBtn');
 const addSubAccountBtn = document.getElementById('addSubAccountBtn');
 const addPostingAccountBtn = document.getElementById('addPostingAccountBtn');
-const addPartnerAccountBtn = document.getElementById('addPartnerAccountBtn');
 const showManageableBtn = document.getElementById('showManageableBtn');
 const showAllBtn = document.getElementById('showAllBtn');
 const totalAccountsSpan = document.getElementById('totalAccounts');
@@ -27,11 +26,9 @@ const totalAccountsSpan = document.getElementById('totalAccounts');
 // Modals
 const subAccountModal = document.getElementById('subAccountModal');
 const postingAccountModal = document.getElementById('postingAccountModal');
-const partnerAccountModal = document.getElementById('partnerAccountModal');
 const editSubAccountModal = document.getElementById('editSubAccountModal');
 const editPostingAccountModal = document.getElementById('editPostingAccountModal');
-const editPartnerAccountModal = document.getElementById('editPartnerAccountModal');
-const convertToPartnerModal = document.getElementById('convertToPartnerModal');
+const partnerAccountModal = document.getElementById('partnerAccountModal');
 
 // Sub Account Modal Elements
 const closeSubAccountModalBtn = document.getElementById('closeSubAccountModalBtn');
@@ -47,16 +44,6 @@ const savePostingAccountBtn = document.getElementById('savePostingAccountBtn');
 const postingAccountForm = document.getElementById('postingAccountForm');
 const postingAccountParentSelect = document.getElementById('postingAccountParent');
 
-// Partner Account Modal Elements
-const closePartnerAccountModalBtn = document.getElementById('closePartnerAccountModalBtn');
-const cancelPartnerAccountBtn = document.getElementById('cancelPartnerAccountBtn');
-const savePartnerAccountBtn = document.getElementById('savePartnerAccountBtn');
-const partnerAccountForm = document.getElementById('partnerAccountForm');
-const partnerAccountParentSelect = document.getElementById('partnerAccountParent');
-const partnerRowsContainer = document.getElementById('partnerRowsContainer');
-const addPartnerRowBtn = document.getElementById('addPartnerRowBtn');
-const remainingPercentageDisplay = document.getElementById('remainingPercentageDisplay');
-
 // Edit Sub Account Modal Elements
 const closeEditSubAccountModalBtn = document.getElementById('closeEditSubAccountModalBtn');
 const cancelEditSubAccountBtn = document.getElementById('cancelEditSubAccountBtn');
@@ -71,29 +58,19 @@ const updatePostingAccountBtn = document.getElementById('updatePostingAccountBtn
 const editPostingAccountForm = document.getElementById('editPostingAccountForm');
 const editPostingAccountParentSelect = document.getElementById('editPostingAccountParent');
 
-// Edit Partner Account Modal Elements
-const closeEditPartnerAccountModalBtn = document.getElementById('closeEditPartnerAccountModalBtn');
-const cancelEditPartnerAccountBtn = document.getElementById('cancelEditPartnerAccountBtn');
-const updatePartnerAccountBtn = document.getElementById('updatePartnerAccountBtn');
-const editPartnerAccountForm = document.getElementById('editPartnerAccountForm');
-const editPartnerAccountParentSelect = document.getElementById('editPartnerAccountParent');
-const editPartnerRowsContainer = document.getElementById('editPartnerRowsContainer');
-const editAddPartnerRowBtn = document.getElementById('editAddPartnerRowBtn');
-const editRemainingPercentageDisplay = document.getElementById('editRemainingPercentageDisplay');
-
-// Convert to Partner Modal Elements
-const closeConvertToPartnerModalBtn = document.getElementById('closeConvertToPartnerModalBtn');
-const cancelConvertToPartnerBtn = document.getElementById('cancelConvertToPartnerBtn');
-const saveConvertToPartnerBtn = document.getElementById('saveConvertToPartnerBtn');
-const convertToPartnerAccountName = document.getElementById('convertToPartnerAccountName');
-const convertPartnerRowsContainer = document.getElementById('convertPartnerRowsContainer');
-const convertAddPartnerRowBtn = document.getElementById('convertAddPartnerRowBtn');
-const convertRemainingPercentageDisplay = document.getElementById('convertRemainingPercentageDisplay');
-let convertToPartnerAccountId = null;
+// Partner Account Modal Elements
+const addPartnerBtn = document.getElementById('addPartnerBtn');
+const closePartnerAccountModalBtn = document.getElementById('closePartnerAccountModalBtn');
+const cancelPartnerAccountBtn = document.getElementById('cancelPartnerAccountBtn');
+const savePartnerAccountBtn = document.getElementById('savePartnerAccountBtn');
+const addPartnerRowBtn = document.getElementById('addPartnerRowBtn');
+const newPartnerRowsContainer = document.getElementById('newPartnerRows');
+const existingPartnersList = document.getElementById('existingPartnersList');
 
 let expandedNodes = new Set();
 let showOnlyManageable = false;
 let totalAccountsCount = 0;
+let newPartnerRowCounter = 0;
 
 // Fetch CoA data from API
 async function fetchCoAData() {
@@ -115,7 +92,7 @@ async function fetchCoAData() {
 
 // Build CoA tree from API data
 function buildCoATree(data) {
-    const { accountHeads, subAccounts, accounts, accountPartners } = data;
+    const { accountHeads, subAccounts, accounts } = data;
     
     // Build account heads
     chartOfAccounts.children = accountHeads.map(head => ({
@@ -155,38 +132,20 @@ function buildCoATree(data) {
             if (head) head.children.push(sub);
         }
     });
-
-    // Group partner splits by account_id
-    const partnersByAccount = {};
-    (accountPartners || []).forEach(p => {
-        if (!partnersByAccount[p.account_id]) partnersByAccount[p.account_id] = [];
-        partnersByAccount[p.account_id].push({
-            partner_name: p.partner_name,
-            percentage: parseFloat(p.percentage)
-        });
-    });
     
-    // Attach posting accounts and partner accounts
+    // Attach posting accounts
     accounts.forEach(acc => {
         const parentSub = subAccountMap[acc.sub_account_id];
         if (parentSub) {
-            const isPartnerAccount = acc.is_partner_account == 1;
-
-            const node = {
+            parentSub.children.push({
                 id: acc.id.toString(),
                 name: acc.name,
-                type: isPartnerAccount ? 'partner' : 'posting',
+                type: 'posting',
                 status: acc.tenant_id === 0 ? 'system-locked' : 'manageable',
                 balanceType: acc.debit > 0 ? 'debit' : 'credit',
                 balanceAmount: acc.debit > 0 ? parseFloat(acc.debit) : parseFloat(acc.credit),
                 tenant_id: acc.tenant_id
-            };
-
-            if (isPartnerAccount) {
-                node.partners = partnersByAccount[acc.id] || [];
-            }
-
-            parentSub.children.push(node);
+            });
         }
     });
     
@@ -261,7 +220,7 @@ function createAccountNode(account, depth) {
 
     // Account icon
     const icon = document.createElement('div');
-    icon.className = `account-icon ${account.iconClass || 'assets'} ${account.type === 'partner' ? 'partner' : ''}`;
+    icon.className = `account-icon ${account.iconClass || 'assets'}`;
 
     // Set icon text based on account type
     if (account.type === 'head') {
@@ -270,8 +229,6 @@ function createAccountNode(account, depth) {
         icon.innerHTML = '<i class="fas fa-folder"></i>';
     } else if (account.type === 'posting') {
         icon.innerHTML = '<i class="fas fa-file-invoice"></i>';
-    } else if (account.type === 'partner') {
-        icon.innerHTML = '<i class="fas fa-handshake"></i>';
     }
 
     header.appendChild(icon);
@@ -291,8 +248,7 @@ function createAccountNode(account, depth) {
     const typeBadge = document.createElement('span');
     typeBadge.className = 'account-type';
     typeBadge.textContent = account.type === 'head' ? 'Head' :
-        account.type === 'sub' ? 'Sub Account' :
-        account.type === 'partner' ? 'Partner Account' : 'Posting';
+        account.type === 'sub' ? 'Sub Account' : 'Posting';
 
     nameRow.appendChild(name);
     nameRow.appendChild(typeBadge);
@@ -304,18 +260,6 @@ function createAccountNode(account, depth) {
     // Add balance for posting accounts
     if (account.type === 'posting') {
         id.innerHTML += ` | Balance: ${account.balanceAmount.toFixed(2)} (${account.balanceType})`;
-    }
-
-    // Add balance + partner split for partner accounts
-    if (account.type === 'partner') {
-        id.innerHTML += ` | Balance: ${account.balanceAmount.toFixed(2)} (${account.balanceType})`;
-
-        const partners = account.partners || [];
-        const partnerTotal = partners.reduce((sum, p) => sum + p.percentage, 0);
-        const selfPercentage = 100 - partnerTotal;
-        const partnerText = partners.map(p => `${p.partner_name}: ${p.percentage}%`).join(', ');
-
-        id.innerHTML += `<br>Partners: ${partnerText}${partnerText ? ', ' : ''}Self/Owner: ${selfPercentage.toFixed(2)}%`;
     }
 
     info.appendChild(nameRow);
@@ -333,8 +277,8 @@ function createAccountNode(account, depth) {
         const actions = document.createElement('div');
         actions.className = 'account-actions';
 
-        // Edit button (only for sub, posting, and partner accounts)
-        if (account.type === 'sub' || account.type === 'posting' || account.type === 'partner') {
+        // Edit button (only for sub and posting accounts)
+        if (account.type === 'sub' || account.type === 'posting') {
             const editBtn = document.createElement('button');
             editBtn.className = 'btn btn-secondary btn-sm';
             editBtn.innerHTML = '<i class="fas fa-edit"></i>';
@@ -346,8 +290,8 @@ function createAccountNode(account, depth) {
             actions.appendChild(editBtn);
         }
 
-        // Delete button (only for sub, posting, and partner accounts)
-        if (account.type === 'sub' || account.type === 'posting' || account.type === 'partner') {
+        // Delete button (only for sub and posting accounts)
+        if (account.type === 'sub' || account.type === 'posting') {
             const deleteBtn = document.createElement('button');
             deleteBtn.className = 'btn btn-secondary btn-sm';
             deleteBtn.innerHTML = '<i class="fas fa-trash"></i>';
@@ -357,21 +301,6 @@ function createAccountNode(account, depth) {
                 deleteAccount(account);
             });
             actions.appendChild(deleteBtn);
-        }
-
-        // Convert to Partner button (only for an EXISTING Posting Account) -
-        // lets the user add partners later without deleting/recreating the account,
-        // so its account_id and existing ledger history stay intact.
-        if (account.type === 'posting') {
-            const convertBtn = document.createElement('button');
-            convertBtn.className = 'btn btn-secondary btn-sm';
-            convertBtn.innerHTML = '<i class="fas fa-handshake"></i>';
-            convertBtn.title = 'Add Partners to this Account';
-            convertBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                openConvertToPartnerModal(account);
-            });
-            actions.appendChild(convertBtn);
         }
 
         header.appendChild(actions);
@@ -543,130 +472,6 @@ function populatePostingAccountParents() {
     }
 }
 
-// Populate parent account select for Partner Accounts
-function populatePartnerAccountParents() {
-    partnerAccountParentSelect.innerHTML = '<option value="">Select parent sub account</option>';
-
-    function addOptions(account, prefix = '') {
-        // Only allow Sub Accounts as parents for Partner Accounts (NOT Account Heads)
-        if (account.type === 'sub') {
-            const option = document.createElement('option');
-            option.value = account.id;
-            option.textContent = `${prefix}${account.name} [Sub] (ID: ${account.id})`;
-            partnerAccountParentSelect.appendChild(option);
-        }
-
-        if (account.children) {
-            account.children.forEach(child => {
-                addOptions(child, prefix + '-- ');
-            });
-        }
-    }
-
-    chartOfAccounts.children.forEach(account => {
-        addOptions(account);
-    });
-
-    // If no sub accounts exist, disable the select
-    if (partnerAccountParentSelect.options.length <= 1) {
-        partnerAccountParentSelect.disabled = true;
-        partnerAccountParentSelect.innerHTML = '<option value="">No Sub Accounts available. Create a Sub Account first.</option>';
-    } else {
-        partnerAccountParentSelect.disabled = false;
-    }
-}
-
-// Populate parent account select for Edit Partner Accounts
-function populateEditPartnerAccountParents() {
-    editPartnerAccountParentSelect.innerHTML = '<option value="">Select parent sub account</option>';
-
-    function addOptions(account, prefix = '') {
-        if (account.type === 'sub') {
-            const option = document.createElement('option');
-            option.value = account.id;
-            option.textContent = `${prefix}${account.name} [Sub] (ID: ${account.id})`;
-            editPartnerAccountParentSelect.appendChild(option);
-        }
-
-        if (account.children) {
-            account.children.forEach(child => {
-                addOptions(child, prefix + '-- ');
-            });
-        }
-    }
-
-    chartOfAccounts.children.forEach(account => {
-        addOptions(account);
-    });
-}
-
-// ---- Partner rows (dynamic Add Partner UI) helpers ----
-
-function getPartnerRowsData(containerEl) {
-    const rows = containerEl.querySelectorAll('.partner-row');
-    const partners = [];
-
-    rows.forEach(row => {
-        const name = row.querySelector('.partner-name-input').value.trim();
-        const percentage = parseFloat(row.querySelector('.partner-percentage-input').value);
-        if (name && !isNaN(percentage) && percentage > 0) {
-            partners.push({ name, percentage });
-        }
-    });
-
-    return partners;
-}
-
-function calculateRemainingPercentage(containerEl) {
-    const partners = getPartnerRowsData(containerEl);
-    const total = partners.reduce((sum, p) => sum + p.percentage, 0);
-    return { total, remaining: 100 - total };
-}
-
-function updateRemainingDisplay(containerEl, displayEl) {
-    const { total, remaining } = calculateRemainingPercentage(containerEl);
-
-    if (remaining < 0) {
-        displayEl.textContent = `Total exceeds 100% by ${Math.abs(remaining).toFixed(2)}%`;
-        displayEl.style.color = '#c0392b';
-    } else {
-        displayEl.textContent = `Remaining (Self / Owner): ${remaining.toFixed(2)}%`;
-        displayEl.style.color = '';
-    }
-}
-
-function createPartnerRow(name = '', percentage = '') {
-    const row = document.createElement('div');
-    row.className = 'partner-row';
-    row.style.display = 'flex';
-    row.style.gap = '10px';
-    row.style.marginBottom = '8px';
-    row.style.alignItems = 'center';
-
-    row.innerHTML = `
-        <input type="text" class="form-input partner-name-input" placeholder="Partner name" value="${name}" style="flex: 2;">
-        <input type="number" class="form-input partner-percentage-input" placeholder="%" min="0" max="100" step="0.01" value="${percentage}" style="flex: 1;">
-        <button type="button" class="btn btn-secondary btn-sm remove-partner-row-btn"><i class="fas fa-times"></i></button>
-    `;
-
-    return row;
-}
-
-function addPartnerRow(containerEl, displayEl, name = '', percentage = '') {
-    const row = createPartnerRow(name, percentage);
-
-    row.querySelector('.remove-partner-row-btn').addEventListener('click', () => {
-        row.remove();
-        updateRemainingDisplay(containerEl, displayEl);
-    });
-
-    row.querySelector('.partner-name-input').addEventListener('input', () => updateRemainingDisplay(containerEl, displayEl));
-    row.querySelector('.partner-percentage-input').addEventListener('input', () => updateRemainingDisplay(containerEl, displayEl));
-
-    containerEl.appendChild(row);
-    updateRemainingDisplay(containerEl, displayEl);
-}
-
 // Add new Sub Account
 async function addNewSubAccount() {
     const parentId = subAccountParentSelect.value;
@@ -722,7 +527,6 @@ async function addNewSubAccount() {
             expandedNodes.add(parentId + '-' + getDepth(parentId));
             await fetchCoAData();
             populatePostingAccountParents();
-            populatePartnerAccountParents();
             alert('Sub Account added successfully!');
         } else {
             alert('Error: ' + result.message);
@@ -775,57 +579,6 @@ async function addNewPostingAccount() {
     }
 }
 
-// Add new Partner Account
-async function addNewPartnerAccount() {
-    const parentId = partnerAccountParentSelect.value;
-    const accountName = document.getElementById('partnerAccountName').value;
-    const balanceType = document.querySelector('input[name="partnerBalanceType"]:checked').value;
-    const balanceAmount = parseFloat(document.getElementById('partnerBalanceAmount').value);
-    const partners = getPartnerRowsData(partnerRowsContainer);
-
-    if (!parentId || !accountName || isNaN(balanceAmount)) {
-        alert('Please fill all fields correctly.');
-        return;
-    }
-
-    const { total } = calculateRemainingPercentage(partnerRowsContainer);
-    if (total > 100) {
-        alert('Total partner percentage cannot exceed 100%.');
-        return;
-    }
-
-    try {
-        const response = await fetch('../../../server/api/chart_of_accounts/coa-add.php', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                type: 'partner',
-                sub_account_id: parentId,
-                name: accountName,
-                debit: balanceType === 'debit' ? balanceAmount : 0,
-                credit: balanceType === 'credit' ? balanceAmount : 0,
-                partners: partners
-            })
-        });
-
-        const result = await response.json();
-
-        if (result.success) {
-            partnerAccountModal.classList.remove('active');
-            partnerAccountForm.reset();
-            partnerRowsContainer.innerHTML = '';
-            expandedNodes.add(parentId + '-' + getDepth(parentId));
-            await fetchCoAData();
-            alert('Partner Account added successfully!');
-        } else {
-            alert('Error: ' + result.message);
-        }
-    } catch (error) {
-        console.error('Error adding partner account:', error);
-        alert('Error adding partner account');
-    }
-}
-
 // Edit account
 function editAccount(account) {
     if (account.type === 'sub') {
@@ -864,36 +617,6 @@ function editAccount(account) {
         editPostingAccountParentSelect.value = parentSubId;
         
         editPostingAccountModal.classList.add('active');
-    } else if (account.type === 'partner') {
-        populateEditPartnerAccountParents();
-        document.getElementById('editPartnerAccountId').value = account.id;
-        document.getElementById('editPartnerAccountName').value = account.name;
-
-        // Find parent sub account
-        let parentSubId = null;
-        function findParentSub(acc) {
-            if (acc.children) {
-                for (let child of acc.children) {
-                    if (child.id === account.id) {
-                        parentSubId = acc.id;
-                        return true;
-                    }
-                    if (findParentSub(child)) return true;
-                }
-            }
-            return false;
-        }
-        chartOfAccounts.children.forEach(acc => findParentSub(acc));
-        editPartnerAccountParentSelect.value = parentSubId;
-
-        // Pre-fill existing partner rows
-        editPartnerRowsContainer.innerHTML = '';
-        (account.partners || []).forEach(p => {
-            addPartnerRow(editPartnerRowsContainer, editRemainingPercentageDisplay, p.partner_name, p.percentage);
-        });
-        updateRemainingDisplay(editPartnerRowsContainer, editRemainingPercentageDisplay);
-
-        editPartnerAccountModal.classList.add('active');
     }
 }
 
@@ -1002,109 +725,6 @@ async function updatePostingAccount() {
     }
 }
 
-// Update Partner Account
-async function updatePartnerAccount() {
-    const id = document.getElementById('editPartnerAccountId').value;
-    const parentId = editPartnerAccountParentSelect.value;
-    const accountName = document.getElementById('editPartnerAccountName').value;
-    const partners = getPartnerRowsData(editPartnerRowsContainer);
-
-    if (!parentId || !accountName) {
-        alert('Please fill all fields correctly.');
-        return;
-    }
-
-    const { total } = calculateRemainingPercentage(editPartnerRowsContainer);
-    if (total > 100) {
-        alert('Total partner percentage cannot exceed 100%.');
-        return;
-    }
-
-    try {
-        const response = await fetch('../../../server/api/chart_of_accounts/coa-add.php', {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                type: 'partner',
-                id: id,
-                sub_account_id: parentId,
-                name: accountName,
-                debit: 0,
-                credit: 0,
-                partners: partners
-            })
-        });
-
-        const result = await response.json();
-
-        if (result.success) {
-            editPartnerAccountModal.classList.remove('active');
-            editPartnerAccountForm.reset();
-            editPartnerRowsContainer.innerHTML = '';
-            await fetchCoAData();
-            alert('Partner Account updated successfully!');
-        } else {
-            alert('Error: ' + result.message);
-        }
-    } catch (error) {
-        console.error('Error updating partner account:', error);
-        alert('Error updating partner account');
-    }
-}
-
-// Open the Convert to Partner modal for an existing Posting Account
-function openConvertToPartnerModal(account) {
-    convertToPartnerAccountId = account.id;
-    convertToPartnerAccountName.textContent = `${account.name} (ID: ${account.id})`;
-
-    convertPartnerRowsContainer.innerHTML = '';
-    addPartnerRow(convertPartnerRowsContainer, convertRemainingPercentageDisplay);
-
-    convertToPartnerModal.classList.add('active');
-}
-
-// Convert an existing Posting Account to a Partner Account (same account_id, name, balance)
-async function saveConvertToPartner() {
-    const partners = getPartnerRowsData(convertPartnerRowsContainer);
-
-    if (partners.length === 0) {
-        alert('Please add at least one partner.');
-        return;
-    }
-
-    const { total } = calculateRemainingPercentage(convertPartnerRowsContainer);
-    if (total > 100) {
-        alert('Total partner percentage cannot exceed 100%.');
-        return;
-    }
-
-    try {
-        const response = await fetch('../../../server/api/chart_of_accounts/coa-add.php', {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                type: 'convert_to_partner',
-                id: convertToPartnerAccountId,
-                partners: partners
-            })
-        });
-
-        const result = await response.json();
-
-        if (result.success) {
-            convertToPartnerModal.classList.remove('active');
-            convertPartnerRowsContainer.innerHTML = '';
-            await fetchCoAData();
-            alert('Account converted to Partner Account successfully! Its ID and history stayed the same.');
-        } else {
-            alert('Error: ' + result.message);
-        }
-    } catch (error) {
-        console.error('Error converting account to partner:', error);
-        alert('Error converting account to partner');
-    }
-}
-
 // Delete account
 async function deleteAccount(account) {
     if (!confirm(`Are you sure you want to delete "${account.name}"? This action cannot be undone.`)) {
@@ -1159,6 +779,273 @@ function getDepth(accountId, account = null, currentDepth = 0) {
     return -1;
 }
 
+// ===== Partner Accounts (Manage Partners modal) =====
+
+// Collect posting accounts that fall under any sub-account named "Capital"
+// Matched by name (not id), since ids can differ between environments/live server
+function collectCapitalPostingAccounts() {
+    const capitalPostingAccounts = [];
+
+    function collectPostings(node) {
+        if (node.type === 'posting') {
+            capitalPostingAccounts.push({ id: node.id, name: node.name });
+        }
+        if (node.children) {
+            node.children.forEach(collectPostings);
+        }
+    }
+
+    function findCapitalNodes(node) {
+        if (node.type === 'sub' && node.name && node.name.trim().toLowerCase() === 'capital') {
+            collectPostings(node);
+        }
+        if (node.children) {
+            node.children.forEach(findCapitalNodes);
+        }
+    }
+
+    chartOfAccounts.children.forEach(findCapitalNodes);
+    return capitalPostingAccounts;
+}
+
+// Build the <option> list for a partner account select (Capital accounts only)
+function buildPartnerAccountOptions(selectedId = '') {
+    const capitalAccounts = collectCapitalPostingAccounts();
+    let optionsHtml = '<option value="">Select capital account</option>';
+
+    capitalAccounts.forEach(acc => {
+        const selected = acc.id === selectedId ? 'selected' : '';
+        optionsHtml += `<option value="${acc.id}" ${selected}>${acc.name}</option>`;
+    });
+
+    return optionsHtml;
+}
+
+// Filter a partner account select's options based on a search term
+function filterPartnerAccountOptions(selectEl, searchTerm) {
+    const term = searchTerm.trim().toLowerCase();
+
+    Array.from(selectEl.options).forEach(option => {
+        if (!option.value) {
+            option.style.display = '';
+            return;
+        }
+        const matches = option.textContent.toLowerCase().includes(term);
+        option.style.display = matches ? '' : 'none';
+    });
+}
+
+// Add a new empty partner row to the "Add New Partner(s)" section
+function addPartnerRow() {
+    newPartnerRowCounter++;
+    const rowId = 'partnerRow' + newPartnerRowCounter;
+
+    const row = document.createElement('div');
+    row.className = 'form-row partner-row';
+    row.dataset.rowId = rowId;
+    row.style.display = 'flex';
+    row.style.gap = '10px';
+    row.style.alignItems = 'flex-end';
+    row.style.marginBottom = '10px';
+
+    row.innerHTML = `
+        <div class="form-group" style="flex: 2; margin-bottom: 0;">
+            <label class="form-label">Account</label>
+            <select class="form-input partner-account-select">
+                ${buildPartnerAccountOptions()}
+            </select>
+        </div>
+        <div class="form-group" style="flex: 1; margin-bottom: 0;">
+            <label class="form-label">Percentage</label>
+            <input type="number" class="form-input partner-percentage-input" placeholder="e.g., 25" step="0.01" min="0" max="100">
+        </div>
+        <button type="button" class="btn btn-secondary btn-sm remove-partner-row-btn" title="Remove Row">
+            <i class="fas fa-times"></i>
+        </button>
+    `;
+
+    row.querySelector('.remove-partner-row-btn').addEventListener('click', () => {
+        row.remove();
+    });
+
+    newPartnerRowsContainer.appendChild(row);
+}
+
+// Fetch existing partner accounts from the API and render them
+async function fetchPartnerAccounts() {
+    try {
+        const response = await fetch('../../../server/api/chart_of_accounts/partner-accounts.php');
+        const result = await response.json();
+
+        if (result.success) {
+            renderExistingPartners(result.data);
+        } else {
+            existingPartnersList.innerHTML = `<p style="color: var(--subtext); font-size: 13px;">Failed to load partners: ${result.message}</p>`;
+        }
+    } catch (error) {
+        console.error('Error fetching partner accounts:', error);
+        existingPartnersList.innerHTML = '<p style="color: var(--subtext); font-size: 13px;">Error loading partners.</p>';
+    }
+}
+
+// Render the list of already-saved partner accounts, with edit/delete controls
+function renderExistingPartners(partners) {
+    existingPartnersList.innerHTML = '';
+
+    if (!partners || partners.length === 0) {
+        existingPartnersList.innerHTML = '<p style="color: var(--subtext); font-size: 13px;">No partners added yet.</p>';
+        return;
+    }
+
+    partners.forEach(partner => {
+        const item = document.createElement('div');
+        item.className = 'partner-item';
+        item.dataset.partnerId = partner.id;
+        item.style.display = 'flex';
+        item.style.justifyContent = 'space-between';
+        item.style.alignItems = 'center';
+        item.style.padding = '10px';
+        item.style.border = '1px solid #e2e2e2';
+        item.style.borderRadius = '6px';
+        item.style.marginBottom = '8px';
+
+        item.innerHTML = `
+            <div>
+                <strong>${partner.account_name}</strong>
+                <span style="color: var(--subtext); margin-left: 8px; font-size: 12px;">Account ID: ${partner.account_id}</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <input type="number" class="form-input existing-partner-percentage" value="${partner.percentage}" step="0.01" min="0" max="100" style="width: 90px;">
+                <button type="button" class="btn btn-secondary btn-sm update-partner-btn" title="Update">
+                    <i class="fas fa-check"></i>
+                </button>
+                <button type="button" class="btn btn-secondary btn-sm delete-partner-btn" title="Delete">
+                    <i class="fas fa-trash"></i>
+                </button>
+            </div>
+        `;
+
+        item.querySelector('.update-partner-btn').addEventListener('click', () => {
+            const newPercentage = item.querySelector('.existing-partner-percentage').value;
+            updatePartnerAccount(partner.id, newPercentage);
+        });
+
+        item.querySelector('.delete-partner-btn').addEventListener('click', () => {
+            deletePartnerAccount(partner.id);
+        });
+
+        existingPartnersList.appendChild(item);
+    });
+}
+
+// Open the Manage Partners modal
+function openPartnerModal() {
+    newPartnerRowsContainer.innerHTML = '';
+    newPartnerRowCounter = 0;
+    addPartnerRow();
+
+    fetchPartnerAccounts();
+
+    partnerAccountModal.classList.add('active');
+}
+
+// Save all new partner rows entered in the modal
+async function savePartnerAccounts() {
+    const rows = newPartnerRowsContainer.querySelectorAll('.partner-row');
+    const partners = [];
+
+    rows.forEach(row => {
+        const accountId = row.querySelector('.partner-account-select').value;
+        const percentage = row.querySelector('.partner-percentage-input').value;
+
+        if (accountId && percentage !== '') {
+            partners.push({ account_id: accountId, percentage: percentage });
+        }
+    });
+
+    if (partners.length === 0) {
+        alert('Please select at least one account and enter a percentage.');
+        return;
+    }
+
+    try {
+        const response = await fetch('../../../server/api/chart_of_accounts/partner-accounts.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ partners: partners })
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+            newPartnerRowsContainer.innerHTML = '';
+            newPartnerRowCounter = 0;
+            addPartnerRow();
+            await fetchPartnerAccounts();
+            alert('Partner(s) added successfully!');
+        } else {
+            alert('Error: ' + result.message);
+        }
+    } catch (error) {
+        console.error('Error adding partner(s):', error);
+        alert('Error adding partner(s)');
+    }
+}
+
+// Update the percentage of an existing partner
+async function updatePartnerAccount(id, percentage) {
+    if (percentage === '' || percentage === null) {
+        alert('Please enter a percentage.');
+        return;
+    }
+
+    try {
+        const response = await fetch('../../../server/api/chart_of_accounts/partner-accounts.php', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: id, percentage: percentage })
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+            await fetchPartnerAccounts();
+            alert('Partner updated successfully!');
+        } else {
+            alert('Error: ' + result.message);
+        }
+    } catch (error) {
+        console.error('Error updating partner:', error);
+        alert('Error updating partner');
+    }
+}
+
+// Delete an existing partner
+async function deletePartnerAccount(id) {
+    if (!confirm('Are you sure you want to remove this partner?')) {
+        return;
+    }
+
+    try {
+        const response = await fetch('../../../server/api/chart_of_accounts/partner-accounts.php', {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: id })
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+            await fetchPartnerAccounts();
+        } else {
+            alert('Error: ' + result.message);
+        }
+    } catch (error) {
+        console.error('Error deleting partner:', error);
+        alert('Error deleting partner');
+    }
+}
+
 // Event Listeners
 expandAllBtn.addEventListener('click', expandAllNodes);
 collapseAllBtn.addEventListener('click', collapseAllNodes);
@@ -1171,13 +1058,6 @@ addSubAccountBtn.addEventListener('click', () => {
 addPostingAccountBtn.addEventListener('click', () => {
     populatePostingAccountParents();
     postingAccountModal.classList.add('active');
-});
-
-addPartnerAccountBtn.addEventListener('click', () => {
-    populatePartnerAccountParents();
-    partnerRowsContainer.innerHTML = '';
-    addPartnerRow(partnerRowsContainer, remainingPercentageDisplay);
-    partnerAccountModal.classList.add('active');
 });
 
 showManageableBtn.addEventListener('click', () => {
@@ -1220,25 +1100,6 @@ cancelPostingAccountBtn.addEventListener('click', () => {
 
 savePostingAccountBtn.addEventListener('click', addNewPostingAccount);
 
-// Partner Account Modal Event Listeners
-closePartnerAccountModalBtn.addEventListener('click', () => {
-    partnerAccountModal.classList.remove('active');
-});
-
-cancelPartnerAccountBtn.addEventListener('click', () => {
-    partnerAccountModal.classList.remove('active');
-});
-
-savePartnerAccountBtn.addEventListener('click', addNewPartnerAccount);
-
-addPartnerRowBtn.addEventListener('click', () => {
-    addPartnerRow(partnerRowsContainer, remainingPercentageDisplay);
-});
-
-editAddPartnerRowBtn.addEventListener('click', () => {
-    addPartnerRow(editPartnerRowsContainer, editRemainingPercentageDisplay);
-});
-
 // Edit Sub Account Modal Event Listeners
 closeEditSubAccountModalBtn.addEventListener('click', () => {
     editSubAccountModal.classList.remove('active');
@@ -1261,16 +1122,20 @@ cancelEditPostingAccountBtn.addEventListener('click', () => {
 
 updatePostingAccountBtn.addEventListener('click', updatePostingAccount);
 
-// Edit Partner Account Modal Event Listeners
-closeEditPartnerAccountModalBtn.addEventListener('click', () => {
-    editPartnerAccountModal.classList.remove('active');
+// Partner Account Modal Event Listeners
+addPartnerBtn.addEventListener('click', openPartnerModal);
+
+closePartnerAccountModalBtn.addEventListener('click', () => {
+    partnerAccountModal.classList.remove('active');
 });
 
-cancelEditPartnerAccountBtn.addEventListener('click', () => {
-    editPartnerAccountModal.classList.remove('active');
+cancelPartnerAccountBtn.addEventListener('click', () => {
+    partnerAccountModal.classList.remove('active');
 });
 
-updatePartnerAccountBtn.addEventListener('click', updatePartnerAccount);
+addPartnerRowBtn.addEventListener('click', addPartnerRow);
+
+savePartnerAccountBtn.addEventListener('click', savePartnerAccounts);
 
 // Close modals when clicking outside
 subAccountModal.addEventListener('click', (e) => {
@@ -1282,12 +1147,6 @@ subAccountModal.addEventListener('click', (e) => {
 postingAccountModal.addEventListener('click', (e) => {
     if (e.target === postingAccountModal) {
         postingAccountModal.classList.remove('active');
-    }
-});
-
-partnerAccountModal.addEventListener('click', (e) => {
-    if (e.target === partnerAccountModal) {
-        partnerAccountModal.classList.remove('active');
     }
 });
 
@@ -1303,30 +1162,9 @@ editPostingAccountModal.addEventListener('click', (e) => {
     }
 });
 
-editPartnerAccountModal.addEventListener('click', (e) => {
-    if (e.target === editPartnerAccountModal) {
-        editPartnerAccountModal.classList.remove('active');
-    }
-});
-
-// Convert to Partner Modal Event Listeners
-closeConvertToPartnerModalBtn.addEventListener('click', () => {
-    convertToPartnerModal.classList.remove('active');
-});
-
-cancelConvertToPartnerBtn.addEventListener('click', () => {
-    convertToPartnerModal.classList.remove('active');
-});
-
-saveConvertToPartnerBtn.addEventListener('click', saveConvertToPartner);
-
-convertAddPartnerRowBtn.addEventListener('click', () => {
-    addPartnerRow(convertPartnerRowsContainer, convertRemainingPercentageDisplay);
-});
-
-convertToPartnerModal.addEventListener('click', (e) => {
-    if (e.target === convertToPartnerModal) {
-        convertToPartnerModal.classList.remove('active');
+partnerAccountModal.addEventListener('click', (e) => {
+    if (e.target === partnerAccountModal) {
+        partnerAccountModal.classList.remove('active');
     }
 });
 
@@ -1334,7 +1172,6 @@ convertToPartnerModal.addEventListener('click', (e) => {
 fetchCoAData().then(() => {
     populateSubAccountParents();
     populatePostingAccountParents();
-    populatePartnerAccountParents();
     // Expand first level by default
     chartOfAccounts.children.forEach(account => {
         expandedNodes.add(account.id + '-0');
