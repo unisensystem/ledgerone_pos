@@ -36,6 +36,9 @@ $expiry_date = $_GET['expiry_date'] ?? null;
 // Salesman (sale officer) filter
 $sale_officer_id = $_GET['sale_officer_id'] ?? null;
 
+// Supplier Man (delivery man) filter
+$supplier_man_id = $_GET['supplier_man_id'] ?? null;
+
 // City filter (customer's city_id)
 $city_id = $_GET['city_id'] ?? null;
 
@@ -99,6 +102,7 @@ try {
     | NO stock_ledger JOIN is required.
     |
     | Salesman filter uses si.sale_officer_id directly.
+    | Supplier Man filter uses si.supplier_man_id directly.
     | City / Area filters use c.city_id / c.area_id directly,
     | since customers already carries those columns.
     |
@@ -374,6 +378,26 @@ try {
 
     /*
     |--------------------------------------------------------------------------
+    | SUPPLIER MAN (DELIVERY MAN)
+    |--------------------------------------------------------------------------
+    |
+    | supplier_man_id is directly on sale_invoice (si), same relationship
+    | (employees.id) as sale_officer_id.
+    |
+    */
+
+    if (!empty($supplier_man_id)) {
+
+        $sql .= "
+            AND si.supplier_man_id = ?
+        ";
+
+        $params[] = $supplier_man_id;
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
     | CITY
     |--------------------------------------------------------------------------
     |
@@ -493,6 +517,184 @@ try {
         $e->getMessage()
     );
 }
+
+
+/*
+|--------------------------------------------------------------------------
+| FILTER LABELS (SALESMAN / SUPPLIER MAN / CITY / AREA)
+|--------------------------------------------------------------------------
+|
+| Looked up independently of $rows (by filter id, from employees /
+| cities / areas) so the label still shows even when the filter
+| combination returns zero rows.
+|
+*/
+
+$salesman_name = null;
+
+if (!empty($sale_officer_id)) {
+
+    try {
+
+        $salesman_sql = "
+            SELECT full_name
+            FROM employees
+            WHERE id = ?
+              AND tenant_id = ?
+            LIMIT 1
+        ";
+
+        $salesman_stmt = $pdo->prepare($salesman_sql);
+
+        $salesman_stmt->execute([$sale_officer_id, $tenant_id]);
+
+        $salesman_row = $salesman_stmt->fetch(PDO::FETCH_ASSOC);
+
+        if ($salesman_row && !empty($salesman_row['full_name'])) {
+            $salesman_name = $salesman_row['full_name'];
+        }
+
+    } catch (Exception $e) {
+
+        error_log(
+            'Print report - salesman lookup skipped: ' .
+            $e->getMessage()
+        );
+    }
+}
+
+
+$supplier_man_name = null;
+
+if (!empty($supplier_man_id)) {
+
+    try {
+
+        $supplier_man_sql = "
+            SELECT full_name
+            FROM employees
+            WHERE id = ?
+              AND tenant_id = ?
+            LIMIT 1
+        ";
+
+        $supplier_man_stmt = $pdo->prepare($supplier_man_sql);
+
+        $supplier_man_stmt->execute([$supplier_man_id, $tenant_id]);
+
+        $supplier_man_row = $supplier_man_stmt->fetch(PDO::FETCH_ASSOC);
+
+        if ($supplier_man_row && !empty($supplier_man_row['full_name'])) {
+            $supplier_man_name = $supplier_man_row['full_name'];
+        }
+
+    } catch (Exception $e) {
+
+        error_log(
+            'Print report - supplier man lookup skipped: ' .
+            $e->getMessage()
+        );
+    }
+}
+
+
+$city_name_filter = null;
+
+if (!empty($city_id)) {
+
+    try {
+
+        $city_filter_sql = "
+            SELECT city_name
+            FROM cities
+            WHERE id = ?
+              AND tenant_id = ?
+            LIMIT 1
+        ";
+
+        $city_filter_stmt = $pdo->prepare($city_filter_sql);
+
+        $city_filter_stmt->execute([$city_id, $tenant_id]);
+
+        $city_filter_row = $city_filter_stmt->fetch(PDO::FETCH_ASSOC);
+
+        if ($city_filter_row && !empty($city_filter_row['city_name'])) {
+            $city_name_filter = $city_filter_row['city_name'];
+        }
+
+    } catch (Exception $e) {
+
+        error_log(
+            'Print report - city lookup skipped: ' .
+            $e->getMessage()
+        );
+    }
+}
+
+
+$area_name_filter = null;
+
+if (!empty($area_id)) {
+
+    try {
+
+        $area_filter_sql = "
+            SELECT area_name
+            FROM areas
+            WHERE id = ?
+              AND tenant_id = ?
+            LIMIT 1
+        ";
+
+        $area_filter_stmt = $pdo->prepare($area_filter_sql);
+
+        $area_filter_stmt->execute([$area_id, $tenant_id]);
+
+        $area_filter_row = $area_filter_stmt->fetch(PDO::FETCH_ASSOC);
+
+        if ($area_filter_row && !empty($area_filter_row['area_name'])) {
+            $area_name_filter = $area_filter_row['area_name'];
+        }
+
+    } catch (Exception $e) {
+
+        error_log(
+            'Print report - area lookup skipped: ' .
+            $e->getMessage()
+        );
+    }
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| FILTER SUMMARY LABEL
+|--------------------------------------------------------------------------
+|
+| Shown as a line above the table, only when at least one of these
+| filters was actually applied.
+|
+*/
+
+$filter_summary_parts = [];
+
+if ($salesman_name) {
+    $filter_summary_parts[] = 'Salesman: ' . $salesman_name;
+}
+
+if ($supplier_man_name) {
+    $filter_summary_parts[] = 'Supplier Man: ' . $supplier_man_name;
+}
+
+if ($city_name_filter) {
+    $filter_summary_parts[] = 'City: ' . $city_name_filter;
+}
+
+if ($area_name_filter) {
+    $filter_summary_parts[] = 'Area: ' . $area_name_filter;
+}
+
+$filter_summary_label = implode('   |   ', $filter_summary_parts);
 
 
 /*
@@ -883,7 +1085,6 @@ body {
 
     font-size: 12px;
 
-    font-style: italic;
 
     border-top:
         1px solid #000;
@@ -904,6 +1105,32 @@ body {
     flex: 1;
 
     text-align: center;
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| FILTER SUMMARY (Salesman / Supplier Man / City / Area)
+|--------------------------------------------------------------------------
+|
+| Sits right under the meta-row, above the table. Only rendered when
+| at least one of these filters is actually applied.
+|
+*/
+
+.filter-summary-row {
+
+    text-align: center;
+
+    font-size: 15.5px;
+
+
+    color: #333;
+
+    padding:
+        5px
+        0
+        0;
 }
 
 
@@ -1399,6 +1626,25 @@ body.hide-col-amount .col-amount {
     </div>
 
 </div>
+
+
+<!-- =========================================================
+     FILTER SUMMARY (Salesman / Supplier Man / City / Area)
+========================================================= -->
+
+<?php if (!empty($filter_summary_label)): ?>
+
+<div class="filter-summary-row">
+
+    <?= htmlspecialchars(
+        $filter_summary_label,
+        ENT_QUOTES,
+        'UTF-8'
+    ) ?>
+
+</div>
+
+<?php endif; ?>
 
 
 <!-- =========================================================

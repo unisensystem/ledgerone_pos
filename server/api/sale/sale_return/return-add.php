@@ -48,7 +48,6 @@ if (!$lockCheck['allowed']) {
 }
 
 // Generate sequential bill number...
-$pdo->beginTransaction();
 
     // Generate sequential bill number — tenant-wide
     $billStmt = $pdo->prepare("SELECT bill_no FROM sale_return WHERE tenant_id = ? ORDER BY id DESC LIMIT 1");
