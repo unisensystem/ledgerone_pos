@@ -514,6 +514,76 @@ if (!$user_id) {
                     </div>
                 </div>
 
+                <!-- Product Display Section -->
+                <div style="margin-bottom: 28px; padding: 16px; background: var(--surface-2); border-radius: var(--radius); border-left: 4px solid var(--success);">
+                    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 16px;">
+                        <i class="fas fa-barcode" style="color: var(--success); font-size: 16px;"></i>
+                        <h4 style="margin: 0; color: var(--heading); font-size: 15px; font-weight: 600;">Product Code / Name Display</h4>
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px;">
+                        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 10px; background: var(--surface-1); border-radius: 6px; transition: all 0.2s;" onmouseover="this.style.background='var(--surface-0)'" onmouseout="this.style.background='var(--surface-1)'">
+                            <input type="radio" name="productDisplayMode" value="code_and_name" id="productDisplayCodeAndName" style="width: auto;" checked>
+                            <div>
+                                <span style="font-size: 13px; font-weight: 500; display: block;">Code & Name</span>
+                                <span style="font-size: 11px; color: var(--subtext);">CODE - NAME</span>
+                            </div>
+                        </label>
+                        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 10px; background: var(--surface-1); border-radius: 6px; transition: all 0.2s;" onmouseover="this.style.background='var(--surface-0)'" onmouseout="this.style.background='var(--surface-1)'">
+                            <input type="radio" name="productDisplayMode" value="code_only" id="productDisplayCodeOnly" style="width: auto;">
+                            <div>
+                                <span style="font-size: 13px; font-weight: 500; display: block;">Code Only</span>
+                                <span style="font-size: 11px; color: var(--subtext);">Show code only</span>
+                            </div>
+                        </label>
+                        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 10px; background: var(--surface-1); border-radius: 6px; transition: all 0.2s;" onmouseover="this.style.background='var(--surface-0)'" onmouseout="this.style.background='var(--surface-1)'">
+                            <input type="radio" name="productDisplayMode" value="name_only" id="productDisplayNameOnly" style="width: auto;">
+                            <div>
+                                <span style="font-size: 13px; font-weight: 500; display: block;">Name Only</span>
+                                <span style="font-size: 11px; color: var(--subtext);">Show name only</span>
+                            </div>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Customer Code Display Section -->
+                <div style="margin-bottom: 28px; padding: 16px; background: var(--surface-2); border-radius: var(--radius); border-left: 4px solid var(--primary);">
+                    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 16px;">
+                        <i class="fas fa-user" style="color: var(--primary); font-size: 16px;"></i>
+                        <h4 style="margin: 0; color: var(--heading); font-size: 15px; font-weight: 600;">Customer Code / Name Display</h4>
+                    </div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 10px; background: var(--surface-1); border-radius: 6px; transition: all 0.2s;" onmouseover="this.style.background='var(--surface-0)'" onmouseout="this.style.background='var(--surface-1)'">
+                            <input type="radio" name="customerDisplayMode" value="code_name_address" id="customerDisplayCodeNameAddress" style="width: auto;" checked>
+                            <div>
+                                <span style="font-size: 13px; font-weight: 500; display: block;">Code, Name & Address</span>
+                                <span style="font-size: 11px; color: var(--subtext);">CODE | NAME | ADDRESS</span>
+                            </div>
+                        </label>
+                        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 10px; background: var(--surface-1); border-radius: 6px; transition: all 0.2s;" onmouseover="this.style.background='var(--surface-0)'" onmouseout="this.style.background='var(--surface-1)'">
+                            <input type="radio" name="customerDisplayMode" value="code_and_name" id="customerDisplayCodeAndName" style="width: auto;">
+                            <div>
+                                <span style="font-size: 13px; font-weight: 500; display: block;">Code & Name</span>
+                                <span style="font-size: 11px; color: var(--subtext);">CODE | NAME</span>
+                            </div>
+                        </label>
+                        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 10px; background: var(--surface-1); border-radius: 6px; transition: all 0.2s;" onmouseover="this.style.background='var(--surface-0)'" onmouseout="this.style.background='var(--surface-1)'">
+                            <input type="radio" name="customerDisplayMode" value="code_only" id="customerDisplayCodeOnly" style="width: auto;">
+                            <div>
+                                <span style="font-size: 13px; font-weight: 500; display: block;">Code Only</span>
+                                <span style="font-size: 11px; color: var(--subtext);">Show code only</span>
+                            </div>
+                        </label>
+                        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 10px; background: var(--surface-1); border-radius: 6px; transition: all 0.2s;" onmouseover="this.style.background='var(--surface-0)'" onmouseout="this.style.background='var(--surface-1)'">
+                            <input type="radio" name="customerDisplayMode" value="name_only" id="customerDisplayNameOnly" style="width: auto;">
+                            <div>
+                                <span style="font-size: 13px; font-weight: 500; display: block;">Name Only</span>
+                                <span style="font-size: 11px; color: var(--subtext);">Show name only</span>
+                            </div>
+                        </label>
+                    </div>
+                </div>
+
                 <!-- Item Display Section -->
                 <div style="margin-bottom: 28px; padding: 16px; background: var(--surface-2); border-radius: var(--radius); border-left: 4px solid var(--warning);">
                     <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 16px;">

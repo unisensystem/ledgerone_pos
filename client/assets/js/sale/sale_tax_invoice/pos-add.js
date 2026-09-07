@@ -19,6 +19,26 @@ const dataCache = {
     branches: new Map()
 };
 
+// Function to get customer display text based on display mode setting
+function getCustomerDisplayText(customer) {
+    const displayMode = localStorage.getItem('customerDisplayMode') || 'code_name_address';
+    if (displayMode === 'code_only') return customer.customer_code;
+    if (displayMode === 'name_only') return customer.customer_name;
+    if (displayMode === 'code_and_name') return `${customer.customer_code} | ${customer.customer_name}`;
+    return `${customer.customer_code} | ${customer.customer_name} | ${customer.address || 'N/A'}`;
+}
+
+// Function to get product display text based on display mode setting
+function getProductDisplayText(product) {
+    const displayMode = localStorage.getItem('productDisplayMode') || 'code_and_name';
+    if (displayMode === 'code_only') {
+        return product.code;
+    } else if (displayMode === 'name_only') {
+        return product.name;
+    }
+    return `${product.code} - ${product.name}`;
+}
+
 // Default shortcuts
 const defaultShortcuts = {
     addRow: 'F2',
@@ -923,7 +943,7 @@ function initializePage(permissions) {
         option.setAttribute('data-supplier-man', customer.supplier_man_id || '');
         option.setAttribute('data-credit-limit', customer.credit_limit || 0);
         option.setAttribute('data-withholding-tax', customer.advance_income_tax_percentage || 0);
-        option.textContent = `${customer.customer_code} | ${customer.customer_name} | ${customer.address || 'N/A'}`;
+        option.textContent = getCustomerDisplayText(customer);
         return option;
     }
 
@@ -1300,7 +1320,12 @@ function initializePage(permissions) {
 
                 // Populate form fields
                 document.getElementById('saleDate').value = invoice.sale_date;
-                document.getElementById('customerCodeSearch').value = invoice.customer_name;
+                document.getElementById('customerCodeSearch').value = (() => {
+                    const mode = localStorage.getItem('customerDisplayMode') || 'code_and_name';
+                    if (mode === 'code_only') return invoice.customer_code || invoice.customer_name;
+                    if (mode === 'name_only') return invoice.customer_name;
+                    return `${invoice.customer_code || ''} | ${invoice.customer_name}`.replace(/^\s*\|\s*/, '');
+                })();
                 document.getElementById('customerCode').value = invoice.customer_id;
                 document.getElementById('branchSearch').value = invoice.branch_name;
                 document.getElementById('branch').value = invoice.branch_id;
@@ -1549,7 +1574,12 @@ function initializePage(permissions) {
 
                 // Populate invoice details
                 document.getElementById('saleDate').value = order.sale_date;
-                document.getElementById('customerCodeSearch').value = `${order.customer_code} - ${order.customer_name}`;
+                document.getElementById('customerCodeSearch').value = (() => {
+                    const mode = localStorage.getItem('customerDisplayMode') || 'code_and_name';
+                    if (mode === 'code_only') return order.customer_code;
+                    if (mode === 'name_only') return order.customer_name;
+                    return `${order.customer_code} - ${order.customer_name}`;
+                })();
                 document.getElementById('customerCode').value = order.customer_id;
                 document.getElementById('branchSearch').value = branchesData.find(b => b.id == order.branch_id)?.branch_name || '';
                 document.getElementById('branch').value = order.branch_id;
@@ -1871,9 +1901,10 @@ function initializePage(permissions) {
             const codes = [];
             if (product.qr_code) codes.push(product.qr_code);
             if (product.barcode) codes.push(product.barcode);
-            const codeDisplay = codes.length > 0 ? ` (${codes.join(' - ')})` : '';
+            const codeDisplay = (localStorage.getItem('productDisplayMode') || 'code_and_name') === 'code_and_name' && codes.length > 0 ? ` (${codes.join(' - ')})` : '';
             const photoHtml = product.photo ? `<img src="../../../assets/uploads/products/${product.photo}" alt="${product.name}" style="width: 30px; height: 30px; object-fit: cover; margin-right: 8px; border-radius: 4px;">` : '';
-            return `<div class="dropdown-option" data-value="${product.id}" data-mrp="${product.mrp}" data-tp="${product.trade_price}" data-unit="${product.default_unit_id}" style="display: flex; align-items: center;">${photoHtml}${product.code} - ${product.name}${codeDisplay}</div>`;
+            const productDisplayText = getProductDisplayText(product);
+            return `<div class="dropdown-option" data-value="${product.id}" data-mrp="${product.mrp}" data-tp="${product.trade_price}" data-unit="${product.default_unit_id}" data-display-text="${productDisplayText}" style="display: flex; align-items: center;">${photoHtml}${productDisplayText}${codeDisplay}</div>`;
         }).join('');
         codeContainer.innerHTML = `
             <input type="text" class="search-input table-input" placeholder="Search product...">
@@ -4091,7 +4122,17 @@ function loadInvoiceSettings() {
     const productFilteringMode = localStorage.getItem('productFilteringMode') || 'showAll';
     const filteringRadio = document.querySelector(`input[name="productFilteringMode"][value="${productFilteringMode}"]`);
     if (filteringRadio) filteringRadio.checked = true;
-    
+
+    // Load product display preference
+    const productDisplayMode = localStorage.getItem('productDisplayMode') || 'code_and_name';
+    const displayRadio = document.querySelector(`input[name="productDisplayMode"][value="${productDisplayMode}"]`);
+    if (displayRadio) displayRadio.checked = true;
+
+    // Load customer display preference
+    const customerDisplayMode = localStorage.getItem('customerDisplayMode') || 'code_name_address';
+    const customerDisplayRadio = document.querySelector(`input[name="customerDisplayMode"][value="${customerDisplayMode}"]`);
+    if (customerDisplayRadio) customerDisplayRadio.checked = true;
+
     // Load other settings
     document.getElementById('enableTradeOfferAmount').checked = localStorage.getItem('enableTradeOfferAmount') === 'true';
     document.getElementById('enableFOC').checked = localStorage.getItem('enableFOC') === 'true';
@@ -4119,7 +4160,17 @@ function saveInvoiceSettings() {
     // Save product filtering preference
     const selectedFilteringMode = document.querySelector('input[name="productFilteringMode"]:checked')?.value || 'showAll';
     localStorage.setItem('productFilteringMode', selectedFilteringMode);
-    
+
+    // Save product display preference
+    const selectedDisplayMode = document.querySelector('input[name="productDisplayMode"]:checked')?.value || 'code_and_name';
+    const previousDisplayMode = localStorage.getItem('productDisplayMode');
+    localStorage.setItem('productDisplayMode', selectedDisplayMode);
+
+    // Save customer display preference
+    const selectedCustomerDisplayMode = document.querySelector('input[name="customerDisplayMode"]:checked')?.value || 'code_and_name';
+    const previousCustomerDisplayMode = localStorage.getItem('customerDisplayMode');
+    localStorage.setItem('customerDisplayMode', selectedCustomerDisplayMode);
+
     // Save other settings
     localStorage.setItem('enableTradeOfferAmount', document.getElementById('enableTradeOfferAmount').checked);
     localStorage.setItem('enableFOC', document.getElementById('enableFOC').checked);
@@ -4133,6 +4184,15 @@ function saveInvoiceSettings() {
     const enableSmartPriceHistoryPositionCheckbox = document.getElementById('enableSmartPriceHistoryPosition');
     if (enableSmartPriceHistoryPositionCheckbox) localStorage.setItem('smartPriceHistoryPosition', enableSmartPriceHistoryPositionCheckbox.checked);
     if (typeof repositionPriceHistoryPanel === 'function') repositionPriceHistoryPanel();
+
+    // Refresh dropdowns in place if the display mode actually changed
+    if (previousDisplayMode !== selectedDisplayMode) {
+        refreshAllProductDropdowns();
+    }
+    if (previousCustomerDisplayMode !== selectedCustomerDisplayMode) {
+        refreshCustomerDisplayInDropdown();
+    }
+
     alert('Invoice settings saved successfully!');
 }
 
@@ -5249,8 +5309,8 @@ async function loadCustomers(companyId = null) {
                 codeOption.setAttribute('data-supplier-man', customer.supplier_man_id || '');
                 codeOption.setAttribute('data-credit-limit', customer.credit_limit || 0);
                 codeOption.setAttribute('data-withholding-tax', customer.advance_income_tax_percentage || 0);
-                codeOption.textContent = `${customer.customer_code} | ${customer.customer_name} | ${customer.address || 'N/A'}`;
-                
+                codeOption.textContent = getCustomerDisplayText(customer);
+
                 if (customer.id == 613) {
                     console.log('Customer 613 loaded:', customer);
                     console.log('supplier_man_id:', customer.supplier_man_id);
@@ -5291,9 +5351,10 @@ function refreshAllProductDropdowns() {
         const codes = [];
         if (product.qr_code) codes.push(product.qr_code);
         if (product.barcode) codes.push(product.barcode);
-        const codeDisplay = codes.length > 0 ? ` (${codes.join(' - ')})` : '';
+        const codeDisplay = (localStorage.getItem('productDisplayMode') || 'code_and_name') === 'code_and_name' && codes.length > 0 ? ` (${codes.join(' - ')})` : '';
         const photoHtml = product.photo ? `<img src="../../../assets/uploads/products/${product.photo}" alt="${product.name}" style="width: 30px; height: 30px; object-fit: cover; margin-right: 8px; border-radius: 4px;">` : '';
-        return `<div class="dropdown-option" data-product='${JSON.stringify(product)}' style="display: flex; align-items: center;">${photoHtml}${product.code} - ${product.name}${codeDisplay}</div>`;
+        const productDisplayText = getProductDisplayText(product);
+        return `<div class="dropdown-option" data-product='${JSON.stringify(product)}' data-display-text="${productDisplayText}" style="display: flex; align-items: center;">${photoHtml}${productDisplayText}${codeDisplay}</div>`;
     }).join('');
 
     const tbody = document.getElementById('itemsTable')?.getElementsByTagName('tbody')[0];
@@ -5303,7 +5364,35 @@ function refreshAllProductDropdowns() {
         const searchInput = row.querySelector('.search-input');
         if (searchInput && searchInput.dropdownOptions) {
             searchInput.dropdownOptions.innerHTML = codeOptionsHtml;
+
+            // Also re-render the already-selected product's displayed text (if any)
+            // so a settings change is reflected immediately without re-selecting.
+            const hiddenInput = row.querySelector('input.item-code');
+            if (hiddenInput?.value) {
+                const product = productsData.find(p => p.id == hiddenInput.value);
+                if (product) searchInput.value = getProductDisplayText(product);
+            }
         }
+    }
+}
+
+// Refresh customer display format in dropdown
+function refreshCustomerDisplayInDropdown() {
+    const codeOptions = document.getElementById('customerCodeOptions');
+    if (!codeOptions) return;
+
+    Array.from(codeOptions.getElementsByClassName('dropdown-option')).forEach(option => {
+        const customerId = option.getAttribute('data-value');
+        const customer = customersData.find(c => c.id == customerId);
+        if (customer) option.textContent = getCustomerDisplayText(customer);
+    });
+
+    // Update search input if a customer is already selected
+    const hiddenInput = document.getElementById('customerCode');
+    const searchInput = document.getElementById('customerCodeSearch');
+    if (hiddenInput?.value && searchInput) {
+        const customer = customersData.find(c => c.id == hiddenInput.value);
+        if (customer) searchInput.value = getCustomerDisplayText(customer);
     }
 }
 
@@ -5423,9 +5512,10 @@ async function addRowDynamic() {
         const codes = [];
         if (product.qr_code) codes.push(product.qr_code);
         if (product.barcode) codes.push(product.barcode);
-        const codeDisplay = codes.length > 0 ? ` (${codes.join(' - ')})` : '';
+        const codeDisplay = (localStorage.getItem('productDisplayMode') || 'code_and_name') === 'code_and_name' && codes.length > 0 ? ` (${codes.join(' - ')})` : '';
         const photoHtml = product.photo ? `<img src="../../../assets/uploads/products/${product.photo}" alt="${product.name}" style="width: 30px; height: 30px; object-fit: cover; margin-right: 8px; border-radius: 4px;">` : '';
-        return `<div class="dropdown-option" data-product='${JSON.stringify(product)}' style="display: flex; align-items: center;">${photoHtml}${product.code} - ${product.name}${codeDisplay}</div>`;
+        const productDisplayText = getProductDisplayText(product);
+        return `<div class="dropdown-option" data-product='${JSON.stringify(product)}' data-display-text="${productDisplayText}" style="display: flex; align-items: center;">${photoHtml}${productDisplayText}${codeDisplay}</div>`;
     }).join('');
     
     codeContainer.innerHTML = `
@@ -5754,7 +5844,7 @@ function initTableDropdownDynamic(container, row) {
             justSelected = true;
             prevSearchText = '';
             const product = JSON.parse(e.target.getAttribute('data-product'));
-            searchInput.value = `${product.code} - ${product.name}`;
+            searchInput.value = getProductDisplayText(product);
             hiddenInput.value = product.id;
             
             // Get UOM details

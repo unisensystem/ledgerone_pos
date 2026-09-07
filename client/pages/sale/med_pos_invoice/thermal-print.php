@@ -422,7 +422,14 @@
             alert('Invoice ID is required');
             window.close();
         }
-        
+
+        // Round money amounts to whole numbers (no decimals) — e.g. 780.67 -> 780.
+        // Quantity fields (.toFixed(2) elsewhere in this file) are untouched.
+        function formatMoneyCell(val) {
+            const num = parseFloat(val || 0);
+            return isNaN(num) ? '0' : Math.round(num).toString();
+        }
+
         async function loadData() {
             try {
                 const [userResponse, invoiceResponse] = await Promise.all([
@@ -490,7 +497,7 @@
             const previousBalance = parseFloat(invoice.previous_balance || 0);
             if (previousBalance !== 0) {
                 document.getElementById('previousBalanceRow').style.display = 'flex';
-                document.getElementById('previousBalance').textContent = `${invoice.currency_symbol || ''}${previousBalance.toFixed(2)}`;
+                document.getElementById('previousBalance').textContent = `${invoice.currency_symbol || ''}${formatMoneyCell(previousBalance)}`;
             }
             
             const branchText = invoice.parent_branch_name ? 
@@ -549,14 +556,14 @@
                     const tradeOfferAmt = parseFloat(item.trade_offer_amount || 0);
                     const totalDisc = discountAmt + tradeOfferAmt;
                     
-                    const discCell = (!enableCashDiscountAmount && !enableTradeOfferAmount) ? '' : `<td class="text-right disc-col">${currencySymbol + totalDisc.toFixed(2)}</td>`;
-                    
+                    const discCell = (!enableCashDiscountAmount && !enableTradeOfferAmount) ? '' : `<td class="text-right disc-col">${currencySymbol + formatMoneyCell(totalDisc)}</td>`;
+
                     row.innerHTML = `
                         <td>${item.product_name}${childrenText}</td>
                         <td class="text-right">${parseFloat(item.quantity).toFixed(2)}</td>
-                        <td class="text-right">${currencySymbol + parseFloat(item.sale_price).toFixed(2)}</td>
+                        <td class="text-right">${currencySymbol + formatMoneyCell(item.sale_price)}</td>
                         ${discCell}
-                        <td class="text-right">${currencySymbol + parseFloat(item.net_amount).toFixed(2)}</td>
+                        <td class="text-right">${currencySymbol + formatMoneyCell(item.net_amount)}</td>
                     `;
                 });
             } else {
@@ -572,14 +579,14 @@
                     const tradeOfferAmt = parseFloat(item.trade_offer_amount || 0);
                     const totalDisc = discountAmt + tradeOfferAmt;
                     
-                    const discCell = (!enableCashDiscountAmount && !enableTradeOfferAmount) ? '' : `<td class="text-right disc-col">${isChild ? '-' : currencySymbol + totalDisc.toFixed(2)}</td>`;
-                    
+                    const discCell = (!enableCashDiscountAmount && !enableTradeOfferAmount) ? '' : `<td class="text-right disc-col">${isChild ? '-' : currencySymbol + formatMoneyCell(totalDisc)}</td>`;
+
                     row.innerHTML = `
                         <td style="${textStyle}">${indent}${item.product_name}</td>
                         <td class="text-right">${parseFloat(item.quantity).toFixed(2)}</td>
-                        <td class="text-right">${isChild ? '-' : currencySymbol + parseFloat(item.sale_price).toFixed(2)}</td>
+                        <td class="text-right">${isChild ? '-' : currencySymbol + formatMoneyCell(item.sale_price)}</td>
                         ${discCell}
-                        <td class="text-right">${isChild ? '-' : currencySymbol + parseFloat(item.net_amount).toFixed(2)}</td>
+                        <td class="text-right">${isChild ? '-' : currencySymbol + formatMoneyCell(item.net_amount)}</td>
                     `;
                 });
             }
@@ -617,17 +624,17 @@
                 <td class="text-right">${totalQty.toFixed(2)}</td>
                 <td class="text-right"></td>
                 ${totalsDiscCell}
-                <td class="text-right">${currencySymbol}${totalAmount.toFixed(2)}</td>
+                <td class="text-right">${currencySymbol}${formatMoneyCell(totalAmount)}</td>
             `;
-            
-            document.getElementById('totalBill').textContent = `${currencySymbol}${parseFloat(invoice.total_bill).toFixed(2)}`;
-            
+
+            document.getElementById('totalBill').textContent = `${currencySymbol}${formatMoneyCell(invoice.total_bill)}`;
+
             const discountAmt = parseFloat(invoice.total_discount_amount);
             if (discountAmt > 0) {
                 document.getElementById('discountRow').style.display = 'flex';
-                document.getElementById('discountAmount').textContent = `${currencySymbol}${discountAmt.toFixed(2)}`;
+                document.getElementById('discountAmount').textContent = `${currencySymbol}${formatMoneyCell(discountAmt)}`;
             }
-            
+
             // Calculate total GST from items
             let totalGst = 0;
             items.forEach(item => {
@@ -635,19 +642,19 @@
             });
             if (totalGst > 0) {
                 document.getElementById('gstRow').style.display = 'flex';
-                document.getElementById('gstAmount').textContent = `${currencySymbol}${totalGst.toFixed(2)}`;
+                document.getElementById('gstAmount').textContent = `${currencySymbol}${formatMoneyCell(totalGst)}`;
             }
-            
-            document.getElementById('netAmount').textContent = `${currencySymbol}${parseFloat(invoice.net_amount).toFixed(2)}`;
-            
+
+            document.getElementById('netAmount').textContent = `${currencySymbol}${formatMoneyCell(invoice.net_amount)}`;
+
             // Calculate received, returned and balance
             const amountPaid = parseFloat(invoice.amount_paid) || 0;
             const amountReturned = parseFloat(invoice.amount_returned) || 0;
             const remainingBalance = parseFloat(invoice.net_amount) - amountPaid + amountReturned;
-            
-            document.getElementById('amountPaid').textContent = `${currencySymbol}${amountPaid.toFixed(2)}`;
-            document.getElementById('amountReturned').textContent = `${currencySymbol}${amountReturned.toFixed(2)}`;
-            document.getElementById('remainingBalance').textContent = `${currencySymbol}${remainingBalance.toFixed(2)}`;
+
+            document.getElementById('amountPaid').textContent = `${currencySymbol}${formatMoneyCell(amountPaid)}`;
+            document.getElementById('amountReturned').textContent = `${currencySymbol}${formatMoneyCell(amountReturned)}`;
+            document.getElementById('remainingBalance').textContent = `${currencySymbol}${formatMoneyCell(remainingBalance)}`;
             
             document.getElementById('paymentMethod').textContent = invoice.payment_method || '-';
             

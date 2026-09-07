@@ -226,6 +226,17 @@
         body.a6-mode { font-size: 7px; }
         body.a6-mode .invoice-container { max-width: 400px; padding: 6px; }
         .warranty-section.hidden { display: none; }
+
+        /* Warranty text / notes are editable in-browser (see setupWarrantyEditing()) —
+           dashed outline only shows on screen so it never shows up in print/PDF. */
+        @media screen {
+            .editable-text:hover, .editable-text:focus {
+                outline: 1px dashed #999;
+                outline-offset: 3px;
+                cursor: text;
+                background: rgba(0, 123, 255, 0.04);
+            }
+        }
     </style>
 </head>
 
@@ -237,6 +248,7 @@
         <button class="print-btn" onclick="setPaperSize('A6')" id="btnA6">A6</button>
         <button class="print-btn" id="downloadPdfBtn" onclick="downloadAsPdf()" style="background:#28a745;">&#8595; Download PDF</button>
         <button class="print-btn" id="warrantyToggleBtn" onclick="toggleWarranty()">Hide Warranty</button>
+        <button class="print-btn" onclick="resetWarrantyCustomizations()" style="background:#6c757d;">Reset Warranty Text</button>
     </div>
 
     <div class="invoice-container" id="invoiceContainer">
@@ -348,12 +360,12 @@
         <!-- Warranty / signature -->
         <div class="warranty-section">
             <div class="text-block">
-                <p id="warrantyText" style="margin-bottom:6px;"></p>
+                <p id="warrantyText" class="editable-text" contenteditable="true" spellcheck="false" style="margin-bottom:6px;"></p>
                 <p><strong>Note:</strong></p>
-                <p>1 - This warranty does not apply to unani, homeopathic, bio-chemic, herbal, nutraceutical and general items including syringes, medical disposables if any mentioned in this invoice.</p>
-                <p>2 - For Near Expiry Items we must be informed 6 months prior to expiry.</p>
-                <p>3 - Ensure that you have received the stock according to printed quantities and values.</p>
-                <p>4 - In case of any discrepancy, please inform us immediately otherwise we don't accept any responsibility afterward.</p>
+                <p id="warrantyNote1" class="editable-text" contenteditable="true" spellcheck="false">1 - This warranty does not apply to unani, homeopathic, bio-chemic, herbal, nutraceutical and general items including syringes, medical disposables if any mentioned in this invoice.</p>
+                <p id="warrantyNote2" class="editable-text" contenteditable="true" spellcheck="false">2 - For Near Expiry Items we must be informed 6 months prior to expiry.</p>
+                <p id="warrantyNote3" class="editable-text" contenteditable="true" spellcheck="false">3 - Ensure that you have received the stock according to printed quantities and values.</p>
+                <p id="warrantyNote4" class="editable-text" contenteditable="true" spellcheck="false">4 - In case of any discrepancy, please inform us immediately otherwise we don't accept any responsibility afterward.</p>
             </div>
             <div class="sign-block">
                 <div id="signatureImgWrap"></div>
@@ -635,6 +647,10 @@
                 `a distributor / wholesaler / authorized agent of the drugs on this invoice, do hereby give this warranty ` +
                 `that the drugs invoiced as sold by us, do not contravene in any way the provision of Section 23 of the Drug Act 1976.`;
 
+            // Apply any saved custom wording over the computed default above —
+            // see setupWarrantyEditing() for how these get saved.
+            applyWarrantyCustomizations();
+
             // QR code (optional, kept from previous version)
             setTimeout(() => {
                 const enablePrintQRCode = localStorage.getItem('enablePrintQRCode') === 'true';
@@ -654,6 +670,9 @@
             const btn = document.getElementById('downloadPdfBtn');
             btn.disabled = true;
             btn.textContent = 'Generating...';
+            // Commit any in-progress warranty text edit (and drop its cursor/selection)
+            // before capturing, so the PDF never shows a mid-edit state.
+            if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
             document.querySelectorAll('.no-print').forEach(el => el.style.setProperty('display', 'none', 'important'));
 
             // Capture the container as-is — .a5-mode/.a6-mode on <body> (see setPaperSize)
@@ -734,6 +753,40 @@
                 btn.style.background = '#6c757d';
             }
         });
+
+        // Warranty text and the 4 numbered notes are editable in-browser (click into
+        // the text and type) — the edited wording is saved to localStorage on blur and
+        // reapplied on every future load, overriding the computed default, until reset.
+        // Shared with invoice-print2.php (same keys) so one edit applies to both.
+        const WARRANTY_EDITABLE_IDS = ['warrantyText', 'warrantyNote1', 'warrantyNote2', 'warrantyNote3', 'warrantyNote4'];
+        function warrantyStorageKey(id) { return `warranty_${id}_custom`; }
+
+        function applyWarrantyCustomizations() {
+            WARRANTY_EDITABLE_IDS.forEach(id => {
+                const saved = localStorage.getItem(warrantyStorageKey(id));
+                if (saved !== null) {
+                    const el = document.getElementById(id);
+                    if (el) el.textContent = saved;
+                }
+            });
+        }
+
+        function setupWarrantyEditing() {
+            WARRANTY_EDITABLE_IDS.forEach(id => {
+                const el = document.getElementById(id);
+                if (!el) return;
+                el.addEventListener('blur', function() {
+                    localStorage.setItem(warrantyStorageKey(id), el.textContent.trim());
+                });
+            });
+        }
+        setupWarrantyEditing();
+
+        function resetWarrantyCustomizations() {
+            if (!confirm('Reset warranty text and notes back to the default wording? This clears your saved edits.')) return;
+            WARRANTY_EDITABLE_IDS.forEach(id => localStorage.removeItem(warrantyStorageKey(id)));
+            location.reload();
+        }
 
         loadData();
     </script>
