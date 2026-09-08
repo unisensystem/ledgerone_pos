@@ -12,10 +12,10 @@ function checkPostingDateAllowed($pdo, $tenant_id, $module_key, $voucher_date) {
         return ['allowed' => true, 'message' => ''];
     }
 
-    if (strtotime($voucher_date) > strtotime($lockDate)) {
+    if (strtotime($voucher_date) <= strtotime($lockDate)) {
         return [
             'allowed' => false,
-            'message' => "Posting is locked. Entries after $lockDate cannot be posted."
+            'message' => "Posting is locked. Entries on or before $lockDate cannot be posted."
         ];
     }
 

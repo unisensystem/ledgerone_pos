@@ -47,12 +47,21 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         });
         updateAssignUomButton();
+        updateBulkDeleteButton();
     });
     
     // Assign UOM button (for selected products)
     document.getElementById('assignUomBtn').addEventListener('click', function() {
         openBulkUomModal(false);
     });
+
+    // Delete Selected button (for selected products)
+    if (document.getElementById('deleteSelectedBtn')) {
+        document.getElementById('deleteSelectedBtn').addEventListener('click', function() {
+            if (selectedProducts.size === 0) return;
+            showBulkDeleteModal();
+        });
+    }
     
     // Bulk UOM modal handlers
     document.getElementById('closeBulkUomModal').addEventListener('click', closeBulkUomModal);
@@ -319,6 +328,7 @@ function renderProductTable(productsToRender) {
                 document.getElementById('selectAll').checked = false;
             }
             updateAssignUomButton();
+            updateBulkDeleteButton();
         });
     });
 
@@ -329,6 +339,16 @@ function updateAssignUomButton() {
     const btn = document.getElementById('assignUomBtn');
     const count = document.getElementById('selectedCount');
     count.textContent = selectedProducts.size;
+    btn.style.display = selectedProducts.size > 0 ? 'inline-flex' : 'none';
+}
+
+// Keeps the "Delete Selected" button in sync with the same selectedProducts
+// set that already drives the Assign UOM button
+function updateBulkDeleteButton() {
+    const btn = document.getElementById('deleteSelectedBtn');
+    if (!btn) return;
+    const count = document.getElementById('deleteSelectedCount');
+    if (count) count.textContent = selectedProducts.size;
     btn.style.display = selectedProducts.size > 0 ? 'inline-flex' : 'none';
 }
 
@@ -502,6 +522,7 @@ function handleBulkUomSubmit(e) {
             selectedProducts.clear();
             document.getElementById('selectAll').checked = false;
             updateAssignUomButton();
+            updateBulkDeleteButton();
             loadProducts(currentPage);
         } else {
             alert('Error: ' + data.message);
@@ -579,6 +600,45 @@ function showDeleteModal(productName, productId) {
     };
 }
 
+// Same delete modal, reused for the bulk case - shows a count-based message
+// and confirms into performBulkDelete instead of performDelete
+function showBulkDeleteModal() {
+    const count = selectedProducts.size;
+    document.getElementById('deleteModalMessage').textContent =
+        `Are you sure you want to delete ${count} selected product${count > 1 ? 's' : ''}? This action cannot be undone.`;
+
+    const modal = document.getElementById('deleteModal');
+    modal.style.display = 'flex';
+
+    // Remove previous event listeners
+    const newCancelBtn = document.getElementById('cancelDelete').cloneNode(true);
+    const newConfirmBtn = document.getElementById('confirmDelete').cloneNode(true);
+    document.getElementById('cancelDelete').parentNode.replaceChild(newCancelBtn, document.getElementById('cancelDelete'));
+    document.getElementById('confirmDelete').parentNode.replaceChild(newConfirmBtn, document.getElementById('confirmDelete'));
+
+    // Add new event listeners
+    newCancelBtn.addEventListener('click', () => {
+        modal.style.display = 'none';
+    });
+
+    newConfirmBtn.addEventListener('click', () => {
+        modal.style.display = 'none';
+        performBulkDelete(Array.from(selectedProducts));
+    });
+
+    // Close button
+    document.getElementById('closeDeleteModal').onclick = () => {
+        modal.style.display = 'none';
+    };
+
+    // Close on outside click
+    modal.onclick = (e) => {
+        if (e.target === modal) {
+            modal.style.display = 'none';
+        }
+    };
+}
+
 function performDelete(productId) {
     fetch(`../../../../server/api/inventory/products/product-delete.php`, {
         method: 'POST',
@@ -599,6 +659,35 @@ function performDelete(productId) {
     .catch(error => {
         console.error('Error:', error);
         alert('An error occurred while deleting the product');
+    });
+}
+
+function performBulkDelete(ids) {
+    const body = ids.map(id => `ids[]=${id}`).join('&');
+
+    fetch(`../../../../server/api/inventory/products/product-delete.php`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: body
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert(data.message);
+            selectedProducts.clear();
+            document.getElementById('selectAll').checked = false;
+            updateAssignUomButton();
+            updateBulkDeleteButton();
+            loadProducts(currentPage);
+        } else {
+            alert('Error: ' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('An error occurred while deleting products');
     });
 }
 
@@ -623,6 +712,9 @@ function loadProducts(page = 1) {
     .then(response => response.json())
     .then(data => {
         if (data.success) {
+            // Reset selection whenever the underlying data set changes
+            selectedProducts.clear();
+
             products = data.products.map(product => {
                 let uomDisplay = '';
                 if (product.uom_type === 'unit' && product.default_unit_name) {
@@ -662,6 +754,9 @@ function loadProducts(page = 1) {
             
             renderProductTable(products);
             updatePagination();
+            document.getElementById('selectAll').checked = false;
+            updateAssignUomButton();
+            updateBulkDeleteButton();
         } else {
             console.error('Error loading products:', data.message);
         }

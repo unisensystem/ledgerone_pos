@@ -8,6 +8,10 @@ let editCustomerCategories = [];
 let editBrands = [];
 let editSubAccountCounter = 0;
 
+// Bulk select/delete state
+let selectedCustomerIds = new Set();
+let bulkDeleteEnabled = false;
+
 document.addEventListener('DOMContentLoaded', function () {
     const customersTable = document.getElementById('customersTable');
     const searchInput = document.getElementById('searchInput');
@@ -18,6 +22,10 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // Check permissions first
     checkPermissions().then(() => {
+        bulkDeleteEnabled = userPermissions.includes('Delete');
+        if (bulkDeleteEnabled) {
+            injectBulkDeleteUI();
+        }
         loadCompanyFilter();
         loadCustomers();
     });
@@ -35,10 +43,13 @@ document.addEventListener('DOMContentLoaded', function () {
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
+                    // Reset selection whenever the underlying data set changes
+                    selectedCustomerIds.clear();
                     customers = data.customers;
                     renderCustomers(customers);
                     updateStats(data.stats);
                     updatePagination(data.pagination);
+                    updateBulkBar();
                 } else {
                     showNotification('Error', data.message, 'error');
                 }
@@ -61,6 +72,10 @@ document.addEventListener('DOMContentLoaded', function () {
             const deleteBtn = userPermissions.includes('Delete') ? 
                 `<button class="action-btn delete" title="Delete Customer"><i class="fas fa-trash"></i></button>` : '';
 
+            const checkboxCell = bulkDeleteEnabled
+                ? `<td><input type="checkbox" class="customer-row-checkbox" value="${customer.id}" ${selectedCustomerIds.has(String(customer.id)) ? 'checked' : ''}></td>`
+                : '';
+
             const balance = parseFloat(customer.current_balance || 0);
             const openingDebit = parseFloat(customer.opening_debit_amount || 0);
             const openingCredit = parseFloat(customer.opening_credit_amount || 0);
@@ -69,6 +84,7 @@ document.addEventListener('DOMContentLoaded', function () {
             const row = document.createElement('tr');
             row.dataset.id = customer.id;
             row.innerHTML = `
+                        ${checkboxCell}
                         <td>${startSr + index}</td>
                         <td><span class="customer-code">${customer.customer_code}</span></td>
                         <td><span class="customer-name">${customer.customer_name}</span></td>
@@ -199,18 +215,20 @@ document.addEventListener('DOMContentLoaded', function () {
     const deleteCancelBtn = document.getElementById('deleteCancelBtn');
     const deleteConfirmBtn = document.getElementById('deleteConfirmBtn');
     const deleteCustomerName = document.getElementById('deleteCustomerName');
-    let currentDeletingCustomerId = null;
+    // Holds the id(s) currently targeted by the delete modal (single delete = 1 id, bulk delete = many)
+    let currentDeletingIds = [];
 
-    // Delete Customer Function
-    function deleteCustomer(customerId, customerName) {
-        currentDeletingCustomerId = customerId;
-        deleteCustomerName.textContent = customerName;
+    // Delete Customer Function - accepts an array of ids so the same modal/flow
+    // works for both single-row delete and bulk delete
+    function deleteCustomer(ids, label) {
+        currentDeletingIds = ids;
+        deleteCustomerName.textContent = label;
         deleteModal.classList.add('show');
     }
 
     function closeDeleteModal() {
         deleteModal.classList.remove('show');
-        currentDeletingCustomerId = null;
+        currentDeletingIds = [];
     }
 
     function confirmDelete() {
@@ -222,13 +240,15 @@ document.addEventListener('DOMContentLoaded', function () {
             headers: {
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({ id: currentDeletingCustomerId })
+            body: JSON.stringify({ ids: currentDeletingIds })
         })
         .then(response => response.json())
         .then(data => {
             if (data.success) {
                 showNotification('Success', data.message, 'success');
                 closeDeleteModal();
+                selectedCustomerIds.clear();
+                updateBulkBar();
                 loadCustomers();
             } else {
                 showNotification('Error', data.message, 'error');
@@ -252,6 +272,89 @@ document.addEventListener('DOMContentLoaded', function () {
         if (e.target === deleteModal) {
             closeDeleteModal();
         }
+    });
+
+    // Bulk select: inject "select all" header checkbox + bulk actions bar
+    // (done dynamically so no HTML template edit is required)
+    function injectBulkDeleteUI() {
+        const table = customersTable.closest('table');
+        if (!table) return;
+
+        // Add "select all" checkbox as the first column of the header row
+        const headerRow = table.querySelector('thead tr');
+        if (headerRow && !document.getElementById('selectAllCheckbox')) {
+            const th = document.createElement('th');
+            th.innerHTML = `<input type="checkbox" id="selectAllCheckbox" title="Select all on this page">`;
+            headerRow.insertBefore(th, headerRow.firstChild);
+
+            document.getElementById('selectAllCheckbox').addEventListener('change', function () {
+                const checked = this.checked;
+                customers.forEach(c => {
+                    if (checked) {
+                        selectedCustomerIds.add(String(c.id));
+                    } else {
+                        selectedCustomerIds.delete(String(c.id));
+                    }
+                });
+                renderCustomers(customers);
+                updateBulkBar();
+            });
+        }
+
+        // Add the bulk actions bar right above the table
+        if (!document.getElementById('bulkActionsBar')) {
+            const bar = document.createElement('div');
+            bar.id = 'bulkActionsBar';
+            bar.style.cssText = 'display:none; align-items:center; justify-content:space-between; padding:10px 16px; margin-bottom:10px; background:var(--surface-secondary, #f5f5f5); border:1px solid var(--border-default, #ddd); border-radius:8px;';
+            bar.innerHTML = `
+                <span id="bulkSelectedCount" style="font-weight:600;"></span>
+                <button type="button" id="bulkDeleteBtn" style="display:flex; align-items:center; gap:6px; padding:8px 14px; border:none; border-radius:6px; background:var(--error, #dc3545); color:#fff; cursor:pointer;">
+                    <i class="fas fa-trash"></i> Delete Selected
+                </button>
+            `;
+            table.parentNode.insertBefore(bar, table);
+
+            document.getElementById('bulkDeleteBtn').addEventListener('click', function () {
+                if (selectedCustomerIds.size === 0) return;
+                deleteCustomer(Array.from(selectedCustomerIds), `${selectedCustomerIds.size} selected customers`);
+            });
+        }
+    }
+
+    // Keep the bulk bar / select-all checkbox in sync with selectedCustomerIds
+    function updateBulkBar() {
+        if (!bulkDeleteEnabled) return;
+        const bar = document.getElementById('bulkActionsBar');
+        const countLabel = document.getElementById('bulkSelectedCount');
+        const selectAllCheckbox = document.getElementById('selectAllCheckbox');
+        if (!bar || !countLabel) return;
+
+        const count = selectedCustomerIds.size;
+        if (count > 0) {
+            bar.style.display = 'flex';
+            countLabel.textContent = `${count} customer${count > 1 ? 's' : ''} selected`;
+        } else {
+            bar.style.display = 'none';
+        }
+
+        if (selectAllCheckbox) {
+            const visibleIds = customers.map(c => String(c.id));
+            const selectedVisible = visibleIds.filter(id => selectedCustomerIds.has(id));
+            selectAllCheckbox.checked = visibleIds.length > 0 && selectedVisible.length === visibleIds.length;
+            selectAllCheckbox.indeterminate = selectedVisible.length > 0 && selectedVisible.length < visibleIds.length;
+        }
+    }
+
+    // Row-level checkbox toggling (delegated, since rows are re-rendered on every load)
+    customersTable.addEventListener('change', function (e) {
+        if (!e.target.classList.contains('customer-row-checkbox')) return;
+        const id = e.target.value;
+        if (e.target.checked) {
+            selectedCustomerIds.add(id);
+        } else {
+            selectedCustomerIds.delete(id);
+        }
+        updateBulkBar();
     });
 
     // View Modal Elements
@@ -613,7 +716,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 showNotification('Access Denied', 'You do not have permission to delete customers', 'error');
                 return;
             }
-            deleteCustomer(customerId, customerName);
+            deleteCustomer([customerId], customerName);
         } else if (target.querySelector('.fa-eye')) {
             openViewModal(customerId);
         }
