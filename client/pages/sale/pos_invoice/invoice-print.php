@@ -731,6 +731,56 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <script>
+        // pos-add.php (Invoice Settings) saves these keys with a "pos_" prefix so its
+        // settings don't clash with med_pos_invoice's own copies of the same keys — this
+        // page must read them back the same prefixed way, or toggles made in Invoice
+        // Settings (e.g. Trade Offer Amount, FOC Qty, Cash Discount %/Amt) silently fail
+        // to show up here. Keep this list identical to the `sharedKeys` set in
+        // client/assets/js/sale/pos_invoice/pos-add.js.
+        (function() {
+            const prefix = 'pos_';
+            const originalGetItem = localStorage.getItem.bind(localStorage);
+            const originalSetItem = localStorage.setItem.bind(localStorage);
+            const originalRemoveItem = localStorage.removeItem.bind(localStorage);
+
+            const sharedKeys = new Set([
+                'enableTaxation', 'enableExtraDiscountItem',
+                'enableBatchNo','enableExpiryDate','enableFOC','enableTradeOfferAmount',
+                'enableCashDiscountPercent','enableCashDiscountAmount',
+                'enableInvoiceCashDiscountPercent','enableInvoiceCashDiscountAmount',
+                'enableExtraDiscount1','enableExtraDiscount2','enableShippingFees',
+                'enableAmountPaidPaymentMethod','enablePrintQRCode',
+                'defaultScheme','salePriceSetting','productFilteringMode',
+                'productDisplayMode','customerDisplayMode',
+                'totalsLayout','childDisplayMode','printColumnCustomization',
+                'pos_print_preference','showSettingsButtons','compactMode',
+                'labelTotalBill','labelDiscountAmount','labelShippingFees','labelNetAmount',
+                'labelAmountPaid','labelPaymentMethod','labelRemainingBalance',
+                'hidePrintCustomerPhone','hidePrintCustomerEmail','hidePrintCustomerAddress',
+                'hidePrintPreviousBalance','hidePrintBranch','hidePrintCurrency',
+                'hidePrintSalesOfficer','hidePrintBiltyNo','hidePrintTransport',
+                'hidePrintRemarks','hidePrintTotalBill','hidePrintNetAmount',
+                'hidePrintPaymentMethod','hidePrintAmountPaid','hidePrintRemainingBalance',
+                'hidePrintAmountInWords','hidePrintSignatures','hidePrintGeneratedBy',
+                'hidePrintGeneratedOn','pos_shortcuts',
+                'hideInvoiceTypeStandard','hideDueDateStandard','hideBrandStandard',
+                'hideSalesOfficerStandard','hideSupplierManStandard','hideAreaCityStandard',
+                'hideSubAccountStandard','hideSaleOrderStandard','hideCurrencyStandard',
+                'hideTransportNameStandard','hideBiltyNoStandard','hideProjectStandard',
+                'hideContainerStandard','hideRemarksStandard'
+            ]);
+
+            localStorage.getItem = function(key) {
+                return originalGetItem(sharedKeys.has(key) ? prefix + key : key);
+            };
+            localStorage.setItem = function(key, value) {
+                return originalSetItem(sharedKeys.has(key) ? prefix + key : key, value);
+            };
+            localStorage.removeItem = function(key) {
+                return originalRemoveItem(sharedKeys.has(key) ? prefix + key : key);
+            };
+        })();
+
         // Paper size management
         function setPaperSize(size) {
             localStorage.setItem('invoicePaperSize', size);
