@@ -740,29 +740,100 @@ async function createBackup() {
 
 function openLoginHistoryModal() {
     document.getElementById('loginHistoryModal').style.display = 'flex';
-    document.getElementById('loginHistoryBody').innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 40px; color: var(--subtext);">Coming Soon</td></tr>';
+    fetchLoginHistory();
 }
 
 function closeLoginHistoryModal() {
     document.getElementById('loginHistoryModal').style.display = 'none';
 }
 
+async function fetchLoginHistory() {
+    const tbody = document.getElementById('loginHistoryBody');
+    tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 40px; color: var(--subtext);">Loading...</td></tr>';
+    try {
+        const response = await fetch('../../../../server/api/system_setup/admin_panel/login-history.php');
+        const data = await response.json();
+        if (data.success && data.data.length > 0) {
+            tbody.innerHTML = data.data.map(row => {
+                const statusClass = row.status === 'success' ? 'status-active' : 'status-blocked';
+                return `<tr>
+                    <td>${row.user}</td>
+                    <td>${row.login_time}</td>
+                    <td>${row.ip_address}</td>
+                    <td>${row.device}</td>
+                    <td><span class="status-badge ${statusClass}">${row.status.charAt(0).toUpperCase() + row.status.slice(1)}</span></td>
+                </tr>`;
+            }).join('');
+        } else {
+            tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 40px; color: var(--subtext);">No login history found</td></tr>';
+        }
+    } catch (error) {
+        console.error('Error fetching login history:', error);
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 40px; color: var(--error);">Failed to load login history</td></tr>';
+    }
+}
+
 function openFailedLoginsModal() {
     document.getElementById('failedLoginsModal').style.display = 'flex';
-    document.getElementById('failedLoginsBody').innerHTML = '<tr><td colspan="4" style="text-align: center; padding: 40px; color: var(--subtext);">Coming Soon</td></tr>';
+    fetchFailedLogins();
 }
 
 function closeFailedLoginsModal() {
     document.getElementById('failedLoginsModal').style.display = 'none';
 }
 
+async function fetchFailedLogins() {
+    const tbody = document.getElementById('failedLoginsBody');
+    tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; padding: 40px; color: var(--subtext);">Loading...</td></tr>';
+    try {
+        const response = await fetch('../../../../server/api/system_setup/admin_panel/failed-logins.php');
+        const data = await response.json();
+        if (data.success && data.data.length > 0) {
+            tbody.innerHTML = data.data.map(row => `<tr>
+                    <td>${row.email}</td>
+                    <td>${row.attempt_time}</td>
+                    <td>${row.ip_address}</td>
+                    <td>${row.reason}</td>
+                </tr>`).join('');
+        } else {
+            tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; padding: 40px; color: var(--subtext);">No failed login attempts found</td></tr>';
+        }
+    } catch (error) {
+        console.error('Error fetching failed logins:', error);
+        tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; padding: 40px; color: var(--error);">Failed to load failed logins</td></tr>';
+    }
+}
+
 function openLoginLocationsModal() {
     document.getElementById('loginLocationsModal').style.display = 'flex';
-    document.getElementById('loginLocationsBody').innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 40px; color: var(--subtext);">Coming Soon</td></tr>';
+    fetchLoginLocations();
 }
 
 function closeLoginLocationsModal() {
     document.getElementById('loginLocationsModal').style.display = 'none';
+}
+
+async function fetchLoginLocations() {
+    const tbody = document.getElementById('loginLocationsBody');
+    tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 40px; color: var(--subtext);">Loading...</td></tr>';
+    try {
+        const response = await fetch('../../../../server/api/system_setup/admin_panel/login-locations.php');
+        const data = await response.json();
+        if (data.success && data.data.length > 0) {
+            tbody.innerHTML = data.data.map(row => `<tr>
+                    <td>${row.user}</td>
+                    <td>${row.location}</td>
+                    <td>${row.ip_address}</td>
+                    <td>${row.last_login}</td>
+                    <td>${row.login_count}</td>
+                </tr>`).join('');
+        } else {
+            tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 40px; color: var(--subtext);">No login locations found</td></tr>';
+        }
+    } catch (error) {
+        console.error('Error fetching login locations:', error);
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 40px; color: var(--error);">Failed to load login locations</td></tr>';
+    }
 }
 
 // User actions

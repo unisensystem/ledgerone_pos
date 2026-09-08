@@ -242,28 +242,41 @@ if (!$user_id) {
                         <i class="fas fa-plus"></i> Add New Product
                     </button>
                 </div>
-                <div class="table-container">
-                    <table id="itemsTable">
+            <div class="table-container" style="overflow-x: auto; -webkit-overflow-scrolling: touch;">
+                    <table id="itemsTable" style="min-width: 1500px;">
                         <thead>
                             <tr>
-                                <th width="3%">S#</th>
-                                <th width="22%">Product Code / Name</th>
-                                <th width="10%">Scheme</th>
-                             <!-- AFTER -->
-<th width="8%" class="batch-no-cell">Batch No</th>
-<th width="8%" class="batch-expiry-cell">Expiry Date</th>
-                                <!-- Dynamic unit columns will be inserted here -->
-                                <th width="8%" class="price-cell"><span id="salePriceLabel">Sale Price</span></th>
-                                <th width="8%" class="gross-cell"><span id="grossAmountLabel">Gross Amount</span></th>
-                                <th width="5%" class="disc-percent-cell">Disc %</th>
-                                <th width="8%" class="disc-amount-cell"><span id="discountAmountLabel">Disc Amt</span></th>
-                                <th width="8%" class="extra-disc-cell">Extra Disc %</th>
-                                <th width="8%" class="to-amount-cell">T.O Amt</th>
-                                <th width="5%" class="tax-percent-cell">Tax %</th>
-                                <th width="8%" class="tax-amount-cell">Tax Amt</th>
-                                <th width="8%" class="foc-cell">Bonus</th>
-                                <th width="8%" class="net-cell"><span id="netAmountLabel">Net Amount</span></th>
-                                <th width="3%">Actions</th>
+                             <th width="3%" style="text-wrap: nowrap;">S#</th>
+<th width="22%" style="text-wrap: nowrap;">Product Code / Name</th>
+<th width="10%" style="text-wrap: nowrap;">Scheme</th>
+<th width="10%" class="batch-no-cell" style="text-wrap: nowrap;">Batch No</th>
+<th width="10%" class="batch-expiry-cell" style="text-wrap: nowrap;">Expiry Date</th>
+
+<th width="10%" class="price-cell" style="text-wrap: nowrap;">
+    <span id="salePriceLabel">Sale Price</span>
+</th>
+
+<th width="10%" class="gross-cell" style="text-wrap: nowrap;">
+    <span id="grossAmountLabel">Gross Amount</span>
+</th>
+
+<th width="10%" class="disc-percent-cell" style="text-wrap: nowrap;">Disc %</th>
+
+<th width="10%" class="disc-amount-cell" style="text-wrap: nowrap;">
+    <span id="discountAmountLabel">Disc Amt</span>
+</th>
+
+<th width="10%" class="extra-disc-cell" style="text-wrap: nowrap;">Extra Disc %</th>
+<th width="10%" class="to-amount-cell" style="text-wrap: nowrap;">T.O Amt</th>
+<th width="10%" class="tax-percent-cell" style="text-wrap: nowrap;">Tax %</th>
+<th width="10%" class="tax-amount-cell" style="text-wrap: nowrap;">Tax Amt</th>
+<th width="10%" class="foc-cell" style="text-wrap: nowrap;">Bonus</th>
+
+<th width="10%" class="net-cell" style="text-wrap: nowrap;">
+    <span id="netAmountLabel">Net Amount</span>
+</th>
+
+<th width="5%" style="text-wrap: nowrap;">Actions</th>
                             </tr>
                         </thead>
                         <tbody>
