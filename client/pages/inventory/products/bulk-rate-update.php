@@ -16,7 +16,53 @@ if (!$user_id) { header('Location: ../../auth/login.html'); exit(); }
 .custom-dropdown .dropdown-item.active {
     background: #e3f2fd;
 }
+input, select, textarea {
+    width: 34%;
+    height: 13px;
+    padding: 0 14px;
+    border: 1.5px solid var(--border-default);
+    border-radius: 8px;
+    background: var(--surface-0);
+    font-size: 14px;
+    color: var(--body);
+    transition: all 0.2s ease;
+}
 
+#rateTable.hide-product .col-product,
+#rateTable.hide-purchase_price .col-purchase_price,
+#rateTable.hide-trade_price .col-trade_price,
+#rateTable.hide-wholesale_price .col-wholesale_price,
+#rateTable.hide-mrp .col-mrp,
+#rateTable.hide-batch_no .col-batch_no,
+#rateTable.hide-expiry_date .col-expiry_date {
+    display: none;
+}
+
+.column-toggle-wrap { position: relative; display: inline-block; margin-left: 10px; }
+
+.column-toggle-panel {
+    display: none;
+    position: absolute;
+    top: 89%;
+    left: -65px;
+    margin-top: 4px;
+    background: #fff;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    padding: 10px 14px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    z-index: 1000;
+    min-width: 180px;
+}
+
+.column-toggle-panel label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    padding: 4px 0;
+    cursor: pointer;
+}
 .rate-table input[type="text"].extra-input,
 .rate-table input[type="date"].extra-input {
     width: 100%;
@@ -179,6 +225,28 @@ if (!$user_id) { header('Location: ../../auth/login.html'); exit(); }
         <a href="product-list.php" class="btn btn-secondary" style="height:36px; line-height:36px; text-decoration:none; display:inline-flex; align-items:center;">
             ← Back to Products
         </a>
+        <div style="display:flex; align-items:center; margin-top:16px;">
+    <button type="button" class="btn btn-secondary" id="addRowBtn">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" style="margin-right:6px;">
+            <path d="M8 3.33333V12.6667" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M3.33325 8H12.6666" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        Add Row
+    </button>
+
+    <div class="column-toggle-wrap">
+        <button type="button" class="btn btn-secondary" id="columnToggleBtn">Columns ▾</button>
+        <div class="column-toggle-panel" id="columnTogglePanel">
+            <label><input type="checkbox" class="col-toggle-cb" data-col="product" checked> Product</label>
+            <label><input type="checkbox" class="col-toggle-cb" data-col="purchase_price" checked> Purchase Price</label>
+            <label><input type="checkbox" class="col-toggle-cb" data-col="trade_price" checked> Trade Price (TP)</label>
+            <label><input type="checkbox" class="col-toggle-cb" data-col="wholesale_price" checked> Wholesale Price</label>
+            <label><input type="checkbox" class="col-toggle-cb" data-col="mrp" checked> MRP</label>
+            <label><input type="checkbox" class="col-toggle-cb" data-col="batch_no" checked> Batch No</label>
+            <label><input type="checkbox" class="col-toggle-cb" data-col="expiry_date" checked> Expiry Date</label>
+        </div>
+    </div>
+</div>
     </div>
     <p class="form-description">Search and add products to update their rates in bulk</p>
 
@@ -186,16 +254,16 @@ if (!$user_id) { header('Location: ../../auth/login.html'); exit(); }
 
         <div style="overflow: visible;">
             <table class="rate-table" id="rateTable">
-               <thead>
+            <thead>
     <tr>
         <th style="width:40px;">#</th>
-        <th style="min-width:220px;">Product</th>
-        <th style="min-width:130px;">Purchase Price</th>
-        <th style="min-width:130px;">Trade Price (TP)</th>
-        <th style="min-width:130px;">Wholesale Price</th>
-        <th style="min-width:130px;">MRP</th>
-        <th style="min-width:120px;">Batch No</th>
-        <th style="min-width:140px;">Expiry Date</th>
+        <th class="col-product" style="min-width:220px;">Product</th>
+        <th class="col-purchase_price" style="min-width:130px;">Purchase Price</th>
+        <th class="col-trade_price" style="min-width:130px;">Trade Price (TP)</th>
+        <th class="col-wholesale_price" style="min-width:130px;">Wholesale Price</th>
+        <th class="col-mrp" style="min-width:130px;">MRP</th>
+        <th class="col-batch_no" style="min-width:120px;">Batch No</th>
+        <th class="col-expiry_date" style="min-width:140px;">Expiry Date</th>
         <th style="width:80px;"></th>
     </tr>
 </thead>

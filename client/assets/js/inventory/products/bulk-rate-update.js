@@ -8,7 +8,42 @@ document.addEventListener('DOMContentLoaded', function () {
         saveRates();
     });
     addRow(); // one empty row by default
+     initColumnToggle();
 });
+function initColumnToggle() {
+    const table   = document.getElementById('rateTable');
+    const btn     = document.getElementById('columnToggleBtn');
+    const panel   = document.getElementById('columnTogglePanel');
+    const storageKey = 'bulkRateColumnPrefs';
+
+    // saved preferences load karein
+    const prefs = JSON.parse(localStorage.getItem(storageKey) || '{}');
+
+    document.querySelectorAll('.col-toggle-cb').forEach(cb => {
+        const col = cb.dataset.col;
+        const visible = prefs[col] !== false; // default: visible
+        cb.checked = visible;
+        table.classList.toggle(`hide-${col}`, !visible);
+
+        cb.addEventListener('change', function () {
+            table.classList.toggle(`hide-${col}`, !this.checked);
+            prefs[col] = this.checked;
+            localStorage.setItem(storageKey, JSON.stringify(prefs));
+        });
+    });
+
+    // dropdown open/close
+    btn.addEventListener('click', function (e) {
+        e.stopPropagation();
+        panel.style.display = panel.style.display === 'block' ? 'none' : 'block';
+    });
+
+    document.addEventListener('click', function (e) {
+        if (!panel.contains(e.target) && e.target !== btn) {
+            panel.style.display = 'none';
+        }
+    });
+}
 
 function addRow() {
     const emptyRow = document.getElementById('emptyRow');
@@ -20,9 +55,9 @@ function addRow() {
     const tr = document.createElement('tr');
     tr.dataset.rowId = rowCounter;
 
-   tr.innerHTML = `
+  tr.innerHTML = `
     <td style="color:#999; text-align:center;" class="row-num">${tbody.querySelectorAll('tr').length + 1}</td>
-    <td>
+    <td class="col-product">
         <div class="custom-dropdown">
             <input type="text" class="product-search" placeholder="Search product..." autocomplete="off">
             <input type="hidden" class="product-id">
@@ -30,12 +65,12 @@ function addRow() {
         </div>
         <div class="product-code product-info" style="display:none;"></div>
     </td>
-    <td><input type="number" class="rate-input" data-field="purchase_price"  step="0.001" min="0" placeholder="0.000"></td>
-    <td><input type="number" class="rate-input" data-field="trade_price"     step="0.001" min="0" placeholder="0.000"></td>
-    <td><input type="number" class="rate-input" data-field="wholesale_price" step="0.001" min="0" placeholder="0.000"></td>
-    <td><input type="number" class="rate-input" data-field="mrp"             step="0.001" min="0" placeholder="0.000"></td>
-    <td><input type="text" class="extra-input" data-field="batch_no" placeholder="Batch No"></td>
-    <td><input type="date" class="extra-input" data-field="expiry_date"></td>
+    <td class="col-purchase_price"><input type="number" class="rate-input" data-field="purchase_price"  step="0.001" min="0" placeholder="0.000"></td>
+    <td class="col-trade_price"><input type="number" class="rate-input" data-field="trade_price"     step="0.001" min="0" placeholder="0.000"></td>
+    <td class="col-wholesale_price"><input type="number" class="rate-input" data-field="wholesale_price" step="0.001" min="0" placeholder="0.000"></td>
+    <td class="col-mrp"><input type="number" class="rate-input" data-field="mrp"             step="0.001" min="0" placeholder="0.000"></td>
+    <td class="col-batch_no"><input type="text" class="extra-input" data-field="batch_no" placeholder="Batch No"></td>
+    <td class="col-expiry_date"><input type="date" class="extra-input" data-field="expiry_date"></td>
     <td style="text-align:center;">
         <button type="button" class="remove-btn">Remove</button>
     </td>
