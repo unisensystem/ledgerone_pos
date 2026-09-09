@@ -27,54 +27,39 @@ try {
         exit;
     }
 
- $stmt = $pdo->prepare("
-    UPDATE products SET
-        purchase_price  = ?,
-        trade_price     = ?,
-        wholesale_price = ?,
-        mrp             = ?,
-        expiry_date     = ?,
-        updated_at      = CURRENT_TIMESTAMP
-    WHERE id = ? AND tenant_id = ?
-");
+    $stmt = $pdo->prepare("
+        UPDATE products SET
+            purchase_price  = ?,
+            trade_price     = ?,
+            wholesale_price = ?,
+            mrp             = ?,
+            batch_no        = ?,
+            expiry_date     = ?,
+            updated_at      = CURRENT_TIMESTAMP
+        WHERE id = ? AND tenant_id = ?
+    ");
 
-$batchStmt = $pdo->prepare("
-    UPDATE stock_opening SET
-        batch_no    = ?,
-        expiry_date = ?
-    WHERE id = (
-        SELECT id FROM (
-            SELECT id FROM stock_opening
-            WHERE product_id = ? AND tenant_id = ?
-            ORDER BY id DESC LIMIT 1
-        ) t
-    )
-");
+    $updated = 0;
+    foreach ($input['products'] as $row) {
+        $id = intval($row['id'] ?? 0);
+        if (!$id) continue;
 
-$updated = 0;
-foreach ($input['products'] as $row) {
-    $id = intval($row['id'] ?? 0);
-    if (!$id) continue;
+        $batchNo    = !empty($row['batch_no']) ? $row['batch_no'] : null;
+        $expiryDate = !empty($row['expiry_date']) ? $row['expiry_date'] : null;
 
-    $batchNo    = !empty($row['batch_no']) ? $row['batch_no'] : null;
-    $expiryDate = !empty($row['expiry_date']) ? $row['expiry_date'] : null;
-
-    $stmt->execute([
-        $row['purchase_price']  ?? 0,
-        $row['trade_price']     ?? 0,
-        $row['wholesale_price'] ?? 0,
-        $row['mrp']             ?? 0,
-        $expiryDate,
-        $id,
-        $tenant_id
-    ]);
-
-    if ($batchNo !== null || $expiryDate !== null) {
-        $batchStmt->execute([$batchNo, $expiryDate, $id, $tenant_id]);
+        $stmt->execute([
+            $row['purchase_price']  ?? 0,
+            $row['trade_price']     ?? 0,
+            $row['wholesale_price'] ?? 0,
+            $row['mrp']             ?? 0,
+            $batchNo,
+            $expiryDate,
+            $id,
+            $tenant_id
+        ]);
+        $updated++;
     }
 
-    $updated++;
-}
     echo json_encode(['success' => true, 'message' => "$updated product(s) updated successfully"]);
 
 } catch (PDOException $e) {
