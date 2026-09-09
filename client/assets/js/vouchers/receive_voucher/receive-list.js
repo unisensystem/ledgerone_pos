@@ -324,6 +324,9 @@ function renderVouchers(vouchersToRender) {
                             <button class="action-btn print" title="Print" data-id="${voucher.id}" onclick="printVoucher(${voucher.id}); return false;">
                                 <i class="fas fa-print"></i>
                             </button>
+                            <button class="action-btn" title="Thermal Print" style="background:#17a2b8;color:#fff;" data-id="${voucher.id}" onclick="printThermalVoucher(${voucher.id}); return false;">
+                                <i class="fas fa-receipt"></i>
+                            </button>
                             <button class="action-btn" title="Download PDF" style="background:#ffc107;color:#333;" data-id="${voucher.id}" onclick="window.open('print.php?id=${voucher.id}&pdf=1','_blank'); return false;">
                                 <i class="fas fa-file-pdf"></i>
                             </button>
@@ -426,6 +429,11 @@ function updatePagination(pagination) {
 // Action functions
 function printVoucher(id) {
     window.open(`print.php?id=${id}`, '_blank');
+}
+
+// Opens the 80mm thermal receipt view for a voucher in a new tab
+function printThermalVoucher(id) {
+    window.open(`thermal-print.php?id=${id}`, '_blank');
 }
 
 function editVoucher(id) {

@@ -196,21 +196,39 @@ $initialSearch = $_GET['search'] ?? '';
             </div>
 
             <!-- Pagination -->
-            <div class="pagination">
-                <div class="pagination-info" id="paginationInfo">Showing 0-0 of 0 products</div>
-                <div class="pagination-controls">
-                    <button class="pagination-btn" id="prevPage" disabled>
-                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                            <path d="M10 12L6 8L10 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-                        </svg>
-                    </button>
-                    <button class="pagination-btn" id="nextPage">
-                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                            <path d="M6 12L10 8L6 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-                        </svg>
-                    </button>
-                </div>
-            </div>
+           <div class="pagination">
+    <div class="pagination-info" id="paginationInfo">Showing 0-0 of 0 products</div>
+
+    <div style="display:flex; align-items:center; gap:16px;">
+        <div class="page-size-selector" style="display:flex; align-items:center; gap:6px;">
+            <label for="pageSize" style="font-weight:normal; margin:0;">Show:</label>
+            <select id="pageSize" style="padding:4px 8px;">
+                <option value="10">10</option>
+                <option value="20">20</option>
+                <option value="30">30</option>
+                <option value="40">40</option>
+                <option value="50">50</option>
+                <option value="60">60</option>
+                <option value="70">70</option>
+                <option value="80">80</option>
+                <option value="100">100</option>
+            </select>
+        </div>
+
+        <div class="pagination-controls">
+            <button class="pagination-btn" id="prevPage" disabled>
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M10 12L6 8L10 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+            </button>
+            <button class="pagination-btn" id="nextPage">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M6 12L10 8L6 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+            </button>
+        </div>
+    </div>
+</div>
         </div>
     </div>
 

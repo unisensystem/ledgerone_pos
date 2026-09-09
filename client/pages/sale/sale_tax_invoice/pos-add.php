@@ -592,6 +592,14 @@ if (!$user_id) {
                     </div>
                     
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 8px; background: var(--surface-1); border-radius: 6px; transition: all 0.2s;" onmouseover="this.style.background='var(--surface-0)'" onmouseout="this.style.background='var(--surface-1)'">
+            <input type="checkbox" id="enableGrossAmount" style="width: auto;">
+            <span style="font-size: 13px;">Gross Amount</span>
+        </label>
+        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 8px; background: var(--surface-1); border-radius: 6px; transition: all 0.2s;" onmouseover="this.style.background='var(--surface-0)'" onmouseout="this.style.background='var(--surface-1)'">
+            <input type="checkbox" id="enableTaxation" style="width: auto;">
+            <span style="font-size: 13px;">Tax % / Tax Amount</span>
+        </label>
                         <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 8px; background: var(--surface-1); border-radius: 6px; transition: all 0.2s;" onmouseover="this.style.background='var(--surface-0)'" onmouseout="this.style.background='var(--surface-1)'">
                             <input type="checkbox" id="enableTradeOfferAmount" style="width: auto;">
                             <span style="font-size: 13px;">Trade Offer Amount</span>

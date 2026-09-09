@@ -1049,3 +1049,81 @@ document.getElementById('deleteCostCenterModal').addEventListener('click', (e) =
         document.getElementById('deleteCostCenterModal').classList.remove('active');
     }
 });
+
+window.addEventListener('global-date-lock-changed', function (e) {
+    const dateInput = document.getElementById('date');
+    if (!dateInput) return;
+
+    dateInput.value = e.detail.date;
+    dateInput.readOnly = e.detail.locked;
+    dateInput.title = e.detail.locked ? 'Date is locked from the dashboard' : '';
+});
+
+// ===== GLOBAL DATE LOCK =====
+(function () {
+    const DATE_KEY = 'global_locked_date';
+    const FLAG_KEY = 'global_date_locked';
+
+    function applyGlobalDateLock() {
+        const dateInput = document.getElementById('date');
+        if (!dateInput) {
+            console.warn('Expense Voucher date field #date not found');
+            return;
+        }
+
+        const isLocked = localStorage.getItem(FLAG_KEY) === 'true';
+        const lockedDate = localStorage.getItem(DATE_KEY);
+
+        console.log('Global Date Lock:', {
+            isLocked: isLocked,
+            lockedDate: lockedDate
+        });
+
+        if (isLocked && lockedDate) {
+            // Apply locked date
+            dateInput.value = lockedDate;
+
+            // Lock the field
+            dateInput.readOnly = true;
+            dateInput.disabled = true;
+
+            dateInput.style.backgroundColor = '#f3f4f6';
+            dateInput.style.cursor = 'not-allowed';
+            dateInput.title = 'Date is locked from Dashboard';
+        } else {
+            // Unlock the field
+            dateInput.readOnly = false;
+            dateInput.disabled = false;
+
+            dateInput.style.backgroundColor = '';
+            dateInput.style.cursor = '';
+            dateInput.title = '';
+
+            // Only set today if empty
+            if (!dateInput.value) {
+                dateInput.value = new Date().toISOString().split('T')[0];
+            }
+        }
+    }
+
+    // Run after page loads
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', applyGlobalDateLock);
+    } else {
+        applyGlobalDateLock();
+    }
+
+    // Re-check when user returns to the page/tab
+    window.addEventListener('focus', applyGlobalDateLock);
+
+    // Re-check when page becomes visible
+    document.addEventListener('visibilitychange', function () {
+        if (!document.hidden) {
+            applyGlobalDateLock();
+        }
+    });
+
+    // Same-page event support
+    window.addEventListener('global-date-lock-changed', applyGlobalDateLock);
+})();
+

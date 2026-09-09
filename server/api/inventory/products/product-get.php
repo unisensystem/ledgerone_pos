@@ -47,6 +47,32 @@ try {
         echo json_encode(['success' => false, 'message' => 'Product not found']);
         exit;
     }
+
+    // Fallback: agar products.batch_no / products.expiry_date khali hain
+    // (kyunki product-add form pe wo Opening Stock section se stock_opening
+    // table mein gaye thay, products table mein nahi), to stock_opening ki
+    // is product ki sabse latest entry se le lein.
+    if (empty($product['batch_no']) || empty($product['expiry_date']) || $product['expiry_date'] === '0000-00-00') {
+        $stockStmt = $pdo->prepare("
+            SELECT batch_no, expiry_date
+            FROM stock_opening
+            WHERE product_id = ? AND tenant_id = ?
+            ORDER BY id DESC
+            LIMIT 1
+        ");
+        $stockStmt->execute([$product_id, $tenant_id]);
+        $stockRow = $stockStmt->fetch(PDO::FETCH_ASSOC);
+
+        if ($stockRow) {
+            if (empty($product['batch_no']) && !empty($stockRow['batch_no'])) {
+                $product['batch_no'] = $stockRow['batch_no'];
+            }
+            if ((empty($product['expiry_date']) || $product['expiry_date'] === '0000-00-00')
+                && !empty($stockRow['expiry_date']) && $stockRow['expiry_date'] !== '0000-00-00') {
+                $product['expiry_date'] = $stockRow['expiry_date'];
+            }
+        }
+    }
     
     echo json_encode(['success' => true, 'product' => $product]);
     

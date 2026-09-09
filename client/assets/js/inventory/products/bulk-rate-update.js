@@ -8,7 +8,42 @@ document.addEventListener('DOMContentLoaded', function () {
         saveRates();
     });
     addRow(); // one empty row by default
+     initColumnToggle();
 });
+function initColumnToggle() {
+    const table   = document.getElementById('rateTable');
+    const btn     = document.getElementById('columnToggleBtn');
+    const panel   = document.getElementById('columnTogglePanel');
+    const storageKey = 'bulkRateColumnPrefs';
+
+    // saved preferences load karein
+    const prefs = JSON.parse(localStorage.getItem(storageKey) || '{}');
+
+    document.querySelectorAll('.col-toggle-cb').forEach(cb => {
+        const col = cb.dataset.col;
+        const visible = prefs[col] !== false; // default: visible
+        cb.checked = visible;
+        table.classList.toggle(`hide-${col}`, !visible);
+
+        cb.addEventListener('change', function () {
+            table.classList.toggle(`hide-${col}`, !this.checked);
+            prefs[col] = this.checked;
+            localStorage.setItem(storageKey, JSON.stringify(prefs));
+        });
+    });
+
+    // dropdown open/close
+    btn.addEventListener('click', function (e) {
+        e.stopPropagation();
+        panel.style.display = panel.style.display === 'block' ? 'none' : 'block';
+    });
+
+    document.addEventListener('click', function (e) {
+        if (!panel.contains(e.target) && e.target !== btn) {
+            panel.style.display = 'none';
+        }
+    });
+}
 
 function addRow() {
     const emptyRow = document.getElementById('emptyRow');
@@ -20,25 +55,26 @@ function addRow() {
     const tr = document.createElement('tr');
     tr.dataset.rowId = rowCounter;
 
-    tr.innerHTML = `
-        <td style="color:#999; text-align:center;" class="row-num">${tbody.querySelectorAll('tr').length + 1}</td>
-        <td>
-            <div class="custom-dropdown">
-                <input type="text" class="product-search" placeholder="Search product..." autocomplete="off">
-                <input type="hidden" class="product-id">
-                <div class="dropdown-list"></div>
-            </div>
-            <div class="product-code product-info" style="display:none;"></div>
-        </td>
-        <td><input type="number" class="rate-input" data-field="purchase_price"  step="0.001" min="0" placeholder="0.000"></td>
-        <td><input type="number" class="rate-input" data-field="trade_price"     step="0.001" min="0" placeholder="0.000"></td>
-        <td><input type="number" class="rate-input" data-field="wholesale_price" step="0.001" min="0" placeholder="0.000"></td>
-        <td><input type="number" class="rate-input" data-field="mrp"             step="0.001" min="0" placeholder="0.000"></td>
-        <td style="text-align:center;">
-            <button type="button" class="remove-btn">Remove</button>
-        </td>
-    `;
-
+  tr.innerHTML = `
+    <td style="color:#999; text-align:center;" class="row-num">${tbody.querySelectorAll('tr').length + 1}</td>
+    <td class="col-product">
+        <div class="custom-dropdown">
+            <input type="text" class="product-search" placeholder="Search product..." autocomplete="off">
+            <input type="hidden" class="product-id">
+            <div class="dropdown-list"></div>
+        </div>
+        <div class="product-code product-info" style="display:none;"></div>
+    </td>
+    <td class="col-purchase_price"><input type="number" class="rate-input" data-field="purchase_price"  step="0.001" min="0" placeholder="0.000"></td>
+    <td class="col-trade_price"><input type="number" class="rate-input" data-field="trade_price"     step="0.001" min="0" placeholder="0.000"></td>
+    <td class="col-wholesale_price"><input type="number" class="rate-input" data-field="wholesale_price" step="0.001" min="0" placeholder="0.000"></td>
+    <td class="col-mrp"><input type="number" class="rate-input" data-field="mrp"             step="0.001" min="0" placeholder="0.000"></td>
+    <td class="col-batch_no"><input type="text" class="extra-input" data-field="batch_no" placeholder="Batch No"></td>
+    <td class="col-expiry_date"><input type="date" class="extra-input" data-field="expiry_date"></td>
+    <td style="text-align:center;">
+        <button type="button" class="remove-btn">Remove</button>
+    </td>
+`;
     initRowControls(tr);
     tbody.appendChild(tr);
     reNumberRows();
@@ -103,11 +139,11 @@ function initRowControls(tr) {
     });
 
     // mark rate inputs as changed
-    tr.querySelectorAll('.rate-input').forEach(input => {
-        input.addEventListener('input', function () {
-            this.classList.add('changed');
-        });
+tr.querySelectorAll('.rate-input, .extra-input').forEach(input => {
+    input.addEventListener('input', function () {
+        this.classList.add('changed');
     });
+});
 
     tr.querySelector('.remove-btn').addEventListener('click', function () {
         const pid = productIdInput.value;
@@ -192,16 +228,18 @@ function selectProduct(tr, product) {
     productInfo.textContent = product.code;
     productInfo.style.display = 'block';
 
-    fetch('../../../../server/api/inventory/products/product-get.php?id=' + product.id)
-        .then(r => r.json())
-        .then(data => {
-            if (!data.success || !data.product) return;
-            const p = data.product;
-            setRate(tr, 'purchase_price',  p.purchase_price);
-            setRate(tr, 'trade_price',     p.trade_price);
-            setRate(tr, 'wholesale_price', p.wholesale_price);
-            setRate(tr, 'mrp',             p.mrp);
-        });
+   fetch('../../../../server/api/inventory/products/product-get.php?id=' + product.id)
+    .then(r => r.json())
+    .then(data => {
+        if (!data.success || !data.product) return;
+        const p = data.product;
+        setRate(tr, 'purchase_price',  p.purchase_price);
+        setRate(tr, 'trade_price',     p.trade_price);
+        setRate(tr, 'wholesale_price', p.wholesale_price);
+        setRate(tr, 'mrp',             p.mrp);
+        setExtra(tr, 'batch_no',     p.batch_no);
+        setExtra(tr, 'expiry_date',  p.expiry_date);
+    });
 }
 
 function setRate(tr, field, value) {
@@ -210,13 +248,22 @@ function setRate(tr, field, value) {
         input.value = parseFloat(value).toFixed(3);
     }
 }
+function setExtra(tr, field, value) {
+    const input = tr.querySelector(`input[data-field="${field}"]`);
+    if (!input) return;
+    if (field === 'expiry_date') {
+        input.value = (value && value !== '0000-00-00') ? value : '';
+    } else {
+        input.value = value || '';
+    }
+}
 
 function clearRow(tr) {
     const pid = tr.querySelector('.product-id').value;
     if (pid) delete addedProducts[pid];
     tr.querySelector('.product-id').value = '';
     tr.querySelector('.product-info').style.display = 'none';
-    tr.querySelectorAll('.rate-input').forEach(i => { i.value = ''; i.classList.remove('changed'); });
+    tr.querySelectorAll('.rate-input, .extra-input').forEach(i => { i.value = ''; i.classList.remove('changed'); });
 }
 
 function reNumberRows() {
@@ -256,13 +303,15 @@ function saveRates() {
             return;
         }
 
-        products.push({
-            id,
-            purchase_price:  parseFloat(tr.querySelector('input[data-field="purchase_price"]').value)  || 0,
-            trade_price:     parseFloat(tr.querySelector('input[data-field="trade_price"]').value)     || 0,
-            wholesale_price: parseFloat(tr.querySelector('input[data-field="wholesale_price"]').value) || 0,
-            mrp:             parseFloat(tr.querySelector('input[data-field="mrp"]').value)             || 0,
-        });
+       products.push({
+    id,
+    purchase_price:  parseFloat(tr.querySelector('input[data-field="purchase_price"]').value)  || 0,
+    trade_price:     parseFloat(tr.querySelector('input[data-field="trade_price"]').value)     || 0,
+    wholesale_price: parseFloat(tr.querySelector('input[data-field="wholesale_price"]').value) || 0,
+    mrp:             parseFloat(tr.querySelector('input[data-field="mrp"]').value)             || 0,
+    batch_no:        tr.querySelector('input[data-field="batch_no"]').value.trim()    || null,
+    expiry_date:     tr.querySelector('input[data-field="expiry_date"]').value         || null,
+});
     });
 
     if (hasError) return;

@@ -451,9 +451,19 @@ const invoiceSettingCheckboxes = [
     }
 
     // Set default date to today
-    const today = new Date().toISOString().split('T')[0];
+        // Set default date to today — unless a date is locked globally from the dashboard widget
+    const globalLockedDate = localStorage.getItem('global_locked_date');
+    const isGlobalDateLocked = localStorage.getItem('global_date_locked') === 'true';
+    const today = (isGlobalDateLocked && globalLockedDate)
+        ? globalLockedDate
+        : new Date().toISOString().split('T')[0];
     document.getElementById('saleDate').value = today;
 
+    // Optional but recommended: don't let user manually change it while locked
+    if (isGlobalDateLocked && globalLockedDate) {
+        document.getElementById('saleDate').readOnly = true;
+        document.getElementById('saleDate').title = 'Date is locked from the dashboard';
+    }
     // Check if in edit mode
     const urlParams = new URLSearchParams(window.location.search);
     const editId = urlParams.get('edit');
@@ -6970,3 +6980,36 @@ async function quickAddCustomer() {
         alert('An error occurred while adding the customer.');
     }
 }
+
+
+    // Live-update Sale Date when dashboard's lock/unlock is clicked
+    window.addEventListener('global-date-lock-changed', function (e) {
+        const saleDateInput = document.getElementById('saleDate');
+        if (!saleDateInput) return;
+
+        if (e.detail.locked) {
+            saleDateInput.value = e.detail.date;
+            saleDateInput.readOnly = true;
+            saleDateInput.title = 'Date is locked from the dashboard';
+        } else {
+            saleDateInput.value = e.detail.date; // aaj ki date
+            saleDateInput.readOnly = false;
+            saleDateInput.title = '';
+        }
+    });
+
+    // Live-update Sale Date when dashboard's lock/unlock is clicked
+    window.addEventListener('global-date-lock-changed', function (e) {
+        const saleDateInput = document.getElementById('saleDate');
+        if (!saleDateInput) return;
+
+        if (e.detail.locked) {
+            saleDateInput.value = e.detail.date;
+            saleDateInput.readOnly = true;
+            saleDateInput.title = 'Date is locked from the dashboard';
+        } else {
+            saleDateInput.value = e.detail.date; // aaj ki date
+            saleDateInput.readOnly = false;
+            saleDateInput.title = '';
+        }
+    });

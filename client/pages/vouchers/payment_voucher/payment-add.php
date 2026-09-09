@@ -222,6 +222,7 @@ if (!$user_id) {
                             <th>Project</th>
                             <th>Container</th>
                             <th>Bank Account</th>
+                            <th>Cheque No</th>
                             <th>Cheque Date</th>
                             <th>Description</th>
                             <th>Action</th>

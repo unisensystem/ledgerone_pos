@@ -809,6 +809,8 @@ function addBulkRow() {
                 <option value="">Select Bank</option>
             </select>
         </td>
+        <td><input type="text" class="bulk-cheque-no" placeholder="Cheque No"></td>
+
         <td><input type="date" class="bulk-cheque-date"></td>
         <td><textarea class="bulk-description" placeholder="Description"></textarea></td>
         <td>
@@ -976,6 +978,8 @@ document.getElementById('postBulkBtn').addEventListener('click', async function(
 
         const bulkBankAccount = row.querySelector('.bulk-bank-account').value;
         if (bulkBankAccount) formData.append('bank_account', bulkBankAccount);
+        const bulkChequeNo = row.querySelector('.bulk-cheque-no').value;
+if (bulkChequeNo) formData.append('cheque_no', bulkChequeNo);
         
         const bulkChequeDate = row.querySelector('.bulk-cheque-date').value;
         if (bulkChequeDate) formData.append('cheque_date', bulkChequeDate);
@@ -1015,3 +1019,47 @@ document.getElementById('postBulkBtn').addEventListener('click', async function(
         }, 2000);
     }
 });
+
+// ===== GLOBAL DATE LOCK =====
+(function () {
+    const DATE_KEY = 'global_locked_date';
+    const FLAG_KEY = 'global_date_locked';
+
+    function applyGlobalDateLock() {
+        const voucherDate = document.getElementById('voucherDate');
+        if (!voucherDate) return;
+
+        const isLocked = localStorage.getItem(FLAG_KEY) === 'true';
+        const lockedDate = localStorage.getItem(DATE_KEY);
+
+        if (isLocked && lockedDate) {
+            voucherDate.value = lockedDate;
+            voucherDate.readOnly = true;
+            voucherDate.style.backgroundColor = '#f3f4f6';
+            voucherDate.title = 'Date is locked from dashboard';
+        } else {
+            voucherDate.readOnly = false;
+            voucherDate.style.backgroundColor = '';
+            voucherDate.title = '';
+            
+            if (!voucherDate.value) {
+                voucherDate.valueAsDate = new Date();
+            }
+        }
+    }
+
+    // Page load
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', applyGlobalDateLock);
+    } else {
+        applyGlobalDateLock();
+    }
+
+    // Same-page event, if available
+    window.addEventListener('global-date-lock-changed', function () {
+        applyGlobalDateLock();
+    });
+
+    // Check again whenever user comes back to this tab/page
+    window.addEventListener('focus', applyGlobalDateLock);
+})();

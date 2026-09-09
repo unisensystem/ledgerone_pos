@@ -33,6 +33,8 @@ try {
             trade_price     = ?,
             wholesale_price = ?,
             mrp             = ?,
+            batch_no        = ?,
+            expiry_date     = ?,
             updated_at      = CURRENT_TIMESTAMP
         WHERE id = ? AND tenant_id = ?
     ");
@@ -42,11 +44,16 @@ try {
         $id = intval($row['id'] ?? 0);
         if (!$id) continue;
 
+        $batchNo    = !empty($row['batch_no']) ? $row['batch_no'] : null;
+        $expiryDate = !empty($row['expiry_date']) ? $row['expiry_date'] : null;
+
         $stmt->execute([
             $row['purchase_price']  ?? 0,
             $row['trade_price']     ?? 0,
             $row['wholesale_price'] ?? 0,
             $row['mrp']             ?? 0,
+            $batchNo,
+            $expiryDate,
             $id,
             $tenant_id
         ]);

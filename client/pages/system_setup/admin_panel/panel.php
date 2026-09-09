@@ -278,6 +278,7 @@ if (!$user_id) {
                         <button class="btn btn-primary" onclick="openCreateRoleModal()">
                             <i class="fas fa-plus"></i> Create Role
                         </button>
+                        
                     </div>
                     <div class="table-container">
                         <table id="rolesTable">
@@ -315,6 +316,7 @@ if (!$user_id) {
                                 <button class="btn btn-secondary" onclick="openRestoreModal()">
                                     <i class="fas fa-upload"></i> Restore Database
                                 </button> -->
+                                
                             </div>
                         </div>
                         <div>
@@ -351,7 +353,9 @@ if (!$user_id) {
             <div class="modal-header">
                 <div class="modal-title">Create New User</div>
                 <button class="modal-close" onclick="closeCreateUserModal()">&times;</button>
+                
             </div>
+            
             <div class="modal-body">
                 <form id="createUserForm">
                     <div class="form-grid">

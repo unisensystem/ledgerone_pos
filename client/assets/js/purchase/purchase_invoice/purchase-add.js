@@ -6,7 +6,14 @@ document.addEventListener('DOMContentLoaded', function () {
     // Set default date to today
     const today = new Date().toISOString().split('T')[0];
     document.getElementById('purchaseDate').value = today;
-
+const globalLockedDate = localStorage.getItem('global_locked_date');
+const isGlobalDateLocked = localStorage.getItem('global_date_locked') === 'true';
+document.getElementById('purchaseDate').value = (isGlobalDateLocked && globalLockedDate)
+    ? globalLockedDate
+    : new Date().toISOString().split('T')[0];
+if (isGlobalDateLocked && globalLockedDate) {
+    document.getElementById('purchaseDate').readOnly = true;
+}
     // Check if in edit mode
     const urlParams = new URLSearchParams(window.location.search);
     const editId = urlParams.get('edit');
@@ -2448,6 +2455,7 @@ document.addEventListener('DOMContentLoaded', function () {
     // Invoice Settings Modal
     document.getElementById('invoiceSettingsBtn').addEventListener('click', function () {
         // Load settings from localStorage
+                document.getElementById('showTableScrollbar').checked = localStorage.getItem('showTableScrollbar') === 'true';
         document.getElementById('enableSize').checked = localStorage.getItem('enableSize') === 'true';
         document.getElementById('enableBatchNo').checked = localStorage.getItem('enableBatchNo') === 'true';
         document.getElementById('enableBatchExpiry').checked = localStorage.getItem('enableBatchExpiry') === 'true';
@@ -2482,6 +2490,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     document.getElementById('saveSettingsBtn').addEventListener('click', function () {
         // Save settings to localStorage
+                localStorage.setItem('showTableScrollbar', document.getElementById('showTableScrollbar').checked);
         localStorage.setItem('enableSize', document.getElementById('enableSize').checked);
         localStorage.setItem('enableBatchNo', document.getElementById('enableBatchNo').checked);
         localStorage.setItem('enableBatchExpiry', document.getElementById('enableBatchExpiry').checked);
@@ -2557,6 +2566,11 @@ document.addEventListener('DOMContentLoaded', function () {
                 if (fg) fg.style.display = show ? '' : 'none';
             }
         });
+              const tableContainer = document.querySelector('.table-container');
+        if (tableContainer) {
+            const scrollEnabled = localStorage.getItem('showTableScrollbar') === 'true';
+            tableContainer.classList.toggle('scroll-active', scrollEnabled);
+        }
 
         // Show/hide thead and tfoot columns via data-col
                const colMap = [
@@ -2835,3 +2849,18 @@ function addChildProducts(parentRow, children) {
     }));
     parentRow.dataset.childProducts = JSON.stringify(childProducts);
 }
+
+window.addEventListener('global-date-lock-changed', function (e) {
+    const purchaseDateInput = document.getElementById('purchaseDate');
+    if (!purchaseDateInput) return;
+
+    if (e.detail.locked) {
+        purchaseDateInput.value = e.detail.date;
+        purchaseDateInput.readOnly = true;
+        purchaseDateInput.title = 'Date is locked from the dashboard';
+    } else {
+        purchaseDateInput.value = e.detail.date;
+        purchaseDateInput.readOnly = false;
+        purchaseDateInput.title = '';
+    }
+});
