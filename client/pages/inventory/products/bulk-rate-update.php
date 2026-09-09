@@ -16,6 +16,22 @@ if (!$user_id) { header('Location: ../../auth/login.html'); exit(); }
 .custom-dropdown .dropdown-item.active {
     background: #e3f2fd;
 }
+
+.rate-table input[type="text"].extra-input,
+.rate-table input[type="date"].extra-input {
+    width: 100%;
+    padding: 7px 8px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 13px;
+    font-family: inherit;
+    box-sizing: border-box;
+}
+
+.rate-table input.extra-input.changed {
+    border-color: #f59e0b;
+    background: #fffbeb;
+}
         .rate-table {
             width: 100%;
             border-collapse: collapse;
@@ -170,22 +186,24 @@ if (!$user_id) { header('Location: ../../auth/login.html'); exit(); }
 
         <div style="overflow: visible;">
             <table class="rate-table" id="rateTable">
-                <thead>
-                    <tr>
-                        <th style="width:40px;">#</th>
-                        <th style="min-width:220px;">Product</th>
-                        <th style="min-width:130px;">Purchase Price</th>
-                        <th style="min-width:130px;">Trade Price (TP)</th>
-                        <th style="min-width:130px;">Wholesale Price</th>
-                        <th style="min-width:130px;">MRP</th>
-                        <th style="width:80px;"></th>
-                    </tr>
-                </thead>
-                <tbody id="rateTableBody">
-                    <tr id="emptyRow">
-                        <td colspan="7" class="empty-state">Click "Add Row" to search and add products</td>
-                    </tr>
-                </tbody>
+               <thead>
+    <tr>
+        <th style="width:40px;">#</th>
+        <th style="min-width:220px;">Product</th>
+        <th style="min-width:130px;">Purchase Price</th>
+        <th style="min-width:130px;">Trade Price (TP)</th>
+        <th style="min-width:130px;">Wholesale Price</th>
+        <th style="min-width:130px;">MRP</th>
+        <th style="min-width:120px;">Batch No</th>
+        <th style="min-width:140px;">Expiry Date</th>
+        <th style="width:80px;"></th>
+    </tr>
+</thead>
+<tbody id="rateTableBody">
+    <tr id="emptyRow">
+        <td colspan="9" class="empty-state">Click "Add Row" to search and add products</td>
+    </tr>
+</tbody>
             </table>
         </div>
 

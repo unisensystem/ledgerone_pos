@@ -382,31 +382,31 @@
 
         <div class="total-row" id="discountRow">
             <span>Discount:</span>
-            <span id="discountAmount">0.00</span>
+            <span id="discountAmount">0</span>
         </div>
         <div class="total-row" style="display: none;" id="gstRow">
             <span>GST:</span>
-            <span id="gstAmount">0.00</span>
+            <span id="gstAmount">0</span>
         </div>
         <div class="total-row" id="advTaxRow">
             <span>Adv. Tax:</span>
-            <span id="advTaxAmount">0.00</span>
+            <span id="advTaxAmount">0</span>
         </div>
         <div class="total-row grand-total">
             <span>Net Bill:</span>
-            <span id="netAmount">0.00</span>
+            <span id="netAmount">0</span>
         </div>
         <div class="total-row">
             <span>Cash Received:</span>
-            <span id="amountPaid">0.00</span>
+            <span id="amountPaid">0</span>
         </div>
         <div class="total-row" id="previousBalanceRow">
             <span>Prv. Balance:</span>
-            <span id="previousBalance">0.00</span>
+            <span id="previousBalance">0</span>
         </div>
         <div class="total-row grand-total">
             <span>Payable Amount:</span>
-            <span id="payableAmount">0.00</span>
+            <span id="payableAmount">0</span>
         </div>
 
         <div id="notesSection" class="notes-section">
@@ -432,13 +432,13 @@
                 Signature of Customer's
             </div>
 
-            <div style="margin-top: 10px; border-top: 1px dashed #000; padding-top: 8px; font-size: 10px; line-height: 1.6;">
+            <!-- <div style="margin-top: 10px; border-top: 1px dashed #000; padding-top: 8px; font-size: 10px; line-height: 1.6;">
                 <div style="font-weight: bold;">Software by: UNISEN SYSTEMS</div>
                 <div>Contact: +92 346 8918711</div>
                 <div>+92 335 3789981</div>
                 <div>Email: support@unisensystems.com</div>
                 <div>www.unisensystems.com</div>
-            </div>
+            </div> -->
         </div>
     </div>
 
@@ -464,23 +464,23 @@
             window.close();
         }
 
-        // Format a Ctn/Dz/Pcs cell value: show '-' when null/undefined/0
+        // Format a Ctn/Dz/Pcs cell value: show '-' when null/undefined/0.
+        // No decimals ever - always rounded to a whole number.
         function formatUnitCell(val) {
             const num = parseFloat(val);
             if (val === null || val === undefined || isNaN(num) || num === 0) {
                 return '-';
             }
-            return (num % 1 === 0) ? num.toFixed(0) : num.toFixed(2);
+            return Math.round(num).toString();
         }
 
-        // Format a money amount: drop the ".00" for whole numbers, keep 2
-        // decimals only when the amount actually has cents/paisa.
+        // Format a money amount: always a whole number, never any decimals.
         function formatMoney(val) {
             const num = parseFloat(val);
             if (val === null || val === undefined || isNaN(num)) {
                 return '0';
             }
-            return (num % 1 === 0) ? num.toFixed(0) : num.toFixed(2);
+            return Math.round(num).toString();
         }
 
         // Same unit IDs used app-wide for Sale Invoice (9=Piece, 10=Dozen, 16=Carton)
@@ -663,7 +663,7 @@
                     let childrenText = '';
                     if (children.length > 0) {
                         childrenText = '<br><span style="font-size: 10px; color: #666;">(' +
-                            children.map(c => `${c.product_name}: ${parseFloat(c.quantity).toFixed(2)}`).join(' | ') +
+                            children.map(c => `${c.product_name}: ${formatMoney(c.quantity)}`).join(' | ') +
                             ')</span>';
                     }
 
@@ -736,9 +736,9 @@
             const totalsDiscCell = (!enableCashDiscountAmount && !enableTradeOfferAmount) ? '' : `<td class="text-right disc-col"></td>`;
 
             totalsRow.innerHTML = `
-                <td class="text-right ctn-col">${totalCarton > 0 ? totalCarton.toFixed(0) : '-'}</td>
-                <td class="text-right dz-col">${totalDozen > 0 ? totalDozen.toFixed(0) : '-'}</td>
-                <td class="text-right pc-col">${totalPiece > 0 ? totalPiece.toFixed(0) : '-'}</td>
+                <td class="text-right ctn-col">${totalCarton > 0 ? Math.round(totalCarton).toString() : '-'}</td>
+                <td class="text-right dz-col">${totalDozen > 0 ? Math.round(totalDozen).toString() : '-'}</td>
+                <td class="text-right pc-col">${totalPiece > 0 ? Math.round(totalPiece).toString() : '-'}</td>
                 <td class="item-col">TOTALS</td>
                 <td class="text-right"></td>
                 ${totalsDiscCell}

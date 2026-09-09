@@ -27,32 +27,38 @@ try {
         exit;
     }
 
-    $stmt = $pdo->prepare("
-        UPDATE products SET
-            purchase_price  = ?,
-            trade_price     = ?,
-            wholesale_price = ?,
-            mrp             = ?,
-            updated_at      = CURRENT_TIMESTAMP
-        WHERE id = ? AND tenant_id = ?
-    ");
+  $stmt = $pdo->prepare("
+    UPDATE products SET
+        purchase_price  = ?,
+        trade_price     = ?,
+        wholesale_price = ?,
+        mrp             = ?,
+        batch_no        = ?,
+        expiry_date     = ?,
+        updated_at      = CURRENT_TIMESTAMP
+    WHERE id = ? AND tenant_id = ?
+");
 
-    $updated = 0;
-    foreach ($input['products'] as $row) {
-        $id = intval($row['id'] ?? 0);
-        if (!$id) continue;
+$updated = 0;
+foreach ($input['products'] as $row) {
+    $id = intval($row['id'] ?? 0);
+    if (!$id) continue;
 
-        $stmt->execute([
-            $row['purchase_price']  ?? 0,
-            $row['trade_price']     ?? 0,
-            $row['wholesale_price'] ?? 0,
-            $row['mrp']             ?? 0,
-            $id,
-            $tenant_id
-        ]);
-        $updated++;
-    }
+    $batchNo    = !empty($row['batch_no']) ? $row['batch_no'] : null;
+    $expiryDate = !empty($row['expiry_date']) ? $row['expiry_date'] : null; // '' ko NULL rakhein warna MySQL error dega
 
+    $stmt->execute([
+        $row['purchase_price']  ?? 0,
+        $row['trade_price']     ?? 0,
+        $row['wholesale_price'] ?? 0,
+        $row['mrp']             ?? 0,
+        $batchNo,
+        $expiryDate,
+        $id,
+        $tenant_id
+    ]);
+    $updated++;
+}
     echo json_encode(['success' => true, 'message' => "$updated product(s) updated successfully"]);
 
 } catch (PDOException $e) {

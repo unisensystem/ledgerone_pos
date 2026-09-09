@@ -1049,3 +1049,12 @@ document.getElementById('deleteCostCenterModal').addEventListener('click', (e) =
         document.getElementById('deleteCostCenterModal').classList.remove('active');
     }
 });
+
+window.addEventListener('global-date-lock-changed', function (e) {
+    const dateInput = document.getElementById('date');
+    if (!dateInput) return;
+
+    dateInput.value = e.detail.date;
+    dateInput.readOnly = e.detail.locked;
+    dateInput.title = e.detail.locked ? 'Date is locked from the dashboard' : '';
+});

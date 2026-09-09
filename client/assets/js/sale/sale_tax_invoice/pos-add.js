@@ -161,16 +161,18 @@ function initializePage(permissions) {
     }
 
     // Add real-time listeners to invoice settings checkboxes
-    const invoiceSettingCheckboxes = [
-        'enableTradeOfferAmount',
-        'enableFOC',
-        'enableCashDiscountPercent',
-        'enableCashDiscountAmount',
-        'enableInvoiceCashDiscountPercent',
-        'enableInvoiceCashDiscountAmount',
-        'enableShippingFees',
-        'enableAmountPaidPaymentMethod'
-    ];
+   const invoiceSettingCheckboxes = [
+    'enableTradeOfferAmount',
+    'enableFOC',
+    'enableGrossAmount',
+    'enableTaxation',
+    'enableCashDiscountPercent',
+    'enableCashDiscountAmount',
+    'enableInvoiceCashDiscountPercent',
+    'enableInvoiceCashDiscountAmount',
+    'enableShippingFees',
+    'enableAmountPaidPaymentMethod'
+];
 
     invoiceSettingCheckboxes.forEach(checkboxId => {
         const checkbox = document.getElementById(checkboxId);
@@ -2125,15 +2127,17 @@ function initializePage(permissions) {
         cell15.appendChild(focQty);
 
         // Apply settings to new row
-        const enableCarton = localStorage.getItem('enableCarton') === 'true';
+               const enableCarton = localStorage.getItem('enableCarton') === 'true';
         const enableDozen = localStorage.getItem('enableDozen') === 'true';
         const enableCashDiscountPercent = localStorage.getItem('enableCashDiscountPercent') === 'true';
         const enableCashDiscountAmount = localStorage.getItem('enableCashDiscountAmount') === 'true';
         const enableTradeOfferDiscount = localStorage.getItem('enableTradeOfferDiscount') === 'true';
         const enableTradeOfferAmount = localStorage.getItem('enableTradeOfferAmount') === 'true';
         const enableFOC = localStorage.getItem('enableFOC') === 'true';
-        const enableTaxation = true;
+        const enableGrossAmount = localStorage.getItem('enableGrossAmount') === 'true';
+        const enableTaxation = localStorage.getItem('enableTaxation') === 'true';
 
+        cell8.style.display = enableGrossAmount ? '' : 'none';
         cell5.style.display = enableCarton ? '' : 'none';
         cell6.style.display = enableDozen ? '' : 'none';
         cell9.style.display = enableCashDiscountPercent ? '' : 'none';
@@ -4134,8 +4138,11 @@ function loadInvoiceSettings() {
     if (customerDisplayRadio) customerDisplayRadio.checked = true;
 
     // Load other settings
+       // Load other settings
     document.getElementById('enableTradeOfferAmount').checked = localStorage.getItem('enableTradeOfferAmount') === 'true';
     document.getElementById('enableFOC').checked = localStorage.getItem('enableFOC') === 'true';
+    document.getElementById('enableGrossAmount').checked = localStorage.getItem('enableGrossAmount') === 'true';
+    document.getElementById('enableTaxation').checked = localStorage.getItem('enableTaxation') === 'true';
     document.getElementById('enableCashDiscountPercent').checked = localStorage.getItem('enableCashDiscountPercent') === 'true';
     document.getElementById('enableCashDiscountAmount').checked = localStorage.getItem('enableCashDiscountAmount') === 'true';
     document.getElementById('enableInvoiceCashDiscountPercent').checked = localStorage.getItem('enableInvoiceCashDiscountPercent') === 'true';
@@ -4172,8 +4179,11 @@ function saveInvoiceSettings() {
     localStorage.setItem('customerDisplayMode', selectedCustomerDisplayMode);
 
     // Save other settings
+       // Save other settings
     localStorage.setItem('enableTradeOfferAmount', document.getElementById('enableTradeOfferAmount').checked);
     localStorage.setItem('enableFOC', document.getElementById('enableFOC').checked);
+    localStorage.setItem('enableGrossAmount', document.getElementById('enableGrossAmount').checked);
+    localStorage.setItem('enableTaxation', document.getElementById('enableTaxation').checked);
     localStorage.setItem('enableCashDiscountPercent', document.getElementById('enableCashDiscountPercent').checked);
     localStorage.setItem('enableCashDiscountAmount', document.getElementById('enableCashDiscountAmount').checked);
     localStorage.setItem('enableInvoiceCashDiscountPercent', document.getElementById('enableInvoiceCashDiscountPercent').checked);
@@ -4202,7 +4212,8 @@ function applyInvoiceSettings() {
     const enableCashDiscountAmount = localStorage.getItem('enableCashDiscountAmount') === 'true';
     const enableTradeOfferAmount = localStorage.getItem('enableTradeOfferAmount') === 'true';
     const enableFOC = localStorage.getItem('enableFOC') === 'true';
-    const enableTaxation = true;
+    const enableGrossAmount = localStorage.getItem('enableGrossAmount') === 'true';
+    const enableTaxation = localStorage.getItem('enableTaxation') === 'true';
     const enableInvoiceCashDiscountPercent = localStorage.getItem('enableInvoiceCashDiscountPercent') === 'true';
     const enableInvoiceCashDiscountAmount = localStorage.getItem('enableInvoiceCashDiscountAmount') === 'true';
     const enableShippingFees = localStorage.getItem('enableShippingFees') === 'true';
@@ -4215,7 +4226,8 @@ function applyInvoiceSettings() {
         const tfoot = itemsTable.getElementsByTagName('tfoot')[0];
         
         // Apply visibility to header
-        if (thead) {
+             if (thead) {
+            const grossHeaders = thead.querySelectorAll('.gross-cell');
             const discPercentHeaders = thead.querySelectorAll('.disc-percent-cell');
             const discAmountHeaders = thead.querySelectorAll('.disc-amount-cell');
             const toAmountHeaders = thead.querySelectorAll('.to-amount-cell');
@@ -4223,6 +4235,7 @@ function applyInvoiceSettings() {
             const taxAmountHeaders = thead.querySelectorAll('.tax-amount-cell');
             const focHeaders = thead.querySelectorAll('.foc-cell');
             
+            grossHeaders.forEach(cell => cell.style.display = enableGrossAmount ? '' : 'none');
             discPercentHeaders.forEach(cell => cell.style.display = enableCashDiscountPercent ? '' : 'none');
             discAmountHeaders.forEach(cell => cell.style.display = enableCashDiscountAmount ? '' : 'none');
             toAmountHeaders.forEach(cell => cell.style.display = enableTradeOfferAmount ? '' : 'none');
@@ -4232,7 +4245,8 @@ function applyInvoiceSettings() {
         }
         
         // Apply visibility to body rows AND disable/enable inputs
-        if (tbody) {
+               if (tbody) {
+            const grossCells = tbody.querySelectorAll('.gross-cell');
             const discPercentCells = tbody.querySelectorAll('.disc-percent-cell');
             const discAmountCells = tbody.querySelectorAll('.disc-amount-cell');
             const toAmountCells = tbody.querySelectorAll('.to-amount-cell');
@@ -4240,6 +4254,13 @@ function applyInvoiceSettings() {
             const taxAmountCells = tbody.querySelectorAll('.tax-amount-cell');
             const focCells = tbody.querySelectorAll('.foc-cell');
             
+            grossCells.forEach(cell => {
+                cell.style.display = enableGrossAmount ? '' : 'none';
+                const input = cell.querySelector('input');
+                if (input) {
+                    input.disabled = !enableGrossAmount;
+                }
+            });
             discPercentCells.forEach(cell => {
                 cell.style.display = enableCashDiscountPercent ? '' : 'none';
                 const input = cell.querySelector('input');
@@ -4291,7 +4312,8 @@ function applyInvoiceSettings() {
         }
         
         // Apply visibility to footer
-        if (tfoot) {
+         if (tfoot) {
+            const grossFooters = tfoot.querySelectorAll('.gross-cell');
             const discPercentFooters = tfoot.querySelectorAll('.disc-percent-cell');
             const discAmountFooters = tfoot.querySelectorAll('.disc-amount-cell');
             const toAmountFooters = tfoot.querySelectorAll('.to-amount-cell');
@@ -4299,6 +4321,7 @@ function applyInvoiceSettings() {
             const taxAmountFooters = tfoot.querySelectorAll('.tax-amount-cell');
             const focFooters = tfoot.querySelectorAll('.foc-cell');
             
+            grossFooters.forEach(cell => cell.style.display = enableGrossAmount ? '' : 'none');
             discPercentFooters.forEach(cell => cell.style.display = enableCashDiscountPercent ? '' : 'none');
             discAmountFooters.forEach(cell => cell.style.display = enableCashDiscountAmount ? '' : 'none');
             toAmountFooters.forEach(cell => cell.style.display = enableTradeOfferAmount ? '' : 'none');
@@ -5755,9 +5778,11 @@ function applyInvoiceSettingsToRow(row) {
     const enableCashDiscountAmount = localStorage.getItem('enableCashDiscountAmount') === 'true';
     const enableTradeOfferAmount = localStorage.getItem('enableTradeOfferAmount') === 'true';
     const enableFOC = localStorage.getItem('enableFOC') === 'true';
-    const enableTaxation = true;
+    const enableGrossAmount = localStorage.getItem('enableGrossAmount') === 'true';
+    const enableTaxation = localStorage.getItem('enableTaxation') === 'true';
 
     // Apply visibility to cells in this row
+    const grossCell = row.querySelector('.gross-cell');
     const discPercentCell = row.querySelector('.disc-percent-cell');
     const discAmountCell = row.querySelector('.disc-amount-cell');
     const toAmountCell = row.querySelector('.to-amount-cell');
@@ -5765,6 +5790,7 @@ function applyInvoiceSettingsToRow(row) {
     const taxAmountCell = row.querySelector('.tax-amount-cell');
     const focCell = row.querySelector('.foc-cell');
     
+    if (grossCell) grossCell.style.display = enableGrossAmount ? '' : 'none';
     if (discPercentCell) discPercentCell.style.display = enableCashDiscountPercent ? '' : 'none';
     if (discAmountCell) discAmountCell.style.display = enableCashDiscountAmount ? '' : 'none';
     if (toAmountCell) toAmountCell.style.display = enableTradeOfferAmount ? '' : 'none';

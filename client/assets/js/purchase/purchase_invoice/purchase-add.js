@@ -6,7 +6,14 @@ document.addEventListener('DOMContentLoaded', function () {
     // Set default date to today
     const today = new Date().toISOString().split('T')[0];
     document.getElementById('purchaseDate').value = today;
-
+const globalLockedDate = localStorage.getItem('global_locked_date');
+const isGlobalDateLocked = localStorage.getItem('global_date_locked') === 'true';
+document.getElementById('purchaseDate').value = (isGlobalDateLocked && globalLockedDate)
+    ? globalLockedDate
+    : new Date().toISOString().split('T')[0];
+if (isGlobalDateLocked && globalLockedDate) {
+    document.getElementById('purchaseDate').readOnly = true;
+}
     // Check if in edit mode
     const urlParams = new URLSearchParams(window.location.search);
     const editId = urlParams.get('edit');
@@ -2835,3 +2842,18 @@ function addChildProducts(parentRow, children) {
     }));
     parentRow.dataset.childProducts = JSON.stringify(childProducts);
 }
+
+window.addEventListener('global-date-lock-changed', function (e) {
+    const purchaseDateInput = document.getElementById('purchaseDate');
+    if (!purchaseDateInput) return;
+
+    if (e.detail.locked) {
+        purchaseDateInput.value = e.detail.date;
+        purchaseDateInput.readOnly = true;
+        purchaseDateInput.title = 'Date is locked from the dashboard';
+    } else {
+        purchaseDateInput.value = e.detail.date;
+        purchaseDateInput.readOnly = false;
+        purchaseDateInput.title = '';
+    }
+});

@@ -1258,6 +1258,10 @@ async function loadItemMovement() {
         const companyId   = document.getElementById('movement-company')?.value || '';
         const fromDate    = document.getElementById('from-date-movement').value;
         const toDate      = document.getElementById('to-date-movement').value;
+        // NEW: Sort By filter — sorts the resulting rows on the chosen numeric
+        // column from smaller to larger (opening/purchase/sale/credit_note/debit_note/closing).
+        // Left blank ('Default') keeps the existing product-name ordering from the API.
+        const sortBy      = document.getElementById('movement-sort')?.value || '';
 
         let productId = null;
         if (productName) {
@@ -1286,7 +1290,14 @@ async function loadItemMovement() {
         const data = await response.json();
 
         if (data.success) {
-            updateMovementTable(data.data, data.currency);
+            let movementData = Array.isArray(data.data) ? [...data.data] : [];
+
+            // NEW: apply smaller-to-larger sort on the selected column, if any.
+            if (sortBy) {
+                movementData.sort((a, b) => parseFloat(a[sortBy] || 0) - parseFloat(b[sortBy] || 0));
+            }
+
+            updateMovementTable(movementData, data.currency);
         } else {
             console.error('Failed to load item movement:', data.message);
         }
@@ -1706,11 +1717,23 @@ document.getElementById('clearMovementFilters').addEventListener('click', () => 
     document.getElementById('movement-branch-input').value = '';
     document.getElementById('from-date-movement').value = '';
     document.getElementById('to-date-movement').value = '';
+    // NEW: reset the Sort By dropdown back to default too
+    if (document.getElementById('movement-sort')) {
+        document.getElementById('movement-sort').value = '';
+    }
     const tbody = document.querySelector('#item-movement .table tbody');
     tbody.innerHTML = '';
     document.getElementById('movement-pagination-info').textContent = 'Showing 0 - 0 of 0 entries';
     document.getElementById('movement-page-info').textContent = 'Page 1 of 1';
 });
+
+// NEW: re-run the movement query/sort as soon as the user picks a Sort By option,
+// so they don't have to also click "Apply Filters".
+if (document.getElementById('movement-sort')) {
+    document.getElementById('movement-sort').addEventListener('change', () => {
+        loadItemMovement();
+    });
+}
 
 document.getElementById('movement-prev-btn').addEventListener('click', () => {
     if (movementCurrentPage > 1) {

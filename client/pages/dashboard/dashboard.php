@@ -1099,6 +1099,23 @@ if (!$currencySymbol) {
                 </div>
             </div>
 
+            <!-- Global Date Lock Widget (collapsible, tucked into right edge) -->
+<div id="dateLockWidgetWrap" style="position: fixed; top: 60px; right: 0; z-index: 9999; display: flex; align-items: center; font-family: sans-serif; font-size: 13px;">
+
+    <!-- Sliding panel -->
+    <div id="dateLockPanel" style="display: flex; align-items: center; gap: 6px; background: #fff; padding: 6px 10px; border-radius: 8px 0 0 8px; box-shadow: -2px 2px 6px rgba(0,0,0,0.15);
+         max-width: 0; overflow: hidden; opacity: 0; transition: max-width 0.25s ease, opacity 0.2s ease; white-space: nowrap;">
+        <input type="date" id="globalLockDate" style="border: 1px solid #ccc; border-radius: 4px; padding: 4px 6px; font-size: 13px;">
+        <button type="button" id="globalDateLockBtn" style="border: none; background: transparent; cursor: pointer; font-size: 16px; padding: 4px;">
+            <i class="fas fa-lock-open" id="globalDateLockIcon" style="color: #888;"></i>
+        </button>
+    </div>
+
+    <!-- Always-visible tab handle -->
+    <button type="button" id="dateLockToggleTab" title="Date Lock" style="border: none; cursor: pointer; background: #fff; box-shadow: -2px 2px 6px rgba(0,0,0,0.15); border-radius: 8px 0 0 8px; padding: 8px 6px; display: flex; align-items: center; justify-content: center;">
+        <i class="fas fa-lock" id="dateLockTabIcon" style="color: #888; font-size: 14px;"></i>
+    </button>
+</div>
             <!-- Global Search -->
             <div class="quick-actions" style="position: relative;">
                 <div class="ledger-search-box" style="position: relative;">
@@ -2827,6 +2844,94 @@ setInterval(loadTodos, 5 * 60 * 1000);
 
 
         <script src="../../assets/js/dashboard/dashboard-main.js"></script>
+
+        <script>
+(function () {
+    const DATE_KEY = 'global_locked_date';
+    const FLAG_KEY = 'global_date_locked';
+
+    function init() {
+        const wrap     = document.getElementById('dateLockWidgetWrap');
+        const panel    = document.getElementById('dateLockPanel');
+        const toggle   = document.getElementById('dateLockToggleTab');
+        const tabIcon  = document.getElementById('dateLockTabIcon');
+        const dateInput= document.getElementById('globalLockDate');
+        const lockBtn  = document.getElementById('globalDateLockBtn');
+        const lockIcon = document.getElementById('globalDateLockIcon');
+        if (!wrap || !panel || !toggle || !dateInput || !lockBtn || !lockIcon) return;
+
+        const isLocked  = localStorage.getItem(FLAG_KEY) === 'true';
+        const savedDate = localStorage.getItem(DATE_KEY);
+
+        function renderLocked() {
+            dateInput.value = savedDate;
+            dateInput.disabled = true;
+            lockIcon.className = 'fas fa-lock';
+            lockIcon.style.color = '#e74c3c';
+            lockBtn.title = 'Click to unlock date';
+            tabIcon.className = 'fas fa-lock';
+            tabIcon.style.color = '#e74c3c';
+        }
+        function renderUnlocked() {
+            if (!dateInput.value) dateInput.value = new Date().toISOString().split('T')[0];
+            dateInput.disabled = false;
+            lockIcon.className = 'fas fa-lock-open';
+            lockIcon.style.color = '#888';
+            lockBtn.title = 'Select a date and click to lock it for all forms';
+            tabIcon.className = 'fas fa-lock-open';
+            tabIcon.style.color = '#888';
+        }
+
+        if (isLocked && savedDate) renderLocked(); else renderUnlocked();
+
+        // Toggle open/close panel
+        function openPanel() {
+            panel.style.maxWidth = '220px';
+            panel.style.opacity = '1';
+        }
+        function closePanel() {
+            panel.style.maxWidth = '0';
+            panel.style.opacity = '0';
+        }
+
+        toggle.addEventListener('click', function (e) {
+            e.stopPropagation();
+            const isOpen = panel.style.maxWidth && panel.style.maxWidth !== '0px';
+            if (isOpen) closePanel(); else openPanel();
+        });
+
+        // Click outside closes the panel
+        document.addEventListener('click', function (e) {
+            if (!wrap.contains(e.target)) closePanel();
+        });
+
+        lockBtn.addEventListener('click', function (e) {
+            e.stopPropagation();
+            const currentlyLocked = localStorage.getItem(FLAG_KEY) === 'true';
+
+            if (currentlyLocked) {
+                localStorage.removeItem(FLAG_KEY);
+                localStorage.removeItem(DATE_KEY);
+                renderUnlocked();
+            } else {
+                if (!dateInput.value) {
+                    alert('Please select a date first.');
+                    return;
+                }
+                localStorage.setItem(DATE_KEY, dateInput.value);
+                localStorage.setItem(FLAG_KEY, 'true');
+                renderLocked();
+            }
+        });
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', init);
+    } else {
+        init();
+    }
+})();
+</script>
     <?php endif; ?>
 
     <!-- Ledger Modal -->

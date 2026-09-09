@@ -571,6 +571,19 @@ $currency_symbol = $currency['symbol'];
         <option value="">All Companies</option>
     </select>
 </div>
+        <!-- NEW: Sort By filter — lets user sort any numeric column smaller to larger -->
+        <div class="form-group">
+            <label class="form-label" for="movement-sort">Sort By (Low to High)</label>
+            <select class="form-control" id="movement-sort">
+                <option value="">Default (Product Name)</option>
+                <option value="opening">Opening</option>
+                <option value="purchase">Purchase</option>
+                <option value="sale">Sale</option>
+                <option value="credit_note">Credit Note</option>
+                <option value="debit_note">Debit Note</option>
+                <option value="closing">Closing</option>
+            </select>
+        </div>
         <div class="form-group">
             <label class="form-label" for="from-date-movement">From Date</label>
             <input type="date" class="form-control" id="from-date-movement">

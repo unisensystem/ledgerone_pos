@@ -6358,32 +6358,33 @@ async function addRowDynamic() {
    // Batch No / Expiry Date — med_pos_invoice only: the column doesn't exist
     // in the regular POS invoice's table markup, so inserting it there would
     // leave headerless/footerless cells (same pattern as Extra Discount below).
-    const batchOffset = isMedInvoicePage ? 2 : 0;
-    if (isMedInvoicePage) {
-        // Batch No (dropdown — auto-selects FEFO batch, user can pick another; inserted at fixed index 3)
-        const batchNoCell = row.insertCell(3);
-        batchNoCell.className = 'batch-no-cell';
-        const batchNoInput = document.createElement('select');
-        batchNoInput.className = 'table-input batch-no-input';
-        batchNoInput.innerHTML = '<option value="">No Batch</option>';
-        batchNoInput.style.color = '#000000';
-        batchNoInput.style.fontWeight = '600';
-        batchNoCell.appendChild(batchNoInput);
+    // Always create Batch No & Expiry Date cells for all pages
+const batchOffset = 2;
 
-        // Expiry Date (auto-filled, read-only, inserted at fixed index 4)
-        const batchExpiryCell = row.insertCell(4);
-        batchExpiryCell.className = 'batch-expiry-cell';
-        const batchExpiryInput = document.createElement('input');
-        batchExpiryInput.type = 'text';
-        batchExpiryInput.className = 'table-input batch-expiry-input';
-        batchExpiryInput.readOnly = true;
-        batchExpiryInput.tabIndex = -1;
-        batchExpiryInput.style.color = '#000000';
-        batchExpiryInput.style.fontWeight = '600';
-        batchExpiryInput.style.opacity = '1';
-        batchExpiryInput.style.webkitTextFillColor = '#000000';
-        batchExpiryCell.appendChild(batchExpiryInput);
-    }
+// Batch No (dropdown — auto-selects FEFO batch, user can pick another; inserted at fixed index 3)
+const batchNoCell = row.insertCell(3);
+batchNoCell.className = 'batch-no-cell';
+const batchNoInput = document.createElement('select');
+batchNoInput.className = 'table-input batch-no-input';
+batchNoInput.innerHTML = '<option value="">No Batch</option>';
+batchNoInput.style.cursor = 'pointer';  // ← Add this
+batchNoInput.style.pointerEvents = 'auto';  // ← Add this
+batchNoInput.disabled = false;  // ← Ensure it's not disabled
+batchNoInput.style.color = '#000000';
+batchNoInput.style.fontWeight = '600';
+batchNoCell.appendChild(batchNoInput);
+
+// Expiry Date (auto-filled, read-only, inserted at fixed index 4)
+const batchExpiryCell = row.insertCell(4);
+batchExpiryCell.className = 'batch-expiry-cell';
+const batchExpiryInput = document.createElement('input');
+batchExpiryInput.type = 'text';
+batchExpiryInput.className = 'table-input batch-expiry-input';
+batchExpiryInput.style.color = '#000000';
+batchExpiryInput.style.fontWeight = '600';
+batchExpiryInput.style.opacity = '1';
+batchExpiryInput.style.webkitTextFillColor = '#000000';
+batchExpiryCell.appendChild(batchExpiryInput);
 
     // Price
     const priceCell = row.insertCell(3 + batchOffset);
@@ -7004,3 +7005,19 @@ async function quickAddCustomer() {
         alert('An error occurred while adding the customer.');
     }
 }
+
+    // Live-update Sale Date when dashboard's lock/unlock is clicked
+    window.addEventListener('global-date-lock-changed', function (e) {
+        const saleDateInput = document.getElementById('saleDate');
+        if (!saleDateInput) return;
+
+        if (e.detail.locked) {
+            saleDateInput.value = e.detail.date;
+            saleDateInput.readOnly = true;
+            saleDateInput.title = 'Date is locked from the dashboard';
+        } else {
+            saleDateInput.value = e.detail.date; // aaj ki date
+            saleDateInput.readOnly = false;
+            saleDateInput.title = '';
+        }
+    });
