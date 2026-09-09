@@ -1019,3 +1019,47 @@ if (bulkChequeNo) formData.append('cheque_no', bulkChequeNo);
         }, 2000);
     }
 });
+
+// ===== GLOBAL DATE LOCK =====
+(function () {
+    const DATE_KEY = 'global_locked_date';
+    const FLAG_KEY = 'global_date_locked';
+
+    function applyGlobalDateLock() {
+        const voucherDate = document.getElementById('voucherDate');
+        if (!voucherDate) return;
+
+        const isLocked = localStorage.getItem(FLAG_KEY) === 'true';
+        const lockedDate = localStorage.getItem(DATE_KEY);
+
+        if (isLocked && lockedDate) {
+            voucherDate.value = lockedDate;
+            voucherDate.readOnly = true;
+            voucherDate.style.backgroundColor = '#f3f4f6';
+            voucherDate.title = 'Date is locked from dashboard';
+        } else {
+            voucherDate.readOnly = false;
+            voucherDate.style.backgroundColor = '';
+            voucherDate.title = '';
+            
+            if (!voucherDate.value) {
+                voucherDate.valueAsDate = new Date();
+            }
+        }
+    }
+
+    // Page load
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', applyGlobalDateLock);
+    } else {
+        applyGlobalDateLock();
+    }
+
+    // Same-page event, if available
+    window.addEventListener('global-date-lock-changed', function () {
+        applyGlobalDateLock();
+    });
+
+    // Check again whenever user comes back to this tab/page
+    window.addEventListener('focus', applyGlobalDateLock);
+})();

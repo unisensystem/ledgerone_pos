@@ -6997,3 +6997,19 @@ async function quickAddCustomer() {
             saleDateInput.title = '';
         }
     });
+
+    // Live-update Sale Date when dashboard's lock/unlock is clicked
+    window.addEventListener('global-date-lock-changed', function (e) {
+        const saleDateInput = document.getElementById('saleDate');
+        if (!saleDateInput) return;
+
+        if (e.detail.locked) {
+            saleDateInput.value = e.detail.date;
+            saleDateInput.readOnly = true;
+            saleDateInput.title = 'Date is locked from the dashboard';
+        } else {
+            saleDateInput.value = e.detail.date; // aaj ki date
+            saleDateInput.readOnly = false;
+            saleDateInput.title = '';
+        }
+    });

@@ -2909,19 +2909,41 @@ setInterval(loadTodos, 5 * 60 * 1000);
             e.stopPropagation();
             const currentlyLocked = localStorage.getItem(FLAG_KEY) === 'true';
 
-            if (currentlyLocked) {
-                localStorage.removeItem(FLAG_KEY);
-                localStorage.removeItem(DATE_KEY);
-                renderUnlocked();
-            } else {
-                if (!dateInput.value) {
-                    alert('Please select a date first.');
-                    return;
-                }
-                localStorage.setItem(DATE_KEY, dateInput.value);
-                localStorage.setItem(FLAG_KEY, 'true');
-                renderLocked();
-            }
+          if (currentlyLocked) {
+    // UNLOCK
+    localStorage.removeItem(FLAG_KEY);
+    localStorage.removeItem(DATE_KEY);
+
+    renderUnlocked();
+
+    window.dispatchEvent(new CustomEvent('global-date-lock-changed', {
+        detail: {
+            locked: false,
+            date: new Date().toISOString().split('T')[0]
+        }
+    }));
+
+} else {
+    // LOCK
+    if (!dateInput.value) {
+        alert('Please select a date first.');
+        return;
+    }
+
+    const lockedDate = dateInput.value;
+
+    localStorage.setItem(DATE_KEY, lockedDate);
+    localStorage.setItem(FLAG_KEY, 'true');
+
+    renderLocked();
+
+    window.dispatchEvent(new CustomEvent('global-date-lock-changed', {
+        detail: {
+            locked: true,
+            date: lockedDate
+        }
+    }));
+}
         });
     }
 
