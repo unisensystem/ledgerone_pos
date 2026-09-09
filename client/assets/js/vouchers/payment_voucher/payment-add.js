@@ -809,6 +809,8 @@ function addBulkRow() {
                 <option value="">Select Bank</option>
             </select>
         </td>
+        <td><input type="text" class="bulk-cheque-no" placeholder="Cheque No"></td>
+
         <td><input type="date" class="bulk-cheque-date"></td>
         <td><textarea class="bulk-description" placeholder="Description"></textarea></td>
         <td>
@@ -976,6 +978,8 @@ document.getElementById('postBulkBtn').addEventListener('click', async function(
 
         const bulkBankAccount = row.querySelector('.bulk-bank-account').value;
         if (bulkBankAccount) formData.append('bank_account', bulkBankAccount);
+        const bulkChequeNo = row.querySelector('.bulk-cheque-no').value;
+if (bulkChequeNo) formData.append('cheque_no', bulkChequeNo);
         
         const bulkChequeDate = row.querySelector('.bulk-cheque-date').value;
         if (bulkChequeDate) formData.append('cheque_date', bulkChequeDate);

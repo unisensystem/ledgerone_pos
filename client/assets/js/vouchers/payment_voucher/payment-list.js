@@ -190,13 +190,14 @@ function fetchVouchers(page = 1) {
         .then(data => {
             if (data.success) {
                 vouchers = data.data.map(voucher => ({
-                    id: voucher.id,
-                    voucherNumber: voucher.voucher_number,
-                    date: voucher.voucher_date,
-                    supplier: voucher.supplier_name,
-                    supplierCode: voucher.supplier_code,
-                    billNo: voucher.bill_no || 'N/A',
-                    amount: parseFloat(voucher.amount),
+    id: voucher.id,
+    voucherNumber: voucher.voucher_number,
+    date: voucher.voucher_date,
+    supplier: voucher.supplier_name,
+    supplierCode: voucher.supplier_code,
+    billNo: voucher.bill_no || 'N/A',
+    chequeNo: voucher.cheque_no || 'N/A',   // ADD
+    amount: parseFloat(voucher.amount),
                     currencySymbol: voucher.currency_symbol || '$',
                     paymentMethod: voucher.payment_method,
                     projectName: voucher.project_name || '-',
@@ -262,6 +263,7 @@ function renderVouchers(vouchersToRender) {
                     <td>${formattedDate}</td>
                     <td>${voucher.supplier}</td>
                     <td>${voucher.billNo}</td>
+                    <td>${voucher.chequeNo}</td>
                     <td>${voucher.projectName}</td>
                     <td class="amount">${formattedAmount}</td>
                     <td>${voucher.paymentMethod}</td>
@@ -783,6 +785,7 @@ function exportVouchersToExcel() {
             [entityLabel + ' Code']: v.supplierCode || '',
             [entityLabel]: v.supplier,
             'Bill No': v.billNo,
+            'Cheque No': v.chequeNo,
             'Project': v.projectName,
             'Amount': v.amount,
             'Currency': v.currencySymbol,

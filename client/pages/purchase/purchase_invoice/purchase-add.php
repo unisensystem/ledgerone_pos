@@ -22,6 +22,36 @@ if (!$user_id) {
     <title>LedgerOne ERP - Purchase Invoice</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="../../../assets/css/purchase/purchase_invoice/purchase-add.css">
+    <style>
+        /* Only applies when scroll mode is turned ON — original layout untouched otherwise */
+        .table-container.scroll-active {
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+        .table-container.scroll-active #itemsTable {
+            width: max-content;
+            min-width: 100%;
+        }
+        .table-container.scroll-active #itemsTable th,
+        .table-container.scroll-active #itemsTable td {
+            white-space: nowrap;
+        }
+        /* Scrollbar style (shown only in scroll-active mode) */
+        .table-container.scroll-active::-webkit-scrollbar {
+            height: 8px;
+        }
+        .table-container.scroll-active::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 4px;
+        }
+        .table-container.scroll-active::-webkit-scrollbar-thumb {
+            background: #1F7BFF;
+            border-radius: 4px;
+        }
+        .table-container.scroll-active::-webkit-scrollbar-thumb:hover {
+            background: #155fc9;
+        }
+    </style>   
 </head>
 <body class="light-theme">
     <div class="container">
@@ -347,6 +377,11 @@ if (!$user_id) {
                     <div class="settings-item"><input type="checkbox" id="enableInvoiceCashDiscountAmount"><label for="enableInvoiceCashDiscountAmount">Invoice-wise Cash Discount Amount</label></div>
                     <div class="settings-item"><input type="checkbox" id="enableShippingFees"><label for="enableShippingFees">Shipping Fees</label></div>
                 </div>
+            </div>
+                        <div class="settings-section">
+                <div class="settings-section-title">Table Display</div>
+                <div class="settings-grid">
+                    <div class="settings-item"><input type="checkbox" id="showTableScrollbar"><label for="showTableScrollbar">Enable Horizontal Scroll (Items Table)</label></div>                </div>
             </div>
 
             <div class="modal-actions">

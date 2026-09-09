@@ -1,5 +1,6 @@
 let products = [];
 let currentPage = 1;
+let pageSize = 10;
 let totalPages = 1;
 let totalRecords = 0;
 let collapsedParents = new Set();
@@ -13,6 +14,11 @@ document.addEventListener('DOMContentLoaded', function () {
     document.getElementById('addProductBtn').addEventListener('click', function () {
         window.location.href = 'product-add.php';
     });
+    
+    document.getElementById('pageSize').addEventListener('change', function () {
+    pageSize = parseInt(this.value);
+    loadProducts(1); // page size change → wapas page 1 se start
+});
 
     // Bulk Opening Stock button
     document.getElementById('bulkOpeningStockBtn').addEventListener('click', function () {
@@ -114,15 +120,21 @@ document.addEventListener('DOMContentLoaded', function () {
         document.getElementById('exportDropdown').classList.remove('show');
     });
 
-    // Apply Filters button
+    // Auto-apply filters on change (not require Apply button click)
     document.getElementById('applyFilters').addEventListener('click', applyFilters);
-
-    // Reset Filters button
     document.getElementById('resetFilters').addEventListener('click', resetFilters);
     
-    // Price type change
+    // Auto-apply on any filter change
+    document.getElementById('search').addEventListener('change', () => applyFilters());
+    document.getElementById('category').addEventListener('change', () => applyFilters());
+    document.getElementById('type').addEventListener('change', () => applyFilters());
+    document.getElementById('status').addEventListener('change', () => applyFilters());
+    document.getElementById('vendor').addEventListener('change', () => applyFilters());
+    document.getElementById('uomFilter').addEventListener('change', () => applyFilters());
+    
+    // Price type change - auto apply
     document.querySelectorAll('input[name="priceType"]').forEach(radio => {
-        radio.addEventListener('change', applyFilters);
+        radio.addEventListener('change', () => applyFilters());
     });
     
     // Load categories for filter
@@ -535,7 +547,7 @@ function handleBulkUomSubmit(e) {
 }
 
 function applyFilters() {
-    loadProducts();
+    loadProducts(1); // Reset to page 1 when filters change
 }
 
 function resetFilters() {
@@ -548,7 +560,7 @@ function resetFilters() {
     document.querySelector('input[name="priceType"][value="tp"]').checked = true;
     collapsedParents.clear();
 
-    loadProducts();
+    loadProducts(1);
 }
 
 
@@ -705,8 +717,9 @@ function loadProducts(page = 1) {
         status: document.getElementById('status').value,
         vendor: document.getElementById('vendor').value,
         uom_filter: document.getElementById('uomFilter').value,
-        page: page
-    });
+page: page,
+        per_page: pageSize 
+        });
     
     fetch(`../../../../server/api/inventory/products/product-list.php?${params}`)
     .then(response => response.json())
@@ -801,8 +814,8 @@ function loadVendorsFilter() {
 }
 
 function updatePagination() {
-    const startRecord = totalRecords === 0 ? 0 : (currentPage - 1) * 10 + 1;
-    const endRecord = Math.min(currentPage * 10, totalRecords);
+      const startRecord = totalRecords === 0 ? 0 : (currentPage - 1) * pageSize + 1;
+    const endRecord = Math.min(currentPage * pageSize, totalRecords);
     
     document.getElementById('paginationInfo').textContent = 
         `Showing ${startRecord}-${endRecord} of ${totalRecords} products`;

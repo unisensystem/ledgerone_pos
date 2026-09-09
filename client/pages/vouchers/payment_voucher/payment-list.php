@@ -140,6 +140,7 @@ $initialSearch = $_GET['search'] ?? '';
                         <th>Date</th>
                         <th>Supplier</th>
                         <th>Bill No</th>
+                        <th>Cheque No</th>
                         <th>Project</th>
                         <th>Amount</th>
                         <th>Payment Method</th>

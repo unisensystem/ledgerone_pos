@@ -2455,6 +2455,7 @@ if (isGlobalDateLocked && globalLockedDate) {
     // Invoice Settings Modal
     document.getElementById('invoiceSettingsBtn').addEventListener('click', function () {
         // Load settings from localStorage
+                document.getElementById('showTableScrollbar').checked = localStorage.getItem('showTableScrollbar') === 'true';
         document.getElementById('enableSize').checked = localStorage.getItem('enableSize') === 'true';
         document.getElementById('enableBatchNo').checked = localStorage.getItem('enableBatchNo') === 'true';
         document.getElementById('enableBatchExpiry').checked = localStorage.getItem('enableBatchExpiry') === 'true';
@@ -2489,6 +2490,7 @@ if (isGlobalDateLocked && globalLockedDate) {
 
     document.getElementById('saveSettingsBtn').addEventListener('click', function () {
         // Save settings to localStorage
+                localStorage.setItem('showTableScrollbar', document.getElementById('showTableScrollbar').checked);
         localStorage.setItem('enableSize', document.getElementById('enableSize').checked);
         localStorage.setItem('enableBatchNo', document.getElementById('enableBatchNo').checked);
         localStorage.setItem('enableBatchExpiry', document.getElementById('enableBatchExpiry').checked);
@@ -2564,6 +2566,11 @@ if (isGlobalDateLocked && globalLockedDate) {
                 if (fg) fg.style.display = show ? '' : 'none';
             }
         });
+              const tableContainer = document.querySelector('.table-container');
+        if (tableContainer) {
+            const scrollEnabled = localStorage.getItem('showTableScrollbar') === 'true';
+            tableContainer.classList.toggle('scroll-active', scrollEnabled);
+        }
 
         // Show/hide thead and tfoot columns via data-col
                const colMap = [

@@ -30,8 +30,15 @@ try {
     $vendor = $_GET['vendor'] ?? '';
     $uom_filter = $_GET['uom_filter'] ?? '';
     $page = max(1, (int)($_GET['page'] ?? 1));
+
+// Allowed page sizes — whitelist taake koi arbitrary/negative value na bhej sake
+$allowedLimits = [10, 20, 30, 40, 50, 60, 70, 80, 100];
+$limit = (int)($_GET['per_page'] ?? 10);
+if (!in_array($limit, $allowedLimits, true)) {
     $limit = 10;
-    $offset = ($page - 1) * $limit;
+}
+
+$offset = ($page - 1) * $limit;
     
     $sql = "
         SELECT p.id, p.code, p.name, p.product_type, p.mrp, p.trade_price, p.wholesale_price, p.is_active,
@@ -52,7 +59,7 @@ try {
         LEFT JOIN tenant_currencies tc ON p.tenant_id = tc.tenant_id AND tc.is_base_currency = 1
         LEFT JOIN ledgerone_public.currencies curr ON tc.currency_id = curr.id
         WHERE p.tenant_id = ?
-    ";;
+    ";
     
     $params = [$tenant_id];
     
