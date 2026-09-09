@@ -66,7 +66,7 @@ input, select, textarea {
 .rate-table input[type="text"].extra-input,
 .rate-table input[type="date"].extra-input {
     width: 100%;
-    padding: 7px 8px;
+    padding: 16px 8px;
     border: 1px solid #ddd;
     border-radius: 4px;
     font-size: 13px;
@@ -113,7 +113,7 @@ input, select, textarea {
 
         .rate-table input[type="number"] {
             width: 100%;
-            padding: 7px 8px;
+                padding: 16px 8px;
             border: 1px solid #ddd;
             border-radius: 4px;
             font-size: 13px;
@@ -139,7 +139,7 @@ input, select, textarea {
 
         .custom-dropdown input[type="text"] {
             width: 100%;
-            padding: 7px 8px;
+            padding: 15px 8px;
             border: 1px solid #ddd;
             border-radius: 4px;
             font-size: 13px;
@@ -275,13 +275,13 @@ input, select, textarea {
             </table>
         </div>
 
-        <button type="button" class="btn btn-secondary" id="addRowBtn" style="margin-top:16px;">
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" style="margin-right:6px;">
-                <path d="M8 3.33333V12.6667" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-                <path d="M3.33325 8H12.6666" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-            Add Row
-        </button>
+        <!-- <button type="button" class="btn btn-secondary" id="addRowBtn">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" style="margin-right:6px;">
+            <path d="M8 3.33333V12.6667" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M3.33325 8H12.6666" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        Add Row
+    </button> -->
 
         <div class="action-buttons">
             <button type="button" class="btn btn-secondary" onclick="location.href='product-list.php'">Cancel</button>
