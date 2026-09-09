@@ -50,6 +50,17 @@ $currency_symbol = $currency['symbol'] ?? '$';
                 <h1 class="page-title">Post Dated Cheques (PDCs) Report</h1>
             </div>
 
+            <!-- Ledger Settings -->
+            <div class="filters-container" style="margin-bottom: 20px;">
+                <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; margin: 0;">
+                    <input type="checkbox" id="pending-pdc-ledger-toggle" style="width: auto; cursor: pointer;">
+                    <span style="font-weight: 600;">Pending Cheques Affect Customer Ledger Balance</span>
+                </label>
+                <small style="color: var(--subtext, #6b7280); display: block; margin-top: 6px;">
+                    By default a Pending cheque is shown on the Customer Ledger for reference only and does not count toward the Dr/Cr totals or closing balance — it starts affecting the ledger once Approved. Turn this on if you want Pending cheques to count immediately.
+                </small>
+            </div>
+
             <!-- Stats Cards -->
             <div class="stats-container">
                 <div class="stat-card">

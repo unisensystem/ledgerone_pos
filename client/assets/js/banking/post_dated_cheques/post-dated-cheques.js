@@ -24,8 +24,45 @@ async function initApp() {
     await loadBanks();
     await loadCompanies();
     await loadBankAccounts();
+    await loadPendingPdcLedgerSetting();
     await fetchPDCs();
     setupEventListeners();
+}
+
+// Load whether Pending PDCs should count towards the customer ledger balance
+async function loadPendingPdcLedgerSetting() {
+    try {
+        const response = await fetch('../../../../server/api/banking/post_dated_cheques/pdc-ledger-setting.php');
+        const result = await response.json();
+        const toggle = document.getElementById('pending-pdc-ledger-toggle');
+        if (result.success && toggle) {
+            toggle.checked = !!result.pending_pdc_affects_ledger;
+        }
+    } catch (error) {
+        console.error('Error loading PDC ledger setting:', error);
+    }
+}
+
+// Save whether Pending PDCs should count towards the customer ledger balance
+async function savePendingPdcLedgerSetting(enabled) {
+    try {
+        const response = await fetch('../../../../server/api/banking/post_dated_cheques/pdc-ledger-setting.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ pending_pdc_affects_ledger: enabled })
+        });
+        const result = await response.json();
+        if (result.success) {
+            showNotification(enabled
+                ? 'Pending cheques will now affect the customer ledger balance'
+                : 'Pending cheques will no longer affect the customer ledger balance');
+        } else {
+            showNotification(result.message || 'Failed to save setting', 'error');
+        }
+    } catch (error) {
+        console.error('Error saving PDC ledger setting:', error);
+        showNotification('Error saving setting', 'error');
+    }
 }
 
 // Load banks for filter dropdown
@@ -564,6 +601,10 @@ function setupEventListeners() {
 
     addPdcBtn.addEventListener('click', () => {
         showNotification('Add PDC feature would open a form in a real application');
+    });
+
+    document.getElementById('pending-pdc-ledger-toggle').addEventListener('change', (e) => {
+        savePendingPdcLedgerSetting(e.target.checked);
     });
 
     prevPageBtn.addEventListener('click', () => {
