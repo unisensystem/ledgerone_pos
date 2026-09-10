@@ -190,6 +190,12 @@ $currency_symbol = $currency['symbol'];
                         </select>
                     </div>
                     <div class="form-group">
+                        <label class="form-label" for="position-project">Project</label>
+                        <select class="form-control" id="position-project">
+                            <option value="">All Projects</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
                         <label class="form-label" for="from-date">From Date</label>
                         <input type="date" class="form-control" id="from-date">
                     </div>
@@ -316,6 +322,12 @@ $currency_symbol = $currency['symbol'];
                         <input type="text" class="form-control" id="item-customer" list="item-customer-list" placeholder="All Customers">
                         <datalist id="item-customer-list"></datalist>
                     </div>
+                    <div class="form-group">
+                        <label class="form-label" for="item-project">Project</label>
+                        <select class="form-control" id="item-project">
+                            <option value="">All Projects</option>
+                        </select>
+                    </div>
                     <div class="filter-group">
                         <label class="form-label" for="item-batch-filter">Batch No</label>
                         <input type="text" class="form-control" id="item-batch-filter" placeholder="Search Batch No">
@@ -326,12 +338,12 @@ $currency_symbol = $currency['symbol'];
                         <input type="date" class="form-control" id="item-expiry-filter">
                     </div>
                     <div class="form-group">
-                        <label class="form-label" for="from-date">From Date</label>
-                        <input type="date" class="form-control" id="from-date">
+                        <label class="form-label" for="item-from-date">From Date</label>
+                        <input type="date" class="form-control" id="item-from-date">
                     </div>
                     <div class="form-group">
-                        <label class="form-label" for="to-date">To Date</label>
-                        <input type="date" class="form-control" id="to-date">
+                        <label class="form-label" for="item-to-date">To Date</label>
+                        <input type="date" class="form-control" id="item-to-date">
                     </div>
                     <div class="form-group" style="display: flex; align-items: flex-end; gap: 8px;">
                         <button class="btn btn-primary" id="applyFilters">
@@ -400,6 +412,12 @@ $currency_symbol = $currency['symbol'];
                         <label class="form-label" for="branch-ledger">Branch</label>
                         <input type="text" class="form-control" id="branch-ledger" list="branch-ledger-list" placeholder="Select Branch">
                         <datalist id="branch-ledger-list"></datalist>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="branch-project">Project</label>
+                        <select class="form-control" id="branch-project">
+                            <option value="">All Projects</option>
+                        </select>
                     </div>
                     <div class="form-group">
                         <label class="form-label" for="from-date-branch">From Date</label>
@@ -475,6 +493,12 @@ $currency_symbol = $currency['symbol'];
                         <label class="form-label" for="customer-product-input">Product</label>
                         <input type="text" class="form-control" id="customer-product-input" list="customer-product-list" placeholder="All Products">
                         <datalist id="customer-product-list"></datalist>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="customer-project">Project</label>
+                        <select class="form-control" id="customer-project">
+                            <option value="">All Projects</option>
+                        </select>
                     </div>
                     <div class="filter-group">
                         <label class="form-label" for="customer-batch-filter">Batch No</label>
@@ -571,6 +595,12 @@ $currency_symbol = $currency['symbol'];
         <option value="">All Companies</option>
     </select>
 </div>
+        <div class="form-group">
+            <label class="form-label" for="movement-project">Project</label>
+            <select class="form-control" id="movement-project">
+                <option value="">All Projects</option>
+            </select>
+        </div>
         <!-- NEW: Sort By filter — lets user sort any numeric column smaller to larger -->
         <div class="form-group">
             <label class="form-label" for="movement-sort">Sort By (Low to High)</label>
@@ -657,6 +687,12 @@ $currency_symbol = $currency['symbol'];
                         <label class="form-label" for="detailed-product">Product</label>
                         <input type="text" class="form-control" id="detailed-product" list="detailed-product-list" placeholder="All Products">
                         <datalist id="detailed-product-list"></datalist>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="detailed-project">Project</label>
+                        <select class="form-control" id="detailed-project">
+                            <option value="">All Projects</option>
+                        </select>
                     </div>
                     <div class="filter-group">
                         <label class="form-label" for="detailed-batch-filter">Batch No</label>
