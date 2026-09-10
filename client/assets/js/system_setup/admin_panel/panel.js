@@ -836,6 +836,97 @@ async function fetchLoginLocations() {
     }
 }
 
+// Activity Log (Audit Trail)
+let activityLogPage = 1;
+let activityLogTotalPages = 1;
+let activityLogModulesLoaded = false;
+
+function escapeHtml(value) {
+    return String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+function openActivityLogModal() {
+    document.getElementById('activityLogModal').style.display = 'flex';
+    activityLogPage = 1;
+    fetchActivityLog(1);
+}
+
+function closeActivityLogModal() {
+    document.getElementById('activityLogModal').style.display = 'none';
+}
+
+function activityLogGoToPage(delta) {
+    const nextPage = activityLogPage + delta;
+    if (nextPage < 1 || nextPage > activityLogTotalPages) return;
+    fetchActivityLog(nextPage);
+}
+
+const ACTIVITY_ACTION_LABELS = { create: 'Created', update: 'Updated', delete: 'Deleted' };
+const ACTIVITY_ACTION_CLASSES = { create: 'status-active', update: 'status-pending', delete: 'status-inactive' };
+
+async function fetchActivityLog(page) {
+    activityLogPage = page;
+    const tbody = document.getElementById('activityLogBody');
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 40px; color: var(--subtext);">Loading...</td></tr>';
+
+    try {
+        const params = new URLSearchParams({
+            page: page,
+            limit: 25,
+            module: document.getElementById('activityLogModuleFilter').value,
+            action: document.getElementById('activityLogActionFilter').value,
+            search: document.getElementById('activityLogSearch').value
+        });
+
+        const response = await fetch(`../../../../server/api/system_setup/admin_panel/activity-log.php?${params}`);
+        const data = await response.json();
+
+        if (data.success) {
+            if (!activityLogModulesLoaded) {
+                const moduleFilter = document.getElementById('activityLogModuleFilter');
+                data.modules.forEach(m => {
+                    const option = document.createElement('option');
+                    option.value = m;
+                    option.textContent = m;
+                    moduleFilter.appendChild(option);
+                });
+                activityLogModulesLoaded = true;
+            }
+
+            if (data.data.length > 0) {
+                tbody.innerHTML = data.data.map(row => {
+                    const actionLabel = ACTIVITY_ACTION_LABELS[row.action] || row.action;
+                    const actionClass = ACTIVITY_ACTION_CLASSES[row.action] || '';
+                    return `<tr>
+                        <td>${escapeHtml(row.created_at)}</td>
+                        <td>${escapeHtml(row.user_name)}</td>
+                        <td><span class="status-badge ${actionClass}">${escapeHtml(actionLabel)}</span></td>
+                        <td>${escapeHtml(row.module)}</td>
+                        <td>${escapeHtml(row.record_reference || row.record_id || '-')}</td>
+                        <td>${escapeHtml(row.description)}</td>
+                    </tr>`;
+                }).join('');
+            } else {
+                tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 40px; color: var(--subtext);">No activity found</td></tr>';
+            }
+
+            activityLogTotalPages = data.pagination.total_pages;
+            const info = document.getElementById('activityLogInfo');
+            const start = data.pagination.total_records === 0 ? 0 : ((page - 1) * data.pagination.limit) + 1;
+            const end = Math.min(start + data.data.length - 1, data.pagination.total_records);
+            info.textContent = `Showing ${start}-${end} of ${data.pagination.total_records}`;
+
+            document.getElementById('activityLogPrevBtn').disabled = page <= 1;
+            document.getElementById('activityLogNextBtn').disabled = page >= activityLogTotalPages;
+        } else {
+            tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 40px; color: var(--error);">Failed to load activity log</td></tr>';
+        }
+    } catch (error) {
+        console.error('Error fetching activity log:', error);
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 40px; color: var(--error);">Failed to load activity log</td></tr>';
+    }
+}
+
 // User actions
 async function createUser() {
     const form     = document.getElementById('createUserForm');

@@ -1,5 +1,6 @@
 <?php
 require_once '../../../../includes/connection.php';
+require_once '../../../../includes/activity-logger.php';
 
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
@@ -42,10 +43,12 @@ try {
     $pdo->beginTransaction();
 
     foreach ($product_ids as $product_id) {
-        // Verify product belongs to tenant
-        $stmt = $pdo->prepare("SELECT id FROM products WHERE id = ? AND tenant_id = ?");
+        // Verify product belongs to tenant, and grab its values for the Activity Log
+        // before it's gone (record_reference/description need this after deletion)
+        $stmt = $pdo->prepare("SELECT id, code, name FROM products WHERE id = ? AND tenant_id = ?");
         $stmt->execute([$product_id, $tenant_id]);
-        if (!$stmt->fetch()) {
+        $productRow = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$productRow) {
             $notFoundIds[] = $product_id;
             continue;
         }
@@ -57,6 +60,12 @@ try {
         // Delete the product
         $stmt = $pdo->prepare("DELETE FROM products WHERE id = ? AND tenant_id = ?");
         $stmt->execute([$product_id, $tenant_id]);
+
+        logActivity(
+            $pdo, $tenant_id, $user_id, 'delete', 'Product', $product_id, $productRow['code'],
+            "Deleted product \"{$productRow['name']}\" ({$productRow['code']})",
+            $productRow, null
+        );
 
         $deletedCount++;
     }

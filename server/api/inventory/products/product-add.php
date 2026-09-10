@@ -1,5 +1,6 @@
 <?php
 require_once '../../../../includes/connection.php';
+require_once '../../../../includes/activity-logger.php';
 
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
@@ -119,7 +120,26 @@ try {
     ]);
     
     $product_id = $pdo->lastInsertId();
-    
+
+    logActivity(
+        $pdo, $tenant_id, $user_id, 'create', 'Product', $product_id, $code,
+        "Created product \"$name\" ($code)",
+        null,
+        [
+            'code' => $code, 'name' => $name, 'product_type' => $product_type, 'uom_type' => $uom_type,
+            'company_id' => $company, 'default_unit_id' => $default_unit, 'uom_group_id' => $uom_group_id,
+            'product_conversion_factor' => $product_conversion_factor, 'category_id' => $category, 'subcategory_id' => $subcategory,
+            'inventory_account_id' => $inventory_account, 'vendor_id' => $vendor_id, 'parent_product_id' => $parent_product_id,
+            'description' => $description, 'qr_code' => $qr_code, 'barcode' => $barcode,
+            'purchase_price' => $purchase_price, 'trade_price' => $trade_price, 'wholesale_price' => $wholesale_price, 'mrp' => $mrp,
+            'default_discount' => $default_discount, 'trade_offer_discount' => $trade_offer_discount, 'default_foc' => $default_foc,
+            'carton_conversion' => $carton_conversion, 'tax_regime_id' => $tax_regime_id,
+            'min_stock_level' => $min_stock, 'max_stock_level' => $max_stock,
+            'manufacturing_date' => $manufacturing_date, 'expiry_date' => $expiry_date,
+            'is_active' => $is_active, 'stock_affects' => $stock_affects, 'invoice_affects' => $invoice_affects
+        ]
+    );
+
     // DEBUG: Log stock opening data
     error_log('=== STOCK OPENING DEBUG ===');
     error_log('Branch isset: ' . (isset($_POST['branch']) ? 'YES' : 'NO'));

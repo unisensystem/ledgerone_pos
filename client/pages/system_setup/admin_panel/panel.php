@@ -341,6 +341,14 @@ if (!$user_id) {
                                 </button>
                             </div>
                         </div>
+                        <div>
+                            <h4 style="margin-bottom: 16px; color: var(--heading);">Audit Trail</h4>
+                            <div class="d-flex flex-column gap-12">
+                                <button class="btn btn-secondary" onclick="openActivityLogModal()">
+                                    <i class="fas fa-clipboard-list"></i> View Activity Log
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -671,6 +679,58 @@ if (!$user_id) {
             </div>
             <div class="modal-footer">
                 <button class="btn btn-secondary" onclick="closeLoginHistoryModal()">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ACTIVITY LOG MODAL -->
+    <div id="activityLogModal" class="modal-overlay">
+        <div class="modal" style="max-width: 1000px;">
+            <div class="modal-header">
+                <div class="modal-title">Activity Log</div>
+                <button class="modal-close" onclick="closeActivityLogModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="d-flex gap-12" style="margin-bottom: 16px; flex-wrap: wrap;">
+                    <select id="activityLogModuleFilter" class="form-input" style="max-width: 200px;" onchange="fetchActivityLog(1)">
+                        <option value="">All Modules</option>
+                    </select>
+                    <select id="activityLogActionFilter" class="form-input" style="max-width: 160px;" onchange="fetchActivityLog(1)">
+                        <option value="">All Actions</option>
+                        <option value="create">Create</option>
+                        <option value="update">Update</option>
+                        <option value="delete">Delete</option>
+                    </select>
+                    <input type="text" id="activityLogSearch" class="form-input" placeholder="Search user, record, description..." style="max-width: 260px;" onkeyup="if(event.key==='Enter') fetchActivityLog(1)">
+                    <button class="btn btn-secondary" onclick="fetchActivityLog(1)"><i class="fas fa-search"></i> Search</button>
+                </div>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Date/Time</th>
+                                <th>User</th>
+                                <th>Action</th>
+                                <th>Module</th>
+                                <th>Record</th>
+                                <th>Description</th>
+                            </tr>
+                        </thead>
+                        <tbody id="activityLogBody">
+                            <!-- Will be populated by JS -->
+                        </tbody>
+                    </table>
+                </div>
+                <div class="d-flex" style="justify-content: space-between; align-items: center; margin-top: 12px;">
+                    <div id="activityLogInfo" style="color: var(--subtext); font-size: 13px;"></div>
+                    <div class="d-flex gap-12">
+                        <button class="btn btn-secondary" id="activityLogPrevBtn" onclick="activityLogGoToPage(-1)"><i class="fas fa-chevron-left"></i> Previous</button>
+                        <button class="btn btn-secondary" id="activityLogNextBtn" onclick="activityLogGoToPage(1)">Next <i class="fas fa-chevron-right"></i></button>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeActivityLogModal()">Close</button>
             </div>
         </div>
     </div>

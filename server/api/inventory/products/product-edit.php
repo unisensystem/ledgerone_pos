@@ -1,5 +1,6 @@
 <?php
 require_once '../../../../includes/connection.php';
+require_once '../../../../includes/activity-logger.php';
 
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
@@ -81,14 +82,36 @@ try {
         exit;
     }
     
-    // Verify product belongs to tenant
-    $stmt = $pdo->prepare("SELECT id FROM products WHERE id = ? AND tenant_id = ?");
+    // Verify product belongs to tenant, and grab its current values for the Activity Log diff.
+    // Covers every column the UPDATE below can touch, so no edit goes unrecorded.
+    $stmt = $pdo->prepare("
+        SELECT code, name, product_type, uom_type, company_id, default_unit_id, uom_group_id, product_conversion_factor,
+               category_id, subcategory_id, inventory_account_id, vendor_id, parent_product_id, description, qr_code, barcode,
+               purchase_price, trade_price, wholesale_price, mrp, price_entry_unit_id, trade_price_entry_value, mrp_entry_value,
+               default_discount, trade_offer_discount, default_foc, carton_conversion, tax_regime_id,
+               min_stock_level, max_stock_level, manufacturing_date, expiry_date, photo, is_active, stock_affects, invoice_affects
+        FROM products WHERE id = ? AND tenant_id = ?
+    ");
     $stmt->execute([$product_id, $tenant_id]);
-    if (!$stmt->fetch()) {
+    $oldProduct = $stmt->fetch(PDO::FETCH_ASSOC);
+    if (!$oldProduct) {
         echo json_encode(['success' => false, 'message' => 'Product not found']);
         exit;
     }
-    
+
+    // Snapshot existing Stock Opening rows BEFORE they get deleted/reinserted below, so the
+    // Activity Log can tell a real stock change apart from the edit form simply resubmitting
+    // whatever it loaded (the form always re-sends branch/qty/price even when the user never
+    // touched that section, and the save logic unconditionally deletes+reinserts on any
+    // submission - so without this comparison every edit falsely logs "Stock Opening updated").
+    $stockSignatureStmt = $pdo->prepare("
+        SELECT branch_id, opening_qty, opening_price, batch_no, expiry_date, unit_id
+        FROM stock_opening WHERE product_id = ? AND tenant_id = ?
+        ORDER BY branch_id, unit_id, id
+    ");
+    $stockSignatureStmt->execute([$product_id, $tenant_id]);
+    $oldStockSignature = json_encode($stockSignatureStmt->fetchAll(PDO::FETCH_ASSOC));
+
     // Update product
     if ($photo_filename) {
         $stmt = $pdo->prepare("
@@ -132,6 +155,81 @@ try {
         ]);
     }
     
+    $newProduct = [
+        'code' => $oldProduct['code'],
+        'name' => $name,
+        'product_type' => $product_type,
+        'uom_type' => $uom_type,
+        'company_id' => $company,
+        'default_unit_id' => $default_unit,
+        'uom_group_id' => $uom_group_id,
+        'product_conversion_factor' => $product_conversion_factor,
+        'category_id' => $category,
+        'subcategory_id' => $subcategory,
+        'inventory_account_id' => $inventory_account,
+        'vendor_id' => $vendor_id,
+        'parent_product_id' => $parent_product_id,
+        'description' => $description,
+        'qr_code' => $qr_code,
+        'barcode' => $barcode,
+        'purchase_price' => $purchase_price,
+        'trade_price' => $trade_price,
+        'wholesale_price' => $wholesale_price,
+        'mrp' => $mrp,
+        'price_entry_unit_id' => $price_entry_unit_id,
+        'trade_price_entry_value' => $trade_price_entry_value,
+        'mrp_entry_value' => $mrp_entry_value,
+        'default_discount' => $default_discount,
+        'trade_offer_discount' => $trade_offer_discount,
+        'default_foc' => $default_foc,
+        'carton_conversion' => $carton_conversion,
+        'tax_regime_id' => $tax_regime_id,
+        'min_stock_level' => $min_stock,
+        'max_stock_level' => $max_stock,
+        'manufacturing_date' => $manufacturing_date,
+        'expiry_date' => $expiry_date,
+        'photo' => $photo_filename ?: $oldProduct['photo'],
+        'is_active' => $is_active,
+        'stock_affects' => $stock_affects,
+        'invoice_affects' => $invoice_affects
+    ];
+    $changeDescriptions = buildChangeDescription($oldProduct, $newProduct, [
+        'name' => 'Name',
+        'product_type' => 'Type',
+        'uom_type' => 'UOM Type',
+        'company_id' => 'Company',
+        'default_unit_id' => 'Default Unit',
+        'uom_group_id' => 'UOM Group',
+        'product_conversion_factor' => 'Conversion Factor',
+        'category_id' => 'Category',
+        'subcategory_id' => 'Sub-category',
+        'inventory_account_id' => 'Inventory Account',
+        'vendor_id' => 'Vendor',
+        'parent_product_id' => 'Parent Product',
+        'description' => 'Description',
+        'qr_code' => 'QR Code',
+        'barcode' => 'Barcode',
+        'purchase_price' => 'Purchase Price',
+        'trade_price' => 'Trade Price',
+        'wholesale_price' => 'Wholesale Price',
+        'mrp' => 'MRP',
+        'price_entry_unit_id' => 'Price Entry Unit',
+        'trade_price_entry_value' => 'Trade Price Entry Value',
+        'mrp_entry_value' => 'MRP Entry Value',
+        'default_discount' => 'Default Discount',
+        'trade_offer_discount' => 'Trade Offer Discount',
+        'default_foc' => 'Default FOC',
+        'carton_conversion' => 'Carton Conversion',
+        'tax_regime_id' => 'Sales Tax Type',
+        'min_stock_level' => 'Min Stock Level',
+        'max_stock_level' => 'Max Stock Level',
+        'manufacturing_date' => 'Manufacturing Date',
+        'expiry_date' => 'Expiry Date',
+        'photo' => 'Photo',
+        'is_active' => 'Active',
+        'stock_affects' => 'Stock Affects',
+        'invoice_affects' => 'Invoice Affects'
+    ]);
     // Update group conversion factors BEFORE processing stock
     $pdo->prepare("DELETE FROM product_uom_conversions WHERE product_id = ?")->execute([$product_id]);
     
@@ -373,7 +471,26 @@ try {
         error_log('Total schemes inserted: ' . $inserted);
     }
     error_log('=== END SCHEME DEBUG (EDIT) ===');
-    
+
+    // Stock Opening rows get unconditionally deleted+reinserted above whenever the form
+    // submits branch data - which happens on EVERY save, even when the user never touched
+    // that section, because the edit form always re-sends whatever it loaded. Comparing the
+    // actual before/after DB contents (not just "was it submitted") is the only way to tell
+    // a real stock change from a no-op resubmission of the same values.
+    $stockSignatureStmt->execute([$product_id, $tenant_id]);
+    $newStockSignature = json_encode($stockSignatureStmt->fetchAll(PDO::FETCH_ASSOC));
+    if ($oldStockSignature !== $newStockSignature) {
+        $changeDescriptions[] = 'Stock Opening entries updated';
+    }
+    if (isset($_POST['schemes']) && is_array($_POST['schemes']) && !empty($_POST['schemes'])) {
+        $changeDescriptions[] = 'Schemes updated';
+    }
+
+    $editDescription = !empty($changeDescriptions)
+        ? "Updated product \"$name\" ({$oldProduct['code']}): " . implode('; ', $changeDescriptions)
+        : "Updated product \"$name\" ({$oldProduct['code']}) - no tracked field changes";
+    logActivity($pdo, $tenant_id, $user_id, 'update', 'Product', $product_id, $oldProduct['code'], $editDescription, $oldProduct, $newProduct);
+
     echo json_encode(['success' => true, 'message' => 'Product updated successfully', 'debug' => $debugInfo]);
     
 } catch (PDOException $e) {
