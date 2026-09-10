@@ -1586,6 +1586,26 @@ if (isGlobalDateLocked && globalLockedDate) {
         netInput.value = '0.000';
         netInput.tabIndex = 0;
         netCell.appendChild(netInput);
+        // Auto-add new row on Tab from Net Amount
+netInput.addEventListener('keydown', function(e) {
+    if (e.key === 'Tab' && !e.shiftKey) {
+        e.preventDefault();
+        
+        // Check if current row has a product selected
+        const codeInput = row.cells[1].querySelector('.item-code');
+        if (codeInput.value) {
+            // Add new row and focus on product field
+            addRowDynamic();
+            setTimeout(() => {
+                const newRow = itemsTable.rows[itemsTable.rows.length - 1];
+                newRow.cells[1].querySelector('.search-input').focus();
+            }, 10);
+        } else {
+            // If no product, focus on product field of current row
+            row.cells[1].querySelector('.search-input').focus();
+        }
+    }
+});
         
         // Actions
         const actionsCell = row.insertCell(16);

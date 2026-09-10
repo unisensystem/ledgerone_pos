@@ -16,13 +16,17 @@ if (!$user_id) {
 ?>
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>LedgerOne ERP - Sale Invoice</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="../../../assets/css/sale/med_pos_invoice/pos-add.css?v=<?php echo time(); ?>">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.js"></script>
 </head>
+
 <body class="light-theme med-invoice-page">
     <div class="container">
         <form id="invoiceForm">
@@ -43,7 +47,7 @@ if (!$user_id) {
                     <i class="fas fa-keyboard"></i> Shortcut Settings
                 </button>
             </div>
-            
+
             <div class="card">
                 <h2 class="card-title">Invoice Details</h2>
                 <div class="form-grid">
@@ -52,7 +56,7 @@ if (!$user_id) {
                         <label for="saleDate" class="required">Sale Date</label>
                         <input type="date" id="saleDate" required tabindex="-1">
                     </div>
-                    
+
                     <!-- 2. Company -->
                     <div class="form-group" id="companyGroup">
                         <label for="company" class="required">Company</label>
@@ -65,7 +69,7 @@ if (!$user_id) {
                         </div>
                         <div class="error-message" id="companyError">Please select a company</div>
                     </div>
-                    
+
                     <!-- 3. Branch -->
                     <div class="form-group" id="branchGroup">
                         <label for="branch" class="required">Branch</label>
@@ -78,7 +82,7 @@ if (!$user_id) {
                         </div>
                         <div class="error-message" id="branchError">Please select a branch</div>
                     </div>
-                    
+
                     <!-- 4. Invoice Type -->
                     <div class="form-group" id="invoiceTypeGroup">
                         <label for="invoiceType">Invoice Type</label>
@@ -87,13 +91,13 @@ if (!$user_id) {
                             <option value="Cash">Cash</option>
                         </select>
                     </div>
-                    
+
                     <!-- 5. Due Date -->
                     <div class="form-group" id="dueDateGroup" style="display:none;">
                         <label for="dueDate">Due Date</label>
                         <input type="date" id="dueDate" tabindex="-1">
                     </div>
-                    
+
                     <!-- 6. Brand -->
                     <div class="form-group" id="brandGroup" style="display:none;">
                         <label for="brand">Brand</label>
@@ -103,7 +107,7 @@ if (!$user_id) {
                             <input type="hidden" id="brand">
                         </div>
                     </div>
-                    
+
                     <!-- 7. Sales Officer -->
                     <div class="form-group" id="salesOfficerGroup">
                         <label for="salesOfficer">Sales Officer</label>
@@ -113,7 +117,7 @@ if (!$user_id) {
                             <input type="hidden" id="salesOfficer">
                         </div>
                     </div>
-                    
+
                     <!-- 8. Supplier Man -->
                     <div class="form-group" id="supplierManGroup">
                         <label for="supplierMan">Supplier Man</label>
@@ -123,7 +127,7 @@ if (!$user_id) {
                             <input type="hidden" id="supplierMan">
                         </div>
                     </div>
-                    
+
                     <!-- 9. Area / City -->
                     <div class="form-group" id="areaCityGroup">
                         <label for="areaCitySearch">Area / City</label>
@@ -133,7 +137,7 @@ if (!$user_id) {
                             <input type="hidden" id="areaCity">
                         </div>
                     </div>
-                    
+
                     <!-- 10. Customer Code -->
                     <div class="form-group">
                         <label for="customerCode" class="required">Customer Code</label>
@@ -151,7 +155,7 @@ if (!$user_id) {
                         </div>
                         <div class="error-message" id="customerCodeError">Please select a customer code</div>
                     </div>
-                    
+
                     <!-- 11. Sub Account -->
                     <div class="form-group" id="subAccountGroup">
                         <label for="subAccount">Sub Account</label>
@@ -160,7 +164,7 @@ if (!$user_id) {
                             <!-- Options loaded dynamically -->
                         </select>
                     </div>
-                    
+
                     <!-- 12. Sale Order# -->
                     <div class="form-group" id="saleOrderGroup">
                         <label for="saleOrder">Sale Order#</label>
@@ -172,7 +176,7 @@ if (!$user_id) {
                             <input type="hidden" id="saleOrder">
                         </div>
                     </div>
-                    
+
                     <!-- 13. Currency -->
                     <div class="form-group" id="currencyGroup">
                         <label for="currency" class="required">Currency</label>
@@ -182,19 +186,19 @@ if (!$user_id) {
                         </select>
                         <div class="error-message" id="currencyError">Please select a currency</div>
                     </div>
-                    
+
                     <!-- 14. Transport Name -->
                     <div class="form-group" id="transportNameGroup">
                         <label for="transportName">Transport Name</label>
                         <input type="text" id="transportName" placeholder="Enter transport name" tabindex="-1">
                     </div>
-                    
+
                     <!-- 15. Bilty No -->
                     <div class="form-group" id="biltyNoGroup">
                         <label for="biltyNo">Bilty No</label>
                         <input type="text" id="biltyNo" placeholder="Enter bilty number" tabindex="-1">
                     </div>
-                    
+
                     <!-- 16. Project -->
                     <div class="form-group" id="projectGroup">
                         <label for="project">Project</label>
@@ -203,7 +207,7 @@ if (!$user_id) {
                             <!-- Options loaded dynamically -->
                         </select>
                     </div>
-                    
+
                     <!-- 17. Container -->
                     <div class="form-group" id="containerGroup">
                         <label for="container">Container</label>
@@ -242,54 +246,54 @@ if (!$user_id) {
                         <i class="fas fa-plus"></i> Add New Product
                     </button>
                 </div>
-            <div class="table-container" style="overflow-x: auto; -webkit-overflow-scrolling: touch;">
+                <div class="table-container" style="overflow-x: auto; -webkit-overflow-scrolling: touch;">
                     <table id="itemsTable" style="min-width: 1500px;">
                         <thead>
                             <tr>
-                             <th width="3%" style="text-wrap: nowrap;">S#</th>
-<th width="22%" style="text-wrap: nowrap;">Product Code / Name</th>
-<th width="10%" style="text-wrap: nowrap;">Scheme</th>
-<th width="10%" class="batch-no-cell" style="text-wrap: nowrap;">Batch No</th>
-<th width="10%" class="batch-expiry-cell" style="text-wrap: nowrap;">Expiry Date</th>
+                                <th width="3%" style="text-wrap: nowrap;">S#</th>
+                                <th width="22%" style="text-wrap: nowrap;">Product Code / Name</th>
+                                <th width="10%" style="text-wrap: nowrap;">Scheme</th>
+                                <th width="10%" class="batch-no-cell" style="text-wrap: nowrap;">Batch No</th>
+                                <th width="10%" class="batch-expiry-cell" style="text-wrap: nowrap;">Expiry Date</th>
 
-<th width="10%" class="price-cell" style="text-wrap: nowrap;">
-    <span id="salePriceLabel">Sale Price</span>
-</th>
+                                <th width="10%" class="price-cell" style="text-wrap: nowrap;">
+                                    <span id="salePriceLabel">Sale Price</span>
+                                </th>
 
-<th width="10%" class="gross-cell" style="text-wrap: nowrap;">
-    <span id="grossAmountLabel">Gross Amount</span>
-</th>
+                                <th width="10%" class="gross-cell" style="text-wrap: nowrap;">
+                                    <span id="grossAmountLabel">Gross Amount</span>
+                                </th>
 
-<th width="10%" class="disc-percent-cell" style="text-wrap: nowrap;">Disc %</th>
+                                <th width="10%" class="disc-percent-cell" style="text-wrap: nowrap;">Disc %</th>
 
-<th width="10%" class="disc-amount-cell" style="text-wrap: nowrap;">
-    <span id="discountAmountLabel">Disc Amt</span>
-</th>
+                                <th width="10%" class="disc-amount-cell" style="text-wrap: nowrap;">
+                                    <span id="discountAmountLabel">Disc Amt</span>
+                                </th>
 
-<th width="10%" class="extra-disc-cell" style="text-wrap: nowrap;">Extra Disc %</th>
-<th width="10%" class="to-amount-cell" style="text-wrap: nowrap;">T.O Amt</th>
-<th width="10%" class="tax-percent-cell" style="text-wrap: nowrap;">Tax %</th>
-<th width="10%" class="tax-amount-cell" style="text-wrap: nowrap;">Tax Amt</th>
-<th width="10%" class="foc-cell" style="text-wrap: nowrap;">Bonus</th>
+                                <th width="10%" class="extra-disc-cell" style="text-wrap: nowrap;">Extra Disc %</th>
+                                <th width="10%" class="to-amount-cell" style="text-wrap: nowrap;">T.O Amt</th>
+                                <th width="10%" class="tax-percent-cell" style="text-wrap: nowrap;">Tax %</th>
+                                <th width="10%" class="tax-amount-cell" style="text-wrap: nowrap;">Tax Amt</th>
+                                <th width="10%" class="foc-cell" style="text-wrap: nowrap;">Bonus</th>
 
-<th width="10%" class="net-cell" style="text-wrap: nowrap;">
-    <span id="netAmountLabel">Net Amount</span>
-</th>
+                                <th width="10%" class="net-cell" style="text-wrap: nowrap;">
+                                    <span id="netAmountLabel">Net Amount</span>
+                                </th>
 
-<th width="5%" style="text-wrap: nowrap;">Actions</th>
+                                <th width="5%" style="text-wrap: nowrap;">Actions</th>
                             </tr>
                         </thead>
                         <tbody>
                             <!-- Rows will be added dynamically -->
                         </tbody>
                         <tfoot>
-                             <tr class="totals-row">
-    <th style="text-align: left;">Totals</th>
-<th style="text-align: left;"></th>
-<th style="text-align: left;"></th>
-<th style="text-align: left;" class="batch-no-cell"></th>
-<th style="text-align: left;" class="batch-expiry-cell"></th>
-    <!-- Dynamic unit totals will be inserted here -->
+                            <tr class="totals-row">
+                                <th style="text-align: left;">Totals</th>
+                                <th style="text-align: left;"></th>
+                                <th style="text-align: left;"></th>
+                                <th style="text-align: left;" class="batch-no-cell"></th>
+                                <th style="text-align: left;" class="batch-expiry-cell"></th>
+                                <!-- Dynamic unit totals will be inserted here -->
                                 <th id="totalSalePrice" class="price-cell">0.00</th>
                                 <th id="totalGrossAmount" class="gross-cell">0.00</th>
                                 <th class="disc-percent-cell"></th>
@@ -419,6 +423,24 @@ if (!$user_id) {
                         <span class="summary-label">Remarks</span>
                         <textarea id="remarks" placeholder="Enter any additional remarks" tabindex="-1" style="width: 100%; min-height: 60px;"></textarea>
                     </div>
+                    <div class="summary-item full-width">
+                        <span class="summary-label">Signature</span>
+                        <div id="signatureUploadWrap" style="display:flex; align-items:center; gap:12px; flex-wrap: wrap;">
+                            <input type="file" id="signatureFileInput" accept="image/png,image/jpeg" style="display:none;">
+                            <button type="button" class="btn btn-secondary" id="signatureUploadBtn" tabindex="-1">
+                                <i class="fas fa-signature"></i> Upload Signature
+                            </button>
+                            <div id="signaturePreviewWrap" style="display:none; align-items:center; gap:8px;">
+                                <img id="signaturePreviewImg" src="" alt="Signature"
+                                    style="max-height:60px; max-width:180px; border:1px solid var(--border-default); border-radius:4px; background:#fff; padding:2px;">
+                                <button type="button" class="btn btn-secondary btn-sm" id="signatureRemoveBtn" tabindex="-1" title="Remove signature">
+                                    <i class="fas fa-times"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <input type="hidden" id="signatureData">
+                        <input type="hidden" id="signatureRemoved" value="0">
+                    </div>
                 </div>
             </div>
 
@@ -446,8 +468,8 @@ if (!$user_id) {
             <!-- Countdown Ring -->
             <div class="success-countdown-wrap">
                 <svg class="success-ring" viewBox="0 0 44 44">
-                    <circle class="success-ring-bg" cx="22" cy="22" r="19"/>
-                    <circle class="success-ring-fill" id="countdownRing" cx="22" cy="22" r="19"/>
+                    <circle class="success-ring-bg" cx="22" cy="22" r="19" />
+                    <circle class="success-ring-fill" id="countdownRing" cx="22" cy="22" r="19" />
                 </svg>
                 <span class="success-countdown-num" id="countdownNum">5</span>
             </div>
@@ -459,22 +481,22 @@ if (!$user_id) {
 
             <!-- Actions -->
             <div class="success-actions">
-    <button class="success-btn success-btn-ghost" id="printLaterBtn">
-        <i class="fas fa-clock"></i> Print Later
-        <kbd>Esc</kbd>
-    </button>
-    <button class="success-btn success-btn-ghost" id="createDcBtn">
-        <i class="fas fa-truck"></i> Create DC
-    </button>
-    <button class="success-btn success-btn-new" id="newInvoiceBtn">
-        <i class="fas fa-plus"></i> New Invoice
-        <kbd>Enter</kbd>
-    </button>
-    <button class="success-btn success-btn-print" id="printInvoiceBtn">
-        <i class="fas fa-print"></i> Print
-        <kbd>P</kbd>
-    </button>
-</div>
+                <button class="success-btn success-btn-ghost" id="printLaterBtn">
+                    <i class="fas fa-clock"></i> Print Later
+                    <kbd>Esc</kbd>
+                </button>
+                <button class="success-btn success-btn-ghost" id="createDcBtn">
+                    <i class="fas fa-truck"></i> Create DC
+                </button>
+                <button class="success-btn success-btn-new" id="newInvoiceBtn">
+                    <i class="fas fa-plus"></i> New Invoice
+                    <kbd>Enter</kbd>
+                </button>
+                <button class="success-btn success-btn-print" id="printInvoiceBtn">
+                    <i class="fas fa-print"></i> Print
+                    <kbd>P</kbd>
+                </button>
+            </div>
         </div>
     </div>
 
@@ -498,6 +520,19 @@ if (!$user_id) {
         </div>
     </div>
 
+    <!-- Signature Crop Modal -->
+<div class="modal" id="signatureCropModal">
+    <div class="modal-content" style="max-width: 520px;">
+        <h3 class="modal-title">Crop Signature</h3>
+        <div style="max-height: 60vh; overflow: hidden; background: var(--surface-2); border-radius: var(--radius);">
+            <img id="signatureCropImage" style="max-width: 100%; display:block;">
+        </div>
+        <div class="modal-actions" style="margin-top: 16px;">
+            <button type="button" class="btn btn-secondary" id="signatureCropCancelBtn">Cancel</button>
+            <button type="button" class="btn btn-primary" id="signatureCropConfirmBtn"><i class="fas fa-check"></i> Use Signature</button>
+        </div>
+    </div>
+</div>
     <!-- Draft Invoices Modal -->
     <div class="modal" id="draftsModal">
         <div class="modal-content" style="width: 800px; max-width: 95%;">
@@ -543,7 +578,7 @@ if (!$user_id) {
                         <i class="fas fa-tag" style="color: var(--primary); font-size: 16px;"></i>
                         <h4 style="margin: 0; color: var(--heading); font-size: 15px; font-weight: 600;">Default Scheme</h4>
                     </div>
-                    
+
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
                         <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 8px; background: var(--surface-1); border-radius: 6px; transition: all 0.2s;" onmouseover="this.style.background='var(--surface-0)'" onmouseout="this.style.background='var(--surface-1)'">
                             <input type="radio" name="defaultScheme" value="sale_on_tp" id="schemeDefault" style="width: auto;">
@@ -570,7 +605,7 @@ if (!$user_id) {
                         <i class="fas fa-rupee-sign" style="color: var(--success); font-size: 16px;"></i>
                         <h4 style="margin: 0; color: var(--heading); font-size: 15px; font-weight: 600;">Sale Price (₨)</h4>
                     </div>
-                    
+
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
                         <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 8px; background: var(--surface-1); border-radius: 6px; transition: all 0.2s;" onmouseover="this.style.background='var(--surface-0)'" onmouseout="this.style.background='var(--surface-1)'">
                             <input type="radio" name="salePriceSetting" value="trade_price" id="salePriceTP" style="width: auto;">
@@ -589,7 +624,7 @@ if (!$user_id) {
                         <i class="fas fa-filter" style="color: var(--success); font-size: 16px;"></i>
                         <h4 style="margin: 0; color: var(--heading); font-size: 15px; font-weight: 600;">Product Filtering</h4>
                     </div>
-                    
+
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
                         <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 10px; background: var(--surface-1); border-radius: 6px; transition: all 0.2s;" onmouseover="this.style.background='var(--surface-0)'" onmouseout="this.style.background='var(--surface-1)'">
                             <input type="radio" name="productFilteringMode" value="showAll" id="productFilteringShowAll" style="width: auto;" checked>
@@ -614,7 +649,7 @@ if (!$user_id) {
                         <i class="fas fa-barcode" style="color: var(--success); font-size: 16px;"></i>
                         <h4 style="margin: 0; color: var(--heading); font-size: 15px; font-weight: 600;">Product Code / Name Display</h4>
                     </div>
-                    
+
                     <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px;">
                         <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 10px; background: var(--surface-1); border-radius: 6px; transition: all 0.2s;" onmouseover="this.style.background='var(--surface-0)'" onmouseout="this.style.background='var(--surface-1)'">
                             <input type="radio" name="productDisplayMode" value="code_and_name" id="productDisplayCodeAndName" style="width: auto;" checked>
@@ -684,24 +719,24 @@ if (!$user_id) {
                         <i class="fas fa-list" style="color: var(--warning); font-size: 16px;"></i>
                         <h4 style="margin: 0; color: var(--heading); font-size: 15px; font-weight: 600;">Item Display Options</h4>
                     </div>
-                    
+
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
                         <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 8px; background: var(--surface-1); border-radius: 6px; transition: all 0.2s;" onmouseover="this.style.background='var(--surface-0)'" onmouseout="this.style.background='var(--surface-1)'">
                             <input type="checkbox" id="enableTradeOfferAmount" style="width: auto;">
                             <span style="font-size: 13px;">Trade Offer Amount</span>
                         </label>
                         <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 8px; background: var(--surface-1); border-radius: 6px; transition: all 0.2s;" onmouseover="this.style.background='var(--surface-0)'" onmouseout="this.style.background='var(--surface-1)'">
-    <input type="checkbox" id="enableBatchNo" style="width: auto;">
-    <span style="font-size: 13px;">Batch No</span>
-</label>
-<label style="display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 8px; background: var(--surface-1); border-radius: 6px; transition: all 0.2s;" onmouseover="this.style.background='var(--surface-0)'" onmouseout="this.style.background='var(--surface-1)'">
-    <input type="checkbox" id="enableExpiryDate" style="width: auto;">
-    <span style="font-size: 13px;">Expiry Date</span>
-</label>
-<label style="display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 8px; background: var(--surface-1); border-radius: 6px; transition: all 0.2s;" onmouseover="this.style.background='var(--surface-0)'" onmouseout="this.style.background='var(--surface-1)'">
-    <input type="checkbox" id="enableTaxation" style="width: auto;">
-    <span style="font-size: 13px;">Taxation (Item + Invoice Level)</span>
-</label>
+                            <input type="checkbox" id="enableBatchNo" style="width: auto;">
+                            <span style="font-size: 13px;">Batch No</span>
+                        </label>
+                        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 8px; background: var(--surface-1); border-radius: 6px; transition: all 0.2s;" onmouseover="this.style.background='var(--surface-0)'" onmouseout="this.style.background='var(--surface-1)'">
+                            <input type="checkbox" id="enableExpiryDate" style="width: auto;">
+                            <span style="font-size: 13px;">Expiry Date</span>
+                        </label>
+                        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 8px; background: var(--surface-1); border-radius: 6px; transition: all 0.2s;" onmouseover="this.style.background='var(--surface-0)'" onmouseout="this.style.background='var(--surface-1)'">
+                            <input type="checkbox" id="enableTaxation" style="width: auto;">
+                            <span style="font-size: 13px;">Taxation (Item + Invoice Level)</span>
+                        </label>
                         <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 8px; background: var(--surface-1); border-radius: 6px; transition: all 0.2s;" onmouseover="this.style.background='var(--surface-0)'" onmouseout="this.style.background='var(--surface-1)'">
                             <input type="checkbox" id="enableFOC" style="width: auto;">
                             <span style="font-size: 13px;">Bonus</span>
@@ -731,7 +766,7 @@ if (!$user_id) {
                         <i class="fas fa-receipt" style="color: var(--info); font-size: 16px;"></i>
                         <h4 style="margin: 0; color: var(--heading); font-size: 15px; font-weight: 600;">Invoice Summary Options</h4>
                     </div>
-                    
+
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
                         <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 8px; background: var(--surface-1); border-radius: 6px; transition: all 0.2s;" onmouseover="this.style.background='var(--surface-0)'" onmouseout="this.style.background='var(--surface-1)'">
                             <input type="checkbox" id="enableInvoiceCashDiscountPercent" style="width: auto;">
@@ -766,7 +801,7 @@ if (!$user_id) {
                         <i class="fas fa-magic" style="color: var(--warning); font-size: 16px;"></i>
                         <h4 style="margin: 0; color: var(--heading); font-size: 15px; font-weight: 600;">Auto-Fill Default Values</h4>
                     </div>
-                    
+
                     <div style="margin-bottom: 16px;">
                         <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 10px; background: var(--surface-1); border-radius: 6px; transition: all 0.2s;" onmouseover="this.style.background='var(--surface-0)'" onmouseout="this.style.background='var(--surface-1)'">
                             <input type="checkbox" id="enableDefaultFieldsAutofill" style="width: auto;">
@@ -830,7 +865,7 @@ if (!$user_id) {
                         <i class="fas fa-print" style="color: var(--error); font-size: 16px;"></i>
                         <h4 style="margin: 0; color: var(--heading); font-size: 15px; font-weight: 600;">Print Options</h4>
                     </div>
-                    
+
                     <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 8px; background: var(--surface-1); border-radius: 6px; transition: all 0.2s;" onmouseover="this.style.background='var(--surface-0)'" onmouseout="this.style.background='var(--surface-1)'">
                         <input type="checkbox" id="enablePrintQRCode" style="width: auto;">
                         <span style="font-size: 13px;">Enable QR Code on Print</span>
@@ -1026,7 +1061,7 @@ if (!$user_id) {
         <div class="modal-content" style="max-width: 1200px; width: 95%; max-height: 90vh; overflow-y: auto;">
             <h3 class="modal-title">Print Customization</h3>
             <p style="margin-bottom: 20px; color: var(--subtext); font-size: 14px;">Drag columns to reorder � Click labels to edit � Changes apply to printed invoices</p>
-            
+
             <div style="display: grid; grid-template-columns: 400px 1fr; gap: 24px; margin-bottom: 24px;">
                 <div>
                     <h4 style="margin-bottom: 16px; color: var(--heading); font-size: 16px;">Column Order & Labels</h4>
@@ -1052,7 +1087,7 @@ if (!$user_id) {
                     </div>
                 </div>
             </div>
-            
+
             <div class="modal-actions">
                 <button class="btn btn-secondary" id="resetPrintCustomizationBtn"><i class="fas fa-undo"></i> Reset to Default</button>
                 <button class="btn btn-secondary" id="closePrintCustomizationBtn">Close</button>
@@ -1083,46 +1118,46 @@ if (!$user_id) {
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; align-items: center;">
                     <label>Add New Row:</label>
                     <input type="text" id="shortcutAddRow" class="table-input" placeholder="e.g., F2">
-                    
+
                     <label>Save Invoice:</label>
                     <input type="text" id="shortcutSave" class="table-input" placeholder="e.g., F9">
-                    
+
                     <label>Save as Draft:</label>
                     <input type="text" id="shortcutDraft" class="table-input" placeholder="e.g., F8">
-                    
+
                     <label>Reset Invoice:</label>
                     <input type="text" id="shortcutReset" class="table-input" placeholder="e.g., F5">
-                    
+
                     <label>Focus Customer:</label>
                     <input type="text" id="shortcutCustomer" class="table-input" placeholder="e.g., F3">
-                    
+
                     <label>Focus Product Search:</label>
                     <input type="text" id="shortcutProduct" class="table-input" placeholder="e.g., F4">
-                    
+
                     <label>View Draft Invoices:</label>
                     <input type="text" id="shortcutViewDrafts" class="table-input" placeholder="e.g., F6">
-                    
+
                     <label>Close Modal/Overlay:</label>
                     <input type="text" id="shortcutCloseModal" class="table-input" placeholder="e.g., Escape">
-                    
+
                     <label>Delete Row:</label>
                     <input type="text" id="shortcutDeleteRow" class="table-input" placeholder="e.g., Delete">
-                    
+
                     <label>Move Forward:</label>
                     <input type="text" id="shortcutMoveForward" class="table-input" placeholder="e.g., ArrowRight">
-                    
+
                     <label>Move Backward:</label>
                     <input type="text" id="shortcutMoveBackward" class="table-input" placeholder="e.g., ArrowLeft">
-                    
+
                     <label>Add Customer:</label>
                     <input type="text" id="shortcutAddCustomer" class="table-input" placeholder="e.g., Ctrl+N">
-                    
+
                     <label>Sales Return:</label>
                     <input type="text" id="shortcutSalesReturn" class="table-input" placeholder="e.g., F7">
-                    
+
                     <label>Next Field:</label>
                     <input type="text" id="shortcutNextField" class="table-input" placeholder="e.g., Tab">
-                    
+
                     <label>Previous Field:</label>
                     <input type="text" id="shortcutPrevField" class="table-input" placeholder="e.g., Shift+Tab">
                 </div>
@@ -1329,19 +1364,19 @@ if (!$user_id) {
     </div>
 
     <script>
-    (function() {
-        function toggleCreditFields() {
-            const isCredit = document.getElementById('invoiceType').value === 'Credit';
-            // Only show due date if invoice type is Credit AND due date is not hidden by field settings
-            const dueDateHidden = localStorage.getItem('hideDueDateStandard') === 'true';
-            document.getElementById('dueDateGroup').style.display = (isCredit && !dueDateHidden) ? '' : 'none';
-        }
-        document.addEventListener('DOMContentLoaded', function() {
-            toggleCreditFields();
-            document.getElementById('invoiceType').addEventListener('change', toggleCreditFields);
-        });
-        window._toggleCreditFields = toggleCreditFields;
-    })();
+        (function() {
+            function toggleCreditFields() {
+                const isCredit = document.getElementById('invoiceType').value === 'Credit';
+                // Only show due date if invoice type is Credit AND due date is not hidden by field settings
+                const dueDateHidden = localStorage.getItem('hideDueDateStandard') === 'true';
+                document.getElementById('dueDateGroup').style.display = (isCredit && !dueDateHidden) ? '' : 'none';
+            }
+            document.addEventListener('DOMContentLoaded', function() {
+                toggleCreditFields();
+                document.getElementById('invoiceType').addEventListener('change', toggleCreditFields);
+            });
+            window._toggleCreditFields = toggleCreditFields;
+        })();
     </script>
     <script src="../../../assets/js/sale/med_pos_invoice/pos-add-uom.js?v=<?php echo time(); ?>&debug=1"></script>
     <script src="../../../assets/js/sale/med_pos_invoice/brand-autofill.js?v=<?php echo time(); ?>"></script>
@@ -1381,4 +1416,5 @@ if (!$user_id) {
         </div>
     </div>
 </body>
+
 </html>

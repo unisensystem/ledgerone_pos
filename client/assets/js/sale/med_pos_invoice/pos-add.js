@@ -1568,6 +1568,12 @@ const invoiceSettingCheckboxes = [
                 }
                 const remarksEl = document.getElementById('remarks');
                 if (remarksEl) remarksEl.value = invoice.remarks || '';
+                if (invoice.signature) {
+    existingSignatureUrl = `../../../assets/uploads/signatures/${invoice.signature}`;
+    showSignaturePreview(existingSignatureUrl);
+} else {
+    hideSignaturePreview();
+}
                 const salesOfficerEl = document.getElementById('salesOfficer');
                 const salesOfficerSearchEl = document.getElementById('salesOfficerSearch');
                 if (salesOfficerEl) {
@@ -4412,6 +4418,8 @@ function saveInvoice(status = 'Posted') {
         amountPaidAutoFill: document.querySelector('input[name="autoFillAmountPaid"]:checked')?.value || 'yes',
         remainingBalance: parseFloat(document.getElementById('remainingBalance')?.value) || 0,
         remarks: document.getElementById('remarks')?.value,
+        signature: currentSignatureDataUrl || null,
+removeSignature: document.getElementById('signatureRemoved')?.value === '1',
         status: status,
         items: [],
         invoiceLevelTaxes: window.invoiceLevelTaxRegimes ? window.invoiceLevelTaxRegimes.map(regime => {
@@ -7021,3 +7029,96 @@ async function quickAddCustomer() {
             saleDateInput.title = '';
         }
     });
+
+    // ===== Signature Upload & Crop =====
+let signatureCropper = null;
+let currentSignatureDataUrl = null; // new cropped PNG (base64) — sirf tab set hoga jab user naya upload/crop kare
+let existingSignatureUrl = null;    // edit mode mein pehle se saved signature ka URL
+
+function initSignatureUpload() {
+    const uploadBtn   = document.getElementById('signatureUploadBtn');
+    const fileInput   = document.getElementById('signatureFileInput');
+    const removeBtn   = document.getElementById('signatureRemoveBtn');
+    const cropModal   = document.getElementById('signatureCropModal');
+    const cropImage   = document.getElementById('signatureCropImage');
+    const cropCancelBtn  = document.getElementById('signatureCropCancelBtn');
+    const cropConfirmBtn = document.getElementById('signatureCropConfirmBtn');
+
+    if (!uploadBtn || !fileInput) return;
+
+    uploadBtn.addEventListener('click', () => fileInput.click());
+
+    fileInput.addEventListener('change', function () {
+        const file = this.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = function (e) {
+            cropImage.src = e.target.result;
+            cropModal.style.display = 'flex';
+
+            if (signatureCropper) signatureCropper.destroy();
+            // Free-form crop — signature shape/ratio fixed nahi karte
+            signatureCropper = new Cropper(cropImage, {
+                viewMode: 1,
+                autoCropArea: 1,
+                background: false,
+                guides: true
+            });
+        };
+        reader.readAsDataURL(file);
+        fileInput.value = ''; // same file dobara select karne ke liye
+    });
+
+    cropCancelBtn.addEventListener('click', function () {
+        cropModal.style.display = 'none';
+        if (signatureCropper) { signatureCropper.destroy(); signatureCropper = null; }
+    });
+
+    cropConfirmBtn.addEventListener('click', function () {
+        if (!signatureCropper) return;
+        // Transparent background — safed box signature ke gird print pe nahi aayega
+        const canvas = signatureCropper.getCroppedCanvas({
+            fillColor: 'transparent',
+            imageSmoothingQuality: 'high'
+        });
+        if (!canvas) return;
+
+        currentSignatureDataUrl = canvas.toDataURL('image/png');
+        existingSignatureUrl = null;
+        document.getElementById('signatureData').value = currentSignatureDataUrl;
+        document.getElementById('signatureRemoved').value = '0';
+        showSignaturePreview(currentSignatureDataUrl);
+
+        cropModal.style.display = 'none';
+        signatureCropper.destroy();
+        signatureCropper = null;
+    });
+
+    if (removeBtn) {
+        removeBtn.addEventListener('click', function () {
+            currentSignatureDataUrl = null;
+            existingSignatureUrl = null;
+            document.getElementById('signatureData').value = '';
+            document.getElementById('signatureRemoved').value = '1';
+            hideSignaturePreview();
+        });
+    }
+
+    cropModal.addEventListener('click', function (e) {
+        if (e.target === this) cropCancelBtn.click();
+    });
+}
+
+function showSignaturePreview(src) {
+    const wrap = document.getElementById('signaturePreviewWrap');
+    const img  = document.getElementById('signaturePreviewImg');
+    if (wrap && img) { img.src = src; wrap.style.display = 'flex'; }
+}
+
+function hideSignaturePreview() {
+    const wrap = document.getElementById('signaturePreviewWrap');
+    if (wrap) wrap.style.display = 'none';
+}
+
+document.addEventListener('DOMContentLoaded', initSignatureUpload);

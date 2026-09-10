@@ -1686,30 +1686,66 @@ function resetForm() {
         field.style.borderColor = '';
     });
 }
-// ===== GLOBAL DATE LOCK =====
+// ===== GLOBAL DATE LOCK (Single Mode + Bulk Mode) =====
 (function () {
     const DATE_KEY = 'global_locked_date';
     const FLAG_KEY = 'global_date_locked';
 
     function applyGlobalDateLock() {
         const voucherDate = document.getElementById('voucherDate');
-        if (!voucherDate) return;
+        const bulkJournalDate = document.getElementById('bulkJournalDate');
 
         const isLocked = localStorage.getItem(FLAG_KEY) === 'true';
         const lockedDate = localStorage.getItem(DATE_KEY);
 
-        if (isLocked && lockedDate) {
-            voucherDate.value = lockedDate;
-            voucherDate.readOnly = true;
-            voucherDate.style.backgroundColor = '#f3f4f6';
-            voucherDate.title = 'Date is locked from dashboard';
-        } else {
-            voucherDate.readOnly = false;
-            voucherDate.style.backgroundColor = '';
-            voucherDate.title = '';
-            
-            if (!voucherDate.value) {
-                voucherDate.valueAsDate = new Date();
+        // Apply to Single Mode
+        if (voucherDate) {
+            if (isLocked && lockedDate) {
+                voucherDate.value = lockedDate;
+                voucherDate.readOnly = true;
+                voucherDate.style.backgroundColor = '#f3f4f6';
+                voucherDate.style.cursor = 'not-allowed';
+                voucherDate.title = 'Date is locked from dashboard';
+            } else {
+                voucherDate.readOnly = false;
+                voucherDate.style.backgroundColor = '';
+                voucherDate.style.cursor = 'auto';
+                voucherDate.title = '';
+                
+                if (!voucherDate.value) {
+                    voucherDate.valueAsDate = new Date();
+                }
+            }
+        }
+
+        // Apply to Bulk Mode
+        if (bulkJournalDate) {
+            if (isLocked && lockedDate) {
+                bulkJournalDate.value = lockedDate;
+                bulkJournalDate.readOnly = true;
+                bulkJournalDate.style.backgroundColor = '#f3f4f6';
+                bulkJournalDate.style.cursor = 'not-allowed';
+                bulkJournalDate.title = 'Date is locked from dashboard';
+                
+                // Auto-apply locked date to all existing rows
+                document.querySelectorAll('#bulkTableBody .bulk-date').forEach(input => {
+                    input.value = lockedDate;
+                    input.readOnly = true;
+                    input.style.backgroundColor = '#f3f4f6';
+                    input.style.cursor = 'not-allowed';
+                });
+            } else {
+                bulkJournalDate.readOnly = false;
+                bulkJournalDate.style.backgroundColor = '';
+                bulkJournalDate.style.cursor = 'auto';
+                bulkJournalDate.title = '';
+                
+                // Make all row dates editable again
+                document.querySelectorAll('#bulkTableBody .bulk-date').forEach(input => {
+                    input.readOnly = false;
+                    input.style.backgroundColor = '';
+                    input.style.cursor = 'auto';
+                });
             }
         }
     }
@@ -1721,11 +1757,32 @@ function resetForm() {
         applyGlobalDateLock();
     }
 
-    // Same-page event, if available
+    // Same-page event listener (dashboard widget se)
     window.addEventListener('global-date-lock-changed', function () {
         applyGlobalDateLock();
     });
 
-    // Check again whenever user comes back to this tab/page
+    // Check again jab user tab par wapas aaye
     window.addEventListener('focus', applyGlobalDateLock);
+
+    // Bulk mode mein naya row add honay par bhe lock apply karo
+    const originalAddBulkRow = window.addBulkRow;
+    window.addBulkRow = function () {
+        originalAddBulkRow();
+        
+        // Newly added row ko lock karo agar date locked ho
+        if (localStorage.getItem(FLAG_KEY) === 'true') {
+            const lockedDate = localStorage.getItem(DATE_KEY);
+            const newRow = document.querySelector('#bulkTableBody tr:last-child');
+            const dateInput = newRow.querySelector('.bulk-date');
+            
+            if (dateInput && lockedDate) {
+                dateInput.value = lockedDate;
+                dateInput.readOnly = true;
+                dateInput.style.backgroundColor = '#f3f4f6';
+                dateInput.style.cursor = 'not-allowed';
+            }
+        }
+    };
 })();
+// ===== END GLOBAL DATE LOCK =====

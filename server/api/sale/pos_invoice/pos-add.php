@@ -122,6 +122,16 @@ $pdo->beginTransaction();
 
     $invoice_id = $pdo->lastInsertId();
     $status = $input['status'] ?? 'Posted';
+    // Save signature (if a new PNG was cropped client-side and sent as a data-URL)
+if ($status === 'Posted' || $status === 'Draft') {
+    if (!empty($input['signature']) && is_string($input['signature']) && strpos($input['signature'], 'data:image') === 0) {
+        $signatureFileName = saveInvoiceSignature($input['signature'], $tenant_id, $invoice_id);
+        if ($signatureFileName) {
+            $pdo->prepare("UPDATE sale_invoice SET signature = ? WHERE id = ?")
+                ->execute([$signatureFileName, $invoice_id]);
+        }
+    }
+}
 
     // Save invoice-level taxes
     if (!empty($input['invoiceLevelTaxes']) && is_array($input['invoiceLevelTaxes'])) {
@@ -539,4 +549,32 @@ function getCostPrice($pdo, $tenant_id, $product_id, $branch_id)
     }
     
     return $costPrice;
+}
+// Decode a base64 data-URL PNG (from the client-side signature crop) and save it
+// to disk, returning the stored filename to be saved in sale_invoice.signature.
+function saveInvoiceSignature($dataUrl, $tenant_id, $invoice_id)
+{
+    if (!preg_match('/^data:image\/(png|jpeg|jpg);base64,/', $dataUrl)) {
+        return null;
+    }
+    $base64Data = substr($dataUrl, strpos($dataUrl, ',') + 1);
+    $decoded = base64_decode($base64Data);
+    if ($decoded === false) {
+        return null;
+    }
+
+    // pos-add.php lives at server/api/sale/pos_invoice/ — 4 levels up reaches the
+    // project root (same as the "../../../../includes/connection.php" require above),
+    // then into client/assets/uploads/signatures/. Adjust if your folder layout differs.
+    $uploadDir = __DIR__ . '/../../../../client/assets/uploads/signatures/';
+    if (!is_dir($uploadDir)) {
+        mkdir($uploadDir, 0755, true);
+    }
+
+    $fileName = 'sig_' . $tenant_id . '_' . $invoice_id . '_' . time() . '.png';
+    if (file_put_contents($uploadDir . $fileName, $decoded) === false) {
+        return null;
+    }
+
+    return $fileName;
 }
