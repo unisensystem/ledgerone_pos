@@ -125,12 +125,21 @@ document.addEventListener('DOMContentLoaded', function () {
     document.getElementById('resetFilters').addEventListener('click', resetFilters);
     
     // Auto-apply on any filter change
-    document.getElementById('search').addEventListener('change', () => applyFilters());
-    document.getElementById('category').addEventListener('change', () => applyFilters());
-    document.getElementById('type').addEventListener('change', () => applyFilters());
-    document.getElementById('status').addEventListener('change', () => applyFilters());
-    document.getElementById('vendor').addEventListener('change', () => applyFilters());
-    document.getElementById('uomFilter').addEventListener('change', () => applyFilters());
+   // Auto-apply search on input (with debounce to avoid excessive API calls)
+let searchTimeout;
+document.getElementById('search').addEventListener('input', function () {
+    clearTimeout(searchTimeout);
+    searchTimeout = setTimeout(() => {
+        applyFilters();
+    }, 500); // Wait 500ms after user stops typing, then search
+});
+
+// Auto-apply on any other filter change (immediate)
+document.getElementById('category').addEventListener('change', () => applyFilters());
+document.getElementById('type').addEventListener('change', () => applyFilters());
+document.getElementById('status').addEventListener('change', () => applyFilters());
+document.getElementById('vendor').addEventListener('change', () => applyFilters());
+document.getElementById('uomFilter').addEventListener('change', () => applyFilters());
     
     // Price type change - auto apply
     document.querySelectorAll('input[name="priceType"]').forEach(radio => {

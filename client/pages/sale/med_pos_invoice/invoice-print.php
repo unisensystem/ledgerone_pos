@@ -540,6 +540,19 @@
 
             const currencySymbol = invoice.currency_symbol || '';
 
+            const signatureImgWrap = document.getElementById('signatureImgWrap');
+if (signatureImgWrap) {
+    signatureImgWrap.innerHTML = '';
+    if (invoice.signature) {
+        const sigImg = document.createElement('img');
+        sigImg.src = `../../../assets/uploads/signatures/${invoice.signature}`;
+        sigImg.alt = 'Signature';
+        sigImg.style.maxWidth = '160px';
+        sigImg.style.maxHeight = '60px';
+        signatureImgWrap.appendChild(sigImg);
+    }
+}
+
             // Group parent items by product
             // Same product sold across multiple rows (e.g. different batches) must print as
             // separate rows — only merge quantities that truly belong to one row (same product
