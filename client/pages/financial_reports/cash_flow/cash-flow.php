@@ -177,6 +177,59 @@ $currency_symbol = $currency['symbol'];
             </div>
         </div>
 
+        <!-- Cash vs Bank Breakdown -->
+        <h3 class="section-title">Cash &amp; Bank Breakdown</h3>
+        <div class="breakdown-section mb-24">
+            <div class="breakdown-card breakdown-cash">
+                <div class="breakdown-header">
+                    <i class="fas fa-money-bill-wave"></i>
+                    <span>Cash</span>
+                </div>
+                <div class="breakdown-rows">
+                    <div class="breakdown-row">
+                        <span class="breakdown-row-label">Opening</span>
+                        <strong id="cashOpeningVal" class="breakdown-row-value">Rs 0.00</strong>
+                    </div>
+                    <div class="breakdown-row">
+                        <span class="breakdown-row-label">Inflow</span>
+                        <strong id="cashInflowVal" class="breakdown-row-value positive">Rs 0.00</strong>
+                    </div>
+                    <div class="breakdown-row">
+                        <span class="breakdown-row-label">Outflow</span>
+                        <strong id="cashOutflowVal" class="breakdown-row-value negative">Rs 0.00</strong>
+                    </div>
+                    <div class="breakdown-row breakdown-row-total">
+                        <span class="breakdown-row-label">Closing</span>
+                        <strong id="cashClosingVal" class="breakdown-row-value">Rs 0.00</strong>
+                    </div>
+                </div>
+            </div>
+            <div class="breakdown-card breakdown-bank">
+                <div class="breakdown-header">
+                    <i class="fas fa-university"></i>
+                    <span>Bank</span>
+                </div>
+                <div class="breakdown-rows">
+                    <div class="breakdown-row">
+                        <span class="breakdown-row-label">Opening</span>
+                        <strong id="bankOpeningVal" class="breakdown-row-value">Rs 0.00</strong>
+                    </div>
+                    <div class="breakdown-row">
+                        <span class="breakdown-row-label">Inflow</span>
+                        <strong id="bankInflowVal" class="breakdown-row-value positive">Rs 0.00</strong>
+                    </div>
+                    <div class="breakdown-row">
+                        <span class="breakdown-row-label">Outflow</span>
+                        <strong id="bankOutflowVal" class="breakdown-row-value negative">Rs 0.00</strong>
+                    </div>
+                    <div class="breakdown-row breakdown-row-total">
+                        <span class="breakdown-row-label">Closing</span>
+                        <strong id="bankClosingVal" class="breakdown-row-value">Rs 0.00</strong>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Graph View -->
         <div class="card" id="graphView" style="display: none;">
             <h2 class="card-title"><i class="fas fa-chart-bar"></i> Cash Flow Graph</h2>
@@ -232,6 +285,6 @@ $currency_symbol = $currency['symbol'];
         </div>
     </div>
 
-    <script src="../../../assets/js/financial_reports/cash_flow/cash-flow.js"></script>
+    <script src="../../../assets/js/financial_reports/cash_flow/cash-flow.js?v=<?= filemtime(__DIR__ . '/../../../assets/js/financial_reports/cash_flow/cash-flow.js') ?>"></script>
 </body>
 </html>

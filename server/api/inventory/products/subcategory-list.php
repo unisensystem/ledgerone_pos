@@ -25,7 +25,7 @@ if (!$user_id || !$tenant_id) {
 try {
     $category_id = $_GET['category_id'] ?? '';
     
-    $sql = "SELECT id, subcategory_name FROM subcategories WHERE tenant_id = ? OR tenant_id = 0";
+    $sql = "SELECT id, subcategory_name FROM subcategories WHERE (tenant_id = ? OR tenant_id = 0)";
     $params = [$tenant_id];
     
     if ($category_id) {

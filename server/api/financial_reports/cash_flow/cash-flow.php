@@ -45,6 +45,22 @@ try {
     $offset = ($page - 1) * $limit;
     $company_id = !empty($_GET['company_id']) ? $_GET['company_id'] : null;
 
+    // Effective start-of-range date used ONLY for the "soft opening" balance calculation
+    // (balance carried in from transactions before the visible range). Needed for every
+    // preset range, not just 'custom' - otherwise Opening Balance always shows the raw
+    // account-creation opening balance and ignores everything that happened between then
+    // and the start of the selected range (e.g. picking "This Week" showed the balance as
+    // if the account was opened today, not the actual balance 7 days ago).
+    switch ($date_range) {
+        case 'today':   $soft_opening_from_date = date('Y-m-d'); break;
+        case 'week':    $soft_opening_from_date = date('Y-m-d', strtotime('-7 days')); break;
+        case 'month':   $soft_opening_from_date = date('Y-m-d', strtotime('-1 month')); break;
+        case 'quarter': $soft_opening_from_date = date('Y-m-d', strtotime('-3 months')); break;
+        case 'year':    $soft_opening_from_date = date('Y-m-d', strtotime('-1 year')); break;
+        case 'custom':  $soft_opening_from_date = $from_date; break;
+        default:        $soft_opening_from_date = ''; // 'all' - showing everything, nothing to carry in
+    }
+
     // Build date condition
     $date_conditions = [];
     $params = [];
@@ -608,7 +624,7 @@ try {
     // Calculate soft opening (transactions before from_date)
     $soft_opening_cash = 0;
     $soft_opening_bank = 0;
-    if ($date_range === 'custom' && $from_date) {
+    if ($soft_opening_from_date) {
         // Build the WHERE clause for bank account filtering
         $bank_filter = '';
         if ($bank_account !== 'all') {
@@ -739,27 +755,27 @@ try {
         // 8: payroll (tenant, from, [company])
         $params_soft = [];
         // 1: rv
-        $params_soft[] = $tenant_id; $params_soft[] = $from_date;
+        $params_soft[] = $tenant_id; $params_soft[] = $soft_opening_from_date;
         if ($company_id) $params_soft[] = $company_id;
         // 2: pv
-        $params_soft[] = $tenant_id; $params_soft[] = $from_date;
+        $params_soft[] = $tenant_id; $params_soft[] = $soft_opening_from_date;
         if ($company_id) $params_soft[] = $company_id;
         // 3: revenue_split
-        $params_soft[] = $tenant_id; $params_soft[] = $from_date;
+        $params_soft[] = $tenant_id; $params_soft[] = $soft_opening_from_date;
         // 4: pdc
-        $params_soft[] = $tenant_id; $params_soft[] = $from_date;
+        $params_soft[] = $tenant_id; $params_soft[] = $soft_opening_from_date;
         if ($company_id) $params_soft[] = $company_id;
         // 5: journal
-        $params_soft[] = $tenant_id; $params_soft[] = $from_date;
+        $params_soft[] = $tenant_id; $params_soft[] = $soft_opening_from_date;
         if ($company_id) $params_soft[] = $company_id;
         // 6: sale_return
-        $params_soft[] = $tenant_id; $params_soft[] = $from_date;
+        $params_soft[] = $tenant_id; $params_soft[] = $soft_opening_from_date;
         if ($company_id) $params_soft[] = $company_id;
         // 7: expense_voucher
-        $params_soft[] = $tenant_id; $params_soft[] = $from_date;
+        $params_soft[] = $tenant_id; $params_soft[] = $soft_opening_from_date;
         if ($company_id) $params_soft[] = $company_id;
         // 8: payroll
-        $params_soft[] = $tenant_id; $params_soft[] = $from_date;
+        $params_soft[] = $tenant_id; $params_soft[] = $soft_opening_from_date;
         if ($company_id) $params_soft[] = $company_id;
         $soft_stmt->execute($params_soft);
         $soft_result = $soft_stmt->fetch();
@@ -818,7 +834,23 @@ try {
     // Calculate totals from all transactions
     $total_inflow = array_sum(array_column($all_transactions, 'inflow'));
     $total_outflow = array_sum(array_column($all_transactions, 'outflow'));
-    
+
+    // Split inflow/outflow between Cash and Bank so the summary can show each separately
+    // alongside the combined total (same '-' vs bank name check used for running balances above).
+    $cash_total_inflow = 0;
+    $cash_total_outflow = 0;
+    $bank_total_inflow = 0;
+    $bank_total_outflow = 0;
+    foreach ($all_transactions as $t) {
+        if ($t['bank_account'] === '-') {
+            $cash_total_inflow += $t['inflow'];
+            $cash_total_outflow += $t['outflow'];
+        } else {
+            $bank_total_inflow += $t['inflow'];
+            $bank_total_outflow += $t['outflow'];
+        }
+    }
+
     // Get currency symbol for target currency
     $stmt = $pdo->prepare("SELECT symbol FROM ledgerone_public.currencies WHERE id = ?");
     $stmt->execute([$target_currency_id]);
@@ -858,7 +890,16 @@ try {
             'opening_balance' => $opening_balance,
             'total_inflow' => $total_inflow,
             'total_outflow' => $total_outflow,
-            'closing_balance' => $closing_balance
+            'closing_balance' => $closing_balance,
+            // Cash vs Bank breakdown, shown alongside the combined figures above
+            'cash_opening_balance' => $cash_opening + $soft_opening_cash,
+            'cash_total_inflow' => $cash_total_inflow,
+            'cash_total_outflow' => $cash_total_outflow,
+            'cash_closing_balance' => $cash_balance,
+            'bank_opening_balance' => $bank_opening_balance + $soft_opening_bank,
+            'bank_total_inflow' => $bank_total_inflow,
+            'bank_total_outflow' => $bank_total_outflow,
+            'bank_closing_balance' => $bank_balance
         ],
         'currency_symbol' => $currency_symbol,
         'count' => count($transactions),

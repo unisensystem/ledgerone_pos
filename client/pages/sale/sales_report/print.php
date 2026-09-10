@@ -24,6 +24,7 @@ $date_from = $_GET['date_from'] ?? date('Y-m-01');
 $date_to = $_GET['date_to'] ?? date('Y-m-d');
 $report_type = $_GET['report_type'] ?? 'all';
 $company_id = $_GET['company_id'] ?? null;
+$search = $_GET['search'] ?? '';
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -110,6 +111,14 @@ $company_id = $_GET['company_id'] ?? null;
         const dateTo = '<?php echo $date_to; ?>';
         const reportType = '<?php echo $report_type; ?>';
         const companyId = '<?php echo $company_id; ?>';
+        const searchTerm = '<?php echo htmlspecialchars($search, ENT_QUOTES); ?>'.toLowerCase();
+
+        // Same field combos the main report page's search boxes match against, so
+        // Print shows exactly what was searched instead of the full dataset.
+        function matchesSearch(fields) {
+            if (!searchTerm) return true;
+            return fields.some(f => String(f || '').toLowerCase().includes(searchTerm));
+        }
         
         async function loadReportData() {
             try {
@@ -146,6 +155,7 @@ $company_id = $_GET['company_id'] ?? null;
             if (reportType === 'all' || reportType === 'officer') {
                 html += '<table><caption>Sales Officer Wise Sales</caption><thead><tr><th>Employee ID</th><th>Officer Name</th><th>Total Invoices</th><th>Total Sales</th><th>Status</th></tr></thead><tbody>';
                 (data.officer_sales || []).forEach(item => {
+                    if (!matchesSearch([item.employee_id, item.officer_name])) return;
                     html += `<tr><td>${item.employee_id}</td><td>${item.officer_name}</td><td>${parseFloat(item.total_invoices || 0).toLocaleString()}</td><td>${CURRENCY_SYMBOL}${parseFloat(item.total_sales || 0).toLocaleString()}</td><td>${item.status}</td></tr>`;
                 });
                 html += '</tbody></table>';
@@ -155,6 +165,7 @@ $company_id = $_GET['company_id'] ?? null;
             if (reportType === 'all' || reportType === 'supplier_man') {
                 html += '<table><caption>Supplier Man Wise Sales</caption><thead><tr><th>Employee ID</th><th>Supplier Man Name</th><th>Total Invoices</th><th>Total Sales</th><th>Status</th></tr></thead><tbody>';
                 (data.supplier_man_sales || []).forEach(item => {
+                    if (!matchesSearch([item.employee_id, item.supplier_man_name])) return;
                     html += `<tr><td>${item.employee_id}</td><td>${item.supplier_man_name}</td><td>${parseFloat(item.total_invoices || 0).toLocaleString()}</td><td>${CURRENCY_SYMBOL}${parseFloat(item.total_sales || 0).toLocaleString()}</td><td>${item.status}</td></tr>`;
                 });
                 html += '</tbody></table>';
@@ -164,6 +175,7 @@ $company_id = $_GET['company_id'] ?? null;
 if (reportType === 'all' || reportType === 'product') {
     html += '<table><caption>Product Wise Sales</caption><thead><tr><th>Product ID</th><th>Product Name</th><th>Category</th><th>Batch No</th><th>Expiry Date</th><th>Quantity Sold</th><th>Revenue</th></tr></thead><tbody>';
     (data.product_sales || []).forEach(item => {
+        if (!matchesSearch([item.product_id_display, item.product_name, item.category])) return;
         const indent = (item.parent_row_id || item.parent_product_id) ? 'padding-left: 20px;' : '';
         const prefix = (item.parent_row_id || item.parent_product_id) ? '→ ' : '';
         const batchNo = item.batch_no || '-';
@@ -177,6 +189,7 @@ if (reportType === 'all' || reportType === 'product') {
             if (reportType === 'all' || reportType === 'branch') {
                 html += '<table><caption>Branch Wise Sales</caption><thead><tr><th>Branch ID</th><th>Branch Name</th><th>Total Sales</th><th>Transactions</th><th>Avg Sale</th></tr></thead><tbody>';
                 (data.branch_sales || []).forEach(item => {
+                    if (!matchesSearch([item.branch_id_display, item.branch_name])) return;
                     html += `<tr><td>${item.branch_id_display}</td><td>${item.branch_name}</td><td>${CURRENCY_SYMBOL}${parseFloat(item.total_sales || 0).toLocaleString()}</td><td>${parseFloat(item.transactions || 0).toLocaleString()}</td><td>${CURRENCY_SYMBOL}${parseFloat(item.avg_sale || 0).toLocaleString()}</td></tr>`;
                 });
                 html += '</tbody></table>';
@@ -187,6 +200,7 @@ if (reportType === 'all' || reportType === 'product') {
                 const total = (data.categories || []).reduce((sum, item) => sum + parseFloat(item.total || 0), 0);
                 html += '<table><caption>Category Wise Sales</caption><thead><tr><th>Category</th><th>Total Revenue</th><th>Percentage</th></tr></thead><tbody>';
                 (data.categories || []).forEach(item => {
+                    if (!matchesSearch([item.category])) return;
                     const percentage = total > 0 ? ((parseFloat(item.total || 0) / total) * 100).toFixed(1) : 0;
                     html += `<tr><td>${item.category}</td><td>${CURRENCY_SYMBOL}${parseFloat(item.total || 0).toLocaleString()}</td><td>${percentage}%</td></tr>`;
                 });
@@ -197,6 +211,7 @@ if (reportType === 'all' || reportType === 'product') {
             if (reportType === 'all' || reportType === 'territory') {
                 html += '<table><caption>Territory Wise Sales</caption><thead><tr><th>Country</th><th>Region</th><th>City</th><th>Zone</th><th>Area</th><th>Total Invoices</th><th>Total Sales</th></tr></thead><tbody>';
                 (data.territory_sales || []).forEach(item => {
+                    if (!matchesSearch([item.country, item.region, item.city, item.zone, item.area])) return;
                     html += `<tr><td>${item.country}</td><td>${item.region}</td><td>${item.city}</td><td>${item.zone}</td><td>${item.area}</td><td>${parseFloat(item.total_invoices || 0).toLocaleString()}</td><td>${CURRENCY_SYMBOL}${parseFloat(item.total_sales || 0).toLocaleString()}</td></tr>`;
                 });
                 html += '</tbody></table>';
@@ -206,6 +221,7 @@ if (reportType === 'all' || reportType === 'product') {
             if (reportType === 'all' || reportType === 'invoice') {
                 html += '<table><caption>Invoice Wise Sales</caption><thead><tr><th>Invoice #</th><th>Date</th><th>Customer</th><th>Sales Officer</th><th>Total Bill</th><th>Discount</th><th>Net Amount</th></tr></thead><tbody>';
                 (data.invoice_sales || []).forEach(item => {
+                    if (!matchesSearch([item.bill_no, item.customer_name, item.officer_name])) return;
                     html += `<tr><td>${item.bill_no}</td><td>${item.sale_date}</td><td>${item.customer_name}</td><td>${item.officer_name}</td><td>${CURRENCY_SYMBOL}${parseFloat(item.total_bill || 0).toLocaleString()}</td><td>${CURRENCY_SYMBOL}${parseFloat(item.total_discount_amount || 0).toLocaleString()}</td><td>${CURRENCY_SYMBOL}${parseFloat(item.net_amount || 0).toLocaleString()}</td></tr>`;
                 });
                 html += '</tbody></table>';
@@ -215,6 +231,7 @@ if (reportType === 'all' || reportType === 'product') {
             if (reportType === 'all' || reportType === 'vendor') {
                 html += '<table><caption>Vendor Wise Sales</caption><thead><tr><th>Vendor ID</th><th>Vendor Name</th><th>Total Invoices</th><th>Total Quantity</th><th>Total Sales</th></tr></thead><tbody>';
                 (data.vendor_sales || []).forEach(item => {
+                    if (!matchesSearch([item.vendor_id_display, item.vendor_name])) return;
                     html += `<tr><td>${item.vendor_id_display}</td><td>${item.vendor_name}</td><td>${parseFloat(item.total_invoices || 0).toLocaleString()}</td><td>${parseFloat(item.total_quantity || 0).toLocaleString()}</td><td>${CURRENCY_SYMBOL}${parseFloat(item.total_sales || 0).toLocaleString()}</td></tr>`;
                 });
                 html += '</tbody></table>';
@@ -224,6 +241,7 @@ if (reportType === 'all' || reportType === 'product') {
             if (reportType === 'all' || reportType === 'customer') {
                 html += '<table><caption>Customer Wise Sales</caption><thead><tr><th>Customer ID</th><th>Customer Name</th><th>Total Invoices</th><th>Total Sales</th></tr></thead><tbody>';
                 (data.customer_sales || []).forEach(item => {
+                    if (!matchesSearch([item.customer_id_display, item.customer_name])) return;
                     html += `<tr><td>${item.customer_id_display}</td><td>${item.customer_name}</td><td>${parseFloat(item.total_invoices || 0).toLocaleString()}</td><td>${CURRENCY_SYMBOL}${parseFloat(item.total_sales || 0).toLocaleString()}</td></tr>`;
                 });
                 html += '</tbody></table>';

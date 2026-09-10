@@ -480,6 +480,6 @@ $currency_symbol = $currency['symbol'];
     <script>
         const CURRENCY_SYMBOL = '<?php echo $currency_symbol; ?>';
     </script>
-    <script src="../../../assets/js/sale/sales_report/sales-report.js"></script>
+    <script src="../../../assets/js/sale/sales_report/sales-report.js?v=<?= filemtime(__DIR__ . '/../../../assets/js/sale/sales_report/sales-report.js') ?>"></script>
 </body>
 </html>

@@ -870,6 +870,21 @@ document.getElementById('refresh-btn').addEventListener('click', function () {
     });
 });
 
+// Report type -> the on-page search box that filters its table, so Print can
+// carry over whatever the user has currently searched for instead of always
+// printing the full unfiltered dataset.
+const REPORT_TYPE_SEARCH_INPUT = {
+    officer: 'search-officer',
+    supplier_man: 'search-supplier-man',
+    product: 'search-product',
+    branch: 'search-branch',
+    category: 'search-category',
+    territory: 'search-territory',
+    invoice: 'search-invoice',
+    vendor: 'search-vendor',
+    customer: 'search-customer'
+};
+
 function printReport() {
     const dateFrom = document.getElementById('date-from').value;
     const dateTo = document.getElementById('date-to').value;
@@ -877,6 +892,11 @@ function printReport() {
     const company = document.getElementById('company').value;
     let printUrl = `print.php?date_from=${dateFrom}&date_to=${dateTo}&report_type=${reportType}`;
     if (company) printUrl += `&company_id=${company}`;
+
+    const searchInputId = REPORT_TYPE_SEARCH_INPUT[reportType];
+    const searchTerm = searchInputId ? (document.getElementById(searchInputId)?.value || '').trim() : '';
+    if (searchTerm) printUrl += `&search=${encodeURIComponent(searchTerm)}`;
+
     window.open(printUrl, '_blank');
 }
 

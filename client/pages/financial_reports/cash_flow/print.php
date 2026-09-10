@@ -201,6 +201,34 @@ $currency_symbol = $currency['symbol'];
         </div>
     </div>
 
+    <table style="margin-top: 0;">
+        <thead>
+            <tr>
+                <th></th>
+                <th style="text-align: right;">Opening</th>
+                <th style="text-align: right;">Inflow</th>
+                <th style="text-align: right;">Outflow</th>
+                <th style="text-align: right;">Closing</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td><strong>Cash</strong></td>
+                <td style="text-align: right;" id="cashOpeningVal"><?php echo $currency_symbol; ?> 0.00</td>
+                <td style="text-align: right;" id="cashInflowVal"><?php echo $currency_symbol; ?> 0.00</td>
+                <td style="text-align: right;" id="cashOutflowVal"><?php echo $currency_symbol; ?> 0.00</td>
+                <td style="text-align: right;" id="cashClosingVal"><?php echo $currency_symbol; ?> 0.00</td>
+            </tr>
+            <tr>
+                <td><strong>Bank</strong></td>
+                <td style="text-align: right;" id="bankOpeningVal"><?php echo $currency_symbol; ?> 0.00</td>
+                <td style="text-align: right;" id="bankInflowVal"><?php echo $currency_symbol; ?> 0.00</td>
+                <td style="text-align: right;" id="bankOutflowVal"><?php echo $currency_symbol; ?> 0.00</td>
+                <td style="text-align: right;" id="bankClosingVal"><?php echo $currency_symbol; ?> 0.00</td>
+            </tr>
+        </tbody>
+    </table>
+
     <table>
         <thead>
             <tr>
@@ -309,6 +337,16 @@ $currency_symbol = $currency['symbol'];
                 document.getElementById('totalInflowBalance').textContent = formatCurrency(balances.total_inflow);
                 document.getElementById('totalOutflowBalance').textContent = formatCurrency(balances.total_outflow);
                 document.getElementById('closingBalance').textContent = formatCurrency(balances.closing_balance);
+
+                document.getElementById('cashOpeningVal').textContent = formatCurrency(balances.cash_opening_balance || 0);
+                document.getElementById('cashInflowVal').textContent = formatCurrency(balances.cash_total_inflow || 0);
+                document.getElementById('cashOutflowVal').textContent = formatCurrency(balances.cash_total_outflow || 0);
+                document.getElementById('cashClosingVal').textContent = formatCurrency(balances.cash_closing_balance || 0);
+
+                document.getElementById('bankOpeningVal').textContent = formatCurrency(balances.bank_opening_balance || 0);
+                document.getElementById('bankInflowVal').textContent = formatCurrency(balances.bank_total_inflow || 0);
+                document.getElementById('bankOutflowVal').textContent = formatCurrency(balances.bank_total_outflow || 0);
+                document.getElementById('bankClosingVal').textContent = formatCurrency(balances.bank_closing_balance || 0);
             }
         }
         

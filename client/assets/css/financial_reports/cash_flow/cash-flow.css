@@ -297,6 +297,94 @@ tbody tr:hover {
   border-left: 4px solid var(--error);
 }
 
+/* Cash vs Bank Breakdown */
+.breakdown-section {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 20px;
+}
+
+.breakdown-card {
+  background-color: var(--surface-0);
+  border-radius: 12px;
+  padding: 20px 24px;
+  border: 1px solid var(--border-default);
+  box-shadow: var(--shadow-light);
+}
+
+.breakdown-cash {
+  border-top: 3px solid var(--success);
+}
+
+.breakdown-bank {
+  border-top: 3px solid var(--primary);
+}
+
+.breakdown-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-heading);
+  margin-bottom: 16px;
+}
+
+.breakdown-cash .breakdown-header i {
+  color: var(--success);
+}
+
+.breakdown-bank .breakdown-header i {
+  color: var(--primary);
+}
+
+.breakdown-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.breakdown-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 0;
+}
+
+.breakdown-row-label {
+  font-size: 13px;
+  color: var(--text-subtle);
+}
+
+.breakdown-row-value {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-heading);
+}
+
+.breakdown-row-value.positive {
+  color: var(--success);
+}
+
+.breakdown-row-value.negative {
+  color: var(--error);
+}
+
+.breakdown-row-total {
+  margin-top: 4px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border-default);
+}
+
+.breakdown-row-total .breakdown-row-label {
+  font-weight: 600;
+  color: var(--text-heading);
+}
+
+.breakdown-row-total .breakdown-row-value {
+  font-size: 18px;
+}
+
 /* Form Layout */
 .form-actions {
   display: flex;

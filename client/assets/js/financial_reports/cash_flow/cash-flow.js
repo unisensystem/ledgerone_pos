@@ -254,6 +254,22 @@ function updateBalances(balances) {
     if (totalOutflow) totalOutflow.textContent = formatCurrency(balances.total_outflow || 0);
     if (netFlow) netFlow.textContent = formatCurrency(net);
     if (closingBalance) closingBalance.textContent = formatCurrency(balances.closing_balance || 0);
+
+    // Cash vs Bank breakdown
+    setTextContent('cashOpeningVal', formatCurrency(balances.cash_opening_balance || 0));
+    setTextContent('cashInflowVal', formatCurrency(balances.cash_total_inflow || 0));
+    setTextContent('cashOutflowVal', formatCurrency(balances.cash_total_outflow || 0));
+    setTextContent('cashClosingVal', formatCurrency(balances.cash_closing_balance || 0));
+
+    setTextContent('bankOpeningVal', formatCurrency(balances.bank_opening_balance || 0));
+    setTextContent('bankInflowVal', formatCurrency(balances.bank_total_inflow || 0));
+    setTextContent('bankOutflowVal', formatCurrency(balances.bank_total_outflow || 0));
+    setTextContent('bankClosingVal', formatCurrency(balances.bank_closing_balance || 0));
+}
+
+function setTextContent(elementId, text) {
+    const el = document.getElementById(elementId);
+    if (el) el.textContent = text;
 }
 
 // Show notification
