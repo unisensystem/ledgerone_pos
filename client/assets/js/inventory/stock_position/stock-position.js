@@ -117,6 +117,49 @@ function toggleChildren(productId) {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Shared From/To Date filter sync
+// ---------------------------------------------------------------------------
+// Setting From Date / To Date on any one tab now keeps every other tab's
+// From Date / To Date in sync automatically, until the user changes it again.
+// All tabs' date inputs already live in the DOM at the same time (tabs are
+// just shown/hidden via CSS), so keeping their values mirrored is enough —
+// each tab's load function already reads straight from its own input.
+const FROM_DATE_IDS = ['from-date', 'item-from-date', 'from-date-branch', 'from-date-customer', 'detailed-from-date', 'from-date-movement'];
+const TO_DATE_IDS = ['to-date', 'item-to-date', 'to-date-branch', 'to-date-customer', 'detailed-to-date', 'to-date-movement'];
+
+function syncDateFilters(sourceId, value, idList) {
+    idList.forEach(id => {
+        if (id === sourceId) return;
+        const el = document.getElementById(id);
+        if (el) el.value = value;
+    });
+}
+
+function initDateFilterSync() {
+    FROM_DATE_IDS.forEach(id => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.addEventListener('change', () => syncDateFilters(id, el.value, FROM_DATE_IDS));
+    });
+    TO_DATE_IDS.forEach(id => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.addEventListener('change', () => syncDateFilters(id, el.value, TO_DATE_IDS));
+    });
+}
+
+// Clears a tab's own From/To Date fields and mirrors the empty value to every
+// other tab too, so "Clear" on one tab doesn't leave the others out of sync.
+function clearAndSyncDateFilters(fromId, toId) {
+    const fromEl = document.getElementById(fromId);
+    const toEl = document.getElementById(toId);
+    if (fromEl) fromEl.value = '';
+    if (toEl) toEl.value = '';
+    syncDateFilters(fromId, '', FROM_DATE_IDS);
+    syncDateFilters(toId, '', TO_DATE_IDS);
+}
+
 // Print function
 function printList() {
     const activeTab = getActiveTabId();
@@ -139,6 +182,7 @@ function printList() {
     const fromDate = document.getElementById('from-date').value;
     const toDate = document.getElementById('to-date').value;
     const valuationMethod = document.getElementById('valuation-method').value;
+    const positionProjectId = document.getElementById('position-project')?.value;
 
     let url = `print.php?type=${activeTab}&`;
 
@@ -152,6 +196,7 @@ function printList() {
         if (fromDate) url += `from_date=${fromDate}&`;
         if (toDate) url += `to_date=${toDate}&`;
         if (valuationMethod) url += `valuation_method=${valuationMethod}&`;
+        if (positionProjectId) url += `project_id=${positionProjectId}&`;
     } else if (activeTab === 'item-ledger') {
         // Item-wise Ledger tab filters
         const itemName = document.getElementById('item').value;
@@ -177,14 +222,16 @@ function printList() {
                 }
             }
         }
-        const itemFromDate = document.getElementById('from-date').value;
-        const itemToDate = document.getElementById('to-date').value;
+        const projectId = document.getElementById('item-project')?.value;
+        const itemFromDate = document.getElementById('item-from-date').value;
+        const itemToDate = document.getElementById('item-to-date').value;
         const batchFilter = document.getElementById('item-batch-filter')?.value;
         const expiryFilter = document.getElementById('item-expiry-filter')?.value;
 
         if (productId) url += `product_id=${productId}&`;
         if (companyId) url += `vendor_id=${companyId}&`;
         if (customerId) url += `customer_id=${customerId}&`;
+        if (projectId) url += `project_id=${projectId}&`;
         if (itemFromDate) url += `from_date=${itemFromDate}&`;
         if (itemToDate) url += `to_date=${itemToDate}&`;
         if (batchFilter) url += `batch_no=${encodeURIComponent(batchFilter)}&`;
@@ -203,10 +250,12 @@ function printList() {
         }
         const branchFromDate = document.getElementById('from-date-branch')?.value;
         const branchToDate = document.getElementById('to-date-branch')?.value;
+        const branchProjectId = document.getElementById('branch-project')?.value;
 
         if (branchId) url += `branch_id=${branchId}&`;
         if (branchFromDate) url += `from_date=${branchFromDate}&`;
         if (branchToDate) url += `to_date=${branchToDate}&`;
+        if (branchProjectId) url += `project_id=${branchProjectId}&`;
     } else if (activeTab === 'detailed-ledger') {
         const branchInput = document.getElementById('detailed-branch').value;
         const productInput = document.getElementById('detailed-product').value;
@@ -234,6 +283,7 @@ function printList() {
         const detailedToDate = document.getElementById('detailed-to-date').value;
         const batchFilter = document.getElementById('detailed-batch-filter')?.value;
         const expiryFilter = document.getElementById('detailed-expiry-filter')?.value;
+        const detailedProjectId = document.getElementById('detailed-project')?.value;
 
         if (branchId) url += `branch_id=${branchId}&`;
         if (productId) url += `product_id=${productId}&`;
@@ -241,6 +291,7 @@ function printList() {
         if (detailedToDate) url += `to_date=${detailedToDate}&`;
         if (batchFilter) url += `batch_no=${encodeURIComponent(batchFilter)}&`;
         if (expiryFilter) url += `expiry_date=${expiryFilter}&`;
+        if (detailedProjectId) url += `project_id=${detailedProjectId}&`;
     }
 
     window.open(url, '_blank');
@@ -444,6 +495,7 @@ function openCustomerLedgerPreview() {
     const toDate = document.getElementById('to-date-customer').value;
     const batchFilter = document.getElementById('customer-batch-filter')?.value;
     const expiryFilter = document.getElementById('customer-expiry-filter')?.value;
+    const projectId = document.getElementById('customer-project')?.value;
 
     let url = `print_customer_ledger.php?`;
     if (customerId) url += `customer_id=${customerId}&`;
@@ -452,6 +504,7 @@ function openCustomerLedgerPreview() {
     if (toDate) url += `to_date=${toDate}&`;
     if (batchFilter) url += `batch_no=${encodeURIComponent(batchFilter)}&`;
     if (expiryFilter) url += `expiry_date=${expiryFilter}&`;
+    if (projectId) url += `project_id=${projectId}&`;
 
     window.open(url, '_blank');
 }
@@ -479,12 +532,14 @@ function openItemMovementPreview() {
 
     const fromDate = document.getElementById('from-date-movement').value;
     const toDate = document.getElementById('to-date-movement').value;
+    const projectId = document.getElementById('movement-project')?.value;
 
     let url = `print_item_movement.php?`;
     if (productId) url += `product_id=${productId}&`;
     if (branchId) url += `branch_id=${branchId}&`;
     if (fromDate) url += `from_date=${fromDate}&`;
     if (toDate) url += `to_date=${toDate}&`;
+    if (projectId) url += `project_id=${projectId}&`;
 
     window.open(url, '_blank');
 }
@@ -530,6 +585,7 @@ async function loadStockPosition() {
         const toDate = document.getElementById('to-date').value;
         const valuationMethod = document.getElementById('valuation-method').value;
         const showBaseUnits = document.getElementById('show-base-units').checked;
+        const projectId = document.getElementById('position-project')?.value;
         
         // Show/hide trade price note
         const tradePriceNote = document.getElementById('trade-price-note');
@@ -574,6 +630,7 @@ async function loadStockPosition() {
         if (toDate) url += `&to_date=${toDate}`;
         if (valuationMethod) url += `&valuation_method=${valuationMethod}`;
         if (showBaseUnits) url += `&show_base_units=true`;
+        if (projectId) url += `&project_id=${projectId}`;
         
         const response = await fetch(url);
         const data = await response.json();
@@ -803,8 +860,9 @@ async function loadItemLedger() {
         const itemName = document.getElementById('item').value;
         const companyId = document.getElementById('item-company').value;
         const customerName = document.getElementById('item-customer')?.value;
-        const fromDate = document.getElementById('from-date').value;
-        const toDate = document.getElementById('to-date').value;
+        const projectId = document.getElementById('item-project')?.value;
+        const fromDate = document.getElementById('item-from-date').value;
+        const toDate = document.getElementById('item-to-date').value;
         const batchFilter = document.getElementById('item-batch-filter').value;
         const expiryFilter = document.getElementById('item-expiry-filter').value;
 
@@ -836,6 +894,7 @@ async function loadItemLedger() {
         if (productId) url += `&product_id=${productId}`;
         if (companyId) url += `&vendor_id=${companyId}`;
         if (customerId) url += `&customer_id=${customerId}`;
+        if (projectId) url += `&project_id=${projectId}`;
         if (fromDate) url += `&from_date=${fromDate}`;
         if (toDate) url += `&to_date=${toDate}`;
 
@@ -858,6 +917,7 @@ async function loadDetailedLedger() {
     try {
         const branchInput = document.getElementById('detailed-branch').value;
         const productInput = document.getElementById('detailed-product').value;
+        const projectId = document.getElementById('detailed-project')?.value;
         const fromDate = document.getElementById('detailed-from-date').value;
         const toDate = document.getElementById('detailed-to-date').value;
         // NEW: Batch No and Expiry Date filters
@@ -891,6 +951,7 @@ async function loadDetailedLedger() {
         let url = `${API_BASE}?action=detailed-ledger`;
         if (branchId) url += `&branch_id=${branchId}`;
         if (productId) url += `&product_id=${productId}`;
+        if (projectId) url += `&project_id=${projectId}`;
         if (fromDate) url += `&from_date=${fromDate}`;
         if (toDate) url += `&to_date=${toDate}`;
         
@@ -1137,6 +1198,7 @@ async function loadCustomerLedger() {
     const expiryFilter = document.getElementById('customer-expiry-filter').value;
     const customerName = document.getElementById('customer-ledger-input').value;
     const productName = document.getElementById('customer-product-input').value;
+    const projectId = document.getElementById('customer-project')?.value;
     const fromDate = document.getElementById('from-date-customer').value;
     const toDate = document.getElementById('to-date-customer').value;
 
@@ -1176,6 +1238,7 @@ async function loadCustomerLedger() {
         let url = `${API_BASE}?action=customer-ledger`;
         if (customerId) url += `&customer_id=${customerId}`;
         if (productId) url += `&product_id=${productId}`;
+        if (projectId) url += `&project_id=${projectId}`;
         if (fromDate) url += `&from_date=${fromDate}`;
         if (toDate) url += `&to_date=${toDate}`;
 
@@ -1256,6 +1319,7 @@ async function loadItemMovement() {
         const productName = document.getElementById('movement-product-input').value;
         const branchName  = document.getElementById('movement-branch-input').value;
         const companyId   = document.getElementById('movement-company')?.value || '';
+        const projectId   = document.getElementById('movement-project')?.value || '';
         const fromDate    = document.getElementById('from-date-movement').value;
         const toDate      = document.getElementById('to-date-movement').value;
         // NEW: Sort By filter — sorts the resulting rows on the chosen numeric
@@ -1283,6 +1347,7 @@ async function loadItemMovement() {
         if (productId) url += `&product_id=${productId}`;
         if (branchId)  url += `&branch_id=${branchId}`;
         if (companyId) url += `&vendor_id=${companyId}`;
+        if (projectId) url += `&project_id=${projectId}`;
         if (fromDate)  url += `&from_date=${fromDate}`;
         if (toDate)    url += `&to_date=${toDate}`;
 
@@ -1320,6 +1385,30 @@ async function loadCustomers() {
         }
     } catch (error) {
         console.error('Error loading customers:', error);
+    }
+}
+
+// Load Projects — populates the "Project" filter dropdown on every ledger tab
+async function loadProjects() {
+    try {
+        const response = await fetch(`${API_BASE}?action=projects`);
+        const data = await response.json();
+        if (data.success) {
+            const projectSelects = ['#position-project', '#item-project', '#branch-project', '#customer-project', '#detailed-project', '#movement-project'];
+            projectSelects.forEach(selector => {
+                const select = document.querySelector(selector);
+                if (select) {
+                    data.data.forEach(project => {
+                        const option = document.createElement('option');
+                        option.value = project.id;
+                        option.textContent = `${project.project_code} - ${project.project_name}`;
+                        select.appendChild(option);
+                    });
+                }
+            });
+        }
+    } catch (error) {
+        console.error('Error loading projects:', error);
     }
 }
 
@@ -1461,6 +1550,9 @@ async function loadCompanies() {
 document.addEventListener('DOMContentLoaded', () => {
     // Load column visibility settings
     loadColumnVisibility();
+
+    // Keep From/To Date synced across every tab until the user changes them
+    initDateFilterSync();
     
     // Column visibility toggles
     const toggles = [
@@ -1492,8 +1584,8 @@ document.addEventListener('DOMContentLoaded', () => {
  document.getElementById('clearCustomerFilters').addEventListener('click', () => {
     document.getElementById('customer-ledger-input').value = '';
     document.getElementById('customer-product-input').value = '';
-    document.getElementById('from-date-customer').value = '';
-    document.getElementById('to-date-customer').value = '';
+    if (document.getElementById('customer-project')) document.getElementById('customer-project').value = '';
+    clearAndSyncDateFilters('from-date-customer', 'to-date-customer');
 
     document.getElementById('customer-batch-filter').value = '';
     document.getElementById('customer-expiry-filter').value = '';
@@ -1533,8 +1625,8 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('stock-status').value = '';
         document.getElementById('status').value = '';
         document.getElementById('stock-level-filter').value = '';
-        document.getElementById('from-date').value = '';
-        document.getElementById('to-date').value = '';
+        if (document.getElementById('position-project')) document.getElementById('position-project').value = '';
+        clearAndSyncDateFilters('from-date', 'to-date');
         document.getElementById('valuation-method').value = 'AVCO';
         loadStockPosition();
         loadDashboardStats();
@@ -1545,8 +1637,8 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('item').value = '';
         document.getElementById('item-company').value = '';
         if (document.getElementById('item-customer')) document.getElementById('item-customer').value = '';
-        document.getElementById('from-date').value = '';
-        document.getElementById('to-date').value = '';
+        if (document.getElementById('item-project')) document.getElementById('item-project').value = '';
+        clearAndSyncDateFilters('item-from-date', 'item-to-date');
 
         document.getElementById('item-batch-filter').value = '';
         document.getElementById('item-expiry-filter').value = '';
@@ -1562,8 +1654,8 @@ document.addEventListener('DOMContentLoaded', () => {
     // Clear Branch Filters
     document.getElementById('clearBranchFilters').addEventListener('click', () => {
         document.querySelector('input[list="branch-ledger-list"]').value = '';
-        document.getElementById('from-date-branch').value = '';
-        document.getElementById('to-date-branch').value = '';
+        if (document.getElementById('branch-project')) document.getElementById('branch-project').value = '';
+        clearAndSyncDateFilters('from-date-branch', 'to-date-branch');
         const tbody = document.querySelector('#branch-ledger .table tbody');
         tbody.innerHTML = '';
         document.getElementById('branch-pagination-info').textContent = 'Showing 0 - 0 of 0 entries';
@@ -1575,6 +1667,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const branchName = document.querySelector('input[list="branch-ledger-list"]').value;
         const fromDate = document.getElementById('from-date-branch').value;
         const toDate = document.getElementById('to-date-branch').value;
+        const projectId = document.getElementById('branch-project')?.value;
         
         if (!branchName || branchName.trim() === '') {
             alert('Please select a branch');
@@ -1600,6 +1693,7 @@ document.addEventListener('DOMContentLoaded', () => {
             let url = `${API_BASE}?action=branch-ledger&branch_id=${branchId}`;
             if (fromDate) url += `&from_date=${fromDate}`;
             if (toDate) url += `&to_date=${toDate}`;
+            if (projectId) url += `&project_id=${projectId}`;
             
             const response = await fetch(url);
             const data = await response.json();
@@ -1693,8 +1787,8 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('clearDetailedFilters').addEventListener('click', () => {
         document.getElementById('detailed-branch').value = '';
         document.getElementById('detailed-product').value = '';
-        document.getElementById('detailed-from-date').value = '';
-        document.getElementById('detailed-to-date').value = '';
+        if (document.getElementById('detailed-project')) document.getElementById('detailed-project').value = '';
+        clearAndSyncDateFilters('detailed-from-date', 'detailed-to-date');
         loadDetailedLedger();
     });
    
@@ -1708,6 +1802,7 @@ document.addEventListener('DOMContentLoaded', () => {
     loadInventoryTypes();
     loadDistributions();
         loadCustomers();
+        loadProjects();
         document.getElementById('applyMovementFilters').addEventListener('click', () => {
     loadItemMovement();
 });
@@ -1715,8 +1810,8 @@ document.addEventListener('DOMContentLoaded', () => {
 document.getElementById('clearMovementFilters').addEventListener('click', () => {
     document.getElementById('movement-product-input').value = '';
     document.getElementById('movement-branch-input').value = '';
-    document.getElementById('from-date-movement').value = '';
-    document.getElementById('to-date-movement').value = '';
+    if (document.getElementById('movement-project')) document.getElementById('movement-project').value = '';
+    clearAndSyncDateFilters('from-date-movement', 'to-date-movement');
     // NEW: reset the Sort By dropdown back to default too
     if (document.getElementById('movement-sort')) {
         document.getElementById('movement-sort').value = '';
