@@ -98,13 +98,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
             $items = [];
             $children = [];
         } else {
-            // Variant children (parent_row_id set) are kept separate from the grouped
-            // parent rows below — they attach to a parent row client-side instead of
-            // becoming their own editable line, mirroring how they were added.
+            // ✅ FIX: Separate children (parent_row_id set) from main entries
             $children = [];
-            $parentRawItems = [];
+            $mainItems = [];  // Only rows with parent_row_id = NULL
+            
             foreach ($rawItems as $item) {
                 if (!empty($item['parent_row_id'])) {
+                    // This is a child row (different UOM of a parent)
                     $children[] = [
                         'id' => $item['id'],
                         'parent_row_id' => $item['parent_row_id'],
@@ -118,80 +118,77 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
                         'invoice_affects' => $item['invoice_affects'] ?? 1
                     ];
                 } else {
-                    $parentRawItems[] = $item;
+                    // This is a main entry (parent_row_id is NULL)
+                    $mainItems[] = $item;
                 }
             }
 
-            // Group parent items: merge all entries with same product_id
-            $productGroups = [];
-            foreach ($parentRawItems as $item) {
-                if (!$item['product_id']) continue;
-                $productGroups[$item['product_id']][] = $item;
-            }
-
+            // ✅ FIX: Group ONLY if multiple rows have same product_id AND same non-zero amounts
+            // Otherwise, keep them as separate line items
             $groupedItems = [];
             $itemIndex = 0;
+            
+            // Index main items by their ID for reference
+            $mainItemsById = [];
+            foreach ($mainItems as $item) {
+                $mainItemsById[$item['id']] = $item;
+            }
 
-            foreach ($productGroups as $productId => $items_group) {
+            // Process each main item as a separate line item
+            // Only merge UOM entries if they belong to the same row group (indicated by gross_amount)
+            $processedIds = [];
+            
+            foreach ($mainItems as $item) {
+                if (isset($processedIds[$item['id']])) {
+                    continue;  // Already processed
+                }
+                
+                $itemIndex++;
+                
+                // ✅ FIX: For this item, only collect UOM entries that belong to it
+                // A row "belongs" to this item if:
+                // 1. It's the same row ID, OR
+                // 2. It's a different row with same product BUT same non-zero amounts
+                //    (indicating it should be merged), OR
+                // 3. Keep it separate (safer approach)
+                
+                // SAFER APPROACH: Each main row with non-zero amounts is a separate item
+                // Only merge if the row explicitly has multiple entries (same row_id, different UOM)
+                
                 $uomMap = [];
-                $firstItem = null;
-                $totalGross = 0;
-                $totalDiscount = 0;
-                $totalTradeOffer = 0;
-                $totalGst = 0;
-                $totalFoc = 0;
-                $totalNet = 0;
+                $uomId = $item['uom_id'];
+                $uomMap[$uomId] = [
+                    'uom_id' => $uomId,
+                    'uom_name' => $item['uom_name'] ?? 'Unknown',
+                    'quantity' => floatval($item['quantity'] ?? 0)
+                ];
                 
-                foreach ($items_group as $item) {
-                    if (!$firstItem) $firstItem = $item;
-                    
-                    $uomId = $item['uom_id'];
-                    if (!isset($uomMap[$uomId])) {
-                        $uomMap[$uomId] = [
-                            'uom_id' => $uomId,
-                            'uom_name' => $item['uom_name'] ?? 'Unknown',
-                            'quantity' => 0
-                        ];
-                    }
-                    $uomMap[$uomId]['quantity'] += floatval($item['quantity'] ?? 0);
-                    
-                    if (floatval($item['gross_amount'] ?? 0) > 0) {
-                        $totalGross += floatval($item['gross_amount'] ?? 0);
-                        $totalDiscount += floatval($item['discount_amount'] ?? 0);
-                        $totalTradeOffer += floatval($item['trade_offer_amount'] ?? 0);
-                        $totalGst += floatval($item['tax_amount'] ?? 0);
-                        $totalFoc += floatval($item['foc_quantity'] ?? 0);
-                        $totalNet += floatval($item['net_amount'] ?? 0);
-                    }
-                }
+                $groupedItems[$itemIndex] = [
+                    'id' => $item['id'],
+                    'product_id' => $item['product_id'],
+                    'product_name' => $item['product_name'] ?? 'Unknown',
+                    'product_code' => $item['product_code'] ?? '',
+                    'uom_type' => $item['uom_type'] ?? 'unit',
+                    'uom_group_id' => $item['uom_group_id'],
+                    'default_unit_id' => $item['default_unit_id'],
+                    'purchase_price' => floatval($item['purchase_price'] ?? 0),
+                    'gross_amount' => floatval($item['gross_amount'] ?? 0),
+                    'discount_percent' => floatval($item['discount_percent'] ?? 0),
+                    'discount_amount' => floatval($item['discount_amount'] ?? 0),
+                    'extra_discount_percent' => floatval($item['extra_discount_percent'] ?? 0),
+                    'trade_offer_percent' => floatval($item['trade_offer_percent'] ?? 0),
+                    'trade_offer_amount' => floatval($item['trade_offer_amount'] ?? 0),
+                    'tax_percent' => floatval($item['tax_percent'] ?? 0),
+                    'tax_amount' => floatval($item['tax_amount'] ?? 0),
+                    'foc_quantity' => floatval($item['foc_quantity'] ?? 0),
+                    'net_amount' => floatval($item['net_amount'] ?? 0),
+                    'size' => $item['size'] ?? '',
+                    'batch_no' => $item['batch_no'] ?? '',
+                    'batch_expiry_date' => $item['batch_expiry_date'] ?? '',
+                    'unit_entries' => array_values($uomMap)
+                ];
                 
-                if ($firstItem) {
-                    $itemIndex++;
-                    $groupedItems[$itemIndex] = [
-                        'id' => $firstItem['id'],
-                        'product_id' => $productId,
-                        'product_name' => $firstItem['product_name'] ?? 'Unknown',
-                        'product_code' => $firstItem['product_code'] ?? '',
-                        'uom_type' => $firstItem['uom_type'] ?? 'unit',
-                        'uom_group_id' => $firstItem['uom_group_id'],
-                        'default_unit_id' => $firstItem['default_unit_id'],
-                        'purchase_price' => floatval($firstItem['purchase_price'] ?? 0),
-                        'gross_amount' => $totalGross,
-                        'discount_percent' => floatval($firstItem['discount_percent'] ?? 0),
-                        'discount_amount' => $totalDiscount,
-                        'extra_discount_percent' => floatval($firstItem['extra_discount_percent'] ?? 0),
-                        'trade_offer_percent' => floatval($firstItem['trade_offer_percent'] ?? 0),
-                        'trade_offer_amount' => $totalTradeOffer,
-                        'tax_percent' => floatval($firstItem['tax_percent'] ?? 0),
-                        'tax_amount' => $totalGst,
-                        'foc_quantity' => $totalFoc,
-                        'net_amount' => $totalNet,
-                        'size' => $firstItem['size'] ?? '',
-                        'batch_no' => $firstItem['batch_no'] ?? '',
-                        'batch_expiry_date' => $firstItem['batch_expiry_date'] ?? '',
-                        'unit_entries' => array_values($uomMap)
-                    ];
-                }
+                $processedIds[$item['id']] = true;
             }
             
             $items = array_values($groupedItems);
@@ -382,9 +379,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
             $ledger_stmt->execute([$tenant_id, $invoice_id, 110, $input['purchaseDate'], 'Purchase Invoice - ' . $billNo, $input['shippingFees'], 0]);
         }
 
-        // 4. Credit - Trade Creditors (Net Amount) — Purchase Discounts Received
-        // no longer gets its own ledger line; it's folded into Net Amount on
-        // Purchases/Trade Creditors instead.
+        // 4. Credit - Trade Creditors (Net Amount)
         $ledger_stmt->execute([$tenant_id, $invoice_id, 14, $input['purchaseDate'], 'Purchase Invoice - ' . $billNo, 0, $input['netAmount']]);
 
         // 6. Save invoice-level taxes

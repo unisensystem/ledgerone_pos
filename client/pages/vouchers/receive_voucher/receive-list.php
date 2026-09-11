@@ -18,14 +18,27 @@ $initialSearch = $_GET['search'] ?? '';
 ?>
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Receive Vouchers - LedgerOne ERP</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="../../../assets/css/vouchers/receive_voucher/receive-list.css?v=<?php echo time(); ?>">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
+<style>
+    .page-size-box {
+    display: flex;
+    align-items: center;
+}
+.page-size-box select {
+    padding: 6px 10px;
+    border-radius: 6px;
+    border: 1px solid #ddd;
+}
+</style>
+
 <body class="light-theme">
     <div class="container">
         <div class="header">
@@ -145,22 +158,36 @@ $initialSearch = $_GET['search'] ?? '';
 
         <!-- Table Section -->
         <div class="table-container">
-            <div class="table-header">
-                <div class="table-title">Recent Receive Vouchers</div>
-                <div class="table-actions">
-                    <div class="search-box">
-                        <i class="fas fa-search search-icon"></i>
-<input type="text" id="searchInput" placeholder="Search vouchers..." value="<?= htmlspecialchars($initialSearch) ?>">
-                    </div>
-                    <button class="btn btn-secondary btn-icon" id="exportBtn" title="Export">
-                        <i class="fas fa-download"></i>
-                    </button>
-                    <button class="btn btn-secondary btn-icon" id="refreshBtn" title="Refresh">
-                        <i class="fas fa-sync-alt"></i>
-                    </button>
-                </div>
-            </div>
-
+          <div class="table-header">
+    <div class="table-title">Recent Receive Vouchers</div>
+    <div class="table-actions">
+        <div class="page-size-box">
+            <label for="itemsPerPageSelect" style="margin-right:6px; font-size:13px;">Show</label>
+            <select id="itemsPerPageSelect">
+                <option value="10">10</option>
+                <option value="20">20</option>
+                <option value="30">30</option>
+                <option value="40">40</option>
+                <option value="50">50</option>
+                <option value="60">60</option>
+                <option value="70">70</option>
+                <option value="80">80</option>
+                <option value="90">90</option>
+                <option value="100">100</option>
+            </select>
+        </div>
+        <div class="search-box">
+            <i class="fas fa-search search-icon"></i>
+            <input type="text" id="searchInput" placeholder="Search vouchers..." value="<?= htmlspecialchars($initialSearch) ?>">
+        </div>
+        <button class="btn btn-secondary btn-icon" id="exportBtn" title="Export">
+            <i class="fas fa-download"></i>
+        </button>
+        <button class="btn btn-secondary btn-icon" id="refreshBtn" title="Refresh">
+            <i class="fas fa-sync-alt"></i>
+        </button>
+    </div>
+</div>
             <table>
                 <thead>
                     <tr>
@@ -222,7 +249,7 @@ $initialSearch = $_GET['search'] ?? '';
                             <label for="editCustomer">Customer</label>
                             <input type="text" id="editCustomer" readonly>
                         </div>
-                                               <div class="form-group">
+                        <div class="form-group">
                             <label for="editBillNo">Bill No</label>
                             <input type="text" id="editBillNo">
                         </div>
@@ -243,33 +270,33 @@ $initialSearch = $_GET['search'] ?? '';
                             </select>
                         </div>
                         <div class="form-group">
-    <label for="editRecoveryOfficer">Recovery Officer</label>
-    <select id="editRecoveryOfficer">
-        <option value="">Select Recovery Officer</option>
-    </select>
-</div>
-<div class="form-group">
-    <label for="editSubAccount">Sub Account</label>
-    <select id="editSubAccount">
-        <option value="">Select Sub Account</option>
-    </select>
-</div>
-<div class="form-group">
-    <label for="editDsrNo">DSR#</label>
-    <input type="text" id="editDsrNo" placeholder="DSR-B-24-26-20251231-20260112">
-</div>
-<div class="form-group">
-    <label for="editAgainstPdc">Against PDC</label>
-    <select id="editAgainstPdc">
-        <option value="">— No PDC —</option>
-    </select>
-</div>
-<div class="form-group hidden" id="editContainerGroup">
-    <label for="editContainer">Container</label>
-    <select id="editContainer">
-        <option value="">Select Container</option>
-    </select>
-</div>
+                            <label for="editRecoveryOfficer">Recovery Officer</label>
+                            <select id="editRecoveryOfficer">
+                                <option value="">Select Recovery Officer</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="editSubAccount">Sub Account</label>
+                            <select id="editSubAccount">
+                                <option value="">Select Sub Account</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="editDsrNo">DSR#</label>
+                            <input type="text" id="editDsrNo" placeholder="DSR-B-24-26-20251231-20260112">
+                        </div>
+                        <div class="form-group">
+                            <label for="editAgainstPdc">Against PDC</label>
+                            <select id="editAgainstPdc">
+                                <option value="">— No PDC —</option>
+                            </select>
+                        </div>
+                        <div class="form-group hidden" id="editContainerGroup">
+                            <label for="editContainer">Container</label>
+                            <select id="editContainer">
+                                <option value="">Select Container</option>
+                            </select>
+                        </div>
                         <div class="form-group">
                             <label for="editAmount">Amount</label>
                             <input type="number" id="editAmount" step="0.01" required>
@@ -328,17 +355,22 @@ $initialSearch = $_GET['search'] ?? '';
         </div>
     </div>
 
-   <script src="../../../assets/js/vouchers/receive_voucher/receive-list.js?v=<?php echo time(); ?>"></script>
-<?php if ($initialSearch): ?>
-<script>
-    window.addEventListener('load', function() {
-        const searchInput = document.getElementById('searchInput');
-        if (searchInput) {
-            searchInput.dispatchEvent(new Event('input', { bubbles: true }));
-            searchInput.dispatchEvent(new Event('keyup', { bubbles: true }));
-        }
-    });
-</script>
-<?php endif; ?>
+    <script src="../../../assets/js/vouchers/receive_voucher/receive-list.js?v=<?php echo time(); ?>"></script>
+    <?php if ($initialSearch): ?>
+        <script>
+            window.addEventListener('load', function() {
+                const searchInput = document.getElementById('searchInput');
+                if (searchInput) {
+                    searchInput.dispatchEvent(new Event('input', {
+                        bubbles: true
+                    }));
+                    searchInput.dispatchEvent(new Event('keyup', {
+                        bubbles: true
+                    }));
+                }
+            });
+        </script>
+    <?php endif; ?>
 </body>
+
 </html>

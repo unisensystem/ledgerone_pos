@@ -1711,13 +1711,16 @@ netInput.addEventListener('keydown', function(e) {
             }
         });
         
-        function updateSelectionDynamic(visibleOptions) {
-            visibleOptions.forEach((option, index) => {
-                option.style.backgroundColor = index === selectedIndex ? '#1a6cdc' : '';
-            option.style.color = index === selectedIndex ? 'white' : '';
-            });
+       function updateSelectionDynamic(visibleOptions) {
+    visibleOptions.forEach((option, index) => {
+        const isSelected = index === selectedIndex;
+        option.style.backgroundColor = isSelected ? '#1a6cdc' : '';
+        option.style.color = isSelected ? 'white' : '';
+        if (isSelected) {
+            option.scrollIntoView({ block: 'nearest' });
         }
-        
+    });
+}
         searchInput.addEventListener('input', function() {
             selectedIndex = -1;
             filterOptionsDynamic();
@@ -1757,9 +1760,15 @@ netInput.addEventListener('keydown', function(e) {
                     window.loadTaxForProduct(row);
                 }
                 
-                // Focus first unit input
+                              // Focus batch no input first (falls back to expiry, then unit, if hidden)
+                const batchNoInput = row.querySelector('.batch-no-input');
+                const batchExpiryInput = row.querySelector('.batch-expiry-input');
                 const firstUnitInput = row.querySelector('.unit-input');
-                if (firstUnitInput) {
+                if (batchNoInput && batchNoInput.offsetParent !== null) {
+                    batchNoInput.focus();
+                } else if (batchExpiryInput && batchExpiryInput.offsetParent !== null) {
+                    batchExpiryInput.focus();
+                } else if (firstUnitInput) {
                     firstUnitInput.focus();
                 }
             }

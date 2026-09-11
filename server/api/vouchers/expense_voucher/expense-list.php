@@ -19,9 +19,10 @@ if (!$user_id || $tenant_id === null) {
 try {
     $project_id = $_GET['project_id'] ?? null;
     
+    // ✅ CHANGE: Remove GROUP_CONCAT—har line ek separate row return karega
     $stmt = $pdo->prepare("
         SELECT 
-            ev.id,
+            ev.id as voucher_id,
             ev.voucher_no,
             ev.date,
             ev.description,
@@ -31,11 +32,11 @@ try {
             ev.project_id,
             ev.is_cash_flow,
             p.project_name,
-            GROUP_CONCAT(a.name ORDER BY evl.id SEPARATOR ',') AS expense_accounts,
-            GROUP_CONCAT(cc.name ORDER BY evl.id SEPARATOR ',') AS cost_centers,
-            GROUP_CONCAT(evl.amount ORDER BY evl.id SEPARATOR ',') AS expense_amounts,
-            GROUP_CONCAT(evl.account_id ORDER BY evl.id SEPARATOR ',') AS expense_account_ids,
-            GROUP_CONCAT(IFNULL(evl.cost_center_id, '') ORDER BY evl.id SEPARATOR ',') AS cost_center_ids
+            a.name as expense_accounts,
+            cc.name as cost_centers,
+            evl.amount as expense_amounts,
+            evl.account_id as expense_account_ids,
+            evl.cost_center_id as cost_center_ids
         FROM expense_voucher ev
         LEFT JOIN projects p ON ev.project_id = p.id
         LEFT JOIN expense_voucher_line evl ON evl.voucher_id = ev.id
@@ -43,8 +44,7 @@ try {
         LEFT JOIN cost_centers cc ON evl.cost_center_id = cc.id
         WHERE ev.tenant_id = ?
         " . ($project_id ? "AND ev.project_id = ?" : "") . "
-        GROUP BY ev.id
-        ORDER BY ev.id DESC
+        ORDER BY ev.id DESC, evl.id ASC
     ");
     
     if ($project_id) {
@@ -59,3 +59,4 @@ try {
     http_response_code(500);
     echo json_encode(['error' => 'Failed to fetch expense vouchers']);
 }
+?>

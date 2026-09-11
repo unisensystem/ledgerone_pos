@@ -115,6 +115,32 @@ $all_symbols = $stmt2->fetchAll();
                     <input type="date" class="form-control" id="to-date">
                     <div class="error-message" id="to-date-error">To Date cannot be less than From Date</div>
                 </div>
+                <div class="form-group">
+                    <label class="form-label" for="amount-field">Amount Filter</label>
+                    <select class="form-control" id="amount-field">
+                        <option value="">No Filter</option>
+                        <option value="opening">Opening Balance</option>
+                        <option value="debit">Debit</option>
+                        <option value="credit">Credit</option>
+                        <option value="closing">Closing / Balance</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="amount-operator">Condition</label>
+                    <select class="form-control" id="amount-operator">
+                        <option value="gt">Greater Than</option>
+                        <option value="lt">Less Than</option>
+                        <option value="between">Between</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="amount-value1">Value</label>
+                    <input type="number" step="0.01" class="form-control" id="amount-value1" placeholder="Amount">
+                </div>
+                <div class="form-group" id="amount-value2-group" style="display: none;">
+                    <label class="form-label" for="amount-value2">To</label>
+                    <input type="number" step="0.01" class="form-control" id="amount-value2" placeholder="Amount">
+                </div>
             </div>
             <div class="actions">
                 <button class="btn btn-primary" id="load-ledger-btn">

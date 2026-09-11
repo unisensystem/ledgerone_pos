@@ -350,6 +350,16 @@ const resetFiltersBtn = document.getElementById('resetFiltersBtn');
 applyFiltersBtn.addEventListener('click', applyFilters);
 resetFiltersBtn.addEventListener('click', resetFilters);
 
+// Items per page selector
+const itemsPerPageSelect = document.getElementById('itemsPerPageSelect');
+if (itemsPerPageSelect) {
+    itemsPerPageSelect.value = itemsPerPage; // default value select mein sync karo
+    itemsPerPageSelect.addEventListener('change', function () {
+        itemsPerPage = parseInt(this.value, 10);
+        fetchVouchers(1); // page size change hone par page 1 se list dikhao
+    });
+}
+
 function applyFilters() {
     // Reset to first page when applying filters
     fetchVouchers(1);
