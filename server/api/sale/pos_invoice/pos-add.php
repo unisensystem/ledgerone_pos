@@ -122,13 +122,27 @@ $pdo->beginTransaction();
 
     $invoice_id = $pdo->lastInsertId();
     $status = $input['status'] ?? 'Posted';
-    // Save signature (if a new PNG was cropped client-side and sent as a data-URL)
+    // Save signature. Two cases:
+    //  1. User cropped a brand-new signature this session -> $input['signature'] is a
+    //     data:image base64 string -> decode it and write a new file to disk.
+    //  2. User kept the tenant's existing default signature (nothing re-cropped) ->
+    //     $input['signature'] is just the filename already on disk (see
+    //     get-default-signature.php) -> re-use it directly, no disk write needed.
+    // Either way sale_invoice.signature ends up populated, so the NEXT invoice's
+    // get-default-signature.php lookup (latest non-null signature for this tenant)
+    // keeps picking up the most recently used signature automatically.
 if ($status === 'Posted' || $status === 'Draft') {
-    if (!empty($input['signature']) && is_string($input['signature']) && strpos($input['signature'], 'data:image') === 0) {
-        $signatureFileName = saveInvoiceSignature($input['signature'], $tenant_id, $invoice_id);
-        if ($signatureFileName) {
+    if (!empty($input['signature']) && is_string($input['signature'])) {
+        if (strpos($input['signature'], 'data:image') === 0) {
+            $signatureFileName = saveInvoiceSignature($input['signature'], $tenant_id, $invoice_id);
+            if ($signatureFileName) {
+                $pdo->prepare("UPDATE sale_invoice SET signature = ? WHERE id = ?")
+                    ->execute([$signatureFileName, $invoice_id]);
+            }
+        } else {
+            // Re-using an existing signature filename (tenant default) — just reference it.
             $pdo->prepare("UPDATE sale_invoice SET signature = ? WHERE id = ?")
-                ->execute([$signatureFileName, $invoice_id]);
+                ->execute([$input['signature'], $invoice_id]);
         }
     }
 }

@@ -483,11 +483,12 @@ const invoiceSettingCheckboxes = [
         setupPaymentMethodListener();
         setupSplitPaymentToggle();
 
-        if (isEditMode) {
+               if (isEditMode) {
             loadInvoiceData(editId);
         } else {
             // Add first row after data is loaded
             addRowDynamic();
+            loadDefaultSignature();
         }
     });
     }); // end outer loadCompanies promise
@@ -3768,10 +3769,20 @@ const invoiceSettingCheckboxes = [
         updatePreviousBalanceDisplay();
         hideBalanceNotification();
 
-        ['extraDiscount1Percent','extraDiscount1Amount','extraDiscount2Percent','extraDiscount2Amount'].forEach(id => {
+             ['extraDiscount1Percent','extraDiscount1Amount','extraDiscount2Percent','extraDiscount2Amount'].forEach(id => {
             const el = document.getElementById(id);
             if (el) el.value = '0';
         });
+
+        // Reset signature state and reload the tenant default for the fresh invoice
+        currentSignatureDataUrl = null;
+        existingSignatureUrl = null;
+        const sigDataEl = document.getElementById('signatureData');
+        if (sigDataEl) sigDataEl.value = '';
+        const sigRemovedEl = document.getElementById('signatureRemoved');
+        if (sigRemovedEl) sigRemovedEl.value = '0';
+        hideSignaturePreview();
+        loadDefaultSignature();
 
         // Set default date to today
         const saleDate = document.getElementById('saleDate');
@@ -4417,8 +4428,15 @@ function saveInvoice(status = 'Posted') {
         amountPaid: parseFloat(document.getElementById('amountPaid')?.value) || 0,
         amountPaidAutoFill: document.querySelector('input[name="autoFillAmountPaid"]:checked')?.value || 'yes',
         remainingBalance: parseFloat(document.getElementById('remainingBalance')?.value) || 0,
-        remarks: document.getElementById('remarks')?.value,
-        signature: currentSignatureDataUrl || null,
+               remarks: document.getElementById('remarks')?.value,
+        // If the user cropped a brand-new signature this session, send that (base64).
+        // Otherwise, if a tenant default signature was auto-loaded and not removed,
+        // resend its filename so this invoice's signature column stays populated —
+        // that's what keeps get-default-signature.php picking it up for the NEXT invoice.
+        signature: currentSignatureDataUrl
+            || (defaultSignatureFilename && document.getElementById('signatureRemoved')?.value !== '1'
+                ? defaultSignatureFilename
+                : null),
 removeSignature: document.getElementById('signatureRemoved')?.value === '1',
         status: status,
         items: [],
@@ -7034,6 +7052,7 @@ async function quickAddCustomer() {
 let signatureCropper = null;
 let currentSignatureDataUrl = null; // new cropped PNG (base64) — sirf tab set hoga jab user naya upload/crop kare
 let existingSignatureUrl = null;    // edit mode mein pehle se saved signature ka URL
+let defaultSignatureFilename = null; // tenant ka last-used signature filename (auto-loaded on new invoice)
 
 function initSignatureUpload() {
     const uploadBtn   = document.getElementById('signatureUploadBtn');
@@ -7119,6 +7138,24 @@ function showSignaturePreview(src) {
 function hideSignaturePreview() {
     const wrap = document.getElementById('signaturePreviewWrap');
     if (wrap) wrap.style.display = 'none';
+}
+
+// Loads the tenant's most-recently-used signature (see
+// get-default-signature.php) and pre-fills it as the preview on a brand-new
+// invoice, so the user only has to upload a signature once — every new
+// invoice after that reuses it automatically until they crop a different one.
+async function loadDefaultSignature() {
+    try {
+        const response = await fetch('../../../../server/api/sale/pos_invoice/get-default-signature.php');
+        const data = await response.json();
+        if (data.success && data.signature) {
+            defaultSignatureFilename = data.signature;
+            existingSignatureUrl = `../../../assets/uploads/signatures/${data.signature}`;
+            showSignaturePreview(existingSignatureUrl);
+        }
+    } catch (error) {
+        console.error('Error loading default signature:', error);
+    }
 }
 
 document.addEventListener('DOMContentLoaded', initSignatureUpload);
