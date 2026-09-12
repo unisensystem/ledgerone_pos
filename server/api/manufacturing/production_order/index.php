@@ -12,6 +12,7 @@ header('Access-Control-Allow-Methods: GET, POST');
 header('Access-Control-Allow-Headers: Content-Type');
 
 require_once '../../../../includes/connection.php';
+require_once '../../../../includes/activity-logger.php';
 
 // Clear any output buffer
 ob_end_clean();
@@ -227,6 +228,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $stmt->execute([$po_id, $mat['material_id'], $mat['required_qty'], $mat['uom_id']]);
         }
         
+        logActivity(
+            $pdo, $tenant_id, $user_id, 'create', 'Production Order', $po_id, $order_no,
+            "Created production order \"$order_no\", qty $order_qty",
+            null,
+            ['order_no' => $order_no, 'product_id' => $product_id, 'bom_id' => $bom_id, 'branch_id' => $branch_id, 'machine_id' => $machine_id, 'order_qty' => $order_qty, 'status' => 'Planned']
+        );
+
         $pdo->commit();
         echo json_encode(['success' => true, 'message' => 'Production Order created successfully', 'po_id' => $po_id]);
     } catch (Exception $e) {

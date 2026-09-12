@@ -1,5 +1,6 @@
 <?php
 require_once '../../../../includes/connection.php';
+require_once '../../../../includes/activity-logger.php';
 
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
@@ -109,6 +110,12 @@ try {
             ]);
         }
         
+        logActivity(
+            $pdo, $tenant_id, $user_id, 'delete', 'Cost Adjustment', $adj['id'], "Order #{$adj['production_order_id']} / Product #{$adj['product_id']}",
+            "Reversed cost adjustment for order #{$adj['production_order_id']}, product #{$adj['product_id']}: reverted to unit cost " . number_format($adj['old_unit_cost'], 2),
+            $adj, null
+        );
+
         $reversed_count++;
     }
     

@@ -1,5 +1,6 @@
 <?php
 require_once '../../../../includes/connection.php';
+require_once '../../../../includes/activity-logger.php';
 
 header('Content-Type: application/json');
 
@@ -167,6 +168,13 @@ try {
             $user_id
         ]);
     }
+
+    logActivity(
+        $pdo, $tenant_id, $user_id, 'create', 'Delivery Chalan', $chalanId, $chalanNo,
+        "Created delivery chalan \"$chalanNo\" from sale invoice #$invoiceId",
+        null,
+        ['chalan_no' => $chalanNo, 'customer_id' => $invoice['customer_id'], 'status' => $statusValue, 'source_sale_invoice_id' => $invoiceId]
+    );
 
     $pdo->commit();
 

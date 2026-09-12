@@ -10,6 +10,7 @@ header('Access-Control-Allow-Methods: GET, POST');
 header('Access-Control-Allow-Headers: Content-Type');
 
 require_once '../../../../includes/connection.php';
+require_once '../../../../includes/activity-logger.php';
 
 ob_end_clean();
 
@@ -521,7 +522,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 WHERE id = ? AND tenant_id = ?
             ");
             $poUpdateStmt->execute([$po_id, $tenant_id]);
-            
+
+            logActivity(
+                $pdo, $tenant_id, $user_id, 'create', 'WIP Management', $wipHeaderId, $wipNumber,
+                "Issued material #$material_id to WIP \"$wipNumber\": qty $issue_qty @ " . number_format($unit_cost, 2),
+                null,
+                ['wip_number' => $wipNumber, 'production_order_id' => $po_id, 'branch_id' => $branch_id, 'material_id' => $material_id, 'issue_qty' => $issue_qty, 'unit_cost' => $unit_cost]
+            );
+
             $pdo->commit();
             echo json_encode(['success' => true, 'message' => 'Material added successfully']);
         } catch (Exception $e) {
@@ -623,13 +631,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
             }
             
+            $wipNumStmt = $pdo->prepare("SELECT wip_number, issue_date as old_issue_date, total_cost as old_total_cost FROM work_in_progress WHERE id = ? AND tenant_id = ?");
+            $wipNumStmt->execute([$wip_id, $tenant_id]);
+            $wipMeta = $wipNumStmt->fetch(PDO::FETCH_ASSOC);
+
             $headerStmt = $pdo->prepare("
                 UPDATE work_in_progress
                 SET issue_date = ?, total_items = ?, total_cost = ?
                 WHERE id = ? AND tenant_id = ?
             ");
             $headerStmt->execute([$issue_date, $totalItems, $totalCost, $wip_id, $tenant_id]);
-            
+
+            if ($wipMeta) {
+                $changeDescriptions = buildChangeDescription(
+                    ['issue_date' => $wipMeta['old_issue_date'], 'total_cost' => $wipMeta['old_total_cost']],
+                    ['issue_date' => $issue_date, 'total_cost' => $totalCost],
+                    ['issue_date' => 'Issue Date', 'total_cost' => 'Total Cost']
+                );
+                $editDescription = !empty($changeDescriptions)
+                    ? "Updated WIP \"{$wipMeta['wip_number']}\": " . implode('; ', $changeDescriptions)
+                    : "Updated WIP \"{$wipMeta['wip_number']}\" - no tracked field changes";
+                logActivity($pdo, $tenant_id, $user_id, 'update', 'WIP Management', $wip_id, $wipMeta['wip_number'], $editDescription,
+                    ['issue_date' => $wipMeta['old_issue_date'], 'total_cost' => $wipMeta['old_total_cost']],
+                    ['issue_date' => $issue_date, 'total_cost' => $totalCost]
+                );
+            }
+
             $pdo->commit();
             echo json_encode(['success' => true, 'message' => 'WIP updated successfully']);
         } catch (Exception $e) {
@@ -718,7 +745,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 WHERE id = ?
             ");
             $updateHeaderStmt->execute([$totals['total_items'], $totals['total_cost'], $wip_id]);
-            
+
+            $wipNumStmt = $pdo->prepare("SELECT wip_number FROM work_in_progress WHERE id = ?");
+            $wipNumStmt->execute([$wip_id]);
+            $wipNum = $wipNumStmt->fetchColumn();
+            if ($item) {
+                logActivity(
+                    $pdo, $tenant_id, $user_id, 'delete', 'WIP Management', $wip_id, $wipNum,
+                    "Removed material #{$item['material_id']} (qty {$item['issue_qty']}) from WIP \"$wipNum\"",
+                    $item, null
+                );
+            }
+
             $pdo->commit();
             echo json_encode(['success' => true, 'message' => 'Item deleted successfully']);
         } catch (Exception $e) {
@@ -740,8 +778,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         
         try {
+            // Grab full WIP header before deletion, for the Activity Log
+            $wipHeaderStmt = $pdo->prepare("SELECT * FROM work_in_progress WHERE id = ? AND tenant_id = ?");
+            $wipHeaderStmt->execute([$wip_id, $tenant_id]);
+            $wipHeaderRow = $wipHeaderStmt->fetch(PDO::FETCH_ASSOC);
+            if (!$wipHeaderRow) {
+                http_response_code(404);
+                echo json_encode(['success' => false, 'message' => 'WIP not found']);
+                exit;
+            }
+
             $pdo->beginTransaction();
-            
+
             // Get WIP details
             $wipStmt = $pdo->prepare("
                 SELECT wip.branch_id, wip.production_order_id, po.product_id as wip_product_id, wip.issue_date
@@ -751,7 +799,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             ");
             $wipStmt->execute([$wip_id]);
             $wipData = $wipStmt->fetch(PDO::FETCH_ASSOC);
-            
+
             // Get all items
             $itemsStmt = $pdo->prepare("SELECT * FROM work_in_progress_items WHERE work_in_progress_id = ?");
             $itemsStmt->execute([$wip_id]);
@@ -813,7 +861,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $revertStmt = $pdo->prepare("UPDATE production_orders SET status = 'Planned', updated_at = NOW() WHERE id = ? AND tenant_id = ?");
                 $revertStmt->execute([$wipData['production_order_id'], $tenant_id]);
             }
-            
+
+            logActivity(
+                $pdo, $tenant_id, $user_id, 'delete', 'WIP Management', $wip_id, $wipHeaderRow['wip_number'],
+                "Deleted WIP \"{$wipHeaderRow['wip_number']}\", total cost " . number_format($wipHeaderRow['total_cost'], 2),
+                $wipHeaderRow, null
+            );
+
             $pdo->commit();
             echo json_encode(['success' => true, 'message' => 'WIP deleted successfully']);
         } catch (Exception $e) {
@@ -996,7 +1050,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             WHERE id = ? AND tenant_id = ?
         ");
         $poStmt->execute([$po_id, $tenant_id]);
-        
+
+        logActivity(
+            $pdo, $tenant_id, $user_id, 'create', 'WIP Management', $wipHeaderId, $wipNumber,
+            "Issued " . count($materials) . " material(s) to WIP \"$wipNumber\", total cost " . number_format($totalCost, 2),
+            null,
+            ['wip_number' => $wipNumber, 'production_order_id' => $po_id, 'branch_id' => $branch_id, 'machine_id' => $machine_id, 'total_cost' => $totalCost]
+        );
+
         $pdo->commit();
         echo json_encode(['success' => true, 'message' => 'Materials issued successfully', 'wip_id' => $wipHeaderId]);
     } catch (Exception $e) {

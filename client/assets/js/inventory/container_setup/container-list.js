@@ -214,12 +214,15 @@ function closeDeleteModal() {
     currentDeleteId = null;
 }
 
+let currentViewContainer = null;
+
 function openViewModal(container) {
+    currentViewContainer = container;
     document.getElementById('viewContainerCode').textContent = container.container_code;
     document.getElementById('viewContainerName').textContent = container.container_name;
     document.getElementById('viewStatus').textContent = container.is_active ? 'Active' : 'Inactive';
     document.getElementById('viewCreatedDate').textContent = new Date(container.created_at).toLocaleDateString();
-    
+
     document.getElementById('viewModal').classList.add('show');
     document.getElementById('viewModal').style.display = 'flex';
 }
@@ -227,6 +230,11 @@ function openViewModal(container) {
 function closeViewModal() {
     document.getElementById('viewModal').classList.remove('show');
     document.getElementById('viewModal').style.display = 'none';
+}
+
+function viewContainerActivityHistory() {
+    if (!currentViewContainer) return;
+    openActivityHistory('Container', currentViewContainer.id, currentViewContainer.container_code);
 }
 
 async function handleAddSubmit(e) {

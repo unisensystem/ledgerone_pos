@@ -31,12 +31,20 @@ $reasonLabels = [
 ];
 
 try {
+    $page = max(1, intval($_GET['page'] ?? 1));
+    $limit = max(1, min(200, intval($_GET['limit'] ?? 25)));
+    $offset = ($page - 1) * $limit;
+
+    $countStmt = $pdo->prepare("SELECT COUNT(*) FROM login_attempts WHERE tenant_id = ? AND attempt_status IN ('failed', 'locked')");
+    $countStmt->execute([$tenant_id]);
+    $total = (int)$countStmt->fetchColumn();
+
     $stmt = $pdo->prepare("
         SELECT attempted_at, ip_address, email, username, failure_reason, attempt_status
         FROM login_attempts
         WHERE tenant_id = ? AND attempt_status IN ('failed', 'locked')
         ORDER BY attempted_at DESC
-        LIMIT 200
+        LIMIT $limit OFFSET $offset
     ");
     $stmt->execute([$tenant_id]);
     $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -51,7 +59,16 @@ try {
         ];
     }, $rows);
 
-    echo json_encode(['success' => true, 'data' => $data]);
+    echo json_encode([
+        'success' => true,
+        'data' => $data,
+        'pagination' => [
+            'current_page' => $page,
+            'total_pages' => max(1, ceil($total / $limit)),
+            'total_records' => $total,
+            'limit' => $limit
+        ]
+    ]);
 } catch (Exception $e) {
     http_response_code(500);
     echo json_encode(['success' => false, 'message' => 'Database error']);

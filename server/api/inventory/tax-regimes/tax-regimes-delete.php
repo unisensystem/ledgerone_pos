@@ -1,5 +1,6 @@
 <?php
 require_once '../../../../includes/connection.php';
+require_once '../../../../includes/activity-logger.php';
 
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
@@ -30,9 +31,9 @@ try {
         exit;
     }
     
-    $stmt = $pdo->prepare("SELECT tenant_id FROM tax_regimes WHERE id = ?");
+    $stmt = $pdo->prepare("SELECT * FROM tax_regimes WHERE id = ?");
     $stmt->execute([$regime_id]);
-    $taxRegime = $stmt->fetch();
+    $taxRegime = $stmt->fetch(PDO::FETCH_ASSOC);
     
     if (!$taxRegime) {
         echo json_encode(['success' => false, 'message' => 'Tax regime not found']);
@@ -52,7 +53,13 @@ try {
     
     $stmt = $pdo->prepare("DELETE FROM tax_regimes WHERE id = ? AND tenant_id = ?");
     $stmt->execute([$regime_id, $tenant_id]);
-    
+
+    logActivity(
+        $pdo, $tenant_id, $user_id, 'delete', 'Tax Regime', $regime_id, $taxRegime['regime_code'],
+        "Deleted tax regime \"{$taxRegime['regime_name']}\" ({$taxRegime['regime_code']})",
+        $taxRegime, null
+    );
+
     echo json_encode([
         'success' => true,
         'message' => 'Tax regime deleted successfully'

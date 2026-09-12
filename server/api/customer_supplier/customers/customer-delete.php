@@ -1,5 +1,6 @@
 <?php
 require_once '../../../../includes/connection.php';
+require_once '../../../../includes/activity-logger.php';
 
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
@@ -43,10 +44,10 @@ try {
     $pdo->beginTransaction();
 
     foreach ($customer_ids as $customer_id) {
-        // Check if customer exists and belongs to tenant
-        $stmt = $pdo->prepare("SELECT customer_name FROM customers WHERE id = ? AND tenant_id = ?");
+        // Check if customer exists and belongs to tenant (grab full row for the Activity Log)
+        $stmt = $pdo->prepare("SELECT * FROM customers WHERE id = ? AND tenant_id = ?");
         $stmt->execute([$customer_id, $tenant_id]);
-        $customer = $stmt->fetch();
+        $customer = $stmt->fetch(PDO::FETCH_ASSOC);
 
         if (!$customer) {
             $notFoundIds[] = $customer_id;
@@ -68,6 +69,12 @@ try {
         // Hard delete customer
         $stmt = $pdo->prepare("DELETE FROM customers WHERE id = ? AND tenant_id = ?");
         $stmt->execute([$customer_id, $tenant_id]);
+
+        logActivity(
+            $pdo, $tenant_id, $user_id, 'delete', 'Customer', $customer_id, $customer['customer_code'],
+            "Deleted customer \"{$customer['customer_name']}\" ({$customer['customer_code']})",
+            $customer, null
+        );
 
         $deletedNames[] = $customer['customer_name'];
     }

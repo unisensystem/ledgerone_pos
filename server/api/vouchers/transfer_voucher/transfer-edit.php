@@ -1,5 +1,6 @@
 <?php
 require_once '../../../../includes/connection.php';
+require_once '../../../../includes/activity-logger.php';
 header('Content-Type: application/json');
 if (session_status() == PHP_SESSION_NONE) session_start();
 $user_id   = $_SESSION['user_id']   ?? null;
@@ -55,8 +56,8 @@ try {
         $attachment = $keep_attachment; // keep existing
     }
 
-    // Get current voucher
-    $stmt = $pdo->prepare("SELECT payment_method_id, from_type, to_type FROM transfer_voucher WHERE id = ? AND tenant_id = ?");
+    // Get current voucher (full row for the Activity Log diff)
+    $stmt = $pdo->prepare("SELECT voucher_number, voucher_date, company_id, payment_method_id, from_type, to_type, amount, currency_id, bank_account_id, cheque_no, slip_no, description FROM transfer_voucher WHERE id = ? AND tenant_id = ?");
     $stmt->execute([$voucher_id, $tenant_id]);
     $current = $stmt->fetch(PDO::FETCH_ASSOC);
     if (!$current) { echo json_encode(['success' => false, 'error' => 'Voucher not found']); exit(); }
@@ -133,6 +134,29 @@ try {
     } else {
         $ledger->execute([$tenant_id, $voucher_id, $to_account_id, $voucher_date, $desc, 0.00, $amount]); // CR TO
     }
+
+    $newVoucher = [
+        'voucher_number' => $current['voucher_number'],
+        'voucher_date' => $voucher_date,
+        'company_id' => $company_id,
+        'payment_method_id' => $payment_method_id,
+        'from_type' => $current['from_type'],
+        'to_type' => $current['to_type'],
+        'amount' => $amount,
+        'currency_id' => $currency_id,
+        'bank_account_id' => $bank_account_id,
+        'cheque_no' => $cheque_no,
+        'slip_no' => $slip_no,
+        'description' => $description
+    ];
+    $changeDescriptions = buildChangeDescription($current, $newVoucher, [
+        'voucher_date' => 'Voucher Date', 'amount' => 'Amount', 'payment_method_id' => 'Payment Method',
+        'bank_account_id' => 'Bank Account', 'cheque_no' => 'Cheque No', 'slip_no' => 'Slip No', 'description' => 'Description'
+    ]);
+    $editDescription = !empty($changeDescriptions)
+        ? "Updated transfer voucher \"{$current['voucher_number']}\": " . implode('; ', $changeDescriptions)
+        : "Updated transfer voucher \"{$current['voucher_number']}\" - no tracked field changes";
+    logActivity($pdo, $tenant_id, $user_id, 'update', 'Transfer Voucher', $voucher_id, $current['voucher_number'], $editDescription, $current, $newVoucher);
 
     $pdo->commit();
     echo json_encode(['success' => true, 'message' => 'Transfer voucher updated successfully']);

@@ -1,5 +1,6 @@
 <?php
 require_once '../../../../includes/connection.php';
+require_once '../../../../includes/activity-logger.php';
 
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
@@ -37,13 +38,19 @@ try {
             throw new Exception("$field is required");
         }
     }
-    
+
+    // account_type is a lowercase ENUM in the DB — normalize so re-reading it back
+    // for comparison (Activity Log diff) never mismatches on casing alone.
+    if (isset($input['accountType'])) {
+        $input['accountType'] = strtolower($input['accountType']);
+    }
+
     $pdo->beginTransaction();
     
     // Get current data
-    $stmt = $pdo->prepare("SELECT opening_balance, balance_type, account_id, bank_logo_path FROM bank_accounts WHERE id = ? AND tenant_id = ?");
+    $stmt = $pdo->prepare("SELECT bank_name, account_number, account_title, account_type, currency_id, branch_name, branch_code, branch_city, branch_state, iban, swift_code, contact_person, contact_number, email, opening_balance, balance_type, is_active, account_id, bank_logo_path FROM bank_accounts WHERE id = ? AND tenant_id = ?");
     $stmt->execute([$id, $tenant_id]);
-    $currentAccount = $stmt->fetch();
+    $currentAccount = $stmt->fetch(PDO::FETCH_ASSOC);
     
     if (!$currentAccount) {
         throw new Exception('Bank account not found');
@@ -188,8 +195,31 @@ try {
         }
     }
     
+    $newAccountValues = [
+        'bank_name' => $input['bankName'], 'account_number' => $input['accountNumber'],
+        'account_title' => $input['accountTitle'] ?? null, 'account_type' => $input['accountType'],
+        'currency_id' => $input['currency'] ?? 'PKR', 'branch_name' => $input['branchName'],
+        'branch_code' => $input['branchCode'] ?? null, 'branch_city' => $input['branchCity'],
+        'branch_state' => $input['branchState'], 'iban' => $input['iban'] ?? null,
+        'swift_code' => $input['swiftCode'] ?? null, 'contact_person' => $input['contactPerson'] ?? null,
+        'contact_number' => $input['contactNumber'] ?? null, 'email' => $input['email'] ?? null,
+        'opening_balance' => $newBalance, 'balance_type' => $newBalanceType,
+        'is_active' => $input['isActive'] === 'true' ? 1 : 0,
+    ];
+    $changeDescriptions = buildChangeDescription($currentAccount, $newAccountValues, [
+        'bank_name' => 'Bank Name', 'account_number' => 'Account Number', 'account_title' => 'Account Title',
+        'account_type' => 'Account Type', 'currency_id' => 'Currency', 'branch_name' => 'Branch Name',
+        'branch_city' => 'Branch City', 'branch_state' => 'Branch State', 'iban' => 'IBAN',
+        'swift_code' => 'SWIFT Code', 'contact_person' => 'Contact Person', 'contact_number' => 'Contact Number',
+        'email' => 'Email', 'opening_balance' => 'Opening Balance', 'balance_type' => 'Balance Type', 'is_active' => 'Active'
+    ]);
+    $editDescription = !empty($changeDescriptions)
+        ? "Updated bank account \"$accountName\": " . implode('; ', $changeDescriptions)
+        : "Updated bank account \"$accountName\" - no tracked field changes";
+    logActivity($pdo, $tenant_id, $user_id, 'update', 'Bank Account', $id, $accountName, $editDescription, $currentAccount, $newAccountValues);
+
     $pdo->commit();
-    
+
     echo json_encode(['success' => true, 'message' => 'Bank account updated successfully']);
     
 } catch (Exception $e) {

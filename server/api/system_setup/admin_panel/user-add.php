@@ -1,5 +1,6 @@
 <?php
 require_once '../../../../includes/connection.php';
+require_once '../../../../includes/activity-logger.php';
 
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
@@ -103,9 +104,16 @@ try {
         $employee_id
     ]);
     
-    $user_id = $pdo->lastInsertId();
-    
-    echo json_encode(['success' => true, 'message' => 'User created successfully', 'user_id' => $user_id]);
+    $newUserId = $pdo->lastInsertId();
+
+    logActivity(
+        $pdo, $tenant_id, $user_id, 'create', 'User', $newUserId, $_POST['email'],
+        "Created user \"{$_POST['full_name']}\" ({$_POST['email']})",
+        null,
+        ['full_name' => $_POST['full_name'], 'email' => $_POST['email'], 'phone' => $_POST['phone'] ?? null, 'employee_id' => $employee_id]
+    );
+
+    echo json_encode(['success' => true, 'message' => 'User created successfully', 'user_id' => $newUserId]);
 } catch (Exception $e) {
     http_response_code(500);
     echo json_encode(['success' => false, 'message' => 'Database error']);

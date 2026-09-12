@@ -11,6 +11,7 @@ header('Access-Control-Allow-Methods: GET, POST');
 header('Access-Control-Allow-Headers: Content-Type');
 
 require_once '../../../../includes/connection.php';
+require_once '../../../../includes/activity-logger.php';
 
 ob_end_clean();
 
@@ -274,6 +275,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $glStmt->execute([$tenant_id, $wastage_id, 117, $wastage_date, 'Finished good wastage: ' . $wastage_no, 0, $fgTotalCost]);
             }
         }
+
+        logActivity(
+            $pdo, $tenant_id, $user_id, 'create', 'Production Wastage', $wastage_id, $wastage_no,
+            "Created wastage entry \"$wastage_no\" for order #$production_order_id (" . count($items) . " material(s)" . ($fg_wastage_qty > 0 ? ", FG qty $fg_wastage_qty" : "") . ")",
+            null,
+            ['wastage_no' => $wastage_no, 'production_order_id' => $production_order_id, 'wastage_date' => $wastage_date, 'wastage_type' => $wastage_type, 'fg_wastage_qty' => $fg_wastage_qty, 'remarks' => $remarks]
+        );
 
         $pdo->commit();
         echo json_encode(['success' => true, 'message' => 'Wastage entry saved successfully', 'wastage_id' => $wastage_id]);

@@ -1,6 +1,7 @@
 <?php
 header('Content-Type: application/json');
 require_once '../../../../includes/connection.php';
+require_once '../../../../includes/activity-logger.php';
 
 if (session_status() == PHP_SESSION_NONE) {
     session_start();
@@ -44,12 +45,13 @@ try {
         throw new Exception('Container code and name cannot be empty');
     }
 
-    // Verify container exists for this tenant
-    $verifyQuery = "SELECT id FROM containers WHERE id = ? AND tenant_id = ?";
+    // Verify container exists for this tenant (grab old values for the Activity Log)
+    $verifyQuery = "SELECT container_code, container_name, is_active FROM containers WHERE id = ? AND tenant_id = ?";
     $verifyStmt = $pdo->prepare($verifyQuery);
     $verifyStmt->execute([$id, $tenant_id]);
+    $oldContainer = $verifyStmt->fetch(PDO::FETCH_ASSOC);
 
-    if ($verifyStmt->rowCount() === 0) {
+    if (!$oldContainer) {
         throw new Exception('Container not found');
     }
 
@@ -68,6 +70,15 @@ try {
     if (!$stmt->execute([$container_code, $container_name, $is_active, $id, $tenant_id])) {
         throw new Exception('Failed to update container');
     }
+
+    $newContainer = ['container_code' => $container_code, 'container_name' => $container_name, 'is_active' => $is_active];
+    $changeDescriptions = buildChangeDescription($oldContainer, $newContainer, [
+        'container_code' => 'Code', 'container_name' => 'Name', 'is_active' => 'Active'
+    ]);
+    $editDescription = !empty($changeDescriptions)
+        ? "Updated container \"$container_name\" ($container_code): " . implode('; ', $changeDescriptions)
+        : "Updated container \"$container_name\" ($container_code) - no tracked field changes";
+    logActivity($pdo, $tenant_id, $user_id, 'update', 'Container', $id, $container_code, $editDescription, $oldContainer, $newContainer);
 
     echo json_encode([
         'success' => true,

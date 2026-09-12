@@ -1,5 +1,6 @@
 <?php
 require_once '../../../../includes/connection.php';
+require_once '../../../../includes/activity-logger.php';
 
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
@@ -33,10 +34,11 @@ if (!$invoice_id) {
 try {
     $pdo->beginTransaction();
 
-    // Verify it exists
-    $checkStmt = $pdo->prepare("SELECT id FROM delivery_chalan WHERE id = ? AND tenant_id = ?");
+    // Verify it exists (grab full row for the Activity Log)
+    $checkStmt = $pdo->prepare("SELECT * FROM delivery_chalan WHERE id = ? AND tenant_id = ?");
     $checkStmt->execute([$invoice_id, $tenant_id]);
-    if (!$checkStmt->fetchColumn()) {
+    $chalanRow = $checkStmt->fetch(PDO::FETCH_ASSOC);
+    if (!$chalanRow) {
         throw new Exception('Delivery Chalan not found');
     }
 
@@ -51,6 +53,12 @@ try {
     if ($stmt->rowCount() === 0) {
         throw new Exception('Delivery Chalan not found or already deleted');
     }
+
+    logActivity(
+        $pdo, $tenant_id, $user_id, 'delete', 'Delivery Chalan', $invoice_id, $chalanRow['chalan_no'],
+        "Deleted delivery chalan \"{$chalanRow['chalan_no']}\"",
+        $chalanRow, null
+    );
 
     $pdo->commit();
 

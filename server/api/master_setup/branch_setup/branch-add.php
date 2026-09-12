@@ -1,5 +1,6 @@
 <?php
 require_once '../../../../includes/connection.php';
+require_once '../../../../includes/activity-logger.php';
 
 session_start();
 header('Content-Type: application/json');
@@ -81,10 +82,19 @@ try {
     ]);
     
     if ($result) {
+        $newBranchId = $pdo->lastInsertId();
+
+        logActivity(
+            $pdo, $tenant_id, $user_id, 'create', 'Branch', $newBranchId, $branch_code,
+            "Created branch \"{$input['branch_name']}\" ($branch_code)",
+            null,
+            ['branch_code' => $branch_code, 'branch_name' => $input['branch_name'], 'branch_type' => $input['branch_type'], 'company_id' => $input['company_id'], 'is_active' => $input['is_active'] ?? 1]
+        );
+
         echo json_encode([
             'success' => true,
             'message' => 'Branch created successfully',
-            'branch_id' => $pdo->lastInsertId(),
+            'branch_id' => $newBranchId,
             'branch_code' => $branch_code
         ]);
     } else {

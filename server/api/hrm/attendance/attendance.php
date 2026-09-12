@@ -3,6 +3,7 @@ ini_set('display_errors', 1);
 error_reporting(E_ALL);
 session_start();
 require_once '../../../../includes/connection.php';
+require_once '../../../../includes/activity-logger.php';
 
 header('Content-Type: application/json');
 
@@ -54,25 +55,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     
     // Check if record exists for today
     $checkStmt = $pdo->prepare("
-        SELECT id FROM attendance 
+        SELECT id, status as old_status, notes as old_notes FROM attendance
         WHERE tenant_id = ? AND employee_id = ? AND attendance_date = ?
     ");
     $checkStmt->execute([$tenant_id, $employee_id, $date]);
     $existing = $checkStmt->fetch(PDO::FETCH_ASSOC);
-    
+
     if ($existing && $is_checkout) {
         // Update existing record with check-out time
         $check_out_datetime = $date . ' ' . $check_out . ':00';
         $stmt = $pdo->prepare("
-            UPDATE attendance 
+            UPDATE attendance
             SET check_out_time = ?, status = ?, notes = ?
             WHERE id = ?
         ");
-        
+
         $result = $stmt->execute([$check_out_datetime, $status, $notes, $existing['id']]);
         error_log("Check-out update result: " . ($result ? 'success' : 'failed') . " for ID: " . $existing['id']);
-        
+
         if ($result) {
+            logActivity(
+                $pdo, $tenant_id, $user_id, 'update', 'Attendance', $existing['id'], "$employee_id - $date",
+                "Recorded check-out for employee \"$employee_id\" on $date at $check_out (status: $status)",
+                ['status' => $existing['old_status'], 'notes' => $existing['old_notes'], 'check_out_time' => null],
+                ['status' => $status, 'notes' => $notes, 'check_out_time' => $check_out_datetime]
+            );
             echo json_encode(['success' => true, 'message' => 'Check-out saved successfully']);
         } else {
             http_response_code(500);
@@ -85,17 +92,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
             echo json_encode(['success' => false, 'message' => 'Check-in and check-out times are required']);
             exit;
         }
-        
+
         $check_in_datetime = $date . ' ' . $check_in . ':00';
         $check_out_datetime = $date . ' ' . $check_out . ':00';
-        
+
         $stmt = $pdo->prepare("
-            INSERT INTO attendance 
+            INSERT INTO attendance
             (tenant_id, employee_id, check_in_time, check_out_time, attendance_date, status, notes)
             VALUES (?, ?, ?, ?, ?, ?, ?)
         ");
-        
+
         if ($stmt->execute([$tenant_id, $employee_id, $check_in_datetime, $check_out_datetime, $date, $status, $notes])) {
+            $newAttendanceId = $pdo->lastInsertId();
+            logActivity(
+                $pdo, $tenant_id, $user_id, 'create', 'Attendance', $newAttendanceId, "$employee_id - $date",
+                "Recorded attendance for employee \"$employee_id\" on $date: $check_in - $check_out (status: $status)",
+                null,
+                ['employee_id' => $employee_id, 'attendance_date' => $date, 'check_in_time' => $check_in_datetime, 'check_out_time' => $check_out_datetime, 'status' => $status, 'notes' => $notes]
+            );
             echo json_encode(['success' => true, 'message' => 'Attendance saved successfully']);
         } else {
             http_response_code(500);

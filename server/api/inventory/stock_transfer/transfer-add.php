@@ -1,5 +1,6 @@
 <?php
 require_once '../../../../includes/connection.php';
+require_once '../../../../includes/activity-logger.php';
 
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
@@ -125,8 +126,19 @@ try {
         ]);
     }
     
+    logActivity(
+        $pdo, $tenant_id, $user_id, 'create', 'Stock Transfer', $transfer_id, $transfer_code,
+        "Created stock transfer \"$transfer_code\" ($total_items item(s), total " . number_format($total_amount, 2) . ")",
+        null,
+        [
+            'transfer_code' => $transfer_code, 'date' => $date, 'company_id' => $company_id,
+            'from_location_id' => $from_location_id, 'to_location_id' => $to_location_id, 'container_id' => $container_id,
+            'remarks' => $remarks, 'total_amount' => $total_amount, 'total_items' => $total_items, 'items' => $items
+        ]
+    );
+
     $pdo->commit();
-    
+
     echo json_encode([
         'success' => true,
         'message' => 'Stock transfer posted successfully',

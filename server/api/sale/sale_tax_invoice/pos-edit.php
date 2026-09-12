@@ -1,5 +1,6 @@
 <?php
 require_once '../../../../includes/connection.php';
+require_once '../../../../includes/activity-logger.php';
 require_once 'invoice-tax-helper.php';
 
 header('Content-Type: application/json');
@@ -148,6 +149,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
     }
 
     try {
+        // Snapshot old header + items for the Activity Log (before mutation)
+        $stOld = $pdo->prepare("SELECT bill_no, currency_id, sale_date, customer_id, branch_id, total_bill, net_amount, remarks, status FROM sale_invoice WHERE id = ? AND tenant_id = ?");
+        $stOld->execute([$invoice_id, $tenant_id]);
+        $oldInvoice = $stOld->fetch(PDO::FETCH_ASSOC);
+        if (!$oldInvoice) throw new Exception('Sale tax invoice not found');
+
+        $stOldItems = $pdo->prepare("SELECT product_id, uom_id, quantity, sale_price, discount_percent, tax_percent, foc_quantity FROM sale_invoice_items WHERE sale_invoice_id = ? AND tenant_id = ? ORDER BY product_id, uom_id, id");
+        $stOldItems->execute([$invoice_id, $tenant_id]);
+        $oldItems = $stOldItems->fetchAll(PDO::FETCH_ASSOC);
+
         $pdo->beginTransaction();
 
         // Get customer tax info
@@ -499,6 +510,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
                 ]);
             }
         }
+
+        $newInvoice = [
+            'bill_no' => $oldInvoice['bill_no'], 'currency_id' => $input['currencyId'], 'sale_date' => $input['saleDate'],
+            'customer_id' => $input['customerId'], 'branch_id' => $input['branchId'], 'total_bill' => $input['totalBill'],
+            'net_amount' => $input['netAmount'], 'remarks' => $input['remarks'] ?? null, 'status' => $status
+        ];
+        $changeDescriptions = buildChangeDescription($oldInvoice, $newInvoice, [
+            'currency_id' => 'Currency', 'sale_date' => 'Sale Date', 'customer_id' => 'Customer',
+            'branch_id' => 'Branch', 'total_bill' => 'Total Bill', 'net_amount' => 'Net Amount',
+            'remarks' => 'Remarks', 'status' => 'Status'
+        ]);
+        $newItemsFlat = array_map(function ($item) {
+            return [
+                'product_id' => $item['productId'], 'uom_id' => $item['uomId'], 'quantity' => $item['quantity'],
+                'sale_price' => $item['salePrice'], 'discount_percent' => $item['discountPercent'] ?? 0,
+                'tax_percent' => $item['taxPercent'] ?? 0, 'foc_quantity' => $item['focQty'] ?? 0
+            ];
+        }, $input['items']);
+        if (itemsChanged($oldItems, $newItemsFlat, ['product_id', 'uom_id', 'quantity', 'sale_price', 'discount_percent', 'tax_percent', 'foc_quantity'])) {
+            $changeDescriptions[] = 'Items updated';
+        }
+        $editDescription = !empty($changeDescriptions)
+            ? "Updated sale tax invoice \"{$oldInvoice['bill_no']}\": " . implode('; ', $changeDescriptions)
+            : "Updated sale tax invoice \"{$oldInvoice['bill_no']}\" - no tracked field changes";
+        logActivity($pdo, $tenant_id, $user_id, 'update', 'Sale Tax Invoice', $invoice_id, $oldInvoice['bill_no'], $editDescription, $oldInvoice, $newInvoice);
 
         $pdo->commit();
 

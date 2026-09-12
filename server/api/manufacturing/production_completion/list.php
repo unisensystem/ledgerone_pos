@@ -1,5 +1,6 @@
 <?php
 require_once '../../../../includes/connection.php';
+require_once '../../../../includes/activity-logger.php';
 
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
@@ -161,7 +162,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'DELETE') {
             $newStatus = $remainingCount > 0 ? 'In Progress' : 'Planned';
             $stmt = $pdo->prepare("UPDATE production_orders SET status = ?, updated_at = NOW() WHERE id = ?");
             $stmt->execute([$newStatus, $completion['production_order_id']]);
-            
+
+            logActivity(
+                $pdo, $tenant_id, $user_id, 'delete', 'Production Completion', $id, $completion['completion_no'],
+                "Deleted production completion \"{$completion['completion_no']}\", total cost " . number_format($completion['total_cost'], 2),
+                $completion, null
+            );
+
             $pdo->commit();
             echo json_encode(['success' => true, 'message' => 'Completion deleted successfully']);
         } catch (Exception $e) {

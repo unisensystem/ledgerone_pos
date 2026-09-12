@@ -1,5 +1,6 @@
 <?php
 require_once '../../../../includes/connection.php';
+require_once '../../../../includes/activity-logger.php';
 
 header('Content-Type: application/json');
 
@@ -47,8 +48,21 @@ if (!$date || empty($entries)) {
 }
 
 try {
+    // Grab old values before anything changes, for the Activity Log diff
+    $stmt = $pdo->prepare("SELECT voucher_no, company_id, date, description, total_amount, total_items, project_id, vendor_id, type, is_cash_flow FROM expense_voucher WHERE id = ? AND tenant_id = ?");
+    $stmt->execute([$voucher_id, $tenant_id]);
+    $oldVoucher = $stmt->fetch(PDO::FETCH_ASSOC);
+    if (!$oldVoucher) {
+        http_response_code(404);
+        echo json_encode(['error' => 'Voucher not found']);
+        exit();
+    }
+    $stmt = $pdo->prepare("SELECT account_id, cost_center_id, amount, payment_method_id, bank_account_id FROM expense_voucher_line WHERE tenant_id = ? AND voucher_id = ? ORDER BY account_id, id");
+    $stmt->execute([$tenant_id, $voucher_id]);
+    $oldLines = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
     $pdo->beginTransaction();
-    
+
     // Delete existing records
     $stmt = $pdo->prepare("DELETE FROM accounting_ledger WHERE tenant_id = ? AND reference_table = 'expense_voucher' AND reference_id = ?");
     $stmt->execute([$tenant_id, $voucher_id]);
@@ -105,6 +119,36 @@ try {
         }
     }
     
+    $newVoucher = [
+        'voucher_no' => $oldVoucher['voucher_no'],
+        'company_id' => $input['company_id'],
+        'date' => $date,
+        'description' => $description,
+        'total_amount' => $total_amount,
+        'total_items' => $total_items,
+        'project_id' => $project_id,
+        'vendor_id' => $vendor_id,
+        'type' => $type,
+        'is_cash_flow' => $is_cash_flow
+    ];
+    $changeDescriptions = buildChangeDescription($oldVoucher, $newVoucher, [
+        'date' => 'Date', 'description' => 'Description', 'total_amount' => 'Total Amount',
+        'vendor_id' => 'Vendor', 'type' => 'Type'
+    ]);
+    $newLines = array_map(function ($entry) {
+        return [
+            'account_id' => $entry['expense_account_id'], 'cost_center_id' => $entry['cost_center_id'],
+            'amount' => $entry['amount'], 'payment_method_id' => $entry['payment_method_id'], 'bank_account_id' => $entry['bank_account_id']
+        ];
+    }, $entries);
+    if (itemsChanged($oldLines, $newLines, ['account_id', 'cost_center_id', 'amount', 'payment_method_id', 'bank_account_id'])) {
+        $changeDescriptions[] = 'Entries updated';
+    }
+    $editDescription = !empty($changeDescriptions)
+        ? "Updated expense voucher \"{$oldVoucher['voucher_no']}\": " . implode('; ', $changeDescriptions)
+        : "Updated expense voucher \"{$oldVoucher['voucher_no']}\" - no tracked field changes";
+    logActivity($pdo, $tenant_id, $user_id, 'update', 'Expense Voucher', $voucher_id, $oldVoucher['voucher_no'], $editDescription, $oldVoucher, $newVoucher);
+
     $pdo->commit();
     echo json_encode(['success' => true, 'message' => 'Expense voucher updated successfully']);
 } catch (Exception $e) {

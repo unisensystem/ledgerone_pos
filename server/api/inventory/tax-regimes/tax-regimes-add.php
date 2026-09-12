@@ -1,5 +1,6 @@
 <?php
 require_once '../../../../includes/connection.php';
+require_once '../../../../includes/activity-logger.php';
 
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
@@ -70,7 +71,14 @@ try {
     ]);
     
     $regime_id = $pdo->lastInsertId();
-    
+
+    logActivity(
+        $pdo, $tenant_id, $user_id, 'create', 'Tax Regime', $regime_id, $regime_code,
+        "Created tax regime \"$regime_name\" ($regime_code)",
+        null,
+        ['regime_name' => $regime_name, 'regime_code' => $regime_code, 'tax_authority' => $tax_authority, 'tax_base' => $tax_base, 'is_active' => $is_active]
+    );
+
     echo json_encode([
         'success' => true,
         'message' => 'Tax regime added successfully',

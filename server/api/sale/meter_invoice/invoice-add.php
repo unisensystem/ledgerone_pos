@@ -1,5 +1,6 @@
 <?php
 require_once '../../../../includes/connection.php';
+require_once '../../../../includes/activity-logger.php';
 
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
@@ -73,7 +74,14 @@ try {
     ]);
     
     $invoice_id = $pdo->lastInsertId();
-    
+
+    logActivity(
+        $pdo, $tenant_id, $user_id, 'create', 'Meter Invoice', $invoice_id, "Station #{$input['station_id']} - {$input['date']}",
+        "Created meter reading (opening: {$input['opening_reading']}) for station #{$input['station_id']} on {$input['date']}",
+        null,
+        ['station_id' => $input['station_id'], 'branch_id' => $input['branch_id'], 'product_id' => $input['product_id'], 'unit_id' => $input['unit_id'], 'usage_date' => $input['date'], 'opening_reading' => $input['opening_reading']]
+    );
+
     echo json_encode(['success' => true, 'message' => 'Meter opening reading saved successfully', 'invoice_id' => $invoice_id]);
 } catch (Exception $e) {
     http_response_code(500);

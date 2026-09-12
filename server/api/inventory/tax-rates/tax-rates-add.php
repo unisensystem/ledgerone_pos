@@ -1,5 +1,6 @@
 <?php
 require_once '../../../../includes/connection.php';
+require_once '../../../../includes/activity-logger.php';
 
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
@@ -84,7 +85,14 @@ try {
     ]);
     
     $tax_rate_id = $pdo->lastInsertId();
-    
+
+    logActivity(
+        $pdo, $tenant_id, $user_id, 'create', 'Tax Rate', $tax_rate_id, $tax_name,
+        "Created tax rate \"$tax_name\" ($rate_percentage%, $tax_type)",
+        null,
+        ['tax_name' => $tax_name, 'tax_type' => $tax_type, 'transaction_type' => $transaction_type, 'rate_percentage' => $rate_percentage, 'tax_regime_id' => $tax_regime_id, 'is_active' => $is_active]
+    );
+
     echo json_encode([
         'success' => true,
         'message' => 'Tax rate added successfully',

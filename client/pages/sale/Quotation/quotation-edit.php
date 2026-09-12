@@ -1,5 +1,6 @@
 <?php
 require_once '../../../../includes/connection.php';
+require_once '../../../../includes/activity-logger.php';
 
 if (session_status() == PHP_SESSION_NONE) session_start();
 $user_id   = $_SESSION['user_id']   ?? null;
@@ -34,12 +35,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_GET['action'])) {
             $qid = (int)$input['quotation_id'];
 
             // Guard: confirm it exists, belongs to this tenant, and is editable
-            $stChk = $pdo->prepare("SELECT id, status FROM quotations
+            $stChk = $pdo->prepare("SELECT * FROM quotations
                                      WHERE id=? AND tenant_id=? AND is_deleted=0");
             $stChk->execute([$qid, $tid]);
             $existing = $stChk->fetch(PDO::FETCH_ASSOC);
             if (!$existing) throw new Exception('Quotation not found');
             if ($existing['status'] === 'converted') throw new Exception('Cannot edit a converted quotation');
+
+            // Snapshot old items for the Activity Log (table gets deleted+reinserted below)
+            $stOldItems = $pdo->prepare("SELECT product_id, item_code, item_name, description, size, quantity, unit_id, rate, tax_pct, tax_amt, line_total
+                                          FROM quotation_items WHERE quotation_id=? AND tenant_id=? ORDER BY sort_order");
+            $stOldItems->execute([$qid, $tid]);
+            $oldItems = $stOldItems->fetchAll(PDO::FETCH_ASSOC);
 
             // Calculate totals for database
             $itemsSubtotalWithTax = 0;
@@ -128,6 +135,50 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_GET['action'])) {
                     (float)($it['line_total'] ?? 0),
                 ]);
             }
+
+            $newValues = [
+                'quotation_date' => $input['quotation_date'] ?: date('Y-m-d'),
+                'valid_till' => $input['valid_till'] ?: null,
+                'customer_id' => (int)$input['customer_id'],
+                'contact_person' => $input['contact_person'] ?: null,
+                'salesman_id' => !empty($input['salesman_id']) ? (int)$input['salesman_id'] : null,
+                'project_id' => !empty($input['project_id']) ? (int)$input['project_id'] : null,
+                'subject' => $input['subject'] ?: null,
+                'payment_term_id' => !empty($input['payment_term_id']) ? (int)$input['payment_term_id'] : null,
+                'terms_conditions' => $input['terms_conditions'] ?: null,
+                'remarks' => $input['remarks'] ?: null,
+                'footer_note' => $input['footer_note'] ?: null,
+                'party_type' => $input['party_type'] ?: null,
+                'currency_id' => !empty($input['currency_id']) ? (int)$input['currency_id'] : null,
+                'discount_pct' => $discountPct,
+                'invoice_tax_pct' => $invoiceTaxPct,
+                'grand_total' => $grandTotal,
+            ];
+            $changeDescriptions = buildChangeDescription($existing, $newValues, [
+                'quotation_date' => 'Date', 'valid_till' => 'Valid Till', 'customer_id' => 'Customer',
+                'contact_person' => 'Contact Person', 'salesman_id' => 'Salesman', 'project_id' => 'Project',
+                'subject' => 'Subject', 'payment_term_id' => 'Payment Term', 'terms_conditions' => 'Terms & Conditions',
+                'remarks' => 'Remarks', 'footer_note' => 'Footer Note', 'party_type' => 'Party Type',
+                'currency_id' => 'Currency', 'discount_pct' => 'Discount %', 'invoice_tax_pct' => 'Tax %',
+                'grand_total' => 'Grand Total'
+            ]);
+            $newItemsForCompare = array_map(function($it) {
+                return [
+                    'product_id' => $it['product_id'] ?? null, 'item_code' => $it['item_code'] ?? null,
+                    'item_name' => $it['item_name'] ?? '', 'description' => $it['description'] ?? null,
+                    'size' => $it['size'] ?? null, 'quantity' => (float)($it['quantity'] ?? 1),
+                    'unit_id' => $it['unit_id'] ?? null, 'rate' => (float)($it['rate'] ?? 0),
+                    'tax_pct' => (float)($it['tax_pct'] ?? 0), 'tax_amt' => (float)($it['tax_amt'] ?? 0),
+                    'line_total' => (float)($it['line_total'] ?? 0),
+                ];
+            }, $input['items']);
+            if (itemsChanged($oldItems, $newItemsForCompare, ['product_id','item_code','item_name','description','size','quantity','unit_id','rate','tax_pct','tax_amt','line_total'])) {
+                $changeDescriptions[] = 'Item lines updated';
+            }
+            $editDescription = !empty($changeDescriptions)
+                ? "Updated quotation \"{$existing['quotation_number']}\": " . implode('; ', $changeDescriptions)
+                : "Updated quotation \"{$existing['quotation_number']}\" - no tracked field changes";
+            logActivity($pdo, $tid, $uid, 'update', 'Quotation', $qid, $existing['quotation_number'], $editDescription, $existing, $newValues);
 
             $pdo->commit();
             resp(true, [], 'Quotation updated successfully');

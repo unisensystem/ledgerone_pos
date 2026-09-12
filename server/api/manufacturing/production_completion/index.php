@@ -1,5 +1,6 @@
 <?php
 require_once '../../../../includes/connection.php';
+require_once '../../../../includes/activity-logger.php';
 
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
@@ -480,6 +481,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $stmt->execute([$po_id]);
         }
         
+        logActivity(
+            $pdo, $tenant_id, $user_id, 'create', 'Production Completion', $completion_id, $completionNo,
+            "Created production completion \"$completionNo\" for order #$po_id: $totalProducts product(s), qty $totalQuantity, cost " . number_format($totalCost, 2),
+            null,
+            ['completion_no' => $completionNo, 'production_order_id' => $po_id, 'branch_id' => $branch_id, 'complete_date' => $complete_date, 'total_quantity' => $totalQuantity, 'total_cost' => $totalCost]
+        );
+
         $pdo->commit();
         echo json_encode(['success' => true, 'message' => 'Production completed successfully']);
     } catch (Exception $e) {
@@ -714,6 +722,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
             $stmt->execute([$po_id]);
         }
         
+        $newValues = ['branch_id' => $branch_id, 'complete_date' => $complete_date, 'total_quantity' => $totalQuantity, 'total_cost' => $totalCost];
+        $changeDescriptions = buildChangeDescription(
+            ['branch_id' => $existing['branch_id'], 'complete_date' => $existing['complete_date'], 'total_quantity' => $existing['total_quantity'], 'total_cost' => $existing['total_cost']],
+            $newValues,
+            ['branch_id' => 'Branch', 'complete_date' => 'Complete Date', 'total_quantity' => 'Total Quantity', 'total_cost' => 'Total Cost']
+        );
+        $editDescription = !empty($changeDescriptions)
+            ? "Updated production completion \"{$existing['completion_no']}\": " . implode('; ', $changeDescriptions)
+            : "Updated production completion \"{$existing['completion_no']}\" - no tracked field changes";
+        logActivity($pdo, $tenant_id, $user_id, 'update', 'Production Completion', $completion_id, $existing['completion_no'], $editDescription, $existing, $newValues);
+
         $pdo->commit();
         echo json_encode(['success' => true, 'message' => 'Production completion updated successfully']);
     } catch (Exception $e) {

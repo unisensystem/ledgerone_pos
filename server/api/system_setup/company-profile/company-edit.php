@@ -1,5 +1,6 @@
 <?php
 require_once '../../../../includes/connection.php';
+require_once '../../../../includes/activity-logger.php';
 
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
@@ -128,6 +129,11 @@ try {
             }
         }
         
+        // Snapshot old values for the Activity Log (before mutation)
+        $oldStmt = $pdo->prepare("SELECT company_code, company_name, email, phone, mobile_no, website, address, city, is_active FROM companies WHERE id = ? AND tenant_id = ?");
+        $oldStmt->execute([$id, $tenant_id]);
+        $oldCompany = $oldStmt->fetch(PDO::FETCH_ASSOC);
+
         // Build SQL based on whether logo is being updated
         if ($logoFileName) {
             $sql = "UPDATE companies SET 
@@ -206,6 +212,24 @@ try {
         $result = $stmt->execute($params);
         
         if ($result) {
+            if ($oldCompany) {
+                $newCompany = [
+                    'company_code' => $oldCompany['company_code'], 'company_name' => $_POST['company_name'],
+                    'email' => $_POST['email'] ?? null, 'phone' => $_POST['phone'] ?? null, 'mobile_no' => $_POST['mobile_no'] ?? null,
+                    'website' => $_POST['website'] ?? null, 'address' => $_POST['address'] ?? null, 'city' => $_POST['city'] ?? null,
+                    'is_active' => isset($_POST['is_active']) ? ($_POST['is_active'] === 'true' ? 1 : 0) : 1
+                ];
+                $changeDescriptions = buildChangeDescription($oldCompany, $newCompany, [
+                    'company_name' => 'Name', 'email' => 'Email', 'phone' => 'Phone', 'mobile_no' => 'Mobile',
+                    'website' => 'Website', 'address' => 'Address', 'city' => 'City', 'is_active' => 'Active'
+                ]);
+                if ($logoFileName) $changeDescriptions[] = 'Logo updated';
+                $editDescription = !empty($changeDescriptions)
+                    ? "Updated company \"{$_POST['company_name']}\" ({$oldCompany['company_code']}): " . implode('; ', $changeDescriptions)
+                    : "Updated company \"{$_POST['company_name']}\" ({$oldCompany['company_code']}) - no tracked field changes";
+                logActivity($pdo, $tenant_id, $user_id, 'update', 'Company', $id, $oldCompany['company_code'], $editDescription, $oldCompany, $newCompany);
+            }
+
             echo json_encode(['success' => true, 'message' => 'Company updated successfully']);
         } else {
             throw new Exception('Failed to update company');

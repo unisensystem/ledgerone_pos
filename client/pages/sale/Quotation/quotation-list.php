@@ -6,6 +6,7 @@
 //            ../../../../includes/dashboard.php
 // ============================================================
 require_once '../../../../includes/connection.php';
+require_once '../../../../includes/activity-logger.php';
 
 if (session_status() == PHP_SESSION_NONE) session_start();
 $user_id   = $_SESSION['user_id']   ?? null;
@@ -153,7 +154,7 @@ $st->execute();
 
             // Resolve required FK defaults
             // currency_id — use tenant default or first available
-           $stCurr = $pdo->prepare("SELECT id FROM currencies ORDER BY id LIMIT 1");
+           $stCurr = $pdo->prepare("SELECT id FROM ledgerone_public.currencies ORDER BY id LIMIT 1");
 $stCurr->execute();
 $currId = (int)($stCurr->fetchColumn() ?: 1);
 
@@ -236,6 +237,18 @@ $currId = (int)($stCurr->fetchColumn() ?: 1);
     WHERE id = ? AND tenant_id = ?");
 $stUpd->execute([$uid, $qid, $tid]);
 
+            logActivity(
+                $pdo, $tid, $uid, 'update', 'Quotation', $qid, $q['quotation_number'],
+                "Converted quotation \"{$q['quotation_number']}\" to Sale Order \"{$soNo}\"",
+                ['status' => $q['status']], ['status' => 'converted', 'sale_order_number' => $soNo]
+            );
+            logActivity(
+                $pdo, $tid, $uid, 'create', 'Sale Order', $soId, $soNo,
+                "Created sale order \"{$soNo}\" from quotation \"{$q['quotation_number']}\", grand total " . number_format((float)$q['grand_total'], 2),
+                null,
+                ['bill_no' => $soNo, 'customer_id' => (int)$q['customer_id'], 'net_amount' => (float)$q['grand_total'], 'source_quotation' => $q['quotation_number']]
+            );
+
             $pdo->commit();
             resp(true, ['so_number' => $soNo, 'so_id' => $soId], "Quotation converted to Sale Order {$soNo}");
         }
@@ -244,11 +257,19 @@ $stUpd->execute([$uid, $qid, $tid]);
         if ($action === 'reject') {
             if (empty($input['quotation_id'])) throw new Exception('Quotation ID required');
             $qid = (int)$input['quotation_id'];
+            $stQno = $pdo->prepare("SELECT quotation_number, status FROM quotations WHERE id=? AND tenant_id=?");
+            $stQno->execute([$qid, $tid]);
+            $qRow = $stQno->fetch(PDO::FETCH_ASSOC);
             $stR = $pdo->prepare("
                 UPDATE quotations SET status='rejected', updated_by=?, updated_at=NOW()
                 WHERE id=? AND tenant_id=? AND status NOT IN ('converted','rejected') AND is_deleted=0");
             $stR->execute([$uid, $qid, $tid]);
             if (!$stR->rowCount()) throw new Exception('Cannot reject — already converted or rejected');
+            logActivity(
+                $pdo, $tid, $uid, 'update', 'Quotation', $qid, $qRow['quotation_number'] ?? null,
+                "Rejected quotation \"{$qRow['quotation_number']}\"",
+                ['status' => $qRow['status'] ?? null], ['status' => 'rejected']
+            );
             resp(true, [], 'Quotation rejected');
         }
 
@@ -256,11 +277,19 @@ $stUpd->execute([$uid, $qid, $tid]);
         if ($action === 'delete') {
             if (empty($input['quotation_id'])) throw new Exception('Quotation ID required');
             $qid = (int)$input['quotation_id'];
+            $stQno = $pdo->prepare("SELECT * FROM quotations WHERE id=? AND tenant_id=?");
+            $stQno->execute([$qid, $tid]);
+            $qRow = $stQno->fetch(PDO::FETCH_ASSOC);
             $stD = $pdo->prepare("
                 UPDATE quotations SET is_deleted=1, updated_by=?, updated_at=NOW()
                 WHERE id=? AND tenant_id=? AND status != 'converted'");
             $stD->execute([$uid, $qid, $tid]);
             if (!$stD->rowCount()) throw new Exception('Cannot delete a converted quotation');
+            logActivity(
+                $pdo, $tid, $uid, 'delete', 'Quotation', $qid, $qRow['quotation_number'] ?? null,
+                "Deleted quotation \"{$qRow['quotation_number']}\"",
+                $qRow, null
+            );
             resp(true, [], 'Quotation deleted');
         }
 

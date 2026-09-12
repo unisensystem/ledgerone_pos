@@ -1,5 +1,6 @@
 <?php
 require_once '../../../../includes/connection.php';
+require_once '../../../../includes/activity-logger.php';
 
 header('Content-Type: application/json');
 
@@ -41,9 +42,9 @@ if (!$voucher_id) {
 }
 
 try {
-    // Verify voucher exists and belongs to current tenant
+    // Verify voucher exists and belongs to current tenant, grab full old values for the Activity Log
     $checkStmt = $pdo->prepare(
-        "SELECT id, company_id FROM journal_voucher WHERE id = ? AND tenant_id = ?"
+        "SELECT voucher_number, company_id, voucher_date, description, total_debit, total_credit, status FROM journal_voucher WHERE id = ? AND tenant_id = ?"
     );
     $checkStmt->execute([$voucher_id, $tenant_id]);
     $existingVoucher = $checkStmt->fetch(PDO::FETCH_ASSOC);
@@ -53,6 +54,10 @@ try {
         echo json_encode(['error' => 'Voucher not found']);
         exit();
     }
+
+    $oldLinesStmt = $pdo->prepare("SELECT account_id, debit, credit FROM journal_voucher_line WHERE tenant_id = ? AND voucher_id = ? ORDER BY account_id, id");
+    $oldLinesStmt->execute([$tenant_id, $voucher_id]);
+    $oldLines = $oldLinesStmt->fetchAll(PDO::FETCH_ASSOC);
 
     $pdo->beginTransaction();
 
@@ -119,6 +124,30 @@ try {
             ]);
         }
     }
+
+    $newVoucher = [
+        'voucher_number' => $existingVoucher['voucher_number'],
+        'company_id' => $new_company_id,
+        'voucher_date' => $data['date'],
+        'description' => $data['description'],
+        'total_debit' => $data['totalDebit'],
+        'total_credit' => $data['totalCredit'],
+        'status' => $status
+    ];
+    $changeDescriptions = buildChangeDescription($existingVoucher, $newVoucher, [
+        'voucher_date' => 'Date', 'description' => 'Description', 'total_debit' => 'Total Debit',
+        'total_credit' => 'Total Credit', 'status' => 'Status'
+    ]);
+    $newLines = array_map(function ($entry) {
+        return ['account_id' => $entry['accountId'], 'debit' => $entry['debit'], 'credit' => $entry['credit']];
+    }, $data['entries']);
+    if (itemsChanged($oldLines, $newLines, ['account_id', 'debit', 'credit'])) {
+        $changeDescriptions[] = 'Entries updated';
+    }
+    $editDescription = !empty($changeDescriptions)
+        ? "Updated journal voucher \"{$existingVoucher['voucher_number']}\": " . implode('; ', $changeDescriptions)
+        : "Updated journal voucher \"{$existingVoucher['voucher_number']}\" - no tracked field changes";
+    logActivity($pdo, $tenant_id, $user_id, 'update', 'Journal Voucher', $voucher_id, $existingVoucher['voucher_number'], $editDescription, $existingVoucher, $newVoucher);
 
     $pdo->commit();
 

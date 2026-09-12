@@ -1,5 +1,6 @@
 <?php
 require_once '../../../../includes/connection.php';
+require_once '../../../../includes/activity-logger.php';
 
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
@@ -43,10 +44,10 @@ try {
             throw new Exception('Customer ID and name are required');
         }
         
-        // Check if customer exists and belongs to tenant
-        $stmt = $pdo->prepare("SELECT company_id, customer_code FROM customers WHERE id = ? AND tenant_id = ?");
+        // Check if customer exists and belongs to tenant (grab full row for the Activity Log)
+        $stmt = $pdo->prepare("SELECT company_id, customer_code, customer_name, shop_name, address, primary_phone, secondary_phone, email, credit_limit, is_blacklisted FROM customers WHERE id = ? AND tenant_id = ?");
         $stmt->execute([$customer_id, $tenant_id]);
-        $existingCustomer = $stmt->fetch();
+        $existingCustomer = $stmt->fetch(PDO::FETCH_ASSOC);
         if (!$existingCustomer) {
             throw new Exception('Customer not found');
         }
@@ -275,8 +276,27 @@ try {
                 ->execute([$tenant_id, $customer_id]);
         }
         
+        $newCustomer = [
+            'company_id' => $newCompanyId, 'customer_code' => $customerCode, 'customer_name' => trim($input['customerName']),
+            'shop_name' => !empty($input['shopName']) ? trim($input['shopName']) : null,
+            'address' => !empty($input['address']) ? trim($input['address']) : null,
+            'primary_phone' => !empty($input['primaryPhone']) ? trim($input['primaryPhone']) : null,
+            'secondary_phone' => !empty($input['secondaryPhone']) ? trim($input['secondaryPhone']) : null,
+            'email' => !empty($input['email']) ? trim($input['email']) : null,
+            'credit_limit' => floatval($input['balanceLimit'] ?? 0),
+            'is_blacklisted' => isset($input['blacklist']) ? (int)$input['blacklist'] : 0,
+        ];
+        $changeDescriptions = buildChangeDescription($existingCustomer, $newCustomer, [
+            'customer_name' => 'Name', 'shop_name' => 'Shop Name', 'address' => 'Address', 'primary_phone' => 'Primary Phone',
+            'secondary_phone' => 'Secondary Phone', 'email' => 'Email', 'credit_limit' => 'Credit Limit', 'is_blacklisted' => 'Blacklisted'
+        ]);
+        $editDescription = !empty($changeDescriptions)
+            ? "Updated customer \"{$newCustomer['customer_name']}\" ($customerCode): " . implode('; ', $changeDescriptions)
+            : "Updated customer \"{$newCustomer['customer_name']}\" ($customerCode) - no tracked field changes";
+        logActivity($pdo, $tenant_id, $user_id, 'update', 'Customer', $customer_id, $customerCode, $editDescription, $existingCustomer, $newCustomer);
+
         echo json_encode(['success' => true, 'message' => 'Customer updated successfully']);
-        
+
     } else {
         http_response_code(405);
         echo json_encode(['success' => false, 'message' => 'Method not allowed']);

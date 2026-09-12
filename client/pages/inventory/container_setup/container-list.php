@@ -206,11 +206,15 @@ if (!$user_id || !$tenant_id) {
                 </div>
             </div>
             <div class="modal-actions">
+                <button type="button" class="btn btn-secondary" onclick="viewContainerActivityHistory()">
+                    <i class="fas fa-history"></i> Activity History
+                </button>
                 <button type="button" class="btn btn-secondary" onclick="closeViewModal()">Close</button>
             </div>
         </div>
     </div>
 
+    <script src="../../../assets/js/shared/activity-history-widget.js"></script>
     <script src="../../../assets/js/inventory/container_setup/container-list.js?v=<?php echo time(); ?>"></script>
 </body>
 </html>

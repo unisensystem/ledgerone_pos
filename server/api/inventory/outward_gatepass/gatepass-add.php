@@ -1,5 +1,6 @@
 <?php
 require_once '../../../../includes/connection.php';
+require_once '../../../../includes/activity-logger.php';
 
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
@@ -81,10 +82,21 @@ try {
         ]);
     }
     
+    logActivity(
+        $pdo, $tenant_id, $user_id, 'create', 'Outward Gatepass', $gatepass_id, $gatepass_code,
+        "Created outward gatepass \"$gatepass_code\" (" . count($input['items']) . " item(s))",
+        null,
+        [
+            'gatepass_code' => $gatepass_code, 'date' => $input['date'], 'company_id' => $input['company_id'],
+            'supplier_id' => $input['supplier_id'], 'branch_id' => $input['branch_id'], 'container_id' => $container_id,
+            'items' => $input['items']
+        ]
+    );
+
     $pdo->commit();
-    
+
     echo json_encode([
-        'success' => true, 
+        'success' => true,
         'message' => 'Outward gatepass created successfully',
         'gatepass_code' => $gatepass_code,
         'gatepass_id' => $gatepass_id

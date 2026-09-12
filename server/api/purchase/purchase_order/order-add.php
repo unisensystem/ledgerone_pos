@@ -1,5 +1,6 @@
 <?php
 require_once '../../../../includes/connection.php';
+require_once '../../../../includes/activity-logger.php';
 
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
@@ -152,8 +153,23 @@ try {
         }
     }
     
+    logActivity(
+        $pdo, $tenant_id, $user_id, 'create', 'Purchase Order', $invoice_id, $billNo,
+        "Created purchase order \"$billNo\" (" . count($input['items']) . " item(s), net " . number_format($input['netAmount'], 2) . ")",
+        null,
+        [
+            'bill_no' => $billNo, 'purchase_date' => $input['purchaseDate'], 'supplier_id' => $input['supplierId'],
+            'branch_id' => $input['branchId'], 'company_id' => $input['companyId'], 'currency_id' => $input['currencyId'],
+            'project_id' => $input['projectId'] ?? null, 'total_bill' => $input['totalBill'],
+            'total_discount_percent' => $input['totalDiscountPercent'] ?? 0, 'total_discount_amount' => $input['totalDiscountAmount'] ?? 0,
+            'net_amount' => $input['netAmount'], 'supplier_invoice_no' => $input['supplierInvoiceNo'],
+            'bilty_no' => $input['biltyNo'], 'transport_name' => $input['transportName'],
+            'remarks' => $input['remarks'] ?? null, 'items' => $input['items']
+        ]
+    );
+
     $pdo->commit();
-    
+
     echo json_encode([
         'success' => true,
         'message' => 'Purchase order saved successfully',

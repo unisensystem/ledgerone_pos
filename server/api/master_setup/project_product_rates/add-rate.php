@@ -3,11 +3,13 @@ header('Content-Type: application/json');
 
 session_start();
 require_once '../../../../includes/connection.php';
+require_once '../../../../includes/activity-logger.php';
 
 try {
     $data = json_decode(file_get_contents('php://input'), true);
     $tenant_id = $_SESSION['tenant_id'] ?? null;
-    
+    $user_id = $_SESSION['user_id'] ?? null;
+
     if (!$tenant_id) {
         throw new Exception('Tenant ID not found in session');
     }
@@ -71,7 +73,14 @@ try {
             
             if ($stmt->execute([$tenant_id, $project_id, $product_id, $rate_value])) {
                 $addedCount++;
-                $insertedIds[] = $pdo->lastInsertId();
+                $newId = $pdo->lastInsertId();
+                $insertedIds[] = $newId;
+                logActivity(
+                    $pdo, $tenant_id, $user_id, 'create', 'Project Product Rate', $newId, "Project #$project_id / Product #$product_id",
+                    "Created project product rate: Project #$project_id, Product #$product_id, Rate " . number_format($rate_value, 2),
+                    null,
+                    ['project_id' => $project_id, 'product_id' => $product_id, 'rate' => $rate_value]
+                );
             } else {
                 $errors[] = "Row " . ($index + 1) . ": Failed to insert rate";
             }

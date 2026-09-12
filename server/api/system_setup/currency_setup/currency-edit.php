@@ -1,5 +1,6 @@
 <?php
 require_once '../../../../includes/connection.php';
+require_once '../../../../includes/activity-logger.php';
 
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
@@ -52,18 +53,30 @@ try {
             exit;
         }
         
-        // Check if currency exists for tenant
-        $stmt = $pdo->prepare("SELECT id FROM tenant_currencies WHERE id = ? AND tenant_id = ?");
+        // Check if currency exists for tenant (grab full row for the Activity Log)
+        $stmt = $pdo->prepare("SELECT tc.currency_id, tc.is_active, c.code FROM tenant_currencies tc JOIN ledgerone_public.currencies c ON tc.currency_id = c.id WHERE tc.id = ? AND tc.tenant_id = ?");
         $stmt->execute([$id, $tenant_id]);
-        if (!$stmt->fetch()) {
+        $oldCurrency = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$oldCurrency) {
             echo json_encode(['success' => false, 'message' => 'Currency not found']);
             exit;
         }
-        
+
         // Update currency
         $stmt = $pdo->prepare("UPDATE tenant_currencies SET currency_id = ?, is_active = ? WHERE id = ? AND tenant_id = ?");
         $stmt->execute([$currency_id, $is_active ? 1 : 0, $id, $tenant_id]);
-        
+
+        $newCodeStmt = $pdo->prepare("SELECT code FROM ledgerone_public.currencies WHERE id = ?");
+        $newCodeStmt->execute([$currency_id]);
+        $newCode = $newCodeStmt->fetchColumn();
+
+        $newCurrency = ['currency_id' => $currency_id, 'is_active' => $is_active ? 1 : 0, 'code' => $newCode];
+        $changeDescriptions = buildChangeDescription($oldCurrency, $newCurrency, ['currency_id' => 'Currency', 'is_active' => 'Active']);
+        $editDescription = !empty($changeDescriptions)
+            ? "Updated currency \"{$oldCurrency['code']}\": " . implode('; ', $changeDescriptions)
+            : "Updated currency \"{$oldCurrency['code']}\" - no tracked field changes";
+        logActivity($pdo, $tenant_id, $user_id, 'update', 'Currency', $id, $oldCurrency['code'], $editDescription, $oldCurrency, $newCurrency);
+
         echo json_encode(['success' => true, 'message' => 'Currency updated successfully']);
     }
 } catch (Exception $e) {

@@ -1,6 +1,7 @@
 <?php
 require_once '../../../../includes/connection.php';
 require_once '../../../../includes/posting_lock.php';
+require_once '../../../../includes/activity-logger.php';
 header('Content-Type: application/json');
 
 if (session_status() == PHP_SESSION_NONE) {
@@ -249,6 +250,18 @@ if (!$lockCheck['allowed']) {
         $tenant_id, 'Payment Voucher', 'payment_voucher', $voucher_id, $credit_account_id,
         $voucher_date, $description, 0.00, $amount
     ]);
+
+    logActivity(
+        $pdo, $tenant_id, $user_id, 'create', 'Payment Voucher', $voucher_id, $voucher_number,
+        "Created payment voucher \"$voucher_number\" (amount " . number_format($amount, 2) . ")",
+        null,
+        [
+            'voucher_number' => $voucher_number, 'voucher_date' => $voucher_date, 'payment_type' => $payment_type,
+            'entity_id' => $entity['id'], 'company_id' => $company_id, 'bill_no' => $bill_no, 'amount' => $amount,
+            'currency_id' => $currency_id, 'payment_method_id' => $payment_method_id, 'bank_account_id' => $bank_account_id,
+            'cheque_no' => $cheque_no, 'description' => $description
+        ]
+    );
 
     echo json_encode(['success' => true, 'message' => 'Payment voucher created successfully']);
 

@@ -1,5 +1,6 @@
 <?php
 require_once '../../../../includes/connection.php';
+require_once '../../../../includes/activity-logger.php';
 
 session_start();
 header('Content-Type: application/json');
@@ -53,8 +54,16 @@ try {
             
             $stmt = $pdo->prepare("INSERT INTO departments (tenant_id, department_name, department_code, is_active) VALUES (?, ?, ?, 1)");
             $stmt->execute([$tenant_id, $name, $code]);
-            
-            echo json_encode(['success' => true, 'id' => $pdo->lastInsertId()]);
+            $newDeptId = $pdo->lastInsertId();
+
+            logActivity(
+                $pdo, $tenant_id, $user_id, 'create', 'Department', $newDeptId, $name,
+                "Created department \"$name\" ($code)",
+                null,
+                ['department_name' => $name, 'department_code' => $code]
+            );
+
+            echo json_encode(['success' => true, 'id' => $newDeptId]);
         }
         else if ($action === 'delete') {
             $id = $data['id'] ?? null;
@@ -64,24 +73,30 @@ try {
             }
             
             // Check if department belongs to tenant
-            $stmt = $pdo->prepare("SELECT tenant_id FROM departments WHERE id = ?");
+            $stmt = $pdo->prepare("SELECT tenant_id, department_name, department_code FROM departments WHERE id = ?");
             $stmt->execute([$id]);
-            $dept = $stmt->fetch();
-            
+            $dept = $stmt->fetch(PDO::FETCH_ASSOC);
+
             if (!$dept || $dept['tenant_id'] != $tenant_id) {
                 throw new Exception('Cannot delete this department');
             }
-            
+
             // Check if department has employees
             $stmt = $pdo->prepare("SELECT COUNT(*) FROM employees WHERE department_id = ? AND tenant_id = ?");
             $stmt->execute([$id, $tenant_id]);
             if ($stmt->fetchColumn() > 0) {
                 throw new Exception('Cannot delete department with employees');
             }
-            
+
             $stmt = $pdo->prepare("UPDATE departments SET is_active = 0 WHERE id = ? AND tenant_id = ?");
             $stmt->execute([$id, $tenant_id]);
-            
+
+            logActivity(
+                $pdo, $tenant_id, $user_id, 'delete', 'Department', $id, $dept['department_name'],
+                "Deleted department \"{$dept['department_name']}\" ({$dept['department_code']})",
+                $dept, null
+            );
+
             echo json_encode(['success' => true]);
         }
     }

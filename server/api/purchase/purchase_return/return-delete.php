@@ -1,5 +1,6 @@
 <?php
 require_once '../../../../includes/connection.php';
+require_once '../../../../includes/activity-logger.php';
 
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
@@ -31,8 +32,16 @@ if (!$invoice_id) {
 }
 
 try {
+    // Grab values before deletion, for the Activity Log (record is gone afterward)
+    $stmt = $pdo->prepare("SELECT bill_no, purchase_date, supplier_id, branch_id, net_amount FROM purchase_return WHERE id = ? AND tenant_id = ?");
+    $stmt->execute([$invoice_id, $tenant_id]);
+    $returnRow = $stmt->fetch(PDO::FETCH_ASSOC);
+    if (!$returnRow) {
+        throw new Exception('Return not found or already deleted');
+    }
+
     $pdo->beginTransaction();
-    
+
     // Delete from accounting_ledger
     $pdo->prepare("DELETE FROM accounting_ledger WHERE reference_table = 'purchase_return' AND reference_id = ? AND tenant_id = ?")->execute([$invoice_id, $tenant_id]);
     
@@ -50,8 +59,14 @@ try {
         throw new Exception('Return not found or already deleted');
     }
     
+    logActivity(
+        $pdo, $tenant_id, $user_id, 'delete', 'Purchase Return', $invoice_id, $returnRow['bill_no'],
+        "Deleted purchase return \"{$returnRow['bill_no']}\"",
+        $returnRow, null
+    );
+
     $pdo->commit();
-    
+
     echo json_encode(['success' => true, 'message' => 'Purchase return deleted successfully']);
     
 } catch (Exception $e) {

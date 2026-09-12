@@ -1,5 +1,6 @@
 <?php
 require_once '../../../../includes/connection.php';
+require_once '../../../../includes/activity-logger.php';
 
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
@@ -163,8 +164,22 @@ try {
     // 3. Credit - Trade Creditors
     $ledger_stmt->execute([$tenant_id, $invoice_id, 14, $input['purchaseDate'], 'Purchase Tax Invoice - ' . $billNo, 0, $input['netAmount']]);
     
+    logActivity(
+        $pdo, $tenant_id, $user_id, 'create', 'Purchase Tax Invoice', $invoice_id, $billNo,
+        "Created purchase tax invoice \"$billNo\" (" . count($input['items']) . " item(s), net " . number_format($input['netAmount'], 2) . ")",
+        null,
+        [
+            'bill_no' => $billNo, 'purchase_date' => $input['purchaseDate'], 'supplier_id' => $input['supplierId'],
+            'branch_id' => $input['branchId'], 'company_id' => $input['companyId'] ?? 1, 'currency_id' => $input['currencyId'] ?? 1,
+            'supplier_invoice_no' => $input['supplierInvoiceNo'] ?? null, 'remarks' => $input['remarks'] ?? null,
+            'rp_total' => $input['rpTotal'], 'tp_total' => $input['tpTotal'], 'discount_total' => $input['discountTotal'],
+            'sales_tax_total' => $input['salesTaxTotal'], 'advance_tax' => $input['advanceTax'],
+            'net_amount' => $input['netAmount'], 'items' => $input['items']
+        ]
+    );
+
     $pdo->commit();
-    
+
     echo json_encode([
         'success' => true,
         'message' => 'Purchase tax invoice saved successfully',

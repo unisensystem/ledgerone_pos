@@ -9,6 +9,7 @@ header('Access-Control-Allow-Methods: GET, PUT, DELETE');
 header('Access-Control-Allow-Headers: Content-Type');
 
 require_once '../../../../includes/connection.php';
+require_once '../../../../includes/activity-logger.php';
 
 $user_id = $_SESSION['user_id'] ?? 1;
 $tenant_id = $_SESSION['tenant_id'] ?? 1;
@@ -109,8 +110,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
     }
     
     try {
+        $stmt = $pdo->prepare("SELECT order_no, status as old_status FROM production_orders WHERE id = ? AND tenant_id = ?");
+        $stmt->execute([$id, $tenant_id]);
+        $orderRow = $stmt->fetch(PDO::FETCH_ASSOC);
+
         $stmt = $pdo->prepare("UPDATE production_orders SET status = ?, updated_at = NOW() WHERE id = ? AND tenant_id = ?");
         $stmt->execute([$status, $id, $tenant_id]);
+
+        if ($orderRow) {
+            $editDescription = $orderRow['old_status'] !== $status
+                ? "Updated production order \"{$orderRow['order_no']}\" status: {$orderRow['old_status']} \u{2192} $status"
+                : "Updated production order \"{$orderRow['order_no']}\" - no tracked field changes";
+            logActivity($pdo, $tenant_id, $user_id, 'update', 'Production Order', $id, $orderRow['order_no'], $editDescription, ['status' => $orderRow['old_status']], ['status' => $status]);
+        }
+
         echo json_encode(['success' => true, 'message' => 'Status updated successfully']);
     } catch (Exception $e) {
         http_response_code(500);
@@ -130,14 +143,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'DELETE') {
     }
     
     try {
+        $stOld = $pdo->prepare("SELECT * FROM production_orders WHERE id = ? AND tenant_id = ?");
+        $stOld->execute([$id, $tenant_id]);
+        $orderRow = $stOld->fetch(PDO::FETCH_ASSOC);
+        if (!$orderRow) {
+            http_response_code(404);
+            echo json_encode(['success' => false, 'message' => 'Production order not found']);
+            exit;
+        }
+
         $pdo->beginTransaction();
-        
+
         $stmt = $pdo->prepare("DELETE FROM production_order_materials WHERE production_order_id = ?");
         $stmt->execute([$id]);
-        
+
         $stmt = $pdo->prepare("DELETE FROM production_orders WHERE id = ? AND tenant_id = ?");
         $stmt->execute([$id, $tenant_id]);
-        
+
+        logActivity(
+            $pdo, $tenant_id, $user_id, 'delete', 'Production Order', $id, $orderRow['order_no'],
+            "Deleted production order \"{$orderRow['order_no']}\"",
+            $orderRow, null
+        );
+
         $pdo->commit();
         echo json_encode(['success' => true, 'message' => 'Order deleted successfully']);
     } catch (Exception $e) {

@@ -1,5 +1,6 @@
 <?php
 require_once '../../../../includes/connection.php';
+require_once '../../../../includes/activity-logger.php';
 
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
@@ -30,10 +31,10 @@ try {
         throw new Exception('Supplier ID is required');
     }
 
-    // Check if supplier exists and belongs to tenant
-    $stmt = $pdo->prepare("SELECT supplier_name FROM suppliers WHERE id = ? AND tenant_id = ?");
+    // Check if supplier exists and belongs to tenant (grab full row for the Activity Log)
+    $stmt = $pdo->prepare("SELECT * FROM suppliers WHERE id = ? AND tenant_id = ?");
     $stmt->execute([$supplier_id, $tenant_id]);
-    $supplier = $stmt->fetch();
+    $supplier = $stmt->fetch(PDO::FETCH_ASSOC);
 
     if (!$supplier) {
         throw new Exception('Supplier not found');
@@ -54,6 +55,13 @@ try {
     // Hard delete supplier
     $stmt = $pdo->prepare("DELETE FROM suppliers WHERE id = ? AND tenant_id = ?");
     $stmt->execute([$supplier_id, $tenant_id]);
+
+    logActivity(
+        $pdo, $tenant_id, $user_id, 'delete', 'Supplier', $supplier_id, $supplier['supplier_code'],
+        "Deleted supplier \"{$supplier['supplier_name']}\" ({$supplier['supplier_code']})",
+        $supplier, null
+    );
+
     echo json_encode([
         'success' => true,
         'message' => 'Supplier deleted successfully'

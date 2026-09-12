@@ -1,5 +1,6 @@
 <?php
 require_once '../../../../includes/connection.php';
+require_once '../../../../includes/activity-logger.php';
 
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
@@ -46,9 +47,21 @@ try {
         $total_amount += $item['stock_value'];
     }
     
+    // Grab old values before anything changes, for the Activity Log diff
+    $stmt = $pdo->prepare("SELECT transfer_code, company_id, date, from_location_id, to_location_id, container_id, remarks, total_amount, total_items FROM stock_transfer WHERE tenant_id = ? AND id = ?");
+    $stmt->execute([$tenant_id, $transfer_id]);
+    $oldTransfer = $stmt->fetch(PDO::FETCH_ASSOC);
+    if (!$oldTransfer) {
+        echo json_encode(['success' => false, 'message' => 'Transfer not found']);
+        exit;
+    }
+    $stmt = $pdo->prepare("SELECT product_id, qty, rate FROM stock_transfer_items WHERE tenant_id = ? AND transfer_id = ? ORDER BY product_id, id");
+    $stmt->execute([$tenant_id, $transfer_id]);
+    $oldItems = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
     // Begin transaction
     $pdo->beginTransaction();
-    
+
     // Delete old stock ledger entries
     $stmt = $pdo->prepare("DELETE FROM stock_ledger WHERE tenant_id = ? AND reference_table = 'stock_transfer' AND reference_id = ?");
     $stmt->execute([$tenant_id, $transfer_id]);
@@ -120,8 +133,40 @@ try {
         ]);
     }
     
+    $newTransfer = [
+        'transfer_code' => $oldTransfer['transfer_code'],
+        'company_id' => $company_id,
+        'date' => $date,
+        'from_location_id' => $from_location_id,
+        'to_location_id' => $to_location_id,
+        'container_id' => $container_id,
+        'remarks' => $remarks,
+        'total_amount' => $total_amount,
+        'total_items' => $total_items
+    ];
+    $changeDescriptions = buildChangeDescription($oldTransfer, $newTransfer, [
+        'company_id' => 'Company',
+        'date' => 'Date',
+        'from_location_id' => 'From Location',
+        'to_location_id' => 'To Location',
+        'container_id' => 'Container',
+        'remarks' => 'Remarks',
+        'total_amount' => 'Total Amount'
+    ]);
+    // Old items (DB) use 'qty', new items (submitted) use 'quantity' - normalize first.
+    $newItemsNormalized = array_map(function ($item) {
+        return ['product_id' => $item['product_id'], 'qty' => $item['quantity'], 'rate' => $item['rate']];
+    }, $items);
+    if (itemsChanged($oldItems, $newItemsNormalized, ['product_id', 'qty', 'rate'])) {
+        $changeDescriptions[] = 'Items updated';
+    }
+    $editDescription = !empty($changeDescriptions)
+        ? "Updated stock transfer \"{$oldTransfer['transfer_code']}\": " . implode('; ', $changeDescriptions)
+        : "Updated stock transfer \"{$oldTransfer['transfer_code']}\" - no tracked field changes";
+    logActivity($pdo, $tenant_id, $user_id, 'update', 'Stock Transfer', $transfer_id, $oldTransfer['transfer_code'], $editDescription, $oldTransfer, $newTransfer);
+
     $pdo->commit();
-    
+
     echo json_encode([
         'success' => true,
         'message' => 'Stock transfer updated successfully'

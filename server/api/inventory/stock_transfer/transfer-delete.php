@@ -1,5 +1,6 @@
 <?php
 require_once '../../../../includes/connection.php';
+require_once '../../../../includes/activity-logger.php';
 
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
@@ -31,9 +32,18 @@ try {
         exit;
     }
     
+    // Grab values before deletion, for the Activity Log (record is gone afterward)
+    $stmt = $pdo->prepare("SELECT transfer_code, company_id, date, from_location_id, to_location_id, container_id, remarks, total_amount, total_items FROM stock_transfer WHERE tenant_id = ? AND id = ?");
+    $stmt->execute([$tenant_id, $transfer_id]);
+    $transferRow = $stmt->fetch(PDO::FETCH_ASSOC);
+    if (!$transferRow) {
+        echo json_encode(['success' => false, 'message' => 'Transfer not found']);
+        exit;
+    }
+
     // Begin transaction
     $pdo->beginTransaction();
-    
+
     // Delete stock ledger entries
     $stmt = $pdo->prepare("DELETE FROM stock_ledger WHERE tenant_id = ? AND reference_table = 'stock_transfer' AND reference_id = ?");
     $stmt->execute([$tenant_id, $transfer_id]);
@@ -46,8 +56,14 @@ try {
     $stmt = $pdo->prepare("DELETE FROM stock_transfer WHERE tenant_id = ? AND id = ?");
     $stmt->execute([$tenant_id, $transfer_id]);
     
+    logActivity(
+        $pdo, $tenant_id, $user_id, 'delete', 'Stock Transfer', $transfer_id, $transferRow['transfer_code'],
+        "Deleted stock transfer \"{$transferRow['transfer_code']}\"",
+        $transferRow, null
+    );
+
     $pdo->commit();
-    
+
     echo json_encode(['success' => true, 'message' => 'Transfer deleted successfully']);
     
 } catch (Exception $e) {

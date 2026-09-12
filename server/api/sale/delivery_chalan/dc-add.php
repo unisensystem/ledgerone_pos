@@ -1,5 +1,6 @@
 <?php
 require_once '../../../../includes/connection.php';
+require_once '../../../../includes/activity-logger.php';
 header('Content-Type: application/json');
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') { http_response_code(405); echo json_encode(['success'=>false,'message'=>'Method not allowed']); exit; }
 
@@ -72,6 +73,13 @@ try {
             $user_id
         ]);
     }
+
+    logActivity(
+        $pdo, $tenant_id, $user_id, 'create', 'Delivery Chalan', $chalanId, $chalanNo,
+        "Created delivery chalan \"$chalanNo\" with " . count($input['items']) . " item(s)",
+        null,
+        ['chalan_no' => $chalanNo, 'customer_id' => $input['customerId'], 'delivery_date' => $input['deliveryDate'], 'status' => $input['status'] ?? 'Posted']
+    );
 
     $pdo->commit();
     echo json_encode(['success'=>true,'message'=>'Delivery Chalan saved successfully','chalan_id'=>$chalanId,'chalan_no'=>$chalanNo]);

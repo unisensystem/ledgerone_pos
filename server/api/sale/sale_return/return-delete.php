@@ -1,5 +1,6 @@
 <?php
 require_once '../../../../includes/connection.php';
+require_once '../../../../includes/activity-logger.php';
 
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
@@ -31,8 +32,18 @@ if (!$invoice_id) {
 }
 
 try {
+    // Grab full row before deletion, for the Activity Log
+    $stOld = $pdo->prepare("SELECT * FROM sale_return WHERE id = ? AND tenant_id = ?");
+    $stOld->execute([$invoice_id, $tenant_id]);
+    $returnRow = $stOld->fetch(PDO::FETCH_ASSOC);
+    if (!$returnRow) {
+        http_response_code(404);
+        echo json_encode(['success' => false, 'message' => 'Return not found']);
+        exit;
+    }
+
     $pdo->beginTransaction();
-    
+
     // Delete from accounting_ledger
     $pdo->prepare("DELETE FROM accounting_ledger WHERE reference_table = 'sale_return' AND reference_id = ? AND tenant_id = ?")->execute([$invoice_id, $tenant_id]);
     
@@ -49,7 +60,13 @@ try {
     if ($stmt->rowCount() === 0) {
         throw new Exception('Return not found or already deleted');
     }
-    
+
+    logActivity(
+        $pdo, $tenant_id, $user_id, 'delete', 'Sale Return', $invoice_id, $returnRow['bill_no'],
+        "Deleted sale return \"{$returnRow['bill_no']}\"",
+        $returnRow, null
+    );
+
     $pdo->commit();
     
     echo json_encode(['success' => true, 'message' => 'Sale return deleted successfully']);

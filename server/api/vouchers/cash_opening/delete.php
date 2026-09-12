@@ -1,5 +1,6 @@
 <?php
 require_once '../../../../includes/connection.php';
+require_once '../../../../includes/activity-logger.php';
 
 header('Content-Type: application/json');
 
@@ -34,24 +35,31 @@ if (!$id) {
 try {
     $pdo->beginTransaction();
     
-    // Verify record exists and belongs to tenant
-    $stmt = $pdo->prepare("SELECT id FROM cash_opening WHERE id = ? AND tenant_id = ?");
+    // Verify record exists and belongs to tenant (grab full row for the Activity Log)
+    $stmt = $pdo->prepare("SELECT id, as_of_date, opening_amount FROM cash_opening WHERE id = ? AND tenant_id = ?");
     $stmt->execute([$id, $tenant_id]);
-    if (!$stmt->fetch()) {
+    $record = $stmt->fetch(PDO::FETCH_ASSOC);
+    if (!$record) {
         $pdo->rollBack();
         http_response_code(404);
         echo json_encode(['error' => 'Record not found']);
         exit();
     }
-    
+
     // Delete accounting ledger entries
     $stmt = $pdo->prepare("DELETE FROM accounting_ledger WHERE reference_table = 'cash_opening' AND reference_id = ? AND tenant_id = ?");
     $stmt->execute([$id, $tenant_id]);
-    
+
     // Delete cash opening record
     $stmt = $pdo->prepare("DELETE FROM cash_opening WHERE id = ? AND tenant_id = ?");
     $stmt->execute([$id, $tenant_id]);
-    
+
+    logActivity(
+        $pdo, $tenant_id, $user_id, 'delete', 'Cash Opening', $id, $record['as_of_date'],
+        "Deleted cash opening (as of {$record['as_of_date']}): Amount " . number_format($record['opening_amount'], 2),
+        $record, null
+    );
+
     $pdo->commit();
     echo json_encode(['success' => true]);
     

@@ -1,5 +1,6 @@
 <?php
 require_once '../../../../includes/connection.php';
+require_once '../../../../includes/activity-logger.php';
 
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
@@ -155,6 +156,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
     }
 
     try {
+        // Snapshot old header + items for the Activity Log (before mutation)
+        $stOld = $pdo->prepare("SELECT bill_no, company_id, currency_id, sale_date, customer_id, branch_id, net_amount, sale_invoice_no, project_id, amount_refunded, payment_method, bank_account_id, sale_officer_id, supplier_man_id, sub_account_id, remarks, status FROM sale_return WHERE id = ? AND tenant_id = ?");
+        $stOld->execute([$invoice_id, $tenant_id]);
+        $oldReturn = $stOld->fetch(PDO::FETCH_ASSOC);
+        if (!$oldReturn) throw new Exception('Sale return not found');
+
+        $stOldItems = $pdo->prepare("SELECT product_id, uom_id, batch_no, quantity, sale_price, tax_percent, net_amount FROM sale_return_items WHERE sale_invoice_id = ? AND tenant_id = ? ORDER BY id");
+        $stOldItems->execute([$invoice_id, $tenant_id]);
+        $oldItems = $stOldItems->fetchAll(PDO::FETCH_ASSOC);
+
         $pdo->beginTransaction();
 
         // Update sale return
@@ -213,6 +224,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ");
 
+        $newItemsForCompare = [];
         foreach ($input['items'] as $item) {
             if (isset($item['unitEntries']) && is_array($item['unitEntries'])) {
                 // Calculate total quantity in pieces for amount calculations
@@ -250,6 +262,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
                             $user_id,
                             $user_id
                         ]);
+                        $newItemsForCompare[] = [
+                            'product_id' => $item['productId'], 'uom_id' => $entry['uomId'],
+                            'batch_no' => $item['batchNo'] ?? null, 'quantity' => (float)$entry['quantity'],
+                            'sale_price' => (float)$item['salePrice'], 'tax_percent' => (float)($item['taxPercent'] ?? 0),
+                            'net_amount' => (float)($item['netAmount'] * $proportionOfTotal),
+                        ];
                     }
                 }
             }
@@ -404,6 +422,39 @@ if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
                 'Sale Return Payment - ' . $billNo, $input['amountPaid']
             ]);
         }
+
+        $newReturn = [
+            'bill_no' => $oldReturn['bill_no'],
+            'company_id' => $input['companyId'] ?? null,
+            'currency_id' => $input['currencyId'],
+            'sale_date' => $input['saleDate'],
+            'customer_id' => $input['customerId'],
+            'branch_id' => $input['branchId'],
+            'net_amount' => $input['netAmount'],
+            'sale_invoice_no' => $input['saleInvoiceId'] ?? null,
+            'project_id' => $input['projectId'] ?? null,
+            'amount_refunded' => $input['amountPaid'] ?? 0.00,
+            'payment_method' => $input['paymentMethod'] ?? null,
+            'bank_account_id' => $input['bankAccountId'] ?? null,
+            'sale_officer_id' => $input['salesOfficerId'] ?? null,
+            'supplier_man_id' => $input['supplierManId'] ?? null,
+            'sub_account_id' => $input['subAccountId'] ?? null,
+            'remarks' => $input['remarks'] ?? null,
+            'status' => $status,
+        ];
+        $changeDescriptions = buildChangeDescription($oldReturn, $newReturn, [
+            'currency_id' => 'Currency', 'sale_date' => 'Sale Date', 'customer_id' => 'Customer',
+            'branch_id' => 'Branch', 'net_amount' => 'Net Amount', 'project_id' => 'Project',
+            'amount_refunded' => 'Amount Refunded', 'payment_method' => 'Payment Method',
+            'bank_account_id' => 'Bank Account', 'remarks' => 'Remarks', 'status' => 'Status'
+        ]);
+        if (itemsChanged($oldItems, $newItemsForCompare, ['product_id', 'uom_id', 'batch_no', 'quantity', 'sale_price', 'tax_percent', 'net_amount'])) {
+            $changeDescriptions[] = 'Item lines updated';
+        }
+        $editDescription = !empty($changeDescriptions)
+            ? "Updated sale return \"{$oldReturn['bill_no']}\": " . implode('; ', $changeDescriptions)
+            : "Updated sale return \"{$oldReturn['bill_no']}\" - no tracked field changes";
+        logActivity($pdo, $tenant_id, $user_id, 'update', 'Sale Return', $invoice_id, $oldReturn['bill_no'], $editDescription, $oldReturn, $newReturn);
 
         $pdo->commit();
 

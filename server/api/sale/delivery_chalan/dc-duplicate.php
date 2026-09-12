@@ -1,5 +1,6 @@
 <?php
 require_once '../../../../includes/connection.php';
+require_once '../../../../includes/activity-logger.php';
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: POST');
@@ -99,6 +100,13 @@ try {
             $user_id
         ]);
     }
+
+    logActivity(
+        $pdo, $tenant_id, $user_id, 'create', 'Delivery Chalan', $newChalanId, $newChalanNo,
+        "Created delivery chalan \"$newChalanNo\" as a duplicate of \"{$chalan['chalan_no']}\"",
+        null,
+        ['chalan_no' => $newChalanNo, 'customer_id' => $final_customer, 'delivery_date' => $final_date, 'status' => $chalan['status'] ?? 'Posted', 'duplicated_from' => $chalan['chalan_no']]
+    );
 
     $pdo->commit();
 

@@ -1,5 +1,6 @@
 <?php
 require_once '../../../../includes/connection.php';
+require_once '../../../../includes/activity-logger.php';
 
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
@@ -78,6 +79,10 @@ try {
         exit;
     }
     
+    $stmt = $pdo->prepare("SELECT regime_name, regime_code, tax_authority, tax_base, is_active, effective_from, effective_to FROM tax_regimes WHERE id = ? AND tenant_id = ?");
+    $stmt->execute([$regime_id, $tenant_id]);
+    $oldRegime = $stmt->fetch(PDO::FETCH_ASSOC);
+
     $stmt = $pdo->prepare("
         UPDATE tax_regimes SET
             regime_name = ?, regime_code = ?, country_id = ?, tax_authority = ?, tax_base = ?, legal_reference = ?,
@@ -96,6 +101,18 @@ try {
         $effective_from, $effective_to, $user_id, $regime_id, $tenant_id
     ]);
     
+    if ($oldRegime) {
+        $newRegime = ['regime_name' => $regime_name, 'regime_code' => $regime_code, 'tax_authority' => $tax_authority, 'tax_base' => $tax_base, 'is_active' => $is_active, 'effective_from' => $effective_from, 'effective_to' => $effective_to];
+        $changeDescriptions = buildChangeDescription($oldRegime, $newRegime, [
+            'regime_name' => 'Name', 'regime_code' => 'Code', 'tax_authority' => 'Tax Authority', 'tax_base' => 'Tax Base',
+            'is_active' => 'Active', 'effective_from' => 'Effective From', 'effective_to' => 'Effective To'
+        ]);
+        $editDescription = !empty($changeDescriptions)
+            ? "Updated tax regime \"$regime_name\" ($regime_code): " . implode('; ', $changeDescriptions)
+            : "Updated tax regime \"$regime_name\" ($regime_code) - no tracked field changes";
+        logActivity($pdo, $tenant_id, $user_id, 'update', 'Tax Regime', $regime_id, $regime_code, $editDescription, $oldRegime, $newRegime);
+    }
+
     echo json_encode([
         'success' => true,
         'message' => 'Tax regime updated successfully'

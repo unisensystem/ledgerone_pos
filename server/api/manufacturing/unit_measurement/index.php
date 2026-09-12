@@ -9,6 +9,7 @@ header('Access-Control-Allow-Methods: GET, POST, DELETE');
 header('Access-Control-Allow-Headers: Content-Type');
 
 require_once '../../../../includes/connection.php';
+require_once '../../../../includes/activity-logger.php';
 
 $user_id = $_SESSION['user_id'] ?? 1;
 $tenant_id = $_SESSION['tenant_id'] ?? 1;
@@ -128,14 +129,42 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         
         if ($id) {
             // Update
+            $stmt = $pdo->prepare("SELECT uom_name, uom_type, base_unit_id, conversion_factor, is_base_unit FROM uom WHERE id = ? AND tenant_id = ?");
+            $stmt->execute([$id, $tenant_id]);
+            $oldUom = $stmt->fetch(PDO::FETCH_ASSOC);
+            if (!$oldUom) {
+                http_response_code(404);
+                echo json_encode(['success' => false, 'message' => 'UOM not found']);
+                exit;
+            }
+
             $stmt = $pdo->prepare("UPDATE uom SET uom_name = ?, uom_type = ?, base_unit_id = ?, conversion_factor = ?, is_base_unit = ? WHERE id = ? AND tenant_id = ?");
             $stmt->execute([$uom_name, $uom_type, $base_unit_id, $conversion_factor, $is_base_unit, $id, $tenant_id]);
+
+            $newUom = ['uom_name' => $uom_name, 'uom_type' => $uom_type, 'base_unit_id' => $base_unit_id, 'conversion_factor' => $conversion_factor, 'is_base_unit' => $is_base_unit];
+            $changeDescriptions = buildChangeDescription($oldUom, $newUom, [
+                'uom_name' => 'Name', 'uom_type' => 'Type', 'base_unit_id' => 'Base Unit', 'conversion_factor' => 'Conversion Factor', 'is_base_unit' => 'Is Base Unit'
+            ]);
+            $editDescription = !empty($changeDescriptions)
+                ? "Updated unit of measurement \"$uom_name\": " . implode('; ', $changeDescriptions)
+                : "Updated unit of measurement \"$uom_name\" - no tracked field changes";
+            logActivity($pdo, $tenant_id, $user_id, 'update', 'Unit of Measurement', $id, $uom_name, $editDescription, $oldUom, $newUom);
+
             echo json_encode(['success' => true, 'message' => 'UOM updated successfully']);
         } else {
             // Insert
             $stmt = $pdo->prepare("INSERT INTO uom (tenant_id, uom_name, uom_type, base_unit_id, conversion_factor, is_base_unit) VALUES (?, ?, ?, ?, ?, ?)");
             $stmt->execute([$tenant_id, $uom_name, $uom_type, $base_unit_id, $conversion_factor, $is_base_unit]);
-            echo json_encode(['success' => true, 'message' => 'UOM added successfully', 'id' => $pdo->lastInsertId()]);
+            $newUomId = $pdo->lastInsertId();
+
+            logActivity(
+                $pdo, $tenant_id, $user_id, 'create', 'Unit of Measurement', $newUomId, $uom_name,
+                "Created unit of measurement \"$uom_name\" ($uom_type" . ($is_base_unit ? ', base unit' : ", conversion $conversion_factor") . ")",
+                null,
+                ['uom_name' => $uom_name, 'uom_type' => $uom_type, 'base_unit_id' => $base_unit_id, 'conversion_factor' => $conversion_factor, 'is_base_unit' => $is_base_unit]
+            );
+
+            echo json_encode(['success' => true, 'message' => 'UOM added successfully', 'id' => $newUomId]);
         }
     } catch (Exception $e) {
         http_response_code(500);
@@ -165,8 +194,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'DELETE') {
             exit;
         }
         
+        $stmt = $pdo->prepare("SELECT * FROM uom WHERE id = ? AND tenant_id = ?");
+        $stmt->execute([$id, $tenant_id]);
+        $uomRow = $stmt->fetch(PDO::FETCH_ASSOC);
+
         $stmt = $pdo->prepare("DELETE FROM uom WHERE id = ? AND tenant_id = ?");
         $stmt->execute([$id, $tenant_id]);
+
+        if ($uomRow) {
+            logActivity(
+                $pdo, $tenant_id, $user_id, 'delete', 'Unit of Measurement', $id, $uomRow['uom_name'],
+                "Deleted unit of measurement \"{$uomRow['uom_name']}\"",
+                $uomRow, null
+            );
+        }
+
         echo json_encode(['success' => true, 'message' => 'UOM deleted successfully']);
     } catch (Exception $e) {
         http_response_code(500);

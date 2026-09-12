@@ -1,5 +1,6 @@
 <?php
 require_once '../../../../includes/connection.php';
+require_once '../../../../includes/activity-logger.php';
 
 header('Content-Type: application/json');
 
@@ -79,6 +80,12 @@ try {
     if ($voucherDeleted === 0) {
         throw new Exception('Failed to delete voucher record');
     }
+
+    logActivity(
+        $pdo, $tenant_id, $user_id, 'delete', 'Journal Voucher', $id, $voucher['voucher_number'],
+        "Deleted journal voucher \"{$voucher['voucher_number']}\"",
+        $voucher, null
+    );
 
     $pdo->commit();
 

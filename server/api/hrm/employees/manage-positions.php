@@ -1,5 +1,6 @@
 <?php
 require_once '../../../../includes/connection.php';
+require_once '../../../../includes/activity-logger.php';
 
 session_start();
 header('Content-Type: application/json');
@@ -64,8 +65,16 @@ try {
             
             $stmt = $pdo->prepare("INSERT INTO positions (tenant_id, department_id, position_title, position_code, is_active) VALUES (?, ?, ?, ?, 1)");
             $stmt->execute([$tenant_id, $department_id, $name, $code]);
-            
-            echo json_encode(['success' => true, 'id' => $pdo->lastInsertId()]);
+            $newPosId = $pdo->lastInsertId();
+
+            logActivity(
+                $pdo, $tenant_id, $user_id, 'create', 'Position', $newPosId, $name,
+                "Created position \"$name\" ($code)",
+                null,
+                ['position_title' => $name, 'position_code' => $code, 'department_id' => $department_id]
+            );
+
+            echo json_encode(['success' => true, 'id' => $newPosId]);
         }
         else if ($action === 'delete') {
             $id = $data['id'] ?? null;
@@ -75,24 +84,30 @@ try {
             }
             
             // Check if position belongs to tenant
-            $stmt = $pdo->prepare("SELECT tenant_id FROM positions WHERE id = ?");
+            $stmt = $pdo->prepare("SELECT tenant_id, position_title, position_code, department_id FROM positions WHERE id = ?");
             $stmt->execute([$id]);
-            $pos = $stmt->fetch();
-            
+            $pos = $stmt->fetch(PDO::FETCH_ASSOC);
+
             if (!$pos || $pos['tenant_id'] != $tenant_id) {
                 throw new Exception('Cannot delete this position');
             }
-            
+
             // Check if position has employees
             $stmt = $pdo->prepare("SELECT COUNT(*) FROM employees WHERE position_id = ? AND tenant_id = ?");
             $stmt->execute([$id, $tenant_id]);
             if ($stmt->fetchColumn() > 0) {
                 throw new Exception('Cannot delete position with employees');
             }
-            
+
             $stmt = $pdo->prepare("UPDATE positions SET is_active = 0 WHERE id = ? AND tenant_id = ?");
             $stmt->execute([$id, $tenant_id]);
-            
+
+            logActivity(
+                $pdo, $tenant_id, $user_id, 'delete', 'Position', $id, $pos['position_title'],
+                "Deleted position \"{$pos['position_title']}\" ({$pos['position_code']})",
+                $pos, null
+            );
+
             echo json_encode(['success' => true]);
         }
     }

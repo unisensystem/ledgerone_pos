@@ -1,5 +1,6 @@
 <?php
 require_once '../../../../includes/connection.php';
+require_once '../../../../includes/activity-logger.php';
 
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
@@ -107,6 +108,23 @@ try {
         $stmt->execute([$tenant_id, $input['invoice_id'], $entry['account_id'], $invoice['usage_date'], $entry['description'], $entry['debit'], $entry['credit']]);
     }
     
+    $oldValues = [
+        'usage_date' => $invoice['usage_date'], 'opening_reading' => $invoice['opening_reading'],
+        'rate' => $invoice['rate'], 'closing_reading' => $invoice['closing_reading'], 'total_revenue' => $invoice['total_revenue']
+    ];
+    $newValues = [
+        'usage_date' => $input['date'], 'opening_reading' => $input['opening_reading'],
+        'rate' => $input['rate'], 'closing_reading' => $input['closing_reading'], 'total_revenue' => $totalRevenue
+    ];
+    $changeDescriptions = buildChangeDescription($oldValues, $newValues, [
+        'usage_date' => 'Date', 'opening_reading' => 'Opening Reading', 'rate' => 'Rate',
+        'closing_reading' => 'Closing Reading', 'total_revenue' => 'Total Revenue'
+    ]);
+    $editDescription = !empty($changeDescriptions)
+        ? "Updated meter invoice (station #{$invoice['station_id']}): " . implode('; ', $changeDescriptions)
+        : "Updated meter invoice (station #{$invoice['station_id']}) - no tracked field changes";
+    logActivity($pdo, $tenant_id, $user_id, 'update', 'Meter Invoice', $input['invoice_id'], "Station #{$invoice['station_id']} - {$input['date']}", $editDescription, $oldValues, $newValues);
+
     $pdo->commit();
     echo json_encode(['success' => true, 'message' => 'Invoice updated successfully']);
     

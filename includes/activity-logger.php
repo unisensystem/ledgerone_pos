@@ -67,3 +67,23 @@ function buildChangeDescription($old, $new, $fieldLabels) {
     }
     return $changes;
 }
+
+// Compares two "line items" arrays (ignoring order) for the Activity Log - used wherever a
+// header record (gatepass, adjustment, transfer...) fully replaces its child rows on every
+// edit, so a real content change can be told apart from a same-data resubmission.
+// $compareKeys is the list of fields per item that matter (e.g. ['product_id','unit_id','quantity']).
+function itemsChanged($oldItems, $newItems, $compareKeys) {
+    $normalize = function ($items) use ($compareKeys) {
+        $rows = array_map(function ($item) use ($compareKeys) {
+            $row = [];
+            foreach ($compareKeys as $key) {
+                $val = is_object($item) ? ($item->$key ?? null) : ($item[$key] ?? null);
+                $row[$key] = is_numeric($val) ? (string)(float)$val : (string)$val;
+            }
+            return $row;
+        }, $items ?? []);
+        usort($rows, fn($a, $b) => json_encode($a) <=> json_encode($b));
+        return json_encode($rows);
+    };
+    return $normalize($oldItems) !== $normalize($newItems);
+}

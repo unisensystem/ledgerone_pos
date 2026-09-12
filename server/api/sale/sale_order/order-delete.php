@@ -1,5 +1,6 @@
 <?php
 require_once '../../../../includes/connection.php';
+require_once '../../../../includes/activity-logger.php';
 
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
@@ -31,21 +32,35 @@ if (!$invoice_id) {
 }
 
 try {
+    // Grab values before deletion, for the Activity Log (record is gone afterward)
+    $stmt = $pdo->prepare("SELECT bill_no, sale_date, customer_id, branch_id, net_amount, status FROM sale_order WHERE id = ? AND tenant_id = ?");
+    $stmt->execute([$invoice_id, $tenant_id]);
+    $orderRow = $stmt->fetch(PDO::FETCH_ASSOC);
+    if (!$orderRow) {
+        throw new Exception('Order not found or already deleted');
+    }
+
     $pdo->beginTransaction();
-    
+
     // Delete from sale_order_items
     $pdo->prepare("DELETE FROM sale_order_items WHERE sale_invoice_id = ? AND tenant_id = ?")->execute([$invoice_id, $tenant_id]);
-    
+
     // Delete from sale_invoice
     $stmt = $pdo->prepare("DELETE FROM sale_order WHERE id = ? AND tenant_id = ?");
     $stmt->execute([$invoice_id, $tenant_id]);
-    
+
     if ($stmt->rowCount() === 0) {
         throw new Exception('Order not found or already deleted');
     }
-    
+
+    logActivity(
+        $pdo, $tenant_id, $user_id, 'delete', 'Sale Order', $invoice_id, $orderRow['bill_no'],
+        "Deleted sale order \"{$orderRow['bill_no']}\"",
+        $orderRow, null
+    );
+
     $pdo->commit();
-    
+
     echo json_encode(['success' => true, 'message' => 'Sale order deleted successfully']);
     
 } catch (Exception $e) {

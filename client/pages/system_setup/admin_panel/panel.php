@@ -320,20 +320,6 @@ if (!$user_id) {
                             </div>
                         </div>
                         <div>
-                            <h4 style="margin-bottom: 16px; color: var(--heading);">Login Activity</h4>
-                            <div class="d-flex flex-column gap-12">
-                                <button class="btn btn-secondary" onclick="openLoginHistoryModal()">
-                                    <i class="fas fa-history"></i> View Login History
-                                </button>
-                                <button class="btn btn-secondary" onclick="openFailedLoginsModal()">
-                                    <i class="fas fa-exclamation-triangle"></i> Failed Logins
-                                </button>
-                                <button class="btn btn-secondary" onclick="openLoginLocationsModal()">
-                                    <i class="fas fa-map-marker-alt"></i> Login Locations
-                                </button>
-                            </div>
-                        </div>
-                        <div>
                             <h4 style="margin-bottom: 16px; color: var(--heading);">Access Management</h4>
                             <div class="d-flex flex-column gap-12">
                                 <button class="btn btn-secondary" onclick="openAccessModal()">
@@ -342,10 +328,10 @@ if (!$user_id) {
                             </div>
                         </div>
                         <div>
-                            <h4 style="margin-bottom: 16px; color: var(--heading);">Audit Trail</h4>
+                            <h4 style="margin-bottom: 16px; color: var(--heading);">Activity & Audit</h4>
                             <div class="d-flex flex-column gap-12">
-                                <button class="btn btn-secondary" onclick="openActivityLogModal()">
-                                    <i class="fas fa-clipboard-list"></i> View Activity Log
+                                <button class="btn btn-secondary" onclick="window.location.href='activity-center.php'">
+                                    <i class="fas fa-clipboard-list"></i> Activity & Audit Center
                                 </button>
                             </div>
                         </div>
@@ -648,150 +634,6 @@ if (!$user_id) {
             <div class="modal-footer">
                 <button class="btn btn-secondary" onclick="closeRestoreModal()">Cancel</button>
                 <button class="btn btn-warning" onclick="restoreDatabase()">Restore Database</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- LOGIN HISTORY MODAL -->
-    <div id="loginHistoryModal" class="modal-overlay">
-        <div class="modal" style="max-width: 900px;">
-            <div class="modal-header">
-                <div class="modal-title">Login History</div>
-                <button class="modal-close" onclick="closeLoginHistoryModal()">&times;</button>
-            </div>
-            <div class="modal-body">
-                <div class="table-container">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>User</th>
-                                <th>Login Time</th>
-                                <th>IP Address</th>
-                                <th>Device</th>
-                                <th>Status</th>
-                            </tr>
-                        </thead>
-                        <tbody id="loginHistoryBody">
-                            <!-- Will be populated by JS -->
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button class="btn btn-secondary" onclick="closeLoginHistoryModal()">Close</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- ACTIVITY LOG MODAL -->
-    <div id="activityLogModal" class="modal-overlay">
-        <div class="modal" style="max-width: 1000px;">
-            <div class="modal-header">
-                <div class="modal-title">Activity Log</div>
-                <button class="modal-close" onclick="closeActivityLogModal()">&times;</button>
-            </div>
-            <div class="modal-body">
-                <div class="d-flex gap-12" style="margin-bottom: 16px; flex-wrap: wrap;">
-                    <select id="activityLogModuleFilter" class="form-input" style="max-width: 200px;" onchange="fetchActivityLog(1)">
-                        <option value="">All Modules</option>
-                    </select>
-                    <select id="activityLogActionFilter" class="form-input" style="max-width: 160px;" onchange="fetchActivityLog(1)">
-                        <option value="">All Actions</option>
-                        <option value="create">Create</option>
-                        <option value="update">Update</option>
-                        <option value="delete">Delete</option>
-                    </select>
-                    <input type="text" id="activityLogSearch" class="form-input" placeholder="Search user, record, description..." style="max-width: 260px;" onkeyup="if(event.key==='Enter') fetchActivityLog(1)">
-                    <button class="btn btn-secondary" onclick="fetchActivityLog(1)"><i class="fas fa-search"></i> Search</button>
-                </div>
-                <div class="table-container">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>Date/Time</th>
-                                <th>User</th>
-                                <th>Action</th>
-                                <th>Module</th>
-                                <th>Record</th>
-                                <th>Description</th>
-                            </tr>
-                        </thead>
-                        <tbody id="activityLogBody">
-                            <!-- Will be populated by JS -->
-                        </tbody>
-                    </table>
-                </div>
-                <div class="d-flex" style="justify-content: space-between; align-items: center; margin-top: 12px;">
-                    <div id="activityLogInfo" style="color: var(--subtext); font-size: 13px;"></div>
-                    <div class="d-flex gap-12">
-                        <button class="btn btn-secondary" id="activityLogPrevBtn" onclick="activityLogGoToPage(-1)"><i class="fas fa-chevron-left"></i> Previous</button>
-                        <button class="btn btn-secondary" id="activityLogNextBtn" onclick="activityLogGoToPage(1)">Next <i class="fas fa-chevron-right"></i></button>
-                    </div>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button class="btn btn-secondary" onclick="closeActivityLogModal()">Close</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- FAILED LOGINS MODAL -->
-    <div id="failedLoginsModal" class="modal-overlay">
-        <div class="modal" style="max-width: 900px;">
-            <div class="modal-header">
-                <div class="modal-title">Failed Login Attempts</div>
-                <button class="modal-close" onclick="closeFailedLoginsModal()">&times;</button>
-            </div>
-            <div class="modal-body">
-                <div class="table-container">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>Email</th>
-                                <th>Attempt Time</th>
-                                <th>IP Address</th>
-                                <th>Reason</th>
-                            </tr>
-                        </thead>
-                        <tbody id="failedLoginsBody">
-                            <!-- Will be populated by JS -->
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button class="btn btn-secondary" onclick="closeFailedLoginsModal()">Close</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- LOGIN LOCATIONS MODAL -->
-    <div id="loginLocationsModal" class="modal-overlay">
-        <div class="modal" style="max-width: 900px;">
-            <div class="modal-header">
-                <div class="modal-title">Login Locations</div>
-                <button class="modal-close" onclick="closeLoginLocationsModal()">&times;</button>
-            </div>
-            <div class="modal-body">
-                <div class="table-container">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>User</th>
-                                <th>Location</th>
-                                <th>IP Address</th>
-                                <th>Last Login</th>
-                                <th>Login Count</th>
-                            </tr>
-                        </thead>
-                        <tbody id="loginLocationsBody">
-                            <!-- Will be populated by JS -->
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button class="btn btn-secondary" onclick="closeLoginLocationsModal()">Close</button>
             </div>
         </div>
     </div>

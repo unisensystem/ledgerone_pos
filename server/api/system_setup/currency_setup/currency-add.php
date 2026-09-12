@@ -1,5 +1,6 @@
 <?php
 require_once '../../../../includes/connection.php';
+require_once '../../../../includes/activity-logger.php';
 
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
@@ -34,9 +35,10 @@ try {
     }
     
     // Validate currency exists
-    $stmt = $pdo->prepare("SELECT id FROM ledgerone_public.currencies WHERE id = ? AND is_active = 1");
+    $stmt = $pdo->prepare("SELECT id, code, name FROM ledgerone_public.currencies WHERE id = ? AND is_active = 1");
     $stmt->execute([$currency_id]);
-    if (!$stmt->fetch()) {
+    $currencyInfo = $stmt->fetch(PDO::FETCH_ASSOC);
+    if (!$currencyInfo) {
         echo json_encode(['success' => false, 'message' => 'Invalid currency']);
         exit;
     }
@@ -52,6 +54,15 @@ try {
     // Insert tenant currency
     $stmt = $pdo->prepare("INSERT INTO tenant_currencies (tenant_id, currency_id, is_base_currency, created_by) VALUES (?, ?, ?, ?)");
     $stmt->execute([$tenant_id, $currency_id, $is_base_currency ? 1 : 0, $user_id]);
+    $newTenantCurrencyId = $pdo->lastInsertId();
+
+    logActivity(
+        $pdo, $tenant_id, $user_id, 'create', 'Currency', $newTenantCurrencyId, $currencyInfo['code'],
+        "Added currency \"{$currencyInfo['name']}\" ({$currencyInfo['code']})" . ($is_base_currency ? ' as base currency' : ''),
+        null,
+        ['currency_id' => $currency_id, 'currency_code' => $currencyInfo['code'], 'is_base_currency' => $is_base_currency ? 1 : 0]
+    );
+
     echo json_encode(['success' => true, 'message' => 'Currency added successfully']);
     
 } catch (Exception $e) {

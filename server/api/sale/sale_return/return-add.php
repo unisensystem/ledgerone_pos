@@ -1,6 +1,7 @@
 <?php
 require_once '../../../../includes/connection.php';
 require_once '../../../../includes/posting_lock.php';
+require_once '../../../../includes/activity-logger.php';
 
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
@@ -349,6 +350,13 @@ if (!$lockCheck['allowed']) {
                     $input['amountPaid']
                 ]);
     }
+
+    logActivity(
+        $pdo, $tenant_id, $user_id, 'create', 'Sale Return', $invoice_id, $billNo,
+        "Created sale return \"$billNo\", net amount " . number_format((float)$input['netAmount'], 2),
+        null,
+        ['bill_no' => $billNo, 'customer_id' => $input['customerId'], 'sale_date' => $input['saleDate'], 'net_amount' => (float)$input['netAmount'], 'status' => $status]
+    );
 
     $pdo->commit();
 

@@ -3,6 +3,7 @@ error_reporting(0);
 ini_set('display_errors', 0);
 
 require_once '../../../includes/connection.php';
+require_once '../../../includes/activity-logger.php';
 
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
@@ -91,10 +92,10 @@ function handleGet() {
 }
 
 function handlePost($input) {
-    global $pdo, $tenant_id;
-    
+    global $pdo, $tenant_id, $user_id;
+
     $type = $input['type'] ?? '';
-    
+
     try {
         switch ($type) {
             case 'head':
@@ -103,47 +104,53 @@ function handlePost($input) {
                     echo json_encode(['success' => false, 'message' => 'Name is required']);
                     return;
                 }
-                
+
                 $stmt = $pdo->prepare("INSERT INTO accounts_head (tenant_id, name) VALUES (?, ?)");
                 $stmt->execute([$tenant_id, $name]);
-                
-                echo json_encode(['success' => true, 'message' => 'Account head created successfully', 'id' => $pdo->lastInsertId()]);
+                $headId = $pdo->lastInsertId();
+
+                logActivity($pdo, $tenant_id, $user_id, 'create', 'Chart of Accounts', $headId, $name, "Created account head \"$name\"", null, ['name' => $name]);
+
+                echo json_encode(['success' => true, 'message' => 'Account head created successfully', 'id' => $headId]);
                 break;
-                
+
             case 'sub':
                 $account_head_id = $input['account_head_id'] ?? 0;
                 $name = $input['name'] ?? '';
                 $parent_id = $input['parent_id'] ?? null;
-                
+
                 if (empty($name) || !$account_head_id) {
                     echo json_encode(['success' => false, 'message' => 'Name and account head are required']);
                     return;
                 }
-                
+
                 $stmt = $pdo->prepare("INSERT INTO sub_accounts (tenant_id, account_head_id, name, parent_id) VALUES (?, ?, ?, ?)");
                 $stmt->execute([$tenant_id, $account_head_id, $name, $parent_id]);
-                
-                echo json_encode(['success' => true, 'message' => 'Sub-account created successfully', 'id' => $pdo->lastInsertId()]);
+                $subId = $pdo->lastInsertId();
+
+                logActivity($pdo, $tenant_id, $user_id, 'create', 'Chart of Accounts', $subId, $name, "Created sub-account \"$name\"", null, ['name' => $name, 'account_head_id' => $account_head_id, 'parent_id' => $parent_id]);
+
+                echo json_encode(['success' => true, 'message' => 'Sub-account created successfully', 'id' => $subId]);
                 break;
-                
+
             case 'account':
                 $sub_account_id = $input['sub_account_id'] ?? 0;
                 $name = $input['name'] ?? '';
                 $debit = $input['debit'] ?? 0;
                 $credit = $input['credit'] ?? 0;
-                
+
                 if (empty($name) || !$sub_account_id) {
                     echo json_encode(['success' => false, 'message' => 'Name and sub-account are required']);
                     return;
                 }
-                
+
                 $pdo->beginTransaction();
-                
+
                 try {
                     $stmt = $pdo->prepare("INSERT INTO accounts (tenant_id, sub_account_id, name, debit, credit) VALUES (?, ?, ?, ?, ?)");
                     $stmt->execute([$tenant_id, $sub_account_id, $name, $debit, $credit]);
                     $account_id = $pdo->lastInsertId();
-                    
+
                     // Create double-entry ledger entries if opening balance > 0
                     if ($debit > 0 || $credit > 0) {
                         $stmt = $pdo->prepare("INSERT INTO accounting_ledger (tenant_id, transaction_type, reference_table, reference_id, account_id, date, description, debit, credit) VALUES (?, 'Opening Balance', 'accounts', ?, ?, CURDATE(), 'Opening Balance', ?, ?)");
@@ -154,7 +161,14 @@ function handlePost($input) {
                         // Contra entry against Opening Balance Equity (account_id = 90)
                         $stmt->execute([$tenant_id, $account_id, 90, $credit, $debit]);
                     }
-                    
+
+                    logActivity(
+                        $pdo, $tenant_id, $user_id, 'create', 'Chart of Accounts', $account_id, $name,
+                        "Created account \"$name\", opening " . number_format($debit, 2) . " Dr / " . number_format($credit, 2) . " Cr",
+                        null,
+                        ['name' => $name, 'sub_account_id' => $sub_account_id, 'debit' => $debit, 'credit' => $credit]
+                    );
+
                     $pdo->commit();
                     echo json_encode(['success' => true, 'message' => 'Account created successfully', 'id' => $account_id]);
                 } catch (Exception $e) {
@@ -172,16 +186,16 @@ function handlePost($input) {
 }
 
 function handlePut($input) {
-    global $pdo, $tenant_id;
-    
+    global $pdo, $tenant_id, $user_id;
+
     $type = $input['type'] ?? '';
     $id = $input['id'] ?? 0;
-    
+
     if (!$id) {
         echo json_encode(['success' => false, 'message' => 'ID is required']);
         return;
     }
-    
+
     try {
         switch ($type) {
             case 'head':
@@ -190,43 +204,74 @@ function handlePut($input) {
                     echo json_encode(['success' => false, 'message' => 'Name is required']);
                     return;
                 }
-                
+
+                $oldStmt = $pdo->prepare("SELECT name FROM accounts_head WHERE id = ? AND tenant_id = ?");
+                $oldStmt->execute([$id, $tenant_id]);
+                $oldName = $oldStmt->fetchColumn();
+
                 $stmt = $pdo->prepare("UPDATE accounts_head SET name = ? WHERE id = ? AND tenant_id = ?");
                 $stmt->execute([$name, $id, $tenant_id]);
-                
+
+                if ($oldName !== false) {
+                    $editDescription = $oldName !== $name ? "Updated account head: \"$oldName\" \u{2192} \"$name\"" : "Updated account head \"$name\" - no tracked field changes";
+                    logActivity($pdo, $tenant_id, $user_id, 'update', 'Chart of Accounts', $id, $name, $editDescription, ['name' => $oldName], ['name' => $name]);
+                }
+
                 echo json_encode(['success' => true, 'message' => 'Account head updated successfully']);
                 break;
-                
+
             case 'sub':
                 $account_head_id = $input['account_head_id'] ?? 0;
                 $name = $input['name'] ?? '';
                 $parent_id = $input['parent_id'] ?? null;
-                
+
                 if (empty($name) || !$account_head_id) {
                     echo json_encode(['success' => false, 'message' => 'Name and account head are required']);
                     return;
                 }
-                
+
+                $oldStmt = $pdo->prepare("SELECT account_head_id, name, parent_id FROM sub_accounts WHERE id = ? AND tenant_id = ?");
+                $oldStmt->execute([$id, $tenant_id]);
+                $oldSub = $oldStmt->fetch(PDO::FETCH_ASSOC);
+
                 $stmt = $pdo->prepare("UPDATE sub_accounts SET account_head_id = ?, name = ?, parent_id = ? WHERE id = ? AND tenant_id = ?");
                 $stmt->execute([$account_head_id, $name, $parent_id, $id, $tenant_id]);
-                
+
+                if ($oldSub) {
+                    $newSub = ['account_head_id' => $account_head_id, 'name' => $name, 'parent_id' => $parent_id];
+                    $changeDescriptions = buildChangeDescription($oldSub, $newSub, ['account_head_id' => 'Account Head', 'name' => 'Name', 'parent_id' => 'Parent']);
+                    $editDescription = !empty($changeDescriptions) ? "Updated sub-account \"$name\": " . implode('; ', $changeDescriptions) : "Updated sub-account \"$name\" - no tracked field changes";
+                    logActivity($pdo, $tenant_id, $user_id, 'update', 'Chart of Accounts', $id, $name, $editDescription, $oldSub, $newSub);
+                }
+
                 echo json_encode(['success' => true, 'message' => 'Sub-account updated successfully']);
                 break;
-                
+
             case 'account':
                 $sub_account_id = $input['sub_account_id'] ?? 0;
                 $name = $input['name'] ?? '';
                 $debit = $input['debit'] ?? 0;
                 $credit = $input['credit'] ?? 0;
-                
+
                 if (empty($name) || !$sub_account_id) {
                     echo json_encode(['success' => false, 'message' => 'Name and sub-account are required']);
                     return;
                 }
-                
+
+                $oldStmt = $pdo->prepare("SELECT sub_account_id, name, debit, credit FROM accounts WHERE id = ? AND tenant_id = ?");
+                $oldStmt->execute([$id, $tenant_id]);
+                $oldAccount = $oldStmt->fetch(PDO::FETCH_ASSOC);
+
                 $stmt = $pdo->prepare("UPDATE accounts SET sub_account_id = ?, name = ?, debit = ?, credit = ? WHERE id = ? AND tenant_id = ?");
                 $stmt->execute([$sub_account_id, $name, $debit, $credit, $id, $tenant_id]);
-                
+
+                if ($oldAccount) {
+                    $newAccount = ['sub_account_id' => $sub_account_id, 'name' => $name, 'debit' => $debit, 'credit' => $credit];
+                    $changeDescriptions = buildChangeDescription($oldAccount, $newAccount, ['sub_account_id' => 'Sub-Account', 'name' => 'Name', 'debit' => 'Debit', 'credit' => 'Credit']);
+                    $editDescription = !empty($changeDescriptions) ? "Updated account \"$name\": " . implode('; ', $changeDescriptions) : "Updated account \"$name\" - no tracked field changes";
+                    logActivity($pdo, $tenant_id, $user_id, 'update', 'Chart of Accounts', $id, $name, $editDescription, $oldAccount, $newAccount);
+                }
+
                 echo json_encode(['success' => true, 'message' => 'Account updated successfully']);
                 break;
                 
@@ -239,36 +284,56 @@ function handlePut($input) {
 }
 
 function handleDelete($input) {
-    global $pdo, $tenant_id;
-    
+    global $pdo, $tenant_id, $user_id;
+
     $type = $input['type'] ?? '';
     $id = $input['id'] ?? 0;
-    
+
     if (!$id) {
         echo json_encode(['success' => false, 'message' => 'ID is required']);
         return;
     }
-    
+
     try {
         switch ($type) {
             case 'head':
+                $oldStmt = $pdo->prepare("SELECT * FROM accounts_head WHERE id = ? AND tenant_id = ?");
+                $oldStmt->execute([$id, $tenant_id]);
+                $headRow = $oldStmt->fetch(PDO::FETCH_ASSOC);
+
                 $stmt = $pdo->prepare("DELETE FROM accounts_head WHERE id = ? AND tenant_id = ?");
                 $stmt->execute([$id, $tenant_id]);
-                
+
+                if ($headRow) {
+                    logActivity($pdo, $tenant_id, $user_id, 'delete', 'Chart of Accounts', $id, $headRow['name'], "Deleted account head \"{$headRow['name']}\"", $headRow, null);
+                }
+
                 echo json_encode(['success' => true, 'message' => 'Account head deleted successfully']);
                 break;
-                
+
             case 'sub':
+                $oldStmt = $pdo->prepare("SELECT * FROM sub_accounts WHERE id = ? AND tenant_id = ?");
+                $oldStmt->execute([$id, $tenant_id]);
+                $subRow = $oldStmt->fetch(PDO::FETCH_ASSOC);
+
                 $stmt = $pdo->prepare("DELETE FROM sub_accounts WHERE id = ? AND tenant_id = ?");
                 $stmt->execute([$id, $tenant_id]);
-                
+
+                if ($subRow) {
+                    logActivity($pdo, $tenant_id, $user_id, 'delete', 'Chart of Accounts', $id, $subRow['name'], "Deleted sub-account \"{$subRow['name']}\"", $subRow, null);
+                }
+
                 echo json_encode(['success' => true, 'message' => 'Sub-account deleted successfully']);
                 break;
-                
+
             case 'account':
                 $pdo->beginTransaction();
 
                 try {
+                    $oldStmt = $pdo->prepare("SELECT * FROM accounts WHERE id = ? AND tenant_id = ?");
+                    $oldStmt->execute([$id, $tenant_id]);
+                    $accountRow = $oldStmt->fetch(PDO::FETCH_ASSOC);
+
                     // Delete all ledger entries that reference this account as account_id (all transaction types)
                     $stmt = $pdo->prepare("DELETE FROM accounting_ledger WHERE account_id = ? AND tenant_id = ?");
                     $stmt->execute([$id, $tenant_id]);
@@ -276,6 +341,10 @@ function handleDelete($input) {
                     // Delete account
                     $stmt = $pdo->prepare("DELETE FROM accounts WHERE id = ? AND tenant_id = ?");
                     $stmt->execute([$id, $tenant_id]);
+
+                    if ($accountRow) {
+                        logActivity($pdo, $tenant_id, $user_id, 'delete', 'Chart of Accounts', $id, $accountRow['name'], "Deleted account \"{$accountRow['name']}\"", $accountRow, null);
+                    }
 
                     $pdo->commit();
                     echo json_encode(['success' => true, 'message' => 'Account deleted successfully']);

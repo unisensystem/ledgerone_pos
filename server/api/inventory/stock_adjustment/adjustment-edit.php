@@ -1,5 +1,6 @@
 <?php
 require_once '../../../../includes/connection.php';
+require_once '../../../../includes/activity-logger.php';
 
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
@@ -44,8 +45,19 @@ try {
         $total_amount += $item['gross'];
     }
     
+    // Grab old values before anything changes, for the Activity Log diff
+    $stmt = $pdo->prepare("SELECT adjustment_code, branch_id, company_id, adjustment_type, main_reason, primary_reason, secondary_reason, remarks, total_amount, total_items FROM stock_adjustment WHERE tenant_id = ? AND id = ?");
+    $stmt->execute([$tenant_id, $adjustment_id]);
+    $oldAdjustment = $stmt->fetch(PDO::FETCH_ASSOC);
+    if (!$oldAdjustment) {
+        throw new Exception('Adjustment not found');
+    }
+    $stmt = $pdo->prepare("SELECT product_id, unit_id, qty, rate FROM stock_adjustment_items WHERE tenant_id = ? AND adjustment_id = ? ORDER BY product_id, unit_id, id");
+    $stmt->execute([$tenant_id, $adjustment_id]);
+    $oldItems = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
     $pdo->beginTransaction();
-    
+
     // Delete old entries
     $stmt = $pdo->prepare("DELETE FROM accounting_ledger WHERE tenant_id = ? AND reference_table = 'stock_adjustment' AND reference_id = ?");
     $stmt->execute([$tenant_id, $adjustment_id]);
@@ -172,8 +184,47 @@ try {
         ]);
     }
     
+    $newAdjustment = [
+        'adjustment_code' => $oldAdjustment['adjustment_code'],
+        'branch_id' => $branch_id,
+        'company_id' => $company_id,
+        // adjustment_type is stored as an ENUM('Increase','Decrease') - MySQL matches ENUM
+        // values case-insensitively on write but always reads back the label's defined
+        // casing, so normalize here to match what $oldAdjustment (fresh from the DB) has,
+        // otherwise every edit falsely shows "Increase -> increase" even when unchanged.
+        'adjustment_type' => ucfirst(strtolower($adjustment_type)),
+        'main_reason' => $main_reason,
+        'primary_reason' => $primary_reason,
+        'secondary_reason' => $secondary_reason,
+        'remarks' => $remarks,
+        'total_amount' => $total_amount,
+        'total_items' => $total_items
+    ];
+    $changeDescriptions = buildChangeDescription($oldAdjustment, $newAdjustment, [
+        'branch_id' => 'Branch',
+        'company_id' => 'Company',
+        'adjustment_type' => 'Adjustment Type',
+        'main_reason' => 'Main Reason',
+        'primary_reason' => 'Primary Reason',
+        'secondary_reason' => 'Secondary Reason',
+        'remarks' => 'Remarks',
+        'total_amount' => 'Total Amount'
+    ]);
+    // Old items (DB) use 'qty', new items (submitted) use 'quantity' - normalize to a
+    // common key before comparing.
+    $newItemsNormalized = array_map(function ($item) {
+        return ['product_id' => $item['product_id'], 'unit_id' => $item['unit_id'] ?? null, 'qty' => $item['quantity'], 'rate' => $item['rate']];
+    }, $items);
+    if (itemsChanged($oldItems, $newItemsNormalized, ['product_id', 'unit_id', 'qty', 'rate'])) {
+        $changeDescriptions[] = 'Items updated';
+    }
+    $editDescription = !empty($changeDescriptions)
+        ? "Updated stock adjustment \"{$oldAdjustment['adjustment_code']}\": " . implode('; ', $changeDescriptions)
+        : "Updated stock adjustment \"{$oldAdjustment['adjustment_code']}\" - no tracked field changes";
+    logActivity($pdo, $tenant_id, $user_id, 'update', 'Stock Adjustment', $adjustment_id, $oldAdjustment['adjustment_code'], $editDescription, $oldAdjustment, $newAdjustment);
+
     $pdo->commit();
-    
+
     echo json_encode([
         'success' => true,
         'message' => 'Stock adjustment updated successfully'

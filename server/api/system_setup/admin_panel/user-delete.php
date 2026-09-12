@@ -1,5 +1,6 @@
 <?php
 require_once '../../../../includes/connection.php';
+require_once '../../../../includes/activity-logger.php';
 
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
@@ -31,9 +32,21 @@ if (!$userId) {
 }
 
 try {
+    $oldStmt = $pdo->prepare("SELECT full_name, email, phone, employee_id, is_active FROM users WHERE id = ? AND tenant_id = ?");
+    $oldStmt->execute([$userId, $tenant_id]);
+    $userRow = $oldStmt->fetch(PDO::FETCH_ASSOC);
+
     $stmt = $pdo->prepare("DELETE FROM users WHERE id = ? AND tenant_id = ?");
     $stmt->execute([$userId, $tenant_id]);
-    
+
+    if ($userRow) {
+        logActivity(
+            $pdo, $tenant_id, $user_id, 'delete', 'User', $userId, $userRow['email'],
+            "Deleted user \"{$userRow['full_name']}\" ({$userRow['email']})",
+            $userRow, null
+        );
+    }
+
     echo json_encode(['success' => true, 'message' => 'User deleted successfully']);
 } catch (Exception $e) {
     http_response_code(500);

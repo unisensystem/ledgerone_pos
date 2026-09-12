@@ -1,5 +1,6 @@
 <?php
 require_once '../../../../includes/connection.php';
+require_once '../../../../includes/activity-logger.php';
 
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
@@ -31,9 +32,9 @@ try {
     }
     
     // Verify tax rate exists and belongs to tenant
-    $stmt = $pdo->prepare("SELECT tenant_id FROM tax_rates WHERE id = ?");
+    $stmt = $pdo->prepare("SELECT * FROM tax_rates WHERE id = ?");
     $stmt->execute([$tax_rate_id]);
-    $taxRate = $stmt->fetch();
+    $taxRate = $stmt->fetch(PDO::FETCH_ASSOC);
     
     if (!$taxRate) {
         echo json_encode(['success' => false, 'message' => 'Tax rate not found']);
@@ -56,7 +57,13 @@ try {
     // Delete tax rate
     $stmt = $pdo->prepare("DELETE FROM tax_rates WHERE id = ?");
     $stmt->execute([$tax_rate_id]);
-    
+
+    logActivity(
+        $pdo, $tenant_id, $user_id, 'delete', 'Tax Rate', $tax_rate_id, $taxRate['tax_name'],
+        "Deleted tax rate \"{$taxRate['tax_name']}\" ({$taxRate['rate_percentage']}%)",
+        $taxRate, null
+    );
+
     echo json_encode([
         'success' => true,
         'message' => 'Tax rate deleted successfully'

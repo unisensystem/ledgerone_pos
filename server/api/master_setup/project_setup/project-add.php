@@ -1,5 +1,6 @@
 <?php
 require_once '../../../../includes/connection.php';
+require_once '../../../../includes/activity-logger.php';
 session_start();
 header('Content-Type: application/json');
 
@@ -53,6 +54,13 @@ try {
             $ins->execute([$project_id, $emp_id, $tenant_id]);
         }
     }
+
+    logActivity(
+        $pdo, $tenant_id, $user_id, 'create', 'Project', $project_id, $project_code,
+        "Created project \"{$input['project_name']}\" ($project_code)",
+        null,
+        ['project_code' => $project_code, 'project_name' => $input['project_name'], 'company_id' => $input['company_id'], 'status' => $input['status'] ?? 'active']
+    );
 
     echo json_encode(['success' => true, 'message' => 'Project created successfully', 'project_id' => $project_id, 'project_code' => $project_code]);
 } catch (Exception $e) {

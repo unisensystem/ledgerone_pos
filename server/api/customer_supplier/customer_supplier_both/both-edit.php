@@ -1,5 +1,6 @@
 <?php
 require_once '../../../../includes/connection.php';
+require_once '../../../../includes/activity-logger.php';
 
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
@@ -70,13 +71,20 @@ try {
             throw new Exception('Customer ID and Party Name are required');
         }
 
-        $stmt = $pdo->prepare("SELECT id, linked_supplier_id FROM customers WHERE id = ? AND tenant_id = ? AND is_both = 1");
+        $stmt = $pdo->prepare("SELECT id, linked_supplier_id, customer_code, customer_name, address, primary_phone, secondary_phone, email, credit_limit, is_blacklisted FROM customers WHERE id = ? AND tenant_id = ? AND is_both = 1");
         $stmt->execute([$customer_id, $tenant_id]);
-        $existing = $stmt->fetch();
+        $existing = $stmt->fetch(PDO::FETCH_ASSOC);
         if (!$existing) {
             throw new Exception('Customer + Supplier (Both) record not found');
         }
         $supplier_id = $existing['linked_supplier_id'];
+
+        $oldSupplierRow = null;
+        if ($supplier_id) {
+            $supStmt = $pdo->prepare("SELECT supplier_code, supplier_name, brand_name, address, primary_phone, secondary_phone, email, credit_days, is_blacklisted FROM suppliers WHERE id = ? AND tenant_id = ?");
+            $supStmt->execute([$supplier_id, $tenant_id]);
+            $oldSupplierRow = $supStmt->fetch(PDO::FETCH_ASSOC);
+        }
 
         $partyName = trim($input['partyName']);
         $address = !empty($input['address']) ? trim($input['address']) : null;
@@ -329,6 +337,38 @@ try {
                     }
                 }
             }
+        }
+
+        $newCustomer = [
+            'customer_code' => $existing['customer_code'], 'customer_name' => $partyName, 'address' => $address,
+            'primary_phone' => $primaryPhone, 'secondary_phone' => $secondaryPhone, 'email' => $email,
+            'credit_limit' => floatval($input['balanceLimit'] ?? 0), 'is_blacklisted' => $isBlacklisted
+        ];
+        $custChangeDescriptions = buildChangeDescription($existing, $newCustomer, [
+            'customer_name' => 'Name', 'address' => 'Address', 'primary_phone' => 'Primary Phone',
+            'secondary_phone' => 'Secondary Phone', 'email' => 'Email', 'credit_limit' => 'Credit Limit', 'is_blacklisted' => 'Blacklisted'
+        ]);
+        $custEditDescription = !empty($custChangeDescriptions)
+            ? "Updated customer \"$partyName\" ({$existing['customer_code']}) via Both entry: " . implode('; ', $custChangeDescriptions)
+            : "Updated customer \"$partyName\" ({$existing['customer_code']}) via Both entry - no tracked field changes";
+        logActivity($pdo, $tenant_id, $user_id, 'update', 'Customer', $customer_id, $existing['customer_code'], $custEditDescription, $existing, $newCustomer);
+
+        if ($supplier_id && $oldSupplierRow) {
+            $newSupplier = [
+                'supplier_code' => $oldSupplierRow['supplier_code'], 'supplier_name' => $partyName,
+                'brand_name' => !empty($input['brandNameSupplier']) ? trim($input['brandNameSupplier']) : null,
+                'address' => $address, 'primary_phone' => $primaryPhone, 'secondary_phone' => $secondaryPhone, 'email' => $email,
+                'credit_days' => isset($input['creditDays']) && $input['creditDays'] !== '' ? (int)$input['creditDays'] : 0,
+                'is_blacklisted' => $isBlacklisted
+            ];
+            $suppChangeDescriptions = buildChangeDescription($oldSupplierRow, $newSupplier, [
+                'supplier_name' => 'Name', 'brand_name' => 'Brand', 'address' => 'Address', 'primary_phone' => 'Primary Phone',
+                'secondary_phone' => 'Secondary Phone', 'email' => 'Email', 'credit_days' => 'Credit Days', 'is_blacklisted' => 'Blacklisted'
+            ]);
+            $suppEditDescription = !empty($suppChangeDescriptions)
+                ? "Updated supplier \"$partyName\" ({$oldSupplierRow['supplier_code']}) via Both entry: " . implode('; ', $suppChangeDescriptions)
+                : "Updated supplier \"$partyName\" ({$oldSupplierRow['supplier_code']}) via Both entry - no tracked field changes";
+            logActivity($pdo, $tenant_id, $user_id, 'update', 'Supplier', $supplier_id, $oldSupplierRow['supplier_code'], $suppEditDescription, $oldSupplierRow, $newSupplier);
         }
 
         $pdo->commit();

@@ -1,5 +1,6 @@
 <?php
 require_once '../../../../includes/connection.php';
+require_once '../../../../includes/activity-logger.php';
 require_once 'purchase-invoice-tax-helper.php';
 
 header('Content-Type: application/json');
@@ -224,8 +225,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
     }
     
     try {
+        // Grab old values before anything changes, for the Activity Log diff
+        $stmt = $pdo->prepare("
+            SELECT bill_no, company_id, currency_id, purchase_date, supplier_id, branch_id, container_id, previous_balance,
+                   total_bill, total_discount_percent, total_discount_amount, total_tax_percent, total_tax_amount,
+                   shipping_fees, net_amount, supplier_invoice_no, purchase_order_id, bilty_no, transport_name, remarks, project_id
+            FROM purchase_invoice WHERE id = ? AND tenant_id = ?
+        ");
+        $stmt->execute([$invoice_id, $tenant_id]);
+        $oldInvoice = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$oldInvoice) {
+            http_response_code(404);
+            echo json_encode(['success' => false, 'message' => 'Invoice not found']);
+            exit;
+        }
+        $stmt = $pdo->prepare("SELECT product_id, uom_id, quantity, purchase_price, discount_percent, tax_percent FROM purchase_invoice_items WHERE purchase_invoice_id = ? AND tenant_id = ? ORDER BY product_id, uom_id, id");
+        $stmt->execute([$invoice_id, $tenant_id]);
+        $oldItems = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
         $pdo->beginTransaction();
-        
+
         // Update purchase invoice
         $stmt = $pdo->prepare("
             UPDATE purchase_invoice SET
@@ -398,8 +417,55 @@ if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
             }
         }
 
+        $newInvoice = [
+            'bill_no' => $oldInvoice['bill_no'],
+            'company_id' => $input['companyId'],
+            'currency_id' => $input['currencyId'],
+            'purchase_date' => $input['purchaseDate'],
+            'supplier_id' => $input['supplierId'],
+            'branch_id' => $input['branchId'],
+            'container_id' => $input['containerId'] ?? null,
+            'previous_balance' => extractBalanceAmount($input['previousBalance'] ?? '0.000'),
+            'total_bill' => $input['totalBill'],
+            'total_discount_percent' => $input['totalDiscountPercent'] ?? 0,
+            'total_discount_amount' => $input['totalDiscountAmount'] ?? 0,
+            'total_tax_percent' => $input['totalTaxPercent'] ?? 0,
+            'total_tax_amount' => $input['totalTaxAmount'] ?? 0,
+            'shipping_fees' => $input['shippingFees'] ?? 0,
+            'net_amount' => $input['netAmount'],
+            'supplier_invoice_no' => $input['supplierInvoiceNo'],
+            'purchase_order_id' => $input['purchaseOrderId'] ?? null,
+            'bilty_no' => $input['biltyNo'],
+            'transport_name' => $input['transportName'],
+            'remarks' => $input['remarks'] ?? null,
+            'project_id' => $input['projectId'] ?? null
+        ];
+        $changeDescriptions = buildChangeDescription($oldInvoice, $newInvoice, [
+            'purchase_date' => 'Purchase Date', 'supplier_id' => 'Supplier', 'branch_id' => 'Branch',
+            'total_bill' => 'Total Bill', 'total_discount_percent' => 'Discount %', 'total_discount_amount' => 'Discount Amount',
+            'total_tax_amount' => 'Tax Amount', 'shipping_fees' => 'Shipping Fees', 'net_amount' => 'Net Amount',
+            'supplier_invoice_no' => 'Supplier Invoice No', 'bilty_no' => 'Bilty No', 'transport_name' => 'Transport',
+            'remarks' => 'Remarks'
+        ]);
+        $newItemsFlat = [];
+        foreach ($input['items'] as $item) {
+            foreach ($item['unitEntries'] as $unitEntry) {
+                $newItemsFlat[] = [
+                    'product_id' => $item['productId'], 'uom_id' => $unitEntry['uomId'], 'quantity' => $unitEntry['quantity'],
+                    'purchase_price' => $item['purchasePrice'], 'discount_percent' => $item['discountPercent'] ?? 0, 'tax_percent' => $item['taxPercent'] ?? 0
+                ];
+            }
+        }
+        if (itemsChanged($oldItems, $newItemsFlat, ['product_id', 'uom_id', 'quantity', 'purchase_price', 'discount_percent', 'tax_percent'])) {
+            $changeDescriptions[] = 'Items updated';
+        }
+        $editDescription = !empty($changeDescriptions)
+            ? "Updated purchase invoice \"{$oldInvoice['bill_no']}\": " . implode('; ', $changeDescriptions)
+            : "Updated purchase invoice \"{$oldInvoice['bill_no']}\" - no tracked field changes";
+        logActivity($pdo, $tenant_id, $user_id, 'update', 'Purchase Invoice', $invoice_id, $oldInvoice['bill_no'], $editDescription, $oldInvoice, $newInvoice);
+
         $pdo->commit();
-        
+
         echo json_encode(['success' => true, 'message' => 'Purchase invoice updated successfully']);
         
     } catch (Exception $e) {

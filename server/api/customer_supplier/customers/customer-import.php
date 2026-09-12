@@ -1,5 +1,6 @@
 <?php
 require_once '../../../../includes/connection.php';
+require_once '../../../../includes/activity-logger.php';
 require_once '../../../../vendor/autoload.php'; // composer require phpoffice/phpspreadsheet
 
 use PhpOffice\PhpSpreadsheet\IOFactory;
@@ -398,6 +399,13 @@ try {
                 $user_id,
                 $user_id
             ]);
+
+            logActivity(
+                $pdo, $tenant_id, $user_id, 'create', 'Customer', $nextId, $customerCode,
+                "Created customer \"$customerName\" ($customerCode) via bulk import",
+                null,
+                ['customer_code' => $customerCode, 'customer_name' => $customerName, 'primary_phone' => $primaryPhone, 'company_id' => $company_id]
+            );
 
             $existing[$dupKey] = true; // prevent duplicates within the same file too
             $inserted++;

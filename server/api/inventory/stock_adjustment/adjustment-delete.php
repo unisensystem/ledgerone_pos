@@ -1,5 +1,6 @@
 <?php
 require_once '../../../../includes/connection.php';
+require_once '../../../../includes/activity-logger.php';
 
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
@@ -25,7 +26,15 @@ if (!$user_id || !$tenant_id) {
 try {
     $data = json_decode(file_get_contents('php://input'), true);
     $adjustment_id = $data['id'];
-    
+
+    // Grab values before deletion, for the Activity Log (record is gone afterward)
+    $stmt = $pdo->prepare("SELECT adjustment_code, branch_id, company_id, adjustment_type, main_reason, primary_reason, secondary_reason, remarks, total_amount, total_items FROM stock_adjustment WHERE tenant_id = ? AND id = ?");
+    $stmt->execute([$tenant_id, $adjustment_id]);
+    $adjustmentRow = $stmt->fetch(PDO::FETCH_ASSOC);
+    if (!$adjustmentRow) {
+        throw new Exception('Adjustment not found');
+    }
+
     $pdo->beginTransaction();
     
     // Delete from accounting_ledger
@@ -56,8 +65,14 @@ try {
     ");
     $stmt->execute([$tenant_id, $adjustment_id]);
     
+    logActivity(
+        $pdo, $tenant_id, $user_id, 'delete', 'Stock Adjustment', $adjustment_id, $adjustmentRow['adjustment_code'],
+        "Deleted stock adjustment \"{$adjustmentRow['adjustment_code']}\"",
+        $adjustmentRow, null
+    );
+
     $pdo->commit();
-    
+
     echo json_encode([
         'success' => true,
         'message' => 'Adjustment deleted successfully'

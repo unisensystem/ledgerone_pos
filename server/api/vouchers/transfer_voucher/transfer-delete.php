@@ -1,5 +1,6 @@
 <?php
 require_once '../../../../includes/connection.php';
+require_once '../../../../includes/activity-logger.php';
 header('Content-Type: application/json');
 if (session_status() == PHP_SESSION_NONE) session_start();
 $user_id   = $_SESSION['user_id']   ?? null;
@@ -11,7 +12,7 @@ $voucher_id = $_GET['id'] ?? null;
 if (!$voucher_id) { http_response_code(400); echo json_encode(['error' => 'Voucher ID required']); exit(); }
 
 try {
-    $stmt = $pdo->prepare("SELECT payment_method_id FROM transfer_voucher WHERE id = ? AND tenant_id = ?");
+    $stmt = $pdo->prepare("SELECT voucher_number, payment_method_id, voucher_date, amount, from_type, to_type FROM transfer_voucher WHERE id = ? AND tenant_id = ?");
     $stmt->execute([$voucher_id, $tenant_id]);
     $voucher = $stmt->fetch(PDO::FETCH_ASSOC);
     if (!$voucher) { echo json_encode(['success' => false, 'error' => 'Voucher not found']); exit(); }
@@ -31,6 +32,12 @@ try {
     // Delete voucher
     $stmt = $pdo->prepare("DELETE FROM transfer_voucher WHERE id = ? AND tenant_id = ?");
     $stmt->execute([$voucher_id, $tenant_id]);
+
+    logActivity(
+        $pdo, $tenant_id, $user_id, 'delete', 'Transfer Voucher', $voucher_id, $voucher['voucher_number'],
+        "Deleted transfer voucher \"{$voucher['voucher_number']}\"",
+        $voucher, null
+    );
 
     $pdo->commit();
     echo json_encode(['success' => true, 'message' => 'Transfer voucher deleted successfully']);

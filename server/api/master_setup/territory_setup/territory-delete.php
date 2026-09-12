@@ -1,5 +1,6 @@
 <?php
 require_once '../../../../includes/connection.php';
+require_once '../../../../includes/activity-logger.php';
 
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
@@ -27,34 +28,34 @@ $type = $data['type'] ?? '';
 $id = $data['id'] ?? 0;
 
 try {
-    switch ($type) {
-        case 'country':
-            $stmt = $pdo->prepare("DELETE FROM countries WHERE id = ? AND tenant_id = ?");
-            break;
+    $typeConfig = [
+        'country' => ['table' => 'countries', 'column' => 'country_name'],
+        'region'  => ['table' => 'regions', 'column' => 'region_name'],
+        'city'    => ['table' => 'cities', 'column' => 'city_name'],
+        'zone'    => ['table' => 'city_zones', 'column' => 'city_zone_name'],
+        'area'    => ['table' => 'areas', 'column' => 'area_name'],
+    ];
 
-        case 'region':
-            $stmt = $pdo->prepare("DELETE FROM regions WHERE id = ? AND tenant_id = ?");
-            break;
-
-        case 'city':
-            $stmt = $pdo->prepare("DELETE FROM cities WHERE id = ? AND tenant_id = ?");
-            break;
-
-        case 'zone':
-            $stmt = $pdo->prepare("DELETE FROM city_zones WHERE id = ? AND tenant_id = ?");
-            break;
-
-        case 'area':
-            $stmt = $pdo->prepare("DELETE FROM areas WHERE id = ? AND tenant_id = ?");
-            break;
-
-        default:
-            http_response_code(400);
-            echo json_encode(['success' => false, 'message' => 'Invalid type']);
-            exit;
+    if (!isset($typeConfig[$type])) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'message' => 'Invalid type']);
+        exit;
     }
 
+    $table = $typeConfig[$type]['table'];
+    $column = $typeConfig[$type]['column'];
+
+    $oldStmt = $pdo->prepare("SELECT $column as name FROM $table WHERE id = ? AND tenant_id = ?");
+    $oldStmt->execute([$id, $tenant_id]);
+    $oldRow = $oldStmt->fetch(PDO::FETCH_ASSOC);
+
+    $stmt = $pdo->prepare("DELETE FROM $table WHERE id = ? AND tenant_id = ?");
     $stmt->execute([$id, $tenant_id]);
+
+    if ($oldRow) {
+        logActivity($pdo, $tenant_id, $user_id, 'delete', 'Territory', $id, $oldRow['name'], "Deleted $type \"{$oldRow['name']}\"", ['type' => $type, 'name' => $oldRow['name']], null);
+    }
+
     echo json_encode(['success' => true]);
 } catch (Exception $e) {
     http_response_code(500);

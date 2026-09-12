@@ -1,6 +1,7 @@
 <?php
 require_once '../../../../includes/connection.php';
 require_once '../../../../includes/posting_lock.php';
+require_once '../../../../includes/activity-logger.php';
 
 require_once 'invoice-tax-helper.php';
 
@@ -458,6 +459,24 @@ if ($status === 'Posted' || $status === 'Draft') {
             ]);
         }
     }
+
+    logActivity(
+        $pdo, $tenant_id, $user_id, 'create', 'Sale Invoice', $invoice_id, $billNo,
+        "Created sale invoice \"$billNo\" (" . count($input['items']) . " item(s), net " . number_format($input['netAmount'], 2) . ")",
+        null,
+        [
+            'bill_no' => $billNo, 'sale_date' => $input['saleDate'], 'customer_id' => $input['customerId'],
+            'branch_id' => $input['branchId'], 'company_id' => $input['companyId'] ?? null, 'currency_id' => $input['currencyId'],
+            'sale_officer_id' => $input['salesOfficerId'] ?? null, 'supplier_man_id' => $input['supplierManId'] ?? null,
+            'brand_id' => $input['brandId'] ?? null, 'sale_order_id' => $input['saleOrderId'] ?? null,
+            'bilty_no' => $input['biltyNo'] ?? null, 'transport_name' => $input['transportName'] ?? null,
+            'total_bill' => $input['totalBill'], 'total_discount_percent' => $input['totalDiscountPercent'] ?? 0,
+            'total_discount_amount' => $input['totalDiscountAmount'] ?? 0, 'shipping_fees' => $input['shippingFees'] ?? 0,
+            'net_amount' => $input['netAmount'], 'invoice_type' => $input['invoiceType'] ?? 'Cash',
+            'due_date' => $input['dueDate'] ?? null, 'remarks' => $input['remarks'] ?? null, 'status' => $status,
+            'amount_paid' => $input['amountPaid'] ?? 0, 'items' => $input['items']
+        ]
+    );
 
     $pdo->commit();
 

@@ -1,5 +1,6 @@
 <?php
 require_once '../../../../includes/connection.php';
+require_once '../../../../includes/activity-logger.php';
 
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
@@ -144,6 +145,13 @@ try {
         $user_id
     ]);
     
+    logActivity(
+        $pdo, $tenant_id, $user_id, 'update', 'Meter Invoice', $input['invoice_id'], "Station #{$invoice['station_id']} - {$invoice['usage_date']}",
+        "Completed meter reading: Opening {$invoice['opening_reading']} \u{2192} Closing {$input['closing_reading']}, Dispensed $totalDispensed @ {$input['rate']}, Revenue " . number_format($totalRevenue, 2),
+        ['opening_reading' => $invoice['opening_reading'], 'closing_reading' => null, 'rate' => null, 'total_revenue' => null],
+        ['opening_reading' => $invoice['opening_reading'], 'closing_reading' => $input['closing_reading'], 'rate' => $input['rate'], 'total_revenue' => $totalRevenue]
+    );
+
     $pdo->commit();
     echo json_encode(['success' => true, 'message' => 'Invoice completed successfully']);
     

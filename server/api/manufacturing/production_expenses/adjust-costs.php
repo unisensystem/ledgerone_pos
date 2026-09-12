@@ -1,5 +1,6 @@
 <?php
 require_once '../../../../includes/connection.php';
+require_once '../../../../includes/activity-logger.php';
 
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
@@ -196,6 +197,14 @@ try {
                     count($sales),
                     $user_id
                 ]);
+                $adjustmentId = $pdo->lastInsertId();
+
+                logActivity(
+                    $pdo, $tenant_id, $user_id, 'update', 'Cost Adjustment', $adjustmentId, "Order #$po_id / Product #{$comp['product_id']}",
+                    "Cost adjustment for order #$po_id, product #{$comp['product_id']}: Unit cost " . number_format($old_unit_cost, 2) . " \u{2192} " . number_format($new_unit_cost, 2) . " ({$comp['completed_qty']} units affected, {$comp['completed_qty']} qty, " . count($sales) . " sale(s) adjusted)",
+                    ['old_unit_cost' => $old_unit_cost],
+                    ['new_unit_cost' => $new_unit_cost, 'cost_variance' => $cost_variance, 'period_from' => $period_from, 'period_to' => $period_to]
+                );
             }
         }
         

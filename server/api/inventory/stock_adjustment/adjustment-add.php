@@ -1,6 +1,7 @@
 <?php
 require_once '../../../../includes/connection.php';
 require_once '../../../../includes/posting_lock.php';
+require_once '../../../../includes/activity-logger.php';
 
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
@@ -169,8 +170,20 @@ try {
         ]);
     }
     
+    logActivity(
+        $pdo, $tenant_id, $user_id, 'create', 'Stock Adjustment', $adjustment_id, $adjustment_code,
+        "Created stock adjustment \"$adjustment_code\" ($adjustment_type, $main_reason, $total_items item(s), total " . number_format($total_amount, 2) . ")",
+        null,
+        [
+            'adjustment_code' => $adjustment_code, 'date' => $date, 'company_id' => $company_id, 'branch_id' => $branch_id,
+            'adjustment_type' => $adjustment_type, 'main_reason' => $main_reason, 'primary_reason' => $primary_reason,
+            'secondary_reason' => $secondary_reason, 'remarks' => $remarks, 'total_amount' => $total_amount,
+            'total_items' => $total_items, 'items' => $items
+        ]
+    );
+
     $pdo->commit();
-    
+
     echo json_encode([
         'success' => true,
         'message' => 'Stock adjustment posted successfully',

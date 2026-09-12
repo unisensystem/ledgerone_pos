@@ -1,5 +1,6 @@
 <?php
 require_once '../../../../includes/connection.php';
+require_once '../../../../includes/activity-logger.php';
 
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
@@ -30,15 +31,22 @@ try {
         throw new Exception('Customer ID is required');
     }
 
-    $stmt = $pdo->prepare("SELECT id, linked_supplier_id FROM customers WHERE id = ? AND tenant_id = ? AND is_both = 1");
+    $stmt = $pdo->prepare("SELECT * FROM customers WHERE id = ? AND tenant_id = ? AND is_both = 1");
     $stmt->execute([$customer_id, $tenant_id]);
-    $customer = $stmt->fetch();
+    $customer = $stmt->fetch(PDO::FETCH_ASSOC);
 
     if (!$customer) {
         throw new Exception('Customer + Supplier (Both) record not found');
     }
 
     $supplier_id = $customer['linked_supplier_id'];
+
+    $supplierRow = null;
+    if ($supplier_id) {
+        $supStmt = $pdo->prepare("SELECT * FROM suppliers WHERE id = ? AND tenant_id = ?");
+        $supStmt->execute([$supplier_id, $tenant_id]);
+        $supplierRow = $supStmt->fetch(PDO::FETCH_ASSOC);
+    }
 
     $pdo->beginTransaction();
 
@@ -62,6 +70,19 @@ try {
             ->execute([$tenant_id, $supplier_id]);
         $pdo->prepare("DELETE FROM suppliers WHERE id = ? AND tenant_id = ?")
             ->execute([$supplier_id, $tenant_id]);
+    }
+
+    logActivity(
+        $pdo, $tenant_id, $user_id, 'delete', 'Customer', $customer_id, $customer['customer_code'],
+        "Deleted customer \"{$customer['customer_name']}\" ({$customer['customer_code']}) via Both entry",
+        $customer, null
+    );
+    if ($supplier_id && $supplierRow) {
+        logActivity(
+            $pdo, $tenant_id, $user_id, 'delete', 'Supplier', $supplier_id, $supplierRow['supplier_code'],
+            "Deleted supplier \"{$supplierRow['supplier_name']}\" ({$supplierRow['supplier_code']}) via Both entry",
+            $supplierRow, null
+        );
     }
 
     $pdo->commit();

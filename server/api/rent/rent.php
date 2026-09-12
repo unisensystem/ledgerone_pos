@@ -1,5 +1,6 @@
 <?php
 require_once '../../../includes/connection.php';
+require_once '../../../includes/activity-logger.php';
 
 header('Content-Type: application/json');
 
@@ -93,6 +94,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $items = json_decode($_POST['items'], true);
     $rent_id = $_POST['rent_id'] ?? null;
+    $wasEdit = (bool)$rent_id;
     
     $nic_picture = null;
     $reference_nic_picture = null;
@@ -117,9 +119,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $pdo->beginTransaction();
         
         if ($rent_id) {
+            // Snapshot old header + items for the Activity Log (before mutation)
+            $oldRentStmt = $pdo->prepare("SELECT rent_no, customer_name, customer_phone, rent_type, rent_rate, total_days, total_rent_amount, remarks FROM rent_management WHERE id = ? AND tenant_id = ?");
+            $oldRentStmt->execute([$rent_id, $tenant_id]);
+            $oldRent = $oldRentStmt->fetch(PDO::FETCH_ASSOC);
+
+            $oldItemsStmt = $pdo->prepare("SELECT product_id, quantity, unit_id, rate FROM rent_items WHERE rent_id = ?");
+            $oldItemsStmt->execute([$rent_id]);
+            $oldRentItems = $oldItemsStmt->fetchAll(PDO::FETCH_ASSOC);
+
             $update_fields = [];
             $update_values = [];
-            
+
             $update_fields[] = "branch_id = ?";
             $update_values[] = $_POST['branch_id'];
             $update_fields[] = "date = ?";
@@ -199,7 +210,35 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $stmt_item->execute([$rent_id, $item['product_id'], $item['item_code'], $item['item_name'], $item['description'], $item['unit_id'], $item['quantity'], $item['rate']]);
             $stmt_stock->execute([$tenant_id, $_POST['branch_id'], $item['product_id'], $rent_id, $item['quantity'], $item['unit_id'], $item['rate'], $_POST['issue_date']]);
         }
-        
+
+        if ($wasEdit) {
+            $newRent = [
+                'rent_no' => $oldRent['rent_no'] ?? $_POST['rent_no'] ?? null, 'customer_name' => $_POST['customer_name'],
+                'customer_phone' => $_POST['customer_phone'], 'rent_type' => $_POST['rent_type'], 'rent_rate' => $_POST['rent_rate'],
+                'total_days' => $_POST['total_days'], 'total_rent_amount' => $_POST['total_rent_amount'], 'remarks' => $_POST['remarks']
+            ];
+            $changeDescriptions = $oldRent ? buildChangeDescription($oldRent, $newRent, [
+                'customer_name' => 'Customer', 'customer_phone' => 'Phone', 'rent_type' => 'Rent Type',
+                'rent_rate' => 'Rate', 'total_days' => 'Total Days', 'total_rent_amount' => 'Total Amount', 'remarks' => 'Remarks'
+            ]) : [];
+            $newItemsForCompare = array_map(fn($it) => ['product_id' => $it['product_id'], 'quantity' => (float)$it['quantity'], 'unit_id' => $it['unit_id'], 'rate' => (float)$it['rate']], $items);
+            if ($oldRentItems && itemsChanged($oldRentItems, $newItemsForCompare, ['product_id', 'quantity', 'unit_id', 'rate'])) {
+                $changeDescriptions[] = 'Items updated';
+            }
+            $rentLabel = $newRent['rent_no'] ?: "Rent #$rent_id";
+            $editDescription = !empty($changeDescriptions)
+                ? "Updated rent \"$rentLabel\": " . implode('; ', $changeDescriptions)
+                : "Updated rent \"$rentLabel\" - no tracked field changes";
+            logActivity($pdo, $tenant_id, $user_id, 'update', 'Rent', $rent_id, $rentLabel, $editDescription, $oldRent, $newRent);
+        } else {
+            logActivity(
+                $pdo, $tenant_id, $user_id, 'create', 'Rent', $rent_id, $_POST['rent_no'],
+                "Issued rent \"{$_POST['rent_no']}\" to \"{$_POST['customer_name']}\", " . count($items) . " item(s), total " . number_format((float)$_POST['total_rent_amount'], 2),
+                null,
+                ['rent_no' => $_POST['rent_no'], 'customer_name' => $_POST['customer_name'], 'rent_type' => $_POST['rent_type'], 'total_rent_amount' => $_POST['total_rent_amount']]
+            );
+        }
+
         $pdo->commit();
         echo json_encode(['success' => true, 'message' => 'Rent saved successfully']);
     } catch (Exception $e) {
@@ -242,7 +281,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
         $stmt->execute([$tenant_id, 'Rent Return', $data['rent_id'], 2, $data['actual_return_date'], "Rent receivable cleared - {$rent['rent_no']}", 0, $total]);
         $stmt->execute([$tenant_id, 'Rent Return', $data['rent_id'], 2, $data['actual_return_date'], "Rent receivable - {$rent['rent_no']}", $total, 0]);
         $stmt->execute([$tenant_id, 'Rent Return', $data['rent_id'], 147, $data['actual_return_date'], "Rent income - {$rent['rent_no']}", 0, $total]);
-        
+
+        logActivity(
+            $pdo, $tenant_id, $user_id, 'update', 'Rent', $data['rent_id'], $rent['rent_no'],
+            "Returned rent \"{$rent['rent_no']}\": late charges " . number_format($data['late_charges'], 2) . ", damage charges " . number_format($data['damage_charges'], 2) . ", net " . number_format($total, 2) . " ({$data['payment_method']})",
+            ['status' => $rent['status'], 'net_amount' => $rent['net_amount']],
+            ['status' => 'Returned', 'net_amount' => $total, 'late_charges' => $data['late_charges'], 'damage_charges' => $data['damage_charges'], 'payment_method' => $data['payment_method']]
+        );
+
         $pdo->commit();
         echo json_encode(['success' => true, 'message' => 'Rent returned successfully']);
     } catch (Exception $e) {
@@ -262,20 +308,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'DELETE') {
     }
     
     try {
+        $oldRentStmt = $pdo->prepare("SELECT * FROM rent_management WHERE id = ? AND tenant_id = ?");
+        $oldRentStmt->execute([$id, $tenant_id]);
+        $rentRow = $oldRentStmt->fetch(PDO::FETCH_ASSOC);
+
         $pdo->beginTransaction();
-        
+
         $stmt = $pdo->prepare("DELETE FROM rent_items WHERE rent_id = ?");
         $stmt->execute([$id]);
-        
+
         $stmt = $pdo->prepare("DELETE FROM stock_ledger WHERE reference_table = 'rent_management' AND reference_id = ?");
         $stmt->execute([$id]);
-        
+
         $stmt = $pdo->prepare("DELETE FROM accounting_ledger WHERE reference_table = 'rent_management' AND reference_id = ?");
         $stmt->execute([$id]);
-        
+
         $stmt = $pdo->prepare("DELETE FROM rent_management WHERE id = ? AND tenant_id = ?");
         $stmt->execute([$id, $tenant_id]);
-        
+
+        if ($rentRow) {
+            logActivity(
+                $pdo, $tenant_id, $user_id, 'delete', 'Rent', $id, $rentRow['rent_no'],
+                "Deleted rent \"{$rentRow['rent_no']}\" (\"{$rentRow['customer_name']}\")",
+                $rentRow, null
+            );
+        }
+
         $pdo->commit();
         echo json_encode(['success' => true, 'message' => 'Rent deleted successfully']);
     } catch (Exception $e) {

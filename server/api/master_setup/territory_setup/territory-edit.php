@@ -1,5 +1,6 @@
 <?php
 require_once '../../../../includes/connection.php';
+require_once '../../../../includes/activity-logger.php';
 
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
@@ -28,36 +29,36 @@ $id = $data['id'] ?? 0;
 $name = $data['name'] ?? '';
 
 try {
-    switch ($type) {
-        case 'country':
-            $stmt = $pdo->prepare("UPDATE countries SET country_name = ? WHERE id = ? AND tenant_id = ?");
-            $stmt->execute([$name, $id, $tenant_id]);
-            break;
+    $typeConfig = [
+        'country' => ['table' => 'countries', 'column' => 'country_name'],
+        'region'  => ['table' => 'regions', 'column' => 'region_name'],
+        'city'    => ['table' => 'cities', 'column' => 'city_name'],
+        'zone'    => ['table' => 'city_zones', 'column' => 'city_zone_name'],
+        'area'    => ['table' => 'areas', 'column' => 'area_name'],
+    ];
 
-        case 'region':
-            $stmt = $pdo->prepare("UPDATE regions SET region_name = ? WHERE id = ? AND tenant_id = ?");
-            $stmt->execute([$name, $id, $tenant_id]);
-            break;
+    if (!isset($typeConfig[$type])) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'message' => 'Invalid type']);
+        exit;
+    }
 
-        case 'city':
-            $stmt = $pdo->prepare("UPDATE cities SET city_name = ? WHERE id = ? AND tenant_id = ?");
-            $stmt->execute([$name, $id, $tenant_id]);
-            break;
+    $table = $typeConfig[$type]['table'];
+    $column = $typeConfig[$type]['column'];
 
-        case 'zone':
-            $stmt = $pdo->prepare("UPDATE city_zones SET city_zone_name = ? WHERE id = ? AND tenant_id = ?");
-            $stmt->execute([$name, $id, $tenant_id]);
-            break;
+    $oldStmt = $pdo->prepare("SELECT $column as old_name FROM $table WHERE id = ? AND tenant_id = ?");
+    $oldStmt->execute([$id, $tenant_id]);
+    $oldRow = $oldStmt->fetch(PDO::FETCH_ASSOC);
+    $oldName = $oldRow['old_name'] ?? null;
 
-        case 'area':
-            $stmt = $pdo->prepare("UPDATE areas SET area_name = ? WHERE id = ? AND tenant_id = ?");
-            $stmt->execute([$name, $id, $tenant_id]);
-            break;
+    $stmt = $pdo->prepare("UPDATE $table SET $column = ? WHERE id = ? AND tenant_id = ?");
+    $stmt->execute([$name, $id, $tenant_id]);
 
-        default:
-            http_response_code(400);
-            echo json_encode(['success' => false, 'message' => 'Invalid type']);
-            exit;
+    if ($oldRow) {
+        $editDescription = $oldName !== $name
+            ? "Updated $type: \"$oldName\" \u{2192} \"$name\""
+            : "Updated $type \"$name\" - no tracked field changes";
+        logActivity($pdo, $tenant_id, $user_id, 'update', 'Territory', $id, $name, $editDescription, ['type' => $type, 'name' => $oldName], ['type' => $type, 'name' => $name]);
     }
 
     echo json_encode(['success' => true]);

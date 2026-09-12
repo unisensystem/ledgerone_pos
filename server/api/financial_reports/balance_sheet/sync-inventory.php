@@ -1,6 +1,7 @@
 <?php
 session_start();
 require_once '../../../../includes/connection.php';
+require_once '../../../../includes/activity-logger.php';
 
 header('Content-Type: application/json');
 
@@ -119,6 +120,13 @@ try {
             $stmt->execute([$tenant_id, $end_date, abs($adjustment)]);
         }
     }
+
+    logActivity(
+        $pdo, $tenant_id, $user_id, 'update', 'Inventory Sync', $tenant_id, $end_date,
+        "Synced inventory ledger as of $end_date: calculated value " . number_format($inventory_value, 2) . ", previous balance " . number_format($current_balance, 2) . ", adjustment " . number_format($adjustment, 2),
+        ['previous_balance' => $current_balance],
+        ['end_date' => $end_date, 'inventory_value' => $inventory_value, 'adjustment' => $adjustment]
+    );
 
     $pdo->commit();
 

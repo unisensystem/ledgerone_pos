@@ -1,5 +1,6 @@
 <?php
 require_once '../../../../includes/connection.php';
+require_once '../../../../includes/activity-logger.php';
 
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
@@ -43,20 +44,20 @@ try {
             throw new Exception('Supplier ID and name are required');
         }
 
-        // Check if supplier exists and belongs to tenant
-        $stmt = $pdo->prepare("SELECT id FROM suppliers WHERE id = ? AND tenant_id = ?");
+        // Check if supplier exists and belongs to tenant (grab full row for the Activity Log)
+        $stmt = $pdo->prepare("SELECT supplier_code, supplier_name, brand_name, address, primary_phone, secondary_phone, email, credit_days, is_blacklisted FROM suppliers WHERE id = ? AND tenant_id = ?");
         $stmt->execute([$supplier_id, $tenant_id]);
-        if (!$stmt->fetch()) {
+        $oldSupplier = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$oldSupplier) {
             throw new Exception('Supplier not found');
         }
 
         // Update supplier
-      $sql = "UPDATE suppliers SET 
-        company_id = ?, 
-        salesman_id = ?, 
-        project_id = ?, 
-        supplier_category_id = ?,
-        supplier_name = ?, 
+      $sql = "UPDATE suppliers SET
+        company_id = ?,
+        salesman_id = ?,
+        project_id = ?,
+        supplier_name = ?,
         brand_name = ?, 
         address = ?, 
         city = ?,
@@ -79,7 +80,6 @@ $stmt->execute([
     !empty($input['companyId']) ? (int)$input['companyId'] : null,
     !empty($input['salesmanId']) ? trim($input['salesmanId']) : null,
     !empty($input['projectId']) ? (int)$input['projectId'] : null,
-    !empty($input['categoryId']) ? (int)$input['categoryId'] : null,
     trim($input['supplierName']),
     !empty($input['brandName']) ? trim($input['brandName']) : null,
     !empty($input['address']) ? trim($input['address']) : null,
@@ -181,6 +181,25 @@ $stmt->execute([
                 }
             }
         }
+
+        $newSupplier = [
+            'supplier_code' => $oldSupplier['supplier_code'], 'supplier_name' => trim($input['supplierName']),
+            'brand_name' => !empty($input['brandName']) ? trim($input['brandName']) : null,
+            'address' => !empty($input['address']) ? trim($input['address']) : null,
+            'primary_phone' => !empty($input['primaryPhone']) ? trim($input['primaryPhone']) : null,
+            'secondary_phone' => !empty($input['secondaryPhone']) ? trim($input['secondaryPhone']) : null,
+            'email' => !empty($input['email']) ? trim($input['email']) : null,
+            'credit_days' => isset($input['creditDays']) && $input['creditDays'] !== '' ? (int)$input['creditDays'] : 0,
+            'is_blacklisted' => isset($input['blacklist']) && $input['blacklist'] === true ? 1 : 0,
+        ];
+        $changeDescriptions = buildChangeDescription($oldSupplier, $newSupplier, [
+            'supplier_name' => 'Name', 'brand_name' => 'Brand', 'address' => 'Address', 'primary_phone' => 'Primary Phone',
+            'secondary_phone' => 'Secondary Phone', 'email' => 'Email', 'credit_days' => 'Credit Days', 'is_blacklisted' => 'Blacklisted'
+        ]);
+        $editDescription = !empty($changeDescriptions)
+            ? "Updated supplier \"{$newSupplier['supplier_name']}\" ({$oldSupplier['supplier_code']}): " . implode('; ', $changeDescriptions)
+            : "Updated supplier \"{$newSupplier['supplier_name']}\" ({$oldSupplier['supplier_code']}) - no tracked field changes";
+        logActivity($pdo, $tenant_id, $user_id, 'update', 'Supplier', $supplier_id, $oldSupplier['supplier_code'], $editDescription, $oldSupplier, $newSupplier);
 
         echo json_encode(['success' => true, 'message' => 'Supplier updated successfully']);
 

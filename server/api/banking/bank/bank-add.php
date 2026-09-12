@@ -1,5 +1,6 @@
 <?php
 require_once '../../../../includes/connection.php';
+require_once '../../../../includes/activity-logger.php';
 
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
@@ -32,6 +33,12 @@ try {
         if (empty($input[$field])) {
             throw new Exception("$field is required");
         }
+    }
+
+    // account_type is a lowercase ENUM in the DB — normalize so re-reading it back
+    // for comparison (Activity Log diff) never mismatches on casing alone.
+    if (isset($input['accountType'])) {
+        $input['accountType'] = strtolower($input['accountType']);
     }
 
     // Validate currency_id belongs to this tenant
@@ -168,8 +175,15 @@ try {
         }
     }
     
+    logActivity(
+        $pdo, $tenant_id, $user_id, 'create', 'Bank Account', $bankAccountId, $accountName,
+        "Created bank account \"$accountName\", opening balance " . number_format($openingBalance, 2),
+        null,
+        ['bank_name' => $input['bankName'], 'account_number' => $input['accountNumber'], 'account_type' => $input['accountType'], 'opening_balance' => $openingBalance, 'balance_type' => $input['balanceType'] ?? 'debit']
+    );
+
     $pdo->commit();
-    
+
     echo json_encode(['success' => true, 'message' => 'Bank account created successfully', 'id' => $bankAccountId]);
     
 } catch (Exception $e) {

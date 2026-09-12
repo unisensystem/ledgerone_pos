@@ -1,5 +1,6 @@
 <?php
 require_once '../../../../includes/connection.php';
+require_once '../../../../includes/activity-logger.php';
 
 if (session_status() == PHP_SESSION_NONE) session_start();
 
@@ -152,9 +153,18 @@ function handlePost($action) {
                 ]);
                 
                 if ($result) {
+                    $newLeadId = $pdo->lastInsertId();
+
+                    logActivity(
+                        $pdo, $tenant_id, $user_id, 'create', 'Lead', $newLeadId, $leadCode,
+                        "Created lead \"{$data['company_name']}\" ($leadCode)",
+                        null,
+                        ['lead_code' => $leadCode, 'company_name' => $data['company_name'], 'contact_name' => $data['contact_name'] ?: null, 'lead_status' => $data['lead_status'] ?: null]
+                    );
+
                     echo json_encode([
-                        'success' => true, 
-                        'id' => $pdo->lastInsertId(), 
+                        'success' => true,
+                        'id' => $newLeadId,
                         'lead_code' => $leadCode,
                         'message' => 'Lead created successfully'
                     ]);
@@ -201,9 +211,23 @@ function handlePost($action) {
                 ]);
                 
                 if ($result) {
+                    $newFollowupId = $pdo->lastInsertId();
+
+                    $leadCodeStmt = $pdo->prepare("SELECT lead_code, company_name FROM leads WHERE id = ? AND tenant_id = ?");
+                    $leadCodeStmt->execute([$data['lead_id'], $tenant_id]);
+                    $leadInfo = $leadCodeStmt->fetch(PDO::FETCH_ASSOC);
+                    $leadLabel = $leadInfo ? "{$leadInfo['lead_code']} ({$leadInfo['company_name']})" : "Lead #{$data['lead_id']}";
+
+                    logActivity(
+                        $pdo, $tenant_id, $user_id, 'create', 'Lead Followup', $newFollowupId, $leadLabel,
+                        "Created follow-up for $leadLabel: {$data['event_type']} on {$data['followup_date']}",
+                        null,
+                        ['lead_id' => $data['lead_id'], 'followup_date' => $data['followup_date'], 'event_type' => $data['event_type'], 'account_manager' => $data['account_manager'], 'job_no' => $data['job_no']]
+                    );
+
                     echo json_encode([
-                        'success' => true, 
-                        'id' => $pdo->lastInsertId(),
+                        'success' => true,
+                        'id' => $newFollowupId,
                         'message' => 'Follow-up created successfully'
                     ]);
                 } else {
@@ -236,26 +260,30 @@ function handlePost($action) {
 }
 
 function handlePut($action) {
-    global $pdo, $tenant_id;
+    global $pdo, $tenant_id, $user_id;
     $data = json_decode(file_get_contents('php://input'), true);
-    
+
     switch ($action) {
         case 'lead':
             try {
                 $id = $_GET['id'] ?? 0;
-                
+
                 $leadDateTime = $data['lead_date'];
                 if (strlen($leadDateTime) == 10) {
                     $leadDateTime .= ' ' . date('H:i:s');
                 }
-                
+
+                $oldStmt = $pdo->prepare("SELECT lead_code, lead_source, lead_date, contact_name, company_name, email, whatsapp, service_type, lead_status, priority FROM leads WHERE id = ? AND tenant_id = ?");
+                $oldStmt->execute([$id, $tenant_id]);
+                $oldLead = $oldStmt->fetch(PDO::FETCH_ASSOC);
+
                 $stmt = $pdo->prepare("
-                    UPDATE leads SET 
-                    lead_source=?, lead_date=?, contact_name=?, company_name=?, 
-                    email=?, whatsapp=?, service_type=?, lead_status=?, priority=? 
+                    UPDATE leads SET
+                    lead_source=?, lead_date=?, contact_name=?, company_name=?,
+                    email=?, whatsapp=?, service_type=?, lead_status=?, priority=?
                     WHERE id=? AND tenant_id=?
                 ");
-                
+
                 $result = $stmt->execute([
                     $data['lead_source'] ?: null,
                     $leadDateTime,
@@ -269,24 +297,45 @@ function handlePut($action) {
                     $id,
                     $tenant_id
                 ]);
-                
+
+                if ($oldLead) {
+                    $newLead = [
+                        'lead_code' => $oldLead['lead_code'], 'lead_source' => $data['lead_source'] ?: null, 'lead_date' => $leadDateTime,
+                        'contact_name' => $data['contact_name'] ?: null, 'company_name' => $data['company_name'],
+                        'email' => $data['email'] ?: null, 'whatsapp' => $data['whatsapp'] ?: null,
+                        'service_type' => $data['service_type'] ?: null, 'lead_status' => $data['lead_status'] ?: null, 'priority' => $data['priority'] ?: null
+                    ];
+                    $changeDescriptions = buildChangeDescription($oldLead, $newLead, [
+                        'lead_source' => 'Source', 'contact_name' => 'Contact Name', 'company_name' => 'Company Name',
+                        'email' => 'Email', 'whatsapp' => 'WhatsApp', 'service_type' => 'Service Type', 'lead_status' => 'Status', 'priority' => 'Priority'
+                    ]);
+                    $editDescription = !empty($changeDescriptions)
+                        ? "Updated lead \"{$data['company_name']}\" ({$oldLead['lead_code']}): " . implode('; ', $changeDescriptions)
+                        : "Updated lead \"{$data['company_name']}\" ({$oldLead['lead_code']}) - no tracked field changes";
+                    logActivity($pdo, $tenant_id, $user_id, 'update', 'Lead', $id, $oldLead['lead_code'], $editDescription, $oldLead, $newLead);
+                }
+
                 echo json_encode(['success' => true, 'message' => 'Lead updated successfully']);
             } catch (Exception $e) {
                 http_response_code(500);
                 echo json_encode(['success' => false, 'error' => $e->getMessage()]);
             }
             break;
-            
+
         case 'followup':
             try {
                 $id = $_GET['id'] ?? 0;
-                
+
+                $oldStmt = $pdo->prepare("SELECT lead_id, followup_date, event_type, account_manager, job_no, remarks FROM followups WHERE id = ? AND tenant_id = ?");
+                $oldStmt->execute([$id, $tenant_id]);
+                $oldFollowup = $oldStmt->fetch(PDO::FETCH_ASSOC);
+
                 $stmt = $pdo->prepare("
-                    UPDATE followups SET 
+                    UPDATE followups SET
                     followup_date=?, event_type=?, account_manager=?, job_no=?, remarks=?
                     WHERE id=? AND tenant_id=?
                 ");
-                
+
                 $result = $stmt->execute([
                     $data['followup_date'],
                     $data['event_type'],
@@ -296,7 +345,27 @@ function handlePut($action) {
                     $id,
                     $tenant_id
                 ]);
-                
+
+                if ($oldFollowup) {
+                    $leadCodeStmt = $pdo->prepare("SELECT lead_code, company_name FROM leads WHERE id = ? AND tenant_id = ?");
+                    $leadCodeStmt->execute([$oldFollowup['lead_id'], $tenant_id]);
+                    $leadInfo = $leadCodeStmt->fetch(PDO::FETCH_ASSOC);
+                    $leadLabel = $leadInfo ? "{$leadInfo['lead_code']} ({$leadInfo['company_name']})" : "Lead #{$oldFollowup['lead_id']}";
+
+                    $newFollowup = [
+                        'followup_date' => $data['followup_date'], 'event_type' => $data['event_type'],
+                        'account_manager' => $data['account_manager'], 'job_no' => $data['job_no'], 'remarks' => $data['remarks'] ?: null
+                    ];
+                    $changeDescriptions = buildChangeDescription($oldFollowup, $newFollowup, [
+                        'followup_date' => 'Follow-up Date', 'event_type' => 'Event Type', 'account_manager' => 'Account Manager',
+                        'job_no' => 'Job No', 'remarks' => 'Remarks'
+                    ]);
+                    $editDescription = !empty($changeDescriptions)
+                        ? "Updated follow-up for $leadLabel: " . implode('; ', $changeDescriptions)
+                        : "Updated follow-up for $leadLabel - no tracked field changes";
+                    logActivity($pdo, $tenant_id, $user_id, 'update', 'Lead Followup', $id, $leadLabel, $editDescription, $oldFollowup, $newFollowup);
+                }
+
                 echo json_encode(['success' => true, 'message' => 'Follow-up updated successfully']);
             } catch (Exception $e) {
                 http_response_code(500);
@@ -311,31 +380,58 @@ function handlePut($action) {
 }
 
 function handleDelete($action) {
-    global $pdo, $tenant_id;
-    
+    global $pdo, $tenant_id, $user_id;
+
     switch ($action) {
         case 'lead':
             try {
                 $id = $_GET['id'] ?? 0;
-                
+
+                $oldStmt = $pdo->prepare("SELECT * FROM leads WHERE id = ? AND tenant_id = ?");
+                $oldStmt->execute([$id, $tenant_id]);
+                $leadRow = $oldStmt->fetch(PDO::FETCH_ASSOC);
+
                 $stmt = $pdo->prepare("DELETE FROM followups WHERE lead_id = ? AND tenant_id = ?");
                 $stmt->execute([$id, $tenant_id]);
-                
+
                 $stmt = $pdo->prepare("DELETE FROM leads WHERE id = ? AND tenant_id = ?");
                 $stmt->execute([$id, $tenant_id]);
-                
+
+                if ($leadRow) {
+                    logActivity(
+                        $pdo, $tenant_id, $user_id, 'delete', 'Lead', $id, $leadRow['lead_code'],
+                        "Deleted lead \"{$leadRow['company_name']}\" ({$leadRow['lead_code']})",
+                        $leadRow, null
+                    );
+                }
+
                 echo json_encode(['success' => true, 'message' => 'Lead and associated follow-ups deleted successfully']);
             } catch (Exception $e) {
                 http_response_code(500);
                 echo json_encode(['success' => false, 'error' => $e->getMessage()]);
             }
             break;
-            
+
         case 'followup':
             try {
                 $id = $_GET['id'] ?? 0;
+
+                $oldStmt = $pdo->prepare("SELECT f.*, l.lead_code, l.company_name FROM followups f LEFT JOIN leads l ON f.lead_id = l.id AND l.tenant_id = f.tenant_id WHERE f.id = ? AND f.tenant_id = ?");
+                $oldStmt->execute([$id, $tenant_id]);
+                $followupRow = $oldStmt->fetch(PDO::FETCH_ASSOC);
+
                 $stmt = $pdo->prepare("DELETE FROM followups WHERE id = ? AND tenant_id = ?");
                 $stmt->execute([$id, $tenant_id]);
+
+                if ($followupRow) {
+                    $leadLabel = $followupRow['lead_code'] ? "{$followupRow['lead_code']} ({$followupRow['company_name']})" : "Lead #{$followupRow['lead_id']}";
+                    logActivity(
+                        $pdo, $tenant_id, $user_id, 'delete', 'Lead Followup', $id, $leadLabel,
+                        "Deleted follow-up for $leadLabel",
+                        $followupRow, null
+                    );
+                }
+
                 echo json_encode(['success' => true, 'message' => 'Follow-up deleted successfully']);
             } catch (Exception $e) {
                 http_response_code(500);

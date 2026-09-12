@@ -1285,6 +1285,176 @@ if (!$currencySymbol) {
                 </div>
             </div>
 
+            <!-- Audit & Activity Analytics -->
+            <div class="quick-actions">
+                <h2 class="section-title" style="display: flex; justify-content: space-between; align-items: center;">
+                    <span>Audit & Activity Analytics</span>
+                    <a href="../system_setup/admin_panel/activity-center.php" style="font-size: 13px; font-weight: 600; color: var(--primary); text-decoration: none; white-space: nowrap;">View Full Audit <i class="fas fa-arrow-right"></i></a>
+                </h2>
+
+                <?php
+                // Critical = a deletion in a module where losing a record has real business/financial
+                // impact (invoices, payments, stock, user/permission changes) - not every delete
+                // counts (e.g. deleting an unused tax rate isn't "critical").
+                $criticalModules = [
+                    'Sale Invoice', 'Sale Tax Invoice', 'Meter Invoice', 'Purchase Invoice', 'Purchase Tax Invoice',
+                    'Payment Voucher', 'Receive Voucher', 'Journal Voucher', 'Expense Voucher',
+                    'Stock Adjustment', 'User', 'Role', 'Role Permission', 'Bank Account', 'Post Dated Cheque',
+                ];
+                $criticalPlaceholders = implode(',', array_fill(0, count($criticalModules), '?'));
+
+                $stmt = $pdo->prepare("SELECT COUNT(DISTINCT user_id) FROM login_attempts WHERE tenant_id = ? AND attempt_status = 'success' AND DATE(attempted_at) = CURDATE()");
+                $stmt->execute([$tenant_id]);
+                $activeUsersToday = (int) $stmt->fetchColumn();
+
+                $stmt = $pdo->prepare("SELECT COUNT(*) FROM login_attempts WHERE tenant_id = ? AND attempt_status = 'success' AND DATE(attempted_at) = CURDATE()");
+                $stmt->execute([$tenant_id]);
+                $totalLoginsToday = (int) $stmt->fetchColumn();
+
+                $stmt = $pdo->prepare("SELECT action, COUNT(*) AS cnt FROM activity_logs WHERE tenant_id = ? AND DATE(created_at) = CURDATE() GROUP BY action");
+                $stmt->execute([$tenant_id]);
+                $actionCountsToday = ['create' => 0, 'update' => 0, 'delete' => 0];
+                foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+                    $actionCountsToday[$row['action']] = (int) $row['cnt'];
+                }
+
+                $stmt = $pdo->prepare("
+                    SELECT COUNT(*) FROM activity_logs
+                    WHERE tenant_id = ? AND action = 'delete' AND DATE(created_at) = CURDATE() AND module IN ($criticalPlaceholders)
+                ");
+                $stmt->execute(array_merge([$tenant_id], $criticalModules));
+                $criticalToday = (int) $stmt->fetchColumn();
+
+                // 7-day trend
+                $trendLabels = [];
+                $trendData = [];
+                for ($i = 6; $i >= 0; $i--) {
+                    $date = date('Y-m-d', strtotime("-$i days"));
+                    $trendLabels[] = date('D', strtotime("-$i days"));
+                    $stmt = $pdo->prepare("SELECT COUNT(*) FROM activity_logs WHERE tenant_id = ? AND DATE(created_at) = ?");
+                    $stmt->execute([$tenant_id, $date]);
+                    $trendData[] = (int) $stmt->fetchColumn();
+                }
+
+                // Module-wise activity, last 30 days, top 5
+                $stmt = $pdo->prepare("
+                    SELECT module, COUNT(*) AS cnt
+                    FROM activity_logs
+                    WHERE tenant_id = ? AND created_at >= (NOW() - INTERVAL 30 DAY)
+                    GROUP BY module ORDER BY cnt DESC LIMIT 5
+                ");
+                $stmt->execute([$tenant_id]);
+                $moduleBreakdown = $stmt->fetchAll(PDO::FETCH_ASSOC);
+                $moduleMax = $moduleBreakdown ? max(array_column($moduleBreakdown, 'cnt')) : 1;
+
+                // Most active users, last 30 days, top 4
+                $stmt = $pdo->prepare("
+                    SELECT user_name, COUNT(*) AS cnt
+                    FROM activity_logs
+                    WHERE tenant_id = ? AND created_at >= (NOW() - INTERVAL 30 DAY)
+                    GROUP BY user_name ORDER BY cnt DESC LIMIT 4
+                ");
+                $stmt->execute([$tenant_id]);
+                $topUsers = $stmt->fetchAll(PDO::FETCH_ASSOC);
+                $topUserMax = $topUsers ? max(array_column($topUsers, 'cnt')) : 1;
+
+                // Anomaly check: today's deletions vs the trailing 7-day average (excluding today) -
+                // only surfaces when there's genuinely something to flag, not a permanent banner.
+                $stmt = $pdo->prepare("
+                    SELECT COUNT(*) / 7 FROM activity_logs
+                    WHERE tenant_id = ? AND action = 'delete' AND created_at >= (NOW() - INTERVAL 7 DAY) AND DATE(created_at) < CURDATE()
+                ");
+                $stmt->execute([$tenant_id]);
+                $avgDailyDeletions = (float) $stmt->fetchColumn();
+                $deletionsToday = $actionCountsToday['delete'];
+                $showAnomaly = $deletionsToday >= 5 && $deletionsToday > (2 * max($avgDailyDeletions, 1));
+                ?>
+
+                <div class="kpi-grid">
+                    <div class="kpi-card">
+                        <div class="kpi-value"><?= $activeUsersToday ?></div>
+                        <div class="kpi-label">Active Users Today</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-value"><?= $totalLoginsToday ?></div>
+                        <div class="kpi-label">Total Logins Today</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-value"><?= $actionCountsToday['create'] ?></div>
+                        <div class="kpi-label">Records Created Today</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-value"><?= $actionCountsToday['update'] ?></div>
+                        <div class="kpi-label">Records Updated Today</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-value"><?= $actionCountsToday['delete'] ?></div>
+                        <div class="kpi-label">Records Deleted Today</div>
+                    </div>
+                    <div class="kpi-card" style="<?= $criticalToday > 0 ? 'border-left: 4px solid var(--error);' : '' ?>">
+                        <div class="kpi-value" style="<?= $criticalToday > 0 ? 'color: var(--error);' : '' ?>"><?= $criticalToday ?></div>
+                        <div class="kpi-label">Critical Activities Today</div>
+                    </div>
+                </div>
+
+                <?php if ($showAnomaly): ?>
+                    <div style="background: #fee2e2; border: 1px solid #fecaca; border-radius: 0.75rem; padding: 0.9rem 1.25rem; margin-bottom: 1rem; display: flex; align-items: center; gap: 0.75rem; color: #991b1b; font-size: 14px;">
+                        <i class="fas fa-triangle-exclamation" style="font-size: 1.1rem;"></i>
+                        <span><strong>Attention:</strong> <?= $deletionsToday ?> records were deleted today, well above the recent daily average (~<?= round($avgDailyDeletions) ?>). <a href="../system_setup/admin_panel/activity-center.php?view=deleted-records" style="color: #991b1b; font-weight: 600;">Review deleted records &rarr;</a></span>
+                    </div>
+                <?php endif; ?>
+
+                <div class="grid" style="grid-template-columns: 1.3fr 1fr; gap: 1rem;">
+                    <div class="card">
+                        <h3 class="card-title">Activity Trend (Last 7 Days)</h3>
+                        <div id="activityTrendChart"></div>
+                    </div>
+
+                    <div class="card">
+                        <h3 class="card-title">Module Activity (30 Days)</h3>
+                        <?php if (empty($moduleBreakdown)): ?>
+                            <p style="text-align: center; color: #64748b; padding: 1.5rem 0; margin: 0;">No activity yet</p>
+                        <?php else: foreach ($moduleBreakdown as $mb):
+                            $pct = max(4, round(($mb['cnt'] / $moduleMax) * 100));
+                        ?>
+                            <div style="margin-bottom: 0.65rem;">
+                                <div style="display: flex; justify-content: space-between; font-size: 12.5px; color: #334155; margin-bottom: 3px;">
+                                    <span><?= htmlspecialchars($mb['module']) ?></span>
+                                    <span style="color: #94a3b8;"><?= $mb['cnt'] ?></span>
+                                </div>
+                                <div style="background: #f1f5f9; border-radius: 4px; height: 8px; overflow: hidden;">
+                                    <div style="background: var(--primary); height: 100%; width: <?= $pct ?>%; border-radius: 4px;"></div>
+                                </div>
+                            </div>
+                        <?php endforeach; endif; ?>
+                    </div>
+                </div>
+
+                <div class="card" style="margin-top: 1rem;">
+                    <h3 class="card-title" style="display: flex; justify-content: space-between; align-items: center;">
+                        Most Active Users (30 Days)
+                        <a href="../system_setup/admin_panel/activity-center.php?view=user-activity" style="font-size: 12px; font-weight: 600; color: var(--primary); text-decoration: none; white-space: nowrap;">View All <i class="fas fa-arrow-right"></i></a>
+                    </h3>
+                    <?php if (empty($topUsers)): ?>
+                        <p style="text-align: center; color: #64748b; padding: 1rem 0; margin: 0;">No activity yet</p>
+                    <?php else: ?>
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
+                            <?php foreach ($topUsers as $u): $pct = max(6, round(($u['cnt'] / $topUserMax) * 100)); ?>
+                                <div>
+                                    <div style="display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 4px;">
+                                        <span style="font-weight: 600; color: #0f172a;"><?= htmlspecialchars($u['user_name']) ?></span>
+                                        <span style="color: #94a3b8;"><?= $u['cnt'] ?></span>
+                                    </div>
+                                    <div style="background: #f1f5f9; border-radius: 4px; height: 6px; overflow: hidden;">
+                                        <div style="background: #3b82f6; height: 100%; width: <?= $pct ?>%; border-radius: 4px;"></div>
+                                    </div>
+                                </div>
+                            <?php endforeach; ?>
+                        </div>
+                    <?php endif; ?>
+                </div>
+            </div>
+
             <!-- Charts and Data Section -->
             <div class="grid" style="grid-template-columns: repeat(2, 1fr); gap: 1rem;">
                 <!-- Sales Chart -->
@@ -1507,6 +1677,63 @@ if (!$currencySymbol) {
                         </table>
                     </div>
                 </div>
+
+                <!-- Recent Activity -->
+                <div class="card" style="grid-column: 1 / -1;">
+                    <h3 class="card-title" style="display: flex; justify-content: space-between; align-items: center;">
+                        Recent Activity
+                        <a href="../system_setup/admin_panel/activity-center.php" style="font-size: 12px; font-weight: 600; color: var(--primary); text-decoration: none; white-space: nowrap;">View All <i class="fas fa-arrow-right"></i></a>
+                    </h3>
+                    <?php
+                    // module != 'System' excludes this feature's own admin housekeeping entries
+                    // (bulk log purges) - noise on a business-overview dashboard, not "what
+                    // happened in my business today".
+                    $stmt = $pdo->prepare("
+                        SELECT user_name, action, module, record_reference, record_id, description,
+                               DATE_FORMAT(created_at, '%h:%i %p') AS time_label,
+                               DATE_FORMAT(created_at, '%Y-%m-%d') AS date_label
+                        FROM activity_logs
+                        WHERE tenant_id = ? AND module != 'System'
+                        ORDER BY created_at DESC, id DESC
+                        LIMIT 6
+                    ");
+                    $stmt->execute([$tenant_id]);
+                    $recentActivity = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+                    $actionMeta = [
+                        'create' => ['fa-plus', '#2fbf71', '#eafff3', 'created'],
+                        'update' => ['fa-pen', '#e8b23f', '#fff8e8', 'updated'],
+                        'delete' => ['fa-trash', '#e34f4f', '#fdeeee', 'deleted'],
+                    ];
+                    $todayLabel = date('Y-m-d');
+                    ?>
+                    <?php if (empty($recentActivity)): ?>
+                        <p style="text-align: center; color: #64748b; padding: 1.5rem 0; margin: 0;">No recent activity</p>
+                    <?php else: ?>
+                        <div>
+                            <?php foreach ($recentActivity as $act):
+                                [$icon, $iconColor, $iconBg, $verb] = $actionMeta[$act['action']] ?? ['fa-circle', '#64748b', '#f1f5f9', $act['action']];
+                                $whenLabel = $act['date_label'] === $todayLabel ? $act['time_label'] : $act['date_label'];
+                                $recordLabel = $act['record_reference'] ?: $act['record_id'];
+                            ?>
+                                <div style="display: flex; align-items: flex-start; gap: 0.75rem; padding: 0.75rem 0; border-bottom: 1px solid #f1f5f9;">
+                                    <div style="flex-shrink: 0; width: 32px; height: 32px; border-radius: 50%; background: <?= $iconBg ?>; display: flex; align-items: center; justify-content: center;">
+                                        <i class="fas <?= $icon ?>" style="color: <?= $iconColor ?>; font-size: 13px;"></i>
+                                    </div>
+                                    <div style="flex: 1; min-width: 0;">
+                                        <div style="font-size: 14px; color: #0f172a;">
+                                            <span style="font-weight: 600;"><?= htmlspecialchars($act['user_name']) ?></span>
+                                            <span style="color: #64748b;"><?= htmlspecialchars($verb) ?></span>
+                                            <?= htmlspecialchars($act['module']) ?><?= $recordLabel ? ' <span style="color: #94a3b8;">&middot; ' . htmlspecialchars($recordLabel) . '</span>' : '' ?>
+                                        </div>
+                                        <div style="font-size: 12px; color: #94a3b8; margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"><?= htmlspecialchars($act['description']) ?></div>
+                                    </div>
+                                    <div style="flex-shrink: 0; font-size: 12px; color: #94a3b8; white-space: nowrap;"><?= htmlspecialchars($whenLabel) ?></div>
+                                </div>
+                            <?php endforeach; ?>
+                        </div>
+                    <?php endif; ?>
+                </div>
             </div>
         </div>
     <?php endif; ?>
@@ -1714,6 +1941,16 @@ if (!$currencySymbol) {
                 colors: ['#3b82f6'],
                 stroke: { curve: 'smooth', width: 2 },
                 fill: { type: 'gradient', gradient: { shadeIntensity: 1, opacityFrom: 0.4, opacityTo: 0.1 } }
+            }).render();
+
+            // Activity Trend (Audit & Activity Analytics)
+            new ApexCharts(document.querySelector('#activityTrendChart'), {
+                chart: { type: 'bar', height: 200, toolbar: { show: false } },
+                series: [{ name: 'Activities', data: <?= json_encode($trendData) ?> }],
+                xaxis: { categories: <?= json_encode($trendLabels) ?> },
+                colors: ['#1f7bff'],
+                dataLabels: { enabled: false },
+                plotOptions: { bar: { columnWidth: '55%', borderRadius: 3 } }
             }).render();
 
             // Receivables vs Payables

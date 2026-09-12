@@ -3,11 +3,13 @@ header('Content-Type: application/json');
 
 session_start();
 require_once '../../../../includes/connection.php';
+require_once '../../../../includes/activity-logger.php';
 
 try {
     $data = json_decode(file_get_contents('php://input'), true);
     $tenant_id = $_SESSION['tenant_id'] ?? null;
-    
+    $user_id = $_SESSION['user_id'] ?? null;
+
     if (!$tenant_id) {
         throw new Exception('Tenant ID not found in session');
     }
@@ -22,7 +24,7 @@ try {
     $rate = $data['rate'] ?? null;
 
     // Verify this rate belongs to current tenant
-    $verifyQuery = "SELECT id, project_id, product_id FROM project_product_rates WHERE id = ? AND tenant_id = ?";
+    $verifyQuery = "SELECT id, project_id, product_id, rate FROM project_product_rates WHERE id = ? AND tenant_id = ?";
     $stmt = $pdo->prepare($verifyQuery);
     $stmt->execute([$id, $tenant_id]);
     $existing = $stmt->fetch();
@@ -81,6 +83,15 @@ try {
     $stmt = $pdo->prepare($query);
     
     if ($stmt->execute($params)) {
+        $newValues = ['project_id' => $new_project_id, 'product_id' => $new_product_id, 'rate' => $rate !== null ? (float)$rate : (float)$existing['rate']];
+        $changeDescriptions = buildChangeDescription($existing, $newValues, [
+            'project_id' => 'Project', 'product_id' => 'Product', 'rate' => 'Rate'
+        ]);
+        $editDescription = !empty($changeDescriptions)
+            ? "Updated project product rate (Project #{$existing['project_id']} / Product #{$existing['product_id']}): " . implode('; ', $changeDescriptions)
+            : "Updated project product rate (Project #{$existing['project_id']} / Product #{$existing['product_id']}) - no tracked field changes";
+        logActivity($pdo, $tenant_id, $user_id, 'update', 'Project Product Rate', $id, "Project #{$existing['project_id']} / Product #{$existing['product_id']}", $editDescription, $existing, $newValues);
+
         echo json_encode([
             'success' => true,
             'message' => 'Rate updated successfully'

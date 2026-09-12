@@ -1,6 +1,7 @@
 <?php
 session_start();
 require_once '../../../../includes/connection.php';
+require_once '../../../../includes/activity-logger.php';
 
 header('Content-Type: application/json');
 
@@ -43,7 +44,7 @@ try {
     $debug_info = [];
     
     // Get PDC details with bank account_id
-    $stmt = $pdo->prepare("SELECT pdc.transaction_type, pdc.amount, pdc.cheque_date, pdc.account_id, pdc.cheque_no, pdc.reference_table, pdc.reference_id, ba.account_id as bank_account_id 
+    $stmt = $pdo->prepare("SELECT pdc.transaction_type, pdc.amount, pdc.cheque_date, pdc.account_id, pdc.cheque_no, pdc.reference_table, pdc.reference_id, pdc.status as old_status, ba.account_id as bank_account_id
                            FROM post_dated_cheques pdc
                            LEFT JOIN bank_accounts ba ON pdc.bank_account_id = ba.id
                            WHERE pdc.id = ? AND pdc.tenant_id = ?");
@@ -185,6 +186,17 @@ try {
         }
     }
     
+    $oldStatus = $pdc['old_status'];
+    $editDescription = $oldStatus !== $new_status
+        ? "Updated PDC \"{$pdc['cheque_no']}\" status: $oldStatus \u{2192} $new_status"
+        : "Updated PDC \"{$pdc['cheque_no']}\" - no tracked field changes";
+    logActivity(
+        $pdo, $tenant_id, $user_id, 'update', 'Post Dated Cheque', $pdc_id, $pdc['cheque_no'],
+        $editDescription,
+        ['status' => $oldStatus],
+        ['status' => $new_status]
+    );
+
     $pdo->commit();
     echo json_encode(['success' => true, 'message' => 'Status updated successfully', 'debug' => $debug_info]);
     

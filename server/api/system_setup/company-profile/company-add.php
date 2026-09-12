@@ -1,5 +1,6 @@
 <?php
 require_once '../../../../includes/connection.php';
+require_once '../../../../includes/activity-logger.php';
 
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
@@ -199,10 +200,19 @@ try {
     ]);
     
     if ($result) {
+        $newCompanyId = $pdo->lastInsertId();
+
+        logActivity(
+            $pdo, $tenant_id, $user_id, 'create', 'Company', $newCompanyId, $companyCode,
+            "Created company \"$companyName\" ($companyCode)",
+            null,
+            ['company_code' => $companyCode, 'company_name' => $companyName, 'email' => $_POST['email'] ?? null, 'phone' => $_POST['phone'] ?? null]
+        );
+
         echo json_encode([
             'success' => true,
             'message' => 'Company created successfully',
-            'company_id' => $pdo->lastInsertId()
+            'company_id' => $newCompanyId
         ]);
     } else {
         throw new Exception('Failed to create company');

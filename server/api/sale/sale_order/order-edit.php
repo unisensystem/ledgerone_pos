@@ -1,5 +1,6 @@
 <?php
 require_once '../../../../includes/connection.php';
+require_once '../../../../includes/activity-logger.php';
 
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
@@ -180,6 +181,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
     }
 
     try {
+        // Grab old values before anything changes, for the Activity Log diff
+        $stmt = $pdo->prepare("SELECT bill_no, company_id, currency_id, sale_date, customer_id, branch_id, previous_balance, sale_officer_id, supplier_man_id, project_id, bilty_no, transport_name, total_bill, total_discount_percent, total_discount_amount, net_amount, remarks, status FROM sale_order WHERE id = ? AND tenant_id = ?");
+        $stmt->execute([$invoice_id, $tenant_id]);
+        $oldOrder = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$oldOrder) {
+            http_response_code(404);
+            echo json_encode(['success' => false, 'message' => 'Order not found']);
+            exit;
+        }
+        $stmt = $pdo->prepare("SELECT product_id, uom_id, quantity, sale_price, discount_percent, gst_percent FROM sale_order_items WHERE sale_invoice_id = ? AND tenant_id = ? ORDER BY product_id, uom_id, id");
+        $stmt->execute([$invoice_id, $tenant_id]);
+        $oldItems = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
         $pdo->beginTransaction();
 
         // Update sale invoice
@@ -252,6 +266,52 @@ if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
                 $isFirstEntry = false;
             }
         }
+
+        $newOrder = [
+            'bill_no' => $oldOrder['bill_no'],
+            'company_id' => $input['companyId'] ?? null,
+            'currency_id' => $input['currencyId'],
+            'sale_date' => $input['saleDate'],
+            'customer_id' => $input['customerId'],
+            'branch_id' => $input['branchId'],
+            'previous_balance' => extractBalanceAmount($input['previousBalance'] ?? '0.00'),
+            'sale_officer_id' => $input['salesOfficerId'] ?? null,
+            'supplier_man_id' => $input['supplierManId'] ?? null,
+            'project_id' => !empty($input['projectId']) ? (int)$input['projectId'] : null,
+            'bilty_no' => $input['biltyNo'] ?? null,
+            'transport_name' => $input['transportName'] ?? null,
+            'total_bill' => $input['totalBill'],
+            'total_discount_percent' => $input['totalDiscountPercent'] ?? 0,
+            'total_discount_amount' => $input['totalDiscountAmount'] ?? 0,
+            'net_amount' => $input['netAmount'],
+            'remarks' => $input['remarks'] ?? null,
+            'status' => $input['status'] ?? 'Posted'
+        ];
+        $changeDescriptions = buildChangeDescription($oldOrder, $newOrder, [
+            'sale_date' => 'Sale Date', 'customer_id' => 'Customer', 'branch_id' => 'Branch',
+            'sale_officer_id' => 'Sales Officer', 'supplier_man_id' => 'Supplier Man', 'project_id' => 'Project',
+            'bilty_no' => 'Bilty No', 'transport_name' => 'Transport', 'total_bill' => 'Total Bill',
+            'total_discount_percent' => 'Discount %', 'total_discount_amount' => 'Discount Amount',
+            'net_amount' => 'Net Amount', 'remarks' => 'Remarks', 'status' => 'Status'
+        ]);
+        // Flatten the nested (product -> unitEntries) submitted items into the same flat
+        // shape as sale_order_items rows, for an accurate before/after comparison.
+        $newItemsFlat = [];
+        foreach ($input['items'] as $item) {
+            foreach ($item['unitEntries'] as $unitEntry) {
+                $newItemsFlat[] = [
+                    'product_id' => $item['productId'], 'uom_id' => $unitEntry['uomId'], 'quantity' => $unitEntry['quantity'],
+                    'sale_price' => $item['salePrice'], 'discount_percent' => $item['discountPercent'] ?? 0, 'gst_percent' => $item['gstPercent'] ?? 0
+                ];
+            }
+        }
+        if (itemsChanged($oldItems, $newItemsFlat, ['product_id', 'uom_id', 'quantity', 'sale_price', 'discount_percent', 'gst_percent'])) {
+            $changeDescriptions[] = 'Items updated';
+        }
+        $editDescription = !empty($changeDescriptions)
+            ? "Updated sale order \"{$oldOrder['bill_no']}\": " . implode('; ', $changeDescriptions)
+            : "Updated sale order \"{$oldOrder['bill_no']}\" - no tracked field changes";
+        logActivity($pdo, $tenant_id, $user_id, 'update', 'Sale Order', $invoice_id, $oldOrder['bill_no'], $editDescription, $oldOrder, $newOrder);
 
         $pdo->commit();
 

@@ -1,6 +1,7 @@
 <?php
 session_start();
 require_once '../../../../includes/connection.php';
+require_once '../../../../includes/activity-logger.php';
 
 header('Content-Type: application/json');
 
@@ -30,12 +31,26 @@ try {
         $data = json_decode(file_get_contents('php://input'), true);
         $enabled = !empty($data['pending_pdc_affects_ledger']) ? 1 : 0;
 
+        $prevStmt = $pdo->prepare("SELECT pending_pdc_affects_ledger FROM pdc_ledger_settings WHERE tenant_id = ?");
+        $prevStmt->execute([$tenant_id]);
+        $prevRow = $prevStmt->fetch(PDO::FETCH_ASSOC);
+        $prevEnabled = $prevRow ? (int)$prevRow['pending_pdc_affects_ledger'] : 0;
+
         $stmt = $pdo->prepare("
             INSERT INTO pdc_ledger_settings (tenant_id, pending_pdc_affects_ledger, updated_by)
             VALUES (?, ?, ?)
             ON DUPLICATE KEY UPDATE pending_pdc_affects_ledger = VALUES(pending_pdc_affects_ledger), updated_by = VALUES(updated_by)
         ");
         $stmt->execute([$tenant_id, $enabled, $user_id]);
+
+        if ($prevEnabled !== $enabled) {
+            logActivity(
+                $pdo, $tenant_id, $user_id, 'update', 'PDC Ledger Setting', $tenant_id, 'Pending PDC Affects Ledger',
+                "Changed \"Pending PDC Affects Ledger\" setting: " . ($prevEnabled ? 'Enabled' : 'Disabled') . " \u{2192} " . ($enabled ? 'Enabled' : 'Disabled'),
+                ['pending_pdc_affects_ledger' => (bool)$prevEnabled],
+                ['pending_pdc_affects_ledger' => (bool)$enabled]
+            );
+        }
 
         echo json_encode(['success' => true, 'pending_pdc_affects_ledger' => (bool)$enabled]);
         exit;

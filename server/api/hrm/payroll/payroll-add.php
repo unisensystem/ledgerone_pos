@@ -1,5 +1,6 @@
 <?php
 require_once '../../../../includes/connection.php';
+require_once '../../../../includes/activity-logger.php';
 
 session_start();
 header('Content-Type: application/json');
@@ -102,8 +103,15 @@ try {
         }
     }
     
+    logActivity(
+        $pdo, $tenant_id, $user_id, 'create', 'Payroll', $payroll_id, $payroll_code,
+        "Created payroll entry \"$payroll_code\" for $payroll_date, total " . number_format($total_amount, 2) . ", " . count($items) . " item(s)",
+        null,
+        ['payroll_code' => $payroll_code, 'payroll_date' => $payroll_date, 'company_id' => $company_id, 'total_amount' => $total_amount]
+    );
+
     $pdo->commit();
-    
+
     echo json_encode([
         'success' => true,
         'message' => 'Payroll entry created successfully',

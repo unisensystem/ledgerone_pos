@@ -1,5 +1,6 @@
 <?php
 require_once '../../../../includes/connection.php';
+require_once '../../../../includes/activity-logger.php';
 
 session_start();
 header('Content-Type: application/json');
@@ -30,10 +31,11 @@ try {
         throw new Exception('Employee ID is required');
     }
     
-    // Verify employee exists and belongs to tenant
-    $stmt = $pdo->prepare("SELECT id FROM employees WHERE id = ? AND tenant_id = ?");
+    // Verify employee exists and belongs to tenant (grab full row for the Activity Log)
+    $stmt = $pdo->prepare("SELECT employee_id, full_name, gender, email, phone_number, department_id, position_id, employment_type, hire_date, base_salary, salary_currency, salary_frequency, current_status FROM employees WHERE id = ? AND tenant_id = ?");
     $stmt->execute([$employee_id, $tenant_id]);
-    if (!$stmt->fetch()) {
+    $oldEmployee = $stmt->fetch(PDO::FETCH_ASSOC);
+    if (!$oldEmployee) {
         throw new Exception('Employee not found');
     }
     
@@ -159,6 +161,25 @@ try {
         $stmt->execute([$tenant_id, $employee_id, "Opening balance - {$fullName}", $openingCredit]);
     }
     
+    $newEmployeeValues = [
+        'employee_id' => $oldEmployee['employee_id'], 'full_name' => $fullName, 'gender' => $data['gender'] ?? null,
+        'email' => !empty($data['email']) ? $data['email'] : null, 'phone_number' => $data['phone'],
+        'department_id' => $data['department'], 'position_id' => $data['position'], 'employment_type' => $data['employmentType'],
+        'hire_date' => !empty($data['hireDate']) ? $data['hireDate'] : null, 'base_salary' => $data['baseSalary'],
+        'salary_currency' => strtoupper($data['currency'] ?? 'USD'), 'salary_frequency' => $data['salaryFrequency'],
+        'current_status' => $oldEmployee['current_status'],
+    ];
+    $changeDescriptions = buildChangeDescription($oldEmployee, $newEmployeeValues, [
+        'full_name' => 'Name', 'gender' => 'Gender', 'email' => 'Email', 'phone_number' => 'Phone',
+        'department_id' => 'Department', 'position_id' => 'Position', 'employment_type' => 'Employment Type',
+        'hire_date' => 'Hire Date', 'base_salary' => 'Base Salary', 'salary_currency' => 'Salary Currency',
+        'salary_frequency' => 'Salary Frequency'
+    ]);
+    $editDescription = !empty($changeDescriptions)
+        ? "Updated employee \"$fullName\" ({$oldEmployee['employee_id']}): " . implode('; ', $changeDescriptions)
+        : "Updated employee \"$fullName\" ({$oldEmployee['employee_id']}) - no tracked field changes";
+    logActivity($pdo, $tenant_id, $user_id, 'update', 'Employee', $employee_id, $oldEmployee['employee_id'], $editDescription, $oldEmployee, $newEmployeeValues);
+
     echo json_encode([
         'success' => true,
         'message' => 'Employee updated successfully'

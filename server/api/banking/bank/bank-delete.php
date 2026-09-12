@@ -1,5 +1,6 @@
 <?php
 require_once '../../../../includes/connection.php';
+require_once '../../../../includes/activity-logger.php';
 
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
@@ -31,10 +32,10 @@ try {
     
     $pdo->beginTransaction();
     
-    // Get account_id and bank_logo_path before deleting
-    $stmt = $pdo->prepare("SELECT account_id, bank_logo_path FROM bank_accounts WHERE id = ? AND tenant_id = ?");
+    // Get full row before deleting, for the Activity Log
+    $stmt = $pdo->prepare("SELECT * FROM bank_accounts WHERE id = ? AND tenant_id = ?");
     $stmt->execute([$id, $tenant_id]);
-    $account = $stmt->fetch();
+    $account = $stmt->fetch(PDO::FETCH_ASSOC);
     
     if (!$account) {
         throw new Exception('Bank account not found');
@@ -69,8 +70,15 @@ try {
         $stmt->execute([$account['account_id'], $tenant_id]);
     }
     
+    $accountName = $account['bank_name'] . ' - ' . $account['account_number'];
+    logActivity(
+        $pdo, $tenant_id, $user_id, 'delete', 'Bank Account', $id, $accountName,
+        "Deleted bank account \"$accountName\"",
+        $account, null
+    );
+
     $pdo->commit();
-    
+
     echo json_encode(['success' => true, 'message' => 'Bank account deleted successfully']);
     
 } catch (Exception $e) {

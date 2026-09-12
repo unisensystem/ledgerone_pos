@@ -1,5 +1,6 @@
 <?php
 require_once '../../../../includes/connection.php';
+require_once '../../../../includes/activity-logger.php';
 header('Content-Type: application/json');
 
 if (session_status() == PHP_SESSION_NONE) session_start();
@@ -160,6 +161,18 @@ try {
         $stmtLedger->execute([$tenant_id, $voucher_id, $acct1,           $voucher_date, $description, $party_debit,  $party_credit]);
         $stmtLedger->execute([$tenant_id, $voucher_id, $contra_account_id, $voucher_date, $description, $contra_debit, $contra_credit]);
     }
+
+    logActivity(
+        $pdo, $tenant_id, $user_id, 'create', 'Journal Voucher', $voucher_id, $voucher_number,
+        "Created journal adjustment \"$voucher_number\" (" . number_format($amount, 2) . ", $adj_mode-party)",
+        null,
+        [
+            'voucher_number' => $voucher_number, 'voucher_date' => $voucher_date, 'company_id' => $company_id,
+            'description' => $description, 'amount' => $amount, 'adj_mode' => $adj_mode, 'adj_type' => $adj_type,
+            'party_type' => $party_type, 'party_id' => $party_id, 'party_type2' => $party_type2, 'party_id2' => $party_id2,
+            'contra_account_id' => $contra_account_id
+        ]
+    );
 
     $pdo->commit();
 

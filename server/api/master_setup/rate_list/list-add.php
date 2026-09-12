@@ -1,6 +1,7 @@
 <?php
 session_start();
 require_once '../../../../includes/connection.php';
+require_once '../../../../includes/activity-logger.php';
 
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
@@ -85,8 +86,15 @@ try {
         }
     }
     
+    logActivity(
+        $pdo, $tenant_id, $user_id, 'create', 'Rate List', $rate_list_id, $list_code,
+        "Created rate list \"$list_name\" ($list_code), $type, " . count($entities) . " " . ($type === 'customer' ? 'customer(s)' : 'supplier(s)') . ", " . count($items) . " item(s)",
+        null,
+        ['list_code' => $list_code, 'list_name' => $list_name, 'type' => $type]
+    );
+
     $pdo->commit();
-    
+
     echo json_encode([
         'success' => true,
         'message' => 'Rate list created successfully',

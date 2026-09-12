@@ -1,5 +1,6 @@
 <?php
 require_once '../../../../includes/connection.php';
+require_once '../../../../includes/activity-logger.php';
 
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
@@ -191,6 +192,22 @@ try {
 
         $voucher_id = $pdo->lastInsertId();
     }
+
+    logActivity(
+        $pdo, $tenant_id, $user_id, 'create', 'Sale Order', $invoice_id, $billNo,
+        "Created sale order \"$billNo\" (" . count($input['items']) . " item(s), net " . number_format($input['netAmount'], 2) . ")",
+        null,
+        [
+            'bill_no' => $billNo, 'sale_date' => $input['saleDate'], 'company_id' => $input['companyId'] ?? null,
+            'currency_id' => $input['currencyId'], 'customer_id' => $input['customerId'], 'branch_id' => $input['branchId'],
+            'sale_officer_id' => $input['salesOfficerId'] ?? null, 'supplier_man_id' => $input['supplierManId'] ?? null,
+            'project_id' => $input['projectId'] ?? null, 'bilty_no' => $input['biltyNo'] ?? null,
+            'transport_name' => $input['transportName'] ?? null, 'total_bill' => $input['totalBill'],
+            'total_discount_percent' => $input['totalDiscountPercent'] ?? 0, 'total_discount_amount' => $input['totalDiscountAmount'] ?? 0,
+            'net_amount' => $input['netAmount'], 'remarks' => $input['remarks'] ?? null, 'status' => $status,
+            'amount_paid' => $input['amountPaid'] ?? 0, 'items' => $input['items']
+        ]
+    );
 
     $pdo->commit();
 

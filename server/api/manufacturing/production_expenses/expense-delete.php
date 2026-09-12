@@ -1,5 +1,6 @@
 <?php
 require_once '../../../../includes/connection.php';
+require_once '../../../../includes/activity-logger.php';
 
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
@@ -91,8 +92,14 @@ try {
     ");
     $deleteExpenseStmt->execute([$expense_id, $tenant_id]);
     
+    logActivity(
+        $pdo, $tenant_id, $user_id, 'delete', 'Production Expense', $expense_id, "Order #{$expense['production_order_id']}",
+        "Deleted production expense for order #{$expense['production_order_id']}, total " . number_format($expense['total_amount'], 2),
+        $expense, null
+    );
+
     $pdo->commit();
-    
+
     echo json_encode([
         'success' => true,
         'message' => 'Production expense deleted successfully'

@@ -1,5 +1,6 @@
 <?php
 require_once '../../../../includes/connection.php';
+require_once '../../../../includes/activity-logger.php';
 
 header('Content-Type: application/json');
 
@@ -58,8 +59,8 @@ $sub_account_id = !empty($input['sub_account_id']) ? intval($input['sub_account_
 $recovery_officer_id = !empty($input['recovery_officer_id']) ? $input['recovery_officer_id'] : null;
 $against_pdc_id = !empty($input['against_pdc_id']) ? intval($input['against_pdc_id']) : null;
 
-    // Need customer_id for the PDC rebuild below
-    $stmt = $pdo->prepare("SELECT customer_id, company_id FROM receive_voucher WHERE id = ? AND tenant_id = ?");
+    // Need customer_id for the PDC rebuild below, plus full old row for the Activity Log diff
+    $stmt = $pdo->prepare("SELECT voucher_number, customer_id, company_id, voucher_date, bill_no, dsr_no, amount, adjust_amount, currency_id, payment_method_id, bank_account_id, cheque_no, description FROM receive_voucher WHERE id = ? AND tenant_id = ?");
     $stmt->execute([$voucher_id, $tenant_id]);
     $existingVoucher = $stmt->fetch(PDO::FETCH_ASSOC);
 
@@ -181,6 +182,31 @@ $stmt->execute([
             $amount, $cheque_date, $voucher_id, 'receive_voucher'
         ]);
     }
+
+    $newVoucher = [
+        'voucher_number' => $existingVoucher['voucher_number'],
+        'customer_id' => $customer_id,
+        'company_id' => $company_id,
+        'voucher_date' => $voucher_date,
+        'bill_no' => $input['bill_no'] ?? null,
+        'dsr_no' => $dsr_no,
+        'amount' => $amount,
+        'adjust_amount' => $adjust_amount,
+        'currency_id' => $input['currency_id'] ?? null,
+        'payment_method_id' => $payment_method_id,
+        'bank_account_id' => $bank_account_id,
+        'cheque_no' => $cheque_no,
+        'description' => $description
+    ];
+    $changeDescriptions = buildChangeDescription($existingVoucher, $newVoucher, [
+        'voucher_date' => 'Voucher Date', 'bill_no' => 'Bill No', 'amount' => 'Amount',
+        'adjust_amount' => 'Adjust Amount', 'payment_method_id' => 'Payment Method',
+        'bank_account_id' => 'Bank Account', 'cheque_no' => 'Cheque No', 'description' => 'Description'
+    ]);
+    $editDescription = !empty($changeDescriptions)
+        ? "Updated receive voucher \"{$existingVoucher['voucher_number']}\": " . implode('; ', $changeDescriptions)
+        : "Updated receive voucher \"{$existingVoucher['voucher_number']}\" - no tracked field changes";
+    logActivity($pdo, $tenant_id, $user_id, 'update', 'Receive Voucher', $voucher_id, $existingVoucher['voucher_number'], $editDescription, $existingVoucher, $newVoucher);
 
     echo json_encode(['success' => true, 'message' => 'Voucher updated successfully']);
 } catch (Exception $e) {

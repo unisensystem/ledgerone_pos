@@ -1,5 +1,6 @@
 <?php
 require_once '../../../../includes/connection.php';
+require_once '../../../../includes/activity-logger.php';
 
 if (session_status() == PHP_SESSION_NONE) session_start();
 $user_id   = $_SESSION['user_id']   ?? null;
@@ -103,6 +104,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_GET['action'])) {
                     (float)($it['line_total'] ?? 0),
                 ]);
             }
+
+            logActivity(
+                $pdo, $tid, $uid, 'create', 'Quotation', $qid, $qno,
+                "Created quotation \"$qno\" for customer, grand total " . number_format($grandTotal, 2),
+                null,
+                ['quotation_number' => $qno, 'customer_id' => (int)$input['customer_id'], 'grand_total' => $grandTotal, 'status' => 'draft']
+            );
 
             $pdo->commit();
             resp(true, ['quotation_number' => $qno, 'id' => $qid], 'Quotation saved successfully');

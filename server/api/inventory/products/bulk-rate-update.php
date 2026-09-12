@@ -1,5 +1,6 @@
 <?php
 require_once '../../../../includes/connection.php';
+require_once '../../../../includes/activity-logger.php';
 
 header('Content-Type: application/json');
 
@@ -67,6 +68,18 @@ try {
             (?, ?, NULL, 0, 0, ?, ?, NULL)
     ");
 
+    // Snapshot old prices for the Activity Log (before mutation)
+    $productIds = array_values(array_unique(array_filter(array_map(fn($r) => intval($r['id'] ?? 0), $input['products']))));
+    $oldProductsById = [];
+    if (!empty($productIds)) {
+        $placeholders = implode(',', array_fill(0, count($productIds), '?'));
+        $snapStmt = $pdo->prepare("SELECT id, code, name, purchase_price, trade_price, wholesale_price, mrp FROM products WHERE id IN ($placeholders) AND tenant_id = ?");
+        $snapStmt->execute(array_merge($productIds, [$tenant_id]));
+        foreach ($snapStmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $oldProductsById[$row['id']] = $row;
+        }
+    }
+
     $pdo->beginTransaction();
 
     $updated = 0;
@@ -106,6 +119,32 @@ try {
                     $batchNo,
                     $expiryDate
                 ]);
+            }
+        }
+
+        // Activity Log — per-product diff against the pre-update snapshot
+        $oldProduct = $oldProductsById[$id] ?? null;
+        if ($oldProduct) {
+            $newProductValues = [
+                'purchase_price' => $row['purchase_price'] ?? 0,
+                'trade_price' => $row['trade_price'] ?? 0,
+                'wholesale_price' => $row['wholesale_price'] ?? 0,
+                'mrp' => $row['mrp'] ?? 0,
+            ];
+            $changeDescriptions = buildChangeDescription($oldProduct, $newProductValues, [
+                'purchase_price' => 'Purchase Price', 'trade_price' => 'Trade Price',
+                'wholesale_price' => 'Wholesale Price', 'mrp' => 'MRP'
+            ]);
+            if ($batchNo !== null || $expiryDate !== null) {
+                $changeDescriptions[] = 'Batch/Expiry updated';
+            }
+            if (!empty($changeDescriptions)) {
+                $productLabel = trim(($oldProduct['code'] ?? '') . ' ' . ($oldProduct['name'] ?? ''));
+                logActivity(
+                    $pdo, $tenant_id, $user_id, 'update', 'Product', $id, $productLabel ?: $oldProduct['code'],
+                    "Bulk rate update on \"$productLabel\": " . implode('; ', $changeDescriptions),
+                    $oldProduct, array_merge($newProductValues, ['batch_no' => $batchNo, 'expiry_date' => $expiryDate])
+                );
             }
         }
 

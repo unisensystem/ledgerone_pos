@@ -1,5 +1,6 @@
 <?php
 require_once '../../../../includes/connection.php';
+require_once '../../../../includes/activity-logger.php';
 
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
@@ -94,6 +95,10 @@ try {
         exit;
     }
     
+    $oldStmt = $pdo->prepare("SELECT tax_name, tax_type, transaction_type, rate_percentage, tax_regime_id, is_active, effective_from, effective_to FROM tax_rates WHERE id = ? AND tenant_id = ?");
+    $oldStmt->execute([$tax_rate_id, $tenant_id]);
+    $oldTaxRate = $oldStmt->fetch(PDO::FETCH_ASSOC);
+
     // Update tax rate
     $stmt = $pdo->prepare("
         UPDATE tax_rates SET
@@ -113,6 +118,18 @@ try {
         $is_active, $effective_from, $effective_to, $currency, $user_id, $tax_rate_id, $tenant_id
     ]);
     
+    if ($oldTaxRate) {
+        $newTaxRate = ['tax_name' => $tax_name, 'tax_type' => $tax_type, 'transaction_type' => $transaction_type, 'rate_percentage' => $rate_percentage, 'tax_regime_id' => $tax_regime_id, 'is_active' => $is_active, 'effective_from' => $effective_from, 'effective_to' => $effective_to];
+        $changeDescriptions = buildChangeDescription($oldTaxRate, $newTaxRate, [
+            'tax_name' => 'Name', 'tax_type' => 'Type', 'transaction_type' => 'Transaction Type', 'rate_percentage' => 'Rate %',
+            'tax_regime_id' => 'Tax Regime', 'is_active' => 'Active', 'effective_from' => 'Effective From', 'effective_to' => 'Effective To'
+        ]);
+        $editDescription = !empty($changeDescriptions)
+            ? "Updated tax rate \"$tax_name\": " . implode('; ', $changeDescriptions)
+            : "Updated tax rate \"$tax_name\" - no tracked field changes";
+        logActivity($pdo, $tenant_id, $user_id, 'update', 'Tax Rate', $tax_rate_id, $tax_name, $editDescription, $oldTaxRate, $newTaxRate);
+    }
+
     echo json_encode([
         'success' => true,
         'message' => 'Tax rate updated successfully'

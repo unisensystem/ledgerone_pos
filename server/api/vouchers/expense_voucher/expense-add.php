@@ -1,6 +1,7 @@
 <?php
 require_once '../../../../includes/connection.php';
 require_once '../../../../includes/posting_lock.php';
+require_once '../../../../includes/activity-logger.php';
 header('Content-Type: application/json');
 
 if (session_status() == PHP_SESSION_NONE) {
@@ -133,6 +134,17 @@ try {
         }
     }
     
+    logActivity(
+        $pdo, $tenant_id, $user_id, 'create', 'Expense Voucher', $voucher_id, $voucher_number,
+        "Created expense voucher \"$voucher_number\" ($total_items entr(y/ies), total " . number_format($total_amount, 2) . ")",
+        null,
+        [
+            'voucher_no' => $voucher_number, 'date' => $date, 'company_id' => $company_id, 'description' => $description,
+            'total_amount' => $total_amount, 'total_items' => $total_items, 'project_id' => $project_id,
+            'vendor_id' => $vendor_id, 'type' => $type, 'is_cash_flow' => $is_cash_flow, 'entries' => $entries
+        ]
+    );
+
     $pdo->commit();
     echo json_encode(['success' => true, 'message' => 'Expense voucher posted successfully']);
 } catch (Exception $e) {

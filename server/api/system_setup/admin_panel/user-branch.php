@@ -1,5 +1,6 @@
 <?php
 require_once '../../../../includes/connection.php';
+require_once '../../../../includes/activity-logger.php';
 
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
@@ -54,6 +55,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     try {
+        // Snapshot old branch access + target user info for the Activity Log
+        $oldStmt = $pdo->prepare("SELECT branch_id FROM user_branches WHERE user_id = ? AND tenant_id = ? ORDER BY branch_id");
+        $oldStmt->execute([$user_id, $tenant_id]);
+        $oldBranchIds = array_map('intval', $oldStmt->fetchAll(PDO::FETCH_COLUMN));
+
+        $targetStmt = $pdo->prepare("SELECT full_name, email FROM users WHERE id = ? AND tenant_id = ?");
+        $targetStmt->execute([$user_id, $tenant_id]);
+        $targetUser = $targetStmt->fetch(PDO::FETCH_ASSOC);
+
         $pdo->beginTransaction();
 
         // Remove existing branch access for this user
@@ -66,6 +76,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             foreach ($branch_ids as $branch_id) {
                 $ins->execute([$tenant_id, $user_id, (int)$branch_id]);
             }
+        }
+
+        $newBranchIds = array_values(array_unique(array_map('intval', $branch_ids)));
+        sort($newBranchIds);
+        $branchesChanged = $oldBranchIds !== $newBranchIds;
+
+        if ($targetUser) {
+            $editDescription = $branchesChanged
+                ? "Updated branch access for user \"{$targetUser['full_name']}\" ({$targetUser['email']}): [" . implode(',', $oldBranchIds) . "] \u{2192} [" . implode(',', $newBranchIds) . "]"
+                : "Updated branch access for user \"{$targetUser['full_name']}\" ({$targetUser['email']}) - no tracked field changes";
+            logActivity($pdo, $tenant_id, $current_user_id, 'update', 'User', $user_id, $targetUser['email'], $editDescription, ['branch_ids' => $oldBranchIds], ['branch_ids' => $newBranchIds]);
         }
 
         $pdo->commit();

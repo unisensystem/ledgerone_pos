@@ -9,6 +9,7 @@ header('Access-Control-Allow-Methods: GET, DELETE');
 header('Access-Control-Allow-Headers: Content-Type');
 
 require_once '../../../../includes/connection.php';
+require_once '../../../../includes/activity-logger.php';
 
 $user_id = $_SESSION['user_id'] ?? 1;
 $tenant_id = $_SESSION['tenant_id'] ?? 1;
@@ -98,10 +99,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'DELETE') {
     }
 
     try {
-        // Verify ownership
-        $check = $pdo->prepare("SELECT id FROM production_wastage WHERE id = ? AND tenant_id = ?");
+        // Verify ownership (grab full row for the Activity Log)
+        $check = $pdo->prepare("SELECT * FROM production_wastage WHERE id = ? AND tenant_id = ?");
         $check->execute([$id, $tenant_id]);
-        if (!$check->fetch()) {
+        $wastageRow = $check->fetch(PDO::FETCH_ASSOC);
+        if (!$wastageRow) {
             http_response_code(404);
             echo json_encode(['success' => false, 'message' => 'Record not found']);
             exit;
@@ -122,6 +124,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'DELETE') {
 
         $stmt = $pdo->prepare("DELETE FROM production_wastage WHERE id = ? AND tenant_id = ?");
         $stmt->execute([$id, $tenant_id]);
+
+        logActivity(
+            $pdo, $tenant_id, $user_id, 'delete', 'Production Wastage', $id, $wastageRow['wastage_no'],
+            "Deleted wastage entry \"{$wastageRow['wastage_no']}\"",
+            $wastageRow, null
+        );
 
         $pdo->commit();
         echo json_encode(['success' => true, 'message' => 'Wastage entry deleted successfully']);

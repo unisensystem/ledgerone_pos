@@ -1,5 +1,6 @@
 <?php
 require_once '../../../../includes/connection.php';
+require_once '../../../../includes/activity-logger.php';
 require_once 'invoice-tax-helper.php';
 
 header('Content-Type: application/json');
@@ -437,6 +438,13 @@ try {
             ]);
         }
     }
+
+    logActivity(
+        $pdo, $tenant_id, $user_id, 'create', 'Sale Tax Invoice', $invoice_id, $billNo,
+        "Created sale tax invoice \"$billNo\", net amount " . number_format((float)$input['netAmount'], 2),
+        null,
+        ['bill_no' => $billNo, 'customer_id' => $input['customerId'], 'sale_date' => $input['saleDate'], 'net_amount' => (float)$input['netAmount'], 'status' => $input['status'] ?? 'Posted']
+    );
 
     $pdo->commit();
 

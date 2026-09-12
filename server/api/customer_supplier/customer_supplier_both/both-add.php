@@ -1,5 +1,6 @@
 <?php
 require_once '../../../../includes/connection.php';
+require_once '../../../../includes/activity-logger.php';
 
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
@@ -259,6 +260,19 @@ try {
     // Link the customer row back to its paired supplier row
     $pdo->prepare("UPDATE customers SET linked_supplier_id = ? WHERE id = ? AND tenant_id = ?")
         ->execute([$supplier_id, $customer_id, $tenant_id]);
+
+    logActivity(
+        $pdo, $tenant_id, $user_id, 'create', 'Customer', $customer_id, $customer_code,
+        "Created customer \"$partyName\" ($customer_code) via Both (Customer+Supplier) entry, linked to supplier $supplier_code",
+        null,
+        ['customer_code' => $customer_code, 'customer_name' => $partyName, 'primary_phone' => $primaryPhone, 'company_id' => $companyId, 'linked_supplier_id' => $supplier_id]
+    );
+    logActivity(
+        $pdo, $tenant_id, $user_id, 'create', 'Supplier', $supplier_id, $supplier_code,
+        "Created supplier \"$partyName\" ($supplier_code) via Both (Customer+Supplier) entry, linked to customer $customer_code",
+        null,
+        ['supplier_code' => $supplier_code, 'supplier_name' => $partyName, 'primary_phone' => $primaryPhone, 'company_id' => $companyId, 'linked_customer_id' => $customer_id]
+    );
 
     $pdo->commit();
 

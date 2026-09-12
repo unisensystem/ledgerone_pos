@@ -1,5 +1,6 @@
 <?php
 require_once '../../../../includes/connection.php';
+require_once '../../../../includes/activity-logger.php';
 
 session_start();
 header('Content-Type: application/json');
@@ -35,23 +36,33 @@ try {
         throw new Exception('Missing required fields');
     }
     
+    // Snapshot old header + items for the Activity Log (before mutation)
+    $stOld = $pdo->prepare("SELECT payroll_code, payroll_date, company_id, total_amount FROM payroll_entries WHERE id = ? AND tenant_id = ?");
+    $stOld->execute([$payroll_id, $tenant_id]);
+    $oldPayroll = $stOld->fetch(PDO::FETCH_ASSOC);
+    if (!$oldPayroll) throw new Exception('Payroll entry not found');
+
+    $stOldItems = $pdo->prepare("SELECT employee_id, type, payment_method_id, bank_account_id, amount FROM payroll_entries_items WHERE tenant_id = ? AND payroll_id = ? ORDER BY id");
+    $stOldItems->execute([$tenant_id, $payroll_id]);
+    $oldItems = $stOldItems->fetchAll(PDO::FETCH_ASSOC);
+
     $pdo->beginTransaction();
-    
+
     // Calculate total amount
     $total_amount = array_sum(array_column($items, 'amount'));
-    
+
     // Update payroll entry
     $stmt = $pdo->prepare("
-        UPDATE payroll_entries 
+        UPDATE payroll_entries
         SET payroll_date = ?, total_amount = ?, company_id = ?
         WHERE id = ? AND tenant_id = ?
     ");
     $stmt->execute([$payroll_date, $total_amount, $company_id, $payroll_id, $tenant_id]);
-    
+
     // Delete old accounting entries
     $stmt = $pdo->prepare("DELETE FROM accounting_ledger WHERE tenant_id = ? AND transaction_type = 'payroll' AND reference_table = 'payroll_entries' AND reference_id = ?");
     $stmt->execute([$tenant_id, $payroll_id]);
-    
+
     // Delete old payroll items
     $stmt = $pdo->prepare("DELETE FROM payroll_entries_items WHERE tenant_id = ? AND payroll_id = ?");
     $stmt->execute([$tenant_id, $payroll_id]);
@@ -111,8 +122,26 @@ try {
         }
     }
     
+    $newPayroll = ['payroll_code' => $oldPayroll['payroll_code'], 'payroll_date' => $payroll_date, 'company_id' => $company_id, 'total_amount' => $total_amount];
+    $changeDescriptions = buildChangeDescription($oldPayroll, $newPayroll, [
+        'payroll_date' => 'Payroll Date', 'company_id' => 'Company', 'total_amount' => 'Total Amount'
+    ]);
+    $newItemsForCompare = array_map(function($it) {
+        return [
+            'employee_id' => $it['employee_code'], 'type' => $it['type'], 'payment_method_id' => $it['payment_method_id'],
+            'bank_account_id' => $it['bank_account_id'] ?? null, 'amount' => (float)$it['amount']
+        ];
+    }, $items);
+    if (itemsChanged($oldItems, $newItemsForCompare, ['employee_id', 'type', 'payment_method_id', 'bank_account_id', 'amount'])) {
+        $changeDescriptions[] = 'Payroll items updated';
+    }
+    $editDescription = !empty($changeDescriptions)
+        ? "Updated payroll entry \"{$oldPayroll['payroll_code']}\": " . implode('; ', $changeDescriptions)
+        : "Updated payroll entry \"{$oldPayroll['payroll_code']}\" - no tracked field changes";
+    logActivity($pdo, $tenant_id, $user_id, 'update', 'Payroll', $payroll_id, $oldPayroll['payroll_code'], $editDescription, $oldPayroll, $newPayroll);
+
     $pdo->commit();
-    
+
     echo json_encode([
         'success' => true,
         'message' => 'Payroll entry updated successfully',

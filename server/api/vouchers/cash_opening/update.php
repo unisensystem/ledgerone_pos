@@ -1,5 +1,6 @@
 <?php
 require_once '../../../../includes/connection.php';
+require_once '../../../../includes/activity-logger.php';
 
 header('Content-Type: application/json');
 
@@ -94,6 +95,16 @@ try {
         $opening_amount
     ]);
     
+    $oldValues = ['as_of_date' => $as_of_date, 'opening_amount' => $old_amount];
+    $newValues = ['as_of_date' => $as_of_date, 'opening_amount' => $opening_amount];
+    $changeDescriptions = buildChangeDescription($oldValues, $newValues, [
+        'opening_amount' => 'Opening Amount'
+    ]);
+    $editDescription = !empty($changeDescriptions)
+        ? "Updated cash opening (as of $as_of_date): " . implode('; ', $changeDescriptions)
+        : "Updated cash opening (as of $as_of_date) - no tracked field changes";
+    logActivity($pdo, $tenant_id, $user_id, 'update', 'Cash Opening', $id, $as_of_date, $editDescription, $oldValues, $newValues);
+
     $pdo->commit();
     echo json_encode(['success' => true]);
     

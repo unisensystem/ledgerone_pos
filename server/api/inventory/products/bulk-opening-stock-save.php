@@ -1,5 +1,6 @@
 <?php
 require_once '../../../../includes/connection.php';
+require_once '../../../../includes/activity-logger.php';
 
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
@@ -52,6 +53,18 @@ try {
         INSERT INTO stock_ledger (tenant_id, account_id, branch_id, product_id, reference_table, reference_id, stock_status, qty_in, qty_out, unit_cost, unit_id, vendor_id, batch_no, expiry_date, transaction_type, transaction_date)
         VALUES (?, ?, ?, ?, 'stock_opening', ?, 'sellable', ?, 0, ?, ?, ?, ?, ?, 'Opening Stock', CURDATE())
     ");
+
+    // Product code/name lookup for the Activity Log labels
+    $productIds = array_values(array_unique(array_filter(array_map(fn($e) => intval($e['product_id'] ?? 0), $stockData))));
+    $productLabelsById = [];
+    if (!empty($productIds)) {
+        $placeholders = implode(',', array_fill(0, count($productIds), '?'));
+        $prodStmt = $pdo->prepare("SELECT id, code, name FROM products WHERE id IN ($placeholders) AND tenant_id = ?");
+        $prodStmt->execute(array_merge($productIds, [$tenant_id]));
+        foreach ($prodStmt->fetchAll(PDO::FETCH_ASSOC) as $p) {
+            $productLabelsById[$p['id']] = trim(($p['code'] ?? '') . ' ' . ($p['name'] ?? ''));
+        }
+    }
 
     $saveCount = 0;
     $errors = [];
@@ -117,6 +130,14 @@ try {
                 $batch_no,
                 $expiry_date
             ]);
+
+            $productLabel = $productLabelsById[$product_id] ?? "Product #$product_id";
+            logActivity(
+                $pdo, $tenant_id, $user_id, 'create', 'Product', $product_id, $productLabel,
+                "Bulk opening stock added for \"$productLabel\": Qty $opening_qty @ " . number_format($opening_price, 2) . " (Branch #$branch_id)",
+                null,
+                ['branch_id' => $branch_id, 'opening_qty' => $opening_qty, 'opening_price' => $opening_price, 'unit_id' => $unit_id, 'batch_no' => $batch_no, 'expiry_date' => $expiry_date]
+            );
 
             $saveCount++;
             error_log("Entry $index: stock_ledger inserted successfully");

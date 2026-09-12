@@ -1,5 +1,6 @@
 <?php
 require_once '../../../../includes/connection.php';
+require_once '../../../../includes/activity-logger.php';
 
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
@@ -61,9 +62,16 @@ try {
         
         $stmt_expense->execute([$tenant_id, $production_order_id, $entry_date, $narration, $total_amount, $user_id]);
         $expense_id = $pdo->lastInsertId();
-        
+
         processExpenseLines($pdo, $expense_id, $lines, $tenant_id, $entry_date, $narration);
-        
+
+        logActivity(
+            $pdo, $tenant_id, $user_id, 'create', 'Production Expense', $expense_id, "Order #$production_order_id",
+            "Created production expense for order #$production_order_id (direct), total " . number_format($total_amount, 2),
+            null,
+            ['production_order_id' => $production_order_id, 'entry_date' => $entry_date, 'total_amount' => $total_amount, 'allocation_method' => 'direct']
+        );
+
     } else {
         if (!isset($input['batches']) || empty($input['batches'])) {
             throw new Exception('Batches required for multi-batch allocation');
@@ -94,6 +102,13 @@ try {
             }, $lines);
             
             processExpenseLines($pdo, $expense_id, $allocated_lines, $tenant_id, $entry_date, $narration);
+
+            logActivity(
+                $pdo, $tenant_id, $user_id, 'create', 'Production Expense', $expense_id, "Order #$po_id",
+                "Created production expense for order #$po_id ($method_value), allocated " . number_format($allocated_amount, 2),
+                null,
+                ['production_order_id' => $po_id, 'entry_date' => $entry_date, 'total_amount' => $allocated_amount, 'allocation_method' => $method_value, 'per_unit_cost' => $per_unit_cost]
+            );
         }
     }
     

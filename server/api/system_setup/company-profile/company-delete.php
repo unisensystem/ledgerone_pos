@@ -1,5 +1,6 @@
 <?php
 require_once '../../../../includes/connection.php';
+require_once '../../../../includes/activity-logger.php';
 
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
@@ -32,21 +33,28 @@ try {
         exit;
     }
     
-    // Check if company exists and belongs to tenant
-    $checkStmt = $pdo->prepare("SELECT id FROM companies WHERE id = ? AND tenant_id = ?");
+    // Check if company exists and belongs to tenant (grab full row for the Activity Log)
+    $checkStmt = $pdo->prepare("SELECT * FROM companies WHERE id = ? AND tenant_id = ?");
     $checkStmt->execute([$id, $tenant_id]);
-    
-    if (!$checkStmt->fetch()) {
+    $companyRow = $checkStmt->fetch(PDO::FETCH_ASSOC);
+
+    if (!$companyRow) {
         http_response_code(404);
         echo json_encode(['success' => false, 'message' => 'Company not found']);
         exit;
     }
-    
+
     // Delete company
     $stmt = $pdo->prepare("DELETE FROM companies WHERE id = ? AND tenant_id = ?");
     $result = $stmt->execute([$id, $tenant_id]);
-    
+
     if ($result) {
+        logActivity(
+            $pdo, $tenant_id, $user_id, 'delete', 'Company', $id, $companyRow['company_code'],
+            "Deleted company \"{$companyRow['company_name']}\" ({$companyRow['company_code']})",
+            $companyRow, null
+        );
+
         echo json_encode(['success' => true, 'message' => 'Company deleted successfully']);
     } else {
         throw new Exception('Failed to delete company');

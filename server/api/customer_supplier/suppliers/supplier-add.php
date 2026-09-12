@@ -1,5 +1,6 @@
 <?php
 require_once '../../../../includes/connection.php';
+require_once '../../../../includes/activity-logger.php';
 
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
@@ -164,6 +165,13 @@ try {
         }
     }
     
+    logActivity(
+        $pdo, $tenant_id, $user_id, 'create', 'Supplier', $new_id, $supplier_code,
+        "Created supplier \"{$data['supplier_name']}\" ($supplier_code)",
+        null,
+        ['supplier_code' => $supplier_code, 'supplier_name' => $data['supplier_name'], 'primary_phone' => $data['primary_phone'], 'company_id' => $data['company_id']]
+    );
+
     $pdo->commit();
 
     echo json_encode([

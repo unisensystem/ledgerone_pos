@@ -1,5 +1,6 @@
 <?php
 require_once '../../../../includes/connection.php';
+require_once '../../../../includes/activity-logger.php';
 
 header('Content-Type: application/json');
 
@@ -85,6 +86,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $opening_amount
         ]);
         
+        logActivity(
+            $pdo, $tenant_id, $user_id, 'create', 'Cash Opening', $cash_opening_id, $as_of_date,
+            "Created cash opening (as of $as_of_date): Amount " . number_format($opening_amount, 2),
+            null,
+            ['as_of_date' => $as_of_date, 'branch_id' => $branch_id, 'company_id' => $company_id, 'opening_amount' => $opening_amount, 'currency_id' => $currency_id]
+        );
+
         $pdo->commit();
         echo json_encode(['success' => true, 'id' => $cash_opening_id]);
         

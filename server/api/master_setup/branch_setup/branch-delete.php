@@ -1,5 +1,6 @@
 <?php
 require_once '../../../../includes/connection.php';
+require_once '../../../../includes/activity-logger.php';
 
 session_start();
 header('Content-Type: application/json');
@@ -28,12 +29,24 @@ try {
     if (empty($id)) {
         throw new Exception('Branch ID is required');
     }
-    
+
+    $stmt = $pdo->prepare("SELECT * FROM branches WHERE id = ? AND tenant_id = ?");
+    $stmt->execute([$id, $tenant_id]);
+    $branchRow = $stmt->fetch(PDO::FETCH_ASSOC);
+
     $sql = "DELETE FROM branches WHERE id = ? AND tenant_id = ?";
     $stmt = $pdo->prepare($sql);
     $result = $stmt->execute([$id, $tenant_id]);
-    
+
     if ($result && $stmt->rowCount() > 0) {
+        if ($branchRow) {
+            logActivity(
+                $pdo, $tenant_id, $user_id, 'delete', 'Branch', $id, $branchRow['branch_code'],
+                "Deleted branch \"{$branchRow['branch_name']}\" ({$branchRow['branch_code']})",
+                $branchRow, null
+            );
+        }
+
         echo json_encode([
             'success' => true,
             'message' => 'Branch deleted successfully'

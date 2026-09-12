@@ -1,5 +1,6 @@
 <?php
 require_once '../../../../includes/connection.php';
+require_once '../../../../includes/activity-logger.php';
 
 header('Content-Type: application/json');
 
@@ -31,8 +32,18 @@ if (!$voucher_id) {
 }
 
 try {
+    // Grab values before deletion, for the Activity Log (record is gone afterward)
+    $stmt = $pdo->prepare("SELECT voucher_no, date, description, total_amount FROM expense_voucher WHERE tenant_id = ? AND id = ?");
+    $stmt->execute([$tenant_id, $voucher_id]);
+    $voucherRow = $stmt->fetch(PDO::FETCH_ASSOC);
+    if (!$voucherRow) {
+        http_response_code(404);
+        echo json_encode(['error' => 'Voucher not found']);
+        exit();
+    }
+
     $pdo->beginTransaction();
-    
+
     // Delete from accounting_ledger
     $stmt = $pdo->prepare("DELETE FROM accounting_ledger WHERE tenant_id = ? AND reference_table = 'expense_voucher' AND reference_id = ?");
     $stmt->execute([$tenant_id, $voucher_id]);
@@ -49,6 +60,12 @@ try {
     $stmt = $pdo->prepare("DELETE FROM expense_voucher WHERE tenant_id = ? AND id = ?");
     $stmt->execute([$tenant_id, $voucher_id]);
     
+    logActivity(
+        $pdo, $tenant_id, $user_id, 'delete', 'Expense Voucher', $voucher_id, $voucherRow['voucher_no'],
+        "Deleted expense voucher \"{$voucherRow['voucher_no']}\"",
+        $voucherRow, null
+    );
+
     $pdo->commit();
     echo json_encode(['success' => true, 'message' => 'Expense voucher deleted successfully']);
 } catch (Exception $e) {

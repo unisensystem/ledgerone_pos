@@ -1,5 +1,6 @@
 <?php
 require_once '../../../../includes/connection.php';
+require_once '../../../../includes/activity-logger.php';
 
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
@@ -130,19 +131,42 @@ if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
     }
 
     try {
+        // Snapshot old header + materials for the Activity Log (before mutation)
+        $stOld = $pdo->prepare("SELECT bom_code, version, is_active, bom_base_qty, batch_locked, remarks FROM bill_of_materials WHERE id = ? AND tenant_id = ?");
+        $stOld->execute([$bom_id, $tenant_id]);
+        $oldBom = $stOld->fetch(PDO::FETCH_ASSOC);
+        if (!$oldBom) throw new Exception('BOM not found');
+
+        $stOldMat = $pdo->prepare("SELECT raw_material_id, quantity, unit_id FROM bom_materials WHERE bom_id = ? ORDER BY id");
+        $stOldMat->execute([$bom_id]);
+        $oldMaterials = $stOldMat->fetchAll(PDO::FETCH_ASSOC);
+
         $pdo->beginTransaction();
 
         $stmt = $pdo->prepare("UPDATE bill_of_materials SET version = ?, is_active = ?, bom_base_qty = ?, batch_locked = ?, remarks = ?, updated_at = NOW() WHERE id = ? AND tenant_id = ?");
         $stmt->execute([$version, $is_active, $bom_base_qty, $batch_locked, $data['remarks'] ?? null, $bom_id, $tenant_id]);
-        
+
         $stmt = $pdo->prepare("DELETE FROM bom_materials WHERE bom_id = ?");
         $stmt->execute([$bom_id]);
-        
+
         $stmt = $pdo->prepare("INSERT INTO bom_materials (bom_id, raw_material_id, quantity, unit_id) VALUES (?, ?, ?, ?)");
         foreach ($materials as $material) {
             $stmt->execute([$bom_id, $material['raw_material_id'], $material['quantity'], $material['unit_id']]);
         }
-        
+
+        $newBom = ['bom_code' => $oldBom['bom_code'], 'version' => $version, 'is_active' => $is_active, 'bom_base_qty' => $bom_base_qty, 'batch_locked' => $batch_locked, 'remarks' => $data['remarks'] ?? null];
+        $changeDescriptions = buildChangeDescription($oldBom, $newBom, [
+            'version' => 'Version', 'is_active' => 'Active', 'bom_base_qty' => 'Base Qty', 'batch_locked' => 'Batch Locked', 'remarks' => 'Remarks'
+        ]);
+        $newMaterialsForCompare = array_map(fn($m) => ['raw_material_id' => $m['raw_material_id'], 'quantity' => (float)$m['quantity'], 'unit_id' => $m['unit_id']], $materials);
+        if (itemsChanged($oldMaterials, $newMaterialsForCompare, ['raw_material_id', 'quantity', 'unit_id'])) {
+            $changeDescriptions[] = 'Materials updated';
+        }
+        $editDescription = !empty($changeDescriptions)
+            ? "Updated BOM \"{$oldBom['bom_code']}\": " . implode('; ', $changeDescriptions)
+            : "Updated BOM \"{$oldBom['bom_code']}\" - no tracked field changes";
+        logActivity($pdo, $tenant_id, $user_id, 'update', 'Bill of Materials', $bom_id, $oldBom['bom_code'], $editDescription, $oldBom, $newBom);
+
         $pdo->commit();
         echo json_encode(['success' => true, 'message' => 'BOM updated successfully']);
     } catch (Exception $e) {
@@ -164,14 +188,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'DELETE') {
     }
     
     try {
+        // Grab full row before deletion, for the Activity Log
+        $stOld = $pdo->prepare("SELECT * FROM bill_of_materials WHERE id = ? AND tenant_id = ?");
+        $stOld->execute([$id, $tenant_id]);
+        $bomRow = $stOld->fetch(PDO::FETCH_ASSOC);
+        if (!$bomRow) {
+            http_response_code(404);
+            echo json_encode(['success' => false, 'message' => 'BOM not found']);
+            exit;
+        }
+
         $pdo->beginTransaction();
-        
+
         $stmt = $pdo->prepare("DELETE FROM bom_materials WHERE bom_id = ?");
         $stmt->execute([$id]);
-        
+
         $stmt = $pdo->prepare("DELETE FROM bill_of_materials WHERE id = ? AND tenant_id = ?");
         $stmt->execute([$id, $tenant_id]);
-        
+
+        logActivity(
+            $pdo, $tenant_id, $user_id, 'delete', 'Bill of Materials', $id, $bomRow['bom_code'],
+            "Deleted BOM \"{$bomRow['bom_code']}\"",
+            $bomRow, null
+        );
+
         $pdo->commit();
         echo json_encode(['success' => true, 'message' => 'BOM deleted successfully']);
     } catch (Exception $e) {

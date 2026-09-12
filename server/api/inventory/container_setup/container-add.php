@@ -1,6 +1,7 @@
 <?php
 header('Content-Type: application/json');
 require_once '../../../../includes/connection.php';
+require_once '../../../../includes/activity-logger.php';
 
 if (session_status() == PHP_SESSION_NONE) {
     session_start();
@@ -51,6 +52,13 @@ try {
     }
 
     $container_id = $pdo->lastInsertId();
+
+    logActivity(
+        $pdo, $tenant_id, $user_id, 'create', 'Container', $container_id, $container_code,
+        "Created container \"$container_name\" ($container_code)",
+        null,
+        ['container_code' => $container_code, 'container_name' => $container_name, 'is_active' => $is_active]
+    );
 
     echo json_encode([
         'success' => true,

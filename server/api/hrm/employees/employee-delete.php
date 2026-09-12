@@ -1,5 +1,6 @@
 <?php
 require_once '../../../../includes/connection.php';
+require_once '../../../../includes/activity-logger.php';
 
 session_start();
 header('Content-Type: application/json');
@@ -30,10 +31,10 @@ try {
         throw new Exception('Employee ID is required');
     }
     
-    // Verify employee exists and belongs to tenant
-    $stmt = $pdo->prepare("SELECT id, employee_id FROM employees WHERE id = ? AND tenant_id = ?");
+    // Verify employee exists and belongs to tenant (grab full row for the Activity Log)
+    $stmt = $pdo->prepare("SELECT * FROM employees WHERE id = ? AND tenant_id = ?");
     $stmt->execute([$employee_id, $tenant_id]);
-    $employee = $stmt->fetch();
+    $employee = $stmt->fetch(PDO::FETCH_ASSOC);
     if (!$employee) {
         throw new Exception('Employee not found');
     }
@@ -56,6 +57,12 @@ try {
     $stmt = $pdo->prepare("DELETE FROM employees WHERE id = ? AND tenant_id = ?");
     $stmt->execute([$employee_id, $tenant_id]);
     
+    logActivity(
+        $pdo, $tenant_id, $user_id, 'delete', 'Employee', $employee_id, $employee['employee_id'],
+        "Deleted employee \"{$employee['full_name']}\" ({$employee['employee_id']})",
+        $employee, null
+    );
+
     echo json_encode([
         'success' => true,
         'message' => 'Employee deleted successfully'

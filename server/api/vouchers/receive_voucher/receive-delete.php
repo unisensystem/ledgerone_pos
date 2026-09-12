@@ -1,5 +1,6 @@
 <?php
 require_once '../../../../includes/connection.php';
+require_once '../../../../includes/activity-logger.php';
 
 header('Content-Type: application/json');
 
@@ -31,8 +32,8 @@ if (!$voucher_id) {
 }
 
 try {
-    // Get payment method to determine which table to delete from
-    $stmt = $pdo->prepare("SELECT payment_method_id FROM receive_voucher WHERE id = ? AND tenant_id = ?");
+    // Get payment method (to determine which table to delete from) and full row for the Activity Log
+    $stmt = $pdo->prepare("SELECT voucher_number, payment_method_id, voucher_date, customer_id, amount FROM receive_voucher WHERE id = ? AND tenant_id = ?");
     $stmt->execute([$voucher_id, $tenant_id]);
     $voucher = $stmt->fetch(PDO::FETCH_ASSOC);
 
@@ -65,6 +66,11 @@ try {
     $stmt->execute([$voucher_id, $tenant_id]);
 
     if ($stmt->rowCount() > 0) {
+        logActivity(
+            $pdo, $tenant_id, $user_id, 'delete', 'Receive Voucher', $voucher_id, $voucher['voucher_number'],
+            "Deleted receive voucher \"{$voucher['voucher_number']}\"",
+            $voucher, null
+        );
         echo json_encode(['success' => true, 'message' => 'Receive voucher deleted successfully']);
     } else {
         echo json_encode(['success' => false, 'error' => 'Voucher not found']);

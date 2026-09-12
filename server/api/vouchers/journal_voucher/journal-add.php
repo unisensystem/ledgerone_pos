@@ -1,6 +1,7 @@
 <?php
 require_once '../../../../includes/connection.php';
 require_once '../../../../includes/posting_lock.php';
+require_once '../../../../includes/activity-logger.php';
 header('Content-Type: application/json');
 
 if (session_status() == PHP_SESSION_NONE) {
@@ -99,6 +100,17 @@ try {
             ]);
         }
     }
+
+    logActivity(
+        $pdo, $tenant_id, $user_id, 'create', 'Journal Voucher', $voucher_id, $data['voucherNumber'],
+        "Created journal voucher \"{$data['voucherNumber']}\" (" . count($data['entries']) . " line(s), " . ($status === 'draft' ? 'Draft' : 'Posted') . ")",
+        null,
+        [
+            'voucher_number' => $data['voucherNumber'], 'voucher_date' => $data['date'], 'company_id' => $data['company_id'] ?? null,
+            'description' => $data['description'], 'total_debit' => $data['totalDebit'], 'total_credit' => $data['totalCredit'],
+            'status' => $status, 'entries' => $data['entries']
+        ]
+    );
 
     $pdo->commit();
 

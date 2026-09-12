@@ -1,5 +1,6 @@
 <?php
 require_once '../../../../includes/connection.php';
+require_once '../../../../includes/activity-logger.php';
 
 session_start();
 header('Content-Type: application/json');
@@ -34,9 +35,16 @@ try {
         throw new Exception('Employee ID and leave type are required');
     }
     
-    $leaveField = $leaveType === 'sick' ? 'leave_balance_sick' : 
+    $leaveField = $leaveType === 'sick' ? 'leave_balance_sick' :
                  ($leaveType === 'paid' ? 'leave_balance_paid' : 'leave_balance_unpaid');
-    
+
+    $stmt = $pdo->prepare("SELECT id, full_name, {$leaveField} as old_balance FROM employees WHERE employee_id = ? AND tenant_id = ?");
+    $stmt->execute([$employeeId, $tenant_id]);
+    $empRow = $stmt->fetch(PDO::FETCH_ASSOC);
+    if (!$empRow) {
+        throw new Exception('Employee not found');
+    }
+
     if ($operation === 'add') {
         $sql = "UPDATE employees SET {$leaveField} = {$leaveField} + ?, updated_by = ? WHERE employee_id = ? AND tenant_id = ?";
     } else {
@@ -51,6 +59,13 @@ try {
     $stmt->execute([$employeeId, $tenant_id]);
     $result = $stmt->fetch();
     
+    logActivity(
+        $pdo, $tenant_id, $user_id, 'update', 'Employee', $empRow['id'], $employeeId,
+        "Updated {$leaveType} leave balance for \"{$empRow['full_name']}\" ({$employeeId}): {$empRow['old_balance']} \u{2192} {$result['balance']}",
+        [$leaveField => $empRow['old_balance']],
+        [$leaveField => $result['balance']]
+    );
+
     echo json_encode([
         'success' => true,
         'message' => 'Leave balance updated successfully',

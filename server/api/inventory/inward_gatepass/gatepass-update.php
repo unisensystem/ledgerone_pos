@@ -1,6 +1,7 @@
 <?php
 session_start();
 require_once '../../../../includes/connection.php';
+require_once '../../../../includes/activity-logger.php';
 
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
@@ -34,12 +35,23 @@ try {
     }
     
     $container_id = $input['container_id'] ?? null;
-    
+
+    // Grab old values before anything changes, for the Activity Log diff
+    $stmt = $pdo->prepare("SELECT gatepass_code, date, company_id, supplier_id, branch_id, container_id FROM inward_gatepass WHERE id = ? AND tenant_id = ?");
+    $stmt->execute([$input['id'], $tenant_id]);
+    $oldGatepass = $stmt->fetch(PDO::FETCH_ASSOC);
+    if (!$oldGatepass) {
+        throw new Exception('Gatepass not found');
+    }
+    $stmt = $pdo->prepare("SELECT product_id, unit_id, quantity FROM inward_gatepass_items WHERE gatepass_id = ? AND tenant_id = ? ORDER BY product_id, unit_id, id");
+    $stmt->execute([$input['id'], $tenant_id]);
+    $oldItemsSignature = json_encode($stmt->fetchAll(PDO::FETCH_ASSOC));
+
     $pdo->beginTransaction();
-    
+
     $stmt = $pdo->prepare("
-        UPDATE inward_gatepass 
-        SET date = ?, company_id = ?, supplier_id = ?, branch_id = ?, container_id = ? 
+        UPDATE inward_gatepass
+        SET date = ?, company_id = ?, supplier_id = ?, branch_id = ?, container_id = ?
         WHERE id = ? AND tenant_id = ?
     ");
     $stmt->execute([
@@ -79,10 +91,33 @@ try {
         ]);
     }
     
+    $newGatepass = [
+        'gatepass_code' => $oldGatepass['gatepass_code'],
+        'date' => $input['date'],
+        'company_id' => $input['company_id'],
+        'supplier_id' => $input['supplier_id'],
+        'branch_id' => $input['branch_id'],
+        'container_id' => $container_id
+    ];
+    $changeDescriptions = buildChangeDescription($oldGatepass, $newGatepass, [
+        'date' => 'Date',
+        'company_id' => 'Company',
+        'supplier_id' => 'Supplier',
+        'branch_id' => 'Branch',
+        'container_id' => 'Container'
+    ]);
+    if (itemsChanged(json_decode($oldItemsSignature, true), $input['items'], ['product_id', 'unit_id', 'quantity'])) {
+        $changeDescriptions[] = 'Items updated';
+    }
+    $editDescription = !empty($changeDescriptions)
+        ? "Updated inward gatepass \"{$oldGatepass['gatepass_code']}\": " . implode('; ', $changeDescriptions)
+        : "Updated inward gatepass \"{$oldGatepass['gatepass_code']}\" - no tracked field changes";
+    logActivity($pdo, $tenant_id, $user_id, 'update', 'Inward Gatepass', $input['id'], $oldGatepass['gatepass_code'], $editDescription, $oldGatepass, $newGatepass);
+
     $pdo->commit();
-    
+
     echo json_encode([
-        'success' => true, 
+        'success' => true,
         'message' => 'Inward gatepass updated successfully'
     ]);
     

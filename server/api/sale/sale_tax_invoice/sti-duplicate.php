@@ -1,5 +1,6 @@
 <?php
 require_once '../../../../includes/connection.php';
+require_once '../../../../includes/activity-logger.php';
 require_once 'invoice-tax-helper.php';
 
 header('Content-Type: application/json');
@@ -254,6 +255,13 @@ try {
     // Payable no longer get their own ledger lines; both are folded into
     // Net Amount on Trade Debtors/Sales Revenue instead.
     $ledger->execute([$tenant_id, $newInvoiceId, 9, $final_date, 'Sale Invoice - '.$newBillNo, 0, $invoice['net_amount']]);
+
+    logActivity(
+        $pdo, $tenant_id, $user_id, 'create', 'Sale Tax Invoice', $newInvoiceId, $newBillNo,
+        "Created sale tax invoice \"$newBillNo\" as a duplicate of \"{$invoice['bill_no']}\"",
+        null,
+        ['bill_no' => $newBillNo, 'customer_id' => $final_customer, 'sale_date' => $final_date, 'net_amount' => (float)$invoice['net_amount'], 'duplicated_from' => $invoice['bill_no']]
+    );
 
     $pdo->commit();
 

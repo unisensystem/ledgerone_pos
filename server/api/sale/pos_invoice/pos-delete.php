@@ -1,5 +1,6 @@
 <?php
 require_once '../../../../includes/connection.php';
+require_once '../../../../includes/activity-logger.php';
 
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
@@ -33,10 +34,11 @@ if (!$invoice_id) {
 try {
     $pdo->beginTransaction();
     
-    // Get bill_no before deletion
-    $billStmt = $pdo->prepare("SELECT bill_no FROM sale_invoice WHERE id = ? AND tenant_id = ?");
+    // Get invoice values before deletion, for both the bill_no reuse below and the Activity Log
+    $billStmt = $pdo->prepare("SELECT bill_no, sale_date, customer_id, branch_id, net_amount, status FROM sale_invoice WHERE id = ? AND tenant_id = ?");
     $billStmt->execute([$invoice_id, $tenant_id]);
-    $billNo = $billStmt->fetchColumn();
+    $invoiceRow = $billStmt->fetch(PDO::FETCH_ASSOC);
+    $billNo = $invoiceRow['bill_no'] ?? null;
     
     // Get receive_voucher id(s) if they exist — a split payment produces one
     // receive_voucher row per method (e.g. one Cash + one Bank Transfer) sharing
@@ -75,9 +77,15 @@ try {
     if ($stmt->rowCount() === 0) {
         throw new Exception('Invoice not found or already deleted');
     }
-    
+
+    logActivity(
+        $pdo, $tenant_id, $user_id, 'delete', 'Sale Invoice', $invoice_id, $billNo,
+        "Deleted sale invoice \"$billNo\"",
+        $invoiceRow, null
+    );
+
     $pdo->commit();
-    
+
     echo json_encode(['success' => true, 'message' => 'Sale invoice deleted successfully']);
     
 } catch (Exception $e) {

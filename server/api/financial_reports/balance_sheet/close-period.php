@@ -1,6 +1,7 @@
 <?php
 session_start();
 require_once '../../../../includes/connection.php';
+require_once '../../../../includes/activity-logger.php';
 
 header('Content-Type: application/json');
 
@@ -203,6 +204,13 @@ try {
             $stmt->execute([$tenant_id, $end_date, $total_cogs]);
         }
     }
+
+    logActivity(
+        $pdo, $tenant_id, $user_id, 'create', 'Period Close', $tenant_id, $end_date,
+        "Closed accounting period as of $end_date: Income " . number_format($total_income, 2) . ", COGS " . number_format($total_cogs, 2) . ", Expenses " . number_format($total_expenses, 2) . ", Net Income " . number_format($net_income, 2),
+        null,
+        ['end_date' => $end_date, 'total_income' => $total_income, 'total_cogs' => $total_cogs, 'total_expenses' => $total_expenses, 'net_income' => $net_income]
+    );
 
     $pdo->commit();
 

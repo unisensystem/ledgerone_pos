@@ -1,5 +1,6 @@
 <?php
 require_once '../../../../includes/connection.php';
+require_once '../../../../includes/activity-logger.php';
 header('Content-Type: application/json');
 
 if (session_status() == PHP_SESSION_NONE) session_start();
@@ -268,6 +269,18 @@ if ($from_side === 'credit') {
 } else {
     $ledger->execute([$tenant_id, $voucher_id, $to_account_id, $voucher_date, $desc, 0.00, $amount]); // CR TO
 }
+
+    logActivity(
+        $pdo, $tenant_id, $user_id, 'create', 'Transfer Voucher', $voucher_id, $voucher_number,
+        "Created transfer voucher \"$voucher_number\" ($from_party_code \u{2192} $to_party_code, " . number_format($amount, 2) . ")",
+        null,
+        [
+            'voucher_number' => $voucher_number, 'voucher_date' => $voucher_date, 'company_id' => $company_id,
+            'from_type' => $from_type, 'from_id' => $from_id, 'to_type' => $to_type, 'to_id' => $to_id,
+            'amount' => $amount, 'currency_id' => $currency_id, 'payment_method_id' => $payment_method_id,
+            'bank_account_id' => $bank_account_id, 'cheque_no' => $cheque_no, 'slip_no' => $slip_no, 'description' => $description
+        ]
+    );
 
     $pdo->commit();
 

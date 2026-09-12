@@ -1,5 +1,6 @@
 <?php
 require_once '../../../../includes/connection.php';
+require_once '../../../../includes/activity-logger.php';
 
 session_start();
 header('Content-Type: application/json');
@@ -195,6 +196,13 @@ try {
         $stmt->execute([$tenant_id, $employeeDbId, "Opening balance - {$fullName}", $openingCredit]);
     }
     
+    logActivity(
+        $pdo, $tenant_id, $user_id, 'create', 'Employee', $employeeDbId, $employeeId,
+        "Created employee \"$fullName\" ($employeeId), base salary " . number_format((float)$data['baseSalary'], 2),
+        null,
+        ['employee_id' => $employeeId, 'full_name' => $fullName, 'department_id' => $data['department'], 'position_id' => $data['position'], 'base_salary' => $data['baseSalary'], 'employment_type' => $data['employmentType']]
+    );
+
     echo json_encode([
         'success' => true,
         'message' => 'Employee added successfully',

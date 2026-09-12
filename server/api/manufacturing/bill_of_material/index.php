@@ -1,5 +1,6 @@
 <?php
 require_once '../../../../includes/connection.php';
+require_once '../../../../includes/activity-logger.php';
 
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
@@ -138,6 +139,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
         
+        logActivity(
+            $pdo, $tenant_id, $user_id, 'create', 'Bill of Materials', $bom_id, $bom_code,
+            "Created BOM \"$bom_code\" (v$version) with " . count($materials) . " material(s)",
+            null,
+            ['bom_code' => $bom_code, 'finished_good_id' => $finished_good_id, 'version' => $version, 'is_active' => $is_active, 'bom_base_qty' => $bom_base_qty]
+        );
+
         $pdo->commit();
         echo json_encode(['success' => true, 'message' => 'BOM saved successfully', 'bom_id' => $bom_id]);
     } catch (Exception $e) {

@@ -1,6 +1,7 @@
 <?php
 header('Content-Type: application/json');
 require_once '../../../../includes/connection.php';
+require_once '../../../../includes/activity-logger.php';
 
 if (session_status() == PHP_SESSION_NONE) {
     session_start();
@@ -28,21 +29,28 @@ try {
         throw new Exception('Container ID is required');
     }
 
-    // Verify container exists for this tenant
-    $checkQuery = "SELECT id FROM containers WHERE id = ? AND tenant_id = ?";
+    // Verify container exists for this tenant (grab full row for the Activity Log)
+    $checkQuery = "SELECT * FROM containers WHERE id = ? AND tenant_id = ?";
     $checkStmt = $pdo->prepare($checkQuery);
     $checkStmt->execute([$id, $tenant_id]);
+    $containerRow = $checkStmt->fetch(PDO::FETCH_ASSOC);
 
-    if ($checkStmt->rowCount() === 0) {
+    if (!$containerRow) {
         throw new Exception('Container not found');
     }
 
     $query = "DELETE FROM containers WHERE id = ? AND tenant_id = ?";
     $stmt = $pdo->prepare($query);
-    
+
     if (!$stmt->execute([$id, $tenant_id])) {
         throw new Exception('Failed to delete container');
     }
+
+    logActivity(
+        $pdo, $tenant_id, $user_id, 'delete', 'Container', $id, $containerRow['container_code'],
+        "Deleted container \"{$containerRow['container_name']}\" ({$containerRow['container_code']})",
+        $containerRow, null
+    );
 
     echo json_encode([
         'success' => true,

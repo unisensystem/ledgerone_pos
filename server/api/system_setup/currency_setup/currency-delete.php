@@ -1,5 +1,6 @@
 <?php
 require_once '../../../../includes/connection.php';
+require_once '../../../../includes/activity-logger.php';
 
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
@@ -31,10 +32,10 @@ try {
         exit;
     }
     
-    // Check if currency is base currency
-    $stmt = $pdo->prepare("SELECT is_base_currency FROM tenant_currencies WHERE id = ? AND tenant_id = ?");
+    // Check if currency is base currency (grab full row for the Activity Log)
+    $stmt = $pdo->prepare("SELECT tc.*, c.code FROM tenant_currencies tc JOIN ledgerone_public.currencies c ON tc.currency_id = c.id WHERE tc.id = ? AND tc.tenant_id = ?");
     $stmt->execute([$id, $tenant_id]);
-    $currency = $stmt->fetch();
+    $currency = $stmt->fetch(PDO::FETCH_ASSOC);
     
     if (!$currency) {
         echo json_encode(['success' => false, 'message' => 'Currency not found']);
@@ -49,7 +50,13 @@ try {
     // Delete currency
     $stmt = $pdo->prepare("DELETE FROM tenant_currencies WHERE id = ? AND tenant_id = ?");
     $stmt->execute([$id, $tenant_id]);
-    
+
+    logActivity(
+        $pdo, $tenant_id, $user_id, 'delete', 'Currency', $id, $currency['code'],
+        "Deleted currency \"{$currency['code']}\"",
+        $currency, null
+    );
+
     echo json_encode(['success' => true, 'message' => 'Currency deleted successfully']);
 } catch (Exception $e) {
     error_log('Currency delete error: ' . $e->getMessage());

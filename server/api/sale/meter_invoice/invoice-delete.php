@@ -1,5 +1,6 @@
 <?php
 require_once '../../../../includes/connection.php';
+require_once '../../../../includes/activity-logger.php';
 
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
@@ -65,6 +66,12 @@ try {
     $stmt = $pdo->prepare("DELETE FROM station_daily_usage WHERE id = ? AND tenant_id = ?");
     $stmt->execute([$input['invoice_id'], $tenant_id]);
     
+    logActivity(
+        $pdo, $tenant_id, $user_id, 'delete', 'Meter Invoice', $input['invoice_id'], "Station #{$invoice['station_id']} - {$invoice['usage_date']}",
+        "Deleted meter invoice (station #{$invoice['station_id']}, {$invoice['usage_date']})",
+        $invoice, null
+    );
+
     $pdo->commit();
     echo json_encode(['success' => true, 'message' => 'Invoice deleted successfully']);
     

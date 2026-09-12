@@ -1,5 +1,6 @@
 <?php
 require_once '../../../../includes/connection.php';
+require_once '../../../../includes/activity-logger.php';
 
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
@@ -31,8 +32,18 @@ if (!$invoice_id) {
 }
 
 try {
+    // Grab values before deletion, for the Activity Log (record is gone afterward). This
+    // endpoint is shared by both the Purchase Invoice and Purchase Tax Invoice pages (same
+    // underlying purchase_invoice table), so the module label is generic to both.
+    $stmt = $pdo->prepare("SELECT bill_no, purchase_date, supplier_id, branch_id, net_amount FROM purchase_invoice WHERE id = ? AND tenant_id = ?");
+    $stmt->execute([$invoice_id, $tenant_id]);
+    $invoiceRow = $stmt->fetch(PDO::FETCH_ASSOC);
+    if (!$invoiceRow) {
+        throw new Exception('Invoice not found or already deleted');
+    }
+
     $pdo->beginTransaction();
-    
+
     // Delete from accounting_ledger
     $pdo->prepare("DELETE FROM accounting_ledger WHERE reference_table = 'purchase_invoice' AND reference_id = ? AND tenant_id = ?")->execute([$invoice_id, $tenant_id]);
     
@@ -50,8 +61,14 @@ try {
         throw new Exception('Invoice not found or already deleted');
     }
     
+    logActivity(
+        $pdo, $tenant_id, $user_id, 'delete', 'Purchase Invoice', $invoice_id, $invoiceRow['bill_no'],
+        "Deleted purchase invoice \"{$invoiceRow['bill_no']}\"",
+        $invoiceRow, null
+    );
+
     $pdo->commit();
-    
+
     echo json_encode(['success' => true, 'message' => 'Purchase invoice deleted successfully']);
     
 } catch (Exception $e) {

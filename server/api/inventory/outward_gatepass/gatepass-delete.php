@@ -1,6 +1,7 @@
 <?php
 session_start();
 require_once '../../../../includes/connection.php';
+require_once '../../../../includes/activity-logger.php';
 
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
@@ -29,20 +30,34 @@ try {
         throw new Exception('Gatepass ID is required');
     }
     
+    // Grab values before deletion, for the Activity Log (record is gone afterward)
+    $stmt = $pdo->prepare("SELECT gatepass_code, date, company_id, supplier_id, branch_id, container_id FROM outward_gatepass WHERE id = ? AND tenant_id = ?");
+    $stmt->execute([$input['id'], $tenant_id]);
+    $gatepassRow = $stmt->fetch(PDO::FETCH_ASSOC);
+    if (!$gatepassRow) {
+        throw new Exception('Gatepass not found or already deleted');
+    }
+
     $pdo->beginTransaction();
-    
+
     // Delete items first
     $stmt = $pdo->prepare("DELETE FROM outward_gatepass_items WHERE gatepass_id = ? AND tenant_id = ?");
     $stmt->execute([$input['id'], $tenant_id]);
-    
+
     // Delete gatepass
     $stmt = $pdo->prepare("DELETE FROM outward_gatepass WHERE id = ? AND tenant_id = ?");
     $stmt->execute([$input['id'], $tenant_id]);
-    
+
     if ($stmt->rowCount() === 0) {
         throw new Exception('Gatepass not found or already deleted');
     }
-    
+
+    logActivity(
+        $pdo, $tenant_id, $user_id, 'delete', 'Outward Gatepass', $input['id'], $gatepassRow['gatepass_code'],
+        "Deleted outward gatepass \"{$gatepassRow['gatepass_code']}\"",
+        $gatepassRow, null
+    );
+
     $pdo->commit();
     
     echo json_encode(['success' => true, 'message' => 'Gatepass deleted successfully']);

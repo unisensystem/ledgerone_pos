@@ -1,6 +1,7 @@
 <?php
 require_once '../../../../includes/connection.php';
 require_once '../../../../includes/posting_lock.php';
+require_once '../../../../includes/activity-logger.php';
 
 header('Content-Type: application/json');
 
@@ -230,6 +231,18 @@ if ($adjust_amount > 0) {
         $tenant_id, 'Receive Voucher', 'receive_voucher', $voucher_id, 2,
         $voucher_date, $description, 0.00, $amount + $adjust_amount
     ]);
+
+    logActivity(
+        $pdo, $tenant_id, $user_id, 'create', 'Receive Voucher', $voucher_id, $voucher_number,
+        "Created receive voucher \"$voucher_number\" (amount " . number_format($amount, 2) . ")",
+        null,
+        [
+            'voucher_number' => $voucher_number, 'voucher_date' => $voucher_date, 'customer_id' => $customer['id'],
+            'company_id' => $company_id, 'bill_no' => $bill_no, 'amount' => $amount, 'adjust_amount' => $adjust_amount,
+            'currency_id' => $currency_id, 'payment_method_id' => $payment_method_id, 'bank_account_id' => $bank_account_id,
+            'cheque_no' => $cheque_no, 'description' => $description
+        ]
+    );
 
     echo json_encode(['success' => true, 'message' => 'Receive voucher created successfully']);
 
