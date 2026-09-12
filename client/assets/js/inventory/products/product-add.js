@@ -2013,6 +2013,7 @@ function loadProductForEdit(productId) {
             safeSetValue('name', product.name);
             safeSetValue('company', product.company_id || '');
             safeSetValue('description', product.description || '');
+            safeSetValue('weight', product.weight || '');
             safeSetValue('purchasePrice', product.purchase_price || '');
             safeSetValue('tradePrice', product.trade_price || '');
             safeSetValue('wholesalePrice', product.wholesale_price || '');

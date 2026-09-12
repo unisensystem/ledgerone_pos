@@ -483,12 +483,11 @@ const invoiceSettingCheckboxes = [
         setupPaymentMethodListener();
         setupSplitPaymentToggle();
 
-               if (isEditMode) {
+        if (isEditMode) {
             loadInvoiceData(editId);
         } else {
             // Add first row after data is loaded
             addRowDynamic();
-            loadDefaultSignature();
         }
     });
     }); // end outer loadCompanies promise
@@ -1702,9 +1701,15 @@ const invoiceSettingCheckboxes = [
                         const uomDetails = await getProductUOMDetails(product);
                         lastRow.dataset.productUomData = JSON.stringify(uomDetails);
                         lastRow.dataset.productId = item.product_id;
-                        lastRow.dataset.stockAffects = item.stock_affects || 1;
+                                                lastRow.dataset.stockAffects = item.stock_affects || 1;
                         lastRow.dataset.invoiceAffects = item.invoice_affects || 1;
-                        recalculateMaxColumns();
+                                             recalculateMaxColumns();
+                        ensureBatchNo2HeaderCells();
+                        ensureBatchNo2CellsAllRows();
+                        
+                        // Set quantities for each unit
+                        
+                        // Set quantities for each unit
                         
                         // Set quantities for each unit
                         productGroup.units.forEach(unit => {
@@ -2002,9 +2007,11 @@ const invoiceSettingCheckboxes = [
                     // Load UOM details so unit columns render correctly
                     const product = dataCache.products.get(parseInt(item.product_id));
                     if (product) {
-                        const uomDetails = await getProductUOMDetails(product);
+                                             const uomDetails = await getProductUOMDetails(product);
                         lastRow.dataset.productUomData = JSON.stringify(uomDetails);
-                        recalculateMaxColumns();
+                                               recalculateMaxColumns();
+                        ensureBatchNo2HeaderCells();
+                        ensureBatchNo2CellsAllRows();
 
                         productGroup.units.forEach(unit => {
                             const unitInput = lastRow.querySelector(`.unit-input[data-unit-id="${unit.uom_id}"]`);
@@ -3769,20 +3776,10 @@ const invoiceSettingCheckboxes = [
         updatePreviousBalanceDisplay();
         hideBalanceNotification();
 
-             ['extraDiscount1Percent','extraDiscount1Amount','extraDiscount2Percent','extraDiscount2Amount'].forEach(id => {
+        ['extraDiscount1Percent','extraDiscount1Amount','extraDiscount2Percent','extraDiscount2Amount'].forEach(id => {
             const el = document.getElementById(id);
             if (el) el.value = '0';
         });
-
-        // Reset signature state and reload the tenant default for the fresh invoice
-        currentSignatureDataUrl = null;
-        existingSignatureUrl = null;
-        const sigDataEl = document.getElementById('signatureData');
-        if (sigDataEl) sigDataEl.value = '';
-        const sigRemovedEl = document.getElementById('signatureRemoved');
-        if (sigRemovedEl) sigRemovedEl.value = '0';
-        hideSignaturePreview();
-        loadDefaultSignature();
 
         // Set default date to today
         const saleDate = document.getElementById('saleDate');
@@ -4428,15 +4425,8 @@ function saveInvoice(status = 'Posted') {
         amountPaid: parseFloat(document.getElementById('amountPaid')?.value) || 0,
         amountPaidAutoFill: document.querySelector('input[name="autoFillAmountPaid"]:checked')?.value || 'yes',
         remainingBalance: parseFloat(document.getElementById('remainingBalance')?.value) || 0,
-               remarks: document.getElementById('remarks')?.value,
-        // If the user cropped a brand-new signature this session, send that (base64).
-        // Otherwise, if a tenant default signature was auto-loaded and not removed,
-        // resend its filename so this invoice's signature column stays populated —
-        // that's what keeps get-default-signature.php picking it up for the NEXT invoice.
-        signature: currentSignatureDataUrl
-            || (defaultSignatureFilename && document.getElementById('signatureRemoved')?.value !== '1'
-                ? defaultSignatureFilename
-                : null),
+        remarks: document.getElementById('remarks')?.value,
+        signature: currentSignatureDataUrl || null,
 removeSignature: document.getElementById('signatureRemoved')?.value === '1',
         status: status,
         items: [],
@@ -4531,7 +4521,15 @@ removeSignature: document.getElementById('signatureRemoved')?.value === '1',
         const netAmount = parseFloat(netInput.value);
 const scheme = schemeSelect ? schemeSelect.value : 'sale_on_tp';
         const batchNo = row.querySelector('.batch-no-input')?.value || null;
-        const batchExpiryDate = row.querySelector('.batch-expiry-input')?.value || null;        
+        const batchExpiryDate = row.querySelector('.batch-expiry-input')?.value || null;
+
+        // Agar user ne Batch No 2 / Expiry 2 column mein kuch bhara hai to wahi save hoga
+        const batchNo2 = row.querySelector('.batch-no-2-input')?.value?.trim() || null;
+        const batchExpiry2 = row.querySelector('.batch-expiry-2-input')?.value || null;
+        const finalBatchNo = batchNo2 || batchNo;
+        const finalBatchExpiryDate = batchExpiry2 || batchExpiryDate;
+        // Create separate item for each unit with quantity
+        // Create separate item for each unit with quantity      
         // Create separate item for each unit with quantity
        unitsWithQty.forEach((unit, index) => {
     const isFirstUnit = index === 0;
@@ -4572,8 +4570,8 @@ const scheme = schemeSelect ? schemeSelect.value : 'sale_on_tp';
         stockAffects: parseInt(row.dataset.stockAffects) || 1,
         invoiceAffects: parseInt(row.dataset.invoiceAffects) || 1,
         scheme: scheme,
-         batchNo: batchNo,
-        batchExpiryDate: batchExpiryDate
+                batchNo: finalBatchNo,
+        batchExpiryDate: finalBatchExpiryDate
     };
     formData.items.push(item);
 });
@@ -4792,6 +4790,10 @@ function loadInvoiceSettings() {
     if (enableBatchNoCheckbox) enableBatchNoCheckbox.checked = localStorage.getItem('enableBatchNo') !== 'false';
     const enableExpiryDateCheckbox = document.getElementById('enableExpiryDate');
     if (enableExpiryDateCheckbox) enableExpiryDateCheckbox.checked = localStorage.getItem('enableExpiryDate') !== 'false';
+    const enableBatchNo2Checkbox = document.getElementById('enableBatchNo2');
+    if (enableBatchNo2Checkbox) enableBatchNo2Checkbox.checked = localStorage.getItem('enableBatchNo2') !== 'false';
+    const enableExpiryDate2Checkbox = document.getElementById('enableExpiryDate2');
+    if (enableExpiryDate2Checkbox) enableExpiryDate2Checkbox.checked = localStorage.getItem('enableExpiryDate2') !== 'false';
     const enableSmartPriceHistoryPositionCheckbox = document.getElementById('enableSmartPriceHistoryPosition');
     if (enableSmartPriceHistoryPositionCheckbox) enableSmartPriceHistoryPositionCheckbox.checked = localStorage.getItem('smartPriceHistoryPosition') !== 'false';
 }
@@ -4843,6 +4845,10 @@ function saveInvoiceSettings() {
     if (enableBatchNoCheckbox) localStorage.setItem('enableBatchNo', enableBatchNoCheckbox.checked);
     const enableExpiryDateCheckbox = document.getElementById('enableExpiryDate');
     if (enableExpiryDateCheckbox) localStorage.setItem('enableExpiryDate', enableExpiryDateCheckbox.checked);
+    const enableBatchNo2Checkbox = document.getElementById('enableBatchNo2');
+    if (enableBatchNo2Checkbox) localStorage.setItem('enableBatchNo2', enableBatchNo2Checkbox.checked);
+    const enableExpiryDate2Checkbox = document.getElementById('enableExpiryDate2');
+    if (enableExpiryDate2Checkbox) localStorage.setItem('enableExpiryDate2', enableExpiryDate2Checkbox.checked);
     const enableSmartPriceHistoryPositionCheckbox = document.getElementById('enableSmartPriceHistoryPosition');
     if (enableSmartPriceHistoryPositionCheckbox) localStorage.setItem('smartPriceHistoryPosition', enableSmartPriceHistoryPositionCheckbox.checked);
     if (typeof repositionPriceHistoryPanel === 'function') repositionPriceHistoryPanel();
@@ -4938,8 +4944,11 @@ function applyInvoiceSettings() {
     const enableExtraDiscount2 = localStorage.getItem('enableExtraDiscount2') === 'true';
     const enableShippingFees = localStorage.getItem('enableShippingFees') === 'true';
     // top of applyInvoiceSettings(), with the other enable* consts
-const enableBatchNo = localStorage.getItem('enableBatchNo') !== 'false';
+
+    const enableBatchNo = localStorage.getItem('enableBatchNo') !== 'false';
 const enableExpiryDate = localStorage.getItem('enableExpiryDate') !== 'false';
+const enableBatchNo2 = localStorage.getItem('enableBatchNo2') !== 'false';
+const enableExpiryDate2 = localStorage.getItem('enableExpiryDate2') !== 'false';
 const enableExtraDiscountItem = localStorage.getItem('enableExtraDiscountItem') !== 'false';
 
     // Hide/show table columns by class name (works with dynamic unit columns)
@@ -4957,8 +4966,10 @@ const enableExtraDiscountItem = localStorage.getItem('enableExtraDiscountItem') 
     const taxPercentHeaders = thead.querySelectorAll('.tax-percent-cell');
     const taxAmountHeaders = thead.querySelectorAll('.tax-amount-cell');
     const focHeaders = thead.querySelectorAll('.foc-cell');
-    const batchNoHeaders = thead.querySelectorAll('.batch-no-cell');           // NEW
+      const batchNoHeaders = thead.querySelectorAll('.batch-no-cell');           // NEW
     const batchExpiryHeaders = thead.querySelectorAll('.batch-expiry-cell');   // NEW
+    const batchNo2Headers = thead.querySelectorAll('.batch-no-2-cell');           // NEW2
+    const batchExpiry2Headers = thead.querySelectorAll('.batch-expiry-2-cell');   // NEW2
     const extraDiscHeaders = thead.querySelectorAll('.extra-disc-cell');       // NEW
 
     discPercentHeaders.forEach(cell => cell.style.display = enableCashDiscountPercent ? '' : 'none');
@@ -4969,6 +4980,8 @@ const enableExtraDiscountItem = localStorage.getItem('enableExtraDiscountItem') 
     focHeaders.forEach(cell => cell.style.display = enableFOC ? '' : 'none');
     batchNoHeaders.forEach(cell => cell.style.display = enableBatchNo ? '' : 'none');           // NEW
     batchExpiryHeaders.forEach(cell => cell.style.display = enableExpiryDate ? '' : 'none');     // NEW
+    batchNo2Headers.forEach(cell => cell.style.display = enableBatchNo2 ? '' : 'none');         // NEW2
+    batchExpiry2Headers.forEach(cell => cell.style.display = enableExpiryDate2 ? '' : 'none');  // NEW2
     extraDiscHeaders.forEach(cell => cell.style.display = enableExtraDiscountItem ? '' : 'none'); // NEW
 }
         
@@ -4980,8 +4993,10 @@ const enableExtraDiscountItem = localStorage.getItem('enableExtraDiscountItem') 
             const taxPercentCells = tbody.querySelectorAll('.tax-percent-cell');
             const taxAmountCells = tbody.querySelectorAll('.tax-amount-cell');
             const focCells = tbody.querySelectorAll('.foc-cell');
-            const batchNoCells = tbody.querySelectorAll('.batch-no-cell');           // NEW
+                       const batchNoCells = tbody.querySelectorAll('.batch-no-cell');           // NEW
             const batchExpiryCells = tbody.querySelectorAll('.batch-expiry-cell');   // NEW
+            const batchNo2Cells = tbody.querySelectorAll('.batch-no-2-cell');            // NEW2
+            const batchExpiry2Cells = tbody.querySelectorAll('.batch-expiry-2-cell');    // NEW2
             const extraDiscCells = tbody.querySelectorAll('.extra-disc-cell');       // NEW
 
             discPercentCells.forEach(cell => {
@@ -5032,8 +5047,10 @@ const enableExtraDiscountItem = localStorage.getItem('enableExtraDiscountItem') 
                     if (!enableFOC) input.value = '0';
                 }
             });
-            batchNoCells.forEach(cell => cell.style.display = enableBatchNo ? '' : 'none');           // NEW
+             batchNoCells.forEach(cell => cell.style.display = enableBatchNo ? '' : 'none');           // NEW
             batchExpiryCells.forEach(cell => cell.style.display = enableExpiryDate ? '' : 'none');     // NEW
+            batchNo2Cells.forEach(cell => cell.style.display = enableBatchNo2 ? '' : 'none');         // NEW2
+            batchExpiry2Cells.forEach(cell => cell.style.display = enableExpiryDate2 ? '' : 'none');  // NEW2
             extraDiscCells.forEach(cell => {                                                          // NEW
                 cell.style.display = enableExtraDiscountItem ? '' : 'none';
                 const input = cell.querySelector('input');
@@ -5052,8 +5069,10 @@ const enableExtraDiscountItem = localStorage.getItem('enableExtraDiscountItem') 
     const taxPercentFooters = tfoot.querySelectorAll('.tax-percent-cell');
     const taxAmountFooters = tfoot.querySelectorAll('.tax-amount-cell');
     const focFooters = tfoot.querySelectorAll('.foc-cell');
-    const batchNoFooters = tfoot.querySelectorAll('.batch-no-cell');          // NEW
+       const batchNoFooters = tfoot.querySelectorAll('.batch-no-cell');          // NEW
     const batchExpiryFooters = tfoot.querySelectorAll('.batch-expiry-cell');  // NEW
+    const batchNo2Footers = tfoot.querySelectorAll('.batch-no-2-cell');          // NEW2
+    const batchExpiry2Footers = tfoot.querySelectorAll('.batch-expiry-2-cell');  // NEW2
     const extraDiscFooters = tfoot.querySelectorAll('.extra-disc-cell');      // NEW
 
     discPercentFooters.forEach(cell => cell.style.display = enableCashDiscountPercent ? '' : 'none');
@@ -5064,6 +5083,8 @@ const enableExtraDiscountItem = localStorage.getItem('enableExtraDiscountItem') 
     focFooters.forEach(cell => cell.style.display = enableFOC ? '' : 'none');
     batchNoFooters.forEach(cell => cell.style.display = enableBatchNo ? '' : 'none');           // NEW
     batchExpiryFooters.forEach(cell => cell.style.display = enableExpiryDate ? '' : 'none');     // NEW
+    batchNo2Footers.forEach(cell => cell.style.display = enableBatchNo2 ? '' : 'none');         // NEW2
+    batchExpiry2Footers.forEach(cell => cell.style.display = enableExpiryDate2 ? '' : 'none');  // NEW2
     extraDiscFooters.forEach(cell => cell.style.display = enableExtraDiscountItem ? '' : 'none'); // NEW
 }
     }
@@ -6215,6 +6236,17 @@ async function loadProducts(companyId = null) {
     }
 }
 
+function ensureBatchNo2CellsAllRows() {
+    const tbody = document.getElementById('itemsTable')?.getElementsByTagName('tbody')[0];
+    if (!tbody) return;
+    Array.from(tbody.rows).forEach(row => {
+        const b2 = row.querySelector('.batch-no-2-input');
+        const e2 = row.querySelector('.batch-expiry-2-input');
+        if (b2) row.dataset.batchNo2Value = b2.value;
+        if (e2) row.dataset.batchExpiry2Value = e2.value;
+        ensureBatchNo2Cells(row);
+    });
+}
 // Rebuild product dropdown options in all existing item rows after reload
 function rebuildProductDropdowns() {
     const tbody = document.getElementById('itemsTable')?.getElementsByTagName('tbody')[0];
@@ -6385,7 +6417,8 @@ async function addRowDynamic() {
     // in the regular POS invoice's table markup, so inserting it there would
     // leave headerless/footerless cells (same pattern as Extra Discount below).
     // Always create Batch No & Expiry Date cells for all pages
-const batchOffset = 2;
+    // Always create Batch No & Expiry Date cells for all pages
+const batchOffset = 4;   // 2 se 4 kiya — 2 naye columns ke liye jagah
 
 // Batch No (dropdown — auto-selects FEFO batch, user can pick another; inserted at fixed index 3)
 const batchNoCell = row.insertCell(3);
@@ -6412,6 +6445,21 @@ batchExpiryInput.style.opacity = '1';
 batchExpiryInput.style.webkitTextFillColor = '#000000';
 batchExpiryCell.appendChild(batchExpiryInput);
 
+// ===== NAYE COLUMNS: Batch No 2 / Expiry Date 2 (manual override, alag column) =====
+const batchNo2Cell = row.insertCell(5);
+batchNo2Cell.className = 'batch-no-2-cell';
+const batchNo2Input = document.createElement('input');
+batchNo2Input.type = 'text';
+batchNo2Input.className = 'table-input batch-no-2-input';
+batchNo2Input.placeholder = 'Batch No 2';
+batchNo2Cell.appendChild(batchNo2Input);
+
+const batchExpiry2Cell = row.insertCell(6);
+batchExpiry2Cell.className = 'batch-expiry-2-cell';
+const batchExpiry2Input = document.createElement('input');
+batchExpiry2Input.type = 'date';
+batchExpiry2Input.className = 'table-input batch-expiry-2-input';
+batchExpiry2Cell.appendChild(batchExpiry2Input);
     // Price
     const priceCell = row.insertCell(3 + batchOffset);
     
@@ -6642,9 +6690,11 @@ batchExpiryCell.appendChild(batchExpiryInput);
             if (searchInput.dropdownOptions) {
                 searchInput.dropdownOptions.remove();
             }
-            row.remove();
+                       row.remove();
             updateSerialNumbers();
-            recalculateMaxColumns();
+                    recalculateMaxColumns();
+            ensureBatchNo2HeaderCells();
+            ensureBatchNo2CellsAllRows();
             updateInvoiceSummaryDynamic();
         } else {
             alert('Cannot delete the only row.');
@@ -6659,7 +6709,6 @@ batchExpiryCell.appendChild(batchExpiryInput);
 }
 
 // Apply invoice settings to a specific row
-// Apply invoice settings to a specific row
 function applyInvoiceSettingsToRow(row) {
     const enableCashDiscountPercent = localStorage.getItem('enableCashDiscountPercent') === 'true';
     const enableCashDiscountAmount = localStorage.getItem('enableCashDiscountAmount') === 'true';
@@ -6668,6 +6717,8 @@ function applyInvoiceSettingsToRow(row) {
     const enableTaxation = isTaxationEnabled();
     const enableBatchNo = localStorage.getItem('enableBatchNo') !== 'false';       // NEW
     const enableExpiryDate = localStorage.getItem('enableExpiryDate') !== 'false'; // NEW
+    const enableBatchNo2 = localStorage.getItem('enableBatchNo2') !== 'false';         // NEW2
+    const enableExpiryDate2 = localStorage.getItem('enableExpiryDate2') !== 'false';   // NEW2
     const enableExtraDiscountItem = localStorage.getItem('enableExtraDiscountItem') !== 'false'; // NEW
 
     // Apply visibility to cells in this row
@@ -6680,6 +6731,8 @@ function applyInvoiceSettingsToRow(row) {
     const focCell = row.querySelector('.foc-cell');
     const batchNoCell = row.querySelector('.batch-no-cell');           // NEW
     const batchExpiryCell = row.querySelector('.batch-expiry-cell');   // NEW
+    const batchNo2Cell = row.querySelector('.batch-no-2-cell');            // NEW2
+    const batchExpiry2Cell = row.querySelector('.batch-expiry-2-cell');    // NEW2
 
     if (discPercentCell) discPercentCell.style.display = enableCashDiscountPercent ? '' : 'none';
     if (discAmountCell) discAmountCell.style.display = enableCashDiscountAmount ? '' : 'none';
@@ -6688,10 +6741,90 @@ function applyInvoiceSettingsToRow(row) {
     if (taxPercentCell) taxPercentCell.style.display = enableTaxation ? '' : 'none';
     if (taxAmountCell) taxAmountCell.style.display = enableTaxation ? '' : 'none';
     if (focCell) focCell.style.display = enableFOC ? '' : 'none';
-    if (batchNoCell) batchNoCell.style.display = enableBatchNo ? '' : 'none';               // NEW
+       if (batchNoCell) batchNoCell.style.display = enableBatchNo ? '' : 'none';               // NEW
     if (batchExpiryCell) batchExpiryCell.style.display = enableExpiryDate ? '' : 'none';     // NEW
+    if (batchNo2Cell) batchNo2Cell.style.display = enableBatchNo2 ? '' : 'none';             // NEW2
+    if (batchExpiry2Cell) batchExpiry2Cell.style.display = enableExpiryDate2 ? '' : 'none';  // NEW2
 }
 
+// recalculateMaxColumns() (pos-add-uom.js) rebuilds unit columns across ALL rows
+// and doesn't know about our Batch No 2 / Expiry Date 2 cells — it silently drops
+// them. This puts them back (with any value the user already typed preserved),
+// right after the Expiry Date cell, on every row.
+function ensureBatchNo2Cells(row) {
+    if (row.querySelector('.batch-no-2-cell')) return; // already there, nothing to do
+
+    const batchExpiryCell = row.querySelector('.batch-expiry-cell');
+    if (!batchExpiryCell) return;
+
+    const savedBatchNo2 = row.dataset.batchNo2Value || '';
+    const savedExpiry2 = row.dataset.batchExpiry2Value || '';
+
+    const batchNo2Cell = document.createElement('td');
+    batchNo2Cell.className = 'batch-no-2-cell';
+    const batchNo2Input = document.createElement('input');
+    batchNo2Input.type = 'text';
+    batchNo2Input.className = 'table-input batch-no-2-input';
+    batchNo2Input.placeholder = 'Batch No 2';
+    batchNo2Input.value = savedBatchNo2;
+    batchNo2Input.addEventListener('input', function () {
+        row.dataset.batchNo2Value = this.value;
+    });
+    batchNo2Cell.appendChild(batchNo2Input);
+
+    const batchExpiry2Cell = document.createElement('td');
+    batchExpiry2Cell.className = 'batch-expiry-2-cell';
+    const batchExpiry2Input = document.createElement('input');
+    batchExpiry2Input.type = 'date';
+    batchExpiry2Input.className = 'table-input batch-expiry-2-input';
+    batchExpiry2Input.value = savedExpiry2;
+    batchExpiry2Input.addEventListener('input', function () {
+        row.dataset.batchExpiry2Value = this.value;
+    });
+    batchExpiry2Cell.appendChild(batchExpiry2Input);
+
+    batchExpiryCell.after(batchNo2Cell, batchExpiry2Cell);
+
+    const enableBatchNo2 = localStorage.getItem('enableBatchNo2') !== 'false';
+    const enableExpiryDate2 = localStorage.getItem('enableExpiryDate2') !== 'false';
+    batchNo2Cell.style.display = enableBatchNo2 ? '' : 'none';
+    batchExpiry2Cell.style.display = enableExpiryDate2 ? '' : 'none';
+}
+
+// Save whatever's typed in Batch No 2 / Expiry 2 before a rebuild wipes them,
+// then re-run ensureBatchNo2Cells on every row so nothing gets lost.
+// Same problem as tbody rows: recalculateMaxColumns() rebuilds the <thead> too
+// (to insert per-unit column headers) and doesn't know about our Batch No 2 /
+// Expiry Date 2 header cells, so it silently drops them from the heading row.
+// This puts the two <th> headers back, right after "Expiry Date", whenever
+// they're missing.
+function ensureBatchNo2HeaderCells() {
+    const thead = document.getElementById('itemsTable')?.getElementsByTagName('thead')[0];
+    if (!thead) return;
+    const headerRow = thead.rows[0];
+    if (!headerRow) return;
+    if (headerRow.querySelector('.batch-no-2-cell')) return; // already there
+
+    const batchExpiryHeader = headerRow.querySelector('.batch-expiry-cell');
+    if (!batchExpiryHeader) return;
+
+    const enableBatchNo2 = localStorage.getItem('enableBatchNo2') !== 'false';
+    const enableExpiryDate2 = localStorage.getItem('enableExpiryDate2') !== 'false';
+
+    const batchNo2Th = document.createElement('th');
+    batchNo2Th.className = 'batch-no-2-cell';
+    batchNo2Th.style.textWrap = 'nowrap';
+    batchNo2Th.textContent = 'Batch No 2';
+    batchNo2Th.style.display = enableBatchNo2 ? '' : 'none';
+
+    const batchExpiry2Th = document.createElement('th');
+    batchExpiry2Th.className = 'batch-expiry-2-cell';
+    batchExpiry2Th.style.textWrap = 'nowrap';
+    batchExpiry2Th.textContent = 'Expiry Date 2';
+    batchExpiry2Th.style.display = enableExpiryDate2 ? '' : 'none';
+
+    batchExpiryHeader.after(batchNo2Th, batchExpiry2Th);
+}
 // Initialize dropdown for dynamic rows
 function initTableDropdownDynamic(container, row) {
     const searchInput = container.querySelector('.search-input');
@@ -6864,10 +6997,12 @@ function initTableDropdownDynamic(container, row) {
                 row.querySelector('.tax-amount-cell input').value = '0.00';
             }
             
-            optionsContainer.style.display = 'none';
+                       optionsContainer.style.display = 'none';
             
             // Recalculate columns
-            recalculateMaxColumns();
+                       recalculateMaxColumns();
+            ensureBatchNo2HeaderCells();
+            ensureBatchNo2CellsAllRows();
             
             // Load price history and stock
             if (customerId) {
@@ -7052,7 +7187,6 @@ async function quickAddCustomer() {
 let signatureCropper = null;
 let currentSignatureDataUrl = null; // new cropped PNG (base64) — sirf tab set hoga jab user naya upload/crop kare
 let existingSignatureUrl = null;    // edit mode mein pehle se saved signature ka URL
-let defaultSignatureFilename = null; // tenant ka last-used signature filename (auto-loaded on new invoice)
 
 function initSignatureUpload() {
     const uploadBtn   = document.getElementById('signatureUploadBtn');
@@ -7138,24 +7272,6 @@ function showSignaturePreview(src) {
 function hideSignaturePreview() {
     const wrap = document.getElementById('signaturePreviewWrap');
     if (wrap) wrap.style.display = 'none';
-}
-
-// Loads the tenant's most-recently-used signature (see
-// get-default-signature.php) and pre-fills it as the preview on a brand-new
-// invoice, so the user only has to upload a signature once — every new
-// invoice after that reuses it automatically until they crop a different one.
-async function loadDefaultSignature() {
-    try {
-        const response = await fetch('../../../../server/api/sale/pos_invoice/get-default-signature.php');
-        const data = await response.json();
-        if (data.success && data.signature) {
-            defaultSignatureFilename = data.signature;
-            existingSignatureUrl = `../../../assets/uploads/signatures/${data.signature}`;
-            showSignaturePreview(existingSignatureUrl);
-        }
-    } catch (error) {
-        console.error('Error loading default signature:', error);
-    }
 }
 
 document.addEventListener('DOMContentLoaded', initSignatureUpload);

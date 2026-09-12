@@ -253,8 +253,10 @@ if (!$user_id) {
                                 <th width="3%" style="text-wrap: nowrap;">S#</th>
                                 <th width="22%" style="text-wrap: nowrap;">Product Code / Name</th>
                                 <th width="10%" style="text-wrap: nowrap;">Scheme</th>
-                                <th width="10%" class="batch-no-cell" style="text-wrap: nowrap;">Batch No</th>
+                                                                <th width="10%" class="batch-no-cell" style="text-wrap: nowrap;">Batch No</th>
                                 <th width="10%" class="batch-expiry-cell" style="text-wrap: nowrap;">Expiry Date</th>
+                                <th width="10%" class="batch-no-2-cell" style="text-wrap: nowrap;">Batch No 2</th>
+                                <th width="10%" class="batch-expiry-2-cell" style="text-wrap: nowrap;">Expiry Date 2</th>
 
                                 <th width="10%" class="price-cell" style="text-wrap: nowrap;">
                                     <span id="salePriceLabel">Sale Price</span>
@@ -291,8 +293,10 @@ if (!$user_id) {
                                 <th style="text-align: left;">Totals</th>
                                 <th style="text-align: left;"></th>
                                 <th style="text-align: left;"></th>
-                                <th style="text-align: left;" class="batch-no-cell"></th>
+                                                                <th style="text-align: left;" class="batch-no-cell"></th>
                                 <th style="text-align: left;" class="batch-expiry-cell"></th>
+                                <th style="text-align: left;" class="batch-no-2-cell"></th>
+                                <th style="text-align: left;" class="batch-expiry-2-cell"></th>
                                 <!-- Dynamic unit totals will be inserted here -->
                                 <th id="totalSalePrice" class="price-cell">0.00</th>
                                 <th id="totalGrossAmount" class="gross-cell">0.00</th>
@@ -725,13 +729,21 @@ if (!$user_id) {
                             <input type="checkbox" id="enableTradeOfferAmount" style="width: auto;">
                             <span style="font-size: 13px;">Trade Offer Amount</span>
                         </label>
-                        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 8px; background: var(--surface-1); border-radius: 6px; transition: all 0.2s;" onmouseover="this.style.background='var(--surface-0)'" onmouseout="this.style.background='var(--surface-1)'">
+                                               <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 8px; background: var(--surface-1); border-radius: 6px; transition: all 0.2s;" onmouseover="this.style.background='var(--surface-0)'" onmouseout="this.style.background='var(--surface-1)'">
                             <input type="checkbox" id="enableBatchNo" style="width: auto;">
                             <span style="font-size: 13px;">Batch No</span>
                         </label>
                         <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 8px; background: var(--surface-1); border-radius: 6px; transition: all 0.2s;" onmouseover="this.style.background='var(--surface-0)'" onmouseout="this.style.background='var(--surface-1)'">
                             <input type="checkbox" id="enableExpiryDate" style="width: auto;">
                             <span style="font-size: 13px;">Expiry Date</span>
+                        </label>
+                        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 8px; background: var(--surface-1); border-radius: 6px; transition: all 0.2s;" onmouseover="this.style.background='var(--surface-0)'" onmouseout="this.style.background='var(--surface-1)'">
+                            <input type="checkbox" id="enableBatchNo2" style="width: auto;">
+                            <span style="font-size: 13px;">Batch No 2</span>
+                        </label>
+                        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 8px; background: var(--surface-1); border-radius: 6px; transition: all 0.2s;" onmouseover="this.style.background='var(--surface-0)'" onmouseout="this.style.background='var(--surface-1)'">
+                            <input type="checkbox" id="enableExpiryDate2" style="width: auto;">
+                            <span style="font-size: 13px;">Expiry Date 2</span>
                         </label>
                         <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 8px; background: var(--surface-1); border-radius: 6px; transition: all 0.2s;" onmouseover="this.style.background='var(--surface-0)'" onmouseout="this.style.background='var(--surface-1)'">
                             <input type="checkbox" id="enableTaxation" style="width: auto;">

@@ -188,6 +188,12 @@ if ($tenant_id) {
                         <label>Description</label>
                         <textarea id="description" name="description"></textarea>
                     </div>
+
+                    <div class="form-group optional-field" data-field="weight">
+                        <label>Weight</label>
+                        <input type="text" id="weight" name="weight" placeholder="e.g., 5 kg, 500 gram, 2 pound">
+                        <div class="helper-text">Free text — enter the number along with any unit you like (kg, gram, pound, etc.)</div>
+                    </div>
                     
                     <div class="form-group full-width optional-field" id="qrCodeGroup" data-field="qrCode">
                         <label>QR Code</label>
