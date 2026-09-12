@@ -122,6 +122,31 @@ try {
     $invoice_id = $pdo->lastInsertId();
     $status = $input['status'] ?? 'Posted';
 
+    // Save signature. Two cases:
+    //  1. User cropped a brand-new signature this session -> $input['signature'] is a
+    //     data:image base64 string -> decode it and write a new file to disk.
+    //  2. User kept the tenant's existing default signature (nothing re-cropped) ->
+    //     $input['signature'] is just the filename already on disk (see
+    //     get-default-signature.php) -> re-use it directly, no disk write needed.
+    // Either way sale_invoice.signature ends up populated, so the NEXT invoice's
+    // get-default-signature.php lookup (latest non-null signature for this tenant)
+    // keeps picking up the most recently used signature automatically.
+    if ($status === 'Posted' || $status === 'Draft') {
+        if (!empty($input['signature']) && is_string($input['signature'])) {
+            if (strpos($input['signature'], 'data:image') === 0) {
+                $signatureFileName = saveInvoiceSignature($input['signature'], $tenant_id, $invoice_id);
+                if ($signatureFileName) {
+                    $pdo->prepare("UPDATE sale_invoice SET signature = ? WHERE id = ?")
+                        ->execute([$signatureFileName, $invoice_id]);
+                }
+            } else {
+                // Re-using an existing signature filename (tenant default) — just reference it.
+                $pdo->prepare("UPDATE sale_invoice SET signature = ? WHERE id = ?")
+                    ->execute([$input['signature'], $invoice_id]);
+            }
+        }
+    }
+
     // Save invoice-level taxes
     if (!empty($input['invoiceLevelTaxes']) && is_array($input['invoiceLevelTaxes'])) {
         $mappedTaxes = array_map(function($t) use ($input) {
@@ -536,4 +561,33 @@ function getCostPrice($pdo, $tenant_id, $product_id, $branch_id)
     }
     
     return $costPrice;
+}
+
+// Decode a base64 data-URL PNG (from the client-side signature crop) and save it
+// to disk, returning the stored filename to be saved in sale_invoice.signature.
+function saveInvoiceSignature($dataUrl, $tenant_id, $invoice_id)
+{
+    if (!preg_match('/^data:image\/(png|jpeg|jpg);base64,/', $dataUrl)) {
+        return null;
+    }
+    $base64Data = substr($dataUrl, strpos($dataUrl, ',') + 1);
+    $decoded = base64_decode($base64Data);
+    if ($decoded === false) {
+        return null;
+    }
+
+    // pos-add.php lives at server/api/sale/sale_tax_invoice/ — 4 levels up reaches the
+    // project root, then into client/assets/uploads/signatures/. Adjust if your
+    // folder layout differs.
+    $uploadDir = __DIR__ . '/../../../../client/assets/uploads/signatures/';
+    if (!is_dir($uploadDir)) {
+        mkdir($uploadDir, 0755, true);
+    }
+
+    $fileName = 'sig_' . $tenant_id . '_' . $invoice_id . '_' . time() . '.png';
+    if (file_put_contents($uploadDir . $fileName, $decoded) === false) {
+        return null;
+    }
+
+    return $fileName;
 }

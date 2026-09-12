@@ -22,6 +22,8 @@ if (!$user_id) {
     <title>LedgerOne ERP - Sale Tax Invoice</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="../../../assets/css/sale/sale_tax_invoice/pos-add.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.js"></script>
 </head>
 <body class="light-theme">
     <div class="container">
@@ -324,6 +326,24 @@ if (!$user_id) {
                     <div class="summary-item full-width">
                         <span class="summary-label">Remarks</span>
                         <textarea id="remarks" placeholder="Enter any additional remarks" tabindex="-1" style="width: 100%; min-height: 60px;"></textarea>
+                    </div>
+                     <div class="summary-item full-width">
+                        <span class="summary-label">Signature</span>
+                        <div id="signatureUploadWrap" style="display:flex; align-items:center; gap:12px; flex-wrap: wrap;">
+                            <input type="file" id="signatureFileInput" accept="image/png,image/jpeg" style="display:none;">
+                            <button type="button" class="btn btn-secondary" id="signatureUploadBtn" tabindex="-1">
+                                <i class="fas fa-signature"></i> Upload Signature
+                            </button>
+                            <div id="signaturePreviewWrap" style="display:none; align-items:center; gap:8px;">
+                                <img id="signaturePreviewImg" src="" alt="Signature"
+                                    style="max-height:60px; max-width:180px; border:1px solid var(--border-default); border-radius:4px; background:#fff; padding:2px;">
+                                <button type="button" class="btn btn-secondary btn-sm" id="signatureRemoveBtn" tabindex="-1" title="Remove signature">
+                                    <i class="fas fa-times"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <input type="hidden" id="signatureData">
+                        <input type="hidden" id="signatureRemoved" value="0">
                     </div>
                 </div>
             </div>

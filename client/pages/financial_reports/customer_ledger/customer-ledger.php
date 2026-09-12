@@ -122,6 +122,26 @@ $all_symbols = $stmt2->fetchAll();
                         <option value="desc">Descending (Newest / Z-A first)</option>
                     </select>
                 </div>
+
+                <!-- NEW: Amount Range Filter (Summary Ledger only) -->
+                <div class="form-group" id="range-filter-field-group">
+                    <label class="form-label" for="range-field">Filter By</label>
+                    <select class="form-control" id="range-field">
+                        <option value="">No Amount Filter</option>
+                        <option value="opening_balance">Opening Balance</option>
+                        <option value="total_debit">Debit (Dr)</option>
+                        <option value="total_credit">Credit (Cr)</option>
+                        <option value="closing_balance">Closing Balance (Dr/Cr)</option>
+                    </select>
+                </div>
+                <div class="form-group" id="range-min-group" style="display: none;">
+                    <label class="form-label" for="range-min">Min Amount</label>
+                    <input type="number" step="0.01" class="form-control" id="range-min" placeholder="e.g. 1000">
+                </div>
+                <div class="form-group" id="range-max-group" style="display: none;">
+                    <label class="form-label" for="range-max">Max Amount</label>
+                    <input type="number" step="0.01" class="form-control" id="range-max" placeholder="e.g. 50000">
+                </div>
             </div>
             <div class="actions">
                 <button class="btn btn-primary" id="load-ledger-btn">

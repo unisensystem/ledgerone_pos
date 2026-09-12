@@ -33,6 +33,14 @@ document.addEventListener('DOMContentLoaded', function () {
     const symbolOverride = document.getElementById('symbol-override');
     const sortOrder = document.getElementById('sort-order');
 
+    // NEW: Amount range filter elements (Summary Ledger only)
+    const rangeField = document.getElementById('range-field');
+    const rangeMin = document.getElementById('range-min');
+    const rangeMax = document.getElementById('range-max');
+    const rangeMinGroup = document.getElementById('range-min-group');
+    const rangeMaxGroup = document.getElementById('range-max-group');
+    const rangeFilterFieldGroup = document.getElementById('range-filter-field-group');
+
     let currentPage = 1;
     let totalPages = 1;
     let allData = [];
@@ -125,6 +133,22 @@ document.addEventListener('DOMContentLoaded', function () {
             if (rawSummaryData.length > 0) applySummarySort();
         }
     });
+
+    // NEW: Show/hide Min & Max inputs based on selected filter field
+    rangeField.addEventListener('change', function () {
+        const hasField = !!this.value;
+        rangeMinGroup.style.display = hasField ? 'block' : 'none';
+        rangeMaxGroup.style.display = hasField ? 'block' : 'none';
+        if (!hasField) {
+            rangeMin.value = '';
+            rangeMax.value = '';
+        }
+        applySummarySort();
+    });
+
+    // NEW: Re-filter live as user types Min/Max values
+    rangeMin.addEventListener('input', applySummarySort);
+    rangeMax.addEventListener('input', applySummarySort);
     
     // Reload customers when company changes
     document.getElementById('company').addEventListener('change', function() {
@@ -219,6 +243,14 @@ document.addEventListener('DOMContentLoaded', function () {
         detailedLedgerTable.style.display = 'none';
         ledgerTitle.textContent = 'Summary Ledger';
         subAccountGroup.style.display = 'none';
+
+        // NEW: Amount range filter is only relevant for Summary Ledger
+        rangeFilterFieldGroup.style.display = 'block';
+        if (rangeField.value) {
+            rangeMinGroup.style.display = 'block';
+            rangeMaxGroup.style.display = 'block';
+        }
+        if (rawSummaryData.length > 0) applySummarySort();
     }
 
     function showDetailedLedger() {
@@ -233,6 +265,11 @@ document.addEventListener('DOMContentLoaded', function () {
         summaryLedgerTable.style.display = 'none';
         ledgerTitle.textContent = 'Detailed Ledger';
         subAccountGroup.style.display = 'block';
+
+        // NEW: Hide amount range filter in Detailed Ledger view
+        rangeFilterFieldGroup.style.display = 'none';
+        rangeMinGroup.style.display = 'none';
+        rangeMaxGroup.style.display = 'none';
     }
 
     summaryLedgerBtn.addEventListener('click', showSummaryLedger);
@@ -416,12 +453,34 @@ document.addEventListener('DOMContentLoaded', function () {
         applySummarySort();
     }
 
-    // Applies the current Sort Order selection to the raw summary data (already
-    // arrives from the server sorted A-Z by customer name, so 'asc' is a no-op
-    // and 'desc' just flips it).
+    // NEW: Applies the amount range filter (Filter By + Min + Max) to a summary dataset
+    function applyRangeFilter(data) {
+        const field = rangeField.value;
+        if (!field) return data;
+
+        const hasMin = rangeMin.value !== '';
+        const hasMax = rangeMax.value !== '';
+        if (!hasMin && !hasMax) return data;
+
+        const minVal = hasMin ? parseFloat(rangeMin.value) : null;
+        const maxVal = hasMax ? parseFloat(rangeMax.value) : null;
+
+        return data.filter(row => {
+            const val = parseFloat(row[field]) || 0;
+            if (minVal !== null && val < minVal) return false;
+            if (maxVal !== null && val > maxVal) return false;
+            return true;
+        });
+    }
+
+    // Applies the current Sort Order selection AND the amount range filter to the
+    // raw summary data (already arrives from the server sorted A-Z by customer name,
+    // so 'asc' is a no-op and 'desc' just flips it).
     function applySummarySort() {
-        allData = sortOrder.value === 'desc' ? rawSummaryData.slice().reverse() : rawSummaryData;
-        totalPages = Math.ceil(allData.length / itemsPerPage);
+        const filtered = applyRangeFilter(rawSummaryData);
+        allData = sortOrder.value === 'desc' ? filtered.slice().reverse() : filtered;
+        currentPage = 1;
+        totalPages = Math.ceil(allData.length / itemsPerPage) || 1;
         if (currentPage > totalPages) currentPage = 1;
         renderPage();
         updatePagination();
@@ -430,6 +489,17 @@ document.addEventListener('DOMContentLoaded', function () {
     function renderPage() {
         const tbody = summaryLedgerTable.querySelector('tbody');
         tbody.innerHTML = '';
+
+        if (allData.length === 0) {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="5" style="text-align:center; padding: 24px; color: var(--text-muted, #888);">
+                        No records match the selected filter.
+                    </td>
+                </tr>
+            `;
+            return;
+        }
         
         const startIndex = (currentPage - 1) * itemsPerPage;
         const endIndex = startIndex + itemsPerPage;
@@ -459,7 +529,7 @@ document.addEventListener('DOMContentLoaded', function () {
             `;
         });
         
-        // Calculate totals for all data
+        // Calculate totals for all (filtered) data
         let grandTotalOpening = 0, grandTotalDebit = 0, grandTotalCredit = 0, grandTotalClosing = 0;
         allData.forEach(row => {
             grandTotalOpening += parseFloat(row.opening_balance) || 0;
@@ -709,6 +779,14 @@ document.addEventListener('DOMContentLoaded', function () {
         distribution.value = '';
         subAccount.value = '';
         sortOrder.value = 'asc';
+
+        // NEW: reset amount range filter
+        rangeField.value = '';
+        rangeMin.value = '';
+        rangeMax.value = '';
+        rangeMinGroup.style.display = 'none';
+        rangeMaxGroup.style.display = 'none';
+
         subAccountGroup.style.display = 'none';
         showSummaryLedger();
         validateDates();
@@ -741,10 +819,6 @@ document.addEventListener('DOMContentLoaded', function () {
         
         if (subAccount.value) {
             params.append('sub_account_id', subAccount.value);
-        }
-        
-        if (isDetailed && expandedRows.size > 0) {
-            params.append('expanded_rows', Array.from(expandedRows).join(','));
         }
         
         if (company.value) {

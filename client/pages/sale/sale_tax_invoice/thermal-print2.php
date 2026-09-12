@@ -336,6 +336,10 @@
             <span>Date:</span>
             <span id="invoiceDate">Loading...</span>
         </div>
+        <div class="info-row" id="dueDateRow" >
+            <span>Due Date:</span>
+            <span id="dueDate">-</span>
+        </div>
         <div class="info-row">
             <span>Customer:</span>
             <span id="customerName">Loading...</span>
@@ -351,10 +355,6 @@
         <div class="info-row" id="deliveryManRow" >
             <span>Delivery Man:</span>
             <span id="deliveryManName">-</span>
-        </div>
-        <div class="info-row" id="dueDateRow" style="display: none;">
-            <span>Due Date:</span>
-            <span id="dueDate">-</span>
         </div>
 
         <div class="divider"></div>
@@ -750,8 +750,17 @@
             if (totalDozen <= 0) document.querySelectorAll('.dz-col').forEach(el => el.style.display = 'none');
             if (totalPiece <= 0) document.querySelectorAll('.pc-col').forEach(el => el.style.display = 'none');
 
-            // Discount - always shown now (even if 0), like FoxPro
-            const discountAmt = parseFloat(invoice.total_discount_amount || 0);
+            // Discount - sum of item-level Discount % amounts + Trade Offer amounts
+            // across all items, plus any invoice-level discount entered separately.
+            // (Previously this only read invoice.total_discount_amount, which stays 0
+            // whenever discount is applied per-item instead of at the invoice level —
+            // that's why Discount always printed as 0.)
+            let itemsDiscountTotal = 0;
+            groups.forEach(group => {
+                itemsDiscountTotal += group.discount_amount + group.trade_offer_amount;
+            });
+            const invoiceLevelDiscount = parseFloat(invoice.total_discount_amount || 0);
+            const discountAmt = itemsDiscountTotal + invoiceLevelDiscount;
             document.getElementById('discountAmount').textContent = `${currencySymbol}${formatMoney(discountAmt)}`;
 
             // Calculate total GST from items

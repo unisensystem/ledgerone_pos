@@ -98,7 +98,9 @@ try {
                 $stmt->execute([$tenant_id, $payroll_id, 31, $payroll_date, $description, 0, $item['amount']]);
             }
         } else {
-            $stmt->execute([$tenant_id, $payroll_id, 28, $payroll_date, $description, $item['amount'], 0]);
+            // FIX: was account_id 28 ('Salaries Payable' - a Liability account),
+            // now correctly debiting account_id 60 ('Salaries Expense')
+            $stmt->execute([$tenant_id, $payroll_id, 60, $payroll_date, $description, $item['amount'], 0]);
             $stmt->execute([$tenant_id, $payroll_id, $payment_account_id, $payroll_date, $description, 0, $item['amount']]);
         }
     }

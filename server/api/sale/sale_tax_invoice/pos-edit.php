@@ -170,42 +170,68 @@ if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
         $withholdingTaxPercent = floatval($customer['advance_income_tax_percentage'] ?? 0);
         $withholdingTaxAmount = $input['netAmount'] * ($withholdingTaxPercent / 100);
 
-        // Update sale invoice
-        $stmt = $pdo->prepare("
-            UPDATE sale_invoice SET
-                currency_id = ?, sale_date = ?, customer_id = ?, sub_account_id = ?, company_id = ?, branch_id = ?, container_id = ?,
-                previous_balance = ?, sale_officer_id = ?, supplier_man_id = ?, sale_order_id = ?, bilty_no = ?, transport_name = ?, project_id = ?, total_bill = ?, total_discount_percent = ?,
-                total_discount_amount = ?, net_amount = ?, withholding_tax_percent = ?, withholding_tax_amount = ?, amount_paid_auto_fill = ?, remarks = ?, status = ?, updated_by = ?
-            WHERE id = ? AND tenant_id = ?
-        ");
-        $stmt->execute([
-            $input['currencyId'],                                // 1
-            $input['saleDate'],                                  // 2
-            $input['customerId'],                                // 3
-            $input['subAccountId'] ?? null,                      // 4
-            $input['companyId'] ?? null,                         // 5
-            $input['branchId'],                                  // 6
-            $input['containerId'] ?? null,                       // 7 - container_id (optional)
-            extractBalanceAmount($input['previousBalance'] ?? '0.00'), // 8
-            $input['salesOfficerId'] ?? null,                    // 9
-            $input['supplierManId'] ?? null,                     // 10
-            $input['saleOrderId'] ?? null,                       // 11
-            $input['biltyNo'] ?? null,                           // 12
-            $input['transportName'] ?? null,                     // 13
-            $input['projectId'] ?? null,                         // 14 - project_id
-            $input['totalBill'],                                 // 15
-            $input['totalDiscountPercent'] ?? 0.00,              // 16
-            $input['totalDiscountAmount'] ?? 0.00,               // 17
-            $input['netAmount'],                                 // 18
-            $withholdingTaxPercent,                              // 19
-            $withholdingTaxAmount,                               // 20
-            $input['amountPaidAutoFill'] ?? 'yes',               // 21
-            $input['remarks'] ?? null,                           // 22
-            $input['status'] ?? 'Posted',                        // 23
-            $user_id,                                            // 24
-            $invoice_id,                                         // 25
-            $tenant_id                                           // 26
-        ]);
+       $stmt = $pdo->prepare("
+    UPDATE sale_invoice SET
+        currency_id = ?, sale_date = ?, customer_id = ?, sub_account_id = ?, company_id = ?, branch_id = ?, container_id = ?,
+        previous_balance = ?, sale_officer_id = ?, supplier_man_id = ?, sale_order_id = ?, bilty_no = ?, transport_name = ?, project_id = ?, total_bill = ?, total_discount_percent = ?,
+        total_discount_amount = ?, shipping_fees = ?, net_amount = ?, withholding_tax_percent = ?, withholding_tax_amount = ?, amount_paid_auto_fill = ?,
+        invoice_type = ?, due_date = ?, remarks = ?, status = ?, updated_by = ?
+    WHERE id = ? AND tenant_id = ?
+");
+$stmt->execute([
+    $input['currencyId'],                                // 1
+    $input['saleDate'],                                  // 2
+    $input['customerId'],                                // 3
+    $input['subAccountId'] ?? null,                      // 4
+    $input['companyId'] ?? null,                         // 5
+    $input['branchId'],                                  // 6
+    $input['containerId'] ?? null,                       // 7 - container_id (optional)
+    extractBalanceAmount($input['previousBalance'] ?? '0.00'), // 8
+    $input['salesOfficerId'] ?? null,                    // 9
+    $input['supplierManId'] ?? null,                     // 10
+    $input['saleOrderId'] ?? null,                       // 11
+    $input['biltyNo'] ?? null,                           // 12
+    $input['transportName'] ?? null,                     // 13
+    $input['projectId'] ?? null,                         // 14 - project_id
+    $input['totalBill'],                                 // 15
+    $input['totalDiscountPercent'] ?? 0.00,              // 16
+    $input['totalDiscountAmount'] ?? 0.00,               // 17
+    $input['shippingFees'] ?? 0.00,                      // 18
+    $input['netAmount'],                                 // 19
+    $withholdingTaxPercent,                              // 20
+    $withholdingTaxAmount,                               // 21
+    $input['amountPaidAutoFill'] ?? 'yes',               // 22
+    $input['invoiceType'] ?? 'Credit',                   // 23
+    $input['dueDate'] ?? null,                           // 24
+    $input['remarks'] ?? null,                           // 25
+    $input['status'] ?? 'Posted',                        // 26
+    $user_id,                                            // 27
+    $invoice_id,                                         // 28
+    $tenant_id                                           // 29
+]);
+
+        // Save/update/remove signature. Three cases:
+        //  1. removeSignature === true -> user explicitly removed it -> clear the column.
+        //  2. signature is a data:image base64 string -> user cropped a brand-new
+        //     signature this session -> decode + save to disk, then store the filename.
+        //  3. signature is a plain filename -> user kept the existing/default
+        //     signature unchanged -> just re-reference it, no disk write needed.
+        if (array_key_exists('removeSignature', $input) && $input['removeSignature'] === true) {
+            $pdo->prepare("UPDATE sale_invoice SET signature = NULL WHERE id = ? AND tenant_id = ?")
+                ->execute([$invoice_id, $tenant_id]);
+        } elseif (!empty($input['signature']) && is_string($input['signature'])) {
+            if (strpos($input['signature'], 'data:image') === 0) {
+                $signatureFileName = saveInvoiceSignature($input['signature'], $tenant_id, $invoice_id);
+                if ($signatureFileName) {
+                    $pdo->prepare("UPDATE sale_invoice SET signature = ? WHERE id = ? AND tenant_id = ?")
+                        ->execute([$signatureFileName, $invoice_id, $tenant_id]);
+                }
+            } else {
+                // Re-using an existing signature filename — just reference it.
+                $pdo->prepare("UPDATE sale_invoice SET signature = ? WHERE id = ? AND tenant_id = ?")
+                    ->execute([$input['signature'], $invoice_id, $tenant_id]);
+            }
+        }
 
         // Delete existing items and related records
         $pdo->prepare("DELETE FROM sale_invoice_taxes WHERE sale_invoice_id = ? AND tenant_id = ?")->execute([$invoice_id, $tenant_id]);
@@ -639,4 +665,33 @@ function convertToPieces($quantity, $uomId, $pdo, $productId)
     
     // Other units - return as is
     return $qty;
+}
+
+// Decode a base64 data-URL PNG (from the client-side signature crop) and save it
+// to disk, returning the stored filename to be saved in sale_invoice.signature.
+function saveInvoiceSignature($dataUrl, $tenant_id, $invoice_id)
+{
+    if (!preg_match('/^data:image\/(png|jpeg|jpg);base64,/', $dataUrl)) {
+        return null;
+    }
+    $base64Data = substr($dataUrl, strpos($dataUrl, ',') + 1);
+    $decoded = base64_decode($base64Data);
+    if ($decoded === false) {
+        return null;
+    }
+
+    // pos-edit.php lives at server/api/sale/sale_tax_invoice/ — 4 levels up reaches the
+    // project root, then into client/assets/uploads/signatures/. Adjust if your
+    // folder layout differs.
+    $uploadDir = __DIR__ . '/../../../../client/assets/uploads/signatures/';
+    if (!is_dir($uploadDir)) {
+        mkdir($uploadDir, 0755, true);
+    }
+
+    $fileName = 'sig_' . $tenant_id . '_' . $invoice_id . '_' . time() . '.png';
+    if (file_put_contents($uploadDir . $fileName, $decoded) === false) {
+        return null;
+    }
+
+    return $fileName;
 }

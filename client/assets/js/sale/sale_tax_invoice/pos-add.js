@@ -8,6 +8,9 @@ let bankAccountsData = [];
 let saleOrdersData = [];
 let customersData = [];
 let productsData = [];
+let currentSignatureDataUrl = null;
+let existingSignatureUrl = null;
+let defaultSignatureFilename = null;
 
 // Initialize invoice-level tax regimes
 window.invoiceLevelTaxRegimes = [];
@@ -19,6 +22,109 @@ const dataCache = {
     branches: new Map()
 };
 
+
+// ===== Signature Upload & Crop =====
+let signatureCropper = null;
+
+function initSignatureUpload() {
+    const uploadBtn   = document.getElementById('signatureUploadBtn');
+    const fileInput   = document.getElementById('signatureFileInput');
+    const removeBtn   = document.getElementById('signatureRemoveBtn');
+    const cropModal   = document.getElementById('signatureCropModal');
+    const cropImage   = document.getElementById('signatureCropImage');
+    const cropCancelBtn  = document.getElementById('signatureCropCancelBtn');
+    const cropConfirmBtn = document.getElementById('signatureCropConfirmBtn');
+
+    if (!uploadBtn || !fileInput) return;
+
+    uploadBtn.addEventListener('click', () => fileInput.click());
+
+    fileInput.addEventListener('change', function () {
+        const file = this.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = function (e) {
+            cropImage.src = e.target.result;
+            cropModal.style.display = 'flex';
+
+            if (signatureCropper) signatureCropper.destroy();
+            signatureCropper = new Cropper(cropImage, {
+                viewMode: 1,
+                autoCropArea: 1,
+                background: false,
+                guides: true
+            });
+        };
+        reader.readAsDataURL(file);
+        fileInput.value = '';
+    });
+
+    cropCancelBtn.addEventListener('click', function () {
+        cropModal.style.display = 'none';
+        if (signatureCropper) { signatureCropper.destroy(); signatureCropper = null; }
+    });
+
+    cropConfirmBtn.addEventListener('click', function () {
+        if (!signatureCropper) return;
+        const canvas = signatureCropper.getCroppedCanvas({
+            fillColor: 'transparent',
+            imageSmoothingQuality: 'high'
+        });
+        if (!canvas) return;
+
+        currentSignatureDataUrl = canvas.toDataURL('image/png');
+        existingSignatureUrl = null;
+        document.getElementById('signatureData').value = currentSignatureDataUrl;
+        document.getElementById('signatureRemoved').value = '0';
+        showSignaturePreview(currentSignatureDataUrl);
+
+        cropModal.style.display = 'none';
+        signatureCropper.destroy();
+        signatureCropper = null;
+    });
+
+    if (removeBtn) {
+        removeBtn.addEventListener('click', function () {
+            currentSignatureDataUrl = null;
+            existingSignatureUrl = null;
+            document.getElementById('signatureData').value = '';
+            document.getElementById('signatureRemoved').value = '1';
+            hideSignaturePreview();
+        });
+    }
+
+    cropModal.addEventListener('click', function (e) {
+        if (e.target === this) cropCancelBtn.click();
+    });
+}
+
+function showSignaturePreview(src) {
+    const wrap = document.getElementById('signaturePreviewWrap');
+    const img  = document.getElementById('signaturePreviewImg');
+    if (wrap && img) { img.src = src; wrap.style.display = 'flex'; }
+}
+
+function hideSignaturePreview() {
+    const wrap = document.getElementById('signaturePreviewWrap');
+    if (wrap) wrap.style.display = 'none';
+}
+
+async function loadDefaultSignature() {
+    try {
+        const response = await fetch('../../../../server/api/sale/sale_tax_invoice/get-default-signature.php');
+        const data = await response.json();
+        if (data.success && data.signature) {
+            defaultSignatureFilename = data.signature;
+            existingSignatureUrl = `../../../assets/uploads/signatures/${data.signature}`;
+            showSignaturePreview(existingSignatureUrl);
+        }
+    } catch (error) {
+        console.error('Error loading default signature:', error);
+    }
+}
+
+document.addEventListener('DOMContentLoaded', initSignatureUpload);
 // Function to get customer display text based on display mode setting
 function getCustomerDisplayText(customer) {
     const displayMode = localStorage.getItem('customerDisplayMode') || 'code_name_address';
@@ -385,10 +491,13 @@ function initializePage(permissions) {
     // Note: loadBranches is NOT in Promise.all — called inside loadCompanies() after company is known
     Promise.all([loadCustomersLocal(), loadCompanies(), loadProductsLocal(), loadUOM(), loadUOMGroupUnits(), loadCurrencies(), loadBankAccounts(), loadEmployees(), loadSaleOrders(), loadProjects(), fetchContainers()]).then(() => {
         console.log('All data loaded. Project dropdown populated.');
-        initSearchableDropdown('customerCodeSearch', 'customerCodeOptions', 'customerCode');
-        initSearchableDropdown('companySearch', 'companyOptions', 'company');
-        initSearchableDropdown('branchSearch', 'branchOptions', 'branch');
-        initSearchableDropdown('saleOrderSearch', 'saleOrderOptions', 'saleOrder');
+         initSearchableDropdown('customerCodeSearch', 'customerCodeOptions', 'customerCode');
+    initSearchableDropdown('companySearch', 'companyOptions', 'company');
+    initSearchableDropdown('branchSearch', 'branchOptions', 'branch');
+    initSearchableDropdown('saleOrderSearch', 'saleOrderOptions', 'saleOrder');
+
+    // ✅ YEH ADD KARO - BRANCH AUTO-SELECT
+    restoreLastSelectedBranch();
 
         // Apply invoice settings
         applyInvoiceSettings();
@@ -402,6 +511,7 @@ function initializePage(permissions) {
         } else {
             // Add first row after data is loaded
             addRowDynamic();
+            loadDefaultSignature();
         }
     });
 
@@ -1336,6 +1446,12 @@ function initializePage(permissions) {
                 if (prevBalanceEl) prevBalanceEl.value = invoice.previous_balance;
                 const remarksEl = document.getElementById('remarks');
                 if (remarksEl) remarksEl.value = invoice.remarks || '';
+                if (invoice.signature) {
+    existingSignatureUrl = `../../../assets/uploads/signatures/${invoice.signature}`;
+    showSignaturePreview(existingSignatureUrl);
+} else {
+    hideSignaturePreview();
+}
                 const salesOfficerEl = document.getElementById('salesOfficer');
                 if (salesOfficerEl) salesOfficerEl.value = invoice.sales_officer_id || '';
                 const supplierManEl = document.getElementById('supplierMan');
@@ -1344,6 +1460,8 @@ function initializePage(permissions) {
                 if (biltyNoEl) biltyNoEl.value = invoice.bilty_no || '';
                 const transportNameEl = document.getElementById('transportName');
                 if (transportNameEl) transportNameEl.value = invoice.transport_name || '';
+                const dueDateEl = document.getElementById('dueDate');  // ✅ Add this
+if (dueDateEl) dueDateEl.value = invoice.due_date || '';
                 const projectEl = document.getElementById('project');
                 if (projectEl) {
                     projectEl.value = invoice.project_id || '';
@@ -3877,6 +3995,7 @@ function saveInvoice(status = 'Posted') {
         // saveInvoice() lives outside initializePage()'s closure (where the split
         // payment helpers are defined), so query the rows directly here instead
         // of calling getSplitPaymentRows().
+        
         paymentSplits = Array.from(document.querySelectorAll('#splitPaymentRows .split-payment-row'))
             .map(row => ({
                 method: row.querySelector('.split-method').value,
@@ -3891,7 +4010,7 @@ function saveInvoice(status = 'Posted') {
         }
     }
 
-    const formData = {
+       const formData = {
         saleDate: document.getElementById('saleDate').value,
         customerId: document.getElementById('customerCode').value,
         subAccountId: document.getElementById('subAccount').value || null,
@@ -3906,6 +4025,9 @@ function saveInvoice(status = 'Posted') {
         biltyNo: document.getElementById('biltyNo')?.value || null,
         transportName: document.getElementById('transportName')?.value || null,
         projectId: document.getElementById('project')?.value ? parseInt(document.getElementById('project').value) : null,
+        invoiceType: document.getElementById('invoiceType')?.value || 'Credit',
+        dueDate: document.getElementById('dueDate')?.value || null,
+        shippingFees: parseFloat(document.getElementById('shippingFees')?.value) || 0,
         totalBill: parseFloat(document.getElementById('totalBill').textContent),
         totalDiscountPercent: parseFloat(document.getElementById('totalDiscountPercent')?.value) || 0,
         totalDiscountAmount: parseFloat(document.getElementById('totalDiscountAmount')?.value),
@@ -3918,6 +4040,11 @@ function saveInvoice(status = 'Posted') {
         amountPaidAutoFill: document.querySelector('input[name="autoFillAmountPaid"]:checked')?.value || 'yes',
         remainingBalance: parseFloat(document.getElementById('remainingBalance')?.value) || 0,
         remarks: document.getElementById('remarks')?.value,
+        signature: currentSignatureDataUrl
+    || (defaultSignatureFilename && document.getElementById('signatureRemoved')?.value !== '1'
+        ? defaultSignatureFilename
+        : null),
+removeSignature: document.getElementById('signatureRemoved')?.value === '1',
         status: status,
         items: [],
         invoiceLevelTaxes: window.invoiceLevelTaxRegimes ? window.invoiceLevelTaxRegimes.map(regime => {
@@ -4756,7 +4883,28 @@ document.getElementById('salesOfficer').addEventListener('change', function () {
 });
 
 
+// Restore last selected branch on page load
+function restoreLastSelectedBranch() {
+    const lastBranchId = localStorage.getItem('lastSelectedBranch');
+    if (lastBranchId) {
+        const branchOption = document.querySelector(`#branchOptions [data-value="${lastBranchId}"]`);
+        if (branchOption) {
+            // Simulate click to select the branch
+            branchOption.click();
+        }
+    }
+}
 
+// Same for company
+function restoreLastSelectedCompany() {
+    const lastCompanyId = localStorage.getItem('lastSelectedCompany');
+    if (lastCompanyId) {
+        const companyOption = document.querySelector(`#companyOptions [data-value="${lastCompanyId}"]`);
+        if (companyOption) {
+            companyOption.click();
+        }
+    }
+}
 
 document.getElementById('closeFieldSettingsBtn').addEventListener('click', function () {
     document.getElementById('fieldSettingsModal').style.display = 'none';
