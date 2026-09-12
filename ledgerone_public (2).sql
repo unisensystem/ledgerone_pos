@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 31.97.123.46:3306
--- Generation Time: Aug 05, 2026 at 03:19 PM
+-- Generation Time: Sep 12, 2026 at 02:03 PM
 -- Server version: 10.5.29-MariaDB
 -- PHP Version: 8.2.12
 
@@ -585,7 +585,14 @@ INSERT INTO `subscriptions` (`id`, `tenant_id`, `plan_id`, `previous_plan_id`, `
 (34, 54, 3, NULL, NULL, NULL, 'one_time', 1, '2026-06-28', NULL, 7, NULL, NULL, NULL, NULL, 0, NULL, 'active', NULL, NULL, NULL, NULL, '2026-06-28 11:18:06', NULL),
 (35, 55, 3, NULL, NULL, NULL, 'one_time', 1, '2026-07-05', NULL, 7, NULL, NULL, NULL, NULL, 0, NULL, 'active', NULL, NULL, NULL, NULL, '2026-07-05 00:58:54', NULL),
 (36, 56, 3, NULL, NULL, NULL, 'one_time', 1, '2026-07-21', NULL, 7, NULL, NULL, NULL, NULL, 0, NULL, 'active', NULL, NULL, NULL, NULL, '2026-07-21 15:26:24', NULL),
-(37, 57, 3, NULL, NULL, NULL, 'one_time', 1, '2026-07-24', NULL, 7, NULL, NULL, NULL, NULL, 0, NULL, 'active', NULL, NULL, NULL, NULL, '2026-07-24 15:24:45', NULL);
+(37, 57, 3, NULL, NULL, NULL, 'one_time', 1, '2026-07-24', NULL, 7, NULL, NULL, NULL, NULL, 0, NULL, 'active', NULL, NULL, NULL, NULL, '2026-07-24 15:24:45', NULL),
+(38, 58, 3, NULL, NULL, NULL, 'one_time', 1, '2026-08-12', NULL, 7, NULL, NULL, NULL, NULL, 0, NULL, 'active', NULL, NULL, NULL, NULL, '2026-08-12 06:42:01', NULL),
+(39, 59, 3, NULL, NULL, NULL, 'one_time', 1, '2026-08-12', NULL, 7, NULL, NULL, NULL, NULL, 0, NULL, 'trialing', NULL, NULL, NULL, NULL, '2026-08-12 08:27:07', NULL),
+(40, 60, 3, NULL, NULL, NULL, 'one_time', 1, '2026-08-17', NULL, 7, NULL, NULL, NULL, NULL, 0, NULL, 'active', NULL, NULL, NULL, NULL, '2026-08-17 19:00:11', NULL),
+(41, 63, 3, NULL, NULL, NULL, 'one_time', 1, '2026-08-23', NULL, 7, NULL, NULL, NULL, NULL, 0, NULL, 'active', NULL, NULL, NULL, NULL, '2026-08-23 13:50:46', NULL),
+(42, 64, 3, NULL, NULL, NULL, 'one_time', 1, '2026-08-26', NULL, 7, NULL, NULL, NULL, NULL, 0, NULL, 'active', NULL, NULL, NULL, NULL, '2026-08-26 18:56:39', NULL),
+(43, 65, 3, NULL, NULL, NULL, 'one_time', 1, '2026-09-01', NULL, 7, NULL, NULL, NULL, NULL, 0, NULL, 'active', NULL, NULL, NULL, NULL, '2026-08-31 20:30:25', NULL),
+(44, 66, 3, NULL, NULL, NULL, 'one_time', 1, '2026-09-09', NULL, 7, NULL, NULL, NULL, NULL, 0, NULL, 'active', NULL, NULL, NULL, NULL, '2026-09-09 13:28:01', NULL);
 
 -- --------------------------------------------------------
 
@@ -668,7 +675,14 @@ INSERT INTO `tenants` (`id`, `business_name`, `logo_url`, `contact_email`, `cont
 (54, 'RODI TRADING L.L.C', NULL, 'ahmedullah364@gmail.com', '0315 8346645', 'PK', 'Balochistan', 'Quetta', NULL, 'Office No:B13, 2nd floor swiss plaza Jinnah Road quetta.', NULL, 'active', 0, NULL, NULL, 'UTC', 'USD', 'en', '2026-06-28 11:16:09', NULL, NULL, NULL, NULL),
 (55, 'NIAZ MOHD METAL SCRAPS TR CO LLC.', NULL, 'niazmetal@gmail.com', '+971-501100583', NULL, NULL, NULL, NULL, NULL, NULL, 'active', 0, NULL, NULL, 'UTC', 'USD', 'en', '2026-07-04 14:14:12', NULL, NULL, NULL, NULL),
 (56, 'Comfort Int', NULL, 'muh1610@gmail.com', '03216777828', 'PK', 'Punjab', 'Lahore', NULL, NULL, NULL, 'active', 0, NULL, NULL, 'UTC', 'USD', 'en', '2026-07-21 15:23:40', NULL, NULL, NULL, NULL),
-(57, 'Al Aziz Traders', NULL, 'alaziztrader110@gmail.com', '03051244737', NULL, NULL, NULL, NULL, NULL, NULL, 'suspended', 0, NULL, NULL, 'UTC', 'USD', 'en', '2026-07-24 15:23:24', '2026-07-25 13:37:59', NULL, NULL, NULL);
+(57, 'Al Aziz Traders', NULL, 'alaziztrader110@gmail.com', '03051244737', NULL, NULL, NULL, NULL, NULL, NULL, 'suspended', 0, NULL, NULL, 'UTC', 'USD', 'en', '2026-07-24 15:23:24', '2026-07-25 13:37:59', NULL, NULL, NULL),
+(58, 'Asad Traders', NULL, 'asadtraders.160@gmail.com', '0300-0280160', NULL, NULL, NULL, NULL, NULL, NULL, 'active', 0, NULL, NULL, 'UTC', 'USD', 'en', '2026-08-11 10:47:17', NULL, NULL, NULL, NULL),
+(59, 'GH WholeSaler', NULL, 'ghwholesaler786@gmail.com', '0303-3070724', NULL, NULL, NULL, NULL, NULL, NULL, 'active', 0, NULL, NULL, 'UTC', 'USD', 'en', '2026-08-12 08:26:31', NULL, NULL, NULL, NULL),
+(60, 'Unisen Systems', NULL, 'usman@unisensystems.com', '', NULL, NULL, NULL, NULL, NULL, NULL, 'active', 0, NULL, NULL, 'UTC', 'USD', 'en', '2026-08-17 18:59:30', NULL, NULL, NULL, NULL),
+(63, 'Rehman Enterprises', NULL, 'asaxme@gmail.com', ' +92-3086022055', NULL, NULL, NULL, NULL, NULL, NULL, 'active', 0, NULL, NULL, 'UTC', 'USD', 'en', '2026-08-23 13:49:52', NULL, NULL, NULL, NULL),
+(64, 'Multiaxis Engineering', NULL, 'multiaxisengg@gmail.com', NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'active', 0, NULL, NULL, 'UTC', 'USD', 'en', '2026-08-26 18:44:18', NULL, NULL, NULL, NULL),
+(65, 'Khattak Traders', NULL, 'khattakfabrics222@gmail.com', '03137212229', NULL, NULL, NULL, NULL, NULL, NULL, 'active', 0, NULL, NULL, 'UTC', 'USD', 'en', '2026-08-31 20:29:42', NULL, NULL, NULL, NULL),
+(66, 'ISMAIL TRADERS', NULL, 'mismailtraders786@gmail.com', '0301-3224590', NULL, NULL, NULL, NULL, NULL, NULL, 'active', 0, NULL, NULL, 'UTC', 'USD', 'en', '2026-09-09 13:27:18', NULL, NULL, NULL, NULL);
 
 --
 -- Indexes for dumped tables
@@ -791,7 +805,7 @@ ALTER TABLE `subscriptions`
 -- AUTO_INCREMENT for table `tenants`
 --
 ALTER TABLE `tenants`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=58;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=67;
 
 --
 -- Constraints for dumped tables

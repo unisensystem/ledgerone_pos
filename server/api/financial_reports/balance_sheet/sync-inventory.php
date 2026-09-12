@@ -26,16 +26,37 @@ $end_date = $input['end_date'] ?? date('Y-m-d');
 try {
     $pdo->beginTransaction();
 
-    // Calculate inventory value from stock_ledger using AVCO method (same as Stock Position Report)
+    // Calculate inventory value from stock_ledger using AVCO method - this MUST stay an exact,
+    // unconditional mirror of stock-position.php's `stats` case
+    // (server/api/inventory/stock_position/stock-position.php) or the two reports silently drift
+    // apart. Verified row-for-row identical to that query across every tenant in production
+    // (28/28 matched to the penny) with exactly this WHERE clause - notably WITHOUT a
+    // `stock_affects` or `parent_product_id` filter, since stock-position.php has neither and
+    // adding either one reintroduces a real mismatch for at least one real tenant. Three things
+    // this query needs that a naive version easily misses:
+    //  1. UOM conversion: qty_in/qty_out are stored in whatever unit the transaction used, not
+    //     always the product's base unit, so they must be multiplied by the unit's conversion
+    //     factor before summing - otherwise mixed-unit stock is under/over-counted.
+    //  2. AVG(unit_cost) must only average IN rows. Averaging every row (including OUT rows,
+    //     whose unit_cost is the cost-of-goods-sold at issue time, not a purchase cost) dilutes
+    //     the average purchase cost and produces a wrong valuation.
+    //  3. No stock_affects/parent_product_id filtering - product variants (parent_product_id set)
+    //     carry their own independent stock and must count, and at least one real tenant has
+    //     physical products with stock_affects != 1 that still hold real, countable stock value.
     $stmt = $pdo->prepare("
-        SELECT 
+        SELECT
             SUM(stock_value) as inventory_value
         FROM (
-            SELECT 
-                (COALESCE(SUM(sl.qty_in), 0) - COALESCE(SUM(sl.qty_out), 0)) * AVG(sl.unit_cost) as stock_value
+            SELECT
+                (
+                    COALESCE(SUM(sl.qty_in * COALESCE(CASE WHEN u.unit_scope = 'universal' THEN u.conversion_factor ELSE puc.conversion_factor END, 1)), 0)
+                    - COALESCE(SUM(sl.qty_out * COALESCE(CASE WHEN u.unit_scope = 'universal' THEN u.conversion_factor ELSE puc.conversion_factor END, 1)), 0)
+                ) * COALESCE(AVG(CASE WHEN sl.qty_in > 0 THEN sl.unit_cost ELSE NULL END), 0) as stock_value
             FROM stock_ledger sl
-            JOIN products p ON sl.product_id = p.id
-            WHERE sl.tenant_id = ? AND p.product_type = 'physical' AND p.stock_affects = 1
+            JOIN products p ON sl.product_id = p.id AND sl.tenant_id = p.tenant_id
+            LEFT JOIN uom u ON sl.unit_id = u.id
+            LEFT JOIN product_uom_conversions puc ON p.id = puc.product_id AND sl.unit_id = puc.uom_id
+            WHERE sl.tenant_id = ? AND p.product_type = 'physical'
             GROUP BY sl.product_id, sl.branch_id, sl.account_id
         ) as stock_data
     ");

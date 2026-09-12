@@ -1852,11 +1852,17 @@ if (!$currencySymbol) {
             // Load KPI data from APIs
             async function loadKPIs() {
                 try {
-                    // Stock Valuation from stock-position API
-                    const stockRes = await fetch('../../../server/api/inventory/stock_position/stock-position.php?action=position');
+                    // Stock Valuation - use the same `stats` aggregate the Stock Position page's
+                    // own "Total Stock Value" card reads (client/assets/js/inventory/stock_position/stock-position.js
+                    // -> loadDashboardStats()), NOT `action=position`. `position` computes each row's
+                    // value via a more complex proportional unit-distribution formula built for the
+                    // detailed multi-unit table, and applies an extra `account_id IS NOT NULL` filter
+                    // that `stats` doesn't - summing its rows client-side silently drifts from the
+                    // real total instead of matching it.
+                    const stockRes = await fetch('../../../server/api/inventory/stock_position/stock-position.php?action=stats');
                     const stockData = await stockRes.json();
-                    if (stockData.success && Array.isArray(stockData.data)) {
-                        const totalValue = stockData.data.reduce((sum, item) => sum + parseFloat(item.stock_value || 0), 0);
+                    if (stockData.success && stockData.data) {
+                        const totalValue = parseFloat(stockData.data.total_value || 0);
                         document.getElementById('kpi-stock-value').textContent = currencySymbol + ' ' + totalValue.toLocaleString('en-PK', {maximumFractionDigits: 0});
                     }
 
