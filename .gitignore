@@ -10,3 +10,8 @@ client/assets/js/dashboard/dashboard-loader.js
 
 # Local browser-automation test artifacts
 .playwright-mcp/
+
+# Dompdf's runtime font-metrics cache - auto-generated the first time a given font is
+# used for a PDF export, derived from the .afm/.ufm/.ttf files already tracked above it,
+# so it doesn't need to be committed and just regenerates wherever the app runs.
+vendor/dompdf/dompdf/lib/fonts/*.json
