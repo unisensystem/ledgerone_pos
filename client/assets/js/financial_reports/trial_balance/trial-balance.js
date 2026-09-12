@@ -2,6 +2,26 @@ let chartOfAccounts = [];
 let allAccounts = [];
 let expandedRows = new Set();
 
+// Keeps the "Trading Inventory" account's ledger balance in sync with the live
+// stock_ledger valuation before rendering - same call the Balance Sheet page makes
+// on load, so Trial Balance doesn't show a stale figure when visited on its own.
+function syncInventory() {
+    const endDate = document.getElementById('toDate')?.value || new Date().toISOString().split('T')[0];
+
+    return fetch('../../../../server/api/financial_reports/balance_sheet/sync-inventory.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ end_date: endDate })
+    })
+        .then(response => response.json())
+        .then(result => {
+            if (!result.success) {
+                console.error('Inventory sync error:', result.message);
+            }
+        })
+        .catch(error => console.error('Inventory sync error:', error));
+}
+
 async function fetchTrialBalanceData() {
     try {
         const response = await fetch('../../../../server/api/financial_reports/trial_balance/trial-balance.php');
@@ -135,6 +155,7 @@ function updateValidationStatus(totalDebits, totalCredits) {
 // Event Listeners
 document.getElementById('refreshBtn').addEventListener('click', async function () {
     this.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Refreshing...';
+    await syncInventory();
     await fetchTrialBalanceData();
     this.innerHTML = '<i class="fas fa-sync-alt"></i> Refresh';
     showNotification('Trial Balance data refreshed successfully.', 'success');
@@ -299,7 +320,7 @@ function showNotification(message, type) {
 }
 
 document.addEventListener('DOMContentLoaded', function () {
-    fetchTrialBalanceData();
+    syncInventory().then(() => fetchTrialBalanceData());
 
     const isFirstVisit = !localStorage.getItem('trialBalanceVisited');
     if (isFirstVisit) {

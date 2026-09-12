@@ -35,7 +35,7 @@ try {
                 (COALESCE(SUM(sl.qty_in), 0) - COALESCE(SUM(sl.qty_out), 0)) * AVG(sl.unit_cost) as stock_value
             FROM stock_ledger sl
             JOIN products p ON sl.product_id = p.id
-            WHERE sl.tenant_id = ? AND p.product_type = 'physical' AND p.stock_affects = 1 AND p.parent_product_id IS NULL
+            WHERE sl.tenant_id = ? AND p.product_type = 'physical' AND p.stock_affects = 1
             GROUP BY sl.product_id, sl.branch_id, sl.account_id
         ) as stock_data
     ");
