@@ -232,28 +232,27 @@ function renderTopCostCentersChart(data) {
     costCentersChart.render();
 }
 
-// Initialize the table
 function renderTable() {
     tableBody.innerHTML = '';
 
     if (filteredData.length === 0) {
         tableBody.innerHTML = `
-                    <tr>
-                        <td colspan="9">
-                            <div class="empty-state">
-                                <div class="empty-icon">
-                                    <i class="fas fa-file-invoice-dollar"></i>
-                                </div>
-                                <h3>No expense vouchers found</h3>
-                                <p>Try adjusting your search or filters</p>
-                            </div>
-                        </td>
-                    </tr>
-                `;
+            <tr>
+                <td colspan="9">
+                    <div class="empty-state">
+                        <div class="empty-icon">
+                            <i class="fas fa-file-invoice-dollar"></i>
+                        </div>
+                        <h3>No expense vouchers found</h3>
+                        <p>Try adjusting your search or filters</p>
+                    </div>
+                </td>
+            </tr>
+        `;
         return;
     }
 
-    // Calculate pagination
+    // Pagination - ab filteredData khud individual lines hai
     const startIndex = (currentPage - 1) * itemsPerPage;
     const endIndex = startIndex + itemsPerPage;
     const pageData = filteredData.slice(startIndex, endIndex);
@@ -262,7 +261,6 @@ function renderTable() {
     pageData.forEach(expense => {
         const row = document.createElement('tr');
 
-        // Format date
         const dateObj = new Date(expense.date);
         const formattedDate = dateObj.toLocaleDateString('en-US', {
             year: 'numeric',
@@ -270,8 +268,7 @@ function renderTable() {
             day: 'numeric'
         });
 
-        // Format amount
-        const formattedAmount = CURRENCY_SYMBOL + parseFloat(expense.total_amount).toFixed(2);
+        const formattedAmount = CURRENCY_SYMBOL + parseFloat(expense.expense_amounts).toFixed(2);
 
         const cfVal = parseInt(expense.is_cash_flow);
         const cashFlowBadge = cfVal === 1
@@ -279,50 +276,48 @@ function renderTable() {
             : `<span class="status-badge status-rejected"><i class="fas fa-times-circle"></i> No</span>`;
 
         row.innerHTML = `
-                    <td><strong>${expense.voucher_no}</strong></td>
-                    <td>${formattedDate}</td>
-                    <td>${expense.description}</td>
-                    <td>${expense.project_name || '-'}</td>
-                    <td>${expense.expense_accounts || '-'}</td>
-                    <td>${expense.cost_centers || '-'}</td>
-                    <td class="amount">${formattedAmount}</td>
-                    <td>${cashFlowBadge}</td>
-                    <td>
-                        <div class="action-buttons">
-                            <button class="action-btn view" title="View Details" onclick="viewVoucher(${expense.id})">
-                                <i class="fas fa-eye"></i>
-                            </button>
-                            <button class="action-btn edit" title="Edit" onclick="editVoucher(${expense.id})">
-                                <i class="fas fa-edit"></i>
-                            </button>
-                            <button class="action-btn cash-flow ${cfVal === 1 ? 'cf-yes' : 'cf-no'}" title="Toggle Cash Flow (${cfVal === 1 ? 'Yes' : 'No'})" onclick="toggleCashFlow(${expense.id}, ${cfVal}, this)">
-                                <i class="fas fa-water"></i>
-                            </button>
-                            <button class="action-btn print" title="Print" onclick="printVoucher(${expense.id})">
-                                <i class="fas fa-print"></i>
-                            </button>
-                            <button class="action-btn delete" title="Delete" onclick="openDeleteModal(${expense.id}, '${expense.voucher_no}')">
-                                <i class="fas fa-trash"></i>
-                            </button>
-                        </div>
-                    </td>
-                `;
+            <td><strong>${expense.voucher_no}</strong></td>
+            <td>${formattedDate}</td>
+            <td>${expense.description}</td>
+            <td>${expense.project_name || '-'}</td>
+            <td>${expense.expense_accounts || '-'}</td>
+            <td>${expense.cost_centers || '-'}</td>
+            <td class="amount">${formattedAmount}</td>
+            <td>${cashFlowBadge}</td>
+            <td>
+                <div class="action-buttons">
+                    <button class="action-btn view" title="View Full Details" onclick="viewVoucher(${expense.voucher_id})">
+                        <i class="fas fa-eye"></i>
+                    </button>
+                    <button class="action-btn edit" title="Edit" onclick="editVoucher(${expense.voucher_id})">
+                        <i class="fas fa-edit"></i>
+                    </button>
+                    <button class="action-btn cash-flow ${cfVal === 1 ? 'cf-yes' : 'cf-no'}" title="Toggle Cash Flow" onclick="toggleCashFlow(${expense.voucher_id}, ${cfVal}, this)">
+                        <i class="fas fa-water"></i>
+                    </button>
+                    <button class="action-btn print" title="Print" onclick="printVoucher(${expense.voucher_id})">
+                        <i class="fas fa-print"></i>
+                    </button>
+                    <button class="action-btn delete" title="Delete" onclick="openDeleteModal(${expense.voucher_id}, '${expense.voucher_no}')">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+            </td>
+        `;
 
         tableBody.appendChild(row);
     });
 
-    // Update pagination info
+    // Update pagination
     const totalPages = Math.ceil(filteredData.length / itemsPerPage);
     const startEntry = filteredData.length > 0 ? startIndex + 1 : 0;
     const endEntry = Math.min(endIndex, filteredData.length);
 
     paginationInfo.textContent = `Showing ${startEntry} to ${endEntry} of ${filteredData.length} entries`;
 
-    // Update pagination buttons
     prevPageBtn.disabled = currentPage === 1;
     nextPageBtn.disabled = currentPage === totalPages || totalPages === 0;
 
-    // Update page number buttons
     updatePaginationButtons(totalPages);
 }
 

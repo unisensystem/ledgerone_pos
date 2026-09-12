@@ -31,12 +31,16 @@ document.addEventListener('DOMContentLoaded', function () {
     const subAccountGroup = document.getElementById('sub-account-group');
     const currencyFilter = document.getElementById('currency-filter');
     const symbolOverride = document.getElementById('symbol-override');
+    const sortOrder = document.getElementById('sort-order');
 
     let currentPage = 1;
     let totalPages = 1;
     let allData = [];
     let allDetailedData = [];       // add this
-let detailedOpeningBalance = 0; // add this
+    let detailedOpeningBalance = 0; // add this
+    let rawSummaryData = [];        // raw, unsorted data as received from server
+    let rawDetailedData = [];       // raw, unsorted data as received from server
+    let rawDetailedOpeningBalance = 0;
     const itemsPerPage = 10;
     let expandedRows = new Set();
     let allCustomers = [];
@@ -111,6 +115,15 @@ let detailedOpeningBalance = 0; // add this
     symbolOverride.addEventListener('change', function() {
         currentCurrencySymbol = this.value;
         if (allData.length > 0) renderPage();
+    });
+
+    // Sort order — re-sorts already-fetched data locally, no refetch needed
+    sortOrder.addEventListener('change', function() {
+        if (detailedLedgerBtn.classList.contains('active')) {
+            if (rawDetailedData.length > 0) applyDetailedSort();
+        } else {
+            if (rawSummaryData.length > 0) applySummarySort();
+        }
     });
     
     // Reload customers when company changes
@@ -398,9 +411,18 @@ let detailedOpeningBalance = 0; // add this
 
     // Render summary ledger
     function renderSummaryLedger(data) {
-        allData = data;
-        totalPages = Math.ceil(data.length / itemsPerPage);
+        rawSummaryData = data;
         currentPage = 1;
+        applySummarySort();
+    }
+
+    // Applies the current Sort Order selection to the raw summary data (already
+    // arrives from the server sorted A-Z by customer name, so 'asc' is a no-op
+    // and 'desc' just flips it).
+    function applySummarySort() {
+        allData = sortOrder.value === 'desc' ? rawSummaryData.slice().reverse() : rawSummaryData;
+        totalPages = Math.ceil(allData.length / itemsPerPage);
+        if (currentPage > totalPages) currentPage = 1;
         renderPage();
         updatePagination();
     }
@@ -464,8 +486,47 @@ let detailedOpeningBalance = 0; // add this
         nextBtn.disabled = currentPage === totalPages;
     }
 
+    // Reorders a detailed-ledger row array for the "Descending" sort option.
+    // 'opening_balance', 'sub_account_header' and 'sub_account_total' rows are
+    // structural anchors and stay where they are; only the transaction rows
+    // between them get reversed, so sub-account grouping / totals still line up.
+    // Each row already carries its own correct running_balance, computed
+    // chronologically on the backend, so reordering for display is safe.
+    function reverseTransactionRuns(data) {
+        const specialTypes = ['opening_balance', 'sub_account_header', 'sub_account_total'];
+        const result = [];
+        let buffer = [];
+        const flush = () => {
+            if (buffer.length) {
+                result.push(...buffer.reverse());
+                buffer = [];
+            }
+        };
+        data.forEach(row => {
+            if (specialTypes.includes(row.type)) {
+                flush();
+                result.push(row);
+            } else {
+                buffer.push(row);
+            }
+        });
+        flush();
+        return result;
+    }
+
     // Render detailed ledger
     function renderDetailedLedger(data, openingBalance) {
+        rawDetailedData = data;
+        rawDetailedOpeningBalance = openingBalance;
+        applyDetailedSort();
+    }
+
+    function applyDetailedSort() {
+        const sorted = sortOrder.value === 'desc' ? reverseTransactionRuns(rawDetailedData) : rawDetailedData;
+        renderDetailedLedgerRows(sorted, rawDetailedOpeningBalance);
+    }
+
+    function renderDetailedLedgerRows(data, openingBalance) {
          allDetailedData = data;
     detailedOpeningBalance = openingBalance;
         const tbody = detailedLedgerTable.querySelector('tbody');
@@ -647,6 +708,7 @@ let detailedOpeningBalance = 0; // add this
         toDate.value = '';
         distribution.value = '';
         subAccount.value = '';
+        sortOrder.value = 'asc';
         subAccountGroup.style.display = 'none';
         showSummaryLedger();
         validateDates();
@@ -692,6 +754,10 @@ let detailedOpeningBalance = 0; // add this
         if (currencyFilter.value) {
             params.append('currency_id', currencyFilter.value);
         }
+
+        if (sortOrder.value) {
+            params.append('sort_order', sortOrder.value);
+        }
         
         window.open(`print.php?${params}`, '_blank');
     });
@@ -713,7 +779,6 @@ function exportLedgerToExcel() {
         }
 
         const rows = [];
-        let runningBalance = detailedOpeningBalance;
 
         allDetailedData.forEach(row => {
             if (row.type === 'sub_account_header' || row.type === 'sub_account_total') {
@@ -793,6 +858,7 @@ function exportLedgerToExcel() {
         if (isDetailed && expandedRows.size > 0) params.append('expanded_rows', Array.from(expandedRows).join(','));
         if (company.value) params.append('company_id', company.value);
         if (currencyFilter.value) params.append('currency_id', currencyFilter.value);
+        if (sortOrder.value) params.append('sort_order', sortOrder.value);
         window.open(`print.php?${params}`, '_blank');
     });
 

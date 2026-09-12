@@ -115,6 +115,13 @@ $all_symbols = $stmt2->fetchAll();
                     <input type="date" class="form-control" id="to-date">
                     <div class="error-message" id="to-date-error">To Date cannot be less than From Date</div>
                 </div>
+                <div class="form-group">
+                    <label class="form-label" for="sort-order">Sort Order</label>
+                    <select class="form-control" id="sort-order">
+                        <option value="asc" selected>Ascending (Oldest / A-Z first)</option>
+                        <option value="desc">Descending (Newest / Z-A first)</option>
+                    </select>
+                </div>
             </div>
             <div class="actions">
                 <button class="btn btn-primary" id="load-ledger-btn">

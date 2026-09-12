@@ -38,6 +38,10 @@ $currency_symbol = $currency['symbol'];
     <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
 </head>
 
+<style>
+    
+</style>
+
 <body>
     <script>
         const CURRENCY_SYMBOL = '<?php echo $currency_symbol; ?>';

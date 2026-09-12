@@ -148,7 +148,8 @@ document.getElementById('uomFilter').addEventListener('change', () => applyFilte
     
     // Load categories for filter
     loadCategoriesFilter();
-    
+    // Column show/hide
+initColumnToggle();
     // Load vendors for filter
     loadVendorsFilter();
 
@@ -252,12 +253,16 @@ function renderProductTable(productsToRender) {
                         </div>
                         ${product.subcategory ? `<div style="font-size: 12px; color: var(--subtext); ${product.parentProductId ? 'padding-left: 24px;' : ''}">${product.subcategory}</div>` : ''}
                     </td>
-                    <td>${typeBadge}</td>
-                    <td>${product.uomDisplay || '<span style="color: #999;">Not Set</span>'}</td>
-                    <td>${product.category}</td>
-                    <td>${product.vendor || '<span style="color: #999;">Not Set</span>'}</td>
-                    <td>${product.price > 0 ? `${product.currencySymbol}${product.price.toFixed(2)}` : 'Free'}</td>
-                    <td>${statusBadge}</td>
+               <td data-col="type">${typeBadge}</td>
+<td data-col="uom">${product.uomDisplay || '<span style="color: #999;">Not Set</span>'}</td>
+<td data-col="category">${product.category}</td>
+<td data-col="vendor">${product.vendor || '<span style="color: #999;">Not Set</span>'}</td>
+<td data-col="price">${product.price > 0 ? `${product.currencySymbol}${product.price.toFixed(2)}` : 'Free'}</td>
+<td data-col="purchasePrice">${product.purchasePrice > 0 ? `${product.currencySymbol}${product.purchasePrice.toFixed(2)}` : '-'}</td>
+<td data-col="batchNo">${product.batchNo || '<span style="color: #999;">-</span>'}</td>
+<td data-col="batchExpiryDate">${product.batchExpiryDate || '<span style="color: #999;">-</span>'}</td>
+<td data-col="stock" class="${stockClass}">${stockStatus}</td>
+<td data-col="status">${statusBadge}</td>
                     <td>
                         <div class="action-buttons">
                             ${product.qrCode || product.barcode ? `
@@ -353,6 +358,7 @@ function renderProductTable(productsToRender) {
         });
     });
 
+     applyColumnVisibility();
     // Pagination info will be updated by updatePagination function
 }
 
@@ -459,11 +465,13 @@ function exportProductsToExcel() {
         'Category': p.category,
         'Subcategory': p.subcategory || '',
         'Vendor': p.vendor || '',
-        'Current Stock': (p.type === 'service' || p.noStockRecords) ? 'N/A' : p.currentStock,
-        'Trade Price': p.tradePrice,
-        'Wholesale Price': p.wholesalePrice,
-        'MRP': p.mrp,
-        'Status': p.status === 'active' ? 'Active' : 'Inactive'
+       'Current Stock': p.stock !== null ? p.stock : 'N/A',
+'Purchase Price': p.purchasePrice,
+'Trade Price': p.tradePrice,
+'Wholesale Price': p.wholesalePrice,
+'MRP': p.mrp,
+'Batch No': p.batchNo,
+'Batch Expiry Date': p.batchExpiryDate,
     }));
 
     const worksheet = XLSX.utils.json_to_sheet(rows);
@@ -745,28 +753,32 @@ page: page,
                     uomDisplay = `<span style="color: var(--heading);">${product.uom_group_name}</span><br><span style="font-size: 11px; color: var(--subtext);">UOM Group</span>`;
                 }
                 
-                return {
-                    id: product.id,
-                    code: product.code,
-                    name: product.name,
-                    type: product.product_type,
-                    uomDisplay: uomDisplay,
-                    category: product.category_name || 'Uncategorized',
-                    vendor: product.supplier_name || '',
-                    subcategory: product.subcategory_name || '',
-                    currentStock: product.current_stock,
-                    price: parseFloat(priceType === 'tp' ? product.trade_price : product.mrp),
-                    tradePrice: parseFloat(product.trade_price),
-                    wholesalePrice: parseFloat(product.wholesale_price),
-                    mrp: parseFloat(product.mrp),
-                    status: product.is_active ? 'active' : 'inactive',
-                    noStockRecords: product.no_stock_records == 1,
-                    currencySymbol: product.currency_symbol || '₹',
-                    parentProductId: product.parent_product_id,
-                    qrCode: product.qr_code,
-                    barcode: product.barcode,
-                    companyName: product.company_name || ''
-                };
+               return {
+    id: product.id,
+    code: product.code,
+    name: product.name,
+    type: product.product_type,
+    uomDisplay: uomDisplay,
+    category: product.category_name || 'Uncategorized',
+    vendor: product.supplier_name || '',
+    subcategory: product.subcategory_name || '',
+    currentStock: product.current_stock,
+    price: parseFloat(priceType === 'tp' ? product.trade_price : product.mrp),
+    tradePrice: parseFloat(product.trade_price),
+    wholesalePrice: parseFloat(product.wholesale_price),
+    mrp: parseFloat(product.mrp),
+    purchasePrice: parseFloat(product.purchase_price || 0),
+batchExpiryDate: (product.batch_expiry_date && product.batch_expiry_date !== '0000-00-00') ? product.batch_expiry_date : '',
+batchNo: product.batch_no || '',
+stock: (product.no_stock_records == 1) ? null : parseFloat(product.current_stock || 0),
+    status: product.is_active ? 'active' : 'inactive',
+    noStockRecords: product.no_stock_records == 1,
+    currencySymbol: product.currency_symbol || '₹',
+    parentProductId: product.parent_product_id,
+    qrCode: product.qr_code,
+    barcode: product.barcode,
+    companyName: product.company_name || ''
+};
             });
             
             // Update pagination info
@@ -1114,4 +1126,72 @@ function handleAiqPrint() {
         printWindow.close();
     }, 250);
     closeAiqModal();
+}
+
+
+const ALL_COLUMNS = [
+    { key: 'code', label: 'Product Code' },
+    { key: 'name', label: 'Name' },
+    { key: 'type', label: 'Type' },
+    { key: 'uom', label: 'UOM' },
+    { key: 'category', label: 'Category' },
+    { key: 'vendor', label: 'Vendor' },
+    { key: 'price', label: 'Price' },
+   { key: 'purchasePrice', label: 'Purchase Price' },
+{ key: 'batchNo', label: 'Batch No' },
+{ key: 'batchExpiryDate', label: 'Batch Expiry Date' },
+{ key: 'stock', label: 'Stock' },
+{ key: 'status', label: 'Status' }
+];
+
+function getColumnPrefs() {
+    return JSON.parse(localStorage.getItem('productListColumnPrefs') || '{}');
+}
+
+function initColumnToggle() {
+    const dropdown = document.getElementById('columnsDropdown');
+    const btn = document.getElementById('columnsBtn');
+    if (!dropdown || !btn) return;
+
+    const prefs = getColumnPrefs();
+
+    dropdown.innerHTML = ALL_COLUMNS.map(col => `
+        <label style="display:flex; align-items:center; gap:8px; padding:6px 4px; font-weight:normal; cursor:pointer;">
+            <input type="checkbox" class="column-toggle" data-col="${col.key}" ${prefs[col.key] === false ? '' : 'checked'}>
+            ${col.label}
+        </label>
+    `).join('');
+
+    dropdown.querySelectorAll('.column-toggle').forEach(cb => {
+        cb.addEventListener('change', function () {
+            const currentPrefs = getColumnPrefs();
+            currentPrefs[this.dataset.col] = this.checked;
+            localStorage.setItem('productListColumnPrefs', JSON.stringify(currentPrefs));
+            applyColumnVisibility();
+        });
+    });
+
+    btn.addEventListener('click', function (e) {
+        e.stopPropagation();
+        dropdown.classList.toggle('show');
+    });
+
+    document.addEventListener('click', function () {
+        dropdown.classList.remove('show');
+    });
+    dropdown.addEventListener('click', function (e) {
+        e.stopPropagation();
+    });
+
+    applyColumnVisibility();
+}
+
+function applyColumnVisibility() {
+    const prefs = getColumnPrefs();
+    ALL_COLUMNS.forEach(col => {
+        const hidden = prefs[col.key] === false;
+        document.querySelectorAll(`[data-col="${col.key}"]`).forEach(el => {
+            el.style.display = hidden ? 'none' : '';
+        });
+    });
 }
