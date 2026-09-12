@@ -31,19 +31,16 @@ document.addEventListener('DOMContentLoaded', function () {
     const subAccountGroup = document.getElementById('sub-account-group');
     const currencyFilter = document.getElementById('currency-filter');
     const symbolOverride = document.getElementById('symbol-override');
-
-    // Amount filter elements (Greater Than / Less Than / Between)
-    const amountField = document.getElementById('amount-field');
-    const amountOperator = document.getElementById('amount-operator');
-    const amountValue1 = document.getElementById('amount-value1');
-    const amountValue2 = document.getElementById('amount-value2');
-    const amountValue2Group = document.getElementById('amount-value2-group');
+    const sortOrder = document.getElementById('sort-order');
 
     let currentPage = 1;
     let totalPages = 1;
     let allData = [];
     let allDetailedData = [];       // add this
-let detailedOpeningBalance = 0; // add this
+    let detailedOpeningBalance = 0; // add this
+    let rawSummaryData = [];        // raw, unsorted data as received from server
+    let rawDetailedData = [];       // raw, unsorted data as received from server
+    let rawDetailedOpeningBalance = 0;
     const itemsPerPage = 10;
     let expandedRows = new Set();
     let allCustomers = [];
@@ -120,73 +117,15 @@ let detailedOpeningBalance = 0; // add this
         if (allData.length > 0) renderPage();
     });
 
-    // ---- Amount filter (Greater Than / Less Than / Between) ----
-
-    // Maps the generic filter field to the property name on each dataset's rows
-    const SUMMARY_FIELD_MAP = { opening: 'opening_balance', debit: 'total_debit', credit: 'total_credit', closing: 'closing_balance' };
-    const DETAILED_FIELD_MAP = { opening: null, debit: 'debit', credit: 'credit', closing: 'running_balance' };
-    const DETAILED_STRUCTURAL_TYPES = ['opening_balance', 'sub_account_header', 'sub_account_total'];
-
-    function amountFilterActive() {
-        return !!amountField.value && amountValue1.value !== '' && !isNaN(parseFloat(amountValue1.value));
-    }
-
-    function passesAmountFilter(value) {
-        if (!amountFilterActive()) return true;
-        const v1 = parseFloat(amountValue1.value);
-        const op = amountOperator.value;
-        if (op === 'gt') return value > v1;
-        if (op === 'lt') return value < v1;
-        if (op === 'between') {
-            const v2 = parseFloat(amountValue2.value);
-            if (amountValue2.value === '' || isNaN(v2)) return true;
-            const lo = Math.min(v1, v2), hi = Math.max(v1, v2);
-            return value >= lo && value <= hi;
-        }
-        return true;
-    }
-
-    function getFilteredSummaryData() {
-        if (!amountFilterActive()) return allData;
-        const key = SUMMARY_FIELD_MAP[amountField.value];
-        if (!key) return allData;
-        return allData.filter(row => passesAmountFilter(parseFloat(row[key]) || 0));
-    }
-
-    function passesDetailedRowFilter(row) {
-        if (!amountFilterActive()) return true;
-        if (DETAILED_STRUCTURAL_TYPES.includes(row.type)) return true; // always keep headers/opening rows for context
-        const key = DETAILED_FIELD_MAP[amountField.value];
-        if (!key) return true;
-        return passesAmountFilter(parseFloat(row[key]) || 0);
-    }
-
-    function reapplyCurrentLedgerFilter() {
+    // Sort order — re-sorts already-fetched data locally, no refetch needed
+    sortOrder.addEventListener('change', function() {
         if (detailedLedgerBtn.classList.contains('active')) {
-            if (allDetailedData.length > 0) {
-                renderDetailedLedger(allDetailedData, detailedOpeningBalance);
-            }
+            if (rawDetailedData.length > 0) applyDetailedSort();
         } else {
-            if (allData.length > 0) {
-                currentPage = 1;
-                renderPage();
-                updatePagination();
-            }
+            if (rawSummaryData.length > 0) applySummarySort();
         }
-    }
-
-    amountField.addEventListener('change', function() {
-        reapplyCurrentLedgerFilter();
     });
-
-    amountOperator.addEventListener('change', function() {
-        amountValue2Group.style.display = this.value === 'between' ? 'block' : 'none';
-        reapplyCurrentLedgerFilter();
-    });
-
-    amountValue1.addEventListener('input', reapplyCurrentLedgerFilter);
-    amountValue2.addEventListener('input', reapplyCurrentLedgerFilter);
-
+    
     // Reload customers when company changes
     document.getElementById('company').addEventListener('change', function() {
         customerCode.value = '';
@@ -472,25 +411,29 @@ let detailedOpeningBalance = 0; // add this
 
     // Render summary ledger
     function renderSummaryLedger(data) {
-        allData = data;
-        const filtered = getFilteredSummaryData();
-        totalPages = Math.max(1, Math.ceil(filtered.length / itemsPerPage));
+        rawSummaryData = data;
         currentPage = 1;
+        applySummarySort();
+    }
+
+    // Applies the current Sort Order selection to the raw summary data (already
+    // arrives from the server sorted A-Z by customer name, so 'asc' is a no-op
+    // and 'desc' just flips it).
+    function applySummarySort() {
+        allData = sortOrder.value === 'desc' ? rawSummaryData.slice().reverse() : rawSummaryData;
+        totalPages = Math.ceil(allData.length / itemsPerPage);
+        if (currentPage > totalPages) currentPage = 1;
         renderPage();
         updatePagination();
     }
 
     function renderPage() {
-        const filteredData = getFilteredSummaryData();
-        totalPages = Math.max(1, Math.ceil(filteredData.length / itemsPerPage));
-        if (currentPage > totalPages) currentPage = totalPages;
-
         const tbody = summaryLedgerTable.querySelector('tbody');
         tbody.innerHTML = '';
         
         const startIndex = (currentPage - 1) * itemsPerPage;
         const endIndex = startIndex + itemsPerPage;
-        const pageData = filteredData.slice(startIndex, endIndex);
+        const pageData = allData.slice(startIndex, endIndex);
         
         let totalOpening = 0, totalDebit = 0, totalCredit = 0, totalClosing = 0;
         
@@ -516,9 +459,9 @@ let detailedOpeningBalance = 0; // add this
             `;
         });
         
-        // Calculate totals for the filtered data (respects the Amount Filter)
+        // Calculate totals for all data
         let grandTotalOpening = 0, grandTotalDebit = 0, grandTotalCredit = 0, grandTotalClosing = 0;
-        filteredData.forEach(row => {
+        allData.forEach(row => {
             grandTotalOpening += parseFloat(row.opening_balance) || 0;
             grandTotalDebit += parseFloat(row.total_debit) || 0;
             grandTotalCredit += parseFloat(row.total_credit) || 0;
@@ -543,22 +486,56 @@ let detailedOpeningBalance = 0; // add this
         nextBtn.disabled = currentPage === totalPages;
     }
 
+    // Reorders a detailed-ledger row array for the "Descending" sort option.
+    // 'opening_balance', 'sub_account_header' and 'sub_account_total' rows are
+    // structural anchors and stay where they are; only the transaction rows
+    // between them get reversed, so sub-account grouping / totals still line up.
+    // Each row already carries its own correct running_balance, computed
+    // chronologically on the backend, so reordering for display is safe.
+    function reverseTransactionRuns(data) {
+        const specialTypes = ['opening_balance', 'sub_account_header', 'sub_account_total'];
+        const result = [];
+        let buffer = [];
+        const flush = () => {
+            if (buffer.length) {
+                result.push(...buffer.reverse());
+                buffer = [];
+            }
+        };
+        data.forEach(row => {
+            if (specialTypes.includes(row.type)) {
+                flush();
+                result.push(row);
+            } else {
+                buffer.push(row);
+            }
+        });
+        flush();
+        return result;
+    }
+
     // Render detailed ledger
     function renderDetailedLedger(data, openingBalance) {
+        rawDetailedData = data;
+        rawDetailedOpeningBalance = openingBalance;
+        applyDetailedSort();
+    }
+
+    function applyDetailedSort() {
+        const sorted = sortOrder.value === 'desc' ? reverseTransactionRuns(rawDetailedData) : rawDetailedData;
+        renderDetailedLedgerRows(sorted, rawDetailedOpeningBalance);
+    }
+
+    function renderDetailedLedgerRows(data, openingBalance) {
          allDetailedData = data;
     detailedOpeningBalance = openingBalance;
-
-    // Amount Filter: keep structural rows (opening/sub-account headers/totals) for context,
-    // filter out individual transaction rows that don't match Debit/Credit/Balance condition.
-    const visibleData = amountFilterActive() ? data.filter(passesDetailedRowFilter) : data;
-
         const tbody = detailedLedgerTable.querySelector('tbody');
         tbody.innerHTML = '';
         
         let totalDebit = 0, totalCredit = 0;
         let rowIndex = 0;
         
-        visibleData.forEach((row) => {
+        data.forEach((row) => {
             if (row.type === 'opening_balance') {
                 const balance = parseFloat(row.running_balance) || 0;
                 const debit = parseFloat(row.debit) || 0;
@@ -731,12 +708,8 @@ let detailedOpeningBalance = 0; // add this
         toDate.value = '';
         distribution.value = '';
         subAccount.value = '';
+        sortOrder.value = 'asc';
         subAccountGroup.style.display = 'none';
-        amountField.value = '';
-        amountOperator.value = 'gt';
-        amountValue1.value = '';
-        amountValue2.value = '';
-        amountValue2Group.style.display = 'none';
         showSummaryLedger();
         validateDates();
     });
@@ -781,6 +754,10 @@ let detailedOpeningBalance = 0; // add this
         if (currencyFilter.value) {
             params.append('currency_id', currencyFilter.value);
         }
+
+        if (sortOrder.value) {
+            params.append('sort_order', sortOrder.value);
+        }
         
         window.open(`print.php?${params}`, '_blank');
     });
@@ -801,12 +778,9 @@ function exportLedgerToExcel() {
             return;
         }
 
-        const sourceRows = amountFilterActive() ? allDetailedData.filter(passesDetailedRowFilter) : allDetailedData;
-
         const rows = [];
-        let runningBalance = detailedOpeningBalance;
 
-        sourceRows.forEach(row => {
+        allDetailedData.forEach(row => {
             if (row.type === 'sub_account_header' || row.type === 'sub_account_total') {
                 return; // skip structural rows, keep the export flat
             }
@@ -837,13 +811,7 @@ function exportLedgerToExcel() {
             return;
         }
 
-        const sourceRows = getFilteredSummaryData();
-        if (sourceRows.length === 0) {
-            showNotification('No ledger data matches the amount filter', 'error');
-            return;
-        }
-
-        const rows = sourceRows.map(row => {
+        const rows = allData.map(row => {
             const opening = parseFloat(row.opening_balance) || 0;
             const closing = parseFloat(row.closing_balance) || 0;
             return {
@@ -890,6 +858,7 @@ function exportLedgerToExcel() {
         if (isDetailed && expandedRows.size > 0) params.append('expanded_rows', Array.from(expandedRows).join(','));
         if (company.value) params.append('company_id', company.value);
         if (currencyFilter.value) params.append('currency_id', currencyFilter.value);
+        if (sortOrder.value) params.append('sort_order', sortOrder.value);
         window.open(`print.php?${params}`, '_blank');
     });
 

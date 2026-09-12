@@ -26,6 +26,11 @@ $initialSearch = $_GET['search'] ?? '';
     <link rel="stylesheet" href="../../../assets/css/inventory/products/product-list.css">
     <link rel="stylesheet" href="../../../assets/css/inventory/products/unit-modal.css">
 </head>
+<style>
+    #productsTable thead th {
+    white-space: nowrap;
+}
+</style>
 
 <body>
     <div class="container">
@@ -189,10 +194,11 @@ $initialSearch = $_GET['search'] ?? '';
         <th data-col="category">Category</th>
         <th data-col="vendor">Vendor</th>
         <th data-col="price">TP</th>
-        <th data-col="purchasePrice">Purchase Price</th>
-        <th data-col="batchNo">Batch No</th>
-        <th data-col="expiryDate">Expiry Date</th>
-        <th data-col="status">Status</th>
+       <th data-col="purchasePrice">Purchase Price</th>
+<th data-col="batchNo">Batch No</th>
+<th data-col="batchExpiryDate">Batch Expiry Date</th>
+<th data-col="stock">Stock</th>
+<th data-col="status">Status</th>
         <th>Actions</th>
     </tr>
 </thead>

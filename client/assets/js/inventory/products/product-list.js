@@ -260,7 +260,8 @@ function renderProductTable(productsToRender) {
 <td data-col="price">${product.price > 0 ? `${product.currencySymbol}${product.price.toFixed(2)}` : 'Free'}</td>
 <td data-col="purchasePrice">${product.purchasePrice > 0 ? `${product.currencySymbol}${product.purchasePrice.toFixed(2)}` : '-'}</td>
 <td data-col="batchNo">${product.batchNo || '<span style="color: #999;">-</span>'}</td>
-<td data-col="expiryDate">${product.expiryDate || '<span style="color: #999;">-</span>'}</td>
+<td data-col="batchExpiryDate">${product.batchExpiryDate || '<span style="color: #999;">-</span>'}</td>
+<td data-col="stock" class="${stockClass}">${stockStatus}</td>
 <td data-col="status">${statusBadge}</td>
                     <td>
                         <div class="action-buttons">
@@ -464,11 +465,13 @@ function exportProductsToExcel() {
         'Category': p.category,
         'Subcategory': p.subcategory || '',
         'Vendor': p.vendor || '',
-        'Current Stock': (p.type === 'service' || p.noStockRecords) ? 'N/A' : p.currentStock,
-        'Trade Price': p.tradePrice,
-        'Wholesale Price': p.wholesalePrice,
-        'MRP': p.mrp,
-        'Status': p.status === 'active' ? 'Active' : 'Inactive'
+       'Current Stock': p.stock !== null ? p.stock : 'N/A',
+'Purchase Price': p.purchasePrice,
+'Trade Price': p.tradePrice,
+'Wholesale Price': p.wholesalePrice,
+'MRP': p.mrp,
+'Batch No': p.batchNo,
+'Batch Expiry Date': p.batchExpiryDate,
     }));
 
     const worksheet = XLSX.utils.json_to_sheet(rows);
@@ -765,8 +768,9 @@ page: page,
     wholesalePrice: parseFloat(product.wholesale_price),
     mrp: parseFloat(product.mrp),
     purchasePrice: parseFloat(product.purchase_price || 0),
-    expiryDate: (product.expiry_date && product.expiry_date !== '0000-00-00') ? product.expiry_date : '',
-    batchNo: product.batch_no || '',
+batchExpiryDate: (product.batch_expiry_date && product.batch_expiry_date !== '0000-00-00') ? product.batch_expiry_date : '',
+batchNo: product.batch_no || '',
+stock: (product.no_stock_records == 1) ? null : parseFloat(product.current_stock || 0),
     status: product.is_active ? 'active' : 'inactive',
     noStockRecords: product.no_stock_records == 1,
     currencySymbol: product.currency_symbol || '₹',
@@ -1133,10 +1137,11 @@ const ALL_COLUMNS = [
     { key: 'category', label: 'Category' },
     { key: 'vendor', label: 'Vendor' },
     { key: 'price', label: 'Price' },
-    { key: 'purchasePrice', label: 'Purchase Price' },
-    { key: 'batchNo', label: 'Batch No' },
-    { key: 'expiryDate', label: 'Expiry Date' },
-    { key: 'status', label: 'Status' }
+   { key: 'purchasePrice', label: 'Purchase Price' },
+{ key: 'batchNo', label: 'Batch No' },
+{ key: 'batchExpiryDate', label: 'Batch Expiry Date' },
+{ key: 'stock', label: 'Stock' },
+{ key: 'status', label: 'Status' }
 ];
 
 function getColumnPrefs() {

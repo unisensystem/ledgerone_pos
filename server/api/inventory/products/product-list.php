@@ -43,7 +43,7 @@ $offset = ($page - 1) * $limit;
    $sql = "
     SELECT p.id, p.code, p.name, p.product_type, p.mrp, p.trade_price, p.wholesale_price, p.is_active,
            p.parent_product_id, p.qr_code, p.barcode, p.company_id, p.uom_type,
-           p.purchase_price, p.expiry_date, lb.batch_no,
+p.purchase_price, lb.batch_no, lb.expiry_date AS batch_expiry_date,
            c.category_name, sc.subcategory_name, comp.company_name, s.supplier_name,
            u.uom_name as default_unit_name, ug.group_name as uom_group_name,
            COALESCE(SUM(sl.qty_in) - SUM(sl.qty_out), 0) as current_stock,
@@ -59,13 +59,13 @@ $offset = ($page - 1) * $limit;
     LEFT JOIN stock_ledger sl ON p.id = sl.product_id AND sl.tenant_id = p.tenant_id
     LEFT JOIN tenant_currencies tc ON p.tenant_id = tc.tenant_id AND tc.is_base_currency = 1
     LEFT JOIN ledgerone_public.currencies curr ON tc.currency_id = curr.id
-    LEFT JOIN (
-        SELECT so1.product_id, so1.batch_no
-        FROM stock_opening so1
-        INNER JOIN (
-            SELECT product_id, MAX(id) AS max_id FROM stock_opening GROUP BY product_id
-        ) so2 ON so1.product_id = so2.product_id AND so1.id = so2.max_id
-    ) lb ON lb.product_id = p.id
+  LEFT JOIN (
+    SELECT so1.product_id, so1.batch_no, so1.expiry_date
+    FROM stock_opening so1
+    INNER JOIN (
+        SELECT product_id, MAX(id) AS max_id FROM stock_opening GROUP BY product_id
+    ) so2 ON so1.product_id = so2.product_id AND so1.id = so2.max_id
+) lb ON lb.product_id = p.id
     WHERE p.tenant_id = ?
 ";
     

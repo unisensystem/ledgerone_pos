@@ -31,6 +31,7 @@ $distribution_id = $_GET['distribution_id'] ?? null;
 $sub_account_id = $_GET['sub_account_id'] ?? null;
 $expanded_rows = $_GET['expanded_rows'] ?? '';
 $company_id = $_GET['company_id'] ?? null;
+$sort_order = ($_GET['sort_order'] ?? 'asc') === 'desc' ? 'desc' : 'asc';
 
 // Get company info based on selected company_id
 if ($company_id) {
@@ -159,6 +160,7 @@ $company_timezone = $company['timezone'] ?? 'UTC';
         }
 
         const currencySymbol = '<?php echo $currency_symbol; ?>';
+        const sortOrder = '<?php echo $sort_order; ?>';
         const expandedRows = '<?php echo $expanded_rows; ?>'.split(',').filter(r => r);
         const params = new URLSearchParams();
         params.append('type', '<?php echo $ledger_type; ?>');
@@ -168,6 +170,32 @@ $company_timezone = $company['timezone'] ?? 'UTC';
         <?php if ($distribution_id): ?>params.append('distribution_id', '<?php echo $distribution_id; ?>');<?php endif; ?>
         <?php if ($sub_account_id): ?>params.append('sub_account_id', '<?php echo $sub_account_id; ?>');<?php endif; ?>
         <?php if ($company_id): ?>params.append('company_id', '<?php echo $company_id; ?>');<?php endif; ?>
+
+        // Reorders a detailed-ledger row array for the "Descending" sort option.
+        // 'opening_balance', 'sub_account_header' and 'sub_account_total' rows are
+        // structural anchors and stay where they are; only the transaction rows
+        // between them get reversed, so sub-account grouping / totals still line up.
+        function reverseTransactionRuns(data) {
+            const specialTypes = ['opening_balance', 'sub_account_header', 'sub_account_total'];
+            const result = [];
+            let buffer = [];
+            const flush = () => {
+                if (buffer.length) {
+                    result.push(...buffer.reverse());
+                    buffer = [];
+                }
+            };
+            data.forEach(row => {
+                if (specialTypes.includes(row.type)) {
+                    flush();
+                    result.push(row);
+                } else {
+                    buffer.push(row);
+                }
+            });
+            flush();
+            return result;
+        }
 
         function numberToWords(num) {
             const ones = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine'];
@@ -236,6 +264,11 @@ $company_timezone = $company['timezone'] ?? 'UTC';
             });
 
         function renderSummaryReport(data) {
+            // Summary rows already arrive A-Z sorted by customer name; just flip for Descending
+            if (sortOrder === 'desc') {
+                data = data.slice().reverse();
+            }
+
             let html = `
                 <table>
                     <thead>
@@ -320,7 +353,7 @@ $company_timezone = $company['timezone'] ?? 'UTC';
             const detailedResponse = await fetch(detailedUrl);
             const result = await detailedResponse.json();
             if (result.success) {
-                data = result.data;
+                data = sortOrder === 'desc' ? reverseTransactionRuns(result.data) : result.data;
                 openingBalance = result.opening_balance;
                 renderDetailedContent();
             }
