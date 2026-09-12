@@ -141,9 +141,17 @@ if ($status === 'Posted' || $status === 'Draft') {
                     ->execute([$signatureFileName, $invoice_id]);
             }
         } else {
-            // Re-using an existing signature filename (tenant default) — just reference it.
-            $pdo->prepare("UPDATE sale_invoice SET signature = ? WHERE id = ?")
-                ->execute([$input['signature'], $invoice_id]);
+            // Re-using an existing signature filename (tenant default). Don't trust the
+            // client-supplied string outright - it later gets rendered as an <img src>
+            // with no server-side check at render time, so verify it actually belongs to
+            // THIS tenant's own signatures before storing it (blocks path traversal and
+            // cross-tenant IDOR via a guessed/probed filename).
+            $stmt = $pdo->prepare("SELECT 1 FROM sale_invoice WHERE tenant_id = ? AND signature = ? LIMIT 1");
+            $stmt->execute([$tenant_id, $input['signature']]);
+            if ($stmt->fetchColumn()) {
+                $pdo->prepare("UPDATE sale_invoice SET signature = ? WHERE id = ?")
+                    ->execute([$input['signature'], $invoice_id]);
+            }
         }
     }
 }
