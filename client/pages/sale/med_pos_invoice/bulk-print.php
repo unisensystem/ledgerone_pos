@@ -32,6 +32,10 @@
 
         .invoice-frame-wrapper {
             page-break-after: always;
+            /* Prevents any transient overlap from being visible while the iframe
+               height is still settling — each wrapper only shows what its own
+               iframe currently reports as its height. */
+            overflow: hidden;
         }
         .invoice-frame-wrapper:last-child {
             page-break-after: avoid;
@@ -42,12 +46,15 @@
             border: none;
             display: block;
             background: white;
+            /* Smooth out visible height jumps as async content (logo/QR/fonts)
+               finishes loading, instead of a sudden snap that looks like a glitch. */
+            transition: height 0.15s ease-out;
         }
 
         @media print {
             .no-print { display: none; }
             body { background: white; }
-            iframe { height: auto; }
+            iframe { height: auto; transition: none; }
         }
     </style>
 </head>
@@ -76,6 +83,17 @@
     let loadedCount = 0;
     const container = document.getElementById('framesContainer');
 
+    // POLL_DURATION_MS: how long we keep re-checking each iframe's real content
+    // height after it loads. invoice-print.php's content height can keep
+    // changing after the initial paint — the company logo <img> and signature
+    // <img> load asynchronously, the QR code library renders on a 400ms
+    // setTimeout, and web fonts can reflow text — so a single one-time height
+    // measurement (even after waiting for the 'invoiceLoaded' event) can still
+    // be wrong. Watching continuously for a few seconds is what actually
+    // guarantees no overlap, regardless of exactly when each async piece settles.
+    const POLL_DURATION_MS = 6000;
+    const POLL_INTERVAL_MS = 300;
+
     ids.forEach((id, index) => {
         const wrapper = document.createElement('div');
         wrapper.className = 'invoice-frame-wrapper';
@@ -84,29 +102,82 @@
         iframe.src = `invoice-print.php?id=${id}`;
         iframe.scrolling = 'no';
 
-        // Resize iframe to fit content after load
         iframe.addEventListener('load', function () {
+            let doc;
             try {
-                const doc = iframe.contentDocument || iframe.contentWindow.document;
-                // Hide the print buttons inside the iframe
+                doc = iframe.contentDocument || iframe.contentWindow.document;
                 doc.querySelectorAll('.no-print').forEach(el => el.style.display = 'none');
-                // Set height to content
-                iframe.style.height = doc.body.scrollHeight + 'px';
-            } catch(e) {}
+            } catch (e) {
+                loadedCount++;
+                updateStatus();
+                return;
+            }
+
+            function measureAndApply() {
+                try {
+                    // documentElement.scrollHeight is generally the most reliable
+                    // cross-browser measure of true content height; body.scrollHeight
+                    // is kept as a fallback/comparison in case margins collapse oddly.
+                    const h = Math.max(
+                        doc.documentElement.scrollHeight,
+                        doc.body.scrollHeight
+                    );
+                    // Small buffer so nothing is ever clipped by a 1-2px rounding gap.
+                    iframe.style.height = (h + 4) + 'px';
+                } catch (e) {}
+            }
+
+            // 1) Measure immediately.
+            measureAndApply();
+
+            // 2) Keep watching for live size changes (images finishing load, QR
+            //    code appearing, font reflow, etc.) via ResizeObserver — the most
+            //    reliable signal, since it fires exactly when the box actually
+            //    changes size rather than guessing a delay.
+            try {
+                const ro = new ResizeObserver(() => measureAndApply());
+                ro.observe(doc.documentElement);
+                setTimeout(() => ro.disconnect(), POLL_DURATION_MS);
+            } catch (e) {
+                // ResizeObserver not available inside this iframe context — polling
+                // fallback below still covers it.
+            }
+
+            // 3) Belt-and-braces polling fallback, in case ResizeObserver misses
+            //    something (e.g. a change that doesn't affect box size directly
+            //    but affects layout of a sibling element).
+            let elapsed = 0;
+            const pollTimer = setInterval(() => {
+                measureAndApply();
+                elapsed += POLL_INTERVAL_MS;
+                if (elapsed >= POLL_DURATION_MS) clearInterval(pollTimer);
+            }, POLL_INTERVAL_MS);
+
+            // 4) Also react to the explicit signal invoice-print.php gives us once
+            //    its fetched data has rendered, for a fast first accurate paint.
+            try {
+                iframe.contentWindow.addEventListener('invoiceLoaded', function () {
+                    setTimeout(measureAndApply, 50);
+                    setTimeout(measureAndApply, 500);
+                });
+            } catch (e) {}
 
             loadedCount++;
-            document.getElementById('statusMsg').textContent =
-                `Loaded ${loadedCount} of ${ids.length} invoice(s)`;
-
-            if (loadedCount === ids.length) {
-                document.getElementById('statusMsg').textContent =
-                    `${ids.length} invoice(s) ready. Click "Print All" to print.`;
-            }
+            updateStatus();
         });
 
         wrapper.appendChild(iframe);
         container.appendChild(wrapper);
     });
+
+    function updateStatus() {
+        document.getElementById('statusMsg').textContent =
+            `Loaded ${loadedCount} of ${ids.length} invoice(s)`;
+        if (loadedCount === ids.length) {
+            document.getElementById('statusMsg').textContent =
+                `${ids.length} invoice(s) ready. Click "Print All" to print.`;
+        }
+    }
 
     function printAll() {
         window.print();

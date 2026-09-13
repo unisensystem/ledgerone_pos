@@ -99,6 +99,35 @@ $all_symbols = $stmt2->fetchAll();
                         <option value="">All Distributions</option>
                     </select>
                 </div>
+
+                <!-- City / Zone / Area / Salesman filters (Summary Ledger only) — City -> Zone
+                     -> Area cascade, plus an independent Salesman (employee) filter. All are
+                     optional and narrow which customers appear in the Summary Ledger list. -->
+                <div class="form-group">
+                    <label class="form-label" for="city-filter">City</label>
+                    <select class="form-control" id="city-filter">
+                        <option value="">All Cities</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="zone-filter">Zone</label>
+                    <select class="form-control" id="zone-filter">
+                        <option value="">All Zones</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="area-filter">Area</label>
+                    <select class="form-control" id="area-filter">
+                        <option value="">All Areas</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="salesman-filter">Salesman</label>
+                    <select class="form-control" id="salesman-filter">
+                        <option value="">All Salesmen</option>
+                    </select>
+                </div>
+
                 <div class="form-group" id="sub-account-group" style="display: none;">
                     <label class="form-label" for="sub-account">Sub Account</label>
                     <select class="form-control" id="sub-account">

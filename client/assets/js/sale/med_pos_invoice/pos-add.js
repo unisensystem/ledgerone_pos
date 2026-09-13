@@ -488,6 +488,7 @@ const invoiceSettingCheckboxes = [
         } else {
             // Add first row after data is loaded
             addRowDynamic();
+            loadDefaultSignature(); 
         }
     });
     }); // end outer loadCompanies promise
@@ -1667,26 +1668,44 @@ const invoiceSettingCheckboxes = [
                 const itemIdToRowMap = {};
 
                 // Load invoice items with dynamic UOM - group by product
-                const itemsByProduct = {};
-                data.items.forEach(item => {
-                    if (!item.parent_row_id) {
-                        // Same product sold across multiple rows (e.g. different batches) must stay
-                        // separate rows on edit — only merge units that truly belong to one row
-                        // (same product + same batch, split across Carton/Dozen/Piece unit columns).
-                        const key = item.product_id + '_' + (item.batch_no || '');
-                        if (!itemsByProduct[key]) {
-                            itemsByProduct[key] = {
-                                baseItem: item,
-                                units: []
-                            };
-                        }
-                        itemsByProduct[key].units.push({
-                            uom_id: item.uom_id,
-                            quantity: item.quantity
-                        });
-                    }
-                });
-
+               // Load invoice items with dynamic UOM - group by product
+const itemsByProduct = {};
+data.items.forEach(item => {
+    if (!item.parent_row_id) {
+        // Same product sold across multiple rows (e.g. different batches, OR
+        // the same product+batch entered as separate rows by the user) must
+        // stay separate rows on edit. Only merge units that truly belong to
+        // one row (same product + same batch + DIFFERENT unit columns, e.g.
+        // Piece/Dozen/Carton split of one logical entry).
+        const baseKey = item.product_id + '_' + (item.batch_no || '');
+        let targetKey = null;
+        let suffix = 0;
+        while (true) {
+            const candidateKey = suffix === 0 ? baseKey : `${baseKey}__${suffix}`;
+            if (!itemsByProduct[candidateKey]) {
+                targetKey = candidateKey;
+                break;
+            }
+            const usedUnitIds = itemsByProduct[candidateKey].units.map(u => String(u.uom_id));
+            if (!usedUnitIds.includes(String(item.uom_id))) {
+                targetKey = candidateKey;
+                break;
+            }
+            suffix++;
+        }
+        if (!itemsByProduct[targetKey]) {
+            itemsByProduct[targetKey] = {
+                baseItem: item,
+                units: []
+            };
+        }
+        itemsByProduct[targetKey].units.push({
+            uom_id: item.uom_id,
+            quantity: item.quantity
+        });
+    }
+});
+                  
                // Create one row per product with all units
                 for (const productGroup of Object.values(itemsByProduct)) {
                     const item = productGroup.baseItem;
@@ -3746,7 +3765,8 @@ const invoiceSettingCheckboxes = [
     // Silent reset without confirmation
     function performReset() {
         form.reset();
-
+defaultSignatureFileName = null;
+loadDefaultSignature();
         // Clear variant selections
         Object.keys(localStorage).forEach(key => {
             if (key.startsWith('variants_')) {
@@ -4426,7 +4446,7 @@ function saveInvoice(status = 'Posted') {
         amountPaidAutoFill: document.querySelector('input[name="autoFillAmountPaid"]:checked')?.value || 'yes',
         remainingBalance: parseFloat(document.getElementById('remainingBalance')?.value) || 0,
         remarks: document.getElementById('remarks')?.value,
-        signature: currentSignatureDataUrl || null,
+signature: currentSignatureDataUrl || defaultSignatureFileName || null,
 removeSignature: document.getElementById('signatureRemoved')?.value === '1',
         status: status,
         items: [],
@@ -7187,7 +7207,20 @@ async function quickAddCustomer() {
 let signatureCropper = null;
 let currentSignatureDataUrl = null; // new cropped PNG (base64) — sirf tab set hoga jab user naya upload/crop kare
 let existingSignatureUrl = null;    // edit mode mein pehle se saved signature ka URL
+let defaultSignatureFileName = null; // pehle se saved (reused) signature ka filename
 
+async function loadDefaultSignature() {
+    try {
+        const response = await fetch('../../../../server/api/sale/pos_invoice/get-default-signature.php');
+        const data = await response.json();
+        if (data.success && data.signature) {
+            defaultSignatureFileName = data.signature;
+            showSignaturePreview(`../../../assets/uploads/signatures/${data.signature}`);
+        }
+    } catch (error) {
+        console.error('Error loading default signature:', error);
+    }
+}
 function initSignatureUpload() {
     const uploadBtn   = document.getElementById('signatureUploadBtn');
     const fileInput   = document.getElementById('signatureFileInput');
@@ -7248,15 +7281,16 @@ function initSignatureUpload() {
         signatureCropper = null;
     });
 
-    if (removeBtn) {
-        removeBtn.addEventListener('click', function () {
-            currentSignatureDataUrl = null;
-            existingSignatureUrl = null;
-            document.getElementById('signatureData').value = '';
-            document.getElementById('signatureRemoved').value = '1';
-            hideSignaturePreview();
-        });
-    }
+   if (removeBtn) {
+    removeBtn.addEventListener('click', function () {
+        currentSignatureDataUrl = null;
+        existingSignatureUrl = null;
+        defaultSignatureFileName = null;   // <-- yeh add karein
+        document.getElementById('signatureData').value = '';
+        document.getElementById('signatureRemoved').value = '1';
+        hideSignaturePreview();
+    });
+}
 
     cropModal.addEventListener('click', function (e) {
         if (e.target === this) cropCancelBtn.click();

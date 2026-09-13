@@ -33,6 +33,14 @@ document.addEventListener('DOMContentLoaded', function () {
     const symbolOverride = document.getElementById('symbol-override');
     const sortOrder = document.getElementById('sort-order');
 
+    // City / Zone / Area / Salesman filters (Summary Ledger only) — city -> zone -> area
+    // cascade, and an independent Salesman (employee) filter. All optional; narrow which
+    // customers are included in the Summary Ledger list.
+    const cityFilter = document.getElementById('city-filter');
+    const zoneFilter = document.getElementById('zone-filter');
+    const areaFilter = document.getElementById('area-filter');
+    const salesmanFilter = document.getElementById('salesman-filter');
+
     // Sort By field (Summary Ledger only) — combines with Sort Order (Less to Greater /
     // Greater to Less) to do a real numeric sort on the selected column instead of just
     // reversing the list.
@@ -65,6 +73,10 @@ document.addEventListener('DOMContentLoaded', function () {
     loadCurrencies();
     loadCustomers();
     loadDistributions();
+    loadCities();
+    loadZones();
+    loadAreas();
+    loadSalesmen();
 
     function loadCompanies() {
         fetch('../../../../server/api/financial_reports/customer_ledger/get-companies.php')
@@ -143,6 +155,86 @@ document.addEventListener('DOMContentLoaded', function () {
         customerSearch.value = '';
         showSummaryLedger();
         loadLedgerData();
+    });
+
+    // Load cities (Summary Ledger filter)
+    async function loadCities() {
+        try {
+            const response = await fetch('../../../../server/api/financial_reports/customer_ledger/customer-ledger.php?type=cities');
+            const result = await response.json();
+
+            if (result.success) {
+                cityFilter.innerHTML = '<option value="">All Cities</option>';
+                result.data.forEach(city => {
+                    cityFilter.innerHTML += `<option value="${city.id}">${city.city_name}</option>`;
+                });
+            }
+        } catch (error) {
+            console.error('Error loading cities:', error);
+        }
+    }
+
+    // Load zones, optionally scoped to a city (Summary Ledger filter)
+    async function loadZones(cityId = '') {
+        try {
+            const url = '../../../../server/api/financial_reports/customer_ledger/customer-ledger.php?type=city_zones' + (cityId ? `&city_id=${cityId}` : '');
+            const response = await fetch(url);
+            const result = await response.json();
+
+            if (result.success) {
+                zoneFilter.innerHTML = '<option value="">All Zones</option>';
+                result.data.forEach(zone => {
+                    zoneFilter.innerHTML += `<option value="${zone.id}">${zone.city_zone_name}</option>`;
+                });
+            }
+        } catch (error) {
+            console.error('Error loading zones:', error);
+        }
+    }
+
+    // Load areas, optionally scoped to a zone (Summary Ledger filter)
+    async function loadAreas(zoneId = '') {
+        try {
+            const url = '../../../../server/api/financial_reports/customer_ledger/customer-ledger.php?type=areas' + (zoneId ? `&city_zone_id=${zoneId}` : '');
+            const response = await fetch(url);
+            const result = await response.json();
+
+            if (result.success) {
+                areaFilter.innerHTML = '<option value="">All Areas</option>';
+                result.data.forEach(area => {
+                    areaFilter.innerHTML += `<option value="${area.id}">${area.area_name}</option>`;
+                });
+            }
+        } catch (error) {
+            console.error('Error loading areas:', error);
+        }
+    }
+
+    // Load salesmen (employees) for the Salesman filter (Summary Ledger)
+    async function loadSalesmen() {
+        try {
+            const response = await fetch('../../../../server/api/financial_reports/customer_ledger/customer-ledger.php?type=salesmen');
+            const result = await response.json();
+
+            if (result.success) {
+                salesmanFilter.innerHTML = '<option value="">All Salesmen</option>';
+                result.data.forEach(s => {
+                    salesmanFilter.innerHTML += `<option value="${s.id}">${s.full_name}</option>`;
+                });
+            }
+        } catch (error) {
+            console.error('Error loading salesmen:', error);
+        }
+    }
+
+    // City -> Zone -> Area cascade
+    cityFilter.addEventListener('change', function () {
+        areaFilter.innerHTML = '<option value="">All Areas</option>';
+        loadZones(this.value);
+    });
+
+    zoneFilter.addEventListener('change', function () {
+        loadAreas(this.value);
     });
 
     // Searchable dropdown functionality
@@ -407,6 +499,22 @@ document.addEventListener('DOMContentLoaded', function () {
         
         if (currencyFilter.value) {
             params.append('currency_id', currencyFilter.value);
+        }
+
+        if (cityFilter.value) {
+            params.append('city_id', cityFilter.value);
+        }
+
+        if (zoneFilter.value) {
+            params.append('zone_id', zoneFilter.value);
+        }
+
+        if (areaFilter.value) {
+            params.append('area_id', areaFilter.value);
+        }
+
+        if (salesmanFilter.value) {
+            params.append('salesman_id', salesmanFilter.value);
         }
 
         try {
@@ -752,6 +860,14 @@ document.addEventListener('DOMContentLoaded', function () {
         // reset Sort By field
         sortField.value = 'closing_balance';
 
+        // reset City / Zone / Area / Salesman filters
+        cityFilter.value = '';
+        zoneFilter.value = '';
+        areaFilter.value = '';
+        salesmanFilter.value = '';
+        loadZones();
+        loadAreas();
+
         subAccountGroup.style.display = 'none';
         showSummaryLedger();
         validateDates();
@@ -796,6 +912,22 @@ document.addEventListener('DOMContentLoaded', function () {
 
         if (sortOrder.value) {
             params.append('sort_order', sortOrder.value);
+        }
+
+        if (cityFilter.value) {
+            params.append('city_id', cityFilter.value);
+        }
+
+        if (zoneFilter.value) {
+            params.append('zone_id', zoneFilter.value);
+        }
+
+        if (areaFilter.value) {
+            params.append('area_id', areaFilter.value);
+        }
+
+        if (salesmanFilter.value) {
+            params.append('salesman_id', salesmanFilter.value);
         }
         
         window.open(`print.php?${params}`, '_blank');
@@ -898,6 +1030,10 @@ function exportLedgerToExcel() {
         if (company.value) params.append('company_id', company.value);
         if (currencyFilter.value) params.append('currency_id', currencyFilter.value);
         if (sortOrder.value) params.append('sort_order', sortOrder.value);
+        if (cityFilter.value) params.append('city_id', cityFilter.value);
+        if (zoneFilter.value) params.append('zone_id', zoneFilter.value);
+        if (areaFilter.value) params.append('area_id', areaFilter.value);
+        if (salesmanFilter.value) params.append('salesman_id', salesmanFilter.value);
         window.open(`print.php?${params}`, '_blank');
     });
 

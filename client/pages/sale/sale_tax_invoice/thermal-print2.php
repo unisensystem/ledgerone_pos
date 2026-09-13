@@ -17,13 +17,13 @@
         }
 
         body {
-            font-family: 'Courier New', monospace;
-            font-size: 14px;
+            font-family: Arial, Helvetica, 'Segoe UI', sans-serif;
+            font-size: 16px;
             line-height: 1.5;
             color: #000;
             background: #f5f5f5;
             padding: 10px;
-            font-weight: bold;
+            font-weight: initial;
         }
 
         .thermal-receipt {
@@ -44,26 +44,26 @@
         }
 
         .bold {
-            font-weight: bold;
+            font-weight: initial;
         }
 
         .company-logo {
-            max-width: 80px;
-            max-height: 60px;
-            margin: 0 auto 5px;
+            max-width: 110px;
+            max-height: 90px;
+            margin: 0 auto 6px;
             display: block;
         }
 
         .company-name {
-            font-size: 16px;
+            font-size: 19px;
             font-weight: bold;
-            margin-bottom: 3px;
+            margin-bottom: 4px;
         }
 
         .company-info {
-            font-size: 12px;
+            font-size: 14px;
             margin-bottom: 2px;
-            font-weight: bold;
+            font-weight: initial;
         }
 
         .divider {
@@ -72,7 +72,7 @@
         }
 
         .invoice-header {
-            font-size: 14px;
+            font-size: 16px;
             font-weight: bold;
             margin: 8px 0;
         }
@@ -81,15 +81,15 @@
             display: flex;
             justify-content: space-between;
             margin-bottom: 3px;
-            font-size: 12px;
-            font-weight: bold;
+            font-size: 14px;
+            font-weight: initial;
         }
 
         .items-table {
             width: 100%;
             margin: 8px 0;
-            font-size: 12px;
-            font-weight: bold;
+            font-size: 14px;
+            font-weight: initial;
             border-collapse: collapse;
         }
 
@@ -103,7 +103,7 @@
         .items-table td {
             padding: 4px 0;
             border-bottom: 1px solid #000;
-            font-weight: bold;
+            font-weight: initial;
             text-align: center;
         }
 
@@ -116,22 +116,22 @@
             display: flex;
             justify-content: space-between;
             margin: 3px 0;
-            font-size: 13px;
-            font-weight: bold;
+            font-size: 15px;
+            font-weight: initial;
         }
 
         .total-row.grand-total {
-            font-size: 14px;
-            font-weight: bold;
+            font-size: 16px;
+            font-weight: initial;
             border-top: 2px solid #000;
             padding-top: 5px;
             margin-top: 5px;
         }
 
         .footer {
-            font-size: 11px;
+            font-size: 13px;
             margin-top: 10px;
-            font-weight: bold;
+            font-weight: initial;
         }
 
         .print-btn {
@@ -215,7 +215,7 @@
             height: 150px;
             padding: 10px;
             font-size: 14px;
-            font-family: 'Courier New', monospace;
+            font-family: Arial, Helvetica, 'Segoe UI', sans-serif;
             border: 1px solid #ddd;
             border-radius: 5px;
             resize: vertical;
@@ -264,8 +264,8 @@
 
         .notes-section {
             margin-top: 5px;
-            font-size: 10px;
-            font-weight: bold;
+            font-size: 12px;
+            font-weight: initial;
             white-space: pre-wrap;
             word-wrap: break-word;
             line-height: 1.3;
@@ -278,7 +278,7 @@
 
         .terms-note {
             margin-top: 8px;
-            font-size: 10px;
+            font-size: 12px;
             text-align: justify;
             direction: rtl;
             line-height: 1.6;
@@ -292,7 +292,7 @@
             width: 60%;
             margin-left: auto;
             margin-right: auto;
-            font-size: 10px;
+            font-size: 12px;
         }
     </style>
 </head>
@@ -418,12 +418,12 @@
         <div class="footer text-center">
             <div>Payment Method: <span id="paymentMethod">-</span></div>
             <div style="margin-top: 5px;">Thank you for your business!</div>
-            <div style="margin-top: 8px; font-size: 10px;">Printed By: <span id="printedBy">-</span></div>
-            <div style="font-size: 10px;">Printed: <span id="printedDate"></span></div>
+            <div style="margin-top: 8px; font-size: 12px;">Printed By: <span id="printedBy">-</span></div>
+            <div style="font-size: 12px;">Printed: <span id="printedDate"></span></div>
             <div id="qrCodeSection" style="margin-top: 8px; display: none;">
                 <div id="qrCode" style="display: inline-block;"></div>
             </div>
-             <div id="remarksSection" style="margin-top: 8px; font-size: 10px; font-weight: bold; text-align: left; display: none;">
+             <div id="remarksSection" style="margin-top: 8px; font-size: 12px; font-weight: initial; text-align: left; display: none;">
         <strong>Remarks:</strong> <span id="remarksText"></span>
     </div>
 
@@ -665,7 +665,7 @@
                     const children = childrenOf(group);
                     let childrenText = '';
                     if (children.length > 0) {
-                        childrenText = '<br><span style="font-size: 10px; color: #666;">(' +
+                        childrenText = '<br><span style="font-size: 11px; color: #666;">(' +
                             children.map(c => `${c.product_name}: ${formatMoney(c.quantity)}`).join(' | ') +
                             ')</span>';
                     }
@@ -710,7 +710,7 @@
                             <td class="text-right ctn-col">-</td>
                             <td class="text-right dz-col">-</td>
                             <td class="text-right pc-col">-</td>
-                            <td class="item-col" style="font-size: 11px; color: #666;"><span style="margin-left: 15px;">? </span>${child.product_name}</td>
+                            <td class="item-col" style="font-size: 12px; color: #666;"><span style="margin-left: 15px;">? </span>${child.product_name}</td>
                             <td class="text-right">-</td>
                             ${childDiscCell}
                             <td class="text-right">-</td>

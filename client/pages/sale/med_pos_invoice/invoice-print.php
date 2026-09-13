@@ -559,14 +559,35 @@ if (signatureImgWrap) {
             // + same batch, split across Carton/Dozen/Piece unit columns). Merging by product_id
             // alone summed quantity across batches while only keeping one batch's price/net/tax,
             // silently dropping the other batch's amounts from the printed totals.
-            const itemsByProduct = {};
-            items.filter(i => !i.parent_row_id).forEach(item => {
-                const key = item.product_id + '_' + (item.batch_no || '');
-                if (!itemsByProduct[key]) {
-                    itemsByProduct[key] = { baseItem: item, totalQty: 0 };
-                }
-                itemsByProduct[key].totalQty += parseFloat(item.quantity);
-            });
+        // Group parent items by product. Same product+batch entered as genuinely
+// separate rows (e.g. 40, 30, 20 units added one by one) must stay separate
+// lines on print — only merge rows that are truly ONE logical entry split
+// across different unit columns (Piece/Dozen/Carton of the SAME uom_id set).
+// Detect this by uom_id: if this uom_id is already used in the candidate
+// group, it's a new separate row, not a unit-split of the same row.
+const itemsByProduct = {};
+items.filter(i => !i.parent_row_id).forEach(item => {
+    const baseKey = item.product_id + '_' + (item.batch_no || '');
+    let targetKey = null;
+    let suffix = 0;
+    while (true) {
+        const candidateKey = suffix === 0 ? baseKey : `${baseKey}__${suffix}`;
+        if (!itemsByProduct[candidateKey]) {
+            targetKey = candidateKey;
+            break;
+        }
+        if (!itemsByProduct[candidateKey].usedUomIds.has(String(item.uom_id))) {
+            targetKey = candidateKey;
+            break;
+        }
+        suffix++;
+    }
+    if (!itemsByProduct[targetKey]) {
+        itemsByProduct[targetKey] = { baseItem: item, totalQty: 0, usedUomIds: new Set() };
+    }
+    itemsByProduct[targetKey].totalQty += parseFloat(item.quantity);
+    itemsByProduct[targetKey].usedUomIds.add(String(item.uom_id));
+});
 
             const tbody = document.getElementById('itemsTableBody');
             tbody.innerHTML = '';

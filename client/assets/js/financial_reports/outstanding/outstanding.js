@@ -6,9 +6,11 @@ document.addEventListener('DOMContentLoaded', function () {
     const customerNameInput = document.getElementById('customer-name');
     const fromDate = document.getElementById('from-date');
     const toDate = document.getElementById('to-date');
+    const sortSelect = document.getElementById('sort-select');
     const loadBtn = document.getElementById('load-btn');
     const resetBtn = document.getElementById('reset-btn');
     const printBtn = document.getElementById('print-btn');
+    const printBtnResults = document.getElementById('print-btn-results');
     const resultsCard = document.getElementById('results-card');
     const reportHead = document.getElementById('report-head');
     const outstandingBody = document.getElementById('outstanding-body');
@@ -94,7 +96,8 @@ document.addEventListener('DOMContentLoaded', function () {
     function buildFilterParams() {
         const params = new URLSearchParams({
             sales_officer_id: dsrSelect.value,
-            to_date: toDate.value || today
+            to_date: toDate.value || today,
+            sort: sortSelect.value || 'high_to_low'
         });
         if (fromDate.value) params.append('from_date', fromDate.value);
         if (companySelect.value) params.append('company_id', companySelect.value);
@@ -150,6 +153,14 @@ document.addEventListener('DOMContentLoaded', function () {
             <div><strong>${dateLabel}</strong></div>
             <div>DSR:- ${result.dsr_name}</div>
             ${filterLine}
+            <div style="margin-top: 12px; display: flex; gap: 8px;">
+                <button class="btn btn-ghost" id="print-btn-thermal" style="font-size: 13px; padding: 6px 12px;">
+                    <i class="fas fa-print"></i> Thermal Print
+                </button>
+                <button class="btn btn-ghost" id="print-btn-normal" style="font-size: 13px; padding: 6px 12px;">
+                    <i class="fas fa-file-pdf"></i> Normal Print (PDF)
+                </button>
+            </div>
         `;
 
         outstandingBody.innerHTML = '';
@@ -188,6 +199,17 @@ document.addEventListener('DOMContentLoaded', function () {
                 <td></td>
             </tr>
         `;
+
+        // Attach print button event listeners after rendering
+        document.getElementById('print-btn-thermal').addEventListener('click', function () {
+            const params = buildFilterParams();
+            window.open(`print-outstanding.php?${params}`, '_blank');
+        });
+
+        document.getElementById('print-btn-normal').addEventListener('click', function () {
+            const params = buildFilterParams();
+            window.open(`print-outstanding-normal.php?${params}`, '_blank');
+        });
     }
 
     loadBtn.addEventListener('click', loadOutstanding);
@@ -199,17 +221,24 @@ document.addEventListener('DOMContentLoaded', function () {
         customerNameInput.value = '';
         fromDate.value = '';
         toDate.value = today;
+        sortSelect.value = 'high_to_low';
         loadAreaList(); // reload full, unfiltered area list
         resultsCard.style.display = 'none';
         lastResult = null;
     });
 
     printBtn.addEventListener('click', function () {
-        if (!dsrSelect.value) {
-            alert('Please select a DSR and load the report first');
+        if (!lastResult) {
+            alert('Please load the report first');
             return;
         }
         const params = buildFilterParams();
-        window.open(`print-outstanding.php?${params}`, '_blank');
+        // Show menu to choose print type
+        const choice = confirm('Thermal Print?\n\nOK = Thermal Print\nCancel = Normal Print (PDF)');
+        if (choice) {
+            window.open(`print-outstanding.php?${params}`, '_blank');
+        } else {
+            window.open(`print-outstanding-normal.php?${params}`, '_blank');
+        }
     });
 });

@@ -28,6 +28,14 @@ try {
     $distribution_id = $_GET['distribution_id'] ?? null;
     $company_id = $_GET['company_id'] ?? null;
     $target_currency_id = $_GET['currency_id'] ?? null;
+
+    // City / Zone / Area / Salesman filters (Summary Ledger only) — narrow which customers
+    // are included in the summary customer list. city_id -> city_zone_id -> area_id is a
+    // cascading location filter; salesman_id filters by associated_sales_officer_id.
+    $city_id = $_GET['city_id'] ?? null;
+    $city_zone_id = $_GET['zone_id'] ?? null;
+    $area_id = $_GET['area_id'] ?? null;
+    $salesman_id = $_GET['salesman_id'] ?? null;
     
     // Initialize currency converter
     $converter = new CurrencyConverter($pdo, $tenant_id);
@@ -88,6 +96,50 @@ try {
         echo json_encode(['success' => true, 'data' => $stmt->fetchAll(PDO::FETCH_ASSOC)]);
         exit;
     }
+
+    if ($type === 'cities') {
+        $stmt = $pdo->prepare("SELECT id, city_name FROM cities WHERE tenant_id = ? ORDER BY city_name");
+        $stmt->execute([$tenant_id]);
+        echo json_encode(['success' => true, 'data' => $stmt->fetchAll(PDO::FETCH_ASSOC)]);
+        exit;
+    }
+
+    if ($type === 'city_zones') {
+        $filter_city_id = $_GET['city_id'] ?? null;
+        $sql = "SELECT id, city_zone_name FROM city_zones WHERE tenant_id = ?";
+        $params = [$tenant_id];
+        if ($filter_city_id) {
+            $sql .= " AND city_id = ?";
+            $params[] = $filter_city_id;
+        }
+        $sql .= " ORDER BY city_zone_name";
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute($params);
+        echo json_encode(['success' => true, 'data' => $stmt->fetchAll(PDO::FETCH_ASSOC)]);
+        exit;
+    }
+
+    if ($type === 'areas') {
+        $filter_zone_id = $_GET['city_zone_id'] ?? null;
+        $sql = "SELECT id, area_name FROM areas WHERE tenant_id = ?";
+        $params = [$tenant_id];
+        if ($filter_zone_id) {
+            $sql .= " AND city_zone_id = ?";
+            $params[] = $filter_zone_id;
+        }
+        $sql .= " ORDER BY area_name";
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute($params);
+        echo json_encode(['success' => true, 'data' => $stmt->fetchAll(PDO::FETCH_ASSOC)]);
+        exit;
+    }
+
+    if ($type === 'salesmen') {
+        $stmt = $pdo->prepare("SELECT id, full_name FROM employees WHERE tenant_id = ? AND current_status = 'active' ORDER BY full_name");
+        $stmt->execute([$tenant_id]);
+        echo json_encode(['success' => true, 'data' => $stmt->fetchAll(PDO::FETCH_ASSOC)]);
+        exit;
+    }
     
     if ($type === 'sub_accounts') {
         $customer_id = $_GET['customer_id'] ?? null;
@@ -108,6 +160,26 @@ try {
         if ($customer_id) {
             $sql .= " AND c.id = ?";
             $params[] = $customer_id;
+        }
+
+        if ($city_id) {
+            $sql .= " AND c.city_id = ?";
+            $params[] = $city_id;
+        }
+
+        if ($city_zone_id) {
+            $sql .= " AND c.city_zone_id = ?";
+            $params[] = $city_zone_id;
+        }
+
+        if ($area_id) {
+            $sql .= " AND c.area_id = ?";
+            $params[] = $area_id;
+        }
+
+        if ($salesman_id) {
+            $sql .= " AND c.associated_sales_officer_id = ?";
+            $params[] = $salesman_id;
         }
         
         $sql .= " ORDER BY c.customer_name";

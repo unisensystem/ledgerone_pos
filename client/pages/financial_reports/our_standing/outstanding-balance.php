@@ -126,9 +126,15 @@ function getCustomerBalanceAsOf(PDO $pdo, $tenant_id, $customer_id, $opening_deb
  * Builds the full grouped Outstanding report (DSR -> area -> customers) for a given
  * tenant/sales-officer/date. Returns the same shape whether called from the JSON API
  * or the print view.
+ * 
+ * NOW WITH SORTING SUPPORT! $sort parameter: 'high_to_low' or 'low_to_high'
  */
-function buildOutstandingReport(PDO $pdo, $tenant_id, $sales_officer_id, $company_id, $from_date, $to_date, $customer_name = null, $city_id = null, $area_id = null)
+function buildOutstandingReport(PDO $pdo, $tenant_id, $sales_officer_id, $company_id = null, $from_date = null, $to_date = null, $customer_name = null, $city_id = null, $area_id = null, $sort = 'high_to_low')
 {
+    if (!$to_date) {
+        $to_date = date('Y-m-d');
+    }
+
     $sql = "SELECT c.id, c.customer_name, c.shop_name, c.opening_debit_amount, c.opening_credit_amount,
                    a.area_name
             FROM customers c
@@ -190,10 +196,29 @@ function buildOutstandingReport(PDO $pdo, $tenant_id, $sales_officer_id, $compan
         $grand_total += $balance;
     }
 
-    foreach ($groups as &$g) {
-        $g['subtotal'] = round($g['subtotal'], 2);
+    // SORTING: Sort customers within each area group by balance
+    foreach ($groups as &$group) {
+        usort($group['customers'], function ($a, $b) use ($sort) {
+            if ($sort === 'low_to_high') {
+                return $a['balance'] <=> $b['balance'];
+            } else {
+                // high_to_low (default)
+                return $b['balance'] <=> $a['balance'];
+            }
+        });
+        $group['subtotal'] = round($group['subtotal'], 2);
     }
-    unset($g);
+    unset($group);
+
+    // Recalculate serial numbers after sorting
+    $serial = 0;
+    foreach ($groups as &$group) {
+        foreach ($group['customers'] as &$customer) {
+            $serial++;
+            $customer['s_no'] = $serial;
+        }
+    }
+    unset($group);
 
     return [
         'dsr_name' => $dsr_name,

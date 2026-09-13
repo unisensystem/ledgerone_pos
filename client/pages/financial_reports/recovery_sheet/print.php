@@ -329,7 +329,15 @@ function groupByCustomerAndSimulate($rows) {
     return array_values($map);
 }
 
-$customers_grouped = ($view_mode === 'customer') ? groupByCustomerAndSimulate($rows) : [];
+// ────── FIX: Filter out zero-balance customers in customer view ──────────────
+// This ensures print and page display show identical data (same as JavaScript)
+$customers_grouped = ($view_mode === 'customer') ? array_filter(
+    groupByCustomerAndSimulate($rows),
+    function($customer) {
+        $net_bal = $customer['total_balance'] - $customer['unallocated_received'] - $customer['unallocated_returns'];
+        return abs($net_bal) > 0.01; // ZERO_BALANCE_EPSILON matches JavaScript
+    }
+) : [];
 
 $total_balance  = 0;
 $total_received = 0;

@@ -243,6 +243,13 @@ if (!$user_id) {
                     <label class="form-label" for="to-date">To Date</label>
                     <input type="date" class="form-control" id="to-date">
                 </div>
+                <div class="form-group">
+                    <label class="form-label" for="sort-select">Sort Balance</label>
+                    <select class="form-control" id="sort-select">
+                        <option value="high_to_low">High to Low</option>
+                        <option value="low_to_high">Low to High</option>
+                    </select>
+                </div>
             </div>
             <div class="actions">
                 <button class="btn btn-primary" id="load-btn">
