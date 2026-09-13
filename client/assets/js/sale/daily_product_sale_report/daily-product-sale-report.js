@@ -472,7 +472,7 @@ function renderTable() {
                     <td class="col-batch">${esc(batchNo)}</td>
                     <td class="col-expiry">${esc(expiryDate)}</td>
                     <td class="col-price">${currentCurrency}${salePrice.toFixed(2)}</td>
-                    <td class="col-qty">${quantity.toFixed(2)} ${esc(row.unit_symbol || '')}</td>
+                    <td class="col-qty">${quantity.toFixed(2)}</td>
                     <td class="col-disc">${smartNum(discPercent)}%</td>
                     <td class="col-extradisc">${smartNum(extraDiscPercent)}%</td>
                     <td class="col-foc">${smartNum(focQty)}</td>
@@ -547,6 +547,12 @@ function renderGrandTotal() {
             0
         );
 
+    // ✅ FIX: Calculate average discount percentage
+    const totalInvoiceAmount = groupedInvoices.reduce((sum, g) => sum + g.invoice_net_amount, 0);
+    const avgDiscountPercent = totalInvoiceAmount > 0 
+        ? (grandTotalDiscount / totalInvoiceAmount * 100) 
+        : 0;
+
     const el =
         document.getElementById('grand-total-info');
 
@@ -555,7 +561,7 @@ function renderGrandTotal() {
             `Grand Total: ${groupedInvoices.length} invoice(s), ` +
             `Qty ${grandTotalQty.toFixed(2)}, ` +
             `FOC ${smartNum(grandTotalFoc)}, ` +
-            `Discount ${currentCurrency}${smartNum(grandTotalDiscount)}, ` +
+            `Discount ${currentCurrency}${smartNum(grandTotalDiscount)} (${smartNum(avgDiscountPercent)}%), ` +
             `Amount ${currentCurrency}${grandTotalAmount.toFixed(2)}`;
     }
 }
@@ -683,7 +689,7 @@ function exportToExcel() {
                         .toFixed(2),
 
                 'Qty':
-                    `${parseFloat(row.quantity || 0).toFixed(2)} ${row.unit_symbol || ''}`,
+                    parseFloat(row.quantity || 0).toFixed(2),
 
                 'Disc %':
                     smartNum(row.discount_percent || 0),
