@@ -37,6 +37,7 @@ $currency_symbol = $currency['symbol'] ?? '$';
     <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
     <link rel="stylesheet" href="../../../assets/css/customer_supplier/customers/customer-list.css">
 </head>
+
 <body class="light-mode">
     <div class="container">
         <div class="header">
@@ -112,6 +113,16 @@ $currency_symbol = $currency['symbol'] ?? '$';
                         <option value="active">Active</option>
                         <option value="blacklisted">Blacklisted</option>
                     </select>
+                                     <div class="dropdown">
+                        <button class="btn btn-secondary" id="columnsBtn">
+                            <i class="fas fa-columns"></i>
+                            Columns
+                            <i class="fas fa-chevron-down"></i>
+                        </button>
+                        <div class="dropdown-menu" id="columnsDropdown">
+                            <!-- checkboxes JS se yahan inject hongi -->
+                        </div>
+                    </div>
                     <div class="dropdown">
                         <button class="btn btn-secondary" id="exportBtn">
                             <i class="fas fa-download"></i>
@@ -136,22 +147,23 @@ $currency_symbol = $currency['symbol'] ?? '$';
             <div class="table-container">
                 <table>
                     <thead>
-                        <tr>
-                            <th>Sr#</th>
-                            <th>Customer Code</th>
-                                                        <th>Customer Name</th>
-
-                            <th>Shopkeeper Name</th>
-                            <th>Address</th>
-                            <th>Group</th>
-                            <th>Category</th>
-                            <th>City</th>
-                            <th>Zone</th>
-                            <th>Area</th>
-                            <th>Phone</th>
-                            <th>Opening Balance</th>
-                            <th>Status</th>
-                            <th>Actions</th>
+                                               <tr>
+                            <th data-col="sr">Sr#</th>
+                            <th data-col="code">Customer Code</th>
+                            <th data-col="name">Customer Name</th>
+                            <th data-col="shopname">Shopkeeper Name</th>
+                            <th data-col="address">Address</th>
+                            <th data-col="group">Group</th>
+                            <th data-col="category">Category</th>
+                            <th data-col="brand">Brand</th>
+                            <th data-col="city">City</th>
+                            <th data-col="zone">Zone</th>
+                            <th data-col="area">Area</th>
+                            <th data-col="salesman">Salesman</th>
+                            <th data-col="phone">Phone</th>
+<th data-col="balance">Opening Balance</th>
+                            <th data-col="status">Status</th>
+                            <th data-col="actions">Actions</th>
                         </tr>
                     </thead>
                     <tbody id="customersTable">

@@ -21,11 +21,12 @@ document.addEventListener('DOMContentLoaded', function () {
     let userPermissions = [];
 
     // Check permissions first
-    checkPermissions().then(() => {
+       checkPermissions().then(() => {
         bulkDeleteEnabled = userPermissions.includes('Delete');
         if (bulkDeleteEnabled) {
             injectBulkDeleteUI();
         }
+        initColumnToggle();
         loadCompanyFilter();
         loadCustomers();
     });
@@ -83,26 +84,28 @@ document.addEventListener('DOMContentLoaded', function () {
 
             const row = document.createElement('tr');
             row.dataset.id = customer.id;
-            row.innerHTML = `
+                     row.innerHTML = `
                         ${checkboxCell}
-                        <td>${startSr + index}</td>
-                        <td><span class="customer-code">${customer.customer_code}</span></td>
-                        <td><span class="customer-name">${customer.customer_name}</span></td>
-                        <td>${customer.shop_name || '-'}</td>
-                        <td>${customer.address || '-'}</td>
-                        <td>${customer.customer_group_name || '-'}</td>
-                        <td>${customer.customer_category_name || '-'}</td>
-                        <td>${customer.city_name || '-'}</td>
-                        <td>${customer.zone_name || '-'}</td>
-                        <td>${customer.area_name || '-'}</td>
-                        <td>${customer.primary_phone || '-'}</td>
-                        <td>
+                        <td data-col="sr">${startSr + index}</td>
+                        <td data-col="code"><span class="customer-code">${customer.customer_code}</span></td>
+                        <td data-col="name"><span class="customer-name">${customer.customer_name}</span></td>
+                        <td data-col="shopname">${customer.shop_name || '-'}</td>
+                        <td data-col="address">${customer.address || '-'}</td>
+                        <td data-col="group">${customer.customer_group_name || '-'}</td>
+                        <td data-col="category">${customer.customer_category_name || '-'}</td>
+                        <td data-col="brand">${customer.brand_name || '-'}</td>
+                        <td data-col="city">${customer.city_name || '-'}</td>
+                        <td data-col="zone">${customer.zone_name || '-'}</td>
+                        <td data-col="area">${customer.area_name || '-'}</td>
+                        <td data-col="salesman">${customer.salesman_name || '-'}</td>
+                        <td data-col="phone">${customer.primary_phone || '-'}</td>
+                        <td data-col="balance">
                             <span class="balance-badge" title="${hasOpeningHistory ? 'Click to view opening balance / invoice history' : 'No opening balance history'}" style="cursor:${hasOpeningHistory ? 'pointer' : 'default'}; ${hasOpeningHistory ? 'text-decoration: underline;' : ''}">
                                 ${currencySymbol}${balance.toFixed(2)}
                             </span>
                         </td>
-                        <td><span class="status-badge status-${status}">${status.charAt(0).toUpperCase() + status.slice(1)}</span></td>
-                        <td>
+                        <td data-col="status"><span class="status-badge status-${status}">${status.charAt(0).toUpperCase() + status.slice(1)}</span></td>
+                        <td data-col="actions">
                             <div class="action-buttons">
                                 ${editBtn}
                                 ${deleteBtn}
@@ -112,6 +115,7 @@ document.addEventListener('DOMContentLoaded', function () {
                             </div>
                         </td>
                     `;
+            applyColumnVisibility(row);
 
             // Clicking the balance badge opens the same View modal (already shows
             // opening balance invoices + sub accounts history)
@@ -1539,5 +1543,87 @@ document.addEventListener('DOMContentLoaded', function () {
                     userPermissions = data.permissions;
                 }
             });
+    }
+
+
+
+        // Columns to exclude from the hide/unhide list (always visible)
+    const NON_TOGGLEABLE_COLS = ['sr', 'actions'];
+    const COLUMN_STORAGE_KEY = 'customerListHiddenColumns';
+
+    function getHiddenColumns() {
+        try {
+            return JSON.parse(localStorage.getItem(COLUMN_STORAGE_KEY)) || [];
+        } catch (e) {
+            return [];
+        }
+    }
+
+    function saveHiddenColumns(hidden) {
+        localStorage.setItem(COLUMN_STORAGE_KEY, JSON.stringify(hidden));
+    }
+
+    function applyColumnVisibility(scopeRow) {
+        const hidden = getHiddenColumns();
+        const headerCells = document.querySelectorAll('#customersTable').length
+            ? document.querySelectorAll('.table-container thead th[data-col]')
+            : [];
+        headerCells.forEach(th => {
+            th.classList.toggle('col-hidden', hidden.includes(th.dataset.col));
+        });
+        const rows = scopeRow ? [scopeRow] : customersTable.querySelectorAll('tr');
+        rows.forEach(row => {
+            row.querySelectorAll('td[data-col]').forEach(td => {
+                td.classList.toggle('col-hidden', hidden.includes(td.dataset.col));
+            });
+        });
+    }
+
+    function initColumnToggle() {
+        const dropdown = document.getElementById('columnsDropdown');
+        const columnsBtn = document.getElementById('columnsBtn');
+        if (!dropdown || !columnsBtn) return;
+
+        const headerCells = document.querySelectorAll('.table-container thead th[data-col]');
+        const hidden = getHiddenColumns();
+
+        dropdown.innerHTML = '';
+        headerCells.forEach(th => {
+            const col = th.dataset.col;
+            if (NON_TOGGLEABLE_COLS.includes(col)) return;
+            const label = document.createElement('label');
+            label.className = 'dropdown-item';
+            label.style.cssText = 'display:flex; align-items:center; gap:8px; cursor:pointer;';
+            label.innerHTML = `<input type="checkbox" data-col-toggle="${col}" ${hidden.includes(col) ? '' : 'checked'}> ${th.textContent.trim()}`;
+            dropdown.appendChild(label);
+        });
+
+        columnsBtn.addEventListener('click', function (e) {
+            e.stopPropagation();
+            dropdown.classList.toggle('show');
+        });
+
+        document.addEventListener('click', function () {
+            dropdown.classList.remove('show');
+        });
+
+        dropdown.addEventListener('click', function (e) {
+            e.stopPropagation();
+        });
+
+        dropdown.addEventListener('change', function (e) {
+            if (!e.target.matches('[data-col-toggle]')) return;
+            const col = e.target.dataset.colToggle;
+            let hiddenCols = getHiddenColumns();
+            if (e.target.checked) {
+                hiddenCols = hiddenCols.filter(c => c !== col);
+            } else {
+                hiddenCols.push(col);
+            }
+            saveHiddenColumns(hiddenCols);
+            applyColumnVisibility();
+        });
+
+        applyColumnVisibility();
     }
 });
