@@ -423,6 +423,9 @@
             <div id="qrCodeSection" style="margin-top: 8px; display: none;">
                 <div id="qrCode" style="display: inline-block;"></div>
             </div>
+             <div id="remarksSection" style="margin-top: 8px; font-size: 10px; font-weight: bold; text-align: left; display: none;">
+        <strong>Remarks:</strong> <span id="remarksText"></span>
+    </div>
 
             <div class="terms-note" id="termsNote">
                 اس انوائس کی ادائیگی مقررہ تاریخ تک مکمل کرنا لازمی ہے، بصورت دیگر آئندہ سپلائی متاثر ہو سکتی ہے۔
@@ -792,6 +795,11 @@
             document.getElementById('payableAmount').textContent = `${currencySymbol}${formatMoney(payableAmount)}`;
 
             document.getElementById('paymentMethod').textContent = invoice.payment_method || '-';
+            // Show remarks if present
+if (invoice.remarks && invoice.remarks.trim() !== '') {
+    document.getElementById('remarksText').textContent = invoice.remarks;
+    document.getElementById('remarksSection').style.display = 'block';
+}
 
             // Generate QR Code if enabled
             setTimeout(() => {

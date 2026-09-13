@@ -257,7 +257,7 @@ if (!$user_id) {
                     </div>
                     <div class="summary-item">
                         <span class="summary-label" id="totalDiscountAmountLabel">Discount Amount</span>
-                        <input type="number" id="totalDiscountAmount" class="table-input" min="0" step="0.01" value="0">
+<input type="number" id="totalDiscountAmount" class="table-input" min="0" step="any" value="0">
                     </div>
                     <div class="summary-item">
                         <span class="summary-label" id="shippingFeesLabel">Shipping Fees</span>
