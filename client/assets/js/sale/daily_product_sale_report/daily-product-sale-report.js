@@ -215,7 +215,13 @@ function findIdFromDatalist(inputVal, datalistSelector) {
     return null;
 }
 
-// Groups rows by invoice
+// Groups rows by invoice.
+//
+// Also accumulates the ITEM-LEVEL discount (sii.discount_amount /
+// discount_percent, per line) separately from the INVOICE-LEVEL discount
+// (invoice_disc_amount / invoice_disc_percent, from the Invoice Summary).
+// These are two different discounts stacked on the same invoice, so the
+// "Discount" row/total combines both instead of showing only one of them.
 function groupByInvoice(rows) {
     const groups = [];
     const indexByInvoice = {};
@@ -237,6 +243,8 @@ function groupByInvoice(rows) {
                 invoice_net_amount: parseFloat(row.invoice_net_amount || 0),
                 invoice_disc_percent: parseFloat(row.invoice_disc_percent || 0),
                 invoice_disc_amount: parseFloat(row.invoice_disc_amount || 0),
+                item_discount_amount: 0,
+                item_discount_percent_sum: 0,
                 items: [],
                 total_amount: 0,
                 total_tax: 0
@@ -248,9 +256,26 @@ function groupByInvoice(rows) {
         group.items.push(row);
         group.total_amount += parseFloat(row.net_amount || 0);
         group.total_tax += parseFloat(row.tax_amount || 0);
+        group.item_discount_amount += parseFloat(row.discount_amount || 0);
+        group.item_discount_percent_sum += parseFloat(row.discount_percent || 0);
     });
 
     return groups;
+}
+
+// Combined discount % and amount for an invoice group — item-level discount
+// (summed/averaged across the invoice's line items) PLUS the invoice-level
+// discount from the Invoice Summary. This is what the "Discount" row shows.
+function getCombinedDiscount(group) {
+    const itemCount = group.items.length;
+    const avgItemDiscPercent = itemCount > 0
+        ? (group.item_discount_percent_sum / itemCount)
+        : 0;
+
+    return {
+        percent: avgItemDiscPercent + group.invoice_disc_percent,
+        amount: group.item_discount_amount + group.invoice_disc_amount
+    };
 }
 
 async function loadReport() {
@@ -489,18 +514,20 @@ function renderTable() {
             </tr>
         `;
 
-        // Invoice discount row — under Total. Same invoice-level Discount %/Amount
-        // entered in the Invoice Summary section when the invoice was created
-        // (sale_invoice.total_discount_percent/_amount + extra discounts 1 & 2),
-        // not a sum of per-item discounts. Toggleable via Columns modal
-        // (row-discount / hide-col-discount).
-        const discountLabel = group.invoice_disc_percent > 0
-            ? `Discount (${smartNum(group.invoice_disc_percent)}%)`
+        // Invoice discount row — under Total. Combines the ITEM-LEVEL
+        // discount (per line, e.g. the 1% product discount) with the
+        // INVOICE-LEVEL discount from the Invoice Summary (e.g. 5%), so a
+        // 1% item discount + 5% invoice discount shows as "Discount (6%)"
+        // with the matching combined amount, instead of only the invoice
+        // portion. Toggleable via Columns modal (row-discount / hide-col-discount).
+        const combinedDiscount = getCombinedDiscount(group);
+        const discountLabel = combinedDiscount.percent > 0
+            ? `Discount (${smartNum(combinedDiscount.percent)}%)`
             : 'Discount';
         html += `
             <tr class="row-discount" style="font-weight:bold;">
                 <td colspan="10" style="text-align:right;">${discountLabel}</td>
-                <td class="col-amount">${currentCurrency}${smartNum(group.invoice_disc_amount)}</td>
+                <td class="col-amount">${currentCurrency}${smartNum(combinedDiscount.amount)}</td>
             </tr>
         `;
 
@@ -533,10 +560,12 @@ function renderGrandTotal() {
             0
         );
 
+    // Combined discount (item-level + invoice-level) across every invoice —
+    // same combination used in each invoice's own Discount row.
     const grandTotalDiscount =
         groupedInvoices.reduce(
             (sum, g) =>
-                sum + g.invoice_disc_amount,
+                sum + getCombinedDiscount(g).amount,
             0
         );
 
@@ -723,17 +752,15 @@ function exportToExcel() {
                 group.total_amount.toFixed(2)
         });
 
-        // Discount — right under Total (invoice-level Discount %/Amount from
-        // Invoice Summary, same value shown on-screen and on the thermal print).
-        // FIX: previously this label was written into the "FOC" column, which
-        // made it easy to miss/overlook in the exported sheet since "FOC" is
-        // expected to hold numbers. It now goes into "Detail" so the word
-        // "Discount" (and its amount, in "Amount") is clearly visible.
+        // Discount — right under Total. Combined item-level + invoice-level
+        // discount (same combination as the on-screen Discount row / grand
+        // total), so the exported sheet matches what's shown on screen.
+        const combinedDiscount = getCombinedDiscount(group);
         rows.push({
             'S.No': '',
             'Code': '',
-            'Detail': group.invoice_disc_percent > 0
-                ? `Discount (${smartNum(group.invoice_disc_percent)}%)`
+            'Detail': combinedDiscount.percent > 0
+                ? `Discount (${smartNum(combinedDiscount.percent)}%)`
                 : 'Discount',
             'Batch No': '',
             'Expiry Date': '',
@@ -743,7 +770,7 @@ function exportToExcel() {
             'Extra Disc %': '',
             'FOC': '',
             'Amount':
-                smartNum(group.invoice_disc_amount)
+                smartNum(combinedDiscount.amount)
         });
 
         // Tax

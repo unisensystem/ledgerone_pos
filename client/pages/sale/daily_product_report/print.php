@@ -127,6 +127,10 @@ try {
                 + si.extra_discount_1_percent
                 + si.extra_discount_2_percent) AS invoice_disc_percent,
 
+            (si.total_discount_amount
+                + si.extra_discount_1_amount
+                + si.extra_discount_2_amount) AS invoice_disc_amount,
+
             c.customer_name,
 
             COALESCE(
@@ -628,6 +632,35 @@ function buildLocationLabel($cityName, $areaName, $zoneName)
 
 /*
 |--------------------------------------------------------------------------
+| COMBINED DISCOUNT (ITEM-LEVEL + INVOICE-LEVEL)
+|--------------------------------------------------------------------------
+|
+| Same combination used on the screen (index.php / daily-product-sale-
+| report.js -> getCombinedDiscount): the ITEM-LEVEL discount (sii.
+| discount_percent / discount_amount, averaged / summed across the
+| invoice's line items) PLUS the INVOICE-LEVEL discount (from the
+| Invoice Summary). Kept as one helper so the table row, the grand
+| total, and the Excel export all agree.
+|
+*/
+
+function getCombinedDiscount($group)
+{
+    $itemCount = count($group['items']);
+
+    $avgItemDiscPercent = $itemCount > 0
+        ? ($group['item_discount_percent_sum'] / $itemCount)
+        : 0;
+
+    return [
+        'percent' => $avgItemDiscPercent + $group['invoice_disc_percent'],
+        'amount'  => $group['item_discount_amount'] + $group['invoice_disc_amount']
+    ];
+}
+
+
+/*
+|--------------------------------------------------------------------------
 | GROUP BY INVOICE
 |--------------------------------------------------------------------------
 */
@@ -674,6 +707,15 @@ foreach ($rows as $row) {
             'invoice_disc_percent' =>
                 (float)($row['invoice_disc_percent'] ?? 0),
 
+            'invoice_disc_amount' =>
+                (float)($row['invoice_disc_amount'] ?? 0),
+
+            'item_discount_amount' =>
+                0,
+
+            'item_discount_percent_sum' =>
+                0,
+
             'items' =>
                 [],
 
@@ -701,6 +743,15 @@ foreach ($rows as $row) {
 
     $groups[$groupIndex]['total_tax'] +=
         (float)($row['tax_amount'] ?? 0);
+
+
+    // Item-level discount (per line) — combined with invoice-level
+    // discount below via getCombinedDiscount().
+    $groups[$groupIndex]['item_discount_amount'] +=
+        (float)($row['discount_amount'] ?? 0);
+
+    $groups[$groupIndex]['item_discount_percent_sum'] +=
+        (float)($row['discount_percent'] ?? 0);
 }
 
 
@@ -718,6 +769,8 @@ $grand_amount = 0;
 
 $grand_tax = 0;
 
+$grand_discount = 0;
+
 
 foreach ($rows as $row) {
 
@@ -732,6 +785,16 @@ foreach ($rows as $row) {
 
     $grand_tax +=
         (float)($row['tax_amount'] ?? 0);
+}
+
+
+// Discount — combined item-level + invoice-level, summed once per invoice
+// group (same combination as each invoice's own Discount row / the
+// screen version's grand total).
+foreach ($groups as $group) {
+
+    $grand_discount +=
+        getCombinedDiscount($group)['amount'];
 }
 
 
@@ -1510,6 +1573,10 @@ $locationLabel = buildLocationLabel(
     $group['zone_name']
 );
 
+// Combined discount (item-level + invoice-level) — same as index.php's
+// on-screen Discount row.
+$combinedDiscount = getCombinedDiscount($group);
+
 ?>
 
 <tr class="invoice-header">
@@ -1716,6 +1783,37 @@ $locationLabel = buildLocationLabel(
     <td colspan="5" class="col-sno col-code col-detail col-batch col-price col-qty"></td>
 
 
+    <td class="num col-qty" style="text-align:right;">
+
+        <?= $combinedDiscount['percent'] > 0
+            ? 'Discount (' . smartNum($combinedDiscount['percent']) . '%)'
+            : 'Discount' ?>
+
+    </td>
+
+
+    <td class="num col-disc"></td>
+
+
+    <td class="num col-foc"></td>
+
+
+    <td class="num col-amount">
+
+        <?= smartNum(
+            $combinedDiscount['amount']
+        ) ?>
+
+    </td>
+
+</tr>
+
+
+<tr class="total-row">
+
+    <td colspan="5" class="col-sno col-code col-detail col-batch col-price col-qty"></td>
+
+
     <td class="num col-qty" style="text-align:right;">Tax</td>
 
 
@@ -1769,6 +1867,12 @@ $locationLabel = buildLocationLabel(
         $grand_foc_qty
     ) ?>,
 
+    Discount
+
+    <?= smartNum(
+        $grand_discount
+    ) ?>,
+
     Tax
 
     <?= smartNum(
@@ -1802,6 +1906,11 @@ const reportGroups = <?= json_encode(
                 $g['zone_name']
             );
 
+            // Combined discount (item-level + invoice-level) — kept in
+            // sync with the on-screen table above so the Excel export
+            // matches what's printed.
+            $combined = getCombinedDiscount($g);
+
             return [
 
                 'date' =>
@@ -1819,7 +1928,10 @@ const reportGroups = <?= json_encode(
                     (float)$g['invoice_net_amount'],
 
                 'disc_percent' =>
-                    (float)$g['invoice_disc_percent'],
+                    (float)$combined['percent'],
+
+                'disc_amount' =>
+                    (float)$combined['amount'],
 
                 'total' =>
                     (float)$g['total_amount'],
@@ -2058,6 +2170,35 @@ function exportToExcel()
 
                 'Amount':
                     group.total.toFixed(2)
+
+            });
+
+
+            // Discount — combined item-level + invoice-level, same as the
+            // on-screen report.
+            rows.push({
+
+                'S.No': '',
+
+                'Code': '',
+
+                'Detail':
+                    group.disc_percent > 0
+                        ? `Discount (${smartNum(group.disc_percent)}%)`
+                        : 'Discount',
+
+                'Batch No.': '',
+
+                'Price': '',
+
+                'Qty': '',
+
+                'Disc %': '',
+
+                'FOC': '',
+
+                'Amount':
+                    smartNum(group.disc_amount)
 
             });
 
