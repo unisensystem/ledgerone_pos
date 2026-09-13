@@ -1327,6 +1327,7 @@ async function loadItemMovement() {
         // Left blank ('Default') keeps the existing product-name ordering from the API.
         const sortBy      = document.getElementById('movement-sort')?.value || '';
 
+                const sortOrder   = document.getElementById('movement-sort-order')?.value || 'asc';
         let productId = null;
         if (productName) {
             const options = document.querySelectorAll('#movement-product-list option');
@@ -1358,10 +1359,12 @@ async function loadItemMovement() {
             let movementData = Array.isArray(data.data) ? [...data.data] : [];
 
             // NEW: apply smaller-to-larger sort on the selected column, if any.
-            if (sortBy) {
-                movementData.sort((a, b) => parseFloat(a[sortBy] || 0) - parseFloat(b[sortBy] || 0));
+                       if (sortBy) {
+                movementData.sort((a, b) => {
+                    const diff = parseFloat(a[sortBy] || 0) - parseFloat(b[sortBy] || 0);
+                    return sortOrder === 'desc' ? -diff : diff;
+                });
             }
-
             updateMovementTable(movementData, data.currency);
         } else {
             console.error('Failed to load item movement:', data.message);

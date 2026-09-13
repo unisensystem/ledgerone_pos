@@ -602,8 +602,9 @@ $currency_symbol = $currency['symbol'];
             </select>
         </div>
         <!-- NEW: Sort By filter — lets user sort any numeric column smaller to larger -->
+              <!-- Sort By filter — column to sort on -->
         <div class="form-group">
-            <label class="form-label" for="movement-sort">Sort By (Low to High)</label>
+            <label class="form-label" for="movement-sort">Sort By</label>
             <select class="form-control" id="movement-sort">
                 <option value="">Default (Product Name)</option>
                 <option value="opening">Opening</option>
@@ -612,6 +613,14 @@ $currency_symbol = $currency['symbol'];
                 <option value="credit_note">Credit Note</option>
                 <option value="debit_note">Debit Note</option>
                 <option value="closing">Closing</option>
+            </select>
+        </div>
+        <!-- Sort order — Low to High or High to Low -->
+        <div class="form-group">
+            <label class="form-label" for="movement-sort-order">Order</label>
+            <select class="form-control" id="movement-sort-order">
+                <option value="asc">Low to High</option>
+                <option value="desc">High to Low</option>
             </select>
         </div>
         <div class="form-group">

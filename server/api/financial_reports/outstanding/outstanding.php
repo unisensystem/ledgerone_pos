@@ -83,15 +83,17 @@ try {
     $customer_name = $_GET['customer_name'] ?? null;
     $city_id = $_GET['city_id'] ?? null;
     $area_id = $_GET['area_id'] ?? null;
+    $sort = $_GET['sort'] ?? 'high_to_low';  // ← IMPORTANT: Get sort parameter
 
     if (!$sales_officer_id) {
         echo json_encode(['success' => false, 'message' => 'DSR (sales officer) is required']);
         exit;
     }
 
+    // Pass sort parameter to function
     $report = buildOutstandingReport(
         $pdo, $tenant_id, $sales_officer_id, $company_id, $from_date, $to_date,
-        $customer_name, $city_id, $area_id
+        $customer_name, $city_id, $area_id, $sort
     );
     echo json_encode(array_merge(['success' => true], $report));
 

@@ -17,12 +17,13 @@ $to_date = $_GET['to_date'] ?? date('Y-m-d');
 $customer_name = $_GET['customer_name'] ?? null;
 $city_id = $_GET['city_id'] ?? null;
 $area_id = $_GET['area_id'] ?? null;
-$sort = $_GET['sort'] ?? 'high_to_low';
+$sort = $_GET['sort'] ?? 'high_to_low';  // ← IMPORTANT: GET SORT
 
 if (!$sales_officer_id) {
     die('DSR (sales officer) is required');
 }
 
+// ← IMPORTANT: PASS SORT TO FUNCTION
 $report = buildOutstandingReport(
     $pdo, $tenant_id, $sales_officer_id, $company_id, $from_date, $to_date,
     $customer_name, $city_id, $area_id, $sort
@@ -411,29 +412,36 @@ function fmt($amount, $symbol) {
                 </tr>
             </thead>
             <tbody>
-                <?php foreach ($report['groups'] as $group): ?>
-                    <!-- Area Header -->
-                    <tr>
-                        <td colspan="3" class="area-header">
-                            <?php echo htmlspecialchars(strtoupper($group['area_name'])); ?>
-                        </td>
-                    </tr>
+               <?php foreach ($report['groups'] as $group): ?>
+    <?php
+        // Zero-balance customers ko nikaal do
+        $visible_customers = array_filter($group['customers'], function($c) {
+            return (float)$c['balance'] != 0;
+        });
+        if (empty($visible_customers)) continue; // pura area skip
+    ?>
+    <!-- Area Header -->
+    <tr>
+        <td colspan="3" class="area-header">
+            <?php echo htmlspecialchars(strtoupper($group['area_name'])); ?>
+        </td>
+    </tr>
 
-                    <!-- Customers -->
-                    <?php foreach ($group['customers'] as $customer): ?>
-                        <tr>
-                            <td><?php echo $customer['s_no']; ?></td>
-                            <td><?php echo htmlspecialchars($customer['shop_name']); ?></td>
-                            <td class="text-right"><?php echo fmt($customer['balance'], $symbol); ?></td>
-                        </tr>
-                    <?php endforeach; ?>
+    <!-- Customers -->
+    <?php foreach ($visible_customers as $customer): ?>
+        <tr>
+            <td><?php echo $customer['s_no']; ?></td>
+            <td><?php echo htmlspecialchars($customer['shop_name']); ?></td>
+            <td class="text-right"><?php echo fmt($customer['balance'], $symbol); ?></td>
+        </tr>
+    <?php endforeach; ?>
 
-                    <!-- Area Subtotal -->
-                    <tr class="area-subtotal">
-                        <td colspan="2">Area Total:</td>
-                        <td class="text-right"><?php echo fmt($group['subtotal'], $symbol); ?></td>
-                    </tr>
-                <?php endforeach; ?>
+    <!-- Area Subtotal -->
+    <tr class="area-subtotal">
+        <td colspan="2">Area Total:</td>
+        <td class="text-right"><?php echo fmt($group['subtotal'], $symbol); ?></td>
+    </tr>
+<?php endforeach; ?>
 
                 <!-- Grand Total -->
                 <tr class="grand-total">

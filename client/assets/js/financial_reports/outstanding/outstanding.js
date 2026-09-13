@@ -135,7 +135,56 @@ document.addEventListener('DOMContentLoaded', function () {
         const abs = Math.abs(amount).toFixed(2);
         return `${symbol}${abs}`;
     }
+    
+    // Add this function BEFORE the renderReport function
 
+function filterZeroBalances(result) {
+    // Filter out zero-balance customers from each group
+    result.groups = result.groups
+        .map(group => ({
+            ...group,
+            customers: group.customers.filter(c => Math.abs(c.balance) > 0)
+        }))
+        .filter(group => group.customers.length > 0); // Remove empty groups
+    
+    // Recalculate subtotals
+    result.groups.forEach(group => {
+        group.subtotal = group.customers.reduce((sum, c) => sum + c.balance, 0);
+    });
+    
+    // Recalculate grand total
+    result.grand_total = result.groups.reduce((sum, group) => sum + group.subtotal, 0);
+    
+    return result;
+}
+
+// ===== Modify loadOutstanding function =====
+async function loadOutstanding() {
+    if (!dsrSelect.value) {
+        alert('Please select a DSR first');
+        return;
+    }
+
+    const params = buildFilterParams();
+
+    try {
+        const res = await fetch(`../../../../server/api/financial_reports/outstanding/outstanding.php?${params}`);
+        const result = await res.json();
+
+        if (!result.success) {
+            alert(result.message || 'Error loading outstanding report');
+            return;
+        }
+
+        // APPLY ZERO BALANCE FILTER HERE
+        const filteredResult = filterZeroBalances(result);
+        
+        lastResult = filteredResult;
+        renderReport(filteredResult);
+    } catch (error) {
+        alert('Network error occurred');
+    }
+}
     function renderReport(result) {
         resultsCard.style.display = 'block';
 

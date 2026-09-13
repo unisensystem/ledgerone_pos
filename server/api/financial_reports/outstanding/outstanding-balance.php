@@ -126,9 +126,18 @@ function getCustomerBalanceAsOf(PDO $pdo, $tenant_id, $customer_id, $opening_deb
  * Builds the full grouped Outstanding report (DSR -> area -> customers) for a given
  * tenant/sales-officer/date. Returns the same shape whether called from the JSON API
  * or the print view.
+ *
+ * $sort parameter: 'high_to_low' or 'low_to_high'.
+ * Sorting is applied BOTH to customers within each area AND to the order of the
+ * area groups themselves (by area subtotal), so the report reads consistently
+ * from top to bottom regardless of which area a customer belongs to.
  */
-function buildOutstandingReport(PDO $pdo, $tenant_id, $sales_officer_id, $company_id, $from_date, $to_date, $customer_name = null, $city_id = null, $area_id = null)
+function buildOutstandingReport(PDO $pdo, $tenant_id, $sales_officer_id, $company_id = null, $from_date = null, $to_date = null, $customer_name = null, $city_id = null, $area_id = null, $sort = 'high_to_low')
 {
+    if (!$to_date) {
+        $to_date = date('Y-m-d');
+    }
+
     $sql = "SELECT c.id, c.customer_name, c.shop_name, c.opening_debit_amount, c.opening_credit_amount,
                    a.area_name
             FROM customers c
@@ -166,7 +175,6 @@ function buildOutstandingReport(PDO $pdo, $tenant_id, $sales_officer_id, $compan
 
     $groups = [];
     $grand_total = 0.0;
-    $serial = 0;
 
     foreach ($customers as $cust) {
         $balance = getCustomerBalanceAsOf(
@@ -175,14 +183,17 @@ function buildOutstandingReport(PDO $pdo, $tenant_id, $sales_officer_id, $compan
             $to_date, $company_id
         );
 
+        // SKIP customers with zero balance
+        if (abs($balance) < 0.01) {
+            continue;
+        }
+
         $area_key = $cust['area_name'] ?: 'No Area Assigned';
         if (!isset($groups[$area_key])) {
             $groups[$area_key] = ['area_name' => $area_key, 'customers' => [], 'subtotal' => 0.0];
         }
 
-        $serial++;
         $groups[$area_key]['customers'][] = [
-            's_no' => $serial,
             'shop_name' => $cust['shop_name'] ?: $cust['customer_name'],
             'balance' => round($balance, 2)
         ];
@@ -190,10 +201,32 @@ function buildOutstandingReport(PDO $pdo, $tenant_id, $sales_officer_id, $compan
         $grand_total += $balance;
     }
 
-    foreach ($groups as &$g) {
-        $g['subtotal'] = round($g['subtotal'], 2);
+    $direction = ($sort === 'low_to_high') ? 1 : -1;
+
+    // 1) Sort customers WITHIN each area group by balance
+    foreach ($groups as &$group) {
+        usort($group['customers'], function ($a, $b) use ($direction) {
+            return ($a['balance'] <=> $b['balance']) * $direction;
+        });
+        $group['subtotal'] = round($group['subtotal'], 2);
     }
-    unset($g);
+    unset($group);
+
+    // 2) Sort the AREA GROUPS themselves by their subtotal, same direction,
+    //    so the whole report reads low->high or high->low top to bottom.
+    uasort($groups, function ($a, $b) use ($direction) {
+        return ($a['subtotal'] <=> $b['subtotal']) * $direction;
+    });
+
+    // 3) Recalculate serial numbers after sorting (global running number)
+    $serial = 0;
+    foreach ($groups as &$group) {
+        foreach ($group['customers'] as &$customer) {
+            $serial++;
+            $customer['s_no'] = $serial;
+        }
+    }
+    unset($group);
 
     return [
         'dsr_name' => $dsr_name,

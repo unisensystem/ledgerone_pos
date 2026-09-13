@@ -405,7 +405,6 @@ function calculateRowAmounts(row, totalQty, price, source) {
     updateInvoiceSummaryDynamic();
 }
 
-// Update footer totals
 function updateFooterTotals() {
     const itemsTable = document.getElementById('itemsTable');
     const tfoot = itemsTable.getElementsByTagName('tfoot')[0];
@@ -414,25 +413,25 @@ function updateFooterTotals() {
     const footerRow = tfoot.rows[0];
     
     // Remove old unit total cells that were dynamically inserted
-    // Keep removing cells at index 3 until we reach the known fixed column IDs
-    // (index 0=Totals label, 1=Product, 2=Scheme; this page has no Batch No/Expiry Date columns)
+    // Fixed columns: 0=Totals label, 1=Product, 2=Scheme, 3=Batch No, 4=Expiry Date,
+    // 5=Batch No 2, 6=Expiry Date 2 — dynamic Unit columns start at index 7.
     let safetyCounter = 0;
     const knownIds = ['totalSalePrice', 'totalGrossAmount', 'totalDiscountAmountItems',
                       'totalTradeOfferAmount', 'totalGstAmount', 'totalFocQty', 'totalNetAmountItems'];
 
-    while (footerRow.cells.length > 3 && safetyCounter < 20) {
-        const cell = footerRow.cells[3];
+    while (footerRow.cells.length > 7 && safetyCounter < 20) {
+        const cell = footerRow.cells[7];
         // Stop if we reach a cell with a known fixed id
         if (cell && cell.id && knownIds.includes(cell.id)) {
             break;
         }
-        footerRow.deleteCell(3);
+        footerRow.deleteCell(7);
         safetyCounter++;
     }
 
-    // Insert empty cells for dynamic unit columns at index 3
+    // Insert empty cells for dynamic unit columns at index 7
     for (let i = 0; i < maxUnitColumns; i++) {
-        const cell = footerRow.insertCell(3 + i);
+        const cell = footerRow.insertCell(7 + i);
         cell.textContent = '';
         cell.style.textAlign = 'center';
         cell.style.padding = '8px 4px';

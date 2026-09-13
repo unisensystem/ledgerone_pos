@@ -1676,6 +1676,14 @@ try {
     } else {
 
         $opening_sql .= " AND sl.transaction_type = 'Opening Stock'";
+
+        // If only To Date is set (no From Date), keep Opening consistent with
+        // the report's end boundary — ignore any Opening Stock entry dated
+        // after To Date instead of always pulling in every Opening Stock row.
+        if ($to_date) {
+            $opening_sql .= " AND sl.transaction_date <= ?";
+            $opening_params[] = $to_date;
+        }
     }
 
 

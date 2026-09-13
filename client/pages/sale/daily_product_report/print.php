@@ -19,6 +19,28 @@ if (!$user_id || !$tenant_id) {
 
 /*
 |--------------------------------------------------------------------------
+| SMART NUMBER FORMAT
+|--------------------------------------------------------------------------
+|
+| Used for Disc %, FOC and Tax figures. Whole numbers (5.00, 0.00) are
+| shown WITHOUT the trailing decimals (5, 0). Non-whole numbers keep
+| 2 decimal places (5.25). Price / Qty / Amount are left untouched
+| (always 2 decimals), since those are currency-style values.
+|
+*/
+
+function smartNum($num)
+{
+    $num = round((float)$num, 2);
+
+    return (fmod($num, 1.0) == 0.0)
+        ? number_format($num, 0)
+        : number_format($num, 2);
+}
+
+
+/*
+|--------------------------------------------------------------------------
 | FILTERS
 |--------------------------------------------------------------------------
 */
@@ -89,40 +111,6 @@ try {
 */
 
 try {
-
-    /*
-    |--------------------------------------------------------------------------
-    | REPORT QUERY
-    |--------------------------------------------------------------------------
-    |
-    | IMPORTANT:
-    | batch_no, foc_quantity and tax_amount are directly inside
-    | sale_invoice_items (sii).
-    |
-    | NO stock_ledger JOIN is required.
-    |
-    | Salesman filter uses si.sale_officer_id directly.
-    | Supplier Man filter uses si.supplier_man_id directly.
-    | City / Area filters use c.city_id / c.area_id directly,
-    | since customers already carries those columns.
-    |
-    | CITY / AREA / ZONE DISPLAY:
-    | customers.city_id      -> cities.city_name
-    | customers.area_id      -> areas.area_name
-    | customers.city_zone_id -> city_zones.city_zone_name
-    |
-    | INVOICE-LEVEL AMOUNT / DISCOUNT:
-    | si.net_amount is the invoice's own net amount (may include
-    | shipping/other charges, so it can differ from the sum of the
-    | item net_amounts shown in the "Total" row).
-    |
-    | invoice_disc_percent combines:
-    | si.total_discount_percent + si.extra_discount_1_percent
-    | + si.extra_discount_2_percent
-    | (this is an invoice-level figure, so it is the same for
-    | every item row belonging to that invoice).
-    |
-    */
 
     $sql = "
         SELECT
@@ -234,12 +222,6 @@ try {
     $params = [$tenant_id];
 
 
-    /*
-    |--------------------------------------------------------------------------
-    | FROM DATE
-    |--------------------------------------------------------------------------
-    */
-
     if (!empty($from_date)) {
 
         $sql .= "
@@ -249,12 +231,6 @@ try {
         $params[] = $from_date;
     }
 
-
-    /*
-    |--------------------------------------------------------------------------
-    | TO DATE
-    |--------------------------------------------------------------------------
-    */
 
     if (!empty($to_date)) {
 
@@ -266,12 +242,6 @@ try {
     }
 
 
-    /*
-    |--------------------------------------------------------------------------
-    | CUSTOMER
-    |--------------------------------------------------------------------------
-    */
-
     if (!empty($customer_id)) {
 
         $sql .= "
@@ -281,12 +251,6 @@ try {
         $params[] = $customer_id;
     }
 
-
-    /*
-    |--------------------------------------------------------------------------
-    | BRANCH
-    |--------------------------------------------------------------------------
-    */
 
     if (!empty($branch_id)) {
 
@@ -298,12 +262,6 @@ try {
     }
 
 
-    /*
-    |--------------------------------------------------------------------------
-    | PRODUCT
-    |--------------------------------------------------------------------------
-    */
-
     if (!empty($product_id)) {
 
         $sql .= "
@@ -313,15 +271,6 @@ try {
         $params[] = $product_id;
     }
 
-
-    /*
-    |--------------------------------------------------------------------------
-    | BATCH NUMBER
-    |--------------------------------------------------------------------------
-    |
-    | Batch number is directly from sii.batch_no
-    |
-    */
 
     if ($batch_no !== '') {
 
@@ -333,20 +282,6 @@ try {
     }
 
 
-    /*
-    |--------------------------------------------------------------------------
-    | EXPIRY DATE
-    |--------------------------------------------------------------------------
-    |
-    | NOTE: the Expiry Date column has been removed from the printed
-    | table, but the filter itself still works if a caller passes
-    | expiry_date in the query string (kept for compatibility with
-    | index.php's filter panel).
-    |
-    | Expiry date is directly from sii.batch_expiry_date
-    |
-    */
-
     if (!empty($expiry_date)) {
 
         $sql .= "
@@ -356,15 +291,6 @@ try {
         $params[] = $expiry_date;
     }
 
-
-    /*
-    |--------------------------------------------------------------------------
-    | SALESMAN (SALE OFFICER)
-    |--------------------------------------------------------------------------
-    |
-    | sale_officer_id is directly on sale_invoice (si).
-    |
-    */
 
     if (!empty($sale_officer_id)) {
 
@@ -376,16 +302,6 @@ try {
     }
 
 
-    /*
-    |--------------------------------------------------------------------------
-    | SUPPLIER MAN (DELIVERY MAN)
-    |--------------------------------------------------------------------------
-    |
-    | supplier_man_id is directly on sale_invoice (si), same relationship
-    | (employees.id) as sale_officer_id.
-    |
-    */
-
     if (!empty($supplier_man_id)) {
 
         $sql .= "
@@ -395,15 +311,6 @@ try {
         $params[] = $supplier_man_id;
     }
 
-
-    /*
-    |--------------------------------------------------------------------------
-    | CITY
-    |--------------------------------------------------------------------------
-    |
-    | city_id is directly on customers (c).
-    |
-    */
 
     if (!empty($city_id)) {
 
@@ -415,15 +322,6 @@ try {
     }
 
 
-    /*
-    |--------------------------------------------------------------------------
-    | AREA
-    |--------------------------------------------------------------------------
-    |
-    | area_id is directly on customers (c).
-    |
-    */
-
     if (!empty($area_id)) {
 
         $sql .= "
@@ -434,12 +332,6 @@ try {
     }
 
 
-    /*
-    |--------------------------------------------------------------------------
-    | ORDER
-    |--------------------------------------------------------------------------
-    */
-
     $sql .= "
         ORDER BY
             si.sale_date ASC,
@@ -447,12 +339,6 @@ try {
             sii.id ASC
     ";
 
-
-    /*
-    |--------------------------------------------------------------------------
-    | EXECUTE QUERY
-    |--------------------------------------------------------------------------
-    */
 
     $stmt = $pdo->prepare($sql);
 
@@ -523,11 +409,6 @@ try {
 |--------------------------------------------------------------------------
 | FILTER LABELS (SALESMAN / SUPPLIER MAN / CITY / AREA)
 |--------------------------------------------------------------------------
-|
-| Looked up independently of $rows (by filter id, from employees /
-| cities / areas) so the label still shows even when the filter
-| combination returns zero rows.
-|
 */
 
 $salesman_name = null;
@@ -670,10 +551,6 @@ if (!empty($area_id)) {
 |--------------------------------------------------------------------------
 | FILTER SUMMARY LABEL
 |--------------------------------------------------------------------------
-|
-| Shown as a line above the table, only when at least one of these
-| filters was actually applied.
-|
 */
 
 $filter_summary_parts = [];
@@ -764,12 +641,6 @@ foreach ($rows as $row) {
 
     $invoice_id = $row['invoice_id'];
 
-    /*
-    |--------------------------------------------------------------------------
-    | NEW INVOICE
-    |--------------------------------------------------------------------------
-    */
-
     if (!isset($indexByInvoice[$invoice_id])) {
 
         $indexByInvoice[$invoice_id] = count($groups);
@@ -816,12 +687,6 @@ foreach ($rows as $row) {
     }
 
 
-    /*
-    |--------------------------------------------------------------------------
-    | ADD ITEM
-    |--------------------------------------------------------------------------
-    */
-
     $groupIndex =
         $indexByInvoice[$invoice_id];
 
@@ -830,21 +695,9 @@ foreach ($rows as $row) {
         $row;
 
 
-    /*
-    |--------------------------------------------------------------------------
-    | INVOICE TOTAL (sum of item net_amount)
-    |--------------------------------------------------------------------------
-    */
-
     $groups[$groupIndex]['total_amount'] +=
         (float)($row['net_amount'] ?? 0);
 
-
-    /*
-    |--------------------------------------------------------------------------
-    | INVOICE TAX (sum of item tax_amount)
-    |--------------------------------------------------------------------------
-    */
 
     $groups[$groupIndex]['total_tax'] +=
         (float)($row['tax_amount'] ?? 0);
@@ -963,12 +816,6 @@ body {
 }
 
 
-/*
-|--------------------------------------------------------------------------
-| TOOLBAR
-|--------------------------------------------------------------------------
-*/
-
 .toolbar {
 
     text-align: center;
@@ -1028,12 +875,6 @@ body {
 }
 
 
-/*
-|--------------------------------------------------------------------------
-| HEADER
-|--------------------------------------------------------------------------
-*/
-
 .print-header {
 
     text-align: center;
@@ -1069,12 +910,6 @@ body {
 }
 
 
-/*
-|--------------------------------------------------------------------------
-| META
-|--------------------------------------------------------------------------
-*/
-
 .meta-row {
 
     display: flex;
@@ -1108,16 +943,6 @@ body {
 }
 
 
-/*
-|--------------------------------------------------------------------------
-| FILTER SUMMARY (Salesman / Supplier Man / City / Area)
-|--------------------------------------------------------------------------
-|
-| Sits right under the meta-row, above the table. Only rendered when
-| at least one of these filters is actually applied.
-|
-*/
-
 .filter-summary-row {
 
     text-align: center;
@@ -1133,12 +958,6 @@ body {
         0;
 }
 
-
-/*
-|--------------------------------------------------------------------------
-| TABLE
-|--------------------------------------------------------------------------
-*/
 
 table {
 
@@ -1243,12 +1062,6 @@ tbody td {
 }
 
 
-/*
-|--------------------------------------------------------------------------
-| INVOICE HEADER
-|--------------------------------------------------------------------------
-*/
-
 tr.invoice-header td {
 
     font-weight: normal;
@@ -1265,23 +1078,11 @@ tr.invoice-header td.bill-no {
 }
 
 
-/*
-|--------------------------------------------------------------------------
-| TOTAL / TAX
-|--------------------------------------------------------------------------
-*/
-
 tr.total-row td {
 
     font-weight: bold;
 }
 
-
-/*
-|--------------------------------------------------------------------------
-| GRAND TOTAL
-|--------------------------------------------------------------------------
-*/
 
 .grand-total {
 
@@ -1305,13 +1106,6 @@ tr.total-row td {
 }
 
 
-/*
-|--------------------------------------------------------------------------
-| COLUMN VISIBILITY (toggled by JS via body classes)
-| Example: body.hide-col-foc .col-foc { display: none; }
-|--------------------------------------------------------------------------
-*/
-
 body.hide-col-sno    .col-sno,
 body.hide-col-code   .col-code,
 body.hide-col-detail .col-detail,
@@ -1324,12 +1118,6 @@ body.hide-col-amount .col-amount {
     display: none !important;
 }
 
-
-/*
-|--------------------------------------------------------------------------
-| COLUMNS MODAL
-|--------------------------------------------------------------------------
-*/
 
 .modal-overlay {
 
@@ -1429,12 +1217,6 @@ body.hide-col-amount .col-amount {
 }
 
 
-/*
-|--------------------------------------------------------------------------
-| PRINT
-|--------------------------------------------------------------------------
-*/
-
 @media print {
 
     .no-print {
@@ -1481,10 +1263,6 @@ body.hide-col-amount .col-amount {
 <body>
 
 
-<!-- =========================================================
-     TOOLBAR
-========================================================= -->
-
 <div class="toolbar no-print">
 
     <button
@@ -1530,10 +1308,6 @@ body.hide-col-amount .col-amount {
 </div>
 
 
-<!-- =========================================================
-     COLUMNS MODAL
-========================================================= -->
-
 <div class="modal-overlay no-print" id="columns-modal-overlay">
 
     <div class="modal-box">
@@ -1560,10 +1334,6 @@ body.hide-col-amount .col-amount {
 <div class="sheet">
 
 
-<!-- =========================================================
-     HEADER
-========================================================= -->
-
 <div class="print-header">
 
     <h1>
@@ -1580,10 +1350,6 @@ body.hide-col-amount .col-amount {
 
 </div>
 
-
-<!-- =========================================================
-     META
-========================================================= -->
 
 <div class="meta-row">
 
@@ -1628,10 +1394,6 @@ body.hide-col-amount .col-amount {
 </div>
 
 
-<!-- =========================================================
-     FILTER SUMMARY (Salesman / Supplier Man / City / Area)
-========================================================= -->
-
 <?php if (!empty($filter_summary_label)): ?>
 
 <div class="filter-summary-row">
@@ -1646,10 +1408,6 @@ body.hide-col-amount .col-amount {
 
 <?php endif; ?>
 
-
-<!-- =========================================================
-     REPORT TABLE
-========================================================= -->
 
 <table id="reportTable">
 
@@ -1754,10 +1512,6 @@ $locationLabel = buildLocationLabel(
 
 ?>
 
-<!-- =========================================================
-     INVOICE HEADER
-========================================================= -->
-
 <tr class="invoice-header">
 
     <td class="col-sno"></td>
@@ -1800,8 +1554,6 @@ $locationLabel = buildLocationLabel(
     <td class="col-foc"></td>
 
 
-    <!-- Invoice net amount, then bill number -->
-
     <td class="bill-no col-amount">
 
         <?= number_format(
@@ -1822,10 +1574,6 @@ $locationLabel = buildLocationLabel(
 </tr>
 
 
-<!-- =========================================================
-     ITEMS
-========================================================= -->
-
 <?php foreach (
     $group['items']
     as $i => $row
@@ -1834,14 +1582,10 @@ $locationLabel = buildLocationLabel(
 
 <tr>
 
-    <!-- S.NO -->
-
     <td class="col-sno">
         <?= $i + 1 ?>
     </td>
 
-
-    <!-- PRODUCT CODE -->
 
     <td class="col-code">
 
@@ -1854,8 +1598,6 @@ $locationLabel = buildLocationLabel(
     </td>
 
 
-    <!-- PRODUCT -->
-
     <td class="col-detail">
 
         <?= htmlspecialchars(
@@ -1866,8 +1608,6 @@ $locationLabel = buildLocationLabel(
 
     </td>
 
-
-    <!-- BATCH -->
 
     <td class="col-batch">
 
@@ -1880,8 +1620,6 @@ $locationLabel = buildLocationLabel(
     </td>
 
 
-    <!-- PRICE -->
-
     <td class="num col-price">
 
         <?= number_format(
@@ -1893,8 +1631,6 @@ $locationLabel = buildLocationLabel(
 
     </td>
 
-
-    <!-- QTY -->
 
     <td class="num col-qty">
 
@@ -1914,33 +1650,23 @@ $locationLabel = buildLocationLabel(
     </td>
 
 
-    <!-- DISC % (invoice-level: Disc % + Extra Disc % combined) -->
-
     <td class="num col-disc">
 
-               <?= number_format(
-            (float)($row['discount_percent'] ?? 0),
-            2
+        <?= smartNum(
+            $row['discount_percent'] ?? 0
         ) ?>%
 
     </td>
 
 
-    <!-- FOC -->
-
     <td class="num col-foc">
 
-        <?= number_format(
-            (float)(
-                $row['foc_quantity'] ?? 0
-            ),
-            2
+        <?= smartNum(
+            $row['foc_quantity'] ?? 0
         ) ?>
 
     </td>
 
-
-    <!-- AMOUNT -->
 
     <td class="num col-amount">
 
@@ -1959,21 +1685,18 @@ $locationLabel = buildLocationLabel(
 <?php endforeach; ?>
 
 
-<!-- =========================================================
-     INVOICE TOTAL
-========================================================= -->
-
 <tr class="total-row">
 
-    <td colspan="6" class="col-sno col-code col-detail col-batch col-price col-qty"></td>
+    <td colspan="5" class="col-sno col-code col-detail col-batch col-price col-qty"></td>
+
+
+    <td class="num col-qty" style="text-align:right;">Total</td>
 
 
     <td class="num col-disc"></td>
 
 
-    <td class="num col-foc">
-        Total
-    </td>
+    <td class="num col-foc"></td>
 
 
     <td class="num col-amount">
@@ -1988,28 +1711,24 @@ $locationLabel = buildLocationLabel(
 </tr>
 
 
-<!-- =========================================================
-     INVOICE TAX (right under Total)
-========================================================= -->
-
 <tr class="total-row">
 
-    <td colspan="6" class="col-sno col-code col-detail col-batch col-price col-qty"></td>
+    <td colspan="5" class="col-sno col-code col-detail col-batch col-price col-qty"></td>
+
+
+    <td class="num col-qty" style="text-align:right;">Tax</td>
 
 
     <td class="num col-disc"></td>
 
 
-    <td class="num col-foc">
-        Tax
-    </td>
+    <td class="num col-foc"></td>
 
 
     <td class="num col-amount">
 
-        <?= number_format(
-            $group['total_tax'],
-            2
+        <?= smartNum(
+            $group['total_tax']
         ) ?>
 
     </td>
@@ -2026,10 +1745,6 @@ $locationLabel = buildLocationLabel(
 
 </table>
 
-
-<!-- =========================================================
-     GRAND TOTAL
-========================================================= -->
 
 <?php if (!empty($groups)): ?>
 
@@ -2050,16 +1765,14 @@ $locationLabel = buildLocationLabel(
 
     FOC
 
-    <?= number_format(
-        $grand_foc_qty,
-        2
+    <?= smartNum(
+        $grand_foc_qty
     ) ?>,
 
     Tax
 
-    <?= number_format(
-        $grand_tax,
-        2
+    <?= smartNum(
+        $grand_tax
     ) ?>,
 
     Amount
@@ -2078,12 +1791,6 @@ $locationLabel = buildLocationLabel(
 
 
 <script>
-
-/*
-|--------------------------------------------------------------------------
-| REPORT DATA
-|--------------------------------------------------------------------------
-*/
 
 const reportGroups = <?= json_encode(
     array_map(
@@ -2179,12 +1886,6 @@ const reportGroups = <?= json_encode(
 ) ?>;
 
 
-/*
-|--------------------------------------------------------------------------
-| DATE FORMAT
-|--------------------------------------------------------------------------
-*/
-
 function fmtDateShort(dateStr)
 {
 
@@ -2224,11 +1925,17 @@ function fmtDateShort(dateStr)
 }
 
 
-/*
-|--------------------------------------------------------------------------
-| EXCEL EXPORT
-|--------------------------------------------------------------------------
-*/
+function smartNum(num)
+{
+    let n = parseFloat(num);
+
+    if (isNaN(n)) n = 0;
+
+    n = Math.round(n * 100) / 100;
+
+    return (n % 1 === 0) ? n.toFixed(0) : n.toFixed(2);
+}
+
 
 function exportToExcel()
 {
@@ -2265,12 +1972,6 @@ function exportToExcel()
     reportGroups.forEach(
         group => {
 
-            /*
-            |--------------------------------------------------------------------------
-            | INVOICE HEADER
-            |--------------------------------------------------------------------------
-            */
-
             rows.push({
 
                 'S.No': '',
@@ -2294,12 +1995,6 @@ function exportToExcel()
                     `${group.invoice_net_amount.toFixed(2)}  ${group.bill_no}`
             });
 
-
-            /*
-            |--------------------------------------------------------------------------
-            | ITEMS
-            |--------------------------------------------------------------------------
-            */
 
             group.items.forEach(
                 (item, idx) => {
@@ -2327,10 +2022,10 @@ function exportToExcel()
                             }`.trim(),
 
                         'Disc %':
-                            group.disc_percent.toFixed(2),
+                            smartNum(group.disc_percent),
 
                         'FOC':
-                            item.foc.toFixed(2),
+                            smartNum(item.foc),
 
                         'Amount':
                             item.amount.toFixed(2)
@@ -2341,19 +2036,15 @@ function exportToExcel()
             );
 
 
-            /*
-            |--------------------------------------------------------------------------
-            | INVOICE TOTAL
-            |--------------------------------------------------------------------------
-            */
-
+            // Total — label goes in "Detail" (not "FOC") so it doesn't get
+            // confused with an actual FOC quantity when scanning the sheet.
             rows.push({
 
                 'S.No': '',
 
                 'Code': '',
 
-                'Detail': '',
+                'Detail': 'Total',
 
                 'Batch No.': '',
 
@@ -2363,7 +2054,7 @@ function exportToExcel()
 
                 'Disc %': '',
 
-                'FOC': 'Total',
+                'FOC': '',
 
                 'Amount':
                     group.total.toFixed(2)
@@ -2371,19 +2062,13 @@ function exportToExcel()
             });
 
 
-            /*
-            |--------------------------------------------------------------------------
-            | INVOICE TAX (right under Total)
-            |--------------------------------------------------------------------------
-            */
-
             rows.push({
 
                 'S.No': '',
 
                 'Code': '',
 
-                'Detail': '',
+                'Detail': 'Tax',
 
                 'Batch No.': '',
 
@@ -2393,10 +2078,10 @@ function exportToExcel()
 
                 'Disc %': '',
 
-                'FOC': 'Tax',
+                'FOC': '',
 
                 'Amount':
-                    group.tax.toFixed(2)
+                    smartNum(group.tax)
 
             });
 
@@ -2404,23 +2089,11 @@ function exportToExcel()
     );
 
 
-    /*
-    |--------------------------------------------------------------------------
-    | CREATE WORKSHEET
-    |--------------------------------------------------------------------------
-    */
-
     const worksheet =
         XLSX.utils.json_to_sheet(
             rows
         );
 
-
-    /*
-    |--------------------------------------------------------------------------
-    | COLUMN WIDTHS
-    |--------------------------------------------------------------------------
-    */
 
     worksheet['!cols'] = [
 
@@ -2445,12 +2118,6 @@ function exportToExcel()
     ];
 
 
-    /*
-    |--------------------------------------------------------------------------
-    | WORKBOOK
-    |--------------------------------------------------------------------------
-    */
-
     const workbook =
         XLSX.utils.book_new();
 
@@ -2465,12 +2132,6 @@ function exportToExcel()
 
     );
 
-
-    /*
-    |--------------------------------------------------------------------------
-    | DOWNLOAD
-    |--------------------------------------------------------------------------
-    */
 
     const today =
         new Date()
@@ -2488,15 +2149,6 @@ function exportToExcel()
 
 }
 
-
-/*
-|--------------------------------------------------------------------------
-| COLUMN SHOW / HIDE
-|
-| Shared with index.php via localStorage so toggling on either page
-| stays in sync (same origin, so the same key is visible on both).
-|--------------------------------------------------------------------------
-*/
 
 const COLUMN_STORAGE_KEY = 'dpsr_column_visibility';
 
@@ -2567,7 +2219,6 @@ function closeColumnsModal() {
 
 document.addEventListener('DOMContentLoaded', () => {
 
-    // Apply saved column preferences as soon as the page loads
     applyColumnVisibility();
 
     const columnsBtn = document.getElementById('columns-btn');

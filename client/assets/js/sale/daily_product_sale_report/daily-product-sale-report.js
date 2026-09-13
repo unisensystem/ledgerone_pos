@@ -14,6 +14,18 @@ function esc(v) {
     return String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
 
+// Smart number formatter — used for Disc %, Extra Disc %, FOC, Tax and
+// Discount amount. Whole numbers (e.g. 5.00, 0.00) are shown WITHOUT the
+// trailing decimals (5, 0). Non-whole numbers keep 2 decimal places
+// (e.g. 5.25). Requested so ".00" values stop cluttering these columns.
+function smartNum(num) {
+    let n = parseFloat(num);
+    if (isNaN(n)) n = 0;
+    // round to 2dp first to kill floating point noise (e.g. 4.999999999)
+    n = Math.round(n * 100) / 100;
+    return (n % 1 === 0) ? n.toFixed(0) : n.toFixed(2);
+}
+
 // DB date (YYYY-MM-DD) -> DD/MM/YY
 function formatDateShort(dateStr) {
     if (!dateStr) return '';
@@ -461,9 +473,9 @@ function renderTable() {
                     <td class="col-expiry">${esc(expiryDate)}</td>
                     <td class="col-price">${currentCurrency}${salePrice.toFixed(2)}</td>
                     <td class="col-qty">${quantity.toFixed(2)} ${esc(row.unit_symbol || '')}</td>
-                    <td class="col-disc">${discPercent.toFixed(2)}%</td>
-                    <td class="col-extradisc">${extraDiscPercent.toFixed(2)}%</td>
-                    <td class="col-foc">${focQty.toFixed(2)}</td>
+                    <td class="col-disc">${smartNum(discPercent)}%</td>
+                    <td class="col-extradisc">${smartNum(extraDiscPercent)}%</td>
+                    <td class="col-foc">${smartNum(focQty)}</td>
                     <td class="col-amount">${currentCurrency}${netAmount.toFixed(2)}</td>
                 </tr>
             `;
@@ -483,12 +495,12 @@ function renderTable() {
         // not a sum of per-item discounts. Toggleable via Columns modal
         // (row-discount / hide-col-discount).
         const discountLabel = group.invoice_disc_percent > 0
-            ? `Discount (${group.invoice_disc_percent.toFixed(2)}%)`
+            ? `Discount (${smartNum(group.invoice_disc_percent)}%)`
             : 'Discount';
         html += `
             <tr class="row-discount" style="font-weight:bold;">
                 <td colspan="10" style="text-align:right;">${discountLabel}</td>
-                <td class="col-amount">${currentCurrency}${group.invoice_disc_amount.toFixed(2)}</td>
+                <td class="col-amount">${currentCurrency}${smartNum(group.invoice_disc_amount)}</td>
             </tr>
         `;
 
@@ -496,7 +508,7 @@ function renderTable() {
         html += `
             <tr style="font-weight:bold;">
                 <td colspan="10" style="text-align:right;">Tax</td>
-                <td class="col-amount">${currentCurrency}${group.total_tax.toFixed(2)}</td>
+                <td class="col-amount">${currentCurrency}${smartNum(group.total_tax)}</td>
             </tr>
         `;
     });
@@ -542,8 +554,8 @@ function renderGrandTotal() {
         el.textContent =
             `Grand Total: ${groupedInvoices.length} invoice(s), ` +
             `Qty ${grandTotalQty.toFixed(2)}, ` +
-            `FOC ${grandTotalFoc.toFixed(2)}, ` +
-            `Discount ${currentCurrency}${grandTotalDiscount.toFixed(2)}, ` +
+            `FOC ${smartNum(grandTotalFoc)}, ` +
+            `Discount ${currentCurrency}${smartNum(grandTotalDiscount)}, ` +
             `Amount ${currentCurrency}${grandTotalAmount.toFixed(2)}`;
     }
 }
@@ -674,14 +686,13 @@ function exportToExcel() {
                     `${parseFloat(row.quantity || 0).toFixed(2)} ${row.unit_symbol || ''}`,
 
                 'Disc %':
-                    parseFloat(row.discount_percent || 0).toFixed(2),
+                    smartNum(row.discount_percent || 0),
 
                 'Extra Disc %':
-                    extraDiscPercent.toFixed(2),
+                    smartNum(extraDiscPercent),
 
                 'FOC':
-                    parseFloat(row.foc_quantity || 0)
-                        .toFixed(2),
+                    smartNum(row.foc_quantity || 0),
 
                 'Amount':
                     parseFloat(row.net_amount || 0)
@@ -689,55 +700,60 @@ function exportToExcel() {
             });
         });
 
-        // Total
+        // Total — label goes in "Detail" (not "FOC") so it doesn't get mixed
+        // up with the actual FOC quantity column.
         rows.push({
             'S.No': '',
             'Code': '',
-            'Detail': '',
+            'Detail': 'Total',
             'Batch No': '',
             'Expiry Date': '',
             'Price': '',
             'Qty': '',
             'Disc %': '',
             'Extra Disc %': '',
-            'FOC': 'Total',
+            'FOC': '',
             'Amount':
                 group.total_amount.toFixed(2)
         });
 
         // Discount — right under Total (invoice-level Discount %/Amount from
-        // Invoice Summary, same value shown on-screen and on the thermal print)
+        // Invoice Summary, same value shown on-screen and on the thermal print).
+        // FIX: previously this label was written into the "FOC" column, which
+        // made it easy to miss/overlook in the exported sheet since "FOC" is
+        // expected to hold numbers. It now goes into "Detail" so the word
+        // "Discount" (and its amount, in "Amount") is clearly visible.
         rows.push({
             'S.No': '',
             'Code': '',
-            'Detail': '',
+            'Detail': group.invoice_disc_percent > 0
+                ? `Discount (${smartNum(group.invoice_disc_percent)}%)`
+                : 'Discount',
             'Batch No': '',
             'Expiry Date': '',
             'Price': '',
             'Qty': '',
             'Disc %': '',
             'Extra Disc %': '',
-            'FOC': group.invoice_disc_percent > 0
-                ? `Discount (${group.invoice_disc_percent.toFixed(2)}%)`
-                : 'Discount',
+            'FOC': '',
             'Amount':
-                group.invoice_disc_amount.toFixed(2)
+                smartNum(group.invoice_disc_amount)
         });
 
         // Tax
         rows.push({
             'S.No': '',
             'Code': '',
-            'Detail': '',
+            'Detail': 'Tax',
             'Batch No': '',
             'Expiry Date': '',
             'Price': '',
             'Qty': '',
             'Disc %': '',
             'Extra Disc %': '',
-            'FOC': 'Tax',
+            'FOC': '',
             'Amount':
-                group.total_tax.toFixed(2)
+                smartNum(group.total_tax)
         });
     });
 
