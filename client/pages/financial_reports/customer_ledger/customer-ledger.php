@@ -115,32 +115,26 @@ $all_symbols = $stmt2->fetchAll();
                     <input type="date" class="form-control" id="to-date">
                     <div class="error-message" id="to-date-error">To Date cannot be less than From Date</div>
                 </div>
-                <div class="form-group">
-                    <label class="form-label" for="sort-order">Sort Order</label>
-                    <select class="form-control" id="sort-order">
-                        <option value="asc" selected>Ascending (Oldest / A-Z first)</option>
-                        <option value="desc">Descending (Newest / Z-A first)</option>
-                    </select>
-                </div>
 
-                <!-- NEW: Amount Range Filter (Summary Ledger only) -->
-                <div class="form-group" id="range-filter-field-group">
-                    <label class="form-label" for="range-field">Filter By</label>
-                    <select class="form-control" id="range-field">
-                        <option value="">No Amount Filter</option>
+                <!-- Sort By field (Summary Ledger only) — works together with Sort Order
+                     below to sort by an actual column (e.g. Closing Balance highest to lowest
+                     or lowest to highest), replacing the old Min/Max amount range filter. -->
+                <div class="form-group" id="sort-field-group">
+                    <label class="form-label" for="sort-field">Sort By</label>
+                    <select class="form-control" id="sort-field">
+                        <option value="closing_balance" selected>Closing Balance (Dr/Cr)</option>
                         <option value="opening_balance">Opening Balance</option>
                         <option value="total_debit">Debit (Dr)</option>
                         <option value="total_credit">Credit (Cr)</option>
-                        <option value="closing_balance">Closing Balance (Dr/Cr)</option>
                     </select>
                 </div>
-                <div class="form-group" id="range-min-group" style="display: none;">
-                    <label class="form-label" for="range-min">Min Amount</label>
-                    <input type="number" step="0.01" class="form-control" id="range-min" placeholder="e.g. 1000">
-                </div>
-                <div class="form-group" id="range-max-group" style="display: none;">
-                    <label class="form-label" for="range-max">Max Amount</label>
-                    <input type="number" step="0.01" class="form-control" id="range-max" placeholder="e.g. 50000">
+
+                <div class="form-group">
+                    <label class="form-label" for="sort-order">Sort Order</label>
+                    <select class="form-control" id="sort-order">
+                        <option value="asc" selected>Less to Greater</option>
+                        <option value="desc">Greater to Less</option>
+                    </select>
                 </div>
             </div>
             <div class="actions">

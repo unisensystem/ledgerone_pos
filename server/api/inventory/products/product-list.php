@@ -39,14 +39,20 @@ if (!in_array($limit, $allowedLimits, true)) {
 }
 
 $offset = ($page - 1) * $limit;
-    
+
+    // Base-unit conversion factor for stock ledger rows — same logic used in
+    // stock-position.php's "Show in Base Units" mode. Without this, qty_in/qty_out
+    // from rows recorded in a non-base unit (Carton, Dozen, etc.) get summed as-is,
+    // producing a wrong current_stock (e.g. 6 instead of the correct base-unit 74).
+    $stockConversionFactor = "COALESCE(CASE WHEN slu.base_unit_id IS NOT NULL AND slu.unit_scope = 'universal' THEN slu.conversion_factor WHEN puc.conversion_factor IS NOT NULL THEN puc.conversion_factor ELSE 1 END, 1)";
+
    $sql = "
     SELECT p.id, p.code, p.name, p.product_type, p.mrp, p.trade_price, p.wholesale_price, p.is_active,
            p.parent_product_id, p.qr_code, p.barcode, p.company_id, p.uom_type,
 p.purchase_price, lb.batch_no, lb.expiry_date AS batch_expiry_date,
            c.category_name, sc.subcategory_name, comp.company_name, s.supplier_name,
            u.uom_name as default_unit_name, ug.group_name as uom_group_name,
-           COALESCE(SUM(sl.qty_in) - SUM(sl.qty_out), 0) as current_stock,
+           COALESCE(ROUND(SUM(sl.qty_in * {$stockConversionFactor}) - SUM(sl.qty_out * {$stockConversionFactor}), 2), 0) as current_stock,
            CASE WHEN COUNT(sl.id) = 0 THEN 1 ELSE 0 END as no_stock_records,
            curr.symbol as currency_symbol
     FROM products p
@@ -57,6 +63,8 @@ p.purchase_price, lb.batch_no, lb.expiry_date AS batch_expiry_date,
     LEFT JOIN uom u ON p.default_unit_id = u.id
     LEFT JOIN uom_groups ug ON p.uom_group_id = ug.id
     LEFT JOIN stock_ledger sl ON p.id = sl.product_id AND sl.tenant_id = p.tenant_id
+    LEFT JOIN uom slu ON sl.unit_id = slu.id
+    LEFT JOIN product_uom_conversions puc ON p.id = puc.product_id AND sl.unit_id = puc.uom_id
     LEFT JOIN tenant_currencies tc ON p.tenant_id = tc.tenant_id AND tc.is_base_currency = 1
     LEFT JOIN ledgerone_public.currencies curr ON tc.currency_id = curr.id
   LEFT JOIN (

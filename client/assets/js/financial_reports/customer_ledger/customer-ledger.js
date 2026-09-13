@@ -33,13 +33,11 @@ document.addEventListener('DOMContentLoaded', function () {
     const symbolOverride = document.getElementById('symbol-override');
     const sortOrder = document.getElementById('sort-order');
 
-    // NEW: Amount range filter elements (Summary Ledger only)
-    const rangeField = document.getElementById('range-field');
-    const rangeMin = document.getElementById('range-min');
-    const rangeMax = document.getElementById('range-max');
-    const rangeMinGroup = document.getElementById('range-min-group');
-    const rangeMaxGroup = document.getElementById('range-max-group');
-    const rangeFilterFieldGroup = document.getElementById('range-filter-field-group');
+    // Sort By field (Summary Ledger only) — combines with Sort Order (Less to Greater /
+    // Greater to Less) to do a real numeric sort on the selected column instead of just
+    // reversing the list.
+    const sortField = document.getElementById('sort-field');
+    const sortFieldGroup = document.getElementById('sort-field-group');
 
     let currentPage = 1;
     let totalPages = 1;
@@ -134,21 +132,10 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     });
 
-    // NEW: Show/hide Min & Max inputs based on selected filter field
-    rangeField.addEventListener('change', function () {
-        const hasField = !!this.value;
-        rangeMinGroup.style.display = hasField ? 'block' : 'none';
-        rangeMaxGroup.style.display = hasField ? 'block' : 'none';
-        if (!hasField) {
-            rangeMin.value = '';
-            rangeMax.value = '';
-        }
-        applySummarySort();
+    // Re-sort when the Sort By field changes (Summary Ledger only)
+    sortField.addEventListener('change', function () {
+        if (rawSummaryData.length > 0) applySummarySort();
     });
-
-    // NEW: Re-filter live as user types Min/Max values
-    rangeMin.addEventListener('input', applySummarySort);
-    rangeMax.addEventListener('input', applySummarySort);
     
     // Reload customers when company changes
     document.getElementById('company').addEventListener('change', function() {
@@ -244,12 +231,8 @@ document.addEventListener('DOMContentLoaded', function () {
         ledgerTitle.textContent = 'Summary Ledger';
         subAccountGroup.style.display = 'none';
 
-        // NEW: Amount range filter is only relevant for Summary Ledger
-        rangeFilterFieldGroup.style.display = 'block';
-        if (rangeField.value) {
-            rangeMinGroup.style.display = 'block';
-            rangeMaxGroup.style.display = 'block';
-        }
+        // Sort By field is only relevant for Summary Ledger
+        sortFieldGroup.style.display = 'block';
         if (rawSummaryData.length > 0) applySummarySort();
     }
 
@@ -266,10 +249,8 @@ document.addEventListener('DOMContentLoaded', function () {
         ledgerTitle.textContent = 'Detailed Ledger';
         subAccountGroup.style.display = 'block';
 
-        // NEW: Hide amount range filter in Detailed Ledger view
-        rangeFilterFieldGroup.style.display = 'none';
-        rangeMinGroup.style.display = 'none';
-        rangeMaxGroup.style.display = 'none';
+        // Hide Sort By field in Detailed Ledger view
+        sortFieldGroup.style.display = 'none';
     }
 
     summaryLedgerBtn.addEventListener('click', showSummaryLedger);
@@ -453,32 +434,20 @@ document.addEventListener('DOMContentLoaded', function () {
         applySummarySort();
     }
 
-    // NEW: Applies the amount range filter (Filter By + Min + Max) to a summary dataset
-    function applyRangeFilter(data) {
-        const field = rangeField.value;
-        if (!field) return data;
-
-        const hasMin = rangeMin.value !== '';
-        const hasMax = rangeMax.value !== '';
-        if (!hasMin && !hasMax) return data;
-
-        const minVal = hasMin ? parseFloat(rangeMin.value) : null;
-        const maxVal = hasMax ? parseFloat(rangeMax.value) : null;
-
-        return data.filter(row => {
-            const val = parseFloat(row[field]) || 0;
-            if (minVal !== null && val < minVal) return false;
-            if (maxVal !== null && val > maxVal) return false;
-            return true;
-        });
-    }
-
-    // Applies the current Sort Order selection AND the amount range filter to the
-    // raw summary data (already arrives from the server sorted A-Z by customer name,
-    // so 'asc' is a no-op and 'desc' just flips it).
+    // Sorts the raw summary data by the selected Sort By field (customer name, opening
+    // balance, debit, credit, or closing balance) and applies the Sort Order (Less to
+    // Greater / Greater to Less) as an actual numeric/alphabetical sort — not just a
+    // reverse of the server order.
     function applySummarySort() {
-        const filtered = applyRangeFilter(rawSummaryData);
-        allData = sortOrder.value === 'desc' ? filtered.slice().reverse() : filtered;
+        const field = sortField.value || 'closing_balance';
+        const direction = sortOrder.value === 'desc' ? -1 : 1;
+
+        allData = rawSummaryData.slice().sort((a, b) => {
+            const valA = parseFloat(a[field]) || 0;
+            const valB = parseFloat(b[field]) || 0;
+            return (valA - valB) * direction;
+        });
+
         currentPage = 1;
         totalPages = Math.ceil(allData.length / itemsPerPage) || 1;
         if (currentPage > totalPages) currentPage = 1;
@@ -556,7 +525,7 @@ document.addEventListener('DOMContentLoaded', function () {
         nextBtn.disabled = currentPage === totalPages;
     }
 
-    // Reorders a detailed-ledger row array for the "Descending" sort option.
+    // Reorders a detailed-ledger row array for the "Greater to Less" sort option.
     // 'opening_balance', 'sub_account_header' and 'sub_account_total' rows are
     // structural anchors and stay where they are; only the transaction rows
     // between them get reversed, so sub-account grouping / totals still line up.
@@ -780,12 +749,8 @@ document.addEventListener('DOMContentLoaded', function () {
         subAccount.value = '';
         sortOrder.value = 'asc';
 
-        // NEW: reset amount range filter
-        rangeField.value = '';
-        rangeMin.value = '';
-        rangeMax.value = '';
-        rangeMinGroup.style.display = 'none';
-        rangeMaxGroup.style.display = 'none';
+        // reset Sort By field
+        sortField.value = 'closing_balance';
 
         subAccountGroup.style.display = 'none';
         showSummaryLedger();

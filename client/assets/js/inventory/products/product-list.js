@@ -720,8 +720,19 @@ function performBulkDelete(ids) {
     });
 }
 
+// Formats a number for display: comma-separates the integer part only,
+// leaves the decimal part untouched. Previously this ran a comma-insertion
+// regex over the ENTIRE string (integer + decimal both), so a value like
+// "1028.000000000000" (a long-precision decimal coming back from a SQL SUM)
+// got corrupted into "1,028.000,000,000" — commas landing inside the
+// decimals too. Splitting on the decimal point first fixes that.
 function formatNumber(num) {
-    return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+    const n = parseFloat(num);
+    if (isNaN(n)) return num;
+
+    const parts = n.toFixed(2).split('.');
+    parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+    return parts.join('.');
 }
 
 function loadProducts(page = 1) {

@@ -344,6 +344,19 @@ document.addEventListener('DOMContentLoaded', function () {
         return customer.total_balance - customer.unallocated_transfer - customer.unallocated_adjustment;
     }
 
+    // Zero-balance tolerance for float comparisons. A customer whose net
+    // balance nets out to (effectively) zero after grouping bills +
+    // transfers + adjustments should not appear in Customer View, even
+    // though each individual bill line was non-zero (SQL only filters
+    // per-line, not per-customer-after-grouping).
+    const ZERO_BALANCE_EPSILON = 0.01;
+
+    function getVisibleGroupedCustomers(rows) {
+        return groupByCustomer(rows).filter(customer =>
+            Math.abs(computeNetBalance(customer)) > ZERO_BALANCE_EPSILON
+        );
+    }
+
     function simulateAutoClear(bills, totalReceived) {
         let remaining = totalReceived;
         return bills.map(bill => {
@@ -411,7 +424,16 @@ document.addEventListener('DOMContentLoaded', function () {
             return;
         }
 
-        const grouped = groupByCustomer(rows);
+        // FIX: drop customers whose net balance (after grouping bills and
+        // subtracting transfers/adjustments) works out to zero - these
+        // were showing up as stray "Rs0.00" rows even though the SQL
+        // already excludes zero-balance individual bill lines.
+        const grouped = getVisibleGroupedCustomers(rows);
+
+        if (!grouped.length) {
+            tbody.innerHTML = '<tr><td colspan="9" style="text-align:center">No records found</td></tr>';
+            return;
+        }
 
         grouped.forEach((customer, i) => {
             const bal      = computeNetBalance(customer);
@@ -515,7 +537,9 @@ document.addEventListener('DOMContentLoaded', function () {
         let rows;
         if (customerViewMode) {
             rows = [['S#', 'Customer Name', 'Address', 'Primary Phone No', 'Total Balance', 'Received Amount', 'Sales Return', 'Days Overdue']];
-            groupByCustomer(lastRecoveryData).forEach((c, i) => {
+            // FIX: same zero-balance filter as the on-screen customer view,
+            // so exported CSV doesn't include stray Rs0.00 customer rows.
+            getVisibleGroupedCustomers(lastRecoveryData).forEach((c, i) => {
                 const netBal = computeNetBalance(c);
                 rows.push([
                     i + 1,
