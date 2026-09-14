@@ -814,6 +814,39 @@ document.getElementById('refreshBtn').addEventListener('click', function () {
     fetchVouchers(currentPage);
 });
 
+// Print Summary button - opens a customer-wise totals report for whatever filters are
+// currently applied (same filter set fetchVouchers() sends), most useful after picking a
+// Recovery Officer (optionally narrowed further by Area/date/etc).
+document.getElementById('printSummaryBtn').addEventListener('click', function () {
+    const dateFrom = document.getElementById('dateFrom').value;
+    const dateTo = document.getElementById('dateTo').value;
+    const customerFilter = document.getElementById('customerFilter').value;
+    const recoveryOfficerFilter = document.getElementById('recoveryOfficerFilter').value;
+    const statusFilter = document.getElementById('statusFilter').value;
+    const companyFilter = document.getElementById('companyFilter').value;
+    const areaFilter = document.getElementById('areaFilter').value;
+    const cityFilter = document.getElementById('cityFilter').value;
+    const voucherNumberFilter = document.getElementById('voucherNumberFilter').value;
+    const projectFilter = document.getElementById('projectFilter').value;
+    const searchTerm = document.getElementById('searchInput').value;
+
+    let url = 'print-summary.php?';
+    const params = [];
+    if (dateFrom) params.push(`date_from=${dateFrom}`);
+    if (dateTo) params.push(`date_to=${dateTo}`);
+    if (customerFilter) params.push(`customer_id=${customerFilter}`);
+    if (recoveryOfficerFilter) params.push(`recovery_officer_id=${recoveryOfficerFilter}`);
+    if (statusFilter) params.push(`status=${statusFilter}`);
+    if (companyFilter) params.push(`company_id=${companyFilter}`);
+    if (areaFilter) params.push(`area_id=${areaFilter}`);
+    if (cityFilter) params.push(`city_id=${cityFilter}`);
+    if (voucherNumberFilter) params.push(`voucher_number=${encodeURIComponent(voucherNumberFilter)}`);
+    if (projectFilter) params.push(`project_id=${projectFilter}`);
+    if (searchTerm) params.push(`search=${encodeURIComponent(searchTerm)}`);
+
+    window.open(url + params.join('&'), '_blank');
+});
+
 // Set default date values for filters (last 30 days)
 const today = new Date();
 const thirtyDaysAgo = new Date();

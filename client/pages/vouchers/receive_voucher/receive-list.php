@@ -183,6 +183,9 @@ $initialSearch = $_GET['search'] ?? '';
         <button class="btn btn-secondary btn-icon" id="exportBtn" title="Export">
             <i class="fas fa-download"></i>
         </button>
+        <button class="btn btn-secondary btn-icon" id="printSummaryBtn" title="Print Summary (customer-wise totals for the current filters)">
+            <i class="fas fa-print"></i>
+        </button>
         <button class="btn btn-secondary btn-icon" id="refreshBtn" title="Refresh">
             <i class="fas fa-sync-alt"></i>
         </button>
