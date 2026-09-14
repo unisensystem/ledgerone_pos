@@ -660,15 +660,22 @@ $currency_symbol = $currency['symbol'];
             </tbody>
         </table>
         <div class="pagination-container">
-            <div class="pagination-info">
-                <span id="movement-pagination-info">Showing 0 - 0 of 0 entries</span>
-            </div>
-            <div class="pagination-controls">
-                <button class="btn btn-secondary" id="movement-prev-btn" disabled>Previous</button>
-                <span id="movement-page-info">Page 1 of 1</span>
-                <button class="btn btn-secondary" id="movement-next-btn" disabled>Next</button>
-            </div>
-        </div>
+    <div class="pagination-info">
+        <span id="movement-pagination-info">Showing 0 - 0 of 0 entries</span>
+    </div>
+    <div class="pagination-controls">
+        <label for="movement-per-page" style="margin-right:6px; font-size:13px;">Show:</label>
+        <select class="form-control" id="movement-per-page" style="width:auto; display:inline-block; margin-right:12px; padding:4px 8px;">
+            <option value="10">10</option>
+            <option value="50" selected>50</option>
+            <option value="100">100</option>
+            <option value="250">250</option>
+        </select>
+        <button class="btn btn-secondary" id="movement-prev-btn" disabled>Previous</button>
+        <span id="movement-page-info">Page 1 of 1</span>
+        <button class="btn btn-secondary" id="movement-next-btn" disabled>Next</button>
+    </div>
+</div>
     </div>
 </div>
 

@@ -20,6 +20,7 @@ let movementCurrentPage = 1;
 let movementTotalItems = 0;
 let allMovementEntries = [];
 let movementCurrency = '$';
+let movementItemsPerPage = 50; // NEW: user-selectable via "Show" dropdown (10/50/100/250)
 
 let rawMovementData = [];      // NEW: unfiltered data from last fetch (before hide-no-movement filter)
 let hideNoMovement = false;
@@ -513,6 +514,7 @@ function openCustomerLedgerPreview() {
 }
 
 // Company-wise (Supplier) Ledger ke liye print preview page kholta hai
+// Company-wise (Supplier) Ledger ke liye print preview page kholta hai
 function openItemMovementPreview() {
     const productName = document.getElementById('movement-product-input').value;
     const branchName = document.getElementById('movement-branch-input').value;
@@ -533,20 +535,26 @@ function openItemMovementPreview() {
         }
     }
 
-    const fromDate = document.getElementById('from-date-movement').value;
-    const toDate = document.getElementById('to-date-movement').value;
-    const projectId = document.getElementById('movement-project')?.value;
+    const companyId  = document.getElementById('movement-company')?.value || '';
+    const fromDate   = document.getElementById('from-date-movement').value;
+    const toDate     = document.getElementById('to-date-movement').value;
+    const projectId  = document.getElementById('movement-project')?.value;
+    const sortBy     = document.getElementById('movement-sort')?.value || '';
+    const sortOrder  = document.getElementById('movement-sort-order')?.value || 'asc';
 
     let url = `print_item_movement.php?`;
     if (productId) url += `product_id=${productId}&`;
     if (branchId) url += `branch_id=${branchId}&`;
+    if (companyId) url += `vendor_id=${companyId}&`;
     if (fromDate) url += `from_date=${fromDate}&`;
     if (toDate) url += `to_date=${toDate}&`;
     if (projectId) url += `project_id=${projectId}&`;
+    if (sortBy) url += `sort_by=${sortBy}&sort_order=${sortOrder}&`;
+    // hideNoMovement is the module-level toggle state already tracked for the on-screen table
+    if (hideNoMovement) url += `hide_no_movement=1&`;
 
     window.open(url, '_blank');
 }
-
 function exportToJSON() {
     alert('JSON export functionality to be implemented');
 }
@@ -1271,9 +1279,11 @@ function updateMovementTable(entries, currency = '$') {
 function renderMovementTable(currency = '$') {
     const tbody = document.querySelector('#item-movement .table tbody');
 
-    const startIndex = (movementCurrentPage - 1) * itemsPerPage;
-    const endIndex   = startIndex + itemsPerPage;
+    const startIndex = (movementCurrentPage - 1) * movementItemsPerPage;   // changed
+    const endIndex   = startIndex + movementItemsPerPage;                  // changed
     const pageData   = allMovementEntries.slice(startIndex, endIndex);
+
+    // ... baqi function same rehta hai
 
     const totalOpening    = allMovementEntries.reduce((s, e) => s + parseFloat(e.opening || 0), 0);
     const totalPurchase   = allMovementEntries.reduce((s, e) => s + parseFloat(e.purchase || 0), 0);
@@ -1306,9 +1316,9 @@ function renderMovementTable(currency = '$') {
 }
 
 function updateMovementPaginationControls() {
-    const totalPages = Math.ceil(movementTotalItems / itemsPerPage);
-    const startItem = movementTotalItems === 0 ? 0 : (movementCurrentPage - 1) * itemsPerPage + 1;
-    const endItem = Math.min(movementCurrentPage * itemsPerPage, movementTotalItems);
+    const totalPages = Math.ceil(movementTotalItems / movementItemsPerPage);   // changed
+    const startItem = movementTotalItems === 0 ? 0 : (movementCurrentPage - 1) * movementItemsPerPage + 1;  // changed
+    const endItem = Math.min(movementCurrentPage * movementItemsPerPage, movementTotalItems);  // changed
 
     document.getElementById('movement-pagination-info').textContent = `Showing ${startItem} - ${endItem} of ${movementTotalItems} entries`;
     document.getElementById('movement-page-info').textContent = `Page ${movementCurrentPage} of ${totalPages}`;
@@ -1609,6 +1619,14 @@ document.addEventListener('DOMContentLoaded', () => {
         : '<i class="fas fa-eye-slash"></i> Hide No Movement';
     applyMovementFilterAndRender();
 });
+
+// NEW: "Show" per-page dropdown for Item Stock Movement
+document.getElementById('movement-per-page').addEventListener('change', (e) => {
+    movementItemsPerPage = parseInt(e.target.value, 10) || 50;
+    movementCurrentPage = 1; // reset to first page on change
+    renderMovementTable(movementCurrency);
+    updateMovementPaginationControls();
+});
     // Apply Position Filters
     document.getElementById('applyPositionFilters').addEventListener('click', () => {
         loadStockPosition();
@@ -1850,7 +1868,10 @@ document.getElementById('clearMovementFilters').addEventListener('click', () => 
         document.getElementById('movement-sort').value = '';
     }
 
-    // NEW: reset the Hide No Movement toggle too
+    // NEW: reset per-page dropdown back to default too
+    document.getElementById('movement-per-page').value = '50';
+    movementItemsPerPage = 50;
+
     hideNoMovement = false;
     rawMovementData = [];
     const hideBtn = document.getElementById('hideNoMovementBtn');
