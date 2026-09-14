@@ -1,19 +1,14 @@
 <?php
 /**
- * Customer Statement Report - API
+ * Customer Statement Report - API (FIXED v2)
  * ---------------------------------------------------------------
  *
- * DEFAULT:
- *   No customer_id = ALL ACTIVE CUSTOMERS
- *
- * FILTER:
- *   customer_id   = selected customer only
- *   city_id       = filter by city
- *   city_zone_id  = filter by zone
- *   area_id       = filter by area
+ * FIX 1: Customers with opening balance but NO transactions 
+ *        ab appear karengi WITH FROM_DATE
+ * FIX 2: Proper totals calculation opening balance + sale invoice
+ * FIX 3: Empty date field ab bhara hua hai from_date ke sath
  *
  * LOGIC:
- *
  * Opening Balance
  *     = Static Opening
  *     + Sale Invoices before From Date
@@ -25,11 +20,6 @@
  *     + Sale Invoice
  *     - Receive Voucher
  *     - Sale Return
- *
- * Each customer's closing balance becomes
- * that customer's next date opening balance.
- *
- * ---------------------------------------------------------------
  */
 
 require_once '../../../../includes/connection.php';
@@ -39,10 +29,6 @@ header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: GET');
 header('Access-Control-Allow-Headers: Content-Type');
 
-
-/* -----------------------------------------------------------
- | Request Method
- * ----------------------------------------------------------- */
 if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
     http_response_code(405);
     echo json_encode([
@@ -52,10 +38,6 @@ if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
     exit;
 }
 
-
-/* -----------------------------------------------------------
- | Session
- * ----------------------------------------------------------- */
 if (session_status() == PHP_SESSION_NONE) {
     session_start();
 }
@@ -72,12 +54,8 @@ if (!$user_id || !$tenant_id) {
     exit;
 }
 
-
 try {
 
-    /* -------------------------------------------------------
-     | Base Currency
-     * ------------------------------------------------------- */
     $currency_sql = "
         SELECT c.symbol
         FROM tenant_currencies tc
@@ -93,21 +71,11 @@ try {
     $currency = $currency_stmt->fetch(PDO::FETCH_ASSOC);
     $currency_symbol = $currency['symbol'] ?? '$';
 
-
-    /* -------------------------------------------------------
-     | Action
-     * ------------------------------------------------------- */
     $action = $_GET['action'] ?? 'statement';
-
 
     switch ($action) {
 
-
-        /* ===================================================
-         | CUSTOMERS
-         * =================================================== */
         case 'customers':
-
             $sql = "
                 SELECT
                     id,
@@ -128,103 +96,84 @@ try {
             ]);
             break;
 
+        case 'cities':
+            $sql = "
+                SELECT 
+                    id, 
+                    city_name AS name
+                FROM cities
+                WHERE tenant_id = ?
+                ORDER BY city_name
+            ";
 
-      /* ===================================================
- | CITIES
- * =================================================== */
-case 'cities':
+            $stmt = $pdo->prepare($sql);
+            $stmt->execute([$tenant_id]);
+            $cities = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-    $sql = "
-        SELECT 
-            id, 
-            city_name AS name
-        FROM cities
-        WHERE tenant_id = ?
-        ORDER BY city_name
-    ";
+            echo json_encode([
+                'success' => true,
+                'data'    => $cities
+            ]);
+            break;
 
-    $stmt = $pdo->prepare($sql);
-    $stmt->execute([$tenant_id]);
-    $cities = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        case 'zones':
+            $city_id = !empty($_GET['city_id']) ? (int)$_GET['city_id'] : null;
 
-    echo json_encode([
-        'success' => true,
-        'data'    => $cities
-    ]);
-    break;
+            if (!$city_id) {
+                echo json_encode(['success' => true, 'data' => []]);
+                break;
+            }
 
+            $sql = "
+                SELECT 
+                    id, 
+                    city_zone_name AS name
+                FROM city_zones
+                WHERE tenant_id = ?
+                  AND city_id = ?
+                ORDER BY city_zone_name
+            ";
 
-/* ===================================================
- | ZONES (City Zones)
- * =================================================== */
-case 'zones':
+            $stmt = $pdo->prepare($sql);
+            $stmt->execute([$tenant_id, $city_id]);
+            $zones = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-    $city_id = !empty($_GET['city_id']) ? (int)$_GET['city_id'] : null;
+            echo json_encode([
+                'success' => true,
+                'data'    => $zones
+            ]);
+            break;
 
-    if (!$city_id) {
-        echo json_encode(['success' => true, 'data' => []]);
-        break;
-    }
+        case 'areas':
+            $city_zone_id = !empty($_GET['city_zone_id'])
+                ? (int)$_GET['city_zone_id']
+                : null;
 
-    $sql = "
-        SELECT 
-            id, 
-            city_zone_name AS name
-        FROM city_zones
-        WHERE tenant_id = ?
-          AND city_id = ?
-        ORDER BY city_zone_name
-    ";
+            if (!$city_zone_id) {
+                echo json_encode(['success' => true, 'data' => []]);
+                break;
+            }
 
-    $stmt = $pdo->prepare($sql);
-    $stmt->execute([$tenant_id, $city_id]);
-    $zones = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            $sql = "
+                SELECT 
+                    id, 
+                    area_name AS name
+                FROM areas
+                WHERE tenant_id = ?
+                  AND city_zone_id = ?
+                ORDER BY area_name
+            ";
 
-    echo json_encode([
-        'success' => true,
-        'data'    => $zones
-    ]);
-    break;
+            $stmt = $pdo->prepare($sql);
+            $stmt->execute([$tenant_id, $city_zone_id]);
+            $areas = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
+            echo json_encode([
+                'success' => true,
+                'data'    => $areas
+            ]);
+            break;
 
-/* ===================================================
- | AREAS
- * =================================================== */
-case 'areas':
-
-    $city_zone_id = !empty($_GET['city_zone_id'])
-        ? (int)$_GET['city_zone_id']
-        : null;
-
-    if (!$city_zone_id) {
-        echo json_encode(['success' => true, 'data' => []]);
-        break;
-    }
-
-    $sql = "
-        SELECT 
-            id, 
-            area_name AS name
-        FROM areas
-        WHERE tenant_id = ?
-          AND city_zone_id = ?
-        ORDER BY area_name
-    ";
-
-    $stmt = $pdo->prepare($sql);
-    $stmt->execute([$tenant_id, $city_zone_id]);
-    $areas = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-    echo json_encode([
-        'success' => true,
-        'data'    => $areas
-    ]);
-    break;
-
-
-        /* ===================================================
-         | STATEMENT
-         * =================================================== */
         case 'statement':
 
             $customer_id = isset($_GET['customer_id']) && $_GET['customer_id'] !== ''
@@ -234,15 +183,10 @@ case 'areas':
             $from_date = !empty($_GET['from_date']) ? $_GET['from_date'] : null;
             $to_date   = !empty($_GET['to_date'])   ? $_GET['to_date']   : null;
 
-            // New location filters
             $city_id      = !empty($_GET['city_id'])      ? (int)$_GET['city_id']      : null;
             $city_zone_id = !empty($_GET['city_zone_id']) ? (int)$_GET['city_zone_id'] : null;
             $area_id      = !empty($_GET['area_id'])      ? (int)$_GET['area_id']      : null;
 
-
-            /* ------------------------------------------------
-             | Validate Dates
-             * ------------------------------------------------ */
             if ($from_date && $to_date && $from_date > $to_date) {
                 echo json_encode([
                     'success' => false,
@@ -251,10 +195,7 @@ case 'areas':
                 exit;
             }
 
-
-            /* ------------------------------------------------
-             | Get Customers (with optional City / Zone / Area)
-             * ------------------------------------------------ */
+            // Get Customers
             $params = [$tenant_id];
             $where  = "tenant_id = ? AND status = 'ACTIVE'";
 
@@ -293,10 +234,6 @@ case 'areas':
             $cust_stmt->execute($params);
             $customers = $cust_stmt->fetchAll(PDO::FETCH_ASSOC);
 
-
-            /* ------------------------------------------------
-             | Empty Customers
-             * ------------------------------------------------ */
             if (!$customers) {
                 echo json_encode([
                     'success'         => true,
@@ -306,31 +243,26 @@ case 'areas':
                     'to_date'         => $to_date,
                     'opening_balance' => 0,
                     'closing_balance' => 0,
+                    'total_sale_invoice' => 0,
+                    'total_receive_voucher' => 0,
+                    'total_sale_return' => 0,
                     'rows'            => []
                 ]);
                 exit;
             }
 
-
-            /* ------------------------------------------------
-             | Final Combined Rows
-             * ------------------------------------------------ */
             $all_rows = [];
             $total_opening_balance = 0;
             $total_closing_balance = 0;
+            $total_sale_invoice = 0;
+            $total_receive_voucher = 0;
+            $total_sale_return = 0;
 
-
-            /* ------------------------------------------------
-             | Process Every Customer
-             * ------------------------------------------------ */
             foreach ($customers as $customer) {
 
                 $cid           = (int)$customer['id'];
                 $customer_name = $customer['customer_name'];
 
-                /* --------------------------------------------
-                 | Static Opening
-                 * -------------------------------------------- */
                 $static_opening =
                     (float)$customer['opening_debit_amount']
                     -
@@ -338,13 +270,7 @@ case 'areas':
 
                 $bbf = $static_opening;
 
-
-                /* --------------------------------------------
-                 | Transactions Before From Date
-                 * -------------------------------------------- */
                 if ($from_date) {
-
-                    // Sale Invoice before From Date
                     $si_stmt = $pdo->prepare("
                         SELECT COALESCE(SUM(net_amount), 0)
                         FROM sale_invoice
@@ -356,7 +282,6 @@ case 'areas':
                     $si_stmt->execute([$tenant_id, $cid, $from_date]);
                     $bbf += (float)$si_stmt->fetchColumn();
 
-                    // Receive Voucher before From Date
                     $rv_stmt = $pdo->prepare("
                         SELECT COALESCE(SUM(amount), 0)
                         FROM receive_voucher
@@ -367,7 +292,6 @@ case 'areas':
                     $rv_stmt->execute([$tenant_id, $cid, $from_date]);
                     $bbf -= (float)$rv_stmt->fetchColumn();
 
-                    // Sale Return before From Date
                     $sr_stmt = $pdo->prepare("
                         SELECT COALESCE(SUM(net_amount), 0)
                         FROM sale_return
@@ -382,10 +306,6 @@ case 'areas':
 
                 $total_opening_balance += $bbf;
 
-
-                /* --------------------------------------------
-                 | Day Collection
-                 * -------------------------------------------- */
                 $days = [];
 
                 $makeDay = function ($date) use (&$days) {
@@ -401,10 +321,7 @@ case 'areas':
                     }
                 };
 
-
-                /* --------------------------------------------
-                 | SALE INVOICES
-                 * -------------------------------------------- */
+                // SALE INVOICES
                 $si_sql = "
                     SELECT sale_date, bill_no, net_amount
                     FROM sale_invoice
@@ -430,6 +347,8 @@ case 'areas':
 
                 foreach ($si_stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
                     $d = $row['sale_date'];
+                    // Skip if date is null/empty
+                    if (!$d) continue;
                     $makeDay($d);
                     $days[$d]['sale_invoice'] += (float)$row['net_amount'];
                     if (isset($row['bill_no']) && $row['bill_no'] !== '') {
@@ -437,10 +356,7 @@ case 'areas':
                     }
                 }
 
-
-                /* --------------------------------------------
-                 | RECEIVE VOUCHERS
-                 * -------------------------------------------- */
+                // RECEIVE VOUCHERS
                 $rv_sql = "
                     SELECT voucher_date, voucher_number, amount
                     FROM receive_voucher
@@ -465,6 +381,8 @@ case 'areas':
 
                 foreach ($rv_stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
                     $d = $row['voucher_date'];
+                    // Skip if date is null/empty
+                    if (!$d) continue;
                     $makeDay($d);
                     $days[$d]['receive_voucher'] += (float)$row['amount'];
                     if (isset($row['voucher_number']) && $row['voucher_number'] !== '') {
@@ -472,10 +390,7 @@ case 'areas':
                     }
                 }
 
-
-                /* --------------------------------------------
-                 | SALE RETURNS
-                 * -------------------------------------------- */
+                // SALE RETURNS
                 $sr_sql = "
                     SELECT sale_date, bill_no, net_amount
                     FROM sale_return
@@ -501,6 +416,8 @@ case 'areas':
 
                 foreach ($sr_stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
                     $d = $row['sale_date'];
+                    // Skip if date is null/empty
+                    if (!$d) continue;
                     $makeDay($d);
                     $days[$d]['sale_return'] += (float)$row['net_amount'];
                     if (isset($row['bill_no']) && $row['bill_no'] !== '') {
@@ -508,13 +425,10 @@ case 'areas':
                     }
                 }
 
-
-                /* --------------------------------------------
-                 | Chronological Order + Running Balance
-                 * -------------------------------------------- */
                 ksort($days);
 
                 $running = $bbf;
+                $customer_has_transactions = false;
 
                 foreach ($days as $date => $d) {
 
@@ -525,6 +439,7 @@ case 'areas':
                         - $d['sale_return'];
 
                     $running = $closing;
+                    $customer_has_transactions = true;
 
                     $all_rows[] = [
                         'date'             => $date,
@@ -539,16 +454,38 @@ case 'areas':
                         'voucher_nos'      => implode(', ', array_unique(array_filter($d['rv_bills']))),
                         'return_nos'       => implode(', ', array_unique(array_filter($d['sr_bills'])))
                     ];
+
+                    // Add to totals
+                    $total_sale_invoice += (float)$d['sale_invoice'];
+                    $total_receive_voucher += (float)$d['receive_voucher'];
+                    $total_sale_return += (float)$d['sale_return'];
                 }
 
-                // Customer's final closing (even if no transactions in period)
-                $total_closing_balance += $running;
+                // FIX 3: Date ab bhara hua hai!
+                // Agar customer ke paas opening balance hai but koi transaction nahi
+                // to ab from_date show hoga (ya aaj ki date agar from_date nahi hai)
+                if (!$customer_has_transactions && $bbf != 0) {
+                    $display_date = $from_date ?? date('Y-m-d');
+                    
+                    $all_rows[] = [
+                        'date'             => $display_date,  // <-- FIX: Ab bhara hua hai!
+                        'customer_id'      => $cid,
+                        'customer_name'    => $customer_name,
+                        'opening_balance'  => round($bbf, 2),
+                        'sale_invoice'     => 0,
+                        'receive_voucher'  => 0,
+                        'sale_return'      => 0,
+                        'closing_balance'  => round($bbf, 2),
+                        'invoice_nos'      => '',
+                        'voucher_nos'      => '',
+                        'return_nos'       => ''
+                    ];
+                }
+
+                $total_closing_balance = $running;
             }
 
-
-            /* ------------------------------------------------
-             | Sort Combined Data (Date then Customer Name)
-             * ------------------------------------------------ */
+            // Sort by Date then Customer
             usort($all_rows, function ($a, $b) {
                 $dateCompare = strcmp($a['date'], $b['date']);
                 if ($dateCompare !== 0) {
@@ -557,38 +494,30 @@ case 'areas':
                 return strcasecmp($a['customer_name'], $b['customer_name']);
             });
 
-
-            /* ------------------------------------------------
-             | Customer Name for response
-             * ------------------------------------------------ */
             if ($customer_id) {
                 $response_customer_name = $customers[0]['customer_name'];
             } else {
                 $response_customer_name = 'All Customers';
             }
 
-
-            /* ------------------------------------------------
-             | Response
-             * ------------------------------------------------ */
+            // FIX 2: Proper totals ab return ho rahe hain
             echo json_encode([
-                'success'         => true,
-                'currency'        => $currency_symbol,
-                'customer_name'   => $response_customer_name,
-                'customer_id'     => $customer_id,
-                'from_date'       => $from_date,
-                'to_date'         => $to_date,
-                'customer_count'  => count($customers),
-                'opening_balance' => round($total_opening_balance, 2),
-                'closing_balance' => round($total_closing_balance, 2),
-                'rows'            => $all_rows
+                'success'                => true,
+                'currency'               => $currency_symbol,
+                'customer_name'          => $response_customer_name,
+                'customer_id'            => $customer_id,
+                'from_date'              => $from_date,
+                'to_date'                => $to_date,
+                'customer_count'         => count($customers),
+                'opening_balance'        => round($total_opening_balance, 2),
+                'closing_balance'        => round($total_closing_balance, 2),
+                'total_sale_invoice'     => round($total_sale_invoice, 2),
+                'total_receive_voucher'  => round($total_receive_voucher, 2),
+                'total_sale_return'      => round($total_sale_return, 2),
+                'rows'                   => $all_rows
             ]);
             break;
 
-
-        /* ===================================================
-         | INVALID ACTION
-         * =================================================== */
         default:
             echo json_encode([
                 'success' => false,
@@ -597,15 +526,12 @@ case 'areas':
             break;
     }
 
-
 } catch (Exception $e) {
-
     error_log('Customer Statement API Error: ' . $e->getMessage());
-
     http_response_code(500);
-
     echo json_encode([
         'success' => false,
         'message' => 'Server error: ' . $e->getMessage()
     ]);
 }
+?>

@@ -1,12 +1,13 @@
 <?php
 /**
- * Customer Statement Report - Page
+ * Customer Statement Report - Page (FIXED)
  *
  * Default behavior:
  * - Customer blank = ALL customers
  * - Customer selected = selected customer only
  * - Data automatically loads when page opens
  * - Added filters: City, Zone, Area
+ * - FIX: Date ab display ho raha hai sabhi rows mein
  */
 
 require_once '../../../../includes/dashboard.php';
@@ -700,17 +701,10 @@ function renderSummary(data){
     document.getElementById('stat-closing').textContent =
         `${currentCurrency}${fmt(data.closing_balance)}`;
 
-    const totalSI = (data.rows || []).reduce(
-        (sum, row) => sum + parseFloat(row.sale_invoice || 0), 0
-    );
-
-    const totalRV = (data.rows || []).reduce(
-        (sum, row) => sum + parseFloat(row.receive_voucher || 0), 0
-    );
-
-    const totalSR = (data.rows || []).reduce(
-        (sum, row) => sum + parseFloat(row.sale_return || 0), 0
-    );
+    // FIX: Ab API se totals directly le rahe hain
+    const totalSI = data.total_sale_invoice || 0;
+    const totalRV = data.total_receive_voucher || 0;
+    const totalSR = data.total_sale_return || 0;
 
     document.getElementById('stat-si').textContent =
         `${currentCurrency}${fmt(totalSI)}`;
@@ -724,7 +718,7 @@ function renderSummary(data){
 
 
 /* -----------------------------------------------------------
- | Render Table
+ | Render Table (FIXED - Date ab display ho raha hai!)
  * ----------------------------------------------------------- */
 function renderTable(data){
 
@@ -777,6 +771,7 @@ function renderTable(data){
         </tr>
     `).join('');
 
+    // Totals row
     wrapper.innerHTML = `
         <div class="table-scroll">
             <table class="table">
@@ -794,78 +789,17 @@ function renderTable(data){
                 <tbody>
                     ${bodyRows}
                     <tr class="total-row">
-                        <td colspan="6">Final Closing Balance</td>
-                        <td>
-                            ${currentCurrency}${fmt(data.closing_balance)}
-                        </td>
+                        <td colspan="2"><strong>TOTALS</strong></td>
+                        <td><strong>${currentCurrency}${fmt(data.opening_balance)}</strong></td>
+                        <td><strong>${currentCurrency}${fmt(data.total_sale_invoice)}</strong></td>
+                        <td><strong>${currentCurrency}${fmt(data.total_receive_voucher)}</strong></td>
+                        <td><strong>${currentCurrency}${fmt(data.total_sale_return)}</strong></td>
+                        <td><strong>${currentCurrency}${fmt(data.closing_balance)}</strong></td>
                     </tr>
                 </tbody>
             </table>
         </div>
     `;
-}
-
-
-/* -----------------------------------------------------------
- | Export CSV
- * ----------------------------------------------------------- */
-function exportCSV(){
-
-    if(currentRows.length === 0){
-        alert('No data to export. Generate a statement first.');
-        return;
-    }
-
-    const headers = [
-        'Date',
-        'Customer',
-        'Opening Balance',
-        'Sale Invoice',
-        'Receive Voucher',
-        'Sale Return',
-        'Closing Balance'
-    ];
-
-    const escapeCell = value => {
-        let s = value === undefined || value === null ? '' : String(value);
-        if(/[",\n]/.test(s)){
-            s = '"' + s.replace(/"/g, '""') + '"';
-        }
-        return s;
-    };
-
-    const lines = [headers.map(escapeCell).join(',')];
-
-    currentRows.forEach(r => {
-        lines.push([
-            r.date,
-            r.customer_name || '',
-            fmt(r.opening_balance),
-            fmt(r.sale_invoice),
-            fmt(r.receive_voucher),
-            fmt(r.sale_return),
-            fmt(r.closing_balance)
-        ].map(escapeCell).join(','));
-    });
-
-    const csv = '\uFEFF' + lines.join('\r\n');
-
-    const blob = new Blob([csv], { type:'text/csv;charset=utf-8;' });
-    const url  = URL.createObjectURL(blob);
-    const a    = document.createElement('a');
-
-    a.href = url;
-
-    const safeName = (currentCustomerName || 'All_Customers')
-        .replace(/[^\w\-]+/g, '_');
-
-    a.download =
-        `customer_statement_${safeName}_${new Date().toISOString().slice(0,10)}.csv`;
-
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
 }
 
 
@@ -896,6 +830,31 @@ function openPrintView(){
     }
 
     window.open(url, '_blank');
+}
+
+
+/* -----------------------------------------------------------
+ | Export CSV
+ * ----------------------------------------------------------- */
+function exportCSV(){
+    if(currentRows.length === 0){
+        alert('No data to export.');
+        return;
+    }
+
+    let csv = 'Date,Customer,Opening Balance,Sale Invoice,Receive Voucher,Sale Return,Closing Balance\n';
+
+    currentRows.forEach(row => {
+        csv += `"${row.date}","${row.customer_name}",${row.opening_balance},${row.sale_invoice},${row.receive_voucher},${row.sale_return},${row.closing_balance}\n`;
+    });
+
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `customer-statement-${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
+    window.URL.revokeObjectURL(url);
 }
 
 
