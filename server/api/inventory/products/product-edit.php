@@ -37,6 +37,8 @@ try {
     $parent_product_id = !empty($_POST['parentProduct']) ? $_POST['parentProduct'] : null;
 
     $description = $_POST['description'] ?? null;
+    $weight_value = ($_POST['weightValue'] ?? '') !== '' ? $_POST['weightValue'] : null;
+    $weight_unit = !empty($_POST['weightUnit']) ? $_POST['weightUnit'] : null;
     $qr_code = !empty($_POST['qrCode']) ? $_POST['qrCode'] : null;
     $barcode = !empty($_POST['barcode']) ? $_POST['barcode'] : null;
     $purchase_price = !empty($_POST['purchasePrice']) ? $_POST['purchasePrice'] : 0;
@@ -86,7 +88,7 @@ try {
     // Covers every column the UPDATE below can touch, so no edit goes unrecorded.
     $stmt = $pdo->prepare("
         SELECT code, name, product_type, uom_type, company_id, default_unit_id, uom_group_id, product_conversion_factor,
-               category_id, subcategory_id, inventory_account_id, vendor_id, parent_product_id, description, qr_code, barcode,
+               category_id, subcategory_id, inventory_account_id, vendor_id, parent_product_id, description, weight_value, weight_unit, qr_code, barcode,
                purchase_price, trade_price, wholesale_price, mrp, price_entry_unit_id, trade_price_entry_value, mrp_entry_value,
                default_discount, trade_offer_discount, default_foc, carton_conversion, tax_regime_id,
                min_stock_level, max_stock_level, manufacturing_date, expiry_date, photo, is_active, stock_affects, invoice_affects
@@ -117,7 +119,7 @@ try {
         $stmt = $pdo->prepare("
             UPDATE products SET
                 company_id = ?, name = ?, product_type = ?, uom_type = ?, default_unit_id = ?, uom_group_id = ?, product_conversion_factor = ?, category_id = ?, subcategory_id = ?,
-                inventory_account_id = ?, vendor_id = ?, parent_product_id = ?, description = ?, qr_code = ?, barcode = ?, purchase_price = ?,
+                inventory_account_id = ?, vendor_id = ?, parent_product_id = ?, description = ?, weight_value = ?, weight_unit = ?, qr_code = ?, barcode = ?, purchase_price = ?,
                 trade_price = ?, wholesale_price = ?, mrp = ?, price_entry_unit_id = ?, trade_price_entry_value = ?, mrp_entry_value = ?,
                 default_discount = ?, trade_offer_discount = ?, default_foc = ?,
                 carton_conversion = ?, tax_regime_id = ?, min_stock_level = ?, max_stock_level = ?,
@@ -127,7 +129,7 @@ try {
 
         $stmt->execute([
             $company, $name, $product_type, $uom_type, $default_unit, $uom_group_id, $product_conversion_factor, $category, $subcategory,
-            $inventory_account, $vendor_id, $parent_product_id, $description, $qr_code, $barcode, $purchase_price,
+            $inventory_account, $vendor_id, $parent_product_id, $description, $weight_value, $weight_unit, $qr_code, $barcode, $purchase_price,
             $trade_price, $wholesale_price, $mrp, $price_entry_unit_id, $trade_price_entry_value, $mrp_entry_value,
             $default_discount, $trade_offer_discount, $default_foc,
             $carton_conversion, $tax_regime_id, $min_stock, $max_stock,
@@ -137,7 +139,7 @@ try {
         $stmt = $pdo->prepare("
             UPDATE products SET
                 company_id = ?, name = ?, product_type = ?, uom_type = ?, default_unit_id = ?, uom_group_id = ?, product_conversion_factor = ?, category_id = ?, subcategory_id = ?,
-                inventory_account_id = ?, vendor_id = ?, parent_product_id = ?, description = ?, qr_code = ?, barcode = ?, purchase_price = ?,
+                inventory_account_id = ?, vendor_id = ?, parent_product_id = ?, description = ?, weight_value = ?, weight_unit = ?, qr_code = ?, barcode = ?, purchase_price = ?,
                 trade_price = ?, wholesale_price = ?, mrp = ?, price_entry_unit_id = ?, trade_price_entry_value = ?, mrp_entry_value = ?,
                 default_discount = ?, trade_offer_discount = ?, default_foc = ?,
                 carton_conversion = ?, tax_regime_id = ?, min_stock_level = ?, max_stock_level = ?,
@@ -147,7 +149,7 @@ try {
 
         $stmt->execute([
             $company, $name, $product_type, $uom_type, $default_unit, $uom_group_id, $product_conversion_factor, $category, $subcategory,
-            $inventory_account, $vendor_id, $parent_product_id, $description, $qr_code, $barcode, $purchase_price,
+            $inventory_account, $vendor_id, $parent_product_id, $description, $weight_value, $weight_unit, $qr_code, $barcode, $purchase_price,
             $trade_price, $wholesale_price, $mrp, $price_entry_unit_id, $trade_price_entry_value, $mrp_entry_value,
             $default_discount, $trade_offer_discount, $default_foc,
             $carton_conversion, $tax_regime_id, $min_stock, $max_stock,
@@ -170,6 +172,8 @@ try {
         'vendor_id' => $vendor_id,
         'parent_product_id' => $parent_product_id,
         'description' => $description,
+        'weight_value' => $weight_value,
+        'weight_unit' => $weight_unit,
         'qr_code' => $qr_code,
         'barcode' => $barcode,
         'purchase_price' => $purchase_price,

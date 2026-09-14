@@ -190,9 +190,20 @@ if ($tenant_id) {
                     </div>
 
                     <div class="form-group optional-field" data-field="weight">
-                        <label>Weight</label>
-                        <input type="text" id="weight" name="weight" placeholder="e.g., 5 kg, 500 gram, 2 pound">
-                        <div class="helper-text">Free text — enter the number along with any unit you like (kg, gram, pound, etc.)</div>
+                        <label>Weight (per base unit)</label>
+                        <div class="input-with-buttons">
+                            <input type="number" id="weightValue" name="weightValue" step="0.0001" min="0" placeholder="e.g., 800">
+                            <select id="weightUnit" name="weightUnit" style="max-width: 120px;">
+                                <option value="">Unit</option>
+                                <option value="gram">Gram</option>
+                                <option value="kg">Kilogram</option>
+                                <option value="pound">Pound</option>
+                                <option value="ounce">Ounce</option>
+                                <option value="ml">Milliliter</option>
+                                <option value="liter">Liter</option>
+                            </select>
+                        </div>
+                        <div class="helper-text">Weight of one base unit (e.g. one Pcs) of this product — used to calculate Total Weight on invoices.</div>
                     </div>
                     
                     <div class="form-group full-width optional-field" id="qrCodeGroup" data-field="qrCode">
