@@ -20,6 +20,9 @@ let movementCurrentPage = 1;
 let movementTotalItems = 0;
 let allMovementEntries = [];
 let movementCurrency = '$';
+
+let rawMovementData = [];      // NEW: unfiltered data from last fetch (before hide-no-movement filter)
+let hideNoMovement = false;
 // Item-wise Ledger pagination variables
 let itemCurrentPage = 1;
 let itemTotalItems = 0;
@@ -1314,6 +1317,24 @@ function updateMovementPaginationControls() {
     document.getElementById('movement-next-btn').disabled = movementCurrentPage === totalPages || totalPages === 0;
 }
 
+// Filters rawMovementData down to rows that actually had movement (if hideNoMovement
+// is on), then renders/paginates. Runs both after a fresh fetch and when the toggle
+// button is clicked (no re-fetch needed for the toggle).
+function applyMovementFilterAndRender(currency) {
+    let displayData = rawMovementData;
+
+    if (hideNoMovement) {
+        displayData = displayData.filter(entry => {
+            const purchase = parseFloat(entry.purchase || 0);
+            const sale = parseFloat(entry.sale || 0);
+            const creditNote = parseFloat(entry.credit_note || 0);
+            const debitNote = parseFloat(entry.debit_note || 0);
+            return purchase !== 0 || sale !== 0 || creditNote !== 0 || debitNote !== 0;
+        });
+    }
+
+    updateMovementTable(displayData, currency || movementCurrency);
+}
 async function loadItemMovement() {
     try {
         const productName = document.getElementById('movement-product-input').value;
@@ -1322,12 +1343,9 @@ async function loadItemMovement() {
         const projectId   = document.getElementById('movement-project')?.value || '';
         const fromDate    = document.getElementById('from-date-movement').value;
         const toDate      = document.getElementById('to-date-movement').value;
-        // NEW: Sort By filter — sorts the resulting rows on the chosen numeric
-        // column from smaller to larger (opening/purchase/sale/credit_note/debit_note/closing).
-        // Left blank ('Default') keeps the existing product-name ordering from the API.
         const sortBy      = document.getElementById('movement-sort')?.value || '';
+        const sortOrder   = document.getElementById('movement-sort-order')?.value || 'asc';
 
-                const sortOrder   = document.getElementById('movement-sort-order')?.value || 'asc';
         let productId = null;
         if (productName) {
             const options = document.querySelectorAll('#movement-product-list option');
@@ -1358,14 +1376,15 @@ async function loadItemMovement() {
         if (data.success) {
             let movementData = Array.isArray(data.data) ? [...data.data] : [];
 
-            // NEW: apply smaller-to-larger sort on the selected column, if any.
-                       if (sortBy) {
+            if (sortBy) {
                 movementData.sort((a, b) => {
                     const diff = parseFloat(a[sortBy] || 0) - parseFloat(b[sortBy] || 0);
                     return sortOrder === 'desc' ? -diff : diff;
                 });
             }
-            updateMovementTable(movementData, data.currency);
+
+            rawMovementData = movementData;
+            applyMovementFilterAndRender(data.currency);
         } else {
             console.error('Failed to load item movement:', data.message);
         }
@@ -1578,6 +1597,18 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
     
+
+
+    document.getElementById('hideNoMovementBtn').addEventListener('click', () => {
+    hideNoMovement = !hideNoMovement;
+    const btn = document.getElementById('hideNoMovementBtn');
+    btn.classList.toggle('btn-primary', hideNoMovement);
+    btn.classList.toggle('btn-secondary', !hideNoMovement);
+    btn.innerHTML = hideNoMovement
+        ? '<i class="fas fa-eye"></i> Show All'
+        : '<i class="fas fa-eye-slash"></i> Hide No Movement';
+    applyMovementFilterAndRender();
+});
     // Apply Position Filters
     document.getElementById('applyPositionFilters').addEventListener('click', () => {
         loadStockPosition();
@@ -1815,16 +1846,23 @@ document.getElementById('clearMovementFilters').addEventListener('click', () => 
     document.getElementById('movement-branch-input').value = '';
     if (document.getElementById('movement-project')) document.getElementById('movement-project').value = '';
     clearAndSyncDateFilters('from-date-movement', 'to-date-movement');
-    // NEW: reset the Sort By dropdown back to default too
     if (document.getElementById('movement-sort')) {
         document.getElementById('movement-sort').value = '';
     }
+
+    // NEW: reset the Hide No Movement toggle too
+    hideNoMovement = false;
+    rawMovementData = [];
+    const hideBtn = document.getElementById('hideNoMovementBtn');
+    hideBtn.classList.remove('btn-primary');
+    hideBtn.classList.add('btn-secondary');
+    hideBtn.innerHTML = '<i class="fas fa-eye-slash"></i> Hide No Movement';
+
     const tbody = document.querySelector('#item-movement .table tbody');
     tbody.innerHTML = '';
     document.getElementById('movement-pagination-info').textContent = 'Showing 0 - 0 of 0 entries';
     document.getElementById('movement-page-info').textContent = 'Page 1 of 1';
 });
-
 // NEW: re-run the movement query/sort as soon as the user picks a Sort By option,
 // so they don't have to also click "Apply Filters".
 if (document.getElementById('movement-sort')) {

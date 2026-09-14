@@ -563,21 +563,24 @@ $currency_symbol = $currency['symbol'];
             <!-- Supplier-wise Ledger Tab -->
             <!-- Item Stock Movement Tab -->
 <div class="tab-content" id="item-movement">
-    <div class="card-header">
-        <h2 class="card-title">Item Stock Movement</h2>
-        <div class="action-buttons">
-            <div class="dropdown">
-                <button class="btn btn-primary dropdown-toggle" type="button" data-toggle="dropdown">
-                    <i class="fas fa-file-export"></i> Export
-                </button>
-                <div class="dropdown-menu">
-                    <a class="dropdown-item" href="#" onclick="printList()"><i class="fas fa-print"></i> Print List</a>
-                    <a class="dropdown-item" href="#" onclick="exportToExcel()"><i class="fas fa-file-excel"></i> Export To Excel</a>
-                    <a class="dropdown-item" href="#" onclick="exportToJSON()"><i class="fas fa-file-code"></i> Export JSON</a>
-                </div>
+   <div class="card-header">
+    <h2 class="card-title">Item Stock Movement</h2>
+    <div class="action-buttons">
+        <button class="btn btn-secondary" id="hideNoMovementBtn" style="margin-right: 8px;">
+            <i class="fas fa-eye-slash"></i> Hide No Movement
+        </button>
+        <div class="dropdown">
+            <button class="btn btn-primary dropdown-toggle" type="button" data-toggle="dropdown">
+                <i class="fas fa-file-export"></i> Export
+            </button>
+            <div class="dropdown-menu">
+                <a class="dropdown-item" href="#" onclick="printList()"><i class="fas fa-print"></i> Print List</a>
+                <a class="dropdown-item" href="#" onclick="exportToExcel()"><i class="fas fa-file-excel"></i> Export To Excel</a>
+                <a class="dropdown-item" href="#" onclick="exportToJSON()"><i class="fas fa-file-code"></i> Export JSON</a>
             </div>
         </div>
     </div>
+</div>
     <div class="form-row">
         <div class="form-group">
             <label class="form-label" for="movement-product-input">Product</label>
