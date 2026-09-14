@@ -45,7 +45,6 @@ try {
             $to_date = $_GET['to_date'] ?? null;
             $valuation_method = $_GET['valuation_method'] ?? 'AVCO';
             $show_base_units = isset($_GET['show_base_units']) && $_GET['show_base_units'] === 'true';
-            $project_id = $_GET['project_id'] ?? null;
 
             // Debug log
             error_log('=== Stock Position Debug ===');
@@ -132,11 +131,6 @@ try {
                     $sql .= " AND sl.account_id = ?";
                     $params[] = $inventory_type_id;
                 }
-                if ($project_id) {
-                    $sql .= " AND (pi.project_id = ? OR si.project_id = ?)";
-                    $params[] = $project_id;
-                    $params[] = $project_id;
-                }
 
                 $sql .= " GROUP BY p.id, sl.branch_id, sl.account_id, COALESCE(u.base_unit_id, u.id) ORDER BY COALESCE(p.parent_product_id, p.id), p.parent_product_id IS NULL DESC, p.name";
             } else {
@@ -180,18 +174,6 @@ try {
                     $filterAgg .= " AND sl2.account_id = ?";
                     $filterParamsSub[] = $inventory_type_id;
                     $filterParamsAgg[] = $inventory_type_id;
-                }
-                if ($project_id) {
-                    // project_id lives on purchase_invoice / sale_invoice - already joined as
-                    // pi/si in the "sub" query below, and joined as pi2/si2 in the "agg" query
-                    // below (added specifically so this filter can also narrow the
-                    // opening/closing aggregate, not just the displayed rows).
-                    $filterSub .= " AND (pi.project_id = ? OR si.project_id = ?)";
-                    $filterAgg .= " AND (pi2.project_id = ? OR si2.project_id = ?)";
-                    $filterParamsSub[] = $project_id;
-                    $filterParamsSub[] = $project_id;
-                    $filterParamsAgg[] = $project_id;
-                    $filterParamsAgg[] = $project_id;
                 }
 
                 $sql = "SELECT
@@ -270,8 +252,6 @@ try {
                             JOIN products p2 ON sl2.product_id = p2.id AND sl2.tenant_id = p2.tenant_id
                             LEFT JOIN uom u2 ON sl2.unit_id = u2.id
                             LEFT JOIN product_uom_conversions puc2 ON p2.id = puc2.product_id AND sl2.unit_id = puc2.uom_id
-                            LEFT JOIN purchase_invoice pi2 ON sl2.reference_table = 'purchase_invoice' AND sl2.reference_id = pi2.id
-                            LEFT JOIN sale_invoice si2 ON sl2.reference_table = 'sale_invoice' AND sl2.reference_id = si2.id
                             WHERE sl2.tenant_id = ? AND p2.product_type = 'physical' AND sl2.account_id IS NOT NULL{$filterAgg}
                             GROUP BY sl2.product_id, sl2.branch_id, sl2.account_id
                         ) agg ON sub.product_id = agg.product_id AND sub.branch_id = agg.branch_id AND sub.account_id = agg.account_id
@@ -365,7 +345,6 @@ try {
     $company_id = $_GET['company_id'] ?? null;
     $vendor_id = $_GET['vendor_id'] ?? null;
     $customer_id = $_GET['customer_id'] ?? null;
-    $project_id = $_GET['project_id'] ?? null;
     $from_date = $_GET['from_date'] ?? null;
     $to_date = $_GET['to_date'] ?? null;
 
@@ -512,31 +491,6 @@ try {
 
             $bbf_params[] = $company_id;
             $bbf_params[] = $company_id;
-        }
-
-
-        /*
-        |--------------------------------------------------------------------------
-        | Project filter
-        |--------------------------------------------------------------------------
-        |
-        | project_id lives on purchase_invoice / sale_invoice (not on
-        | stock_ledger itself), so - same as the Company filter just above -
-        | it's applied through the pi/si joins already present here.
-        |
-        |--------------------------------------------------------------------------
-        */
-
-        if ($project_id) {
-
-            $bbf_sql .= " AND (
-                                pi.project_id = ?
-                                OR
-                                si.project_id = ?
-                              )";
-
-            $bbf_params[] = $project_id;
-            $bbf_params[] = $project_id;
         }
 
 
@@ -879,39 +833,6 @@ try {
 
     /*
     |--------------------------------------------------------------------------
-    | PROJECT FILTER
-    |--------------------------------------------------------------------------
-    |
-    | project_id lives on purchase_invoice / sale_invoice / sale_return /
-    | purchase_return - all four are already joined above, so a row matches
-    | if ANY of them carries this project (only the table matching this
-    | row's reference_table will actually have a non-null value; the rest
-    | are NULL for that row and simply fail the OR harmlessly).
-    |
-    |--------------------------------------------------------------------------
-    */
-
-    if ($project_id) {
-
-        $sql .= " AND (
-                            pi.project_id = ?
-                            OR
-                            si.project_id = ?
-                            OR
-                            sr.project_id = ?
-                            OR
-                            pr.project_id = ?
-                          )";
-
-        $params[] = $project_id;
-        $params[] = $project_id;
-        $params[] = $project_id;
-        $params[] = $project_id;
-    }
-
-
-    /*
-    |--------------------------------------------------------------------------
     | ORDER BY
     |--------------------------------------------------------------------------
     */
@@ -1237,7 +1158,6 @@ try {
         case 'branch-ledger':
             $branch_id = $_GET['branch_id'] ?? null;
             $company_id = $_GET['company_id'] ?? null;
-            $project_id = $_GET['project_id'] ?? null;
             $from_date = $_GET['from_date'] ?? null;
             $to_date = $_GET['to_date'] ?? null;
 
@@ -1292,12 +1212,6 @@ try {
                 $sql .= " AND (pi.company_id = ? OR si.company_id = ?)";
                 $params[] = $company_id;
                 $params[] = $company_id;
-            }
-
-            if ($project_id) {
-                $sql .= " AND (pi.project_id = ? OR si.project_id = ?)";
-                $params[] = $project_id;
-                $params[] = $project_id;
             }
 
             $sql .= " ORDER BY sl.transaction_date DESC, sl.id DESC";
@@ -1385,37 +1299,34 @@ try {
         case 'customer-ledger':
             $customer_id = $_GET['customer_id'] ?? null;
             $product_id = $_GET['product_id'] ?? null;
-            $project_id = $_GET['project_id'] ?? null;
             $from_date = $_GET['from_date'] ?? null;
             $to_date = $_GET['to_date'] ?? null;
 
-            // NOTE: Customer/Product used to be mandatory here — the tab now
-            // auto-loads full tenant-wide data by default (same pattern as the
-            // other ledger tabs), with customer_id/product_id as optional
-            // narrowing filters, so that requirement was removed.
+            if (!$customer_id && !$product_id) {
+                echo json_encode(['success' => false, 'message' => 'Customer or Product required']);
+                exit;
+            }
 
             $sql = "SELECT 
-            sl.transaction_date,
-            si.bill_no as invoice_number,
-            p.name as product_name,
-            COALESCE(b.branch_name, 'No Branch') as branch_name,
-            sl.transaction_type,
-            sl.batch_no,
-            sl.expiry_date AS batch_expiry_date,
-            c.customer_name,
-            sl.qty_in * COALESCE(CASE WHEN u.unit_scope = 'universal' THEN u.conversion_factor ELSE puc.conversion_factor END, 1) as qty_in,
-            sl.qty_out * COALESCE(CASE WHEN u.unit_scope = 'universal' THEN u.conversion_factor ELSE puc.conversion_factor END, 1) as qty_out,
-            sl.unit_cost,
-            COALESCE(base_u.uom_name, u.uom_name, 'L') as unit_symbol
-        FROM stock_ledger sl
-        JOIN products p ON sl.product_id = p.id
-        LEFT JOIN branches b ON sl.branch_id = b.id
-        LEFT JOIN uom u ON sl.unit_id = u.id
-        LEFT JOIN uom base_u ON COALESCE(u.base_unit_id, u.id) = base_u.id
-        LEFT JOIN product_uom_conversions puc ON p.id = puc.product_id AND sl.unit_id = puc.uom_id
-        JOIN sale_invoice si ON sl.reference_table = 'sale_invoice' AND sl.reference_id = si.id
-        LEFT JOIN customers c ON si.customer_id = c.id
-        WHERE sl.tenant_id = ? AND p.product_type = 'physical'";
+                        sl.transaction_date,
+                        si.bill_no as invoice_number,
+                        p.name as product_name,
+                        COALESCE(b.branch_name, 'No Branch') as branch_name,
+                        sl.transaction_type,
+                        sl.batch_no,
+                        sl.expiry_date AS batch_expiry_date,
+                        sl.qty_in * COALESCE(CASE WHEN u.unit_scope = 'universal' THEN u.conversion_factor ELSE puc.conversion_factor END, 1) as qty_in,
+                        sl.qty_out * COALESCE(CASE WHEN u.unit_scope = 'universal' THEN u.conversion_factor ELSE puc.conversion_factor END, 1) as qty_out,
+                        sl.unit_cost,
+                        COALESCE(base_u.uom_name, u.uom_name, 'L') as unit_symbol
+                    FROM stock_ledger sl
+                    JOIN products p ON sl.product_id = p.id
+                    LEFT JOIN branches b ON sl.branch_id = b.id
+                    LEFT JOIN uom u ON sl.unit_id = u.id
+                    LEFT JOIN uom base_u ON COALESCE(u.base_unit_id, u.id) = base_u.id
+                    LEFT JOIN product_uom_conversions puc ON p.id = puc.product_id AND sl.unit_id = puc.uom_id
+                    JOIN sale_invoice si ON sl.reference_table = 'sale_invoice' AND sl.reference_id = si.id
+                    WHERE sl.tenant_id = ? AND p.product_type = 'physical'";
 
             $params = [$tenant_id];
 
@@ -1427,11 +1338,6 @@ try {
             if ($product_id) {
                 $sql .= " AND p.id = ?";
                 $params[] = $product_id;
-            }
-
-            if ($project_id) {
-                $sql .= " AND si.project_id = ?";
-                $params[] = $project_id;
             }
 
             if ($from_date) {
@@ -1458,7 +1364,6 @@ try {
     $product_id = $_GET['product_id'] ?? null;
     $branch_id  = $_GET['branch_id'] ?? null;
     $vendor_id  = $_GET['vendor_id'] ?? null;
-    $project_id = $_GET['project_id'] ?? null;
     $from_date  = $_GET['from_date'] ?? null;
     $to_date    = $_GET['to_date'] ?? null;
 
@@ -1559,16 +1464,6 @@ try {
            AND sl.unit_id = puc.uom_id
 
 
-        LEFT JOIN purchase_invoice pi
-            ON sl.reference_table = 'purchase_invoice'
-           AND sl.reference_id = pi.id
-
-
-        LEFT JOIN sale_invoice si
-            ON sl.reference_table = 'sale_invoice'
-           AND sl.reference_id = si.id
-
-
         WHERE sl.tenant_id = ?
 
           AND p.product_type = 'physical'
@@ -1621,26 +1516,6 @@ try {
 
     /*
     |--------------------------------------------------------------------------
-    | PROJECT FILTER
-    |--------------------------------------------------------------------------
-    |
-    | Needs the pi/si joins added above (they weren't previously joined
-    | here at all, since this query only used to filter by product/branch/
-    | vendor - none of which need an invoice join).
-    |
-    |--------------------------------------------------------------------------
-    */
-
-    if ($project_id) {
-
-        $opening_sql .= " AND (pi.project_id = ? OR si.project_id = ?)";
-        $opening_params[] = $project_id;
-        $opening_params[] = $project_id;
-    }
-
-
-    /*
-    |--------------------------------------------------------------------------
     | DATE FILTER
     |--------------------------------------------------------------------------
     |
@@ -1676,14 +1551,6 @@ try {
     } else {
 
         $opening_sql .= " AND sl.transaction_type = 'Opening Stock'";
-
-        // If only To Date is set (no From Date), keep Opening consistent with
-        // the report's end boundary — ignore any Opening Stock entry dated
-        // after To Date instead of always pulling in every Opening Stock row.
-        if ($to_date) {
-            $opening_sql .= " AND sl.transaction_date <= ?";
-            $opening_params[] = $to_date;
-        }
     }
 
 
@@ -1847,16 +1714,6 @@ try {
            AND sl.unit_id = puc.uom_id
 
 
-        LEFT JOIN purchase_invoice pi
-            ON sl.reference_table = 'purchase_invoice'
-           AND sl.reference_id = pi.id
-
-
-        LEFT JOIN sale_invoice si
-            ON sl.reference_table = 'sale_invoice'
-           AND sl.reference_id = si.id
-
-
         WHERE sl.tenant_id = ?
 
           AND p.product_type = 'physical'
@@ -1904,20 +1761,6 @@ try {
 
         $sql .= " AND p.vendor_id = ?";
         $params[] = $vendor_id;
-    }
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | PROJECT FILTER
-    |--------------------------------------------------------------------------
-    */
-
-    if ($project_id) {
-
-        $sql .= " AND (pi.project_id = ? OR si.project_id = ?)";
-        $params[] = $project_id;
-        $params[] = $project_id;
     }
 
 
@@ -2352,20 +2195,9 @@ try {
             echo json_encode(['success' => true, 'data' => $companies]);
             break;
 
-        case 'projects':
-            // Powers the new "Project" filter dropdown across the ledger tabs.
-            $projects_sql = "SELECT id, project_code, project_name FROM projects WHERE tenant_id = ? ORDER BY project_name";
-            $projects_stmt = $pdo->prepare($projects_sql);
-            $projects_stmt->execute([$tenant_id]);
-            $projects = $projects_stmt->fetchAll(PDO::FETCH_ASSOC);
-
-            echo json_encode(['success' => true, 'data' => $projects]);
-            break;
-
         case 'detailed-ledger':
             $branchId = $_GET['branch_id'] ?? null;
             $productId = $_GET['product_id'] ?? null;
-            $projectId = $_GET['project_id'] ?? null;
             $fromDate = $_GET['from_date'] ?? null;
             $toDate = $_GET['to_date'] ?? null;
 
@@ -2399,12 +2231,6 @@ try {
             if ($productId) {
                 $sql .= " AND sl.product_id = ?";
                 $params[] = $productId;
-            }
-
-            if ($projectId) {
-                $sql .= " AND (pi.project_id = ? OR si.project_id = ?)";
-                $params[] = $projectId;
-                $params[] = $projectId;
             }
 
             if ($fromDate) {

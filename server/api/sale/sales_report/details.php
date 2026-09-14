@@ -15,8 +15,8 @@ try {
         // Get invoices for a specific product
         // Row-level (one sale_invoice_items row per line), so batch_no / expiry_date
         // are read directly off sii - no aggregation needed here.
-        // sale_invoice_items' expiry column is "expiry_date" - "batch_expiry_date" is only
-        // an API response alias used elsewhere, not a real column.
+        // sale_invoice_items only has "batch_expiry_date" column (no plain
+        // "expiry_date"), so alias it back to expiry_date for the frontend.
         $stmt = $pdo->prepare("
             SELECT 
                 si.bill_no,
@@ -25,7 +25,7 @@ try {
                 sii.quantity,
                 sii.sale_price,
                 sii.batch_no,
-                sii.expiry_date as expiry_date,
+                sii.batch_expiry_date as expiry_date,
                 sii.net_amount
             FROM sale_invoice_items sii
             JOIN sale_invoice si ON sii.sale_invoice_id = si.id AND si.tenant_id = ?
@@ -44,7 +44,7 @@ try {
                 SUM(sii.quantity) as total_quantity,
                 SUM(sii.net_amount) as total_sales,
                 GROUP_CONCAT(DISTINCT NULLIF(sii.batch_no,'') SEPARATOR ', ') as batch_no,
-                MIN(CASE WHEN sii.expiry_date >= CURDATE() THEN sii.expiry_date END) as nearest_expiry
+                MIN(CASE WHEN sii.batch_expiry_date >= CURDATE() THEN sii.batch_expiry_date END) as nearest_expiry
             FROM sale_invoice_items sii
             JOIN sale_invoice si ON sii.sale_invoice_id = si.id AND si.tenant_id = ?
             JOIN products p ON sii.product_id = p.id AND p.tenant_id = ?
@@ -70,7 +70,7 @@ try {
             LEFT JOIN (
                 SELECT sii.sale_invoice_id,
                        GROUP_CONCAT(DISTINCT NULLIF(sii.batch_no,'') SEPARATOR ', ') as batch_no,
-                       MIN(CASE WHEN sii.expiry_date >= CURDATE() THEN sii.expiry_date END) as nearest_expiry
+                       MIN(CASE WHEN sii.batch_expiry_date >= CURDATE() THEN sii.batch_expiry_date END) as nearest_expiry
                 FROM sale_invoice_items sii
                 WHERE sii.tenant_id = ?
                 GROUP BY sii.sale_invoice_id
@@ -88,7 +88,7 @@ try {
                 sii.quantity,
                 sii.sale_price,
                 sii.batch_no,
-                sii.expiry_date as expiry_date,
+                sii.batch_expiry_date as expiry_date,
                 sii.discount_amount,
                 sii.net_amount
             FROM sale_invoice_items sii
@@ -124,7 +124,7 @@ try {
             LEFT JOIN (
                 SELECT sii.sale_invoice_id,
                        GROUP_CONCAT(DISTINCT NULLIF(sii.batch_no,'') SEPARATOR ', ') as batch_no,
-                       MIN(CASE WHEN sii.expiry_date >= CURDATE() THEN sii.expiry_date END) as nearest_expiry
+                       MIN(CASE WHEN sii.batch_expiry_date >= CURDATE() THEN sii.batch_expiry_date END) as nearest_expiry
                 FROM sale_invoice_items sii
                 WHERE sii.tenant_id = ?
                 GROUP BY sii.sale_invoice_id
