@@ -52,29 +52,44 @@ $stmt = $pdo->prepare("
         cu.id as customer_id,
         cu.customer_code,
         cu.customer_name,
-        rv.amount
+        rv.amount,
+        rv.payment_method_id,
+        a.name as payment_method
     FROM receive_voucher rv
     LEFT JOIN customers cu ON rv.customer_id = cu.id
+    LEFT JOIN accounts a ON rv.payment_method_id = a.id
     WHERE $whereClause
     ORDER BY cu.customer_name ASC, rv.voucher_date ASC
 ");
 $stmt->execute($params);
 $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
+// Grouped by customer + payment method (not just customer) - a customer who paid via both
+// Cash and Cheque across different vouchers gets one row per method, so each row has a
+// single, unambiguous payment method rather than trying to cram several into one cell.
 $grouped = [];
 $grandTotal = 0;
+$paymentMethodTotals = [];
 foreach ($rows as $row) {
-    $key = $row['customer_id'] ?: 'unassigned_' . $row['customer_name'];
+    $methodLabel = $row['payment_method'] ?: 'Unknown';
+    $key = ($row['customer_id'] ?: 'unassigned_' . $row['customer_name']) . '|' . ($row['payment_method_id'] ?: 'none');
     if (!isset($grouped[$key])) {
         $grouped[$key] = [
             'code' => $row['customer_code'],
             'name' => $row['customer_name'] ?: 'Unknown Customer',
+            'payment_method' => $methodLabel,
             'total' => 0,
         ];
     }
     $grouped[$key]['total'] += (float) $row['amount'];
     $grandTotal += (float) $row['amount'];
+
+    if (!isset($paymentMethodTotals[$methodLabel])) {
+        $paymentMethodTotals[$methodLabel] = 0;
+    }
+    $paymentMethodTotals[$methodLabel] += (float) $row['amount'];
 }
+arsort($paymentMethodTotals);
 
 // Currency symbol (base currency), matching the pattern used elsewhere in this module
 $stmt = $pdo->prepare("
@@ -203,6 +218,35 @@ $generatedOn = date('d/m/Y h:i A');
         padding: 6px 10px;
         font-weight: 600;
     }
+    .payment-summary {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-bottom: 16px;
+    }
+    .payment-summary-box {
+        flex: 1;
+        min-width: 120px;
+        border: 1px solid #333;
+        border-radius: 4px;
+        padding: 8px 12px;
+        text-align: center;
+    }
+    .payment-summary-box.grand-total-box {
+        background: #f0f0f0;
+        border-width: 2px;
+    }
+    .payment-summary-label {
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.4px;
+        color: #555;
+        margin-bottom: 4px;
+    }
+    .payment-summary-value {
+        font-size: 15px;
+        font-weight: 700;
+    }
     table.summary-table {
         width: 100%;
         border-collapse: collapse;
@@ -292,10 +336,24 @@ $generatedOn = date('d/m/Y h:i A');
         <?php if (empty($grouped)): ?>
             <div class="empty-note">No receive vouchers match the selected filters.</div>
         <?php else: ?>
+        <div class="payment-summary">
+            <?php foreach ($paymentMethodTotals as $methodName => $methodTotal): ?>
+            <div class="payment-summary-box">
+                <div class="payment-summary-label"><?= htmlspecialchars($methodName) ?></div>
+                <div class="payment-summary-value"><?= $currencySymbol . ' ' . number_format($methodTotal, 2) ?></div>
+            </div>
+            <?php endforeach; ?>
+            <div class="payment-summary-box grand-total-box">
+                <div class="payment-summary-label">Grand Total</div>
+                <div class="payment-summary-value"><?= $currencySymbol . ' ' . number_format($grandTotal, 2) ?></div>
+            </div>
+        </div>
+
         <table class="summary-table">
             <thead>
                 <tr>
                     <th>Account</th>
+                    <th>Payment Method</th>
                     <th class="amount">Total</th>
                 </tr>
             </thead>
@@ -303,11 +361,12 @@ $generatedOn = date('d/m/Y h:i A');
                 <?php foreach ($grouped as $g): ?>
                 <tr>
                     <td><?= htmlspecialchars(($g['code'] ? $g['code'] . ' - ' : '') . $g['name']) ?></td>
+                    <td><?= htmlspecialchars($g['payment_method']) ?></td>
                     <td class="amount"><?= $currencySymbol . ' ' . number_format($g['total'], 2) ?></td>
                 </tr>
                 <?php endforeach; ?>
                 <tr class="total-row">
-                    <td>Total</td>
+                    <td colspan="2">Total</td>
                     <td class="amount"><?= $currencySymbol . ' ' . number_format($grandTotal, 2) ?></td>
                 </tr>
             </tbody>

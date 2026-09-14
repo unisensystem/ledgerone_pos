@@ -17,6 +17,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const summaryLedgerTable = document.getElementById('summary-ledger-table');
     const detailedLedgerTable = document.getElementById('detailed-ledger-table');
     const ledgerTitle = document.getElementById('ledger-title');
+    const toggleAllRowsBtn = document.getElementById('toggle-all-rows-btn');
     const shareModal = document.getElementById('share-modal');
     const closeShareModal = document.getElementById('close-share-modal');
     const closeModalBtn = document.getElementById('close-modal-btn');
@@ -57,6 +58,7 @@ document.addEventListener('DOMContentLoaded', function () {
     let rawDetailedOpeningBalance = 0;
     const itemsPerPage = 10;
     let expandedRows = new Set();
+    let allRowsExpanded = false; // drives the Expand All / Collapse All button's label + behavior
     let allCustomers = [];
     let currentCurrencySymbol = window.currencySymbol;
 
@@ -326,6 +328,9 @@ document.addEventListener('DOMContentLoaded', function () {
         // Sort By field is only relevant for Summary Ledger
         sortFieldGroup.style.display = 'block';
         if (rawSummaryData.length > 0) applySummarySort();
+
+        // Expand All / Collapse All only applies to Detailed Ledger's invoice rows.
+        toggleAllRowsBtn.style.display = 'none';
     }
 
     function showDetailedLedger() {
@@ -343,7 +348,45 @@ document.addEventListener('DOMContentLoaded', function () {
 
         // Hide Sort By field in Detailed Ledger view
         sortFieldGroup.style.display = 'none';
+
+        updateToggleAllRowsButton();
     }
+
+    // Shows/hides the Expand All / Collapse All button (only worth showing when the
+    // currently-rendered Detailed Ledger actually has at least one expandable invoice row)
+    // and keeps its label in sync with allRowsExpanded.
+    function updateToggleAllRowsButton() {
+        const hasExpandableRows = detailedLedgerTable.querySelectorAll('.expand-btn').length > 0;
+        toggleAllRowsBtn.style.display = hasExpandableRows ? 'inline-flex' : 'none';
+        toggleAllRowsBtn.innerHTML = allRowsExpanded
+            ? '<i class="fas fa-compress-alt"></i> Collapse All'
+            : '<i class="fas fa-expand-alt"></i> Expand All';
+    }
+
+    toggleAllRowsBtn.addEventListener('click', function () {
+        const expandBtns = detailedLedgerTable.querySelectorAll('.expand-btn');
+        const shouldExpand = !allRowsExpanded;
+
+        expandBtns.forEach(btn => {
+            const rowId = btn.dataset.rowId;
+            const itemsRow = document.getElementById(`items-${rowId}`);
+            const icon = btn.querySelector('i');
+            if (!itemsRow) return;
+
+            itemsRow.style.display = shouldExpand ? 'table-row' : 'none';
+            icon.classList.toggle('fa-chevron-down', shouldExpand);
+            icon.classList.toggle('fa-chevron-right', !shouldExpand);
+
+            if (shouldExpand) {
+                expandedRows.add(rowId);
+            } else {
+                expandedRows.delete(rowId);
+            }
+        });
+
+        allRowsExpanded = shouldExpand;
+        updateToggleAllRowsButton();
+    });
 
     summaryLedgerBtn.addEventListener('click', showSummaryLedger);
     detailedLedgerBtn.addEventListener('click', showDetailedLedger);
@@ -471,68 +514,71 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     // Load ledger data
-    async function loadLedgerData() {
-        if (!validateDates()) return;
-
-        const isDetailed = detailedLedgerBtn.classList.contains('active');
+    // Filters shared by both the Summary and Detailed requests below.
+    function sharedLedgerParams() {
         const params = new URLSearchParams({
-            type: isDetailed ? 'detailed' : 'summary',
             from_date: fromDate.value,
             to_date: toDate.value
         });
+        if (distribution.value) params.append('distribution_id', distribution.value);
+        if (company.value) params.append('company_id', company.value);
+        if (currencyFilter.value) params.append('currency_id', currencyFilter.value);
+        if (cityFilter.value) params.append('city_id', cityFilter.value);
+        if (zoneFilter.value) params.append('zone_id', zoneFilter.value);
+        if (areaFilter.value) params.append('area_id', areaFilter.value);
+        if (salesmanFilter.value) params.append('salesman_id', salesmanFilter.value);
+        return params;
+    }
 
-        if (isDetailed && customerCode.value) {
-            params.append('customer_id', customerCode.value);
-        }
-        
-        if (distribution.value) {
-            params.append('distribution_id', distribution.value);
-        }
-        
-        if (isDetailed && subAccount.value) {
-            params.append('sub_account_id', subAccount.value);
-        }
-        
-        if (company.value) {
-            params.append('company_id', company.value);
-        }
-        
-        if (currencyFilter.value) {
-            params.append('currency_id', currencyFilter.value);
+    // Loads Summary Ledger, and Detailed Ledger too whenever a customer is selected -
+    // regardless of which tab happens to be active when "Load Ledger" is clicked. That way
+    // switching between Summary/Detailed afterward always shows current data for both, not
+    // just whichever view was active at load time (previously only the active tab's data
+    // actually refreshed, so the other tab kept showing stale/empty data until you switched
+    // to it AND clicked Load Ledger again).
+    async function loadLedgerData() {
+        if (!validateDates()) return;
+
+        const requests = [];
+
+        const summaryParams = sharedLedgerParams();
+        summaryParams.set('type', 'summary');
+        requests.push(
+            fetch(`../../../../server/api/financial_reports/customer_ledger/customer-ledger.php?${summaryParams}`)
+                .then(r => r.json())
+                .then(result => {
+                    if (result.success) {
+                        renderSummaryLedger(result.data);
+                    } else {
+                        showNotification(result.message || 'Error loading Summary Ledger', 'error');
+                    }
+                })
+                .catch(() => showNotification('Network error occurred while loading Summary Ledger', 'error'))
+        );
+
+        if (customerCode.value) {
+            const detailedParams = sharedLedgerParams();
+            detailedParams.set('type', 'detailed');
+            detailedParams.append('customer_id', customerCode.value);
+            if (subAccount.value) detailedParams.append('sub_account_id', subAccount.value);
+            requests.push(
+                fetch(`../../../../server/api/financial_reports/customer_ledger/customer-ledger.php?${detailedParams}`)
+                    .then(r => r.json())
+                    .then(result => {
+                        if (result.success) {
+                            renderDetailedLedger(result.data, result.opening_balance);
+                        } else {
+                            showNotification(result.message || 'Error loading Detailed Ledger', 'error');
+                        }
+                    })
+                    .catch(() => showNotification('Network error occurred while loading Detailed Ledger', 'error'))
+            );
+        } else if (detailedLedgerBtn.classList.contains('active')) {
+            // Detailed tab is active but no customer picked - same guard showDetailedLedger() uses.
+            showCustomerError();
         }
 
-        if (cityFilter.value) {
-            params.append('city_id', cityFilter.value);
-        }
-
-        if (zoneFilter.value) {
-            params.append('zone_id', zoneFilter.value);
-        }
-
-        if (areaFilter.value) {
-            params.append('area_id', areaFilter.value);
-        }
-
-        if (salesmanFilter.value) {
-            params.append('salesman_id', salesmanFilter.value);
-        }
-
-        try {
-            const response = await fetch(`../../../../server/api/financial_reports/customer_ledger/customer-ledger.php?${params}`);
-            const result = await response.json();
-            
-            if (result.success) {
-                if (isDetailed) {
-                    renderDetailedLedger(result.data, result.opening_balance);
-                } else {
-                    renderSummaryLedger(result.data);
-                }
-            } else {
-                showNotification(result.message || 'Error loading data', 'error');
-            }
-        } catch (error) {
-            showNotification('Network error occurred', 'error');
-        }
+        await Promise.all(requests);
     }
 
     // Render summary ledger
@@ -811,7 +857,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 const rowId = this.dataset.rowId;
                 const itemsRow = document.getElementById(`items-${rowId}`);
                 const icon = this.querySelector('i');
-                
+
                 if (itemsRow.style.display === 'none') {
                     itemsRow.style.display = 'table-row';
                     icon.classList.remove('fa-chevron-right');
@@ -823,8 +869,23 @@ document.addEventListener('DOMContentLoaded', function () {
                     icon.classList.add('fa-chevron-right');
                     expandedRows.delete(rowId);
                 }
+
+                // Keep the Expand All / Collapse All button's label accurate even after a
+                // manual per-row toggle (e.g. expanding every row one by one by hand should
+                // still flip the button to "Collapse All").
+                const allExpandBtns = detailedLedgerTable.querySelectorAll('.expand-btn');
+                allRowsExpanded = allExpandBtns.length > 0 && Array.from(allExpandBtns).every(b => {
+                    const r = document.getElementById(`items-${b.dataset.rowId}`);
+                    return r && r.style.display !== 'none';
+                });
+                updateToggleAllRowsButton();
             });
         });
+
+        // Freshly rendered data - nothing is expanded yet.
+        expandedRows.clear();
+        allRowsExpanded = false;
+        updateToggleAllRowsButton();
     }
 
     // Show notification
@@ -901,11 +962,15 @@ document.addEventListener('DOMContentLoaded', function () {
         if (subAccount.value) {
             params.append('sub_account_id', subAccount.value);
         }
-        
+
+        if (isDetailed && expandedRows.size > 0) {
+            params.append('expanded_rows', Array.from(expandedRows).join(','));
+        }
+
         if (company.value) {
             params.append('company_id', company.value);
         }
-        
+
         if (currencyFilter.value) {
             params.append('currency_id', currencyFilter.value);
         }
@@ -929,7 +994,7 @@ document.addEventListener('DOMContentLoaded', function () {
         if (salesmanFilter.value) {
             params.append('salesman_id', salesmanFilter.value);
         }
-        
+
         window.open(`print.php?${params}`, '_blank');
     });
 

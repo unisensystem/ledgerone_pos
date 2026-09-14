@@ -183,7 +183,7 @@ $initialSearch = $_GET['search'] ?? '';
         </div>
     </div>
 
-    <script src="../../../assets/js/sale/delivery_chalan/pos-list.js"></script>
+    <script src="../../../assets/js/sale/delivery_chalan/pos-list.js?v=<?php echo time(); ?>"></script>
 <?php if ($initialSearch): ?>
 <script>
     window.addEventListener('load', function() {

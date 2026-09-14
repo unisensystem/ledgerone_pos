@@ -203,7 +203,12 @@ $all_symbols = $stmt2->fetchAll();
         </div>
 
         <div class="card">
-            <h2 class="card-title" id="ledger-title">Summary Ledger</h2>
+            <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
+                <h2 class="card-title" id="ledger-title" style="margin: 0;">Summary Ledger</h2>
+                <button class="btn btn-secondary" id="toggle-all-rows-btn" style="display: none;">
+                    <i class="fas fa-expand-alt"></i> Expand All
+                </button>
+            </div>
             <div class="table-container">
                 <table id="summary-ledger-table">
                     <thead>
