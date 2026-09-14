@@ -77,10 +77,11 @@ document.addEventListener('DOMContentLoaded', function () {
                 ? `<td><input type="checkbox" class="customer-row-checkbox" value="${customer.id}" ${selectedCustomerIds.has(String(customer.id)) ? 'checked' : ''}></td>`
                 : '';
 
-            const balance = parseFloat(customer.current_balance || 0);
+                 const balance = parseFloat(customer.current_balance || 0);
             const openingDebit = parseFloat(customer.opening_debit_amount || 0);
             const openingCredit = parseFloat(customer.opening_credit_amount || 0);
             const hasOpeningHistory = openingDebit > 0 || openingCredit > 0;
+            const realBalance = parseFloat(customer.current_balance_real ?? customer.current_balance ?? 0);
 
             const row = document.createElement('tr');
             row.dataset.id = customer.id;
@@ -102,6 +103,11 @@ document.addEventListener('DOMContentLoaded', function () {
                         <td data-col="balance">
                             <span class="balance-badge" title="${hasOpeningHistory ? 'Click to view opening balance / invoice history' : 'No opening balance history'}" style="cursor:${hasOpeningHistory ? 'pointer' : 'default'}; ${hasOpeningHistory ? 'text-decoration: underline;' : ''}">
                                 ${currencySymbol}${balance.toFixed(2)}
+                            </span>
+                        </td>
+                        <td data-col="current">
+                            <span class="balance-badge" style="font-weight:600; color:${realBalance > 0 ? 'var(--error, #dc3545)' : (realBalance < 0 ? 'var(--success, #28a745)' : 'inherit')};">
+                                ${currencySymbol}${realBalance.toFixed(2)}
                             </span>
                         </td>
                         <td data-col="status"><span class="status-badge status-${status}">${status.charAt(0).toUpperCase() + status.slice(1)}</span></td>

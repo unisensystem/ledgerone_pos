@@ -162,6 +162,8 @@ $currency_symbol = $currency['symbol'] ?? '$';
                             <th data-col="salesman">Salesman</th>
                             <th data-col="phone">Phone</th>
 <th data-col="balance">Opening Balance</th>
+                            <th data-col="current"> Balance</th>
+
                             <th data-col="status">Status</th>
                             <th data-col="actions">Actions</th>
                         </tr>

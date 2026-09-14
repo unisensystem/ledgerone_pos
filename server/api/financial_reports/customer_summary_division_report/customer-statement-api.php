@@ -1,12 +1,28 @@
 <?php
 /**
- * Customer Statement Report - API (FIXED v2)
+ * Customer Statement Report - API (FIXED v4)
  * ---------------------------------------------------------------
  *
  * FIX 1: Customers with opening balance but NO transactions 
  *        ab appear karengi WITH FROM_DATE
  * FIX 2: Proper totals calculation opening balance + sale invoice
  * FIX 3: Empty date field ab bhara hua hai from_date ke sath
+ * FIX 4: total_closing_balance ab har customer ke closing balance
+ *        ko SUM kar raha hai (pehle sirf last customer ka closing
+ *        balance overwrite ho raha tha)
+ * FIX 5 (NEW): City / Zone / Area / Salesman filters ab MULTI-SELECT
+ *        support karte hain. Query string mein ye params ab
+ *        COMMA-SEPARATED ids lete hain, e.g. city_id=3,7,10
+ *        Backward compatible hai - single id bhi bilkul pehle
+ *        jaisa kaam karega (e.g. city_id=3).
+ * FIX 6 (NEW): action=salesmen add ki gayi hai - dropdown ke liye
+ *        employees list return karti hai. Salesman filter
+ *        customers.associated_sales_officer_id column pe lagta hai.
+ *        NOTE: employees table mein role/designation column pata
+ *        nahi, isliye abhi tenant ke sab employees list mein aate
+ *        hain. Agar sirf "Sales Officer" designation wale employees
+ *        chahiye to WHERE clause mein designation filter add karna
+ *        hoga.
  *
  * LOGIC:
  * Opening Balance
@@ -52,6 +68,35 @@ if (!$user_id || !$tenant_id) {
         'message' => 'Unauthorized'
     ]);
     exit;
+}
+
+/**
+ * Helper: comma-separated id string se clean integer array banata hai.
+ * "3,7,10" -> [3, 7, 10]. Empty/invalid values discard ho jati hain.
+ */
+function parseIdList($commaSeparated) {
+    if (empty($commaSeparated)) {
+        return [];
+    }
+    $ids = array_map('intval', explode(',', $commaSeparated));
+    $ids = array_filter($ids, function ($v) { return $v > 0; });
+    return array_values(array_unique($ids));
+}
+
+/**
+ * Helper: given a column name and an array of ids, ek "AND col IN (?,?,?)"
+ * SQL fragment + params array return karta hai. Empty array pe empty
+ * fragment deta hai (koi filter nahi lagta).
+ */
+function buildInClause($column, array $ids) {
+    if (empty($ids)) {
+        return ['sql' => '', 'params' => []];
+    }
+    $placeholders = implode(',', array_fill(0, count($ids), '?'));
+    return [
+        'sql'    => " AND {$column} IN ({$placeholders})",
+        'params' => $ids
+    ];
 }
 
 try {
@@ -117,25 +162,28 @@ try {
             break;
 
         case 'zones':
-            $city_id = !empty($_GET['city_id']) ? (int)$_GET['city_id'] : null;
+            // FIX 5: ab multiple city ids accept karta hai (comma-separated).
+            // Agar city_id bilkul na diya jaye to TENANT KE SAB zones return
+            // hote hain (multi-select "All Cities" state ke liye zaroori).
+            $city_ids = parseIdList($_GET['city_id'] ?? null);
 
-            if (!$city_id) {
-                echo json_encode(['success' => true, 'data' => []]);
-                break;
-            }
-
-            $sql = "
+            $sql    = "
                 SELECT 
                     id, 
                     city_zone_name AS name
                 FROM city_zones
                 WHERE tenant_id = ?
-                  AND city_id = ?
-                ORDER BY city_zone_name
             ";
+            $params = [$tenant_id];
+
+            $in = buildInClause('city_id', $city_ids);
+            $sql .= $in['sql'];
+            $params = array_merge($params, $in['params']);
+
+            $sql .= " ORDER BY city_zone_name";
 
             $stmt = $pdo->prepare($sql);
-            $stmt->execute([$tenant_id, $city_id]);
+            $stmt->execute($params);
             $zones = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
             echo json_encode([
@@ -145,32 +193,56 @@ try {
             break;
 
         case 'areas':
-            $city_zone_id = !empty($_GET['city_zone_id'])
-                ? (int)$_GET['city_zone_id']
-                : null;
+            // FIX 5: ab multiple zone ids accept karta hai (comma-separated).
+            // Agar city_zone_id bilkul na diya jaye to TENANT KE SAB areas
+            // return hote hain.
+            $city_zone_ids = parseIdList($_GET['city_zone_id'] ?? null);
 
-            if (!$city_zone_id) {
-                echo json_encode(['success' => true, 'data' => []]);
-                break;
-            }
-
-            $sql = "
+            $sql    = "
                 SELECT 
                     id, 
                     area_name AS name
                 FROM areas
                 WHERE tenant_id = ?
-                  AND city_zone_id = ?
-                ORDER BY area_name
             ";
+            $params = [$tenant_id];
+
+            $in = buildInClause('city_zone_id', $city_zone_ids);
+            $sql .= $in['sql'];
+            $params = array_merge($params, $in['params']);
+
+            $sql .= " ORDER BY area_name";
 
             $stmt = $pdo->prepare($sql);
-            $stmt->execute([$tenant_id, $city_zone_id]);
+            $stmt->execute($params);
             $areas = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
             echo json_encode([
                 'success' => true,
                 'data'    => $areas
+            ]);
+            break;
+
+        case 'salesmen':
+            // FIX 6 (NEW): Salesman dropdown ke liye employees list.
+            // NOTE: designation/role column pata nahi hai, isliye abhi
+            // tenant ke sab employees dikh rahe hain.
+            $sql = "
+                SELECT
+                    id,
+                    full_name AS name
+                FROM employees
+                WHERE tenant_id = ?
+                ORDER BY full_name
+            ";
+
+            $stmt = $pdo->prepare($sql);
+            $stmt->execute([$tenant_id]);
+            $salesmen = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+            echo json_encode([
+                'success' => true,
+                'data'    => $salesmen
             ]);
             break;
 
@@ -183,9 +255,14 @@ try {
             $from_date = !empty($_GET['from_date']) ? $_GET['from_date'] : null;
             $to_date   = !empty($_GET['to_date'])   ? $_GET['to_date']   : null;
 
-            $city_id      = !empty($_GET['city_id'])      ? (int)$_GET['city_id']      : null;
-            $city_zone_id = !empty($_GET['city_zone_id']) ? (int)$_GET['city_zone_id'] : null;
-            $area_id      = !empty($_GET['area_id'])      ? (int)$_GET['area_id']      : null;
+            // FIX 5: City / Zone / Area / Salesman - ab sab MULTI-SELECT hain.
+            // Query string mein comma-separated ids aati hain, e.g.
+            // city_id=3,7,10. Single id (e.g. city_id=3) bhi bilkul pehle
+            // jaisa kaam karta hai - backward compatible.
+            $city_ids      = parseIdList($_GET['city_id']      ?? null);
+            $city_zone_ids = parseIdList($_GET['city_zone_id'] ?? null);
+            $area_ids      = parseIdList($_GET['area_id']      ?? null);
+            $salesman_ids  = parseIdList($_GET['salesman_id']  ?? null);
 
             if ($from_date && $to_date && $from_date > $to_date) {
                 echo json_encode([
@@ -204,20 +281,22 @@ try {
                 $params[] = $customer_id;
             }
 
-            if ($city_id) {
-                $where   .= " AND city_id = ?";
-                $params[] = $city_id;
-            }
+            $city_in = buildInClause('city_id', $city_ids);
+            $where  .= $city_in['sql'];
+            $params  = array_merge($params, $city_in['params']);
 
-            if ($city_zone_id) {
-                $where   .= " AND city_zone_id = ?";
-                $params[] = $city_zone_id;
-            }
+            $zone_in = buildInClause('city_zone_id', $city_zone_ids);
+            $where  .= $zone_in['sql'];
+            $params  = array_merge($params, $zone_in['params']);
 
-            if ($area_id) {
-                $where   .= " AND area_id = ?";
-                $params[] = $area_id;
-            }
+            $area_in = buildInClause('area_id', $area_ids);
+            $where  .= $area_in['sql'];
+            $params  = array_merge($params, $area_in['params']);
+
+            // Salesman filter - customers.associated_sales_officer_id
+            $salesman_in = buildInClause('associated_sales_officer_id', $salesman_ids);
+            $where      .= $salesman_in['sql'];
+            $params      = array_merge($params, $salesman_in['params']);
 
             $cust_sql = "
                 SELECT
@@ -480,9 +559,15 @@ try {
                         'voucher_nos'      => '',
                         'return_nos'       => ''
                     ];
+
+                    // FIX 4: Transaction-less customer ka closing balance
+                    // (= opening balance) bhi total mein shamil karna hai.
+                    $running = $bbf;
                 }
 
-                $total_closing_balance = $running;
+                // FIX 4: SUM (+=) - har customer ka closing balance total
+                // mein add hota hai, overwrite nahi hota.
+                $total_closing_balance += $running;
             }
 
             // Sort by Date then Customer

@@ -71,21 +71,45 @@ try {
     $total = $stmt->fetch()['total'];
     
     // Get customers
-    $sql = "SELECT c.id, c.customer_code, c.customer_name, c.shop_name, c.address, c.primary_phone, c.email,
-            c.current_balance, c.opening_debit_amount, c.opening_credit_amount, c.is_blacklisted, c.created_at,
-            comp.company_name as company_name,
-            ct.type_name as customer_group_name,
-            cc.category_name as customer_category_name,
-            s.supplier_name as brand_name,
-                        ci.city_name as city_name,
-            cz.city_zone_name as zone_name,
-            ar.area_name as area_name,
-            e.full_name as salesman_name
-            FROM customers c
-            $joins
-            $whereClause 
-            ORDER BY c.created_at DESC 
-            LIMIT $limit OFFSET $offset";
+   // Get customers
+$sql = "SELECT c.id, c.customer_code, c.customer_name, c.shop_name, c.address, c.primary_phone, c.email,
+        c.current_balance, c.opening_debit_amount, c.opening_credit_amount, c.is_blacklisted, c.created_at,
+        comp.company_name as company_name,
+        ct.type_name as customer_group_name,
+        cc.category_name as customer_category_name,
+        s.supplier_name as brand_name,
+        ci.city_name as city_name,
+        cz.city_zone_name as zone_name,
+        ar.area_name as area_name,
+        e.full_name as salesman_name,
+        (
+            c.opening_debit_amount - c.opening_credit_amount
+            + COALESCE((
+                SELECT SUM(si.net_amount)
+                FROM sale_invoice si
+                WHERE si.tenant_id = c.tenant_id
+                  AND si.customer_id = c.id
+                  AND si.status = 'Posted'
+            ), 0)
+            - COALESCE((
+                SELECT SUM(rv.amount)
+                FROM receive_voucher rv
+                WHERE rv.tenant_id = c.tenant_id
+                  AND rv.customer_id = c.id
+            ), 0)
+            - COALESCE((
+                SELECT SUM(sr.net_amount)
+                FROM sale_return sr
+                WHERE sr.tenant_id = c.tenant_id
+                  AND sr.customer_id = c.id
+                  AND sr.status = 'Posted'
+            ), 0)
+        ) as current_balance_real
+        FROM customers c
+        $joins
+        $whereClause 
+        ORDER BY c.created_at DESC 
+        LIMIT $limit OFFSET $offset";
     
     $stmt = $pdo->prepare($sql);
     $stmt->execute($params);

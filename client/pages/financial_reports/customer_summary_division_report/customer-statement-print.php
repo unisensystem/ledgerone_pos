@@ -1,11 +1,17 @@
 <?php
 /**
- * Customer Statement - Print View
+ * Customer Statement - Print View (UPDATED)
  * Supports:
  * - All Customers (when customer_id is empty)
  * - Single Customer
- * - City / Zone / Area filters
+ * - City / Zone / Area / Salesman filters - ab SAB MULTI-SELECT
+ *   (comma-separated ids), jaise main page se aate hain
  * - Date range
+ *
+ * NEW: Top par selected City/Zone/Area/Salesman ke naam dikhte hain
+ * NEW: Bottom totals row ab sab columns ka total dikhata hai
+ *      (Opening, Sale Invoice, Receive Voucher, Sale Return, Closing)
+ *      - pehle sirf "Final Closing Balance" dikhta tha
  */
 
 if (session_status() == PHP_SESSION_NONE) {
@@ -24,6 +30,7 @@ $to_date       = $_GET['to_date']       ?? '';
 $city_id       = $_GET['city_id']       ?? '';
 $city_zone_id  = $_GET['city_zone_id']  ?? '';
 $area_id       = $_GET['area_id']       ?? '';
+$salesman_id   = $_GET['salesman_id']   ?? '';
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -153,6 +160,9 @@ $area_id       = $_GET['area_id']       ?? '';
     </div>
 </div>
 
+<!-- NEW: Applied filters (City / Zone / Area / Salesman) - sirf jo select huay hon wo dikhte hain -->
+<div class="meta-row" id="p-filters-row" style="display:none;"></div>
+
 <div class="summary-line" id="p-summary" style="display:none;">
     <span>Opening Balance<strong id="p-opening">0.00</strong></span>
     <span>Total Sale Invoice<strong id="p-si">0.00</strong></span>
@@ -176,6 +186,7 @@ const toDate      = <?php echo json_encode($to_date); ?>;
 const cityId      = <?php echo json_encode($city_id); ?>;
 const cityZoneId  = <?php echo json_encode($city_zone_id); ?>;
 const areaId      = <?php echo json_encode($area_id); ?>;
+const salesmanId  = <?php echo json_encode($salesman_id); ?>;
 
 function esc(v){
     return String(v ?? '').replace(/[&<>"']/g, c => ({
@@ -192,6 +203,7 @@ document.getElementById('p-printed').textContent = new Date().toLocaleString();
 async function loadStatement(){
 
     // Build URL - customer_id is OPTIONAL now
+    // City/Zone/Area/Salesman - comma-separated multi-select ids
     let url = `${API_BASE}?action=statement`;
 
     if (customerId)  url += `&customer_id=${encodeURIComponent(customerId)}`;
@@ -200,6 +212,7 @@ async function loadStatement(){
     if (cityId)      url += `&city_id=${encodeURIComponent(cityId)}`;
     if (cityZoneId)  url += `&city_zone_id=${encodeURIComponent(cityZoneId)}`;
     if (areaId)      url += `&area_id=${encodeURIComponent(areaId)}`;
+    if (salesmanId)  url += `&salesman_id=${encodeURIComponent(salesmanId)}`;
 
     try {
         const res  = await fetch(url);
@@ -225,9 +238,11 @@ async function loadStatement(){
 
         const rows = data.rows || [];
 
-        const totalSI = rows.reduce((s, r) => s + parseFloat(r.sale_invoice || 0), 0);
-        const totalRV = rows.reduce((s, r) => s + parseFloat(r.receive_voucher || 0), 0);
-        const totalSR = rows.reduce((s, r) => s + parseFloat(r.sale_return || 0), 0);
+        // NEW: totals ab API se directly (rows se manually jama karne ki
+        // zaroorat nahi - main page ki tarah)
+        const totalSI = data.total_sale_invoice || 0;
+        const totalRV = data.total_receive_voucher || 0;
+        const totalSR = data.total_sale_return || 0;
 
         document.getElementById('p-summary').style.display = 'flex';
         document.getElementById('p-opening').textContent  = `${currency}${fmt(data.opening_balance)}`;
@@ -293,7 +308,25 @@ async function loadStatement(){
             }
         }).join('');
 
-        const colspan = showCustomerColumn ? 6 : 5;
+        // NEW: Full totals row - Opening / Sale Invoice / Receive Voucher /
+        // Sale Return / Closing - sab columns ka total (sirf closing nahi)
+        const totalsRow = showCustomerColumn
+            ? `<tr class="total-row">
+                    <td colspan="2">TOTALS</td>
+                    <td>${currency}${fmt(data.opening_balance)}</td>
+                    <td>${currency}${fmt(totalSI)}</td>
+                    <td>${currency}${fmt(totalRV)}</td>
+                    <td>${currency}${fmt(totalSR)}</td>
+                    <td>${currency}${fmt(data.closing_balance)}</td>
+               </tr>`
+            : `<tr class="total-row">
+                    <td>TOTALS</td>
+                    <td>${currency}${fmt(data.opening_balance)}</td>
+                    <td>${currency}${fmt(totalSI)}</td>
+                    <td>${currency}${fmt(totalRV)}</td>
+                    <td>${currency}${fmt(totalSR)}</td>
+                    <td>${currency}${fmt(data.closing_balance)}</td>
+               </tr>`;
 
         wrapper.innerHTML = `
             <table class="table">
@@ -302,10 +335,7 @@ async function loadStatement(){
                 </thead>
                 <tbody>
                     ${bodyRows}
-                    <tr class="total-row">
-                        <td colspan="${colspan}">Final Closing Balance</td>
-                        <td>${currency}${fmt(data.closing_balance)}</td>
-                    </tr>
+                    ${totalsRow}
                 </tbody>
             </table>
         `;
@@ -317,7 +347,67 @@ async function loadStatement(){
     }
 }
 
+
+/* -----------------------------------------------------------
+ | NEW: Applied filter names (City / Zone / Area / Salesman)
+ | ids ko naam mein resolve karne ke liye respective list
+ | endpoints call karta hai, phir sirf selected filters top
+ | par dikhata hai.
+ * ----------------------------------------------------------- */
+async function fetchNameMap(action){
+    try{
+        const res  = await fetch(`${API_BASE}?action=${action}`);
+        const data = await res.json();
+        if(!data.success) return {};
+
+        const map = {};
+        data.data.forEach(item => { map[String(item.id)] = item.name; });
+        return map;
+    }catch(e){
+        console.error(`Error loading ${action}:`, e);
+        return {};
+    }
+}
+
+function idsToNames(idsParam, map){
+    if(!idsParam) return '';
+    return idsParam.split(',')
+        .map(id => map[id.trim()] || id.trim())
+        .filter(Boolean)
+        .join(', ');
+}
+
+async function loadFilterLabels(){
+    const anyFilter = cityId || cityZoneId || areaId || salesmanId;
+    if(!anyFilter) return;
+
+    const [cityMap, zoneMap, areaMap, salesmanMap] = await Promise.all([
+        cityId     ? fetchNameMap('cities')   : {},
+        cityZoneId ? fetchNameMap('zones')    : {},
+        areaId     ? fetchNameMap('areas')    : {},
+        salesmanId ? fetchNameMap('salesmen') : {}
+    ]);
+
+    const parts = [];
+    if (cityId)     parts.push({ label: 'City',     value: idsToNames(cityId, cityMap) });
+    if (cityZoneId) parts.push({ label: 'Zone',     value: idsToNames(cityZoneId, zoneMap) });
+    if (areaId)     parts.push({ label: 'Area',     value: idsToNames(areaId, areaMap) });
+    if (salesmanId) parts.push({ label: 'Salesman', value: idsToNames(salesmanId, salesmanMap) });
+
+    if (!parts.length) return;
+
+    const filtersRow = document.getElementById('p-filters-row');
+    filtersRow.style.display = 'flex';
+    filtersRow.innerHTML = parts.map(p => `
+        <div>
+            <strong>${esc(p.label)}</strong>
+            <span>${esc(p.value)}</span>
+        </div>
+    `).join('');
+}
+
 loadStatement();
+loadFilterLabels();
 </script>
 </body>
 </html>

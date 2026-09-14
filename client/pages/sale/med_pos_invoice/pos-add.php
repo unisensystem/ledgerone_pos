@@ -26,9 +26,7 @@ if (!$user_id) {
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.js"></script>
 </head>
-<style>
-    
-</style>
+
 <body class="light-theme med-invoice-page">
     <div class="container">
         <form id="invoiceForm">

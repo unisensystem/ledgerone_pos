@@ -1,12 +1,13 @@
 <?php
 /**
- * Customer Statement Report - Page (FIXED)
+ * Customer Statement Report - Page (FIXED v2)
  *
  * Default behavior:
  * - Customer blank = ALL customers
  * - Customer selected = selected customer only
  * - Data automatically loads when page opens
- * - Added filters: City, Zone, Area
+ * - Filters: City, Zone, Area, Salesman - ab sab MULTI-SELECT hain
+ *   (checkbox dropdown), e.g. Ali + Usman dono select ho sakte hain
  * - FIX: Date ab display ho raha hai sabhi rows mein
  */
 
@@ -152,6 +153,84 @@ if (!$user_id) {
     .btn:disabled{
         opacity:.6;
         cursor:not-allowed;
+    }
+
+    /* -----------------------------------------------------------
+     | Multi-select checkbox dropdown (City / Zone / Area / Salesman)
+     * ----------------------------------------------------------- */
+    .multiselect{
+        position:relative;
+        min-width:160px;
+    }
+
+    .multiselect-toggle{
+        width:100%;
+        text-align:left;
+        padding:8px 10px;
+        border:1px solid var(--border);
+        border-radius:6px;
+        background:#fff;
+        font-size:14px;
+        cursor:pointer;
+        display:flex;
+        justify-content:space-between;
+        align-items:center;
+        color:var(--text);
+    }
+
+    .multiselect-toggle:after{
+        content:'\25BE';
+        color:var(--subtext);
+        margin-left:8px;
+    }
+
+    .multiselect-toggle:focus{
+        outline:none;
+        border-color:var(--primary);
+        box-shadow:0 0 0 2px rgba(37,99,235,.10);
+    }
+
+    .multiselect-panel{
+        display:none;
+        position:absolute;
+        top:calc(100% + 4px);
+        left:0;
+        min-width:210px;
+        max-height:230px;
+        overflow-y:auto;
+        background:#fff;
+        border:1px solid var(--border);
+        border-radius:6px;
+        box-shadow:0 4px 14px rgba(0,0,0,.10);
+        padding:6px 0;
+        z-index:30;
+    }
+
+    .multiselect-panel.open{
+        display:block;
+    }
+
+    .ms-option{
+        display:flex;
+        align-items:center;
+        gap:8px;
+        padding:7px 12px;
+        font-size:13.5px;
+        cursor:pointer;
+    }
+
+    .ms-option:hover{
+        background:var(--header-bg);
+    }
+
+    .ms-option input{
+        cursor:pointer;
+    }
+
+    .ms-empty{
+        padding:10px 12px;
+        color:var(--subtext);
+        font-size:13px;
     }
 
     .summary-cards{
@@ -320,28 +399,40 @@ if (!$user_id) {
                 <datalist id="customer-list"></datalist>
             </div>
 
-            <!-- CITY -->
+            <!-- CITY (multi-select) -->
             <div class="form-group">
-                <label for="city-select">City</label>
-                <select class="form-control" id="city-select">
-                    <option value="">All Cities</option>
-                </select>
+                <label>City</label>
+                <div class="multiselect" id="city-multiselect">
+                    <button type="button" class="multiselect-toggle" id="city-toggle">All Cities</button>
+                    <div class="multiselect-panel" id="city-panel"></div>
+                </div>
             </div>
 
-            <!-- ZONE -->
+            <!-- ZONE (multi-select) -->
             <div class="form-group">
-                <label for="zone-select">Zone</label>
-                <select class="form-control" id="zone-select">
-                    <option value="">All Zones</option>
-                </select>
+                <label>Zone</label>
+                <div class="multiselect" id="zone-multiselect">
+                    <button type="button" class="multiselect-toggle" id="zone-toggle">All Zones</button>
+                    <div class="multiselect-panel" id="zone-panel"></div>
+                </div>
             </div>
 
-            <!-- AREA -->
+            <!-- AREA (multi-select) -->
             <div class="form-group">
-                <label for="area-select">Area</label>
-                <select class="form-control" id="area-select">
-                    <option value="">All Areas</option>
-                </select>
+                <label>Area</label>
+                <div class="multiselect" id="area-multiselect">
+                    <button type="button" class="multiselect-toggle" id="area-toggle">All Areas</button>
+                    <div class="multiselect-panel" id="area-panel"></div>
+                </div>
+            </div>
+
+            <!-- SALESMAN (multi-select, NEW) -->
+            <div class="form-group">
+                <label>Salesman</label>
+                <div class="multiselect" id="salesman-multiselect">
+                    <button type="button" class="multiselect-toggle" id="salesman-toggle">All Salesmen</button>
+                    <div class="multiselect-panel" id="salesman-panel"></div>
+                </div>
             </div>
 
             <!-- FROM DATE -->
@@ -451,6 +542,12 @@ let currentRows = [];
 let currentCustomerName = 'All Customers';
 let currentCustomerId = null;
 
+/* Multi-select state - Sets of string ids (City / Zone / Area / Salesman) */
+const selectedCityIds     = new Set();
+const selectedZoneIds     = new Set();
+const selectedAreaIds     = new Set();
+const selectedSalesmanIds = new Set();
+
 
 /* -----------------------------------------------------------
  | Escape HTML
@@ -482,7 +579,69 @@ function fmt(n){
 
 
 /* -----------------------------------------------------------
- | Load Cities
+ | Multi-select helpers (generic - City / Zone / Area / Salesman
+ | sab isi function se render hote hain)
+ * ----------------------------------------------------------- */
+function renderMultiSelectOptions(panelEl, toggleEl, items, selectedSet, allLabel, onChange){
+    if(!items || !items.length){
+        panelEl.innerHTML = `<div class="ms-empty">No options available.</div>`;
+    }else{
+        panelEl.innerHTML = items.map(it => `
+            <label class="ms-option">
+                <input type="checkbox" value="${esc(it.id)}" ${selectedSet.has(String(it.id)) ? 'checked' : ''}>
+                <span>${esc(it.name)}</span>
+            </label>
+        `).join('');
+    }
+
+    panelEl.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+        cb.addEventListener('change', function(){
+            if(this.checked){
+                selectedSet.add(this.value);
+            }else{
+                selectedSet.delete(this.value);
+            }
+            updateMultiSelectLabel(toggleEl, selectedSet, allLabel);
+            onChange();
+        });
+    });
+
+    updateMultiSelectLabel(toggleEl, selectedSet, allLabel);
+}
+
+function updateMultiSelectLabel(toggleEl, selectedSet, allLabel){
+    if(selectedSet.size === 0){
+        toggleEl.textContent = allLabel;
+    }else if(selectedSet.size === 1){
+        toggleEl.textContent = '1 selected';
+    }else{
+        toggleEl.textContent = selectedSet.size + ' selected';
+    }
+}
+
+// Open/close dropdown panels on toggle click
+document.querySelectorAll('.multiselect-toggle').forEach(btn => {
+    btn.addEventListener('click', function(e){
+        e.stopPropagation();
+        const panel = this.nextElementSibling;
+        const isOpen = panel.classList.contains('open');
+        document.querySelectorAll('.multiselect-panel.open')
+            .forEach(p => p.classList.remove('open'));
+        if(!isOpen){
+            panel.classList.add('open');
+        }
+    });
+});
+
+// Close any open panel when clicking outside
+document.addEventListener('click', function(){
+    document.querySelectorAll('.multiselect-panel.open')
+        .forEach(p => p.classList.remove('open'));
+});
+
+
+/* -----------------------------------------------------------
+ | Load Cities (multi-select)
  * ----------------------------------------------------------- */
 async function loadCities(){
     try{
@@ -491,71 +650,122 @@ async function loadCities(){
 
         if(!data.success) return;
 
-        const sel = document.getElementById('city-select');
-        sel.innerHTML = '<option value="">All Cities</option>' +
-            data.data.map(c =>
-                `<option value="${esc(c.id)}">${esc(c.name)}</option>`
-            ).join('');
+        renderMultiSelectOptions(
+            document.getElementById('city-panel'),
+            document.getElementById('city-toggle'),
+            data.data,
+            selectedCityIds,
+            'All Cities',
+            onCitySelectionChange
+        );
     }catch(e){
         console.error('Error loading cities:', e);
     }
 }
 
+async function onCitySelectionChange(){
+    // City selection badalne par Zones (aur unke through Areas) refresh hote hain
+    await loadZones();
+}
+
 
 /* -----------------------------------------------------------
- | Load Zones (depends on City)
+ | Load Zones (multi-select, cascades from selected Cities)
+ | Koi city select na ho to TENANT KE SAB zones dikhte hain.
  * ----------------------------------------------------------- */
-async function loadZones(cityId = null){
-    const sel = document.getElementById('zone-select');
-    sel.innerHTML = '<option value="">All Zones</option>';
+async function loadZones(){
+    const cityIdsParam = [...selectedCityIds].join(',');
 
-    // Clear areas when zones change
-    document.getElementById('area-select').innerHTML =
-        '<option value="">All Areas</option>';
-
-    if(!cityId) return;
+    let url = `${API_BASE}?action=zones`;
+    if(cityIdsParam) url += `&city_id=${encodeURIComponent(cityIdsParam)}`;
 
     try{
-        const res = await fetch(
-            `${API_BASE}?action=zones&city_id=${encodeURIComponent(cityId)}`
-        );
+        const res = await fetch(url);
         const data = await res.json();
 
         if(!data.success) return;
 
-        sel.innerHTML = '<option value="">All Zones</option>' +
-            data.data.map(z =>
-                `<option value="${esc(z.id)}">${esc(z.name)}</option>`
-            ).join('');
+        // Jo zones ab valid list mein nahi, unki selection hata do
+        const validIds = new Set(data.data.map(z => String(z.id)));
+        [...selectedZoneIds].forEach(id => {
+            if(!validIds.has(id)) selectedZoneIds.delete(id);
+        });
+
+        renderMultiSelectOptions(
+            document.getElementById('zone-panel'),
+            document.getElementById('zone-toggle'),
+            data.data,
+            selectedZoneIds,
+            'All Zones',
+            onZoneSelectionChange
+        );
+
+        await loadAreas();
     }catch(e){
         console.error('Error loading zones:', e);
     }
 }
 
+async function onZoneSelectionChange(){
+    await loadAreas();
+}
+
 
 /* -----------------------------------------------------------
- | Load Areas (depends on Zone)
+ | Load Areas (multi-select, cascades from selected Zones)
+ | Koi zone select na ho to TENANT KE SAB areas dikhte hain.
  * ----------------------------------------------------------- */
-async function loadAreas(zoneId = null){
-    const sel = document.getElementById('area-select');
-    sel.innerHTML = '<option value="">All Areas</option>';
+async function loadAreas(){
+    const zoneIdsParam = [...selectedZoneIds].join(',');
 
-    if(!zoneId) return;
+    let url = `${API_BASE}?action=areas`;
+    if(zoneIdsParam) url += `&city_zone_id=${encodeURIComponent(zoneIdsParam)}`;
 
     try{
-        const res = await fetch(
-            `${API_BASE}?action=areas&city_zone_id=${encodeURIComponent(zoneId)}`
-        );
+        const res = await fetch(url);
         const data = await res.json();
 
         if(!data.success) return;
 
-        sel.innerHTML = '<option value="">All Areas</option>' +
-            data.data.map(a =>
-                `<option value="${esc(a.id)}">${esc(a.name)}</option>`
-            ).join('');
+        const validIds = new Set(data.data.map(a => String(a.id)));
+        [...selectedAreaIds].forEach(id => {
+            if(!validIds.has(id)) selectedAreaIds.delete(id);
+        });
+
+        renderMultiSelectOptions(
+            document.getElementById('area-panel'),
+            document.getElementById('area-toggle'),
+            data.data,
+            selectedAreaIds,
+            'All Areas',
+            () => {}
+        );
     }catch(e){
         console.error('Error loading areas:', e);
+    }
+}
+
+
+/* -----------------------------------------------------------
+ | Load Salesmen (multi-select, NEW)
+ * ----------------------------------------------------------- */
+async function loadSalesmen(){
+    try{
+        const res = await fetch(`${API_BASE}?action=salesmen`);
+        const data = await res.json();
+
+        if(!data.success) return;
+
+        renderMultiSelectOptions(
+            document.getElementById('salesman-panel'),
+            document.getElementById('salesman-toggle'),
+            data.data,
+            selectedSalesmanIds,
+            'All Salesmen',
+            () => {}
+        );
+    }catch(e){
+        console.error('Error loading salesmen:', e);
     }
 }
 
@@ -634,9 +844,11 @@ async function generateStatement(){
     const fromDate = document.getElementById('from-date').value;
     const toDate   = document.getElementById('to-date').value;
 
-    const cityId  = document.getElementById('city-select').value || null;
-    const zoneId  = document.getElementById('zone-select').value || null;
-    const areaId  = document.getElementById('area-select').value || null;
+    // Multi-select filters - comma-separated ids
+    const cityIdsParam     = [...selectedCityIds].join(',');
+    const zoneIdsParam     = [...selectedZoneIds].join(',');
+    const areaIdsParam     = [...selectedAreaIds].join(',');
+    const salesmanIdsParam = [...selectedSalesmanIds].join(',');
 
     // Validate dates
     if(fromDate && toDate && fromDate > toDate){
@@ -646,12 +858,13 @@ async function generateStatement(){
 
     let url = `${API_BASE}?action=statement`;
 
-    if(customerId) url += `&customer_id=${encodeURIComponent(customerId)}`;
-    if(fromDate)   url += `&from_date=${encodeURIComponent(fromDate)}`;
-    if(toDate)     url += `&to_date=${encodeURIComponent(toDate)}`;
-    if(cityId)     url += `&city_id=${encodeURIComponent(cityId)}`;
-    if(zoneId)     url += `&city_zone_id=${encodeURIComponent(zoneId)}`;
-    if(areaId)     url += `&area_id=${encodeURIComponent(areaId)}`;
+    if(customerId)       url += `&customer_id=${encodeURIComponent(customerId)}`;
+    if(fromDate)         url += `&from_date=${encodeURIComponent(fromDate)}`;
+    if(toDate)           url += `&to_date=${encodeURIComponent(toDate)}`;
+    if(cityIdsParam)     url += `&city_id=${encodeURIComponent(cityIdsParam)}`;
+    if(zoneIdsParam)     url += `&city_zone_id=${encodeURIComponent(zoneIdsParam)}`;
+    if(areaIdsParam)     url += `&area_id=${encodeURIComponent(areaIdsParam)}`;
+    if(salesmanIdsParam) url += `&salesman_id=${encodeURIComponent(salesmanIdsParam)}`;
 
     document.getElementById('table-wrapper').innerHTML =
         `<div class="loading">
@@ -811,19 +1024,22 @@ function openPrintView(){
     const customerId = resolveCustomerId();
     const fromDate   = document.getElementById('from-date').value;
     const toDate     = document.getElementById('to-date').value;
-    const cityId     = document.getElementById('city-select').value || null;
-    const zoneId     = document.getElementById('zone-select').value || null;
-    const areaId     = document.getElementById('area-select').value || null;
+
+    const cityIdsParam     = [...selectedCityIds].join(',');
+    const zoneIdsParam     = [...selectedZoneIds].join(',');
+    const areaIdsParam     = [...selectedAreaIds].join(',');
+    const salesmanIdsParam = [...selectedSalesmanIds].join(',');
 
     let url = `customer-statement-print.php`;
     const params = [];
 
-    if(customerId) params.push(`customer_id=${encodeURIComponent(customerId)}`);
-    if(fromDate)   params.push(`from_date=${encodeURIComponent(fromDate)}`);
-    if(toDate)     params.push(`to_date=${encodeURIComponent(toDate)}`);
-    if(cityId)     params.push(`city_id=${encodeURIComponent(cityId)}`);
-    if(zoneId)     params.push(`city_zone_id=${encodeURIComponent(zoneId)}`);
-    if(areaId)     params.push(`area_id=${encodeURIComponent(areaId)}`);
+    if(customerId)       params.push(`customer_id=${encodeURIComponent(customerId)}`);
+    if(fromDate)         params.push(`from_date=${encodeURIComponent(fromDate)}`);
+    if(toDate)           params.push(`to_date=${encodeURIComponent(toDate)}`);
+    if(cityIdsParam)     params.push(`city_id=${encodeURIComponent(cityIdsParam)}`);
+    if(zoneIdsParam)     params.push(`city_zone_id=${encodeURIComponent(zoneIdsParam)}`);
+    if(areaIdsParam)     params.push(`area_id=${encodeURIComponent(areaIdsParam)}`);
+    if(salesmanIdsParam) params.push(`salesman_id=${encodeURIComponent(salesmanIdsParam)}`);
 
     if(params.length){
         url += '?' + params.join('&');
@@ -872,15 +1088,6 @@ document.getElementById('customer-input')
         }
     });
 
-// Cascade: City → Zone → Area
-document.getElementById('city-select').addEventListener('change', function(){
-    loadZones(this.value || null);
-});
-
-document.getElementById('zone-select').addEventListener('change', function(){
-    loadAreas(this.value || null);
-});
-
 // Buttons
 document.getElementById('generateBtn')
     .addEventListener('click', generateStatement);
@@ -895,11 +1102,17 @@ document.getElementById('clearBtn').addEventListener('click', async function(){
     document.getElementById('customer-input').value = '';
     document.getElementById('from-date').value = '';
     document.getElementById('to-date').value = '';
-    document.getElementById('city-select').value = '';
-    document.getElementById('zone-select').innerHTML =
-        '<option value="">All Zones</option>';
-    document.getElementById('area-select').innerHTML =
-        '<option value="">All Areas</option>';
+
+    selectedCityIds.clear();
+    selectedZoneIds.clear();
+    selectedAreaIds.clear();
+    selectedSalesmanIds.clear();
+
+    // Panels ko unchecked state mein re-render karna, aur cascade refresh
+    await loadCities();
+    await loadZones();
+    await loadAreas();
+    await loadSalesmen();
 
     currentCustomerId   = null;
     currentCustomerName = 'All Customers';
@@ -913,6 +1126,9 @@ document.getElementById('clearBtn').addEventListener('click', async function(){
  * ----------------------------------------------------------- */
 (async function init(){
     await loadCities();
+    await loadZones();
+    await loadAreas();
+    await loadSalesmen();
     await loadCustomers();   // this already triggers generateStatement
 })();
 
