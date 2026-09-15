@@ -186,6 +186,10 @@ if (!$user_id) {
                     <strong style="color: var(--heading); font-size: 12px;">Last 3 Sale Prices:</strong>
                     <div id="priceHistoryContent" style="margin-top: 4px; font-size: 13px; color: var(--body);"></div>
                 </div>
+                <div id="purchaseHistoryContainer" style="display: none; margin-bottom: 16px; padding: 8px 12px; background: var(--surface-2); border-radius: var(--radius); border-left: 4px solid var(--warning); width: fit-content;">
+    <strong style="color: var(--heading); font-size: 12px;">Last 3 Purchase Prices:</strong>
+    <div id="purchaseHistoryContent" style="margin-top: 4px; font-size: 13px; color: var(--body);"></div>
+</div>
                 <div id="stockContainer" style="display: none; margin-bottom: 16px; padding: 8px 12px; background: var(--surface-2); border-radius: var(--radius); border-left: 4px solid var(--success); width: fit-content;">
                     <div id="stockContent" style="font-size: 13px; color: var(--body);"></div>
                 </div>

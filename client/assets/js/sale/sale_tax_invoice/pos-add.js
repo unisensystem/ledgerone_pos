@@ -4682,6 +4682,44 @@ function loadPriceHistoryForAllRows() {
         }
     }
 }
+// Last 3 purchases — sirf product se linked (customer se nahi)
+async function loadPurchaseHistory(productId) {
+    const container = document.getElementById('purchaseHistoryContainer');
+    const content = document.getElementById('purchaseHistoryContent');
+    if (!container || !content) return;
+
+    if (!productId) {
+        container.style.display = 'none';
+        return;
+    }
+
+    try {
+        const companyId = document.getElementById('company')?.value;
+        let url = `../../../../server/api/sale/sale_tax_invoice/get-purchase-history.php?product_id=${productId}`;
+        if (companyId) url += `&company_id=${companyId}`;
+
+        const response = await fetch(url);
+        const data = await response.json();
+
+        if (data.success && data.history && data.history.length > 0) {
+            content.innerHTML = data.history.map((item, index) => {
+                const date = new Date(item.purchase_date).toLocaleDateString();
+                const price = parseFloat(item.purchase_price).toFixed(2);
+                const qty = parseFloat(item.quantity).toFixed(2);
+                const supplier = item.supplier_name
+                    ? `<br><span style="font-size: 11px; color: var(--subtext);">${item.supplier_name}</span>` : '';
+                return `<div>${index + 1}. ${date} - ${item.currency_symbol}${price} (Qty: ${qty})${supplier}</div>`;
+            }).join('');
+            container.style.display = 'block';
+        } else {
+            content.innerHTML = '';
+            container.style.display = 'none';
+        }
+    } catch (error) {
+        console.error('Error loading purchase history:', error);
+        container.style.display = 'none';
+    }
+}
 
 // With a long item list, the price-history/stock panels (fixed at the top of
 // the Items card) scroll out of view while working on later rows, forcing a
@@ -6101,6 +6139,7 @@ function initTableDropdownDynamic(container, row) {
                 loadPriceHistory(product.id);
             }
             loadProductStock(product.id);
+            loadPurchaseHistory(product.id);
             
             // Focus first unit input
             const firstUnitInput = row.querySelector('.unit-input');
