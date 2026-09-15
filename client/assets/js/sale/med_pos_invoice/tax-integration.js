@@ -80,15 +80,14 @@ async function loadTaxForProductSelection(row) {
 }
 
 // Also listen for customer changes to reload tax for all products
-document.addEventListener('click', function(e) {
-    if (e.target.classList.contains('dropdown-option') && e.target.closest('#customerCodeOptions')) {
-        // Customer changed, reload tax for all rows
-        setTimeout(function() {
-            const customerId = document.getElementById('customerCode')?.value;
-            if (customerId && typeof loadTaxRatesForCustomer === 'function') {
-                console.log('Customer changed, reloading tax for all rows');
-                loadTaxRatesForCustomer(customerId);
-            }
-        }, 100);
-    }
-});
+// document.addEventListener('click', function(e) {
+//     if (e.target.classList.contains('dropdown-option') && e.target.closest('#customerCodeOptions')) {
+//         setTimeout(function() {
+//             const customerId = document.getElementById('customerCode')?.value;
+//             if (customerId && typeof loadTaxRatesForCustomer === 'function') {
+//                 console.log('Customer changed, reloading tax for all rows');
+//                 loadTaxRatesForCustomer(customerId);
+//             }
+//         }, 100);
+//     }
+// });

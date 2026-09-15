@@ -160,7 +160,13 @@ async function loadTaxRatesForCustomer(customerId) {
             
             // Recalculate row amounts
             if (typeof calculateRowAmounts === 'function') {
-                const totalQty = Number(row.querySelector('.qty-cell input')?.value) || 0;
+                const unitInputs = row.querySelectorAll('.unit-input');
+                let totalQty = 0;
+                unitInputs.forEach(input => {
+                    const qty = Number(input.value) || 0;
+                    const cf = Number(input.dataset.conversionFactor) || 1;
+                    totalQty += qty * cf;
+                });
                 const price = Number(row.querySelector('.price-cell input')?.value) || 0;
                 calculateRowAmounts(row, totalQty, price);
             }
@@ -217,12 +223,14 @@ async function loadTaxForNewProduct(row, customerId, productId) {
             }
         }
         
-        // Trigger row recalculation to apply formula
+               // Trigger row recalculation to apply formula
         if (typeof calculateRowAmounts === 'function') {
             const unitInputs = row.querySelectorAll('.unit-input');
             let totalQty = 0;
             unitInputs.forEach(input => {
-                totalQty += parseFloat(input.value) || 0;
+                const qty = parseFloat(input.value) || 0;
+                const cf = parseFloat(input.dataset.conversionFactor) || 1;
+                totalQty += qty * cf;
             });
             const price = parseFloat(row.querySelector('.price-cell input')?.value) || 0;
             calculateRowAmounts(row, totalQty, price);
