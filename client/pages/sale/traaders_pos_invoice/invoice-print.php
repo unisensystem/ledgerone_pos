@@ -656,6 +656,14 @@
                     <td>Shipping Fees:</td>
                     <td class="text-right" id="shippingFees">0.00</td>
                 </tr>
+                <tr id="kirayaRow" style="display: none;">
+                    <td>Kiraya:</td>
+                    <td class="text-right" id="kiraya">0.00</td>
+                </tr>
+                <tr id="mazdooriRow" style="display: none;">
+                    <td>Mazdoori:</td>
+                    <td class="text-right" id="mazdoori">0.00</td>
+                </tr>
                 <tr class="total-row">
                     <td>Net Amount:</td>
                     <td class="text-right" id="netAmount">0.00</td>
@@ -749,6 +757,8 @@
                 'enableCashDiscountPercent','enableCashDiscountAmount',
                 'enableInvoiceCashDiscountPercent','enableInvoiceCashDiscountAmount',
                 'enableExtraDiscount1','enableExtraDiscount2','enableShippingFees',
+                'enableKiraya','enableMazdoori',
+                'enableWeightColumn','enablePackingColumn','enableTotalWeightColumn',
                 'enableAmountPaidPaymentMethod','enablePrintQRCode',
                 'defaultScheme','salePriceSetting','productFilteringMode',
                 'productDisplayMode','customerDisplayMode',
@@ -834,6 +844,11 @@
         const enableTradeOfferAmount = localStorage.getItem('enableTradeOfferAmount') === 'true';
         const enableFOC = localStorage.getItem('enableFOC') === 'true';
         const enableShippingFees    = localStorage.getItem('enableShippingFees')    === 'true';
+        const enableKiraya          = localStorage.getItem('enableKiraya')          === 'true';
+        const enableMazdoori        = localStorage.getItem('enableMazdoori')        === 'true';
+        const enablePackingColumn   = localStorage.getItem('enablePackingColumn')   !== 'false';
+        const enableWeightColumn    = localStorage.getItem('enableWeightColumn')    !== 'false';
+        const enableTotalWeightColumn = localStorage.getItem('enableTotalWeightColumn') !== 'false';
         const enableExtraDiscount1  = localStorage.getItem('enableExtraDiscount1')  === 'true';
         const enableExtraDiscount2  = localStorage.getItem('enableExtraDiscount2')  === 'true';
 
@@ -904,6 +919,32 @@
             unitPlaceholder.id = 'unitColumnsPlaceholder';
             unitPlaceholder.style.display = 'none';
             headerRow.appendChild(unitPlaceholder);
+
+            // Packing / Weight / Total Weight — same order as the entry form
+            if (enablePackingColumn) {
+                const th = document.createElement('th');
+                th.width = '6%';
+                th.className = 'text-center';
+                th.textContent = 'Packing';
+                th.dataset.colId = 'packing';
+                headerRow.appendChild(th);
+            }
+            if (enableWeightColumn) {
+                const th = document.createElement('th');
+                th.width = '6%';
+                th.className = 'text-right';
+                th.textContent = 'Weight';
+                th.dataset.colId = 'weight';
+                headerRow.appendChild(th);
+            }
+            if (enableTotalWeightColumn) {
+                const th = document.createElement('th');
+                th.width = '8%';
+                th.className = 'text-right';
+                th.textContent = 'Total Weight';
+                th.dataset.colId = 'total_weight';
+                headerRow.appendChild(th);
+            }
 
             // Add remaining columns
             const remainingCols = ['price', 'gross', 'disc_pct', 'disc_amt', 'to_amt', 'foc', 'net'];
@@ -984,6 +1025,11 @@
                 th.textContent = '';
                 totalsRow.appendChild(th);
             }
+
+            // Packing / Weight / Total Weight - empty cells (structural alignment only)
+            if (enablePackingColumn) totalsRow.appendChild(document.createElement('th'));
+            if (enableWeightColumn) totalsRow.appendChild(document.createElement('th'));
+            if (enableTotalWeightColumn) totalsRow.appendChild(document.createElement('th'));
 
             // Remaining columns with totals
             const remainingCols = [
@@ -1304,7 +1350,8 @@
                     }
                     itemsByProduct[key].units.push({
                         uom_name: item.uom_name,
-                        quantity: item.quantity
+                        quantity: item.quantity,
+                        conversionFactor: parseFloat(item.uom_conversion_factor) || 1
                     });
                 } else {
                     childItems.push(item);
@@ -1368,6 +1415,44 @@
                         td.style.color = '#dee2e6';
                         td.innerHTML = '<span style="opacity: 0.3;">-</span>';
                     }
+                }
+
+                // Packing / Weight / Total Weight — same math as the entry form:
+                // Packing always shows "1 x <conversion factor>" (fixed packaging size,
+                // not scaled by quantity); Total Weight = product's per-base-unit weight
+                // × total quantity in base units (unit.quantity × its conversion factor,
+                // summed across every unit column used on this line).
+                let totalQtyBaseUnits = 0;
+                const packingParts = [];
+                productGroup.units.forEach(unit => {
+                    const qty = parseFloat(unit.quantity) || 0;
+                    const cf = parseFloat(unit.conversionFactor) || 1;
+                    totalQtyBaseUnits += qty * cf;
+                    if (qty > 0 && cf !== 1) packingParts.push(`1 x ${cf}`);
+                });
+                const weightValue = parseFloat(item.weight_value);
+                const weightUnit = item.weight_unit || '';
+                const hasWeight = !isNaN(weightValue) && weightValue > 0;
+
+                if (enablePackingColumn) {
+                    const td = row.insertCell();
+                    td.className = 'text-center';
+                    td.dataset.colId = 'packing';
+                    td.textContent = packingParts.length > 0 ? packingParts.join(', ') : '-';
+                }
+                if (enableWeightColumn) {
+                    const td = row.insertCell();
+                    td.className = 'text-right';
+                    td.dataset.colId = 'weight';
+                    td.textContent = hasWeight ? `${weightValue} ${weightUnit}`.trim() : '-';
+                }
+                if (enableTotalWeightColumn) {
+                    const td = row.insertCell();
+                    td.className = 'text-right';
+                    td.dataset.colId = 'total_weight';
+                    td.textContent = (hasWeight && totalQtyBaseUnits > 0)
+                        ? `${(weightValue * totalQtyBaseUnits).toFixed(2)} ${weightUnit}`.trim()
+                        : '-';
                 }
 
                 // Remaining columns
@@ -1508,6 +1593,8 @@
                 { id: 'extraDiscount2Percent', label: 'Extra Discount 2 (%)', value: `${parseFloat(invoice.extra_discount_2_percent || 0).toFixed(2)}%`, show: parseFloat(invoice.extra_discount_2_percent || 0) > 0 },
                 { id: 'extraDiscount2Amount',  label: 'Extra Discount 2 Amt', value: `${currencySymbol} ${parseFloat(invoice.extra_discount_2_amount  || 0).toFixed(2)}`, show: parseFloat(invoice.extra_discount_2_amount  || 0) > 0 },
                 { id: 'shippingFees', label: localStorage.getItem('labelShippingFees') || 'Shipping Fees', value: `${currencySymbol} ${parseFloat(invoice.shipping_fees || 0).toFixed(2)}`, show: enableShippingFees && invoice.shipping_fees },
+                { id: 'kiraya', label: 'Kiraya', value: `${currencySymbol} ${parseFloat(invoice.kiraya || 0).toFixed(2)}`, show: enableKiraya && invoice.kiraya > 0 },
+                { id: 'mazdoori', label: 'Mazdoori', value: `${currencySymbol} ${parseFloat(invoice.mazdoori || 0).toFixed(2)}`, show: enableMazdoori && invoice.mazdoori > 0 },
                 { id: 'netAmount', label: localStorage.getItem('labelNetAmount') || 'Net Amount', value: `${currencySymbol} ${parseFloat(invoice.net_amount).toFixed(2)}`, show: localStorage.getItem('hidePrintNetAmount') !== 'true', isTotal: true },
                 { id: 'amountPaid', label: localStorage.getItem('labelAmountPaid') || 'Amount Paid', value: `${currencySymbol} ${amountPaid.toFixed(2)}`, show: localStorage.getItem('hidePrintAmountPaid') !== 'true' },
                 { id: 'paymentMethod', label: localStorage.getItem('labelPaymentMethod') || 'Payment Method', value: invoice.payment_method || '-', show: localStorage.getItem('hidePrintPaymentMethod') !== 'true' },
@@ -1560,6 +1647,16 @@
                     shippingFeesRow.style.display = '';
                     shippingFeesRow.querySelector('td:first-child').textContent = localStorage.getItem('labelShippingFees') || 'Shipping Fees';
                     document.getElementById('shippingFees').textContent = `${currencySymbol} ${parseFloat(invoice.shipping_fees).toFixed(2)}`;
+                }
+
+                if (enableKiraya && invoice.kiraya && parseFloat(invoice.kiraya) > 0) {
+                    document.getElementById('kirayaRow').style.display = '';
+                    document.getElementById('kiraya').textContent = `${currencySymbol} ${parseFloat(invoice.kiraya).toFixed(2)}`;
+                }
+
+                if (enableMazdoori && invoice.mazdoori && parseFloat(invoice.mazdoori) > 0) {
+                    document.getElementById('mazdooriRow').style.display = '';
+                    document.getElementById('mazdoori').textContent = `${currencySymbol} ${parseFloat(invoice.mazdoori).toFixed(2)}`;
                 }
 
                 document.getElementById('netAmount').textContent = `${currencySymbol} ${parseFloat(invoice.net_amount).toFixed(2)}`;

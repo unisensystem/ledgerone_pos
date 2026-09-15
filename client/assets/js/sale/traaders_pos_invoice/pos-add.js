@@ -31,7 +31,9 @@
         'hideSalesOfficerStandard','hideSupplierManStandard','hideAreaCityStandard',
         'hideSubAccountStandard','hideSaleOrderStandard','hideCurrencyStandard',
         'hideTransportNameStandard','hideBiltyNoStandard','hideProjectStandard',
-        'hideContainerStandard','hideRemarksStandard'
+        'hideContainerStandard','hideRemarksStandard',
+        'enableWeightColumn','enablePackingColumn','enableTotalWeightColumn',
+        'enableKiraya','enableMazdoori'
     ]);
 
     localStorage.getItem = function(key) {
@@ -1569,6 +1571,12 @@ const invoiceSettingCheckboxes = [
                 document.getElementById('currency').value = invoice.currency_id;
                 const prevBalanceEl = document.getElementById('previousBalance');
                 if (prevBalanceEl) prevBalanceEl.value = invoice.previous_balance;
+                const shippingFeesEditEl = document.getElementById('shippingFees');
+                if (shippingFeesEditEl) shippingFeesEditEl.value = invoice.shipping_fees || 0;
+                const kirayaEditEl = document.getElementById('kiraya');
+                if (kirayaEditEl) kirayaEditEl.value = invoice.kiraya || 0;
+                const mazdooriEditEl = document.getElementById('mazdoori');
+                if (mazdooriEditEl) mazdooriEditEl.value = invoice.mazdoori || 0;
                 const remarksEl = document.getElementById('remarks');
                 if (remarksEl) remarksEl.value = invoice.remarks || '';
                 const salesOfficerEl = document.getElementById('salesOfficer');
@@ -3343,14 +3351,18 @@ const invoiceSettingCheckboxes = [
             // GST calculation - skip if elements don't exist
             const shippingFeesEl = document.getElementById('shippingFees');
             const shippingFees = shippingFeesEl ? parseFloat(shippingFeesEl.value) || 0 : 0;
-            const netAmount = afterDiscount + shippingFees;
+            const kirayaEl = document.getElementById('kiraya');
+            const kiraya = kirayaEl ? parseFloat(kirayaEl.value) || 0 : 0;
+            const mazdooriEl = document.getElementById('mazdoori');
+            const mazdoori = mazdooriEl ? parseFloat(mazdooriEl.value) || 0 : 0;
+            const netAmount = afterDiscount + shippingFees + kiraya + mazdoori;
 
             console.log('Summary: totalNetAmountItems =', totalNetAmountItems, 'extraDiscount1 =', extraDiscount1Amount, 'extraDiscount2 =', extraDiscount2Amount, 'netAmount =', netAmount);
 
             // Expose invoice totals for invoice-level tax base resolution
             window.currentTotalBill = totalNetAmountItems;              // before any invoice discount
             window.currentValueExclSalesTax = afterDiscount;            // totalBill - all discounts
-            window.currentNetAmount = netAmount;                        // afterDiscount + shippingFees
+            window.currentNetAmount = netAmount;                        // afterDiscount + shippingFees + kiraya + mazdoori
 
             // Update DOM element
             const netAmountEl = document.getElementById('netAmount');
@@ -3501,6 +3513,16 @@ const invoiceSettingCheckboxes = [
     const shippingFees = document.getElementById('shippingFees');
     if (shippingFees) {
         shippingFees.addEventListener('input', updateInvoiceSummary);
+    }
+
+    // Add event listeners for Kiraya / Mazdoori (added straight to Net Receivable)
+    const kirayaEl = document.getElementById('kiraya');
+    if (kirayaEl) {
+        kirayaEl.addEventListener('input', updateInvoiceSummary);
+    }
+    const mazdooriEl = document.getElementById('mazdoori');
+    if (mazdooriEl) {
+        mazdooriEl.addEventListener('input', updateInvoiceSummary);
     }
 
     // Add event listener for withholding tax percent
@@ -4406,6 +4428,9 @@ function saveInvoice(status = 'Posted') {
         totalDiscountAmount: parseFloat(document.getElementById('totalDiscountAmount')?.value),
         netAmount: parseFloat(document.getElementById('netAmount').textContent),
         netReceivable: parseFloat(document.getElementById('netReceivable').textContent),
+        shippingFees: parseFloat(document.getElementById('shippingFees')?.value) || 0,
+        kiraya: parseFloat(document.getElementById('kiraya')?.value) || 0,
+        mazdoori: parseFloat(document.getElementById('mazdoori')?.value) || 0,
         paymentMethod: effectivePaymentMethod,
         bankAccountId: effectiveBankAccountId,
         paymentSplits: paymentSplits,
@@ -4757,6 +4782,8 @@ function loadInvoiceSettings() {
     document.getElementById('enableInvoiceCashDiscountPercent').checked = localStorage.getItem('enableInvoiceCashDiscountPercent') === 'true';
     document.getElementById('enableInvoiceCashDiscountAmount').checked = localStorage.getItem('enableInvoiceCashDiscountAmount') === 'true';
     document.getElementById('enableShippingFees').checked = localStorage.getItem('enableShippingFees') === 'true';
+    document.getElementById('enableKiraya').checked = localStorage.getItem('enableKiraya') === 'true';
+    document.getElementById('enableMazdoori').checked = localStorage.getItem('enableMazdoori') === 'true';
     document.getElementById('enablePrintQRCode').checked = localStorage.getItem('enablePrintQRCode') === 'true';
     document.getElementById('enableAmountPaidPaymentMethod').checked = localStorage.getItem('enableAmountPaidPaymentMethod') === 'true';
     document.getElementById('enableExtraDiscount1').checked = localStorage.getItem('enableExtraDiscount1') === 'true';
@@ -4774,6 +4801,9 @@ function loadInvoiceSettings() {
     if (enableExpiryDateCheckbox) enableExpiryDateCheckbox.checked = localStorage.getItem('enableExpiryDate') !== 'false';
     const enableSmartPriceHistoryPositionCheckbox = document.getElementById('enableSmartPriceHistoryPosition');
     if (enableSmartPriceHistoryPositionCheckbox) enableSmartPriceHistoryPositionCheckbox.checked = localStorage.getItem('smartPriceHistoryPosition') !== 'false';
+    document.getElementById('enableWeightColumn').checked = localStorage.getItem('enableWeightColumn') !== 'false';
+    document.getElementById('enablePackingColumn').checked = localStorage.getItem('enablePackingColumn') !== 'false';
+    document.getElementById('enableTotalWeightColumn').checked = localStorage.getItem('enableTotalWeightColumn') !== 'false';
 }
 
 // Save invoice settings to localStorage
@@ -4810,6 +4840,8 @@ function saveInvoiceSettings() {
     localStorage.setItem('enableExtraDiscount1', document.getElementById('enableExtraDiscount1').checked);
     localStorage.setItem('enableExtraDiscount2', document.getElementById('enableExtraDiscount2').checked);
     localStorage.setItem('enableShippingFees', document.getElementById('enableShippingFees').checked);
+    localStorage.setItem('enableKiraya', document.getElementById('enableKiraya').checked);
+    localStorage.setItem('enableMazdoori', document.getElementById('enableMazdoori').checked);
     localStorage.setItem('enablePrintQRCode', document.getElementById('enablePrintQRCode').checked);
     localStorage.setItem('enableAmountPaidPaymentMethod', document.getElementById('enableAmountPaidPaymentMethod').checked);
     // Taxation / Extra Discount / Batch No / Expiry Date checkboxes only exist on
@@ -4825,6 +4857,10 @@ function saveInvoiceSettings() {
     if (enableExpiryDateCheckbox) localStorage.setItem('enableExpiryDate', enableExpiryDateCheckbox.checked);
     const enableSmartPriceHistoryPositionCheckbox = document.getElementById('enableSmartPriceHistoryPosition');
     if (enableSmartPriceHistoryPositionCheckbox) localStorage.setItem('smartPriceHistoryPosition', enableSmartPriceHistoryPositionCheckbox.checked);
+    localStorage.setItem('enableWeightColumn', document.getElementById('enableWeightColumn').checked);
+    localStorage.setItem('enablePackingColumn', document.getElementById('enablePackingColumn').checked);
+    localStorage.setItem('enableTotalWeightColumn', document.getElementById('enableTotalWeightColumn').checked);
+    if (typeof applyInvoiceSettings === 'function') applyInvoiceSettings();
     if (typeof repositionPriceHistoryPanel === 'function') repositionPriceHistoryPanel();
     alert('Invoice settings saved successfully!');
 
@@ -4921,6 +4957,9 @@ function applyInvoiceSettings() {
 const enableBatchNo = localStorage.getItem('enableBatchNo') !== 'false';
 const enableExpiryDate = localStorage.getItem('enableExpiryDate') !== 'false';
 const enableExtraDiscountItem = localStorage.getItem('enableExtraDiscountItem') !== 'false';
+const enableWeightColumn = localStorage.getItem('enableWeightColumn') !== 'false';
+const enablePackingColumn = localStorage.getItem('enablePackingColumn') !== 'false';
+const enableTotalWeightColumn = localStorage.getItem('enableTotalWeightColumn') !== 'false';
 
     // Hide/show table columns by class name (works with dynamic unit columns)
     const itemsTable = document.getElementById('itemsTable');
@@ -4928,7 +4967,7 @@ const enableExtraDiscountItem = localStorage.getItem('enableExtraDiscountItem') 
         const thead = itemsTable.getElementsByTagName('thead')[0];
         const tbody = itemsTable.getElementsByTagName('tbody')[0];
         const tfoot = itemsTable.getElementsByTagName('tfoot')[0];
-        
+
         // Apply visibility to header
        if (thead) {
     const discPercentHeaders = thead.querySelectorAll('.disc-percent-cell');
@@ -4940,6 +4979,9 @@ const enableExtraDiscountItem = localStorage.getItem('enableExtraDiscountItem') 
     const batchNoHeaders = thead.querySelectorAll('.batch-no-cell');           // NEW
     const batchExpiryHeaders = thead.querySelectorAll('.batch-expiry-cell');   // NEW
     const extraDiscHeaders = thead.querySelectorAll('.extra-disc-cell');       // NEW
+    const weightValueHeaders = thead.querySelectorAll('.weight-value-cell');
+    const packingHeaders = thead.querySelectorAll('.packing-cell');
+    const totalWeightHeaders = thead.querySelectorAll('.weight-cell');
 
     discPercentHeaders.forEach(cell => cell.style.display = enableCashDiscountPercent ? '' : 'none');
     discAmountHeaders.forEach(cell => cell.style.display = enableCashDiscountAmount ? '' : 'none');
@@ -4950,6 +4992,9 @@ const enableExtraDiscountItem = localStorage.getItem('enableExtraDiscountItem') 
     batchNoHeaders.forEach(cell => cell.style.display = enableBatchNo ? '' : 'none');           // NEW
     batchExpiryHeaders.forEach(cell => cell.style.display = enableExpiryDate ? '' : 'none');     // NEW
     extraDiscHeaders.forEach(cell => cell.style.display = enableExtraDiscountItem ? '' : 'none'); // NEW
+    weightValueHeaders.forEach(cell => cell.style.display = enableWeightColumn ? '' : 'none');
+    packingHeaders.forEach(cell => cell.style.display = enablePackingColumn ? '' : 'none');
+    totalWeightHeaders.forEach(cell => cell.style.display = enableTotalWeightColumn ? '' : 'none');
 }
         
         // Apply visibility to body rows AND disable/enable inputs
@@ -5022,6 +5067,9 @@ const enableExtraDiscountItem = localStorage.getItem('enableExtraDiscountItem') 
                     if (!enableExtraDiscountItem) input.value = '0.00';
                 }
             });
+            tbody.querySelectorAll('.weight-value-cell').forEach(cell => cell.style.display = enableWeightColumn ? '' : 'none');
+            tbody.querySelectorAll('.packing-cell').forEach(cell => cell.style.display = enablePackingColumn ? '' : 'none');
+            tbody.querySelectorAll('.weight-cell').forEach(cell => cell.style.display = enableTotalWeightColumn ? '' : 'none');
         }
 
         // Apply visibility to footer
@@ -5035,6 +5083,9 @@ const enableExtraDiscountItem = localStorage.getItem('enableExtraDiscountItem') 
     const batchNoFooters = tfoot.querySelectorAll('.batch-no-cell');          // NEW
     const batchExpiryFooters = tfoot.querySelectorAll('.batch-expiry-cell');  // NEW
     const extraDiscFooters = tfoot.querySelectorAll('.extra-disc-cell');      // NEW
+    const weightValueFooters = tfoot.querySelectorAll('.weight-value-cell');
+    const packingFooters = tfoot.querySelectorAll('.packing-cell');
+    const totalWeightFooters = tfoot.querySelectorAll('.weight-cell');
 
     discPercentFooters.forEach(cell => cell.style.display = enableCashDiscountPercent ? '' : 'none');
     discAmountFooters.forEach(cell => cell.style.display = enableCashDiscountAmount ? '' : 'none');
@@ -5045,6 +5096,9 @@ const enableExtraDiscountItem = localStorage.getItem('enableExtraDiscountItem') 
     batchNoFooters.forEach(cell => cell.style.display = enableBatchNo ? '' : 'none');           // NEW
     batchExpiryFooters.forEach(cell => cell.style.display = enableExpiryDate ? '' : 'none');     // NEW
     extraDiscFooters.forEach(cell => cell.style.display = enableExtraDiscountItem ? '' : 'none'); // NEW
+    weightValueFooters.forEach(cell => cell.style.display = enableWeightColumn ? '' : 'none');
+    packingFooters.forEach(cell => cell.style.display = enablePackingColumn ? '' : 'none');
+    totalWeightFooters.forEach(cell => cell.style.display = enableTotalWeightColumn ? '' : 'none');
 }
     }
 
@@ -5052,6 +5106,10 @@ const enableExtraDiscountItem = localStorage.getItem('enableExtraDiscountItem') 
     const totalDiscountPercentItem = document.getElementById('totalDiscountPercent')?.closest('.summary-item');
     const totalDiscountAmountItem = document.getElementById('totalDiscountAmount')?.closest('.summary-item');
     const shippingFeesItem = document.getElementById('shippingFees')?.closest('.summary-item');
+    const kirayaItem = document.getElementById('kiraya')?.closest('.summary-item');
+    const mazdooriItem = document.getElementById('mazdoori')?.closest('.summary-item');
+    const enableKiraya = localStorage.getItem('enableKiraya') === 'true';
+    const enableMazdoori = localStorage.getItem('enableMazdoori') === 'true';
     const enableAmountPaidPaymentMethod = localStorage.getItem('enableAmountPaidPaymentMethod') === 'true';
     const paymentMethodItem = document.getElementById('paymentMethod')?.closest('.summary-item');
     const bankAccountItem = document.getElementById('bankAccountContainer');
@@ -5080,6 +5138,22 @@ const enableExtraDiscountItem = localStorage.getItem('enableExtraDiscountItem') 
         if (input) {
             input.disabled = !enableShippingFees;
             if (!enableShippingFees) input.value = '0.00';
+        }
+    }
+    if (kirayaItem) {
+        kirayaItem.style.display = enableKiraya ? '' : 'none';
+        const input = document.getElementById('kiraya');
+        if (input) {
+            input.disabled = !enableKiraya;
+            if (!enableKiraya) input.value = '0.00';
+        }
+    }
+    if (mazdooriItem) {
+        mazdooriItem.style.display = enableMazdoori ? '' : 'none';
+        const input = document.getElementById('mazdoori');
+        if (input) {
+            input.disabled = !enableMazdoori;
+            if (!enableMazdoori) input.value = '0.00';
         }
     }
     if (paymentMethodItem) {
@@ -6362,9 +6436,67 @@ async function addRowDynamic() {
         batchExpiryCell.appendChild(batchExpiryInput);
     }
 
+    // Packing — always shows "1 x <conversion factor>" for whichever unit
+    // column(s) have a quantity entered (e.g. "1 x 12" for Carton with a factor
+    // of 12) — states the fixed packaging size, independent of how many were
+    // actually ordered (that's what Total Weight is for).
+    const packingCell = row.insertCell(3 + batchOffset);
+    packingCell.className = 'packing-cell';
+    const packingInput = document.createElement('input');
+    packingInput.type = 'text';
+    packingInput.className = 'table-input';
+    packingInput.readOnly = true;
+    packingInput.tabIndex = -1;
+    packingInput.style.textAlign = 'center';
+    packingInput.value = '-';
+    packingInput.title = 'Packing (1 × conversion factor of that unit)';
+    packingCell.appendChild(packingInput);
+
+    // Weight — reference display of the product's own per-base-unit weight (set
+    // in product-add.php), e.g. "800" with a small "gram" label above the box,
+    // matching the Unit 1/Unit 2 column style. Not editable, not part of any
+    // financial calculation — populated by updateRowWeightAndPacking().
+    const weightValueCell = row.insertCell(4 + batchOffset);
+    weightValueCell.className = 'weight-value-cell';
+    const weightValueContainer = document.createElement('div');
+    weightValueContainer.style.display = 'flex';
+    weightValueContainer.style.flexDirection = 'column';
+    weightValueContainer.style.gap = '2px';
+    weightValueContainer.style.padding = '4px';
+    const weightUnitLabel = document.createElement('div');
+    weightUnitLabel.className = 'unit-label weight-unit-label';
+    weightUnitLabel.style.fontSize = '10px';
+    weightUnitLabel.style.fontWeight = '500';
+    weightUnitLabel.style.color = 'var(--text-secondary, #6c757d)';
+    weightUnitLabel.style.textAlign = 'left';
+    weightUnitLabel.style.marginBottom = '2px';
+    weightUnitLabel.style.opacity = '0.8';
+    weightValueContainer.appendChild(weightUnitLabel);
+    const weightValueDisplay = document.createElement('input');
+    weightValueDisplay.type = 'text';
+    weightValueDisplay.className = 'table-input weight-value-display';
+    weightValueDisplay.readOnly = true;
+    weightValueDisplay.tabIndex = -1;
+    weightValueDisplay.value = '-';
+    weightValueContainer.appendChild(weightValueDisplay);
+    weightValueCell.appendChild(weightValueContainer);
+
+    // Total Weight — product's per-base-unit weight × total quantity in base
+    // units (qty entered × that unit's conversion factor, summed across units).
+    const weightCell = row.insertCell(5 + batchOffset);
+    weightCell.className = 'weight-cell';
+    const weightTotalInput = document.createElement('input');
+    weightTotalInput.type = 'text';
+    weightTotalInput.className = 'table-input';
+    weightTotalInput.readOnly = true;
+    weightTotalInput.tabIndex = -1;
+    weightTotalInput.style.textAlign = 'right';
+    weightTotalInput.value = '-';
+    weightCell.appendChild(weightTotalInput);
+
     // Price
-    const priceCell = row.insertCell(3 + batchOffset);
-    
+    const priceCell = row.insertCell(6 + batchOffset);
+
     // Unit cells will be added dynamically (inserted starting at index 3)
     // Price
     priceCell.className = 'price-cell';
@@ -6415,7 +6547,7 @@ async function addRowDynamic() {
     priceCell.appendChild(priceInput);
     
     // Gross Amount
-    const grossCell = row.insertCell(4 + batchOffset);
+    const grossCell = row.insertCell(7 + batchOffset);
     grossCell.className = 'gross-cell';
     const grossInput = document.createElement('input');
     grossInput.type = 'text';
@@ -6426,7 +6558,7 @@ async function addRowDynamic() {
     grossCell.appendChild(grossInput);
     
     // Discount %
-    const discPercentCell = row.insertCell(5 + batchOffset);
+    const discPercentCell = row.insertCell(8 + batchOffset);
     discPercentCell.className = 'disc-percent-cell';
     const discPercentInput = document.createElement('input');
     discPercentInput.type = 'number';
@@ -6449,7 +6581,7 @@ async function addRowDynamic() {
     discPercentCell.appendChild(discPercentInput);
     
     // Discount Amount
-    const discAmountCell = row.insertCell(6 + batchOffset);
+    const discAmountCell = row.insertCell(9 + batchOffset);
     discAmountCell.className = 'disc-amount-cell';
     const discAmountInput = document.createElement('input');
     discAmountInput.type = 'number';
@@ -6476,7 +6608,7 @@ async function addRowDynamic() {
     // inserting it there would leave a headerless/footerless cell.
     const extraDiscOffset = isMedInvoicePage ? 1 : 0;
     if (isMedInvoicePage) {
-        const extraDiscCell = row.insertCell(7 + batchOffset);
+        const extraDiscCell = row.insertCell(10 + batchOffset);
         extraDiscCell.className = 'extra-disc-cell';
         const extraDiscInput = document.createElement('input');
         extraDiscInput.type = 'number';
@@ -6501,7 +6633,7 @@ async function addRowDynamic() {
     }
 
     // TO Amount
-    const toAmountCell = row.insertCell(7 + batchOffset + extraDiscOffset);
+    const toAmountCell = row.insertCell(10 + batchOffset + extraDiscOffset);
     toAmountCell.className = 'to-amount-cell';
     const toAmountInput = document.createElement('input');
     toAmountInput.type = 'number';
@@ -6512,7 +6644,7 @@ async function addRowDynamic() {
     toAmountCell.appendChild(toAmountInput);
     
     // GST %
-    const taxPercentCell = row.insertCell(8 + batchOffset + extraDiscOffset);
+    const taxPercentCell = row.insertCell(11 + batchOffset + extraDiscOffset);
     taxPercentCell.className = 'tax-percent-cell';
     const taxPercentInput = document.createElement('input');
     taxPercentInput.type = 'number';
@@ -6535,7 +6667,7 @@ async function addRowDynamic() {
     taxPercentCell.appendChild(taxPercentInput);
     
     // GST Amount
-    const taxAmountCell = row.insertCell(9 + batchOffset + extraDiscOffset);
+    const taxAmountCell = row.insertCell(12 + batchOffset + extraDiscOffset);
     taxAmountCell.className = 'tax-amount-cell';
     const taxAmountInput = document.createElement('input');
     taxAmountInput.type = 'number';
@@ -6546,7 +6678,7 @@ async function addRowDynamic() {
     taxAmountCell.appendChild(taxAmountInput);
     
     // FOC Qty
-    const focCell = row.insertCell(10 + batchOffset + extraDiscOffset);
+    const focCell = row.insertCell(13 + batchOffset + extraDiscOffset);
     focCell.className = 'foc-cell';
     const focInput = document.createElement('input');
     focInput.type = 'number';
@@ -6564,7 +6696,7 @@ async function addRowDynamic() {
     focCell.appendChild(focInput);
     
     // Net Amount
-    const netCell = row.insertCell(11 + batchOffset + extraDiscOffset);
+    const netCell = row.insertCell(14 + batchOffset + extraDiscOffset);
     netCell.className = 'net-cell';
     const netInput = document.createElement('input');
     netInput.type = 'text';
@@ -6574,26 +6706,8 @@ async function addRowDynamic() {
     netInput.tabIndex = 0;
     netCell.appendChild(netInput);
 
-    // Packing — shows "{qty} x {conversion factor}" for whichever unit column(s)
-    // have a quantity entered (e.g. "1 x 12" for 1 Carton with a factor of 12).
-    // Derived/read-only — kept updated by updateRowWeightAndPacking().
-    const packingCell = row.insertCell(12 + batchOffset + extraDiscOffset);
-    packingCell.className = 'packing-cell';
-    packingCell.style.textAlign = 'center';
-    packingCell.style.fontSize = '12px';
-    packingCell.textContent = '-';
-    packingCell.title = 'Packing (quantity entered × conversion factor of that unit)';
-
-    // Total Weight — product's per-base-unit weight (from product-add.php) ×
-    // total quantity in base units. Derived/read-only.
-    const weightCell = row.insertCell(13 + batchOffset + extraDiscOffset);
-    weightCell.className = 'weight-cell';
-    weightCell.style.textAlign = 'right';
-    weightCell.style.fontSize = '12px';
-    weightCell.textContent = '-';
-
     // Actions
-    const actionsCell = row.insertCell(14 + batchOffset + extraDiscOffset);
+    const actionsCell = row.insertCell(15 + batchOffset + extraDiscOffset);
     const actionsDiv = document.createElement('div');
     actionsDiv.style.display = 'flex';
     actionsDiv.style.gap = '4px';
@@ -6649,9 +6763,24 @@ async function addRowDynamic() {
 // financial calculation (calculateRowAmounts etc.), so it's safe to call as
 // often as needed without risking the price/tax math elsewhere in this file.
 function updateRowWeightAndPacking(row) {
+    const weightValueCell = row.querySelector('.weight-value-cell');
     const packingCell = row.querySelector('.packing-cell');
     const weightCell = row.querySelector('.weight-cell');
     if (!packingCell || !weightCell) return;
+
+    const weightValue = parseFloat(row.dataset.weightValue);
+    const weightUnit = row.dataset.weightUnit || '';
+    const hasWeight = !isNaN(weightValue) && weightValue > 0;
+
+    // Weight reference column: small unit label above the box (e.g. "gram"),
+    // the product's own per-base-unit weight below (e.g. "800") — same visual
+    // pattern as the Unit 1/Unit 2 columns' unit-label + input.
+    if (weightValueCell) {
+        const label = weightValueCell.querySelector('.weight-unit-label');
+        const display = weightValueCell.querySelector('.weight-value-display');
+        if (label) label.textContent = hasWeight ? weightUnit : '';
+        if (display) display.value = hasWeight ? weightValue : '-';
+    }
 
     const unitInputs = row.querySelectorAll('.unit-input');
     let totalQtyBaseUnits = 0;
@@ -6660,37 +6789,54 @@ function updateRowWeightAndPacking(row) {
         const qty = parseFloat(input.value) || 0;
         const cf = parseFloat(input.dataset.conversionFactor) || 1;
         totalQtyBaseUnits += qty * cf;
+        // Packing states the fixed packaging size ("1 x 12"), not scaled by how
+        // many were actually entered — that's what Total Weight is for.
         if (qty > 0 && cf !== 1) {
-            packingParts.push(`${qty} x ${cf}`);
+            packingParts.push(`1 x ${cf}`);
         }
     });
-    packingCell.textContent = packingParts.length > 0 ? packingParts.join(', ') : '-';
+    const packingInput = packingCell.querySelector('input');
+    if (packingInput) packingInput.value = packingParts.length > 0 ? packingParts.join(', ') : '-';
 
-    const weightValue = parseFloat(row.dataset.weightValue);
-    const weightUnit = row.dataset.weightUnit || '';
-    if (!isNaN(weightValue) && weightValue > 0 && totalQtyBaseUnits > 0) {
+    const weightTotalInput = weightCell.querySelector('input');
+    if (hasWeight && totalQtyBaseUnits > 0) {
         const totalWeight = weightValue * totalQtyBaseUnits;
-        weightCell.textContent = `${totalWeight.toFixed(2)} ${weightUnit}`.trim();
+        if (weightTotalInput) weightTotalInput.value = `${totalWeight.toFixed(2)} ${weightUnit}`.trim();
     } else {
-        weightCell.textContent = '-';
+        if (weightTotalInput) weightTotalInput.value = '-';
     }
 
     updateFooterWeightTotal();
 }
 
-// Sums Total Weight across all rows into the footer, grouped by weight unit
-// (grams and kilograms are never silently added together as if they were the
-// same number).
+// Weight units group into two physical dimensions — mass and volume. Units in
+// the same dimension convert into one another (grams into kilograms); mass and
+// volume never combine (a gram total and a liter total stay separate, shown as
+// two parts). Factors below convert 1 of that unit into the dimension's base
+// (grams for mass, milliliters for volume).
+const WEIGHT_UNIT_DIMENSIONS = {
+    gram: { base: 'gram', factor: 1, displayUnit: 'kg', displayFactor: 1000 },
+    kg: { base: 'gram', factor: 1000, displayUnit: 'kg', displayFactor: 1000 },
+    pound: { base: 'gram', factor: 453.592, displayUnit: 'kg', displayFactor: 1000 },
+    ounce: { base: 'gram', factor: 28.3495, displayUnit: 'kg', displayFactor: 1000 },
+    ml: { base: 'ml', factor: 1, displayUnit: 'liter', displayFactor: 1000 },
+    liter: { base: 'ml', factor: 1000, displayUnit: 'liter', displayFactor: 1000 }
+};
+
+// Sums Total Weight across all rows into the footer, converting every row into
+// a common unit per dimension (mass → kg, volume → liter) so e.g. a 9600 gram
+// row and a 12 kg row combine into one real total instead of sitting side by
+// side as two meaningless numbers.
 function updateFooterWeightTotal() {
     const itemsTable = document.getElementById('itemsTable');
     const totalWeightCell = document.getElementById('totalWeightRow');
     if (!itemsTable || !totalWeightCell) return;
 
     const tbody = itemsTable.getElementsByTagName('tbody')[0];
-    const totalsByUnit = {};
+    const totalsByBase = {}; // base ('gram'/'ml'/unrecognized-unit-label) -> total in that base unit
     Array.from(tbody.rows).forEach(row => {
         const weightValue = parseFloat(row.dataset.weightValue);
-        const weightUnit = row.dataset.weightUnit || '';
+        const weightUnit = (row.dataset.weightUnit || '').toLowerCase();
         if (isNaN(weightValue) || weightValue <= 0) return;
 
         let totalQtyBaseUnits = 0;
@@ -6701,11 +6847,22 @@ function updateFooterWeightTotal() {
         });
         if (totalQtyBaseUnits <= 0) return;
 
-        const key = weightUnit || 'unit';
-        totalsByUnit[key] = (totalsByUnit[key] || 0) + (weightValue * totalQtyBaseUnits);
+        const rowTotal = weightValue * totalQtyBaseUnits;
+        const dimension = WEIGHT_UNIT_DIMENSIONS[weightUnit];
+        // Recognized unit: fold into its dimension's base (gram/ml). Unrecognized
+        // (custom free-text unit typed elsewhere): keep as its own group so it
+        // still shows up rather than being silently dropped.
+        const key = dimension ? dimension.base : (weightUnit || 'unit');
+        totalsByBase[key] = (totalsByBase[key] || 0) + (dimension ? rowTotal * dimension.factor : rowTotal);
     });
 
-    const parts = Object.entries(totalsByUnit).map(([unit, val]) => `${val.toFixed(2)} ${unit}`.trim());
+    const displayUnitFor = { gram: { unit: 'kg', factor: 1000 }, ml: { unit: 'liter', factor: 1000 } };
+    const parts = Object.entries(totalsByBase).map(([base, val]) => {
+        const display = displayUnitFor[base];
+        return display
+            ? `${(val / display.factor).toFixed(2)} ${display.unit}`
+            : `${val.toFixed(2)} ${base}`.trim();
+    });
     totalWeightCell.textContent = parts.length > 0 ? parts.join(', ') : '0.00';
 }
 
@@ -6720,6 +6877,9 @@ function applyInvoiceSettingsToRow(row) {
     const enableBatchNo = localStorage.getItem('enableBatchNo') !== 'false';       // NEW
     const enableExpiryDate = localStorage.getItem('enableExpiryDate') !== 'false'; // NEW
     const enableExtraDiscountItem = localStorage.getItem('enableExtraDiscountItem') !== 'false'; // NEW
+    const enableWeightColumn = localStorage.getItem('enableWeightColumn') !== 'false';
+    const enablePackingColumn = localStorage.getItem('enablePackingColumn') !== 'false';
+    const enableTotalWeightColumn = localStorage.getItem('enableTotalWeightColumn') !== 'false';
 
     // Apply visibility to cells in this row
     const discPercentCell = row.querySelector('.disc-percent-cell');
@@ -6731,6 +6891,9 @@ function applyInvoiceSettingsToRow(row) {
     const focCell = row.querySelector('.foc-cell');
     const batchNoCell = row.querySelector('.batch-no-cell');           // NEW
     const batchExpiryCell = row.querySelector('.batch-expiry-cell');   // NEW
+    const weightValueCell = row.querySelector('.weight-value-cell');
+    const packingCell = row.querySelector('.packing-cell');
+    const totalWeightCell = row.querySelector('.weight-cell');
 
     if (discPercentCell) discPercentCell.style.display = enableCashDiscountPercent ? '' : 'none';
     if (discAmountCell) discAmountCell.style.display = enableCashDiscountAmount ? '' : 'none';
@@ -6741,6 +6904,9 @@ function applyInvoiceSettingsToRow(row) {
     if (focCell) focCell.style.display = enableFOC ? '' : 'none';
     if (batchNoCell) batchNoCell.style.display = enableBatchNo ? '' : 'none';               // NEW
     if (batchExpiryCell) batchExpiryCell.style.display = enableExpiryDate ? '' : 'none';     // NEW
+    if (weightValueCell) weightValueCell.style.display = enableWeightColumn ? '' : 'none';
+    if (packingCell) packingCell.style.display = enablePackingColumn ? '' : 'none';
+    if (totalWeightCell) totalWeightCell.style.display = enableTotalWeightColumn ? '' : 'none';
 }
 
 // Initialize dropdown for dynamic rows

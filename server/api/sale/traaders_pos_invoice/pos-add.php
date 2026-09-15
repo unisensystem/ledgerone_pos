@@ -78,9 +78,9 @@ $pdo->beginTransaction();
             previous_balance, sale_officer_id, supplier_man_id, brand_id, sale_order_id, bilty_no, transport_name,
             total_bill, total_discount_percent, total_discount_amount,
             extra_discount_1_percent, extra_discount_1_amount, extra_discount_2_percent, extra_discount_2_amount,
-            shipping_fees, net_amount, withholding_tax_percent, withholding_tax_amount, amount_paid_auto_fill,
+            shipping_fees, kiraya, mazdoori, net_amount, withholding_tax_percent, withholding_tax_amount, amount_paid_auto_fill,
             invoice_type, due_date, remarks, status, created_by, updated_by, project_id, container_id
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ");
 
     $stmt->execute([
@@ -107,6 +107,8 @@ $pdo->beginTransaction();
         $input['extraDiscount2Percent'] ?? 0.00,
         $input['extraDiscount2Amount'] ?? 0.00,
         $input['shippingFees'] ?? 0.00,
+        $input['kiraya'] ?? 0.00,
+        $input['mazdoori'] ?? 0.00,
         $input['netAmount'],
         $withholdingTaxPercent,
         $withholdingTaxAmount,
@@ -494,6 +496,7 @@ if ($status === 'Posted' || $status === 'Draft') {
             'bilty_no' => $input['biltyNo'] ?? null, 'transport_name' => $input['transportName'] ?? null,
             'total_bill' => $input['totalBill'], 'total_discount_percent' => $input['totalDiscountPercent'] ?? 0,
             'total_discount_amount' => $input['totalDiscountAmount'] ?? 0, 'shipping_fees' => $input['shippingFees'] ?? 0,
+            'kiraya' => $input['kiraya'] ?? 0, 'mazdoori' => $input['mazdoori'] ?? 0,
             'net_amount' => $input['netAmount'], 'invoice_type' => $input['invoiceType'] ?? 'Cash',
             'due_date' => $input['dueDate'] ?? null, 'remarks' => $input['remarks'] ?? null, 'status' => $status,
             'amount_paid' => $input['amountPaid'] ?? 0, 'items' => $input['items']

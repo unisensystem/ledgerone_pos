@@ -106,17 +106,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
 
         // Get invoice items
         $itemStmt = $pdo->prepare("
-            SELECT 
+            SELECT
                 sii.*,
                 COALESCE(sii.scheme, 'sale_on_tp') as scheme,
                 p.name as product_name,
                 p.code as product_code,
                 p.stock_affects,
                 p.invoice_affects,
-                u.uom_name
+                p.weight_value,
+                p.weight_unit,
+                u.uom_name,
+                COALESCE(puc.conversion_factor, u.conversion_factor, 1) as uom_conversion_factor
             FROM sale_invoice_items sii
             LEFT JOIN products p ON sii.product_id = p.id
             LEFT JOIN uom u ON sii.uom_id = u.id
+            LEFT JOIN product_uom_conversions puc ON puc.product_id = sii.product_id AND puc.uom_id = sii.uom_id
             WHERE sii.sale_invoice_id = ? AND sii.tenant_id = ?
             ORDER BY COALESCE(sii.parent_row_id, sii.id), sii.id
         ");
@@ -167,7 +171,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
             SELECT bill_no, currency_id, sale_date, customer_id, sub_account_id, company_id, branch_id, previous_balance,
                    sale_officer_id, supplier_man_id, brand_id, sale_order_id, bilty_no, transport_name, total_bill,
                    total_discount_percent, total_discount_amount, extra_discount_1_percent, extra_discount_1_amount,
-                   extra_discount_2_percent, extra_discount_2_amount, net_amount, remarks, ship_to, status, project_id, container_id
+                   extra_discount_2_percent, extra_discount_2_amount, kiraya, mazdoori, net_amount, remarks, ship_to, status, project_id, container_id
             FROM sale_invoice WHERE id = ? AND tenant_id = ?
         ");
         $stmt->execute([$invoice_id, $tenant_id]);
@@ -198,6 +202,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
                 currency_id = ?, sale_date = ?, customer_id = ?, sub_account_id = ?, company_id = ?, branch_id = ?,
                 previous_balance = ?, sale_officer_id = ?, supplier_man_id = ?, brand_id = ?, sale_order_id = ?, bilty_no = ?, transport_name = ?, total_bill = ?, total_discount_percent = ?,
                 total_discount_amount = ?, extra_discount_1_percent = ?, extra_discount_1_amount = ?, extra_discount_2_percent = ?, extra_discount_2_amount = ?,
+                kiraya = ?, mazdoori = ?,
                 net_amount = ?, withholding_tax_percent = ?, withholding_tax_amount = ?, amount_paid_auto_fill = ?, remarks = ?, ship_to = ?, status = ?, project_id = ?, container_id = ?, updated_by = ?
             WHERE id = ? AND tenant_id = ?
         ");
@@ -222,6 +227,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
             $input['extraDiscount1Amount'] ?? 0.00,
             $input['extraDiscount2Percent'] ?? 0.00,
             $input['extraDiscount2Amount'] ?? 0.00,
+            $input['kiraya'] ?? 0.00,
+            $input['mazdoori'] ?? 0.00,
             $input['netAmount'],
             $withholdingTaxPercent,
             $withholdingTaxAmount,
@@ -569,6 +576,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
             'extra_discount_1_amount' => $input['extraDiscount1Amount'] ?? 0,
             'extra_discount_2_percent' => $input['extraDiscount2Percent'] ?? 0,
             'extra_discount_2_amount' => $input['extraDiscount2Amount'] ?? 0,
+            'kiraya' => $input['kiraya'] ?? 0,
+            'mazdoori' => $input['mazdoori'] ?? 0,
             'net_amount' => $input['netAmount'],
             'remarks' => $input['remarks'] ?? null,
             'ship_to' => $input['shipTo'] ?? null,

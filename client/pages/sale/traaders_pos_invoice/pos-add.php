@@ -21,7 +21,7 @@ if (!$user_id) {
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>LedgerOne ERP - Sale Invoice</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="stylesheet" href="../../../assets/css/sale/traaders_pos_invoice/pos-add.css">
+    <link rel="stylesheet" href="../../../assets/css/sale/traaders_pos_invoice/pos-add.css?v=<?php echo time(); ?>">
 </head>
 <body class="light-theme">
     <div class="container">
@@ -250,6 +250,9 @@ if (!$user_id) {
                                 <th width="18%">Product Code / Name</th>
                                 <th width="10%">Scheme</th>
                                 <!-- Dynamic unit columns will be inserted here -->
+                                <th width="6%" class="packing-cell">Packing</th>
+                                <th width="6%" class="weight-value-cell">Weight</th>
+                                <th width="9%" class="weight-cell">Total Weight</th>
                                 <th width="8%" class="price-cell"><span id="salePriceLabel">Sale Price</span></th>
                                 <th width="8%" class="gross-cell"><span id="grossAmountLabel">Gross Amount</span></th>
                                 <th width="5%" class="disc-percent-cell">Disc %</th>
@@ -259,8 +262,6 @@ if (!$user_id) {
                                 <th width="8%" class="tax-amount-cell">Tax Amt</th>
                                 <th width="8%" class="foc-cell">FOC Qty</th>
                                 <th width="8%" class="net-cell"><span id="netAmountLabel">Net Amount</span></th>
-                                <th width="7%" class="packing-cell">Packing</th>
-                                <th width="8%" class="weight-cell">Total Weight</th>
                                 <th width="3%">Actions</th>
                             </tr>
                         </thead>
@@ -273,6 +274,9 @@ if (!$user_id) {
 <th style="text-align: left;"></th>
 <th style="text-align: left;"></th>
     <!-- Dynamic unit totals will be inserted here -->
+                                <th class="packing-cell"></th>
+                                <th class="weight-value-cell"></th>
+                                <th id="totalWeightRow" class="weight-cell">0.00</th>
                                 <th id="totalSalePrice" class="price-cell">0.00</th>
                                 <th id="totalGrossAmount" class="gross-cell">0.00</th>
                                 <th class="disc-percent-cell"></th>
@@ -282,8 +286,6 @@ if (!$user_id) {
                                 <th id="totalTaxAmount" class="tax-amount-cell">0.00</th>
                                 <th id="totalFocQty" class="foc-cell">0.00</th>
                                 <th id="totalNetAmountItems" class="net-cell">0.00</th>
-                                <th class="packing-cell"></th>
-                                <th id="totalWeightRow" class="weight-cell">0.00</th>
                                 <th></th>
                             </tr>
                         </tfoot>
@@ -330,6 +332,14 @@ if (!$user_id) {
                     <div class="summary-item">
                         <span class="summary-label" id="shippingFeesLabel">Shipping Fees</span>
                         <input type="number" id="shippingFees" class="table-input" min="0" step="0.001" value="0">
+                    </div>
+                    <div class="summary-item">
+                        <span class="summary-label">Kiraya</span>
+                        <input type="number" id="kiraya" class="table-input" min="0" step="0.001" value="0">
+                    </div>
+                    <div class="summary-item">
+                        <span class="summary-label">Mazdoori</span>
+                        <input type="number" id="mazdoori" class="table-input" min="0" step="0.001" value="0">
                     </div>
                     <div class="summary-item">
                         <span class="summary-label" id="netAmountSummaryLabel">Net Amount</span>
@@ -682,6 +692,18 @@ if (!$user_id) {
                             <input type="checkbox" id="enableSmartPriceHistoryPosition" style="width: auto;">
                             <span style="font-size: 13px;">Auto-Move Price History (5+ Items)</span>
                         </label>
+                        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 8px; background: var(--surface-1); border-radius: 6px; transition: all 0.2s;" onmouseover="this.style.background='var(--surface-0)'" onmouseout="this.style.background='var(--surface-1)'">
+                            <input type="checkbox" id="enableWeightColumn" style="width: auto;">
+                            <span style="font-size: 13px;">Weight Column</span>
+                        </label>
+                        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 8px; background: var(--surface-1); border-radius: 6px; transition: all 0.2s;" onmouseover="this.style.background='var(--surface-0)'" onmouseout="this.style.background='var(--surface-1)'">
+                            <input type="checkbox" id="enablePackingColumn" style="width: auto;">
+                            <span style="font-size: 13px;">Packing Column</span>
+                        </label>
+                        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 8px; background: var(--surface-1); border-radius: 6px; transition: all 0.2s;" onmouseover="this.style.background='var(--surface-0)'" onmouseout="this.style.background='var(--surface-1)'">
+                            <input type="checkbox" id="enableTotalWeightColumn" style="width: auto;">
+                            <span style="font-size: 13px;">Total Weight Column</span>
+                        </label>
                     </div>
                 </div>
 
@@ -712,6 +734,14 @@ if (!$user_id) {
                         <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 8px; background: var(--surface-1); border-radius: 6px; transition: all 0.2s;" onmouseover="this.style.background='var(--surface-0)'" onmouseout="this.style.background='var(--surface-1)'">
                             <input type="checkbox" id="enableShippingFees" style="width: auto;">
                             <span style="font-size: 13px;">Shipping Fees</span>
+                        </label>
+                        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 8px; background: var(--surface-1); border-radius: 6px; transition: all 0.2s;" onmouseover="this.style.background='var(--surface-0)'" onmouseout="this.style.background='var(--surface-1)'">
+                            <input type="checkbox" id="enableKiraya" style="width: auto;">
+                            <span style="font-size: 13px;">Kiraya</span>
+                        </label>
+                        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 8px; background: var(--surface-1); border-radius: 6px; transition: all 0.2s;" onmouseover="this.style.background='var(--surface-0)'" onmouseout="this.style.background='var(--surface-1)'">
+                            <input type="checkbox" id="enableMazdoori" style="width: auto;">
+                            <span style="font-size: 13px;">Mazdoori</span>
                         </label>
                         <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 8px; background: var(--surface-1); border-radius: 6px; transition: all 0.2s;" onmouseover="this.style.background='var(--surface-0)'" onmouseout="this.style.background='var(--surface-1)'">
                             <input type="checkbox" id="enableAmountPaidPaymentMethod" style="width: auto;">
