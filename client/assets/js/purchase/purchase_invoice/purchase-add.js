@@ -1,6 +1,7 @@
 // Global variables for products and UOM data
 let productsData = [];
 let uomData = [];
+let suppliersData = [];
 
 document.addEventListener('DOMContentLoaded', function () {
     // Set default date to today
@@ -67,14 +68,14 @@ if (isGlobalDateLocked && globalLockedDate) {
             .then(data => {
                 codeOptions.innerHTML = '';
                 if (data.success && data.suppliers.length) {
-                    data.suppliers.forEach(supplier => {
-                        const opt = document.createElement('div');
-                        opt.className = 'dropdown-option';
-                        opt.setAttribute('data-value', supplier.id);
-                        opt.setAttribute('data-balance', supplier.current_balance);
-                        opt.textContent = `${supplier.supplier_code} - ${supplier.supplier_name}${supplier.primary_phone ? ' - ' + supplier.primary_phone : ''}`;
-                        codeOptions.appendChild(opt);
-                    });
+         data.suppliers.forEach(supplier => {
+    const codeOption = document.createElement('div');
+    codeOption.className = 'dropdown-option';
+    codeOption.setAttribute('data-value', supplier.id);
+    codeOption.setAttribute('data-balance', supplier.current_balance);
+    codeOption.textContent = getSupplierDisplayText(supplier);   // ✅ already correct
+    codeOptions.appendChild(codeOption);
+});
                 } else {
                     codeOptions.innerHTML = '<div style="padding:10px;color:var(--subtext)">No suppliers found for this company</div>';
                 }
@@ -82,6 +83,8 @@ if (isGlobalDateLocked && globalLockedDate) {
             .catch(err => console.error('suppliers by assoc company error:', err));
     });
 
+
+    
     // Add row button event
     addRowBtn.addEventListener('click', addRowDynamic);
 
@@ -145,33 +148,33 @@ if (isGlobalDateLocked && globalLockedDate) {
         }
     });
 
-    // Load suppliers from API
-    async function loadSuppliers(companyId = null) {
-        try {
-            const url = companyId
-                ? `../../../../server/api/purchase/purchase_invoice/get-suppliers.php?company_id=${companyId}`
-                : '../../../../server/api/purchase/purchase_invoice/get-suppliers.php';
-            const response = await fetch(url);
-            const data = await response.json();
+   async function loadSuppliers(companyId = null) {
+    try {
+        const url = companyId
+            ? `../../../../server/api/purchase/purchase_invoice/get-suppliers.php?company_id=${companyId}`
+            : '../../../../server/api/purchase/purchase_invoice/get-suppliers.php';
+        const response = await fetch(url);
+        const data = await response.json();
 
-            if (data.success) {
-                const codeOptions = document.getElementById('supplierCodeOptions');
+        if (data.success) {
+    suppliersData = data.suppliers;
+    const codeOptions = document.getElementById('supplierCodeOptions');
 
-                codeOptions.innerHTML = '';
+    codeOptions.innerHTML = '';
 
-                data.suppliers.forEach(supplier => {
-                    const codeOption = document.createElement('div');
-                    codeOption.className = 'dropdown-option';
-                    codeOption.setAttribute('data-value', supplier.id);
-                    codeOption.setAttribute('data-balance', supplier.current_balance);
-                    codeOption.textContent = `${supplier.supplier_code} - ${supplier.supplier_name}${supplier.primary_phone ? ' - ' + supplier.primary_phone : ''}`;
-                    codeOptions.appendChild(codeOption);
-                });
-            }
-        } catch (error) {
-            console.error('Error loading suppliers:', error);
+    data.suppliers.forEach(supplier => {
+                const codeOption = document.createElement('div');
+                codeOption.className = 'dropdown-option';
+                codeOption.setAttribute('data-value', supplier.id);
+                codeOption.setAttribute('data-balance', supplier.current_balance);
+                codeOption.textContent = getSupplierDisplayText(supplier);
+                codeOptions.appendChild(codeOption);
+            });
         }
+    } catch (error) {
+        console.error('Error loading suppliers:', error);
     }
+}
 
     // Load branches from API
     async function loadBranches(companyId = null) {
@@ -886,14 +889,16 @@ if (isGlobalDateLocked && globalLockedDate) {
         const cell1 = row.insertCell(1);
         const codeContainer = document.createElement('div');
         codeContainer.className = 'searchable-dropdown';
-        const codeOptionsHtml = productsData.map(product => {
-            const codes = [];
-            if (product.qr_code) codes.push(product.qr_code);
-            if (product.barcode) codes.push(product.barcode);
-            const codeDisplay = codes.length > 0 ? ` (${codes.join(' - ')})` : '';
-            const photoHtml = product.photo ? `<img src="../../../assets/uploads/products/${product.photo}" alt="${product.name}" style="width: 30px; height: 30px; object-fit: cover; margin-right: 8px; border-radius: 4px;">` : '';
-            return `<div class="dropdown-option" data-value="${product.id}" data-price="${product.purchase_price}" data-unit="${product.default_unit_id}" data-carton-conversion="${product.carton_conversion || 0}" data-discount="${product.default_discount || 0}" data-trade-offer="${product.trade_offer_discount || 0}" data-foc="${product.default_foc || 0}" data-gst="${product.sales_tax || 0}" style="display: flex; align-items: center;">${photoHtml}${product.code} - ${product.name}${codeDisplay}</div>`;
-        }).join('');
+     
+  const codeOptionsHtml = productsData.map(product => {
+    const codes = [];
+    if (product.qr_code) codes.push(product.qr_code);
+    if (product.barcode) codes.push(product.barcode);
+    const codeDisplay = codes.length > 0 ? ` (${codes.join(' - ')})` : '';
+    const photoHtml = product.photo ? `<img src="../../../assets/uploads/products/${product.photo}" alt="${product.name}" style="width: 30px; height: 30px; object-fit: cover; margin-right: 8px; border-radius: 4px;">` : '';
+    const displayText = getProductDisplayText(product);
+    return `<div class="dropdown-option" data-product='${JSON.stringify(product)}' style="display: flex; align-items: center;">${photoHtml}${displayText}${codeDisplay}</div>`;
+}).join('');
         codeContainer.innerHTML = `
             <input type="text" class="search-input table-input" placeholder="Search product...">
             <input type="hidden" class="item-code" required>
@@ -1726,11 +1731,11 @@ netInput.addEventListener('keydown', function(e) {
             filterOptionsDynamic();
         });
         
-        optionsContainer.addEventListener('click', function(e) {
-            if (e.target.classList.contains('dropdown-option')) {
-                const product = JSON.parse(e.target.getAttribute('data-product'));
-                searchInput.value = `${product.code} - ${product.name}`;
-                hiddenInput.value = product.id;
+       optionsContainer.addEventListener('click', function(e) {
+    if (e.target.classList.contains('dropdown-option')) {
+        const product = JSON.parse(e.target.getAttribute('data-product'));
+        searchInput.value = getProductDisplayText(product);
+        hiddenInput.value = product.id;
                 
                 // Get UOM details
                 const uomDetails = getProductUOMDetails(product);
@@ -2061,19 +2066,61 @@ netInput.addEventListener('keydown', function(e) {
         document.getElementById('branch').value = '';
     });
 
-    function rebuildProductDropdowns() {
-        const tbody = document.getElementById('itemsTable')?.getElementsByTagName('tbody')[0];
-        if (!tbody) return;
+   function rebuildProductDropdowns() {
+    const tbody = document.getElementById('itemsTable')?.getElementsByTagName('tbody')[0];
+    if (!tbody) return;
+    Array.from(tbody.rows).forEach(row => {
+        const searchInput = row.querySelector('.search-input');
+        if (!searchInput || !searchInput.dropdownOptions) return;
+        const optionsContainer = searchInput.dropdownOptions;
+        optionsContainer.innerHTML = productsData.map(product => {
+            return `<div class="dropdown-option" data-product='${JSON.stringify(product)}' style="display:flex;align-items:center;">${getProductDisplayText(product)}</div>`;
+        }).join('');
+    });
+}
+
+function rebuildSupplierDropdowns() {
+    const codeOptions = document.getElementById('supplierCodeOptions');
+    if (!codeOptions) return;
+    
+    codeOptions.innerHTML = '';
+    suppliersData.forEach(supplier => {
+        const codeOption = document.createElement('div');
+        codeOption.className = 'dropdown-option';
+        codeOption.setAttribute('data-value', supplier.id);
+        codeOption.setAttribute('data-balance', supplier.current_balance);
+        codeOption.textContent = getSupplierDisplayText(supplier);
+        codeOptions.appendChild(codeOption);
+    });
+}
+
+function refreshSelectedDisplayTexts() {
+    // Update already-selected product text in each item row
+    const tbody = document.getElementById('itemsTable')?.getElementsByTagName('tbody')[0];
+    if (tbody) {
         Array.from(tbody.rows).forEach(row => {
-            const searchInput = row.querySelector('.search-input');
-            if (!searchInput || !searchInput.dropdownOptions) return;
-            const optionsContainer = searchInput.dropdownOptions;
-            optionsContainer.innerHTML = productsData.map(product => {
-                return `<div class="dropdown-option" data-product='${JSON.stringify(product)}' style="display:flex;align-items:center;">${product.code} - ${product.name}</div>`;
-            }).join('');
+            const hiddenInput = row.cells[1]?.querySelector('.item-code');
+            const searchInput = row.cells[1]?.querySelector('.search-input');
+            if (hiddenInput && hiddenInput.value && searchInput) {
+                const product = productsData.find(p => p.id == hiddenInput.value);
+                if (product) {
+                    searchInput.value = getProductDisplayText(product);
+                }
+            }
         });
     }
 
+    // Update already-selected supplier text
+  // Update already-selected supplier text
+const supplierHidden = document.getElementById('supplierCode');
+const supplierSearch = document.getElementById('supplierCodeSearch');
+if (supplierHidden && supplierHidden.value && supplierSearch) {
+    const supplier = suppliersData.find(s => s.id == supplierHidden.value);
+    if (supplier) {
+        supplierSearch.value = getSupplierDisplayText(supplier);
+    }
+}
+}
     function updateInvoiceSummaryFromAmount() {
         let totalBill = 0;
         const rows = itemsTable.rows;
@@ -2511,9 +2558,19 @@ netInput.addEventListener('keydown', function(e) {
         document.getElementById('showProject').checked = localStorage.getItem('showProject') !== 'false';
         document.getElementById('showRemarks').checked = localStorage.getItem('showRemarks') !== 'false';
         document.getElementById('settingsModal').style.display = 'flex';
-    });
 
-    document.getElementById('closeSettingsBtn').addEventListener('click', function () {
+        
+    const productFormat = localStorage.getItem('productDisplayFormat') || 'code-name';
+    const supplierFormat = localStorage.getItem('supplierDisplayFormat') || 'code-name';
+    const customerFormat = localStorage.getItem('customerDisplayFormat') || 'code-name';
+    
+    document.querySelector(`input[name="productDisplayFormat"][value="${productFormat}"]`).checked = true;
+    document.querySelector(`input[name="supplierDisplayFormat"][value="${supplierFormat}"]`).checked = true;
+    document.querySelector(`input[name="customerDisplayFormat"][value="${customerFormat}"]`).checked = true;
+    
+    document.getElementById('settingsModal').style.display = 'flex';
+});
+        document.getElementById('closeSettingsBtn').addEventListener('click', function () {
         document.getElementById('settingsModal').style.display = 'none';
     });
 
@@ -2545,18 +2602,69 @@ netInput.addEventListener('keydown', function(e) {
         localStorage.setItem('showContainer', document.getElementById('showContainer').checked);
         localStorage.setItem('showProject', document.getElementById('showProject').checked);
         localStorage.setItem('showRemarks', document.getElementById('showRemarks').checked);
-        document.getElementById('settingsModal').style.display = 'none';
 
-        // Apply settings immediately
-        applyInvoiceSettings();
-    });
-
+       const productFormat = document.querySelector('input[name="productDisplayFormat"]:checked')?.value || 'code-name';
+    const supplierFormat = document.querySelector('input[name="supplierDisplayFormat"]:checked')?.value || 'code-name';
+    const customerFormat = document.querySelector('input[name="customerDisplayFormat"]:checked')?.value || 'code-name';
+    
+        localStorage.setItem('productDisplayFormat', productFormat);
+    localStorage.setItem('supplierDisplayFormat', supplierFormat);
+    localStorage.setItem('customerDisplayFormat', customerFormat);
+    
+    document.getElementById('settingsModal').style.display = 'none';
+    applyInvoiceSettings();
+    rebuildProductDropdowns(); // Rebuild to apply new format
+    rebuildSupplierDropdowns(); // ✅ ADD THIS LINE - Rebuild supplier dropdown
+    refreshSelectedDisplayTexts(); // Update already-selected product/supplier text
+});
     document.getElementById('settingsModal').addEventListener('click', function (e) {
         if (e.target === this) {
             this.style.display = 'none';
         }
     });
 
+
+
+    // PRODUCT Display Text
+const getProductDisplayText = (product) => {
+    const format = localStorage.getItem('productDisplayFormat') || 'code-name';
+    switch(format) {
+        case 'code-only':
+            return product.code;
+        case 'name-only':
+            return product.name;
+        default: // code-name
+            return `${product.code} - ${product.name}`;
+    }
+};
+
+// SUPPLIER Display Text
+const getSupplierDisplayText = (supplier) => {
+    const format = localStorage.getItem('supplierDisplayFormat') || 'code-name';
+    const phone = supplier.primary_phone ? ` - ${supplier.primary_phone}` : '';
+    switch(format) {
+        case 'code-only':
+            return `${supplier.supplier_code}${phone}`;
+        case 'name-only':
+            return `${supplier.supplier_name}${phone}`;
+        default: // code-name
+            return `${supplier.supplier_code} - ${supplier.supplier_name}${phone}`;
+    }
+};
+
+// CUSTOMER Display Text
+const getCustomerDisplayText = (customer) => {
+    const format = localStorage.getItem('customerDisplayFormat') || 'code-name';
+    const phone = customer.primary_phone ? ` - ${customer.primary_phone}` : '';
+    switch(format) {
+        case 'code-only':
+            return `${customer.customer_code}${phone}`;
+        case 'name-only':
+            return `${customer.customer_name}${phone}`;
+        default: // code-name
+            return `${customer.customer_code} - ${customer.customer_name}${phone}`;
+    }
+};
     // Apply invoice settings to show/hide columns
     function applyInvoiceSettings() {
         const enableTradeOffer = localStorage.getItem('enableTradeOffer') === 'true';

@@ -48,6 +48,12 @@ $search = $_GET['search'] ?? '';
         th { background: #333; color: white; padding: 8px; text-align: left; }
         td { padding: 8px; border-bottom: 1px solid #ddd; }
         tbody tr:nth-child(even) { background: #f9f9f9; }
+        .sub-table-wrap { padding: 10px 8px 16px 28px; background: #f7f9fc; }
+        .sub-table-title { font-weight: 600; font-size: 11px; margin-bottom: 6px; color: #555; }
+        .sub-table { width: 100%; font-size: 10px; border: 1px solid #ddd; margin-bottom: 0; }
+        .sub-table th { background: #5b6472; padding: 5px 8px; }
+        .sub-table td { padding: 5px 8px; }
+        .sub-table-empty { font-size: 11px; color: #888; padding: 4px 0; }
         .footer { text-align: center; font-size: 10px; color: #666; margin-top: 30px; padding-top: 15px; border-top: 1px solid #ddd; }
         @media print {
             body { padding: 0; }
@@ -99,7 +105,9 @@ $search = $_GET['search'] ?? '';
         </div>
     </div>
     
-    <div id="report-tables"></div>
+    <div id="report-tables">
+        <div class="sub-table-empty" id="loading-msg">Loading report data & details…</div>
+    </div>
     
     <div class="footer">
         <p>LedgerOne ERP Sales Report • Confidential • Page generated on <?php echo date('F d, Y'); ?></p>
@@ -112,6 +120,7 @@ $search = $_GET['search'] ?? '';
         const reportType = '<?php echo $report_type; ?>';
         const companyId = '<?php echo $company_id; ?>';
         const searchTerm = '<?php echo htmlspecialchars($search, ENT_QUOTES); ?>'.toLowerCase();
+        const API_BASE = '../../../../server/api/sale/sales_report';
 
         // Same field combos the main report page's search boxes match against, so
         // Print shows exactly what was searched instead of the full dataset.
@@ -119,24 +128,104 @@ $search = $_GET['search'] ?? '';
             if (!searchTerm) return true;
             return fields.some(f => String(f || '').toLowerCase().includes(searchTerm));
         }
-        
+
+        function esc(v) {
+            return String(v ?? '').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+        }
+
+        function formatBatchCell(batchValue) {
+            return batchValue && batchValue.length ? esc(batchValue) : '-';
+        }
+
+        function formatExpiryCell(expiryValue) {
+            if (!expiryValue) return '-';
+            const firstDate = expiryValue.split(',')[0].trim();
+            const isExpiringSoon = firstDate && !isNaN(new Date(firstDate)) && (new Date(firstDate) - new Date()) / (1000 * 60 * 60 * 24) <= 30;
+            const safe = esc(expiryValue);
+            return isExpiringSoon
+                ? `<span style="color:#d64545; font-weight:600;">${safe}</span>`
+                : safe;
+        }
+
+        // ---- Detail / breakdown fetch helpers (mirror the dashboard's click handlers,
+        // but run automatically for every row since print has no click interaction) ----
+
+        async function fetchBreakdown(type, id) {
+            try {
+                const res = await fetch(`${API_BASE}/breakdown.php?type=${type}&id=${encodeURIComponent(id)}&date_from=${dateFrom}&date_to=${dateTo}`);
+                const result = await res.json();
+                return result.success ? (result.data || []) : [];
+            } catch (e) {
+                console.error('breakdown fetch error', e);
+                return [];
+            }
+        }
+
+        async function fetchDetails(type, id, extraParams = '') {
+            try {
+                const res = await fetch(`${API_BASE}/details.php?type=${type}&id=${encodeURIComponent(id)}&date_from=${dateFrom}&date_to=${dateTo}${extraParams}`);
+                const result = await res.json();
+                return result.success ? (result.data || []) : [];
+            } catch (e) {
+                console.error('details fetch error', e);
+                return [];
+            }
+        }
+
+        function subTableRow(colspan, title, headerCells, bodyRowsHtml) {
+            const body = bodyRowsHtml && bodyRowsHtml.length
+                ? bodyRowsHtml
+                : `<tr><td colspan="${headerCells.length}" class="sub-table-empty">No data available</td></tr>`;
+            return `<tr><td colspan="${colspan}" style="padding:0; border:none;">
+                <div class="sub-table-wrap">
+                    <div class="sub-table-title">${title}</div>
+                    <table class="sub-table">
+                        <thead><tr>${headerCells.map(h => `<th>${h}</th>`).join('')}</tr></thead>
+                        <tbody>${body}</tbody>
+                    </table>
+                </div>
+            </td></tr>`;
+        }
+
+        // Builds: main row + (always-visible) detail sub-table row, for a list of items.
+        // matchFn(item) -> array of fields to search against.
+        // fetchFn(item) -> Promise<Array> of detail rows.
+        // detailRowFn(detailItem) -> html string for one <tr> of the sub-table.
+        async function buildExpandableSection(items, colspan, matchFn, mainRowFn, subTitle, subHeaders, fetchFn, detailRowFn) {
+            const visibleItems = items.filter(item => matchesSearch(matchFn(item)));
+            if (!visibleItems.length) return '';
+
+            const rendered = await Promise.all(visibleItems.map(async item => {
+                const mainRow = mainRowFn(item);
+                const details = await fetchFn(item);
+                const bodyHtml = details.map(detailRowFn).join('');
+                const subRow = subTableRow(colspan, subTitle, subHeaders, bodyHtml);
+                return mainRow + subRow;
+            }));
+
+            return rendered.join('');
+        }
+
         async function loadReportData() {
             try {
-                let url = `../../../../server/api/sale/sales_report/sales-report.php?date_from=${dateFrom}&date_to=${dateTo}&report_type=${reportType}`;
+                let url = `${API_BASE}/sales-report.php?date_from=${dateFrom}&date_to=${dateTo}&report_type=${reportType}`;
                 if (companyId) url += `&company_id=${companyId}`;
                 
                 const response = await fetch(url);
                 const result = await response.json();
                 
                 if (result.success) {
-                    populateReport(result.data);
+                    await populateReport(result.data);
+                } else {
+                    document.getElementById('report-tables').innerHTML = '<div class="sub-table-empty">Failed to load report.</div>';
                 }
             } catch (error) {
                 console.error('Error loading report:', error);
+                document.getElementById('report-tables').innerHTML = '<div class="sub-table-empty">Error loading report.</div>';
             }
         }
         
-        function populateReport(data) {
+        async function populateReport(data) {
             // Summary
             const totalSales = (data.officer_sales || []).reduce((sum, item) => sum + parseFloat(item.total_sales || 0), 0);
             const totalCustomers = (data.customer_sales || []).length;
@@ -149,105 +238,149 @@ $search = $_GET['search'] ?? '';
             document.getElementById('avg-sale').textContent = CURRENCY_SYMBOL + avgSale.toLocaleString(undefined, {maximumFractionDigits: 2});
             
             const container = document.getElementById('report-tables');
-            let html = '';
-            
-            // Officer Sales
+            const sectionHtmlParts = [];
+
+            // ---- Officer Sales (+ daily breakdown) ----
             if (reportType === 'all' || reportType === 'officer') {
-                html += '<table><caption>Sales Officer Wise Sales</caption><thead><tr><th>Employee ID</th><th>Officer Name</th><th>Total Invoices</th><th>Total Sales</th><th>Status</th></tr></thead><tbody>';
-                (data.officer_sales || []).forEach(item => {
-                    if (!matchesSearch([item.employee_id, item.officer_name])) return;
-                    html += `<tr><td>${item.employee_id}</td><td>${item.officer_name}</td><td>${parseFloat(item.total_invoices || 0).toLocaleString()}</td><td>${CURRENCY_SYMBOL}${parseFloat(item.total_sales || 0).toLocaleString()}</td><td>${item.status}</td></tr>`;
-                });
-                html += '</tbody></table>';
+                const rows = await buildExpandableSection(
+                    data.officer_sales || [],
+                    5,
+                    item => [item.employee_id, item.officer_name],
+                    item => `<tr><td>${esc(item.employee_id)}</td><td>${esc(item.officer_name)}</td><td>${parseFloat(item.total_invoices || 0).toLocaleString()}</td><td>${CURRENCY_SYMBOL}${parseFloat(item.total_sales || 0).toLocaleString()}</td><td>${esc(item.status)}</td></tr>`,
+                    'Daily Breakdown',
+                    ['Date', 'Invoices', 'Revenue', 'Batch No', 'Expiry Date'],
+                    item => fetchBreakdown('officer', item.sale_officer_id),
+                    d => `<tr><td>${esc(d.date)}</td><td>${parseFloat(d.invoices || 0).toLocaleString()}</td><td>${CURRENCY_SYMBOL}${parseFloat(d.revenue || 0).toLocaleString()}</td><td>${formatBatchCell(d.batch_no)}</td><td>${formatExpiryCell(d.nearest_expiry)}</td></tr>`
+                );
+                sectionHtmlParts.push(`<table><caption>Sales Officer Wise Sales</caption><thead><tr><th>Employee ID</th><th>Officer Name</th><th>Total Invoices</th><th>Total Sales</th><th>Status</th></tr></thead><tbody>${rows}</tbody></table>`);
             }
             
-            // Supplier Man Sales
+            // ---- Supplier Man Sales (+ daily breakdown) ----
             if (reportType === 'all' || reportType === 'supplier_man') {
-                html += '<table><caption>Supplier Man Wise Sales</caption><thead><tr><th>Employee ID</th><th>Supplier Man Name</th><th>Total Invoices</th><th>Total Sales</th><th>Status</th></tr></thead><tbody>';
-                (data.supplier_man_sales || []).forEach(item => {
-                    if (!matchesSearch([item.employee_id, item.supplier_man_name])) return;
-                    html += `<tr><td>${item.employee_id}</td><td>${item.supplier_man_name}</td><td>${parseFloat(item.total_invoices || 0).toLocaleString()}</td><td>${CURRENCY_SYMBOL}${parseFloat(item.total_sales || 0).toLocaleString()}</td><td>${item.status}</td></tr>`;
-                });
-                html += '</tbody></table>';
+                const rows = await buildExpandableSection(
+                    data.supplier_man_sales || [],
+                    5,
+                    item => [item.employee_id, item.supplier_man_name],
+                    item => `<tr><td>${esc(item.employee_id)}</td><td>${esc(item.supplier_man_name)}</td><td>${parseFloat(item.total_invoices || 0).toLocaleString()}</td><td>${CURRENCY_SYMBOL}${parseFloat(item.total_sales || 0).toLocaleString()}</td><td>${esc(item.status)}</td></tr>`,
+                    'Daily Breakdown',
+                    ['Date', 'Invoices', 'Revenue', 'Batch No', 'Expiry Date'],
+                    item => fetchBreakdown('supplier_man', item.supplier_man_id),
+                    d => `<tr><td>${esc(d.date)}</td><td>${parseFloat(d.invoices || 0).toLocaleString()}</td><td>${CURRENCY_SYMBOL}${parseFloat(d.revenue || 0).toLocaleString()}</td><td>${formatBatchCell(d.batch_no)}</td><td>${formatExpiryCell(d.nearest_expiry)}</td></tr>`
+                );
+                sectionHtmlParts.push(`<table><caption>Supplier Man Wise Sales</caption><thead><tr><th>Employee ID</th><th>Supplier Man Name</th><th>Total Invoices</th><th>Total Sales</th><th>Status</th></tr></thead><tbody>${rows}</tbody></table>`);
             }
             
-           // Product Sales
-if (reportType === 'all' || reportType === 'product') {
-    html += '<table><caption>Product Wise Sales</caption><thead><tr><th>Product ID</th><th>Product Name</th><th>Category</th><th>Batch No</th><th>Expiry Date</th><th>Quantity Sold</th><th>Revenue</th></tr></thead><tbody>';
-    (data.product_sales || []).forEach(item => {
-        if (!matchesSearch([item.product_id_display, item.product_name, item.category])) return;
-        const indent = (item.parent_row_id || item.parent_product_id) ? 'padding-left: 20px;' : '';
-        const prefix = (item.parent_row_id || item.parent_product_id) ? '→ ' : '';
-        const batchNo = item.batch_no || '-';
-        const expiryDate = item.nearest_expiry || '-';
-        html += `<tr><td>${item.product_id_display}</td><td style="${indent}">${prefix}${item.product_name}</td><td>${item.category}</td><td>${batchNo}</td><td>${expiryDate}</td><td>${parseFloat(item.quantity_sold || 0).toLocaleString()}</td><td>${CURRENCY_SYMBOL}${parseFloat(item.revenue || 0).toLocaleString()}</td></tr>`;
-    });
-    html += '</tbody></table>';
-}
+            // ---- Product Sales (+ invoices including this product) ----
+            if (reportType === 'all' || reportType === 'product') {
+                const rows = await buildExpandableSection(
+                    data.product_sales || [],
+                    7,
+                    item => [item.product_id_display, item.product_name, item.category],
+                    item => {
+                        const isChild = item.parent_row_id || item.parent_product_id;
+                        const indent = isChild ? 'padding-left: 20px;' : '';
+                        const prefix = isChild ? '→ ' : '';
+                        const batchNo = item.batch_no || '-';
+                        const expiryDate = item.nearest_expiry || '-';
+                        return `<tr><td>${esc(item.product_id_display)}</td><td style="${indent}">${prefix}${esc(item.product_name)}</td><td>${esc(item.category)}</td><td>${esc(batchNo)}</td><td>${esc(expiryDate)}</td><td>${parseFloat(item.quantity_sold || 0).toLocaleString()}</td><td>${CURRENCY_SYMBOL}${parseFloat(item.revenue || 0).toLocaleString()}</td></tr>`;
+                    },
+                    'Invoices Including This Product',
+                    ['Invoice #', 'Date', 'Customer', 'Quantity', 'Price', 'Batch No', 'Expiry Date', 'Amount'],
+                    item => fetchDetails('product_invoices', item.product_id),
+                    d => `<tr><td>${esc(d.bill_no)}</td><td>${esc(d.sale_date)}</td><td>${esc(d.customer_name)}</td><td>${parseFloat(d.quantity || 0).toLocaleString()}</td><td>${CURRENCY_SYMBOL}${parseFloat(d.sale_price || 0).toLocaleString()}</td><td>${formatBatchCell(d.batch_no)}</td><td>${formatExpiryCell(d.expiry_date)}</td><td>${CURRENCY_SYMBOL}${parseFloat(d.net_amount || 0).toLocaleString()}</td></tr>`
+                );
+                sectionHtmlParts.push(`<table><caption>Product Wise Sales</caption><thead><tr><th>Product ID</th><th>Product Name</th><th>Category</th><th>Batch No</th><th>Expiry Date</th><th>Quantity Sold</th><th>Revenue</th></tr></thead><tbody>${rows}</tbody></table>`);
+            }
             
-            // Branch Sales
+            // ---- Branch Sales (+ daily breakdown) ----
             if (reportType === 'all' || reportType === 'branch') {
-                html += '<table><caption>Branch Wise Sales</caption><thead><tr><th>Branch ID</th><th>Branch Name</th><th>Total Sales</th><th>Transactions</th><th>Avg Sale</th></tr></thead><tbody>';
-                (data.branch_sales || []).forEach(item => {
-                    if (!matchesSearch([item.branch_id_display, item.branch_name])) return;
-                    html += `<tr><td>${item.branch_id_display}</td><td>${item.branch_name}</td><td>${CURRENCY_SYMBOL}${parseFloat(item.total_sales || 0).toLocaleString()}</td><td>${parseFloat(item.transactions || 0).toLocaleString()}</td><td>${CURRENCY_SYMBOL}${parseFloat(item.avg_sale || 0).toLocaleString()}</td></tr>`;
-                });
-                html += '</tbody></table>';
+                const rows = await buildExpandableSection(
+                    data.branch_sales || [],
+                    5,
+                    item => [item.branch_id_display, item.branch_name],
+                    item => `<tr><td>${esc(item.branch_id_display)}</td><td>${esc(item.branch_name)}</td><td>${CURRENCY_SYMBOL}${parseFloat(item.total_sales || 0).toLocaleString()}</td><td>${parseFloat(item.transactions || 0).toLocaleString()}</td><td>${CURRENCY_SYMBOL}${parseFloat(item.avg_sale || 0).toLocaleString()}</td></tr>`,
+                    'Daily Breakdown',
+                    ['Date', 'Quantity', 'Unit', 'Revenue', 'Batch No', 'Expiry Date'],
+                    item => fetchBreakdown('branch', item.branch_id),
+                    d => `<tr><td>${esc(d.date)}</td><td>${parseFloat(d.volume || 0).toLocaleString()}</td><td>${esc(d.unit || '-')}</td><td>${CURRENCY_SYMBOL}${parseFloat(d.revenue || 0).toLocaleString()}</td><td>${formatBatchCell(d.batch_no)}</td><td>${formatExpiryCell(d.nearest_expiry)}</td></tr>`
+                );
+                sectionHtmlParts.push(`<table><caption>Branch Wise Sales</caption><thead><tr><th>Branch ID</th><th>Branch Name</th><th>Total Sales</th><th>Transactions</th><th>Avg Sale</th></tr></thead><tbody>${rows}</tbody></table>`);
             }
             
-            // Category Sales
+            // ---- Category Sales (no expand on the dashboard, kept flat) ----
             if (reportType === 'all' || reportType === 'category') {
                 const total = (data.categories || []).reduce((sum, item) => sum + parseFloat(item.total || 0), 0);
-                html += '<table><caption>Category Wise Sales</caption><thead><tr><th>Category</th><th>Total Revenue</th><th>Percentage</th></tr></thead><tbody>';
+                let html = '<table><caption>Category Wise Sales</caption><thead><tr><th>Category</th><th>Total Revenue</th><th>Percentage</th></tr></thead><tbody>';
                 (data.categories || []).forEach(item => {
                     if (!matchesSearch([item.category])) return;
                     const percentage = total > 0 ? ((parseFloat(item.total || 0) / total) * 100).toFixed(1) : 0;
-                    html += `<tr><td>${item.category}</td><td>${CURRENCY_SYMBOL}${parseFloat(item.total || 0).toLocaleString()}</td><td>${percentage}%</td></tr>`;
+                    html += `<tr><td>${esc(item.category)}</td><td>${CURRENCY_SYMBOL}${parseFloat(item.total || 0).toLocaleString()}</td><td>${percentage}%</td></tr>`;
                 });
                 html += '</tbody></table>';
+                sectionHtmlParts.push(html);
             }
             
-            // Territory Sales
+            // ---- Territory Sales (+ territory invoices) ----
             if (reportType === 'all' || reportType === 'territory') {
-                html += '<table><caption>Territory Wise Sales</caption><thead><tr><th>Country</th><th>Region</th><th>City</th><th>Zone</th><th>Area</th><th>Total Invoices</th><th>Total Sales</th></tr></thead><tbody>';
-                (data.territory_sales || []).forEach(item => {
-                    if (!matchesSearch([item.country, item.region, item.city, item.zone, item.area])) return;
-                    html += `<tr><td>${item.country}</td><td>${item.region}</td><td>${item.city}</td><td>${item.zone}</td><td>${item.area}</td><td>${parseFloat(item.total_invoices || 0).toLocaleString()}</td><td>${CURRENCY_SYMBOL}${parseFloat(item.total_sales || 0).toLocaleString()}</td></tr>`;
-                });
-                html += '</tbody></table>';
+                const rows = await buildExpandableSection(
+                    data.territory_sales || [],
+                    7,
+                    item => [item.country, item.region, item.city, item.zone, item.area],
+                    item => `<tr><td>${esc(item.country)}</td><td>${esc(item.region)}</td><td>${esc(item.city)}</td><td>${esc(item.zone)}</td><td>${esc(item.area)}</td><td>${parseFloat(item.total_invoices || 0).toLocaleString()}</td><td>${CURRENCY_SYMBOL}${parseFloat(item.total_sales || 0).toLocaleString()}</td></tr>`,
+                    'Territory Invoices',
+                    ['Invoice #', 'Date', 'Customer', 'Net Amount', 'Batch No', 'Expiry Date'],
+                    item => fetchDetails('territory_invoices', 0, `&country=${encodeURIComponent(item.country)}&region=${encodeURIComponent(item.region)}&city=${encodeURIComponent(item.city)}&zone=${encodeURIComponent(item.zone)}&area=${encodeURIComponent(item.area)}`),
+                    d => `<tr><td>${esc(d.bill_no)}</td><td>${esc(d.sale_date)}</td><td>${esc(d.customer_name)}</td><td>${CURRENCY_SYMBOL}${parseFloat(d.net_amount || 0).toLocaleString()}</td><td>${formatBatchCell(d.batch_no)}</td><td>${formatExpiryCell(d.nearest_expiry)}</td></tr>`
+                );
+                sectionHtmlParts.push(`<table><caption>Territory Wise Sales</caption><thead><tr><th>Country</th><th>Region</th><th>City</th><th>Zone</th><th>Area</th><th>Total Invoices</th><th>Total Sales</th></tr></thead><tbody>${rows}</tbody></table>`);
             }
             
-            // Invoice Sales
+            // ---- Invoice Sales (+ invoice items) ----
             if (reportType === 'all' || reportType === 'invoice') {
-                html += '<table><caption>Invoice Wise Sales</caption><thead><tr><th>Invoice #</th><th>Date</th><th>Customer</th><th>Sales Officer</th><th>Total Bill</th><th>Discount</th><th>Net Amount</th></tr></thead><tbody>';
-                (data.invoice_sales || []).forEach(item => {
-                    if (!matchesSearch([item.bill_no, item.customer_name, item.officer_name])) return;
-                    html += `<tr><td>${item.bill_no}</td><td>${item.sale_date}</td><td>${item.customer_name}</td><td>${item.officer_name}</td><td>${CURRENCY_SYMBOL}${parseFloat(item.total_bill || 0).toLocaleString()}</td><td>${CURRENCY_SYMBOL}${parseFloat(item.total_discount_amount || 0).toLocaleString()}</td><td>${CURRENCY_SYMBOL}${parseFloat(item.net_amount || 0).toLocaleString()}</td></tr>`;
-                });
-                html += '</tbody></table>';
+                const rows = await buildExpandableSection(
+                    data.invoice_sales || [],
+                    7,
+                    item => [item.bill_no, item.customer_name, item.officer_name],
+                    item => `<tr><td>${esc(item.bill_no)}</td><td>${esc(item.sale_date)}</td><td>${esc(item.customer_name)}</td><td>${esc(item.officer_name)}</td><td>${CURRENCY_SYMBOL}${parseFloat(item.total_bill || 0).toLocaleString()}</td><td>${CURRENCY_SYMBOL}${parseFloat(item.total_discount_amount || 0).toLocaleString()}</td><td>${CURRENCY_SYMBOL}${parseFloat(item.net_amount || 0).toLocaleString()}</td></tr>`,
+                    'Invoice Items',
+                    ['Product', 'Batch No', 'Expiry Date', 'Quantity', 'Price', 'Discount', 'Net Amount'],
+                    item => fetchDetails('invoice_items', item.id),
+                    d => `<tr><td>${esc(d.product_name)}</td><td>${formatBatchCell(d.batch_no)}</td><td>${formatExpiryCell(d.expiry_date)}</td><td>${parseFloat(d.quantity || 0).toLocaleString()}</td><td>${CURRENCY_SYMBOL}${parseFloat(d.sale_price || 0).toLocaleString()}</td><td>${CURRENCY_SYMBOL}${parseFloat(d.discount_amount || 0).toLocaleString()}</td><td>${CURRENCY_SYMBOL}${parseFloat(d.net_amount || 0).toLocaleString()}</td></tr>`
+                );
+                sectionHtmlParts.push(`<table><caption>Invoice Wise Sales</caption><thead><tr><th>Invoice #</th><th>Date</th><th>Customer</th><th>Sales Officer</th><th>Total Bill</th><th>Discount</th><th>Net Amount</th></tr></thead><tbody>${rows}</tbody></table>`);
             }
             
-            // Vendor Sales
+            // ---- Vendor Sales (+ products sold) ----
             if (reportType === 'all' || reportType === 'vendor') {
-                html += '<table><caption>Vendor Wise Sales</caption><thead><tr><th>Vendor ID</th><th>Vendor Name</th><th>Total Invoices</th><th>Total Quantity</th><th>Total Sales</th></tr></thead><tbody>';
-                (data.vendor_sales || []).forEach(item => {
-                    if (!matchesSearch([item.vendor_id_display, item.vendor_name])) return;
-                    html += `<tr><td>${item.vendor_id_display}</td><td>${item.vendor_name}</td><td>${parseFloat(item.total_invoices || 0).toLocaleString()}</td><td>${parseFloat(item.total_quantity || 0).toLocaleString()}</td><td>${CURRENCY_SYMBOL}${parseFloat(item.total_sales || 0).toLocaleString()}</td></tr>`;
-                });
-                html += '</tbody></table>';
+                const rows = await buildExpandableSection(
+                    data.vendor_sales || [],
+                    5,
+                    item => [item.vendor_id_display, item.vendor_name],
+                    item => `<tr><td>${esc(item.vendor_id_display)}</td><td>${esc(item.vendor_name)}</td><td>${parseFloat(item.total_invoices || 0).toLocaleString()}</td><td>${parseFloat(item.total_quantity || 0).toLocaleString()}</td><td>${CURRENCY_SYMBOL}${parseFloat(item.total_sales || 0).toLocaleString()}</td></tr>`,
+                    'Products Sold',
+                    ['Product', 'Batch No', 'Expiry Date', 'Quantity', 'Total Sales'],
+                    item => fetchDetails('vendor_products', item.vendor_id),
+                    d => `<tr><td>${esc(d.product_name)}</td><td>${formatBatchCell(d.batch_no)}</td><td>${formatExpiryCell(d.nearest_expiry)}</td><td>${parseFloat(d.total_quantity || 0).toLocaleString()}</td><td>${CURRENCY_SYMBOL}${parseFloat(d.total_sales || 0).toLocaleString()}</td></tr>`
+                );
+                sectionHtmlParts.push(`<table><caption>Vendor Wise Sales</caption><thead><tr><th>Vendor ID</th><th>Vendor Name</th><th>Total Invoices</th><th>Total Quantity</th><th>Total Sales</th></tr></thead><tbody>${rows}</tbody></table>`);
             }
             
-            // Customer Sales
+            // ---- Customer Sales (+ customer invoices) ----
             if (reportType === 'all' || reportType === 'customer') {
-                html += '<table><caption>Customer Wise Sales</caption><thead><tr><th>Customer ID</th><th>Customer Name</th><th>Total Invoices</th><th>Total Sales</th></tr></thead><tbody>';
-                (data.customer_sales || []).forEach(item => {
-                    if (!matchesSearch([item.customer_id_display, item.customer_name])) return;
-                    html += `<tr><td>${item.customer_id_display}</td><td>${item.customer_name}</td><td>${parseFloat(item.total_invoices || 0).toLocaleString()}</td><td>${CURRENCY_SYMBOL}${parseFloat(item.total_sales || 0).toLocaleString()}</td></tr>`;
-                });
-                html += '</tbody></table>';
+                const rows = await buildExpandableSection(
+                    data.customer_sales || [],
+                    4,
+                    item => [item.customer_id_display, item.customer_name],
+                    item => `<tr><td>${esc(item.customer_id_display)}</td><td>${esc(item.customer_name)}</td><td>${parseFloat(item.total_invoices || 0).toLocaleString()}</td><td>${CURRENCY_SYMBOL}${parseFloat(item.total_sales || 0).toLocaleString()}</td></tr>`,
+                    'Customer Invoices',
+                    ['Invoice #', 'Date', 'Total Bill', 'Discount', 'Net Amount', 'Batch No', 'Expiry Date'],
+                    item => fetchDetails('customer_invoices', item.customer_id),
+                    d => `<tr><td>${esc(d.bill_no)}</td><td>${esc(d.sale_date)}</td><td>${CURRENCY_SYMBOL}${parseFloat(d.total_bill || 0).toLocaleString()}</td><td>${CURRENCY_SYMBOL}${parseFloat(d.total_discount_amount || 0).toLocaleString()}</td><td>${CURRENCY_SYMBOL}${parseFloat(d.net_amount || 0).toLocaleString()}</td><td>${formatBatchCell(d.batch_no)}</td><td>${formatExpiryCell(d.nearest_expiry)}</td></tr>`
+                );
+                sectionHtmlParts.push(`<table><caption>Customer Wise Sales</caption><thead><tr><th>Customer ID</th><th>Customer Name</th><th>Total Invoices</th><th>Total Sales</th></tr></thead><tbody>${rows}</tbody></table>`);
             }
             
-            container.innerHTML = html;
+            container.innerHTML = sectionHtmlParts.join('');
         }
         
         loadReportData();

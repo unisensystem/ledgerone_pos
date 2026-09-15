@@ -15,8 +15,8 @@ try {
         // Get invoices for a specific product
         // Row-level (one sale_invoice_items row per line), so batch_no / expiry_date
         // are read directly off sii - no aggregation needed here.
-        // sale_invoice_items only has "batch_expiry_date" column (no plain
-        // "expiry_date"), so alias it back to expiry_date for the frontend.
+        // FIX: sale_invoice_items.batch_expiry_date is unused and always NULL -
+        // the column that actually gets populated on sale is "expiry_date".
         $stmt = $pdo->prepare("
             SELECT 
                 si.bill_no,
@@ -25,7 +25,7 @@ try {
                 sii.quantity,
                 sii.sale_price,
                 sii.batch_no,
-                sii.batch_expiry_date as expiry_date,
+                sii.expiry_date as expiry_date,
                 sii.net_amount
             FROM sale_invoice_items sii
             JOIN sale_invoice si ON sii.sale_invoice_id = si.id AND si.tenant_id = ?
@@ -38,13 +38,14 @@ try {
         // Get products sold for a specific vendor
         // sale_invoice_items is already joined and grouped per product, so
         // batch/expiry are aggregated the same way as in sales-report.php.
+        // FIX: use expiry_date, not the always-NULL batch_expiry_date.
         $stmt = $pdo->prepare("
             SELECT 
                 p.name as product_name,
                 SUM(sii.quantity) as total_quantity,
                 SUM(sii.net_amount) as total_sales,
                 GROUP_CONCAT(DISTINCT NULLIF(sii.batch_no,'') SEPARATOR ', ') as batch_no,
-                MIN(CASE WHEN sii.batch_expiry_date >= CURDATE() THEN sii.batch_expiry_date END) as nearest_expiry
+                MIN(CASE WHEN sii.expiry_date >= CURDATE() THEN sii.expiry_date END) as nearest_expiry
             FROM sale_invoice_items sii
             JOIN sale_invoice si ON sii.sale_invoice_id = si.id AND si.tenant_id = ?
             JOIN products p ON sii.product_id = p.id AND p.tenant_id = ?
@@ -57,6 +58,7 @@ try {
         // Get invoices for a specific customer
         // No item-level join here, so use the "ib" invoice-batch subquery
         // (same pattern as Customer Wise Sales in sales-report.php).
+        // FIX: use expiry_date, not the always-NULL batch_expiry_date.
         $stmt = $pdo->prepare("
             SELECT 
                 si.bill_no,
@@ -70,7 +72,7 @@ try {
             LEFT JOIN (
                 SELECT sii.sale_invoice_id,
                        GROUP_CONCAT(DISTINCT NULLIF(sii.batch_no,'') SEPARATOR ', ') as batch_no,
-                       MIN(CASE WHEN sii.batch_expiry_date >= CURDATE() THEN sii.batch_expiry_date END) as nearest_expiry
+                       MIN(CASE WHEN sii.expiry_date >= CURDATE() THEN sii.expiry_date END) as nearest_expiry
                 FROM sale_invoice_items sii
                 WHERE sii.tenant_id = ?
                 GROUP BY sii.sale_invoice_id
@@ -82,13 +84,14 @@ try {
     } elseif ($type === 'invoice_items') {
         // Get items for a specific invoice
         // Row-level, sii already joined for this exact invoice - read batch/expiry directly.
+        // FIX: use expiry_date, not the always-NULL batch_expiry_date.
         $stmt = $pdo->prepare("
             SELECT 
                 p.name as product_name,
                 sii.quantity,
                 sii.sale_price,
                 sii.batch_no,
-                sii.batch_expiry_date as expiry_date,
+                sii.expiry_date as expiry_date,
                 sii.discount_amount,
                 sii.net_amount
             FROM sale_invoice_items sii
@@ -100,6 +103,7 @@ try {
     } elseif ($type === 'territory_invoices') {
         // Get invoices for a specific territory
         // No item-level join here either, so use the "ib" invoice-batch subquery.
+        // FIX: use expiry_date, not the always-NULL batch_expiry_date.
         $country = $_GET['country'] ?? '';
         $region = $_GET['region'] ?? '';
         $city = $_GET['city'] ?? '';
@@ -124,7 +128,7 @@ try {
             LEFT JOIN (
                 SELECT sii.sale_invoice_id,
                        GROUP_CONCAT(DISTINCT NULLIF(sii.batch_no,'') SEPARATOR ', ') as batch_no,
-                       MIN(CASE WHEN sii.batch_expiry_date >= CURDATE() THEN sii.batch_expiry_date END) as nearest_expiry
+                       MIN(CASE WHEN sii.expiry_date >= CURDATE() THEN sii.expiry_date END) as nearest_expiry
                 FROM sale_invoice_items sii
                 WHERE sii.tenant_id = ?
                 GROUP BY sii.sale_invoice_id

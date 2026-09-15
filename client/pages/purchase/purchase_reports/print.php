@@ -85,6 +85,64 @@ $company_id = $_GET['company_id'] ?? null;
             font-weight: bold;
         }
 
+        /* Nested breakdown styling */
+        .breakdown-wrap {
+            padding: 0 !important;
+        }
+
+        .breakdown-inner {
+            padding: 8px 8px 8px 24px;
+            background-color: #fafbfd;
+        }
+
+        .breakdown-inner h4 {
+            font-size: 11px;
+            color: #555;
+            margin-bottom: 6px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .breakdown-inner table {
+            margin-bottom: 10px;
+            background: #fff;
+        }
+
+        .breakdown-inner table th,
+        .breakdown-inner table td {
+            font-size: 11px;
+            padding: 6px;
+        }
+
+        .breakdown-inner table th {
+            background-color: #eef1f7;
+        }
+
+        .subcat-block, .invoice-block {
+            margin-bottom: 10px;
+            border: 1px solid #e1e6ee;
+            border-radius: 4px;
+            padding: 8px;
+            background: #fff;
+        }
+
+        .subcat-block-header, .invoice-block-header {
+            display: flex;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 8px;
+            font-size: 11px;
+            font-weight: bold;
+            margin-bottom: 6px;
+            padding-bottom: 6px;
+            border-bottom: 1px solid #e1e6ee;
+        }
+
+        .expiring-soon {
+            color: #d64545;
+            font-weight: 600;
+        }
+
         .print-footer {
             margin-top: 30px;
             text-align: center;
@@ -101,6 +159,10 @@ $company_id = $_GET['company_id'] ?? null;
             
             .no-print {
                 display: none;
+            }
+
+            .subcat-block, .invoice-block {
+                break-inside: avoid;
             }
 
             @page {
@@ -170,12 +232,29 @@ $company_id = $_GET['company_id'] ?? null;
                 if (result.success) {
                     renderTable(result.data);
                     setTimeout(() => window.print(), 500);
+                } else {
+                    document.getElementById('tableBody').innerHTML =
+                        '<tr><td colspan="9" style="text-align:center; padding:20px;">Failed to load report data</td></tr>';
                 }
+            })
+            .catch(() => {
+                document.getElementById('tableBody').innerHTML =
+                    '<tr><td colspan="9" style="text-align:center; padding:20px;">Error loading report data</td></tr>';
             });
+
+        // Highlight expiry date if within 30 days
+        function renderExpiryCell(expiryDate) {
+            if (!expiryDate || expiryDate === '-') return '-';
+            const isExpiringSoon = (new Date(expiryDate) - new Date()) / (1000 * 60 * 60 * 24) <= 30;
+            return isExpiringSoon
+                ? `<span class="expiring-soon">${expiryDate}</span>`
+                : expiryDate;
+        }
 
         function renderTable(data) {
             const tableHead = document.getElementById('tableHead');
             const tableBody = document.getElementById('tableBody');
+            const colCount = tableHeaders[reportType].length;
 
             // Render headers
             const headerRow = document.createElement('tr');
@@ -186,29 +265,214 @@ $company_id = $_GET['company_id'] ?? null;
             });
             tableHead.appendChild(headerRow);
 
-            // Render data
+            if (!data || data.length === 0) {
+                tableBody.innerHTML = `<tr><td colspan="${colCount}" style="text-align:center; padding:20px;">No data available</td></tr>`;
+                return;
+            }
+
+            // Render data rows + nested breakdown rows
             data.forEach(item => {
                 const row = document.createElement('tr');
                 let cells = [];
 
                 if (reportType === 'item') {
-                    cells = [item.id, item.name, item.category, item.batchNo || '-', item.expiryDate || '-', item.quantity, item.unitPrice, item.total, item.supplier];
+                    cells = [item.id, item.name, item.category, item.batchNo || '-', renderExpiryCell(item.expiryDate), item.quantity, item.unitPrice, item.total, item.supplier];
                 } else if (reportType === 'invoice') {
-                    cells = [item.id, item.name, item.category, item.batchNo || '-', item.expiryDate || '-', item.quantity, item.dueDate, item.total, item.supplier];
+                    cells = [item.id, item.name, item.category, item.batchNo || '-', renderExpiryCell(item.expiryDate), item.quantity, item.dueDate, item.total, item.supplier];
                 } else if (reportType === 'category') {
-                    cells = [item.id, item.name, item.category, item.batchNo || '-', item.expiryDate || '-', item.quantity, item.unitPrice, item.total, item.supplier];
+                    cells = [item.id, item.name, item.category, item.batchNo || '-', renderExpiryCell(item.expiryDate), item.quantity, item.unitPrice, item.total, item.supplier];
                 } else if (reportType === 'supplier') {
-                    cells = [item.id, item.name, item.batchNo || '-', item.expiryDate || '-', item.quantity, item.unitPrice, item.total, item.contact];
+                    cells = [item.id, item.name, item.batchNo || '-', renderExpiryCell(item.expiryDate), item.quantity, item.unitPrice, item.total, item.contact];
                 }
 
                 cells.forEach(cellContent => {
                     const td = document.createElement('td');
-                    td.textContent = cellContent;
+                    td.innerHTML = cellContent;
                     row.appendChild(td);
                 });
 
                 tableBody.appendChild(row);
+
+                // Append nested breakdown row right after, always expanded
+                const breakdownHtml = buildBreakdownHtml(item, colCount);
+                if (breakdownHtml) {
+                    const breakdownRow = document.createElement('tr');
+                    const td = document.createElement('td');
+                    td.colSpan = colCount;
+                    td.className = 'breakdown-wrap';
+                    td.innerHTML = breakdownHtml;
+                    breakdownRow.appendChild(td);
+                    tableBody.appendChild(breakdownRow);
+                }
             });
+        }
+
+        function buildBreakdownHtml(item, colCount) {
+            if (reportType === 'item') {
+                return buildInvoicesTable(item.invoices, 'Purchase Invoices');
+            } else if (reportType === 'invoice') {
+                return buildItemsTable(item.items, 'Invoice Items Breakdown');
+            } else if (reportType === 'supplier') {
+                return buildSupplierInvoicesBlock(item.invoices);
+            } else if (reportType === 'category') {
+                return buildCategorySubcategoriesBlock(item.subcategories);
+            }
+            return '';
+        }
+
+        // item report: flat invoices table
+        function buildInvoicesTable(invoices, title) {
+            if (!invoices || invoices.length === 0) return '';
+            let rows = invoices.map(inv => `
+                <tr>
+                    <td>${inv.billNo}</td>
+                    <td>${inv.date}</td>
+                    <td>${inv.batchNo || '-'}</td>
+                    <td>${renderExpiryCell(inv.expiryDate)}</td>
+                    <td>${inv.quantity}</td>
+                    <td>${inv.price}</td>
+                    <td>${inv.total}</td>
+                    <td>${inv.supplier}</td>
+                </tr>
+            `).join('');
+
+            return `
+                <div class="breakdown-inner">
+                    <h4>${title}</h4>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Invoice No</th><th>Date</th><th>Batch No</th><th>Expiry Date</th>
+                                <th>Quantity</th><th>Unit Price</th><th>Total</th><th>Supplier</th>
+                            </tr>
+                        </thead>
+                        <tbody>${rows}</tbody>
+                    </table>
+                </div>
+            `;
+        }
+
+        // invoice report: flat items table
+        function buildItemsTable(items, title) {
+            if (!items || items.length === 0) return '';
+            let rows = items.map(it => `
+                <tr>
+                    <td>${it.product}</td>
+                    <td>${it.batchNo || '-'}</td>
+                    <td>${renderExpiryCell(it.expiryDate)}</td>
+                    <td>${it.quantity}</td>
+                    <td>${it.price}</td>
+                    <td>${it.total}</td>
+                </tr>
+            `).join('');
+
+            return `
+                <div class="breakdown-inner">
+                    <h4>${title}</h4>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Product</th><th>Batch No</th><th>Expiry Date</th>
+                                <th>Quantity</th><th>Unit Price</th><th>Total</th>
+                            </tr>
+                        </thead>
+                        <tbody>${rows}</tbody>
+                    </table>
+                </div>
+            `;
+        }
+
+        // supplier report: invoices, each with its own items table
+        function buildSupplierInvoicesBlock(invoices) {
+            if (!invoices || invoices.length === 0) return '';
+            let blocks = invoices.map(inv => `
+                <div class="invoice-block">
+                    <div class="invoice-block-header">
+                        <span>Invoice: ${inv.billNo}</span>
+                        <span>Date: ${inv.date}</span>
+                        <span>Total: ${inv.total}</span>
+                    </div>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Product</th><th>Batch No</th><th>Expiry Date</th>
+                                <th>Quantity</th><th>Unit Price</th><th>Total</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${(inv.items || []).map(it => `
+                                <tr>
+                                    <td>${it.product}</td>
+                                    <td>${it.batchNo || '-'}</td>
+                                    <td>${renderExpiryCell(it.expiryDate)}</td>
+                                    <td>${it.quantity}</td>
+                                    <td>${it.price}</td>
+                                    <td>${it.total}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            `).join('');
+
+            return `
+                <div class="breakdown-inner">
+                    <h4>Supplier Invoices</h4>
+                    ${blocks}
+                </div>
+            `;
+        }
+
+        // category report: subcategories, each with invoices, each with items
+        function buildCategorySubcategoriesBlock(subcategories) {
+            if (!subcategories || subcategories.length === 0) return '';
+            let blocks = subcategories.map(sub => `
+                <div class="subcat-block">
+                    <div class="subcat-block-header">
+                        <span>Subcategory: ${sub.name}</span>
+                        <span>Batch No: ${sub.batchNo || '-'}</span>
+                        <span>Expiry: ${renderExpiryCell(sub.expiryDate)}</span>
+                        <span>Quantity: ${sub.quantity}</span>
+                        <span>Total: ${sub.total}</span>
+                    </div>
+                    ${(sub.invoices || []).map(inv => `
+                        <div class="invoice-block">
+                            <div class="invoice-block-header">
+                                <span>Invoice: ${inv.billNo}</span>
+                                <span>Date: ${inv.date}</span>
+                                <span>Total: ${inv.total}</span>
+                            </div>
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Product</th><th>Batch No</th><th>Expiry Date</th>
+                                        <th>Quantity</th><th>Unit Price</th><th>Total</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${(inv.items || []).map(it => `
+                                        <tr>
+                                            <td>${it.product}</td>
+                                            <td>${it.batchNo || '-'}</td>
+                                            <td>${renderExpiryCell(it.expiryDate)}</td>
+                                            <td>${it.quantity}</td>
+                                            <td>${it.price}</td>
+                                            <td>${it.total}</td>
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                    `).join('')}
+                </div>
+            `).join('');
+
+            return `
+                <div class="breakdown-inner">
+                    <h4>Subcategories</h4>
+                    ${blocks}
+                </div>
+            `;
         }
     </script>
 </body>

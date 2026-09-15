@@ -244,6 +244,7 @@ if (!$user_id) {
                 </div>
             </div>
 
+            
             <div class="card">
                 <h2 class="card-title">Invoice Summary</h2>
                 <div class="summary-grid">
@@ -384,6 +385,73 @@ if (!$user_id) {
                     <div class="settings-item"><input type="checkbox" id="showTableScrollbar"><label for="showTableScrollbar">Enable Horizontal Scroll (Items Table)</label></div>                </div>
             </div>
 
+
+            <!-- Settings Modal میں یہ سیکشن شامل کریں -->
+
+<div class="settings-section">
+    <div class="settings-section-title">Dropdown Display Format</div>
+    
+    <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; padding: 16px;">
+        
+        <!-- PRODUCT FORMAT -->
+        <div style="border: 1px solid var(--border-light); padding: 12px; border-radius: 4px;">
+            <div style="font-weight: 600; margin-bottom: 10px; color: var(--primary);">
+                📦 Product Format
+            </div>
+            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; margin-bottom: 8px;">
+                <input type="radio" name="productDisplayFormat" value="code-name" checked> 
+                <span>Code + Name</span>
+            </label>
+            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; margin-bottom: 8px;">
+                <input type="radio" name="productDisplayFormat" value="code-only">
+                <span>Code Only</span>
+            </label>
+            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                <input type="radio" name="productDisplayFormat" value="name-only">
+                <span>Name Only</span>
+            </label>
+        </div>
+
+        <!-- SUPPLIER FORMAT -->
+        <div style="border: 1px solid var(--border-light); padding: 12px; border-radius: 4px;">
+            <div style="font-weight: 600; margin-bottom: 10px; color: var(--primary);">
+                🏢 Supplier Format
+            </div>
+            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; margin-bottom: 8px;">
+                <input type="radio" name="supplierDisplayFormat" value="code-name" checked>
+                <span>Code + Name</span>
+            </label>
+            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; margin-bottom: 8px;">
+                <input type="radio" name="supplierDisplayFormat" value="code-only">
+                <span>Code Only</span>
+            </label>
+            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                <input type="radio" name="supplierDisplayFormat" value="name-only">
+                <span>Name Only</span>
+            </label>
+        </div>
+
+        <!-- CUSTOMER FORMAT -->
+        <!-- <div style="border: 1px solid var(--border-light); padding: 12px; border-radius: 4px;">
+            <div style="font-weight: 600; margin-bottom: 10px; color: var(--primary);">
+                👤 Customer Format
+            </div>
+            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; margin-bottom: 8px;">
+                <input type="radio" name="customerDisplayFormat" value="code-name" checked>
+                <span>Code + Name</span>
+            </label>
+            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; margin-bottom: 8px;">
+                <input type="radio" name="customerDisplayFormat" value="code-only">
+                <span>Code Only</span>
+            </label>
+            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                <input type="radio" name="customerDisplayFormat" value="name-only">
+                <span>Name Only</span>
+            </label>
+        </div> -->
+
+    </div>
+</div>
             <div class="modal-actions">
                 <button class="btn btn-secondary" id="closeSettingsBtn">Close</button>
                 <button class="btn btn-primary" id="saveSettingsBtn">Save Settings</button>
