@@ -185,6 +185,19 @@ th {
 td {
   padding: 4px 2px;
   border-bottom: 1px solid var(--border-default);
+  /* Unit 1 / Weight cells stack a small label above their input; every other
+     cell in the row is just the input. Centering each cell independently
+     can NEVER line the actual inputs up — a taller (label+input) block and a
+     shorter (input-only) block centered in the same row still place their
+     inputs at different heights, because the extra label height always sits
+     above the input inside its own cell, shifting it down relative to a
+     lone input's centered position. Bottom-aligning is the only way to put
+     every input on the same line; it looked broken on the first attempt only
+     because of real box-model bugs elsewhere (double top/bottom padding on
+     the label+input wrapper, .search-input's borrowed 8px margin-bottom,
+     td:has(.unit-label) padding still applying to a hidden/empty label) —
+     those are fixed now, not this property. */
+  vertical-align: bottom;
 }
 
 tbody tr:hover {
@@ -424,6 +437,14 @@ tbody tr:hover {
   background: var(--surface-0);
   color: var(--body);
   font-weight: 500;
+}
+
+/* The 8px margin-bottom above is meant for standalone form fields (Company,
+   Branch, Customer Code, etc. — spacing before the next field below). Reused
+   inside the items table for the product search box, that same margin pushed
+   it noticeably higher than every other single-line cell in the row. */
+#itemsTable .search-input {
+  margin-bottom: 0;
 }
 
 .dropdown-options {
@@ -1012,9 +1033,14 @@ td:has(.unit-input) {
   color: #60a5fa;
 }
 
-/* Adjust unit input styling when it has a label above */
+/* Adjust unit input styling when it has a label above. Bottom padding is
+   deliberately left at the base td value (4px, not bumped to 6px like the
+   rest) — every cell in the row bottom-aligns (see the base td rule above),
+   so keeping padding-bottom identical everywhere is what actually keeps
+   every input sitting on the same line; only padding-top gets the extra
+   room to breathe above the label. */
 td:has(.unit-label) {
-  padding: 6px 4px;
+  padding: 6px 4px 4px 4px;
 }
 
 td:has(.unit-label) .unit-input {

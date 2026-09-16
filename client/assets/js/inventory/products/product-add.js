@@ -1441,19 +1441,40 @@ function handleDefaultUnitChange() {
         if (unitScope === 'per_product' && isBaseUnit == 0) {
             conversionFactorGroup.style.display = 'block';
             conversionFactorInput.setAttribute('required', '');
+
+            // A product whose only unit IS a per-product one (e.g. just "Carton",
+            // no UOM Group involved) still needs the "Enter Trade Price / MRP By"
+            // toggle — it was previously only wired up for the Group-UOM path, so a
+            // single-unit product with a real packing size (e.g. 1 Carton = 12 Pc)
+            // had no way to enter price per-Carton at all. Pair it with the account's
+            // "Piece" base unit (every per-product packaging unit multiplies a Piece
+            // count) and drive it through the same dropdown/conversion machinery the
+            // Group-UOM path already uses.
+            const pieceUnit = (window.unitsData || []).find(u =>
+                u.is_base_unit == 1 && /piece/i.test(u.uom_name || '')
+            );
+            const selectedUnitData = (window.unitsData || []).find(u => String(u.id) === String(selectedUnitId));
+            if (pieceUnit && selectedUnitData) {
+                window.currentGroupUnits = [pieceUnit, selectedUnitData];
+                populatePriceEntryUnitDropdown(window.currentGroupUnits);
+            }
         } else {
             conversionFactorGroup.style.display = 'none';
             conversionFactorInput.removeAttribute('required');
             conversionFactorInput.value = '';
+            window.currentGroupUnits = [];
+            populatePriceEntryUnitDropdown([]);
         }
-        
+
         // Filter UOM Groups based on selected unit
         filterUomGroupsByUnit(selectedUnitId);
     } else {
         conversionFactorGroup.style.display = 'none';
         conversionFactorInput.removeAttribute('required');
         conversionFactorInput.value = '';
-        
+        window.currentGroupUnits = [];
+        populatePriceEntryUnitDropdown([]);
+
         // Show all UOM groups when no unit selected
         showAllUomGroups();
     }
@@ -2077,6 +2098,11 @@ function loadProductForEdit(productId) {
                             }
                         }
                         handleDefaultUnitChange();
+                        // handleDefaultUnitChange() populates window.currentGroupUnits
+                        // synchronously for a per-product single unit (e.g. Carton-only
+                        // product), so it's safe to restore the saved price-entry state
+                        // right after, same as the Group-UOM path does post-fetch.
+                        applyStoredPriceEntry(product);
                     }
                 }
                 
@@ -2573,7 +2599,15 @@ function getUnitFactorValue(unit) {
     if (!unit) return null;
     if (unit.is_base_unit == 1) return 1;
     if (unit.unit_scope === 'per_product') {
-        const input = document.querySelector(`input[name="groupConversionFactor[${unit.id}]"]`);
+        // Group-UOM mode names the factor input per unit id; single-Default-Unit mode
+        // (just one per-product unit, e.g. only "Carton" — no group involved) uses the
+        // one fixed #productConversionFactor field instead. Check both.
+        const groupInput = document.querySelector(`input[name="groupConversionFactor[${unit.id}]"]`);
+        const defaultUnitSelect = document.getElementById('defaultUnit');
+        const singleInput = (defaultUnitSelect && String(defaultUnitSelect.value) === String(unit.id))
+            ? document.getElementById('productConversionFactor')
+            : null;
+        const input = groupInput || singleInput;
         const val = input ? parseFloat(input.value) : NaN;
         return (!isNaN(val) && val > 0) ? val : null;
     }

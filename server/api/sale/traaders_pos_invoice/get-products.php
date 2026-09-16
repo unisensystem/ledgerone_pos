@@ -27,7 +27,18 @@ try {
             p.uom_type, p.uom_group_id, p.product_conversion_factor,
             p.weight_value, p.weight_unit,
             p.price_entry_unit_id, p.trade_price_entry_value, p.mrp_entry_value,
-            COALESCE(puc.conversion_factor, peu.conversion_factor) as price_entry_unit_factor,
+            -- product_uom_conversions is essentially never populated in practice, and
+            -- peu.conversion_factor (the UOM's own generic factor) is just a 1.0
+            -- placeholder for a per_product-scoped unit like Carton — the real
+            -- packing size lives on products.product_conversion_factor. Use it
+            -- whenever the price-entry unit IS this product's single default unit
+            -- (the normal case for a 'unit'-type product priced by Carton/Dozen/etc);
+            -- otherwise fall back to the unit's own factor as before.
+            COALESCE(
+                puc.conversion_factor,
+                CASE WHEN p.price_entry_unit_id = p.default_unit_id AND p.product_conversion_factor > 0 THEN p.product_conversion_factor END,
+                peu.conversion_factor
+            ) as price_entry_unit_factor,
             u.uom_name as default_unit_name, u.unit_scope as default_unit_scope,
             u.is_base_unit as default_is_base_unit, u.conversion_factor as default_conversion_factor
         FROM products p

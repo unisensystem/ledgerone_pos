@@ -177,8 +177,12 @@ function updateRowUnitCells(row) {
             container.style.display = 'flex';
             container.style.flexDirection = 'column';
             container.style.gap = '2px';
-            container.style.padding = '4px';
-            
+            // No vertical padding — the <td> already pads every cell in the row.
+            // Adding the wrapper's own top/bottom padding on top of that made this
+            // 2-line (label+input) cell noticeably taller than every 1-line cell
+            // in the same row, staggering them under center alignment.
+            container.style.padding = '0 4px';
+
             // Add unit label
             const label = document.createElement('div');
             label.className = 'unit-label';

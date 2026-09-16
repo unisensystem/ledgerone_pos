@@ -118,10 +118,12 @@ function getCustomerDisplayText(customer) {
 // Effective per-Piece sale price for a product. Products entered via a non-Piece
 // unit (e.g. Carton, via the "Enter Trade Price / MRP By" product-form feature)
 // store a rounded-to-3-decimals per-Piece rate for general use, PLUS the exact
-// originally-typed value and unit. Recomputing live here (full floating-point
-// precision, only rounded at the final Gross/Net amount) avoids a whole-Carton
-// sale totalling 1999.992 instead of 2000 â€” see calculateRowAmounts's
-// gross.toFixed(3), which absorbs the tiny float epsilon correctly.
+// originally-typed value and unit. Recomputing live here keeps the Sale Price box
+// consistent with every other money field on this form (all toFixed(3) — Net,
+// Gross, Discount, etc.), instead of showing a raw 6-decimal string like
+// "12900.000000". The resulting sub-paisa rounding on a whole-Carton sale (a few
+// thousandths of a rupee) is the same order of float epsilon calculateRowAmounts
+// already absorbs via gross.toFixed(3).
 function getEffectivePriceValue(product, salePriceSetting) {
     const flatPrice = salePriceSetting === 'mrp' ? (product.mrp || 0) : (product.trade_price || 0);
     if (!product.price_entry_unit_id || !product.price_entry_unit_factor) return flatPrice;
@@ -130,7 +132,7 @@ function getEffectivePriceValue(product, salePriceSetting) {
     const entryValue = salePriceSetting === 'mrp' ? product.mrp_entry_value : product.trade_price_entry_value;
     if (!factor || factor <= 0 || !entryValue) return flatPrice;
 
-    return (parseFloat(entryValue) / factor).toFixed(6);
+    return (parseFloat(entryValue) / factor).toFixed(3);
 }
 
 // Function to get product display text based on display mode setting
@@ -6486,15 +6488,31 @@ async function addRowDynamic() {
     weightValueContainer.style.display = 'flex';
     weightValueContainer.style.flexDirection = 'column';
     weightValueContainer.style.gap = '2px';
-    weightValueContainer.style.padding = '4px';
+    // No vertical padding here — the <td> itself already pads every cell in the
+    // row. Adding the wrapper's own top/bottom padding on top of that made this
+    // 2-line (label+input) cell noticeably taller than every 1-line cell in the
+    // same row, staggering them under center alignment. Horizontal-only keeps
+    // the label/input inset from the cell edges without adding row height.
+    weightValueContainer.style.padding = '0 4px';
     const weightUnitLabel = document.createElement('div');
-    weightUnitLabel.className = 'unit-label weight-unit-label';
+    // Starts WITHOUT the 'unit-label' class — td:has(.unit-label) gives a cell
+    // extra padding to fit a real label, and :has() matches on the element's
+    // presence in the DOM regardless of display:none, so leaving that class on
+    // an empty/hidden label would still puff up this cell's padding with
+    // nothing to show for it. updateRowWeightAndPacking() adds 'unit-label'
+    // back (along with showing it) once there's a real weight to label.
+    weightUnitLabel.className = 'weight-unit-label';
     weightUnitLabel.style.fontSize = '10px';
     weightUnitLabel.style.fontWeight = '500';
     weightUnitLabel.style.color = 'var(--text-secondary, #6c757d)';
     weightUnitLabel.style.textAlign = 'left';
     weightUnitLabel.style.marginBottom = '2px';
     weightUnitLabel.style.opacity = '0.8';
+    // No product selected yet — nothing to label. Hidden (not just empty text)
+    // so its box doesn't sit there reserving height and pushing the "-"
+    // placeholder input up off the row's shared baseline; updateRowWeightAndPacking()
+    // shows it again once a product with a real weight is picked.
+    weightUnitLabel.style.display = 'none';
     weightValueContainer.appendChild(weightUnitLabel);
     const weightValueDisplay = document.createElement('input');
     weightValueDisplay.type = 'text';
@@ -6802,7 +6820,11 @@ function updateRowWeightAndPacking(row) {
     if (weightValueCell) {
         const label = weightValueCell.querySelector('.weight-unit-label');
         const display = weightValueCell.querySelector('.weight-value-display');
-        if (label) label.textContent = hasWeight ? weightUnit : '';
+        if (label) {
+            label.textContent = hasWeight ? weightUnit : '';
+            label.style.display = hasWeight ? '' : 'none';
+            label.classList.toggle('unit-label', hasWeight);
+        }
         if (display) display.value = hasWeight ? weightValue : '-';
     }
 
@@ -6827,12 +6849,28 @@ function updateRowWeightAndPacking(row) {
     const weightTotalInput = weightCell.querySelector('input');
     if (hasWeight && totalQtyBaseUnits > 0) {
         const totalWeight = weightValue * totalQtyBaseUnits;
-        if (weightTotalInput) weightTotalInput.value = `${totalWeight.toFixed(2)} ${weightUnit}`.trim();
+        if (weightTotalInput) weightTotalInput.value = formatRowTotalWeight(totalWeight, weightUnit);
     } else {
         if (weightTotalInput) weightTotalInput.value = '-';
     }
 
     updateFooterWeightTotal();
+}
+
+// Displays a row's Total Weight in whichever unit reads best: the small unit
+// (gram/ml) while under 1000, auto-switching to the bigger one (kg/liter) once
+// it crosses that — e.g. "800.00 gram" but "9.60 kg" once the row's total
+// reaches 1kg. Mirrors the same gram/ml <-> kg/liter relationship the footer
+// total already applies across all rows combined.
+function formatRowTotalWeight(totalWeight, weightUnit) {
+    const dimension = WEIGHT_UNIT_DIMENSIONS[(weightUnit || '').toLowerCase()];
+    if (!dimension) return `${totalWeight.toFixed(2)} ${weightUnit}`.trim();
+
+    const baseAmount = totalWeight * dimension.factor; // normalized into gram/ml
+    if (baseAmount >= dimension.displayFactor) {
+        return `${(baseAmount / dimension.displayFactor).toFixed(2)} ${dimension.displayUnit}`;
+    }
+    return `${baseAmount.toFixed(2)} ${dimension.base}`;
 }
 
 // Weight units group into two physical dimensions — mass and volume. Units in

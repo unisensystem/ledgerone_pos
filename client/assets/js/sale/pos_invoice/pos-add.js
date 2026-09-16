@@ -115,10 +115,12 @@ function getCustomerDisplayText(customer) {
 // Effective per-Piece sale price for a product. Products entered via a non-Piece
 // unit (e.g. Carton, via the "Enter Trade Price / MRP By" product-form feature)
 // store a rounded-to-3-decimals per-Piece rate for general use, PLUS the exact
-// originally-typed value and unit. Recomputing live here (full floating-point
-// precision, only rounded at the final Gross/Net amount) avoids a whole-Carton
-// sale totalling 1999.992 instead of 2000 â€” see calculateRowAmounts's
-// gross.toFixed(3), which absorbs the tiny float epsilon correctly.
+// originally-typed value and unit. Recomputing live here keeps the Sale Price box
+// consistent with every other money field on this form (all toFixed(3) — Net,
+// Gross, Discount, etc.), instead of showing a raw 6-decimal string like
+// "12900.000000". The resulting sub-paisa rounding on a whole-Carton sale (a few
+// thousandths of a rupee) is the same order of float epsilon calculateRowAmounts
+// already absorbs via gross.toFixed(3).
 function getEffectivePriceValue(product, salePriceSetting) {
     const flatPrice = salePriceSetting === 'mrp' ? (product.mrp || 0) : (product.trade_price || 0);
     if (!product.price_entry_unit_id || !product.price_entry_unit_factor) return flatPrice;
@@ -127,7 +129,7 @@ function getEffectivePriceValue(product, salePriceSetting) {
     const entryValue = salePriceSetting === 'mrp' ? product.mrp_entry_value : product.trade_price_entry_value;
     if (!factor || factor <= 0 || !entryValue) return flatPrice;
 
-    return (parseFloat(entryValue) / factor).toFixed(6);
+    return (parseFloat(entryValue) / factor).toFixed(3);
 }
 
 // Function to get product display text based on display mode setting

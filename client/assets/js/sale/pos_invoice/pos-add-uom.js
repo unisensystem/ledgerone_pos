@@ -15,25 +15,25 @@ async function getProductUOMDetails(product) {
                 // Fetch from product_uom_conversions table
                 const response = await fetch(`../../../../server/api/sale/pos_invoice/get-product-uom-conversions.php?product_id=${product.id}`);
                 const data = await response.json();
-                if (data.success && data.conversions.length > 0) {
-                    const conversion = data.conversions.find(c => c.uom_id == defaultUom.id);
-                    if (conversion) {
-                        uomDetails.push({
-                            id: defaultUom.id,
-                            name: defaultUom.uom_name,
-                            conversionFactor: parseFloat(conversion.conversion_factor) || 1,
-                            isBase: true
-                        });
-                    }
-                } else {
-                    // Fallback to default
-                    uomDetails.push({
-                        id: defaultUom.id,
-                        name: defaultUom.uom_name,
-                        conversionFactor: 1,
-                        isBase: true
-                    });
-                }
+                const conversion = (data.success && data.conversions.length > 0)
+                    ? data.conversions.find(c => c.uom_id == defaultUom.id)
+                    : null;
+
+                // product_uom_conversions is essentially never populated in practice
+                // (the actual per-product packing size is entered on the product form
+                // and saved straight to products.product_conversion_factor instead) —
+                // fall back to that before defaulting to 1, otherwise a product whose
+                // only unit is a per-product one (e.g. Carton) silently prices/sells
+                // at a factor of 1 instead of its real packing size.
+                const productCf = parseFloat(product.product_conversion_factor);
+                const fallbackCf = (!isNaN(productCf) && productCf > 0) ? productCf : 1;
+
+                uomDetails.push({
+                    id: defaultUom.id,
+                    name: defaultUom.uom_name,
+                    conversionFactor: conversion ? (parseFloat(conversion.conversion_factor) || fallbackCf) : fallbackCf,
+                    isBase: true
+                });
             } else {
                 uomDetails.push({
                     id: defaultUom.id,
