@@ -66,6 +66,15 @@ document.addEventListener('DOMContentLoaded', function () {
         document.getElementById('reportType').value = 'all';
         document.getElementById('dateRange').value = 'last30';
         document.getElementById('searchInput').value = '';
+        document.getElementById('company').value = '';
+        document.getElementById('project').value = '';
+        document.getElementById('supplier').value = '';
+
+        // custom date range block ko bhi wapis hide/clear karo
+        document.getElementById('customDateRange').style.display = 'none';
+        document.getElementById('startDate').value = '';
+        document.getElementById('endDate').value = '';
+
         currentReportType = 'item';
         currentDateRange = 'last30';
         currentSearchTerm = '';
@@ -813,11 +822,28 @@ function getDateRangeText(range) {
 
 function handleExport(type) {
     const reportName = getReportTypeText(currentReportType);
-    const company = document.getElementById('company').value;
+    const companySelect = document.getElementById('company');
+    const projectSelect = document.getElementById('project');
+    const supplierSelect = document.getElementById('supplier');
+    const company = companySelect.value;
+    const project = projectSelect.value;
+    const supplier = supplierSelect.value;
     
     if (type === 'print') {
+        // jo bhi filters (company/project/supplier/search) abhi list par applied hain, wohi print me bhi jaayen
         let printUrl = `print.php?type=${currentReportType}&date_range=${currentDateRange}`;
-        if (company) printUrl += `&company_id=${company}`;
+        if (company) {
+            printUrl += `&company_id=${company}&company_name=${encodeURIComponent(companySelect.options[companySelect.selectedIndex].text)}`;
+        }
+        if (project) {
+            printUrl += `&project_id=${project}&project_name=${encodeURIComponent(projectSelect.options[projectSelect.selectedIndex].text)}`;
+        }
+        if (supplier) {
+            printUrl += `&supplier_id=${supplier}&supplier_name=${encodeURIComponent(supplierSelect.options[supplierSelect.selectedIndex].text)}`;
+        }
+        if (currentSearchTerm) {
+            printUrl += `&search=${encodeURIComponent(currentSearchTerm)}`;
+        }
         window.open(printUrl, '_blank');
     } else if (type === 'excel') {
         alert(`Exporting ${reportName} to Excel format`);

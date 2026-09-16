@@ -19,6 +19,16 @@ $currency_symbol = $currency['symbol'] ?? '$';
 $report_type = $_GET['type'] ?? 'item';
 $date_range = $_GET['date_range'] ?? 'last30';
 $company_id = $_GET['company_id'] ?? null;
+$project_id = $_GET['project_id'] ?? null;
+$supplier_id = $_GET['supplier_id'] ?? null;
+$search_term = $_GET['search'] ?? '';
+
+// Display labels for the applied filters (sent from the list page along with the ids)
+$company_name = $_GET['company_name'] ?? '';
+$project_name = $_GET['project_name'] ?? '';
+$supplier_name = $_GET['supplier_name'] ?? '';
+
+$has_filters = $company_name !== '' || $project_name !== '' || $supplier_name !== '' || $search_term !== '';
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -35,20 +45,22 @@ $company_id = $_GET['company_id'] ?? null;
 
         body {
             font-family: Arial, sans-serif;
-            padding: 20px;
-            color: #333;
+            padding: 24px;
+            color: #2b2b2b;
+            font-size: 13px;
+            line-height: 1.5;
         }
 
         .print-header {
             text-align: center;
-            margin-bottom: 30px;
+            margin-bottom: 24px;
             border-bottom: 2px solid #333;
-            padding-bottom: 20px;
+            padding-bottom: 16px;
         }
 
         .print-header h1 {
             font-size: 24px;
-            margin-bottom: 5px;
+            margin-bottom: 4px;
         }
 
         .print-header p {
@@ -59,12 +71,34 @@ $company_id = $_GET['company_id'] ?? null;
         .report-info {
             display: flex;
             justify-content: space-between;
-            margin-bottom: 20px;
+            gap: 12px;
+            margin-bottom: 12px;
             font-size: 12px;
+            background: #f7f9fc;
+            border: 1px solid #e1e6ee;
+            border-radius: 4px;
+            padding: 10px 14px;
         }
 
         .report-info div {
             flex: 1;
+        }
+
+        .report-filters {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 20px;
+        }
+
+        .filter-chip {
+            display: inline-block;
+            font-size: 11px;
+            background: #eef1f7;
+            border: 1px solid #d7deea;
+            border-radius: 12px;
+            padding: 4px 10px;
+            color: #333;
         }
 
         table {
@@ -75,14 +109,18 @@ $company_id = $_GET['company_id'] ?? null;
 
         th, td {
             border: 1px solid #ddd;
-            padding: 8px;
+            padding: 9px;
             text-align: left;
             font-size: 12px;
         }
 
         th {
-            background-color: #f5f5f5;
+            background-color: #eef1f7;
             font-weight: bold;
+        }
+
+        #reportTable > tbody > tr:nth-child(4n+1) {
+            background-color: #fafbfd;
         }
 
         /* Nested breakdown styling */
@@ -91,27 +129,27 @@ $company_id = $_GET['company_id'] ?? null;
         }
 
         .breakdown-inner {
-            padding: 8px 8px 8px 24px;
+            padding: 10px 10px 10px 26px;
             background-color: #fafbfd;
         }
 
         .breakdown-inner h4 {
             font-size: 11px;
             color: #555;
-            margin-bottom: 6px;
+            margin-bottom: 8px;
             text-transform: uppercase;
             letter-spacing: 0.5px;
         }
 
         .breakdown-inner table {
-            margin-bottom: 10px;
+            margin-bottom: 12px;
             background: #fff;
         }
 
         .breakdown-inner table th,
         .breakdown-inner table td {
             font-size: 11px;
-            padding: 6px;
+            padding: 7px;
         }
 
         .breakdown-inner table th {
@@ -119,10 +157,10 @@ $company_id = $_GET['company_id'] ?? null;
         }
 
         .subcat-block, .invoice-block {
-            margin-bottom: 10px;
+            margin-bottom: 12px;
             border: 1px solid #e1e6ee;
             border-radius: 4px;
-            padding: 8px;
+            padding: 10px;
             background: #fff;
         }
 
@@ -133,8 +171,8 @@ $company_id = $_GET['company_id'] ?? null;
             gap: 8px;
             font-size: 11px;
             font-weight: bold;
-            margin-bottom: 6px;
-            padding-bottom: 6px;
+            margin-bottom: 8px;
+            padding-bottom: 8px;
             border-bottom: 1px solid #e1e6ee;
         }
 
@@ -156,7 +194,7 @@ $company_id = $_GET['company_id'] ?? null;
             body {
                 padding: 0;
             }
-            
+
             .no-print {
                 display: none;
             }
@@ -189,6 +227,23 @@ $company_id = $_GET['company_id'] ?? null;
         </div>
     </div>
 
+    <?php if ($has_filters): ?>
+    <div class="report-filters">
+        <?php if ($company_name !== ''): ?>
+            <span class="filter-chip">Company: <?php echo htmlspecialchars($company_name); ?></span>
+        <?php endif; ?>
+        <?php if ($project_name !== ''): ?>
+            <span class="filter-chip">Project: <?php echo htmlspecialchars($project_name); ?></span>
+        <?php endif; ?>
+        <?php if ($supplier_name !== ''): ?>
+            <span class="filter-chip">Supplier: <?php echo htmlspecialchars($supplier_name); ?></span>
+        <?php endif; ?>
+        <?php if ($search_term !== ''): ?>
+            <span class="filter-chip">Search: "<?php echo htmlspecialchars($search_term); ?>"</span>
+        <?php endif; ?>
+    </div>
+    <?php endif; ?>
+
     <table id="reportTable">
         <thead id="tableHead"></thead>
         <tbody id="tableBody"></tbody>
@@ -202,6 +257,9 @@ $company_id = $_GET['company_id'] ?? null;
         const reportType = '<?php echo $report_type; ?>';
         const dateRange = '<?php echo $date_range; ?>';
         const companyId = '<?php echo $company_id; ?>';
+        const projectId = '<?php echo $project_id; ?>';
+        const supplierId = '<?php echo $supplier_id; ?>';
+        const searchTerm = '<?php echo addslashes($search_term); ?>';
         const currencySymbol = '<?php echo $currency_symbol; ?>';
 
         const tableHeaders = {
@@ -222,15 +280,28 @@ $company_id = $_GET['company_id'] ?? null;
         document.getElementById('reportType').textContent = reportTitles[reportType];
         document.getElementById('dateRange').textContent = dateRange;
 
+        // Same search filter the list page applies, so print shows exactly what's filtered on screen
+        function applySearchFilter(data, term) {
+            if (!term) return data;
+            const t = term.toLowerCase();
+            return data.filter(item => Object.keys(item).some(key => {
+                const val = item[key];
+                return typeof val === 'string' && val.toLowerCase().includes(t);
+            }));
+        }
+
         // Fetch and display data
         let url = `../../../../server/api/purchase/purchase_reports/purchase-reports.php?type=${reportType}&date_range=${dateRange}`;
-        if (companyId) url += `&company_id=${companyId}`;
-        
+        if (companyId && companyId !== 'null') url += `&company_id=${companyId}`;
+        if (projectId && projectId !== 'null') url += `&project_id=${projectId}`;
+        if (supplierId && supplierId !== 'null') url += `&supplier_id=${supplierId}`;
+
         fetch(url)
             .then(response => response.json())
             .then(result => {
                 if (result.success) {
-                    renderTable(result.data);
+                    const filtered = applySearchFilter(result.data, searchTerm);
+                    renderTable(filtered);
                     setTimeout(() => window.print(), 500);
                 } else {
                     document.getElementById('tableBody').innerHTML =
