@@ -33,7 +33,7 @@
         'hideTransportNameStandard','hideBiltyNoStandard','hideProjectStandard',
         'hideContainerStandard','hideRemarksStandard',
         'enableWeightColumn','enablePackingColumn','enableTotalWeightColumn',
-        'enableKiraya','enableMazdoori'
+        'enableKiraya','enableMazdoori','enableGrossAmount','enableSchemeColumn'
     ]);
 
     localStorage.getItem = function(key) {
@@ -4775,6 +4775,8 @@ function loadInvoiceSettings() {
     if (customerDisplayRadio) customerDisplayRadio.checked = true;
     
     // Load other settings
+    document.getElementById('enableGrossAmount').checked = localStorage.getItem('enableGrossAmount') === 'true';
+    document.getElementById('enableSchemeColumn').checked = localStorage.getItem('enableSchemeColumn') !== 'false';
     document.getElementById('enableTradeOfferAmount').checked = localStorage.getItem('enableTradeOfferAmount') === 'true';
     document.getElementById('enableFOC').checked = localStorage.getItem('enableFOC') === 'true';
     document.getElementById('enableCashDiscountPercent').checked = localStorage.getItem('enableCashDiscountPercent') === 'true';
@@ -4831,6 +4833,8 @@ function saveInvoiceSettings() {
     localStorage.setItem('customerDisplayMode', selectedCustomerDisplayMode);
     
     // Save other settings
+    localStorage.setItem('enableGrossAmount', document.getElementById('enableGrossAmount').checked);
+    localStorage.setItem('enableSchemeColumn', document.getElementById('enableSchemeColumn').checked);
     localStorage.setItem('enableTradeOfferAmount', document.getElementById('enableTradeOfferAmount').checked);
     localStorage.setItem('enableFOC', document.getElementById('enableFOC').checked);
     localStorage.setItem('enableCashDiscountPercent', document.getElementById('enableCashDiscountPercent').checked);
@@ -4943,6 +4947,8 @@ function refreshCustomerDisplayInDropdown() {
 
 // Apply invoice settings to show/hide columns
 function applyInvoiceSettings() {
+    const enableGrossAmount = localStorage.getItem('enableGrossAmount') === 'true';
+    const enableSchemeColumn = localStorage.getItem('enableSchemeColumn') !== 'false';
     const enableCashDiscountPercent = localStorage.getItem('enableCashDiscountPercent') === 'true';
     const enableCashDiscountAmount = localStorage.getItem('enableCashDiscountAmount') === 'true';
     const enableTradeOfferAmount = localStorage.getItem('enableTradeOfferAmount') === 'true';
@@ -4970,6 +4976,9 @@ const enableTotalWeightColumn = localStorage.getItem('enableTotalWeightColumn') 
 
         // Apply visibility to header
        if (thead) {
+    const schemeHeaders = thead.querySelectorAll('.scheme-cell');
+    schemeHeaders.forEach(cell => cell.style.display = enableSchemeColumn ? '' : 'none');
+    const grossHeaders = thead.querySelectorAll('.gross-cell');
     const discPercentHeaders = thead.querySelectorAll('.disc-percent-cell');
     const discAmountHeaders = thead.querySelectorAll('.disc-amount-cell');
     const toAmountHeaders = thead.querySelectorAll('.to-amount-cell');
@@ -4983,6 +4992,7 @@ const enableTotalWeightColumn = localStorage.getItem('enableTotalWeightColumn') 
     const packingHeaders = thead.querySelectorAll('.packing-cell');
     const totalWeightHeaders = thead.querySelectorAll('.weight-cell');
 
+    grossHeaders.forEach(cell => cell.style.display = enableGrossAmount ? '' : 'none');
     discPercentHeaders.forEach(cell => cell.style.display = enableCashDiscountPercent ? '' : 'none');
     discAmountHeaders.forEach(cell => cell.style.display = enableCashDiscountAmount ? '' : 'none');
     toAmountHeaders.forEach(cell => cell.style.display = enableTradeOfferAmount ? '' : 'none');
@@ -4999,6 +5009,16 @@ const enableTotalWeightColumn = localStorage.getItem('enableTotalWeightColumn') 
         
         // Apply visibility to body rows AND disable/enable inputs
         if (tbody) {
+            // Scheme selects the pricing mechanism for the row (Sale On TP/Less/etc) —
+            // hidden rows keep whatever scheme is already selected, just not shown.
+            const schemeCells = tbody.querySelectorAll('.scheme-cell');
+            schemeCells.forEach(cell => cell.style.display = enableSchemeColumn ? '' : 'none');
+
+            // Gross Amount is a computed/derived value (feeds invoice totals) — only
+            // ever hide/show it, never disable or zero it out like the editable cells below.
+            const grossCells = tbody.querySelectorAll('.gross-cell');
+            grossCells.forEach(cell => cell.style.display = enableGrossAmount ? '' : 'none');
+
             const discPercentCells = tbody.querySelectorAll('.disc-percent-cell');
             const discAmountCells = tbody.querySelectorAll('.disc-amount-cell');
             const toAmountCells = tbody.querySelectorAll('.to-amount-cell');
@@ -5074,6 +5094,10 @@ const enableTotalWeightColumn = localStorage.getItem('enableTotalWeightColumn') 
 
         // Apply visibility to footer
        if (tfoot) {
+    const schemeFooters = tfoot.querySelectorAll('.scheme-cell');
+    schemeFooters.forEach(cell => cell.style.display = enableSchemeColumn ? '' : 'none');
+    const grossFooters = tfoot.querySelectorAll('.gross-cell');
+    grossFooters.forEach(cell => cell.style.display = enableGrossAmount ? '' : 'none');
     const discPercentFooters = tfoot.querySelectorAll('.disc-percent-cell');
     const discAmountFooters = tfoot.querySelectorAll('.disc-amount-cell');
     const toAmountFooters = tfoot.querySelectorAll('.to-amount-cell');
@@ -6869,6 +6893,8 @@ function updateFooterWeightTotal() {
 // Apply invoice settings to a specific row
 // Apply invoice settings to a specific row
 function applyInvoiceSettingsToRow(row) {
+    const enableGrossAmount = localStorage.getItem('enableGrossAmount') === 'true';
+    const enableSchemeColumn = localStorage.getItem('enableSchemeColumn') !== 'false';
     const enableCashDiscountPercent = localStorage.getItem('enableCashDiscountPercent') === 'true';
     const enableCashDiscountAmount = localStorage.getItem('enableCashDiscountAmount') === 'true';
     const enableTradeOfferAmount = localStorage.getItem('enableTradeOfferAmount') === 'true';
@@ -6882,6 +6908,8 @@ function applyInvoiceSettingsToRow(row) {
     const enableTotalWeightColumn = localStorage.getItem('enableTotalWeightColumn') !== 'false';
 
     // Apply visibility to cells in this row
+    const schemeCell = row.querySelector('.scheme-cell');
+    const grossCell = row.querySelector('.gross-cell');
     const discPercentCell = row.querySelector('.disc-percent-cell');
     const discAmountCell = row.querySelector('.disc-amount-cell');
     const extraDiscCell = row.querySelector('.extra-disc-cell');       // NEW
@@ -6895,6 +6923,8 @@ function applyInvoiceSettingsToRow(row) {
     const packingCell = row.querySelector('.packing-cell');
     const totalWeightCell = row.querySelector('.weight-cell');
 
+    if (schemeCell) schemeCell.style.display = enableSchemeColumn ? '' : 'none';
+    if (grossCell) grossCell.style.display = enableGrossAmount ? '' : 'none';
     if (discPercentCell) discPercentCell.style.display = enableCashDiscountPercent ? '' : 'none';
     if (discAmountCell) discAmountCell.style.display = enableCashDiscountAmount ? '' : 'none';
     if (extraDiscCell) extraDiscCell.style.display = enableExtraDiscountItem ? '' : 'none'; // NEW

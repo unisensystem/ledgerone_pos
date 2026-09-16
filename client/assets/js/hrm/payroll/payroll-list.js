@@ -217,6 +217,16 @@ function renderTable() {
                 break;
         }
 
+        const payrollStatus = item.status || 'finalized';
+        const statusBadge = payrollStatus === 'draft'
+            ? '<span class="status-badge status-draft">Draft</span>'
+            : '<span class="status-badge status-approved">Finalized</span>';
+        const finalizeBtn = payrollStatus === 'draft'
+            ? `<button class="action-btn finalize" title="Finalize (locks and posts to accounting)" data-id="${item.id}">
+                   <i class="fas fa-lock"></i>
+               </button>`
+            : '';
+
         row.innerHTML = `
                     <td><strong>${item.payroll_code}</strong></td>
                     <td>${formattedDate}</td>
@@ -228,8 +238,10 @@ function renderTable() {
                     <td>${item.type}</td>
                     <td><strong>${formattedAmount}</strong></td>
                     <td>${item.payment_method || '-'}</td>
+                    <td>${statusBadge}</td>
                     <td>
                         <div class="action-buttons">
+                            ${finalizeBtn}
                             <button class="action-btn view" title="View" data-id="${item.id}">
                                 <i class="fas fa-eye"></i>
                             </button>
@@ -431,6 +443,8 @@ function addEventListeners() {
         } else if (target.classList.contains('print')) {
             const employeeId = target.dataset.employee;
             printReceipt(id, employeeId);
+        } else if (target.classList.contains('finalize')) {
+            finalizeRecord(id);
         }
     });
 
@@ -532,6 +546,27 @@ function editRecord(id) {
 function deleteRecord(id) {
     deleteId = id;
     deleteModal.style.display = 'flex';
+}
+
+// Finalize a draft payroll — locks it and posts the accounting entries.
+function finalizeRecord(id) {
+    if (!confirm('Finalize this payroll?\n\nThis posts it to the accounting ledger and locks it — it can no longer be edited or deleted without a controlled correction.')) return;
+
+    fetch('../../../../server/api/hrm/payroll/payroll-finalize.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ payroll_id: id })
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.success) {
+            showNotification(data.message, 'success');
+            fetchPayrollData();
+        } else {
+            alert('Error: ' + data.message);
+        }
+    })
+    .catch(err => alert('Error finalizing payroll: ' + err.message));
 }
 
 // Print receipt

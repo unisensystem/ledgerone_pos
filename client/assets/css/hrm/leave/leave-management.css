@@ -1,0 +1,189 @@
+* { box-sizing: border-box; }
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: #f4f6f9;
+    color: #1e293b;
+    /* No margin override here — the dashboard shell (includes/dashboard.php)
+       sets body's margin-top/margin-left itself to clear the fixed top header
+       and left nav. Overriding it to 0 is what was hiding the page heading
+       under the header. */
+}
+.container { max-width: 1400px; margin: 0 auto; padding: 24px 20px; }
+
+.header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-bottom: 20px;
+}
+.header h1 { margin: 0; font-size: 1.6rem; }
+.header-stats { display: flex; gap: 10px; }
+.stat-chip {
+    padding: 6px 14px;
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: 600;
+    background: #e2e8f0;
+}
+.stat-chip span { font-size: 15px; margin-right: 4px; }
+.stat-pending { background: #fef3c7; color: #92400e; }
+.stat-approved { background: #dcfce7; color: #166534; }
+.stat-rejected { background: #fee2e2; color: #991b1b; }
+
+.card {
+    background: #fff;
+    border-radius: 10px;
+    border: 1px solid #e2e8f0;
+    padding: 20px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+}
+
+.filters-row {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 18px;
+    align-items: center;
+}
+.filters-row input, .filters-row select {
+    height: 38px;
+    padding: 0 10px;
+    border: 1.5px solid #d6dbe4;
+    border-radius: 6px;
+    font-size: 13px;
+}
+.filters-row input[type="text"] { flex: 1; min-width: 160px; }
+
+.btn {
+    height: 38px;
+    padding: 0 16px;
+    border-radius: 6px;
+    border: none;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    transition: all 0.15s;
+}
+.btn-primary { background: #1f7bff; color: #fff; }
+.btn-primary:hover { background: #1559b8; }
+.btn-secondary { background: #f1f5f9; color: #334155; }
+.btn-secondary:hover { background: #e2e8f0; }
+.btn-danger { background: #ef4444; color: #fff; }
+.btn-danger:hover { background: #dc2626; }
+.btn-success { background: #22c55e; color: #fff; }
+.btn-success:hover { background: #16a34a; }
+.btn-sm { height: 30px; padding: 0 10px; font-size: 12px; }
+
+.table-wrap { overflow-x: auto; }
+.data-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.data-table th {
+    text-align: left;
+    padding: 10px 12px;
+    background: #f8fafc;
+    border-bottom: 2px solid #e2e8f0;
+    font-weight: 700;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: #64748b;
+    white-space: nowrap;
+}
+.data-table td {
+    padding: 10px 12px;
+    border-bottom: 1px solid #f1f5f9;
+    vertical-align: middle;
+}
+.data-table tbody tr:hover { background: #f8fafc; }
+.text-center { text-align: center; color: #94a3b8; padding: 24px !important; }
+
+.badge {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+}
+.badge-pending { background: #fef3c7; color: #92400e; }
+.badge-approved { background: #dcfce7; color: #166534; }
+.badge-rejected { background: #fee2e2; color: #991b1b; }
+.badge-cancelled { background: #e2e8f0; color: #475569; }
+
+.action-buttons { display: flex; gap: 6px; flex-wrap: wrap; }
+
+.modal {
+    display: none;
+    position: fixed;
+    top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(0,0,0,0.55);
+    z-index: 10000;
+    align-items: center;
+    justify-content: center;
+}
+.modal.show { display: flex; }
+.modal-content {
+    background: #fff;
+    width: 95%;
+    max-width: 480px;
+    border-radius: 10px;
+    overflow: hidden;
+}
+.modal-header {
+    padding: 16px 20px;
+    background: #1f7bff;
+    color: #fff;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+.modal-header h3 { margin: 0; font-size: 1.05rem; }
+.modal-close { background: rgba(255,255,255,0.15); border: none; color: #fff; width: 30px; height: 30px; border-radius: 6px; cursor: pointer; }
+.modal-body { padding: 20px; }
+.modal-footer { padding: 14px 20px; display: flex; justify-content: flex-end; gap: 10px; border-top: 1px solid #f1f5f9; }
+
+.form-group { margin-bottom: 14px; }
+.form-group label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; color: #334155; }
+.form-group label.required::after { content: ' *'; color: #ef4444; }
+.form-group textarea, .form-group input {
+    width: 100%;
+    padding: 8px 10px;
+    border: 1.5px solid #d6dbe4;
+    border-radius: 6px;
+    font-size: 13px;
+    font-family: inherit;
+}
+.form-group textarea { min-height: 70px; resize: vertical; }
+.checkbox-group { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+
+.warning-box {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    background: #fef2f2;
+    border: 1px solid #fecaca;
+    color: #991b1b;
+    padding: 10px 12px;
+    border-radius: 6px;
+    font-size: 13px;
+    margin-bottom: 10px;
+}
+.helper-text { font-size: 12px; color: #64748b; margin-top: 4px; }
+
+#alertContainer .alert {
+    padding: 10px 16px;
+    border-radius: 6px;
+    margin-bottom: 14px;
+    font-size: 13px;
+}
+.alert-success { background: #dcfce7; color: #166534; }
+.alert-error { background: #fee2e2; color: #991b1b; }
+
+@media (max-width: 768px) {
+    .filters-row { flex-direction: column; align-items: stretch; }
+    .filters-row input, .filters-row select { width: 100%; }
+}

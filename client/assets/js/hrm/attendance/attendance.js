@@ -499,6 +499,9 @@ async function updateAttendanceTable() {
             } else if (record.status === 'halfday') {
                 statusBadgeClass = 'badge-late';
                 statusText = 'Half Day';
+            } else if (record.status === 'on_leave') {
+                statusBadgeClass = record.leave_is_paid == 1 ? 'badge-late' : 'badge-absent';
+                statusText = record.leave_type_name || 'On Leave';
             }
 
             row.innerHTML = `

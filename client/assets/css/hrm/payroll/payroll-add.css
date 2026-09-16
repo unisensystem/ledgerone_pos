@@ -216,6 +216,19 @@ body {
   color: white;
 }
 
+.btn-calculate {
+  background-color: #1f7bff;
+  color: white;
+}
+
+.btn-calculate:hover {
+  background-color: #1559b8;
+}
+
+.breakdown-hint {
+  color: #1f7bff;
+}
+
 /* Table styles based on DS */
 .table-container {
   overflow-x: auto;

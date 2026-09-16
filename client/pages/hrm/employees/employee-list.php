@@ -206,22 +206,8 @@ $currency_symbol = $currency['symbol'] ?? '$';
 
                 <div class="form-group">
                     <label class="required">Leave Type</label>
-                    <div class="leave-type-selector">
-                        <div class="leave-type paid" onclick="selectLeaveType('paid')">
-                            <i class="fas fa-sun"></i>
-                            <div>Paid Leave</div>
-                            <div class="leave-days">Balance: 12 days</div>
-                        </div>
-                        <div class="leave-type unpaid" onclick="selectLeaveType('unpaid')">
-                            <i class="fas fa-moon"></i>
-                            <div>Unpaid Leave</div>
-                            <div class="leave-days">Unlimited</div>
-                        </div>
-                        <div class="leave-type sick" onclick="selectLeaveType('sick')">
-                            <i class="fas fa-heartbeat"></i>
-                            <div>Sick Leave</div>
-                            <div class="leave-days">Balance: 7 days</div>
-                        </div>
+                    <div class="leave-type-selector" id="leaveTypeSelector">
+                        <!-- Populated from leave-types.php: types + live balances are tenant-configurable, not hardcoded -->
                     </div>
                 </div>
 
@@ -237,7 +223,15 @@ $currency_symbol = $currency['symbol'] ?? '$';
                             <input type="date" id="leaveEndDate" class="leave-date" onchange="calculateLeaveDays()">
                         </div>
                     </div>
-                    <div class="helper-text" id="leaveDaysCount">Total days: 0</div>
+                    <div class="checkbox-group" style="margin-top: 8px;">
+                        <input type="checkbox" id="leaveIsHalfDay" onchange="toggleHalfDay()">
+                        <label for="leaveIsHalfDay">Half-day leave</label>
+                        <select id="leaveHalfDayPeriod" style="display:none; margin-left: 10px; width: auto;">
+                            <option value="morning">Morning</option>
+                            <option value="afternoon">Afternoon</option>
+                        </select>
+                    </div>
+                    <div class="helper-text" id="leaveDaysCount">Total days: 0 (weekends/holidays excluded)</div>
                 </div>
 
                 <div class="form-group">
@@ -250,9 +244,19 @@ $currency_symbol = $currency['symbol'] ?? '$';
                     <input type="text" id="leaveContact" placeholder="Emergency contact number">
                 </div>
 
+                <div class="form-group" id="leaveOverrideBox" style="display:none;">
+                    <div class="checkbox-group">
+                        <input type="checkbox" id="leaveOverride">
+                        <label for="leaveOverride">Override the warning above and submit anyway</label>
+                    </div>
+                    <input type="text" id="leaveOverrideReason" placeholder="Reason for override (required)" style="margin-top:6px;">
+                </div>
+
+                <div class="warning-box" id="leaveValidationWarning" style="display:none;"></div>
+
                 <div class="warning-box">
                     <i class="fas fa-exclamation-triangle"></i>
-                    <span>Employee will be marked as "On Leave" during this period. All active work will be paused.</span>
+                    <span>Employee will be marked as "On Leave" during this period. If the leave type requires approval it stays Pending until approved.</span>
                 </div>
             </div>
             <div class="modal-footer">
@@ -456,36 +460,52 @@ $currency_symbol = $currency['symbol'] ?? '$';
                 </div>
 
                 <div class="form-group">
-                    <label class="required">Leave Type</label>
-                    <select id="balanceLeaveType">
-                        <option value="paid">Paid Leave</option>
-                        <option value="sick">Sick Leave</option>
-                        <option value="unpaid">Unpaid Leave</option>
-                    </select>
+                    <table class="data-table" id="balanceBreakdownTable" style="width:100%; font-size: 13px;">
+                        <thead>
+                            <tr>
+                                <th>Leave Type</th><th>Opening</th><th>Allocated</th><th>Carry Fwd</th>
+                                <th>Used</th><th>Pending</th><th>Adjustment</th><th>Remaining</th>
+                            </tr>
+                        </thead>
+                        <tbody id="balanceBreakdownBody"><!-- filled by JS --></tbody>
+                    </table>
                 </div>
 
                 <div class="form-group">
-                    <label>Current Balance</label>
-                    <div id="currentBalance" style="font-size: 18px; font-weight: 600; color: #2fbf71;">21 days</div>
+                    <label class="required">Adjust Leave Type</label>
+                    <select id="balanceLeaveType"><!-- filled by JS --></select>
                 </div>
 
                 <div class="form-group">
                     <label class="required">Operation</label>
                     <select id="balanceOperation">
-                        <option value="add">Add Days</option>
-                        <option value="set">Set Balance</option>
+                        <option value="add">Add/Subtract Days (+/-)</option>
+                        <option value="set">Set Remaining Balance To</option>
                     </select>
                 </div>
 
                 <div class="form-group">
-                    <label class="required">Amount</label>
-                    <input type="number" id="balanceAmount" min="0" placeholder="Enter days">
+                    <label class="required">Days</label>
+                    <input type="number" id="balanceAmount" step="0.5" placeholder="e.g. 5 or -2">
+                </div>
+
+                <div class="form-group">
+                    <label class="required">Reason</label>
+                    <input type="text" id="balanceReason" placeholder="Reason for this adjustment">
+                </div>
+
+                <div class="form-group">
+                    <label>Recent Transactions (this leave type)</label>
+                    <table class="data-table" style="width:100%; font-size: 12px;">
+                        <thead><tr><th>Date</th><th>Type</th><th>Days</th><th>Reason</th></tr></thead>
+                        <tbody id="balanceHistoryBody"><!-- filled by JS --></tbody>
+                    </table>
                 </div>
             </div>
             <div class="modal-footer">
                 <button class="btn btn-secondary" onclick="closeModal('leaveBalanceModal')">Cancel</button>
                 <button class="btn btn-primary" onclick="updateLeaveBalance()">
-                    <i class="fas fa-save"></i> Update Balance
+                    <i class="fas fa-save"></i> Save Adjustment
                 </button>
             </div>
         </div>

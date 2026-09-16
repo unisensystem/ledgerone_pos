@@ -217,6 +217,38 @@ if (!$currencySymbol) {
             font-size: 14px;
         }
 
+        /* Professional custom dropdown styling for the "Select Page" shortcut picker
+           (a native <select> otherwise renders with the browser's own plain look,
+           inconsistent with the rest of this styled UI). */
+        select.ledger-input {
+            appearance: none;
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            background-color: #fff;
+            background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3e%3cpath d='M1 1.5L6 6.5L11 1.5' stroke='%2364748b' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round' fill='none'/%3e%3c/svg%3e");
+            background-repeat: no-repeat;
+            background-position: right 0.9rem center;
+            padding-right: 2.5rem;
+            color: #1e293b;
+            cursor: pointer;
+            transition: border-color 0.15s ease, box-shadow 0.15s ease;
+        }
+
+        select.ledger-input:hover {
+            border-color: #aab3c2;
+        }
+
+        select.ledger-input:focus {
+            outline: none;
+            border-color: var(--primary, #1f7bff);
+            box-shadow: 0 0 0 3px rgba(31, 123, 255, 0.15);
+        }
+
+        select.ledger-input option {
+            color: #1e293b;
+            padding: 0.5rem;
+        }
+
         .ledger-radio-group {
             display: flex;
             gap: 1.5rem;
@@ -1206,33 +1238,34 @@ if (!$currencySymbol) {
                 <div class="ledger-search-box" style="flex-direction: column; align-items: stretch;">
                     <div style="display:flex; gap:1rem; flex-wrap:wrap; align-items:center; width:100%;">
                         <select id="shortcutPageSelect" class="ledger-input" style="flex:1; min-width:220px;">
-    <option value="">Select Page...</option>
+                            <option value="">Select Page...</option>
 
-    <!-- Lists -->
-    <option value="sale-invoice" data-label="Sale Invoice List">Sale Invoice List</option>
-    <option value="med-sale-invoice" data-label="Med Sale Invoice List">Med Sale Invoice </option>
-<option value="sale-tax-invoice" data-label="Sale Tax Invoice List">Sale Tax Invoice </option>
-    <option value="purchase-invoice" data-label="Purchase Invoice List">Purchase Invoice List</option>
-    <option value="receive-voucher" data-label="Receive Voucher List">Receive Voucher List</option>
-    <option value="payment-voucher" data-label="Payment Voucher List">Payment Voucher List</option>
-    <option value="expense-voucher" data-label="Expense Voucher List">Expense Voucher List</option>
-    <option value="customer-ledger" data-label="Customer Ledger">Customer Ledger</option>
-    <option value="supplier-ledger" data-label="Supplier Ledger">Supplier Ledger</option>
-    <option value="pos-invoice" data-label="POS Invoice">POS Invoice</option>
-    <option value="new-product" data-label="Product List">Product List</option>
-    <option value="new-customer" data-label="New Customer List">New Customer List</option>
-    <option value="new-supplier" data-label="New Supplier List">New Supplier List</option>
+                            <!-- Lists -->
+                            <option value="sale-invoice" data-label="Sale Invoice List">Sale Invoice List</option>
+                            <option value="med-sale-invoice" data-label="Med Sale Invoice List">Med Sale Invoice List</option>
+                            <option value="sale-tax-invoice" data-label="Sale Tax Invoice List">Sale Tax Invoice List</option>
+                            <option value="purchase-invoice" data-label="Purchase Invoice List">Purchase Invoice List</option>
+                            <option value="receive-voucher" data-label="Receive Voucher List">Receive Voucher List</option>
+                            <option value="payment-voucher" data-label="Payment Voucher List">Payment Voucher List</option>
+                            <option value="expense-voucher" data-label="Expense Voucher List">Expense Voucher List</option>
+                            <option value="customer-ledger" data-label="Customer Ledger">Customer Ledger</option>
+                            <option value="supplier-ledger" data-label="Supplier Ledger">Supplier Ledger</option>
+                            <option value="pos-invoice" data-label="POS Invoice">POS Invoice</option>
+                            <option value="traders-sale-invoice" data-label="Traders Sale Invoice">Traders Sale Invoice</option>
+                            <option value="new-product" data-label="Product List">Product List</option>
+                            <option value="new-customer" data-label="New Customer List">New Customer List</option>
+                            <option value="new-supplier" data-label="New Supplier List">New Supplier List</option>
 
-    <!-- Entries -->
-    <option value="sale-invoice-entry" data-label="Sale Invoice Entry">Sale Invoice Entry</option>
-    <option value="purchase-invoice-entry" data-label="Purchase Invoice Entry">Purchase Invoice Entry</option>
-    <option value="rv-entry" data-label="RV Entry">Receive Voucher Entry</option>
-    <option value="pv-entry" data-label="PV Entry">Payment Voucher Entry</option>
-    <option value="delivery-challan-entry" data-label="Delivery Challan Entry">Delivery Challan Entry</option>
-    <option value="new-customer-entry" data-label="New Customer Entry">New Customer Entry</option>
-    <option value="new-supplier-entry" data-label="New Supplier Entry">New Supplier Entry</option>
-    <option value="new-item-entry" data-label="New Item Entry">New Item Entry</option>
-</select>
+                            <!-- Entries -->
+                            <option value="sale-invoice-entry" data-label="Sale Invoice Entry">Sale Invoice Entry</option>
+                            <option value="purchase-invoice-entry" data-label="Purchase Invoice Entry">Purchase Invoice Entry</option>
+                            <option value="rv-entry" data-label="Receive Voucher Entry">Receive Voucher Entry</option>
+                            <option value="pv-entry" data-label="Payment Voucher Entry">Payment Voucher Entry</option>
+                            <option value="delivery-challan-entry" data-label="Delivery Challan Entry">Delivery Challan Entry</option>
+                            <option value="new-customer-entry" data-label="New Customer Entry">New Customer Entry</option>
+                            <option value="new-supplier-entry" data-label="New Supplier Entry">New Supplier Entry</option>
+                            <option value="new-item-entry" data-label="New Item Entry">New Item Entry</option>
+                        </select>
                         <input type="text" id="shortcutKeyInput" class="ledger-input"
                             style="flex:0 0 220px; text-align:center; cursor:pointer; background:#f8fafc;"
                             placeholder="Click here, then press keys" readonly>

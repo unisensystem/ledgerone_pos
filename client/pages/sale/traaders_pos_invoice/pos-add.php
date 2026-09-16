@@ -248,7 +248,7 @@ if (!$user_id) {
                             <tr>
                                 <th width="3%">S#</th>
                                 <th width="18%">Product Code / Name</th>
-                                <th width="10%">Scheme</th>
+                                <th width="10%" class="scheme-cell">Scheme</th>
                                 <!-- Dynamic unit columns will be inserted here -->
                                 <th width="6%" class="packing-cell">Packing</th>
                                 <th width="6%" class="weight-value-cell">Weight</th>
@@ -272,7 +272,7 @@ if (!$user_id) {
                              <tr class="totals-row">
     <th style="text-align: left;">Totals</th>
 <th style="text-align: left;"></th>
-<th style="text-align: left;"></th>
+<th style="text-align: left;" class="scheme-cell"></th>
     <!-- Dynamic unit totals will be inserted here -->
                                 <th class="packing-cell"></th>
                                 <th class="weight-value-cell"></th>
@@ -672,6 +672,14 @@ if (!$user_id) {
                     </div>
                     
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 8px; background: var(--surface-1); border-radius: 6px; transition: all 0.2s;" onmouseover="this.style.background='var(--surface-0)'" onmouseout="this.style.background='var(--surface-1)'">
+                            <input type="checkbox" id="enableGrossAmount" style="width: auto;">
+                            <span style="font-size: 13px;">Gross Amount</span>
+                        </label>
+                        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 8px; background: var(--surface-1); border-radius: 6px; transition: all 0.2s;" onmouseover="this.style.background='var(--surface-0)'" onmouseout="this.style.background='var(--surface-1)'">
+                            <input type="checkbox" id="enableSchemeColumn" style="width: auto;">
+                            <span style="font-size: 13px;">Scheme</span>
+                        </label>
                         <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 8px; background: var(--surface-1); border-radius: 6px; transition: all 0.2s;" onmouseover="this.style.background='var(--surface-0)'" onmouseout="this.style.background='var(--surface-1)'">
                             <input type="checkbox" id="enableTradeOfferAmount" style="width: auto;">
                             <span style="font-size: 13px;">Trade Offer Amount</span>

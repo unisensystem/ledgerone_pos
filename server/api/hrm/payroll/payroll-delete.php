@@ -38,6 +38,9 @@ try {
     if (!$payrollRow) {
         throw new Exception('Payroll entry not found');
     }
+    if ($payrollRow['status'] === 'finalized' && empty($data['acknowledge_finalized'])) {
+        throw new Exception("This payroll (\"{$payrollRow['payroll_code']}\") is finalized and locked. Resubmit with acknowledge_finalized=true to force delete.");
+    }
 
     $pdo->beginTransaction();
 

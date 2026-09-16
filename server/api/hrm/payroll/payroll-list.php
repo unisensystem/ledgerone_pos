@@ -14,6 +14,7 @@ if (!$tenant_id) {
 
 try {
     $sql = "SELECT pe.id, pe.payroll_code, pe.payroll_date, pe.total_amount, pe.company_id,
+                   pe.status,
                    COALESCE(co.company_name, '') as company_name,
                    pei.employee_id, e.full_name as employee_name,
                    pei.type, pei.amount,

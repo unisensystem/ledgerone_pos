@@ -110,26 +110,21 @@ try {
         
         switch ($action) {
             case 'leave':
-                $pdo->beginTransaction();
-                
-                // Calculate leave days
-                $start = new DateTime($data['start_date']);
-                $end = new DateTime($data['end_date']);
-                $days = $start->diff($end)->days + 1;
-                
-                // Insert leave record
-                $stmt = $pdo->prepare("INSERT INTO leave_records (tenant_id, employee_id, leave_type, start_date, end_date, total_days, reason, contact_during_leave, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
-                $stmt->execute([$tenant_id, $employeeId, $data['leave_type'] ?? 'paid', $data['start_date'], $data['end_date'], $days, $data['reason'], $data['contact'] ?? null, $user_id]);
-                
-                // Update employee status and leave balance
-                $leaveField = $data['leave_type'] === 'sick' ? 'leave_balance_sick' : ($data['leave_type'] === 'paid' ? 'leave_balance_paid' : 'leave_balance_unpaid');
-                $stmt = $pdo->prepare("UPDATE employees SET current_status = 'on-leave', status_effective_date = ?, status_change_reason = ?, {$leaveField} = {$leaveField} - ?, current_leave_id = LAST_INSERT_ID(), updated_by = ? WHERE employee_id = ? AND tenant_id = ?");
-                $stmt->execute([$data['start_date'], $data['reason'], $days, $user_id, $employeeId, $tenant_id]);
-                
-                $pdo->commit();
-                echo json_encode(['success' => true, 'message' => 'Leave request processed']);
+                // Superseded by server/api/hrm/leave/leave-request.php, which
+                // properly validates overlap/balance/working-days and keeps
+                // attendance + the leave balance ledger in sync. This old
+                // inline handler also had a real bug: it always used
+                // employees.id (the client sent currentEmployee.id, an int
+                // PK) as leave_records.employee_id, while every other HR
+                // table (attendance, payroll, employee ledger) keys off
+                // employees.employee_id (the business code) — the two were
+                // never actually joinable. Kept here only so a stray old
+                // client request gets a clear redirect instead of silently
+                // writing bad data again.
+                http_response_code(410);
+                echo json_encode(['success' => false, 'message' => 'This action has moved to server/api/hrm/leave/leave-request.php']);
                 break;
-                
+
             case 'suspend':
                 $pdo->beginTransaction();
                 

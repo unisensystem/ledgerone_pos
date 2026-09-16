@@ -757,7 +757,7 @@
                 'enableCashDiscountPercent','enableCashDiscountAmount',
                 'enableInvoiceCashDiscountPercent','enableInvoiceCashDiscountAmount',
                 'enableExtraDiscount1','enableExtraDiscount2','enableShippingFees',
-                'enableKiraya','enableMazdoori',
+                'enableKiraya','enableMazdoori','enableGrossAmount',
                 'enableWeightColumn','enablePackingColumn','enableTotalWeightColumn',
                 'enableAmountPaidPaymentMethod','enablePrintQRCode',
                 'defaultScheme','salePriceSetting','productFilteringMode',
@@ -838,6 +838,7 @@
         // Apply invoice settings to hide/show columns
         const enableCarton = localStorage.getItem('enableCarton') === 'true';
         const enableDozen = localStorage.getItem('enableDozen') === 'true';
+        const enableGrossAmount = localStorage.getItem('enableGrossAmount') === 'true';
         const enableCashDiscountPercent = localStorage.getItem('enableCashDiscountPercent') === 'true';
         const enableCashDiscountAmount = localStorage.getItem('enableCashDiscountAmount') === 'true';
         const enableTradeOfferDiscount = localStorage.getItem('enableTradeOfferDiscount') === 'true';
@@ -967,6 +968,7 @@
                 }
 
                 // Apply visibility based on settings
+                if (colId === 'gross' && !enableGrossAmount) th.style.display = 'none';
                 if (colId === 'disc_pct' && !enableCashDiscountPercent) th.style.display = 'none';
                 if (colId === 'disc_amt' && !enableCashDiscountAmount) th.style.display = 'none';
                 if (colId === 'to_amt' && !enableTradeOfferAmount) th.style.display = 'none';
@@ -1045,6 +1047,7 @@
             remainingCols.forEach(colDef => {
                 const col = columnConfig.find(c => c.id === colDef.id);
                 if (col && col.visible === false) return;
+                if (colDef.id === 'gross' && !enableGrossAmount) return;
 
                 const th = document.createElement('th');
                 th.className = 'text-right';
@@ -1458,7 +1461,7 @@
                 // Remaining columns
                 const remainingData = [
                     { id: 'price', value: currencySymbol + ' ' + parseFloat(item.sale_price).toFixed(2), visible: true },
-                    { id: 'gross', value: currencySymbol + ' ' + parseFloat(item.gross_amount).toFixed(2), visible: true },
+                    { id: 'gross', value: currencySymbol + ' ' + parseFloat(item.gross_amount).toFixed(2), visible: enableGrossAmount },
                     { id: 'disc_pct', value: parseFloat(item.discount_percent || 0).toFixed(2) + '%', visible: enableCashDiscountPercent },
                     { id: 'disc_amt', value: currencySymbol + ' ' + parseFloat(item.discount_amount || 0).toFixed(2), visible: enableCashDiscountAmount },
                     { id: 'to_amt',   value: currencySymbol + ' ' + parseFloat(item.trade_offer_amount || 0).toFixed(2), visible: enableTradeOfferAmount },

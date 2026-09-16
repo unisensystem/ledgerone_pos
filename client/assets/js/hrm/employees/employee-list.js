@@ -356,6 +356,36 @@ function setCurrentEmployee(employeeId) {
 }
 
 // Manage Leave
+let leaveTypesCache = [];
+let selectedLeaveTypeId = null;
+
+async function loadLeaveTypesForModal(employeeCode) {
+    const [typesRes, balRes] = await Promise.all([
+        fetch('../../../../server/api/hrm/leave/leave-types.php'),
+        fetch(`../../../../server/api/hrm/leave/leave-balance.php?employee_id=${encodeURIComponent(employeeCode)}`)
+    ]);
+    const typesData = await typesRes.json();
+    const balData = await balRes.json();
+    leaveTypesCache = typesData.success ? typesData.leave_types : [];
+    const balances = balData.success ? balData.balances : [];
+
+    const container = document.getElementById('leaveTypeSelector');
+    container.innerHTML = leaveTypesCache.map(lt => {
+        const bal = balances.find(b => b.leave_type_id == lt.id);
+        const balanceText = lt.track_balance
+            ? `Balance: ${bal ? Number(bal.remaining).toFixed(1) : '0.0'} days`
+            : (lt.is_paid ? 'Not balance-tracked' : 'Unpaid — salary deduction applies');
+        const icon = lt.is_paid ? 'fa-sun' : 'fa-moon';
+        return `<div class="leave-type" data-leave-type-id="${lt.id}" onclick="selectLeaveType(${lt.id})">
+            <i class="fas ${icon}"></i>
+            <div>${lt.name}</div>
+            <div class="leave-days">${balanceText}</div>
+        </div>`;
+    }).join('');
+
+    if (leaveTypesCache.length > 0) selectLeaveType(leaveTypesCache[0].id);
+}
+
 function manageLeave(employeeId) {
     const employee = setCurrentEmployee(employeeId);
     if (!employee) return;
@@ -374,74 +404,109 @@ function manageLeave(employeeId) {
 
     document.getElementById('leaveStartDate').valueAsDate = today;
     document.getElementById('leaveEndDate').valueAsDate = tomorrow;
+    document.getElementById('leaveReason').value = '';
+    document.getElementById('leaveContact').value = '';
+    document.getElementById('leaveIsHalfDay').checked = false;
+    document.getElementById('leaveHalfDayPeriod').style.display = 'none';
+    document.getElementById('leaveOverrideBox').style.display = 'none';
+    document.getElementById('leaveOverride').checked = false;
+    document.getElementById('leaveValidationWarning').style.display = 'none';
 
-    // Reset leave type selection and update balances
-    document.querySelectorAll('.leave-type').forEach(el => el.classList.remove('selected'));
-    document.querySelector('.leave-type.paid').classList.add('selected');
-    selectedLeaveType = 'paid';
-    
-    // Update leave balances
-    document.querySelector('.leave-type.paid .leave-days').textContent = `Balance: ${employee.leaveBalancePaid} days`;
-    document.querySelector('.leave-type.sick .leave-days').textContent = `Balance: ${employee.leaveBalanceSick} days`;
-    document.querySelector('.leave-type.unpaid .leave-days').textContent = 'Unlimited';
-
-    calculateLeaveDays();
+    loadLeaveTypesForModal(employee.employeeId).then(() => calculateLeaveDays());
     openModal('leaveModal');
 }
 
-function selectLeaveType(type) {
-    selectedLeaveType = type;
+function selectLeaveType(leaveTypeId) {
+    selectedLeaveTypeId = leaveTypeId;
     document.querySelectorAll('.leave-type').forEach(el => el.classList.remove('selected'));
-    document.querySelector(`.leave-type.${type}`).classList.add('selected');
+    const el = document.querySelector(`.leave-type[data-leave-type-id="${leaveTypeId}"]`);
+    if (el) el.classList.add('selected');
 }
 
+function toggleHalfDay() {
+    const isHalf = document.getElementById('leaveIsHalfDay').checked;
+    document.getElementById('leaveHalfDayPeriod').style.display = isHalf ? 'inline-block' : 'none';
+    if (isHalf) document.getElementById('leaveEndDate').value = document.getElementById('leaveStartDate').value;
+    calculateLeaveDays();
+}
+
+// Rough client-side estimate only (excludes Sunday as a common default) —
+// the server is the source of truth and recalculates against the tenant's
+// actual weekly-off/holiday configuration when the request is submitted.
 function calculateLeaveDays() {
     const startDate = new Date(document.getElementById('leaveStartDate').value);
     const endDate = new Date(document.getElementById('leaveEndDate').value);
+    const isHalfDay = document.getElementById('leaveIsHalfDay').checked;
 
     if (startDate && endDate && endDate >= startDate) {
-        const timeDiff = endDate.getTime() - startDate.getTime();
-        const dayDiff = Math.ceil(timeDiff / (1000 * 3600 * 24)) + 1;
-        document.getElementById('leaveDaysCount').textContent = `Total days: ${dayDiff}`;
+        let count = 0;
+        const cursor = new Date(startDate);
+        while (cursor <= endDate) {
+            if (cursor.getDay() !== 0) count++; // default estimate: Sunday off
+            cursor.setDate(cursor.getDate() + 1);
+        }
+        const total = isHalfDay ? 0.5 : count;
+        document.getElementById('leaveDaysCount').textContent = `Estimated: ${total} day(s) (weekends/holidays excluded — server confirms exact count)`;
     } else {
         document.getElementById('leaveDaysCount').textContent = 'Total days: 0';
     }
 }
 
-async function submitLeaveRequest() {
+async function submitLeaveRequest(overrideConfirmed) {
     const startDate = document.getElementById('leaveStartDate').value;
     const endDate = document.getElementById('leaveEndDate').value;
     const reason = document.getElementById('leaveReason').value;
+    const isHalfDay = document.getElementById('leaveIsHalfDay').checked;
 
-    if (!startDate || !endDate || !reason) {
-        alert('Please fill all required fields');
+    if (!startDate || !endDate || !reason || !selectedLeaveTypeId) {
+        alert('Please fill all required fields and select a leave type');
+        return;
+    }
+
+    const override = document.getElementById('leaveOverride').checked;
+    const overrideReason = document.getElementById('leaveOverrideReason').value;
+    if (override && !overrideReason) {
+        alert('Please enter a reason for the override');
         return;
     }
 
     try {
-        const response = await fetch('../../../../server/api/hrm/employees/employee-list.php', {
+        const response = await fetch('../../../../server/api/hrm/leave/leave-request.php', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                action: 'leave',
-                employee_id: currentEmployee.id,
+                employee_id: currentEmployee.employeeId,
+                leave_type_id: selectedLeaveTypeId,
                 start_date: startDate,
                 end_date: endDate,
+                is_half_day: isHalfDay,
+                half_day_period: isHalfDay ? document.getElementById('leaveHalfDayPeriod').value : null,
                 reason: reason,
-                leave_type: selectedLeaveType,
-                contact: document.getElementById('leaveContact').value
+                contact: document.getElementById('leaveContact').value,
+                override: override,
+                override_reason: overrideReason
             })
         });
-        
+
         const result = await response.json();
         if (result.success) {
-            currentEmployee.status = 'on-leave';
-            updateStats();
+            currentEmployee.status = result.status === 'approved' ? 'on-leave' : currentEmployee.status;
+            await loadEmployees();
             renderTable();
-            alert(`Leave request submitted for ${currentEmployee.name}`);
+            alert(result.message + (result.total_days ? ` (${result.total_days} day(s))` : ''));
             closeModal('leaveModal');
         } else {
-            alert('Error: ' + result.message);
+            // Show the validation reason inline with an override option, instead of just an alert.
+            const warnBox = document.getElementById('leaveValidationWarning');
+            warnBox.style.display = 'flex';
+            warnBox.textContent = '';
+            const warnIcon = document.createElement('i');
+            warnIcon.className = 'fas fa-exclamation-triangle';
+            const warnText = document.createElement('span');
+            warnText.textContent = result.message; // textContent — never render server text as HTML
+            warnBox.appendChild(warnIcon);
+            warnBox.appendChild(warnText);
+            document.getElementById('leaveOverrideBox').style.display = 'block';
         }
     } catch (error) {
         alert('Error submitting leave request');
@@ -577,7 +642,7 @@ async function submitTermination() {
 }
 
 // Manage Leave Balance
-function manageLeaveBalance(employeeId) {
+async function manageLeaveBalance(employeeId) {
     const employee = setCurrentEmployee(employeeId);
     if (!employee) return;
 
@@ -588,38 +653,77 @@ function manageLeaveBalance(employeeId) {
     const initials = employee.name.split(' ').map(n => n[0]).join('').toUpperCase();
     avatar.innerHTML = employee.avatar ? `<img src="${employee.avatar}" alt="${employee.name}">` : initials;
 
-    // Update current balance display
-    updateBalanceDisplay();
-    
+    await loadBalanceBreakdown(employee.employeeId);
     openModal('leaveBalanceModal');
 }
 
-function updateBalanceDisplay() {
-    const leaveType = document.getElementById('balanceLeaveType').value;
-    let balance;
-    
-    switch(leaveType) {
-        case 'paid':
-            balance = currentEmployee.leaveBalancePaid;
-            break;
-        case 'sick':
-            balance = currentEmployee.leaveBalanceSick;
-            break;
-        case 'unpaid':
-            balance = currentEmployee.leaveBalanceUnpaid;
-            break;
+async function loadBalanceBreakdown(employeeCode) {
+    const res = await fetch(`../../../../server/api/hrm/leave/leave-balance.php?employee_id=${encodeURIComponent(employeeCode)}`);
+    const data = await res.json();
+    if (!data.success) return;
+
+    const body = document.getElementById('balanceBreakdownBody');
+    body.innerHTML = '';
+    data.balances.forEach(b => {
+        const row = document.createElement('tr');
+        const cells = [b.name, b.opening_balance, b.allocated, b.carry_forward, b.used, b.pending, b.adjustment, b.track_balance == 1 ? Number(b.remaining).toFixed(1) : 'Unlimited'];
+        cells.forEach((val, i) => {
+            const td = document.createElement('td');
+            td.textContent = i === 0 ? val : (typeof val === 'number' ? Number(val).toFixed(1) : val);
+            row.appendChild(td);
+        });
+        body.appendChild(row);
+    });
+
+    const select = document.getElementById('balanceLeaveType');
+    select.innerHTML = '';
+    data.balances.filter(b => b.track_balance == 1).forEach(b => {
+        const opt = document.createElement('option');
+        opt.value = b.leave_type_id;
+        opt.textContent = b.name;
+        select.appendChild(opt);
+    });
+
+    renderBalanceHistory(data.transactions.filter(t => !select.value || t.leave_type_id == select.value));
+
+    select.onchange = async () => {
+        const res2 = await fetch(`../../../../server/api/hrm/leave/leave-balance.php?employee_id=${encodeURIComponent(employeeCode)}&leave_type_id=${select.value}`);
+        const d2 = await res2.json();
+        if (d2.success) renderBalanceHistory(d2.transactions);
+    };
+}
+
+function renderBalanceHistory(transactions) {
+    const body = document.getElementById('balanceHistoryBody');
+    body.innerHTML = '';
+    if (!transactions.length) {
+        const row = document.createElement('tr');
+        const td = document.createElement('td');
+        td.colSpan = 4;
+        td.textContent = 'No transactions yet';
+        row.appendChild(td);
+        body.appendChild(row);
+        return;
     }
-    
-    document.getElementById('currentBalance').textContent = `${balance} days`;
+    transactions.slice(0, 15).forEach(t => {
+        const row = document.createElement('tr');
+        [t.transaction_date, t.transaction_type, Number(t.days).toFixed(1), t.reason || ''].forEach(val => {
+            const td = document.createElement('td');
+            td.textContent = val;
+            row.appendChild(td);
+        });
+        body.appendChild(row);
+    });
 }
 
 async function updateLeaveBalance() {
-    const leaveType = document.getElementById('balanceLeaveType').value;
+    const leaveTypeId = document.getElementById('balanceLeaveType').value;
     const operation = document.getElementById('balanceOperation').value;
     const amount = document.getElementById('balanceAmount').value;
+    const reason = document.getElementById('balanceReason').value;
 
-    if (!amount) {
-        alert('Please enter an amount');
+    if (!amount || !reason) {
+        alert('Please enter the days and a reason');
         return;
     }
 
@@ -628,31 +732,20 @@ async function updateLeaveBalance() {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                employee_id: currentEmployee.id,
-                leave_type: leaveType,
-                amount: parseInt(amount),
-                operation: operation
+                employee_id: currentEmployee.employeeId,
+                leave_type_id: leaveTypeId,
+                amount: parseFloat(amount),
+                operation: operation,
+                reason: reason
             })
         });
-        
+
         const result = await response.json();
         if (result.success) {
-            // Update local data
-            switch(leaveType) {
-                case 'paid':
-                    currentEmployee.leaveBalancePaid = result.new_balance;
-                    break;
-                case 'sick':
-                    currentEmployee.leaveBalanceSick = result.new_balance;
-                    break;
-                case 'unpaid':
-                    currentEmployee.leaveBalanceUnpaid = result.new_balance;
-                    break;
-            }
-            
-            updateBalanceDisplay();
-            alert(`Leave balance updated successfully. New balance: ${result.new_balance} days`);
-            closeModal('leaveBalanceModal');
+            document.getElementById('balanceAmount').value = '';
+            document.getElementById('balanceReason').value = '';
+            await loadBalanceBreakdown(currentEmployee.employeeId);
+            alert(`Leave balance updated. New balance: ${result.new_balance} days`);
         } else {
             alert('Error: ' + result.message);
         }

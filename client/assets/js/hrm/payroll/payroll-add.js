@@ -123,7 +123,9 @@ function loadPayrollData(id, isViewMode) {
                 if (payroll.company_id) {
                     document.getElementById('companyId').value = payroll.company_id;
                 }
-                
+                if (payroll.period_start) document.getElementById('periodStart').value = payroll.period_start;
+                if (payroll.period_end) document.getElementById('periodEnd').value = payroll.period_end;
+
                 // Wait for data to load
                 setTimeout(() => {
                     payroll.items.forEach((item, index) => {
@@ -143,7 +145,29 @@ function loadPayrollData(id, isViewMode) {
                                 row.querySelector('.cheque-date').value = item.cheque_date || '';
                                 row.querySelector('.description').value = item.description || '';
                                 row.querySelector('.amount').value = item.amount;
-                                
+
+                                // Show the Calculate button for Salary rows, matching the
+                                // type-dropdown-selection behavior (see typeDropdown handler).
+                                const calcBtn = row.querySelector('[data-action="calculate"]');
+                                if (calcBtn) calcBtn.style.display = item.type === 'Salary' ? 'inline-flex' : 'none';
+
+                                // If this item already carries a Calculate breakdown, restore it onto
+                                // the row so re-submitting without re-calculating doesn't drop it.
+                                if (item.daily_rate !== null && item.daily_rate !== undefined) {
+                                    row.dataset.presentDays = item.present_days;
+                                    row.dataset.paidLeaveDays = item.paid_leave_days;
+                                    row.dataset.unpaidLeaveDays = item.unpaid_leave_days;
+                                    row.dataset.absentDays = item.absent_days;
+                                    row.dataset.dailyRate = item.daily_rate;
+                                    row.dataset.grossAmount = item.gross_amount;
+                                    row.dataset.deductionAmount = item.deduction_amount;
+                                    const hint = row.querySelector('.breakdown-hint');
+                                    hint.style.display = 'block';
+                                    hint.textContent = `Present ${item.present_days} · Paid Leave ${item.paid_leave_days} · `
+                                        + `Unpaid Leave ${item.unpaid_leave_days} · Absent ${item.absent_days} · `
+                                        + `Deduction ${currencySymbol}${Number(item.deduction_amount).toFixed(2)} (@ ${currencySymbol}${Number(item.daily_rate).toFixed(2)}/day)`;
+                                }
+
                                 // Trigger payment method change to show/hide fields
                                 row.querySelector('.payment-method').dispatchEvent(new Event('change'));
                             }
@@ -220,9 +244,13 @@ function addTableRow() {
                 </td>
                 <td>
                     <input type="number" class="amount" placeholder="0.00" min="0" step="0.01">
+                    <div class="helper-text breakdown-hint" style="display:none;"></div>
                 </td>
                 <td>
                     <div class="table-actions">
+                        <button class="btn btn-icon btn-calculate" data-action="calculate" title="Calculate from attendance/leave (Salary rows only)" style="display:none;">
+                            <i class="fas fa-calculator"></i>
+                        </button>
                         <button class="btn btn-icon btn-add" data-action="add" title="Add row">
                             <i class="fas fa-plus"></i>
                         </button>
@@ -359,7 +387,9 @@ function addRowEventListeners(row, rowIndex) {
     // Action buttons
     const addBtn = row.querySelector('[data-action="add"]');
     const removeBtn = row.querySelector('[data-action="remove"]');
+    const calcBtn = row.querySelector('[data-action="calculate"]');
 
+    calcBtn.addEventListener('click', () => calculateSuggestedSalary(row));
     addBtn.addEventListener('click', () => addTableRow());
     removeBtn.addEventListener('click', () => {
         if (tableBody.children.length > 1) {
@@ -427,12 +457,52 @@ document.addEventListener('click', (e) => {
 
             // Set value
             typeInput.value = e.target.dataset.value;
+
+            // "Calculate from attendance/leave" only makes sense for a Salary row.
+            const calcBtn = row.querySelector('[data-action="calculate"]');
+            if (calcBtn) calcBtn.style.display = typeInput.value === 'Salary' ? 'inline-flex' : 'none';
         }
 
         // Close dropdown
         typeDropdown.classList.remove('show');
     }
 });
+
+// Reads the row's selected employee + the form's attendance period, and
+// fills the Amount field with a suggested net Salary computed from actual
+// attendance/leave for that period (see server/api/hrm/payroll/calculate-suggested.php).
+// HR can still edit the amount afterward — this is a starting point, not a lock-in.
+async function calculateSuggestedSalary(row) {
+    const employeeId = row.querySelector('.employee-id').value;
+    const periodStart = document.getElementById('periodStart').value;
+    const periodEnd = document.getElementById('periodEnd').value;
+    const hint = row.querySelector('.breakdown-hint');
+
+    if (!employeeId) { alert('Please select an employee for this row first.'); return; }
+    if (!periodStart || !periodEnd) { alert('Please set the Attendance Period (From/To) near the top of the form first.'); return; }
+
+    try {
+        const res = await fetch(`../../../../server/api/hrm/payroll/calculate-suggested.php?employee_id=${encodeURIComponent(employeeId)}&period_start=${periodStart}&period_end=${periodEnd}`);
+        const data = await res.json();
+        if (!data.success) { alert('Error: ' + data.message); return; }
+
+        row.querySelector('.amount').value = data.suggested_net_amount;
+        row.dataset.presentDays = data.attendance.present_days;
+        row.dataset.paidLeaveDays = data.attendance.paid_leave_days;
+        row.dataset.unpaidLeaveDays = data.attendance.unpaid_leave_days;
+        row.dataset.absentDays = data.attendance.absent_days;
+        row.dataset.dailyRate = data.daily_rate;
+        row.dataset.grossAmount = data.gross_amount;
+        row.dataset.deductionAmount = data.total_deduction;
+
+        hint.style.display = 'block';
+        hint.textContent = `Present ${data.attendance.present_days} · Paid Leave ${data.attendance.paid_leave_days} · `
+            + `Unpaid Leave ${data.attendance.unpaid_leave_days} · Absent ${data.attendance.absent_days} · `
+            + `Deduction ${currencySymbol}${data.total_deduction.toFixed(2)} (@ ${currencySymbol}${data.daily_rate.toFixed(2)}/day)`;
+    } catch (err) {
+        alert('Error calculating suggested salary');
+    }
+}
 
 // Form validation
 function validateForm() {
@@ -481,6 +551,7 @@ function validateForm() {
 function submitPayroll() {
     const rows = tableBody.querySelectorAll('tr');
     const items = [];
+    let anyCalculated = false;
 
     rows.forEach(row => {
         const employeeId = row.querySelector('.employee-id').value;
@@ -491,7 +562,7 @@ function submitPayroll() {
         const description = row.querySelector('.description').value || null;
         const amount = parseFloat(row.querySelector('.amount').value);
 
-        items.push({
+        const item = {
             employee_code: employeeId,
             type: type,
             payment_method_id: paymentMethodId,
@@ -499,15 +570,39 @@ function submitPayroll() {
             cheque_date: chequeDate,
             description: description,
             amount: amount
-        });
+        };
+
+        // If this row was populated via "Calculate from attendance/leave", carry the
+        // breakdown along so it's stored with the payroll entry for later review.
+        if (row.dataset.dailyRate !== undefined) {
+            anyCalculated = true;
+            item.present_days = Number(row.dataset.presentDays);
+            item.paid_leave_days = Number(row.dataset.paidLeaveDays);
+            item.unpaid_leave_days = Number(row.dataset.unpaidLeaveDays);
+            item.absent_days = Number(row.dataset.absentDays);
+            item.daily_rate = Number(row.dataset.dailyRate);
+            item.gross_amount = Number(row.dataset.grossAmount);
+            item.deduction_amount = Number(row.dataset.deductionAmount);
+        }
+
+        items.push(item);
     });
 
     const payload = {
         payroll_date: dateInput.value,
         payroll_code: payrollIdInput.value,
         company_id: document.getElementById('companyId').value || null,
+        period_start: document.getElementById('periodStart').value || null,
+        period_end: document.getElementById('periodEnd').value || null,
         items: items
     };
+
+    // Payroll built from calculated attendance/leave data starts as a draft so HR can
+    // review before it's locked in — existing manual-entry payrolls keep defaulting to
+    // 'finalized' server-side (unchanged behavior) when this is omitted.
+    if (anyCalculated && !editPayrollId) {
+        payload.status = 'draft';
+    }
 
     if (editPayrollId) {
         payload.payroll_id = editPayrollId;

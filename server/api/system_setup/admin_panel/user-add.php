@@ -67,7 +67,12 @@ if (isset($_FILES['profile_picture']) && $_FILES['profile_picture']['error'] ===
         exit;
     }
     
-    $uploadDir = '../../../assets/uploads/profile_picture/';
+    // The dashboard sidebar reads avatars from client/assets/uploads/profile_picture/
+    // (see dashboard-core.js loadCompanyInfo()) — this file lives at
+    // server/api/system_setup/admin_panel/, so it takes 4 levels up to reach the
+    // project root, not 3. The old 3-level path silently saved into
+    // server/assets/uploads/profile_picture/ instead, where nothing ever reads it.
+    $uploadDir = '../../../../client/assets/uploads/profile_picture/';
     if (!is_dir($uploadDir)) {
         mkdir($uploadDir, 0755, true);
     }

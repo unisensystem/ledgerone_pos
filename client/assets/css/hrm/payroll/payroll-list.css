@@ -400,6 +400,11 @@ td {
   border-color: #1f7bff;
 }
 
+.action-btn.finalize:hover {
+  color: #2fbf71;
+  border-color: #2fbf71;
+}
+
 /* Pagination */
 .pagination {
   display: flex;

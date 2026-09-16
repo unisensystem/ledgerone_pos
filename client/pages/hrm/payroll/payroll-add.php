@@ -83,6 +83,18 @@ $currency_symbol = $currency['symbol'] ?? '$';
                         </select>
                     </div>
                 </div>
+
+                <div class="form-row">
+                    <div class="form-field">
+                        <label for="periodStart">Attendance Period — From</label>
+                        <input type="date" id="periodStart">
+                        <div class="helper-text">Used by "Calculate" on Salary rows to read attendance/leave</div>
+                    </div>
+                    <div class="form-field">
+                        <label for="periodEnd">Attendance Period — To</label>
+                        <input type="date" id="periodEnd">
+                    </div>
+                </div>
             </div>
 
             <!-- Payroll Table Section -->

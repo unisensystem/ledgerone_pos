@@ -52,11 +52,14 @@ try {
     // Fetch transactions from payroll_entries_items
     $transactions = [];
     foreach ($employees as $emp) {
-        $transSql = "SELECT pei.created_at as date, pe.payroll_code as voucher_no, 
+        // Only finalized payroll is actually committed money — a draft hasn't
+        // posted to accounting_ledger yet (see payroll-add.php/payroll-finalize.php)
+        // and must not show up here as if it had been paid.
+        $transSql = "SELECT pei.created_at as date, pe.payroll_code as voucher_no,
                             pei.type, pei.description, pei.amount, pei.employee_id
                      FROM payroll_entries_items pei
                      JOIN payroll_entries pe ON pei.payroll_id = pe.id
-                     WHERE pei.tenant_id = ? AND pei.employee_id = ?";
+                     WHERE pei.tenant_id = ? AND pei.employee_id = ? AND pe.status = 'finalized'";
         $transParams = [$tenant_id, $emp['employee_id']];
         
         if ($start_date) {
@@ -117,7 +120,7 @@ try {
             $beforeDateSql = "SELECT pei.type, pei.amount
                              FROM payroll_entries_items pei
                              JOIN payroll_entries pe ON pei.payroll_id = pe.id
-                             WHERE pei.tenant_id = ? AND pei.employee_id = ? AND DATE(pei.created_at) < ?";
+                             WHERE pei.tenant_id = ? AND pei.employee_id = ? AND pe.status = 'finalized' AND DATE(pei.created_at) < ?";
             $beforeStmt = $pdo->prepare($beforeDateSql);
             $beforeStmt->execute([$tenant_id, $emp['employee_id'], $start_date]);
             $beforeTransactions = $beforeStmt->fetchAll(PDO::FETCH_ASSOC);

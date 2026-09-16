@@ -147,6 +147,7 @@ $currency_symbol = $currency['symbol'] ?? '$';
                             <th>Type</th>
                             <th>Amount</th>
                             <th>Payment Method</th>
+                            <th>Status</th>
                             <th>Actions</th>
                         </tr>
                     </thead>

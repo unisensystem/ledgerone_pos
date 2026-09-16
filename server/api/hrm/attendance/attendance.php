@@ -24,10 +24,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
                a.attendance_date,
                DATE_FORMAT(a.check_in_time, '%H:%i') as check_in,
                DATE_FORMAT(a.check_out_time, '%H:%i') as check_out,
-               a.status, a.notes
+               a.status, a.notes, lt.name AS leave_type_name, lt.is_paid AS leave_is_paid
         FROM attendance a
         LEFT JOIN employees e ON a.employee_id = e.employee_id AND e.tenant_id = ?
         LEFT JOIN departments d ON e.department_id = d.id
+        LEFT JOIN leave_types lt ON lt.id = a.leave_type_id
         WHERE a.tenant_id = ? AND a.attendance_date = ?
         ORDER BY a.check_in_time DESC
     ");
