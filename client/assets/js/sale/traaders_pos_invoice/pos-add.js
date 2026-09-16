@@ -6813,9 +6813,11 @@ function updateRowWeightAndPacking(row) {
         const qty = parseFloat(input.value) || 0;
         const cf = parseFloat(input.dataset.conversionFactor) || 1;
         totalQtyBaseUnits += qty * cf;
-        // Packing states the fixed packaging size ("1 x 12"), not scaled by how
-        // many were actually entered — that's what Total Weight is for.
-        if (qty > 0 && cf !== 1) {
+        // Packing states the fixed packaging size ("1 x 12") for this unit — it's
+        // a property of the unit itself, not of how many were ordered, so it
+        // shows as soon as the unit is known, before any quantity is entered
+        // (that's what Total Weight is for — it IS scaled by quantity).
+        if (cf !== 1) {
             packingParts.push(`1 x ${cf}`);
         }
     });

@@ -116,7 +116,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
                 p.weight_value,
                 p.weight_unit,
                 u.uom_name,
-                COALESCE(puc.conversion_factor, u.conversion_factor, 1) as uom_conversion_factor
+                -- product_uom_conversions is essentially never populated in practice — the
+                -- actual per-product packing size lives on products.product_conversion_factor
+                -- instead (see client/assets/js/sale/traaders_pos_invoice/pos-add-uom.js for
+                -- the matching fix on the add-invoice side). Only applies to a per_product-scoped
+                -- unit; a normal shared unit (Piece, Dozen, ...) keeps using its own conversion_factor.
+                COALESCE(
+                    puc.conversion_factor,
+                    CASE WHEN u.unit_scope = 'per_product' AND p.product_conversion_factor > 0 THEN p.product_conversion_factor END,
+                    u.conversion_factor,
+                    1
+                ) as uom_conversion_factor
             FROM sale_invoice_items sii
             LEFT JOIN products p ON sii.product_id = p.id
             LEFT JOIN uom u ON sii.uom_id = u.id
