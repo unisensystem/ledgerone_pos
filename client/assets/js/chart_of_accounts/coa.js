@@ -781,7 +781,10 @@ function getDepth(accountId, account = null, currentDepth = 0) {
 
 // ===== Partner Accounts (Manage Partners modal) =====
 
-// Collect posting accounts that fall under any sub-account named "Capital"
+// Collect posting accounts eligible for the partner dropdown:
+// - any posting account under a sub-account named "Capital"
+// - any posting account anywhere inside the "Intangible Asset" subtree
+//   (any nested sub-account under it, regardless of that sub-account's name)
 // Matched by name (not id), since ids can differ between environments/live server
 function collectCapitalPostingAccounts() {
     const capitalPostingAccounts = [];
@@ -796,7 +799,10 @@ function collectCapitalPostingAccounts() {
     }
 
     function findCapitalNodes(node) {
-        if (node.type === 'sub' && node.name && node.name.trim().toLowerCase() === 'capital') {
+        const nodeName = node.name ? node.name.trim().toLowerCase() : '';
+        if (node.type === 'sub' && (nodeName === 'capital' || nodeName === 'intangible asset')) {
+            // Grabs every posting account under this node, at any depth,
+            // regardless of the names of the sub-accounts in between.
             collectPostings(node);
         }
         if (node.children) {
@@ -808,7 +814,7 @@ function collectCapitalPostingAccounts() {
     return capitalPostingAccounts;
 }
 
-// Build the <option> list for a partner account select (Capital accounts only)
+// Build the <option> list for a partner account select (Capital + Intangible Asset accounts)
 function buildPartnerAccountOptions(selectedId = '') {
     const capitalAccounts = collectCapitalPostingAccounts();
     let optionsHtml = '<option value="">Select capital account</option>';

@@ -379,7 +379,7 @@ $currency_symbol = $currency['symbol'];
                     <table id="partnerTable">
                         <thead>
                             <tr>
-                                <th style="width: 45%;">Partner (Capital Account)</th>
+                                <th style="width: 45%;">Partner </th>
                                 <th style="width: 20%;">Share %</th>
                                 <th style="width: 35%;">Profit Share</th>
                             </tr>
