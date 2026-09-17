@@ -409,6 +409,6 @@ $currency_symbol = $currency['symbol'];
     <script>
         const CURRENCY_SYMBOL = '<?php echo $currency_symbol; ?>';
     </script>
-    <script src="../../../assets/js/financial_reports/profit_loss_detail/profit-loss-detail.js"></script>
+    <script src="../../../assets/js/financial_reports/profit_loss_detail/profit-loss-detail.js?v=2"></script>
 </body>
 </html>

@@ -417,35 +417,36 @@ async function generateReport() {
         validationText.textContent = 'Loading report data...';
         validationMessage.style.display = 'flex';
 
-        const data = await fetchReportData(
-            startDateEl.value,
-            endDateEl.value,
-            branchFilterEl.value,
-            companyFilterEl.value,
-            categoryFilterEl.value,
-            customerFilterEl.value,
-            productFilterEl.value,
-            invoiceFilterEl.value,
-            currencyFilterEl.value,
-            supplierFilterEl.value
-        );
+     const data = await fetchReportData(
+        startDateEl.value,
+        endDateEl.value,
+        branchFilterEl.value,
+        companyFilterEl.value,
+        categoryFilterEl.value,
+        customerFilterEl.value,
+        productFilterEl.value,
+        invoiceFilterEl.value,
+        currencyFilterEl.value,
+        supplierFilterEl.value
+    );
 
-        console.log('Report Data:', data);
+    // Calculate totals
+    let totalRevenue = 0;
+    let totalCOGS = 0;
+    let totalExpenses = data.total_expenses || 0;  // ✅ Get from API
 
-        // Store data globally for print
-        window.currentData = data;
+    data.itemwise.forEach(item => {
+        totalRevenue += parseFloat(item.revenue);
+        totalCOGS += parseFloat(item.cogs);
+    });
 
-        // Calculate totals
-        let totalRevenue = 0;
-        let totalCOGS = 0;
+    let grossProfit = totalRevenue - totalCOGS;
+    let netProfit = grossProfit - totalExpenses;  // ✅ Calculate Net Profit
+    let profitMargin = totalRevenue > 0 ? ((grossProfit / totalRevenue) * 100).toFixed(2) : 0;
 
-        data.itemwise.forEach(item => {
-            totalRevenue += parseFloat(item.revenue);
-            totalCOGS += parseFloat(item.cogs);
-        });
+    // ✅ Pass Net Profit to partner distribution instead of Gross Profit
+    await renderPartnerTable(netProfit);
 
-    let netProfit = totalRevenue - totalCOGS - operatingExpenses - otherExpenses - taxes;
-await renderPartnerTable(netProfit);  // ✅ Net Profit
 
         // Update summary cards
         const selectedOption = currencyFilterEl.options[currencyFilterEl.selectedIndex];
@@ -686,8 +687,8 @@ await renderPartnerTable(netProfit);  // ✅ Net Profit
 
         supplierTableBody.innerHTML = supplierHTML;
 
-        // Build partner-wise distribution table (based on overall Gross Profit)
-        await renderPartnerTable(grossProfit);
+                // Build partner-wise distribution table (based on Net Profit)
+        await renderPartnerTable(netProfit);
 
         // Show results
         summaryCards.style.display = 'grid';

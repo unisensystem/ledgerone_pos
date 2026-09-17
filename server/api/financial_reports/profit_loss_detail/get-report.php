@@ -28,12 +28,34 @@ $category_id = !empty($_GET['category_id']) ? $_GET['category_id'] : null;
 $customer_id = !empty($_GET['customer_id']) ? $_GET['customer_id'] : null;
 $product_id = !empty($_GET['product_id']) ? $_GET['product_id'] : null;
 $invoice_id = !empty($_GET['invoice_id']) ? $_GET['invoice_id'] : null;
+$supplier_id = !empty($_GET['supplier_id']) ? $_GET['supplier_id'] : null;
 $target_currency_id = $_GET['currency_id'] ?? null;
 
 if (!$start_date || !$end_date) {
     http_response_code(400);
     echo json_encode(['success' => false, 'message' => 'Start date and end date are required']);
     exit;
+}
+
+/**
+ * Build a reference-table based filter for accounting_ledger rows.
+ */
+function buildReferenceFilter($alias, $company_id, $tenant_id, array &$params) {
+    $tables = ['sale_invoice', 'purchase_invoice', 'payment_voucher', 'receive_voucher'];
+    $sql = '';
+
+    if ($company_id) {
+        $parts = [];
+        foreach ($tables as $t) {
+            $parts[] = "($alias.reference_table = '$t' AND $alias.reference_id IN (SELECT id FROM $t WHERE company_id = ?))";
+            $params[] = $company_id;
+        }
+        $parts[] = "$alias.reference_table IS NULL";
+        $parts[] = "$alias.reference_table NOT IN ('" . implode("','", $tables) . "')";
+        $sql .= " AND (" . implode(' OR ', $parts) . ")";
+    }
+
+    return $sql;
 }
 
 try {
@@ -275,12 +297,12 @@ try {
         $stmt->execute([$item['product_id']]);
         $cat = $stmt->fetch(PDO::FETCH_ASSOC);
         
-        $category_id = $cat['id'] ?? 0;
+        $category_id_key = $cat['id'] ?? 0;
         $category_name = $cat['category_name'] ?? 'Uncategorized';
         
-        if (!isset($category_map[$category_id])) {
-            $category_map[$category_id] = [
-                'category_id' => $category_id,
+        if (!isset($category_map[$category_id_key])) {
+            $category_map[$category_id_key] = [
+                'category_id' => $category_id_key,
                 'category_name' => $category_name,
                 'product_count' => 0,
                 'revenue' => 0,
@@ -289,10 +311,10 @@ try {
             ];
         }
         
-        $category_map[$category_id]['product_count']++;
-        $category_map[$category_id]['revenue'] += $item['revenue'];
-        $category_map[$category_id]['cogs'] += $item['cogs'];
-        $category_map[$category_id]['profit'] += $item['profit'];
+        $category_map[$category_id_key]['product_count']++;
+        $category_map[$category_id_key]['revenue'] += $item['revenue'];
+        $category_map[$category_id_key]['cogs'] += $item['cogs'];
+        $category_map[$category_id_key]['profit'] += $item['profit'];
     }
     
     $categorywise_data = array_values($category_map);
@@ -656,7 +678,6 @@ try {
     }
 
     // Get all suppliers who have products sold in this period
-    // via purchase_invoice supplier link OR products.vendor_id
     $sql = "
         SELECT DISTINCT
             s.id as supplier_id,
@@ -693,9 +714,8 @@ try {
     $all_suppliers = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
     // Filter by supplier if specified
-    if (!empty($_GET['supplier_id'])) {
-        $filter_supplier_id = $_GET['supplier_id'];
-        $all_suppliers = array_filter($all_suppliers, fn($s) => $s['supplier_id'] == $filter_supplier_id);
+    if ($supplier_id) {
+        $all_suppliers = array_filter($all_suppliers, fn($s) => $s['supplier_id'] == $supplier_id);
         $all_suppliers = array_values($all_suppliers);
     }
 
@@ -704,8 +724,7 @@ try {
     foreach ($all_suppliers as $supplier) {
         $sup_id = $supplier['supplier_id'];
 
-        // Get all product IDs linked to this supplier:
-        // 1. via purchase_invoice items
+        // Get all product IDs linked to this supplier
         $stmt = $pdo->prepare("
             SELECT DISTINCT pii.product_id
             FROM purchase_invoice pi
@@ -713,24 +732,24 @@ try {
             WHERE pi.supplier_id = ?
             AND pi.tenant_id = ?
             " . ($company_id ? " AND pi.company_id = ?" : "") . "
-            " . (!empty($_GET['product_id']) ? " AND pii.product_id = ?" : "") . "
+            " . ($product_id ? " AND pii.product_id = ?" : "") . "
         ");
         $params_pid = [$sup_id, $tenant_id];
         if ($company_id) $params_pid[] = $company_id;
-        if (!empty($_GET['product_id'])) $params_pid[] = $_GET['product_id'];
+        if ($product_id) $params_pid[] = $product_id;
         $stmt->execute($params_pid);
         $supplier_product_ids = array_column($stmt->fetchAll(PDO::FETCH_ASSOC), 'product_id');
 
-        // 2. via products.vendor_id
+        // Via products.vendor_id
         $stmt = $pdo->prepare("
             SELECT id FROM products
             WHERE vendor_id = ?
             AND tenant_id = ?
             AND is_active = 1
-            " . (!empty($_GET['product_id']) ? " AND id = ?" : "") . "
+            " . ($product_id ? " AND id = ?" : "") . "
         ");
         $params_vp = [$sup_id, $tenant_id];
-        if (!empty($_GET['product_id'])) $params_vp[] = $_GET['product_id'];
+        if ($product_id) $params_vp[] = $product_id;
         $stmt->execute($params_vp);
         foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $vp) {
             if (!in_array($vp['id'], $supplier_product_ids)) {
@@ -757,8 +776,7 @@ try {
         $stmt->execute($params_cnt);
         $purchase_count = (int)$stmt->fetchColumn();
 
-        // --- COGS & REVENUE: aggregate from already-calculated itemwise_data ---
-        // This ensures supplier COGS = weighted avg cost × qty sold (same as item-wise)
+        // Aggregate revenue and COGS from itemwise_data
         $total_revenue = 0;
         $total_cogs    = 0;
 
@@ -783,14 +801,123 @@ try {
         ];
     }
 
+    // ==================== OPERATING EXPENSES ====================
+
+    $params_exp = [$tenant_id, $start_date, $end_date];
+    $expense_filter = buildReferenceFilter('al', $company_id, $tenant_id, $params_exp);
+
+    $stmt = $pdo->prepare("
+        SELECT
+            a.name as account,
+            al.debit,
+            al.credit,
+            al.reference_table,
+            al.reference_id
+        FROM accounting_ledger al
+        JOIN accounts a ON al.account_id = a.id
+        LEFT JOIN sub_accounts sa ON a.sub_account_id = sa.id
+        LEFT JOIN sub_accounts sa_parent ON sa.parent_id = sa_parent.id
+        WHERE al.tenant_id = ?
+        AND al.date BETWEEN ? AND ?
+        AND (
+            COALESCE(sa.account_head_id, sa_parent.account_head_id) = 5
+            OR a.sub_account_id IN (96, 94)
+        )
+        AND al.account_id != 19
+        $expense_filter
+        ORDER BY a.name
+    ");
+    $stmt->execute($params_exp);
+    $expenses_raw = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    // Group and convert expenses
+    $expenses = [];
+    $ref_currency_cache = [];
+    foreach ($expenses_raw as $row) {
+        $amount = $row['debit'] - $row['credit'];
+        if ($amount <= 0) continue;
+
+        $currency_id = $base_currency_id;
+        if ($row['reference_table'] && $row['reference_id']) {
+            $tables = ['sale_invoice', 'purchase_invoice', 'payment_voucher', 'receive_voucher'];
+            if (in_array($row['reference_table'], $tables)) {
+                $cache_key = $row['reference_table'] . ':' . $row['reference_id'];
+                if (!array_key_exists($cache_key, $ref_currency_cache)) {
+                    try {
+                        $stmt_curr = $pdo->prepare("SELECT currency_id FROM {$row['reference_table']} WHERE id = ?");
+                        $stmt_curr->execute([$row['reference_id']]);
+                        $curr_data = $stmt_curr->fetch(PDO::FETCH_ASSOC);
+                        $ref_currency_cache[$cache_key] = ($curr_data && $curr_data['currency_id']) ? $curr_data['currency_id'] : null;
+                    } catch (Exception $e) {
+                        error_log('Currency lookup error: ' . $e->getMessage());
+                        $ref_currency_cache[$cache_key] = null;
+                    }
+                }
+                if ($ref_currency_cache[$cache_key]) {
+                    $currency_id = $ref_currency_cache[$cache_key];
+                }
+            }
+        }
+
+        if ($currency_id != $target_currency_id) {
+            $amount = $converter->convert($amount, $currency_id, $target_currency_id);
+        }
+
+        $account = $row['account'];
+        if (!isset($expenses[$account])) {
+            $expenses[$account] = ['account' => $account, 'amount' => 0];
+        }
+        $expenses[$account]['amount'] += $amount;
+    }
+    $expenses = array_values($expenses);
+
+    // Production Expenses
+    $stmt = $pdo->prepare("
+        SELECT
+            a.name as account,
+            pea.amount,
+            pe.created_at
+        FROM production_expenses pe
+        JOIN production_expense_accounts pea ON pe.id = pea.production_expense_id
+        JOIN accounts a ON pea.expense_account_id = a.id
+        WHERE pe.tenant_id = ?
+        AND DATE(pe.created_at) BETWEEN ? AND ?
+        ORDER BY a.name
+    ");
+    $stmt->execute([$tenant_id, $start_date, $end_date]);
+    $production_expenses_raw = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    foreach ($production_expenses_raw as $row) {
+        $amount = $row['amount'];
+        if ($amount <= 0) continue;
+
+        if ($base_currency_id != $target_currency_id) {
+            $amount = $converter->convert($amount, $base_currency_id, $target_currency_id);
+        }
+
+        $account = $row['account'];
+        if (!isset($expenses[$account])) {
+            $expenses[$account] = ['account' => $account, 'amount' => 0];
+        }
+        $expenses[$account]['amount'] += $amount;
+    }
+    $expenses = array_values($expenses);
+
+    // Calculate total expenses
+    $total_expenses = array_reduce($expenses, fn($sum, $item) => $sum + $item['amount'], 0);
+
+    // ==================== RETURN RESPONSE ====================
+
     echo json_encode([
         'success' => true,
         'data' => [
-            'itemwise'     => $itemwise_data,
-            'categorywise' => $categorywise_data,
-            'customerwise' => $customerwise_data,
-            'invoicewise'  => $invoicewise_data,
-            'supplierwise' => $supplierwise_data
+            'itemwise'      => $itemwise_data,
+            'categorywise'  => $categorywise_data,
+            'customerwise'  => $customerwise_data,
+            'invoicewise'   => $invoicewise_data,
+            'supplierwise'  => $supplierwise_data,
+            'expenses'      => $expenses,
+            'total_expenses' => $total_expenses
         ]
     ]);
 
@@ -798,3 +925,4 @@ try {
     http_response_code(500);
     echo json_encode(['success' => false, 'message' => 'Server error: ' . $e->getMessage()]);
 }
+?>
