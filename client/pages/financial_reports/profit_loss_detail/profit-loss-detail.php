@@ -372,7 +372,7 @@ $currency_symbol = $currency['symbol'];
                 </div>
 
                 <div class="modal-info" style="margin-bottom: 16px;">
-                    <p><strong>Note:</strong> Distribution is calculated on the <strong>Gross Profit</strong> of the selected period (Revenue &minus; COGS). Partners and their % share are managed from the Chart of Accounts &rarr; "Add Partner" screen. Any percentage not assigned to a partner is shown as the remaining/owner's share.</p>
+                    <p><strong>Note:</strong> Distribution is calculated on the <strong>Net Profit/Loss</strong> of the selected period (Revenue &minus; COGS). Partners and their % share are managed from the Chart of Accounts &rarr; "Add Partner" screen. Any percentage not assigned to a partner is shown as the remaining/owner's share.</p>
                 </div>
 
                 <div class="table-container">
