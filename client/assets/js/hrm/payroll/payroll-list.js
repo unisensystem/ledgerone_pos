@@ -495,34 +495,48 @@ function addEventListeners() {
         deleteModal.style.display = 'none';
     });
 
-    confirmDelete.addEventListener('click', () => {
-        if (deleteId) {
-            fetch('../../../../server/api/hrm/payroll/payroll-delete.php', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ id: deleteId })
-            })
-            .then(res => res.json())
-            .then(data => {
-                if (data.success) {
-                    currentData = currentData.filter(item => item.id !== deleteId);
-                    payrollData = payrollData.filter(item => item.id !== deleteId);
-                    renderTable();
-                    updateStats();
-                    deleteModal.style.display = 'none';
-                    deleteId = null;
-                    showNotification('Payroll record deleted successfully', 'success');
+    confirmDelete.addEventListener('click', () => deletePayroll(false));
+
+    // A finalized payroll is locked by design (see payroll-delete.php) — it's
+    // already posted to the accounting ledger, so deleting it needs an explicit
+    // "yes, I understand" rather than being silently allowed. On that specific
+    // error, ask for real confirmation and retry with acknowledge_finalized.
+    function deletePayroll(acknowledgeFinalized) {
+        if (!deleteId) return;
+        const payload = { id: deleteId };
+        if (acknowledgeFinalized) payload.acknowledge_finalized = true;
+
+        fetch('../../../../server/api/hrm/payroll/payroll-delete.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                currentData = currentData.filter(item => item.id !== deleteId);
+                payrollData = payrollData.filter(item => item.id !== deleteId);
+                renderTable();
+                updateStats();
+                deleteModal.style.display = 'none';
+                deleteId = null;
+                showNotification('Payroll record deleted successfully', 'success');
+            } else if (!acknowledgeFinalized && data.message && data.message.includes('finalized and locked')) {
+                if (confirm(data.message + '\n\nThis payroll was already posted to the accounting ledger. Deleting it also permanently removes those ledger entries — there is no audit trail of a reversal, it is simply gone. Delete anyway?')) {
+                    deletePayroll(true);
                 } else {
-                    alert('Error: ' + data.message);
                     deleteModal.style.display = 'none';
                 }
-            })
-            .catch(err => {
-                alert('Error deleting payroll: ' + err.message);
+            } else {
+                alert('Error: ' + data.message);
                 deleteModal.style.display = 'none';
-            });
-        }
-    });
+            }
+        })
+        .catch(err => {
+            alert('Error deleting payroll: ' + err.message);
+            deleteModal.style.display = 'none';
+        });
+    }
 
     // Close modal when clicking outside
     deleteModal.addEventListener('click', (e) => {

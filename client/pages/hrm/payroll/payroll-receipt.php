@@ -322,16 +322,60 @@ $user = $stmt->fetch();
                         <?php endif; ?>
                     </td>
                     <td style="text-align: right; font-weight: 600;">
-                        <?php 
+                        <?php
                             $display_amount = in_array(strtolower($item['type']), ['deduction', 'advance return', 'loan repayment']) ? -$item['amount'] : $item['amount'];
-                            echo $currency_symbol . number_format($display_amount, 2); 
+                            echo $currency_symbol . number_format($display_amount, 2);
                         ?>
                     </td>
                 </tr>
+                <?php
+                    // If this line was built from real attendance/leave (via "Calculate Suggested"
+                    // on the payroll form), show exactly how the final amount was reached — full
+                    // salary earned, what was deducted and why, so it never reads as "we only gave
+                    // 3500" when the real story is "salary is 5000, 1500 was deducted for absence,
+                    // 3500 was actually paid out". Manual items (Advance, Bonus, etc.) have no
+                    // breakdown data and simply don't get this box.
+                    $hasBreakdown = $item['gross_amount'] !== null && $item['deduction_amount'] !== null;
+                    if ($hasBreakdown):
+                ?>
+                <tr>
+                    <td colspan="4" style="padding: 0;">
+                        <div style="margin: 4px 0 12px; padding: 12px 16px; background: #f7f9fc; border: 1px dashed #c9cfda; border-radius: 6px; font-size: 12px; color: #2f3b4c;">
+                            <div style="font-weight: 600; margin-bottom: 6px; color: #0e1a2b;">How this amount was calculated</div>
+                            <div style="display: flex; justify-content: space-between; padding: 2px 0;">
+                                <span>Gross Salary</span>
+                                <span><?php echo $currency_symbol . number_format($item['gross_amount'], 2); ?></span>
+                            </div>
+                            <?php if ((float) $item['deduction_amount'] > 0): ?>
+                            <div style="display: flex; justify-content: space-between; padding: 2px 0; color: #991b1b;">
+                                <span>Deduction
+                                    <?php if ($item['daily_rate'] !== null): ?>
+                                        <small style="color: #6b7280;">(@ <?php echo $currency_symbol . number_format($item['daily_rate'], 2); ?>/day)</small>
+                                    <?php endif; ?>
+                                </span>
+                                <span>- <?php echo $currency_symbol . number_format($item['deduction_amount'], 2); ?></span>
+                            </div>
+                            <?php endif; ?>
+                            <div style="display: flex; justify-content: space-between; padding: 4px 0 0; margin-top: 4px; border-top: 1px solid #e1e6ee; font-weight: 700; color: #166534;">
+                                <span>Net Salary Paid</span>
+                                <span><?php echo $currency_symbol . number_format($item['amount'], 2); ?></span>
+                            </div>
+                            <?php if ($item['present_days'] !== null): ?>
+                            <div style="margin-top: 8px; padding-top: 8px; border-top: 1px solid #e1e6ee; color: #6b7280; font-size: 11px;">
+                                Present: <?php echo number_format($item['present_days'], 1); ?> day(s)
+                                &nbsp;·&nbsp; Paid Leave: <?php echo number_format($item['paid_leave_days'], 1); ?> day(s)
+                                &nbsp;·&nbsp; Unpaid Leave: <?php echo number_format($item['unpaid_leave_days'], 1); ?> day(s)
+                                &nbsp;·&nbsp; Absent: <?php echo number_format($item['absent_days'], 1); ?> day(s)
+                            </div>
+                            <?php endif; ?>
+                        </div>
+                    </td>
+                </tr>
+                <?php endif; ?>
                 <?php endforeach; ?>
             </tbody>
         </table>
-        
+
         <div class="total-section">
             <div class="total-label">Total Amount</div>
             <div class="total-amount"><?php 

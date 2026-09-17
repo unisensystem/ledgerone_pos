@@ -6857,20 +6857,18 @@ function updateRowWeightAndPacking(row) {
     updateFooterWeightTotal();
 }
 
-// Displays a row's Total Weight in whichever unit reads best: the small unit
-// (gram/ml) while under 1000, auto-switching to the bigger one (kg/liter) once
-// it crosses that — e.g. "800.00 gram" but "9.60 kg" once the row's total
-// reaches 1kg. Mirrors the same gram/ml <-> kg/liter relationship the footer
-// total already applies across all rows combined.
+// Displays a row's Total Weight in whichever unit reads best: gram -> kg (at
+// 1000g) -> ton (at 1000kg) for mass, ml -> liter (at 1000ml) for volume —
+// e.g. "800.00 gram", "9.60 kg" once it crosses 1kg, "2.50 ton" once it
+// crosses 1000kg. Mirrors the same ladder the footer total applies across all
+// rows combined.
 function formatRowTotalWeight(totalWeight, weightUnit) {
     const dimension = WEIGHT_UNIT_DIMENSIONS[(weightUnit || '').toLowerCase()];
     if (!dimension) return `${totalWeight.toFixed(2)} ${weightUnit}`.trim();
 
     const baseAmount = totalWeight * dimension.factor; // normalized into gram/ml
-    if (baseAmount >= dimension.displayFactor) {
-        return `${(baseAmount / dimension.displayFactor).toFixed(2)} ${dimension.displayUnit}`;
-    }
-    return `${baseAmount.toFixed(2)} ${dimension.base}`;
+    const step = pickWeightDisplayStep(baseAmount, dimension.base);
+    return `${(baseAmount / step.perBase).toFixed(2)} ${step.unit}`;
 }
 
 // Weight units group into two physical dimensions — mass and volume. Units in
@@ -6879,18 +6877,48 @@ function formatRowTotalWeight(totalWeight, weightUnit) {
 // two parts). Factors below convert 1 of that unit into the dimension's base
 // (grams for mass, milliliters for volume).
 const WEIGHT_UNIT_DIMENSIONS = {
-    gram: { base: 'gram', factor: 1, displayUnit: 'kg', displayFactor: 1000 },
-    kg: { base: 'gram', factor: 1000, displayUnit: 'kg', displayFactor: 1000 },
-    pound: { base: 'gram', factor: 453.592, displayUnit: 'kg', displayFactor: 1000 },
-    ounce: { base: 'gram', factor: 28.3495, displayUnit: 'kg', displayFactor: 1000 },
-    ml: { base: 'ml', factor: 1, displayUnit: 'liter', displayFactor: 1000 },
-    liter: { base: 'ml', factor: 1000, displayUnit: 'liter', displayFactor: 1000 }
+    gram: { base: 'gram', factor: 1 },
+    kg: { base: 'gram', factor: 1000 },
+    pound: { base: 'gram', factor: 453.592 },
+    ounce: { base: 'gram', factor: 28.3495 },
+    ml: { base: 'ml', factor: 1 },
+    liter: { base: 'ml', factor: 1000 }
 };
 
+// Each dimension's display ladder, smallest unit first, each entry's
+// "perBase" being how many of the dimension's base unit (gram/ml) make up one
+// of that display unit. Mass goes gram -> kg -> ton; volume goes ml -> liter
+// (no further step in everyday use for invoicing, so it stops there).
+const WEIGHT_DISPLAY_LADDERS = {
+    gram: [
+        { unit: 'gram', perBase: 1 },
+        { unit: 'kg', perBase: 1000 },
+        { unit: 'ton', perBase: 1000000 }
+    ],
+    ml: [
+        { unit: 'ml', perBase: 1 },
+        { unit: 'liter', perBase: 1000 }
+    ]
+};
+
+// Walks a dimension's ladder (smallest unit first) and returns the LARGEST
+// step whose threshold the amount has reached — e.g. 500g -> gram, 9600g ->
+// kg, 1500000g -> ton. Falls back to the smallest/base step for anything under
+// the first threshold.
+function pickWeightDisplayStep(baseAmount, base) {
+    const ladder = WEIGHT_DISPLAY_LADDERS[base] || [{ unit: base, perBase: 1 }];
+    let chosen = ladder[0];
+    for (const step of ladder) {
+        if (baseAmount >= step.perBase) chosen = step;
+    }
+    return chosen;
+}
+
 // Sums Total Weight across all rows into the footer, converting every row into
-// a common unit per dimension (mass → kg, volume → liter) so e.g. a 9600 gram
+// its dimension's base unit (gram for mass, ml for volume) so e.g. a 9600 gram
 // row and a 12 kg row combine into one real total instead of sitting side by
-// side as two meaningless numbers.
+// side as two meaningless numbers, then displays that combined total via the
+// same gram->kg->ton / ml->liter ladder each row uses individually.
 function updateFooterWeightTotal() {
     const itemsTable = document.getElementById('itemsTable');
     const totalWeightCell = document.getElementById('totalWeightRow');
@@ -6920,12 +6948,10 @@ function updateFooterWeightTotal() {
         totalsByBase[key] = (totalsByBase[key] || 0) + (dimension ? rowTotal * dimension.factor : rowTotal);
     });
 
-    const displayUnitFor = { gram: { unit: 'kg', factor: 1000 }, ml: { unit: 'liter', factor: 1000 } };
     const parts = Object.entries(totalsByBase).map(([base, val]) => {
-        const display = displayUnitFor[base];
-        return display
-            ? `${(val / display.factor).toFixed(2)} ${display.unit}`
-            : `${val.toFixed(2)} ${base}`.trim();
+        if (!WEIGHT_DISPLAY_LADDERS[base]) return `${val.toFixed(2)} ${base}`.trim();
+        const step = pickWeightDisplayStep(val, base);
+        return `${(val / step.perBase).toFixed(2)} ${step.unit}`;
     });
     totalWeightCell.textContent = parts.length > 0 ? parts.join(', ') : '0.00';
 }
