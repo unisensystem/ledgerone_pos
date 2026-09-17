@@ -444,8 +444,8 @@ async function generateReport() {
             totalCOGS += parseFloat(item.cogs);
         });
 
-        let grossProfit = totalRevenue - totalCOGS;
-        let profitMargin = totalRevenue > 0 ? ((grossProfit / totalRevenue) * 100).toFixed(2) : 0;
+    let netProfit = totalRevenue - totalCOGS - operatingExpenses - otherExpenses - taxes;
+await renderPartnerTable(netProfit);  // ✅ Net Profit
 
         // Update summary cards
         const selectedOption = currencyFilterEl.options[currencyFilterEl.selectedIndex];
