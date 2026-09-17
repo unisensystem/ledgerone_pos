@@ -887,6 +887,53 @@
             }
         }
 
+        // Weight units group into two physical dimensions — mass and volume — same
+        // as the entry form (pos-add.js). Factors convert 1 of that unit into the
+        // dimension's base (grams for mass, milliliters for volume); the display
+        // ladder then picks whichever unit in that dimension reads best for a given
+        // amount: gram -> kg (at 1000g) -> ton (at 1000kg) for mass, ml -> liter
+        // (at 1000ml) for volume.
+        const WEIGHT_UNIT_DIMENSIONS = {
+            gram: { base: 'gram', factor: 1 },
+            kg: { base: 'gram', factor: 1000 },
+            pound: { base: 'gram', factor: 453.592 },
+            ounce: { base: 'gram', factor: 28.3495 },
+            ml: { base: 'ml', factor: 1 },
+            liter: { base: 'ml', factor: 1000 }
+        };
+        const WEIGHT_DISPLAY_LADDERS = {
+            gram: [
+                { unit: 'gram', perBase: 1 },
+                { unit: 'kg', perBase: 1000 },
+                { unit: 'ton', perBase: 1000000 }
+            ],
+            ml: [
+                { unit: 'ml', perBase: 1 },
+                { unit: 'liter', perBase: 1000 }
+            ]
+        };
+
+        // Walks a dimension's ladder (smallest unit first) and returns the LARGEST
+        // step whose threshold the amount has reached.
+        function pickWeightDisplayStep(baseAmount, base) {
+            const ladder = WEIGHT_DISPLAY_LADDERS[base] || [{ unit: base, perBase: 1 }];
+            let chosen = ladder[0];
+            for (const step of ladder) {
+                if (baseAmount >= step.perBase) chosen = step;
+            }
+            return chosen;
+        }
+
+        // Formats one row's Total Weight (already in the product's configured
+        // weight_unit) into whichever unit in its dimension reads best.
+        function formatRowTotalWeight(totalWeight, weightUnit) {
+            const dimension = WEIGHT_UNIT_DIMENSIONS[(weightUnit || '').toLowerCase()];
+            if (!dimension) return `${fmtNum(totalWeight)} ${weightUnit}`.trim();
+            const baseAmount = totalWeight * dimension.factor;
+            const step = pickWeightDisplayStep(baseAmount, dimension.base);
+            return `${fmtNum(baseAmount / step.perBase)} ${step.unit}`;
+        }
+
         // Get totals layout preference
         const totalsLayout = localStorage.getItem('totalsLayout') || 'vertical';
 
@@ -1065,7 +1112,9 @@
             }
             if (enableTotalWeightColumn) {
                 const th = document.createElement('th');
+                th.className = 'text-right';
                 th.dataset.colId = 'total_weight';
+                th.id = 'totalWeightItems';
                 totalsRow.appendChild(th);
             }
 
@@ -1364,6 +1413,9 @@
             tbody.innerHTML = '';
 
             let totalQty = 0, totalPcs = 0, totalCtn = 0, totalDz = 0, totalUnitPrice = 0, totalGrossAmount = 0, totalDiscountAmountItems = 0, totalTradeOfferAmountItems = 0, totalFocQty = 0, totalNetAmountItems = 0;
+            // Combined Total Weight footer sum, grouped by physical dimension base
+            // (gram/ml) so mixed mass+volume products don't get summed together.
+            const totalWeightByBase = {};
 
             // Group items by product_id to reconstruct rows with multiple units
             const itemsByProduct = {};
@@ -1482,12 +1534,21 @@
                     td.dataset.colId = 'weight';
                     td.textContent = hasWeight ? `${fmtNum(weightValue)} ${weightUnit}`.trim() : '-';
                 }
+                if (hasWeight && totalQtyBaseUnits > 0) {
+                    const rowTotalWeight = weightValue * totalQtyBaseUnits;
+                    const dimension = WEIGHT_UNIT_DIMENSIONS[weightUnit.toLowerCase()];
+                    // Recognized unit: fold into its dimension's base (gram/ml) for the
+                    // combined footer total. Unrecognized (custom free-text unit): keep
+                    // as its own group so it still shows rather than being dropped.
+                    const key = dimension ? dimension.base : (weightUnit.toLowerCase() || 'unit');
+                    totalWeightByBase[key] = (totalWeightByBase[key] || 0) + (dimension ? rowTotalWeight * dimension.factor : rowTotalWeight);
+                }
                 if (enableTotalWeightColumn) {
                     const td = row.insertCell();
                     td.className = 'text-right';
                     td.dataset.colId = 'total_weight';
                     td.textContent = (hasWeight && totalQtyBaseUnits > 0)
-                        ? `${fmtNum(weightValue * totalQtyBaseUnits)} ${weightUnit}`.trim()
+                        ? formatRowTotalWeight(weightValue * totalQtyBaseUnits, weightUnit)
                         : '-';
                 }
 
@@ -1565,6 +1626,31 @@
                         }
                     }
 
+                    // Packing / Weight / Total Weight — child rows carry no packing/weight
+                    // data of their own, but the cells still have to exist (as '-') so this
+                    // row's later columns (Price, Gross, etc.) line up under the same header
+                    // as every other row instead of shifting left by however many of these
+                    // three columns are enabled. Same principle as isRemainingColVisible()
+                    // above: a column must be present-or-absent identically in every row group.
+                    if (enablePackingColumn) {
+                        const td = row.insertCell();
+                        td.className = 'text-center';
+                        td.dataset.colId = 'packing';
+                        td.textContent = '-';
+                    }
+                    if (enableWeightColumn) {
+                        const td = row.insertCell();
+                        td.className = 'text-right';
+                        td.dataset.colId = 'weight';
+                        td.textContent = '-';
+                    }
+                    if (enableTotalWeightColumn) {
+                        const td = row.insertCell();
+                        td.className = 'text-right';
+                        td.dataset.colId = 'total_weight';
+                        td.textContent = '-';
+                    }
+
                     // Remaining columns - all dashes for child items, same visibility check
                     const remainingCols = ['price', 'gross', 'disc_pct', 'disc_amt', 'to_amt', 'foc', 'net'];
                     remainingCols.forEach(colId => {
@@ -1600,6 +1686,17 @@
             if (totalTradeOfferAmountItemsEl) totalTradeOfferAmountItemsEl.textContent = `${currencySymbol} ${fmtNum(totalTradeOfferAmountItems)}`;
             if (totalFocQtyEl) totalFocQtyEl.textContent = fmtNum(totalFocQty);
             if (totalNetAmountItemsEl) totalNetAmountItemsEl.textContent = `${currencySymbol} ${fmtNum(totalNetAmountItems)}`;
+
+            // Combined Total Weight footer — one formatted value per dimension group
+            // (e.g. "1.01 ton, 2.4 liter" if the invoice mixes mass and volume products).
+            const totalWeightItemsEl = document.getElementById('totalWeightItems');
+            if (totalWeightItemsEl) {
+                const parts = Object.entries(totalWeightByBase).map(([base, amount]) => {
+                    const step = pickWeightDisplayStep(amount, base);
+                    return `${fmtNum(amount / step.perBase)} ${step.unit}`;
+                });
+                totalWeightItemsEl.textContent = parts.length > 0 ? parts.join(', ') : '-';
+            }
 
             // Populate totals with currency symbol
             const enableInvoiceCashDiscountPercent = localStorage.getItem('enableInvoiceCashDiscountPercent') === 'true';
