@@ -1,39 +1,39 @@
 <?php
-// Returns the most recently used signature filename for this tenant, so a new
-// invoice can auto-load it as the default — the user only needs to upload a
-// signature once; every invoice after that reuses it until they upload a
-// different one (which then becomes the new "latest" for future invoices).
 require_once '../../../../includes/connection.php';
 
 header('Content-Type: application/json');
-header('Access-Control-Allow-Origin: *');
-header('Access-Control-Allow-Methods: GET');
-header('Access-Control-Allow-Headers: Content-Type');
 
 session_start();
 $tenant_id = $_SESSION['tenant_id'] ?? null;
+$user_id = $_SESSION['user_id'] ?? null;  // ← YAHI IMPORTANT!
 
-if (!$tenant_id) {
+if (!$tenant_id || !$user_id) {
     http_response_code(401);
-    echo json_encode(['success' => false, 'message' => 'Unauthorized - Please login again']);
+    echo json_encode(['success' => false, 'message' => 'Unauthorized']);
     exit;
 }
 
 try {
+    // ✅ Filter by USER not just TENANT
     $stmt = $pdo->prepare("
         SELECT signature
         FROM sale_invoice
-        WHERE tenant_id = ? AND signature IS NOT NULL AND signature <> ''
+        WHERE tenant_id = ? 
+        AND created_by = ?     
+        AND signature IS NOT NULL 
+        AND signature != ''
         ORDER BY id DESC
         LIMIT 1
     ");
-    $stmt->execute([$tenant_id]);
+    
+    $stmt->execute([$tenant_id, $user_id]);  // ← Dono parameter
     $signature = $stmt->fetchColumn();
-
+    
     echo json_encode([
         'success' => true,
         'signature' => $signature ?: null
     ]);
+    
 } catch (Exception $e) {
     http_response_code(500);
     echo json_encode([
