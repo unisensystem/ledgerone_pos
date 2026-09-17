@@ -19,8 +19,8 @@ try {
     $company_id = isset($_GET['company_id']) ? (int)$_GET['company_id'] : null;
 
     $sql = "
-        SELECT 
-            c.id, c.customer_code, c.customer_name, c.current_balance, c.address, 
+        SELECT
+            c.id, c.customer_code, c.customer_name, c.current_balance, c.address, c.primary_phone,
             c.city_id, c.area_id, c.brand_id,
             c.default_discount_percentage, c.credit_limit, c.associated_sales_officer_id, 
             c.supplier_man_id, c.is_sales_tax_registered, c.is_filer, 

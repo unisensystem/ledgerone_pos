@@ -36,7 +36,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
                 c.customer_name,
                 c.customer_code,
                 c.address as customer_address,
-                c.primary_phone as customer_phone,
+                -- Aliased as customer_primary_phone (not customer_phone) to avoid colliding
+                -- with si.customer_phone (the invoice's own saved/editable Phone No field,
+                -- from si.* above) — the two can legitimately differ once someone edits the
+                -- invoice's phone to something other than the customer's current phone.
+                c.primary_phone as customer_primary_phone,
                 c.email as customer_email,
                 c.ntn as customer_ntn,
                 c.strn as customer_gst,
@@ -165,7 +169,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
         // Grab old values before anything changes, for the Activity Log diff
         $stmt = $pdo->prepare("
             SELECT bill_no, currency_id, sale_date, customer_id, sub_account_id, company_id, branch_id, previous_balance,
-                   sale_officer_id, supplier_man_id, brand_id, sale_order_id, bilty_no, transport_name, total_bill,
+                   sale_officer_id, supplier_man_id, brand_id, sale_order_id, bilty_no, transport_name, customer_phone, total_bill,
                    total_discount_percent, total_discount_amount, extra_discount_1_percent, extra_discount_1_amount,
                    extra_discount_2_percent, extra_discount_2_amount, net_amount, remarks, ship_to, status, project_id, container_id
             FROM sale_invoice WHERE id = ? AND tenant_id = ?
@@ -196,7 +200,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
         $stmt = $pdo->prepare("
             UPDATE sale_invoice SET
                 currency_id = ?, sale_date = ?, customer_id = ?, sub_account_id = ?, company_id = ?, branch_id = ?,
-                previous_balance = ?, sale_officer_id = ?, supplier_man_id = ?, brand_id = ?, sale_order_id = ?, bilty_no = ?, transport_name = ?, total_bill = ?, total_discount_percent = ?,
+                previous_balance = ?, sale_officer_id = ?, supplier_man_id = ?, brand_id = ?, sale_order_id = ?, bilty_no = ?, transport_name = ?, customer_phone = ?, total_bill = ?, total_discount_percent = ?,
                 total_discount_amount = ?, extra_discount_1_percent = ?, extra_discount_1_amount = ?, extra_discount_2_percent = ?, extra_discount_2_amount = ?,
                 net_amount = ?, withholding_tax_percent = ?, withholding_tax_amount = ?, amount_paid_auto_fill = ?, remarks = ?, ship_to = ?, status = ?, project_id = ?, container_id = ?, updated_by = ?
             WHERE id = ? AND tenant_id = ?
@@ -215,6 +219,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
             $input['saleOrderId'] ?? null,
             $input['biltyNo'] ?? null,
             $input['transportName'] ?? null,
+            $input['customerPhone'] ?? null,
             $input['totalBill'],
             $input['totalDiscountPercent'] ?? 0.00,
             $input['totalDiscountAmount'] ?? 0.00,
@@ -562,6 +567,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
             'sale_order_id' => $input['saleOrderId'] ?? null,
             'bilty_no' => $input['biltyNo'] ?? null,
             'transport_name' => $input['transportName'] ?? null,
+            'customer_phone' => $input['customerPhone'] ?? null,
             'total_bill' => $input['totalBill'],
             'total_discount_percent' => $input['totalDiscountPercent'] ?? 0,
             'total_discount_amount' => $input['totalDiscountAmount'] ?? 0,
@@ -579,7 +585,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
         $changeDescriptions = buildChangeDescription($oldInvoice, $newInvoice, [
             'sale_date' => 'Sale Date', 'customer_id' => 'Customer', 'branch_id' => 'Branch',
             'sale_officer_id' => 'Sales Officer', 'supplier_man_id' => 'Supplier Man', 'brand_id' => 'Brand',
-            'bilty_no' => 'Bilty No', 'transport_name' => 'Transport', 'total_bill' => 'Total Bill',
+            'bilty_no' => 'Bilty No', 'transport_name' => 'Transport', 'customer_phone' => 'Phone No', 'total_bill' => 'Total Bill',
             'total_discount_percent' => 'Discount %', 'total_discount_amount' => 'Discount Amount',
             'net_amount' => 'Net Amount', 'remarks' => 'Remarks', 'ship_to' => 'Ship To',
             'status' => 'Status', 'project_id' => 'Project', 'container_id' => 'Container'

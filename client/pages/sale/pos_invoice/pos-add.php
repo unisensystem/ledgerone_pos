@@ -151,7 +151,15 @@ if (!$user_id) {
                         </div>
                         <div class="error-message" id="customerCodeError">Please select a customer code</div>
                     </div>
-                    
+
+                    <!-- 10b. Customer Phone — auto-fills from the selected customer's Primary
+                         Phone (see customer-add.php), but stays a normal editable text field so
+                         a different number can be entered per-invoice when needed. -->
+                    <div class="form-group" id="customerPhoneGroup">
+                        <label for="customerPhone">Phone No</label>
+                        <input type="text" id="customerPhone" placeholder="Auto-fills from customer" tabindex="-1">
+                    </div>
+
                     <!-- 11. Sub Account -->
                     <div class="form-group" id="subAccountGroup">
                         <label for="subAccount">Sub Account</label>
@@ -1228,6 +1236,15 @@ if (!$user_id) {
                         <span style="font-size: 13px; font-weight: 500;">Currency</span>
                     </div>
                     <input type="checkbox" id="hideCurrencyStandard" style="width: auto; cursor: pointer;">
+                </label>
+
+                <!-- Customer Phone -->
+                <label style="display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; background: var(--surface-1); border-radius: var(--radius); border: 1px solid var(--border-default); cursor: pointer; transition: background 0.15s;" onmouseover="this.style.background='var(--surface-2)'" onmouseout="this.style.background='var(--surface-1)'">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <i class="fas fa-phone" style="color: var(--primary); width: 14px;"></i>
+                        <span style="font-size: 13px; font-weight: 500;">Phone No</span>
+                    </div>
+                    <input type="checkbox" id="hideCustomerPhoneStandard" style="width: auto; cursor: pointer;">
                 </label>
 
                 <!-- Transport Name -->

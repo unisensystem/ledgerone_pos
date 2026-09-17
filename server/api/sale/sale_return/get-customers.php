@@ -16,7 +16,7 @@ if (!$tenant_id) {
 }
 
 try {
-    $sql = "SELECT c.id, c.customer_code, c.customer_name, c.current_balance, c.address, c.supplier_man_id, e.full_name as supplier_man_name FROM customers c LEFT JOIN employees e ON c.supplier_man_id = e.id WHERE (c.tenant_id = ? OR c.tenant_id = 0) AND c.status = 'ACTIVE'";
+    $sql = "SELECT c.id, c.customer_code, c.customer_name, c.current_balance, c.address, c.primary_phone, c.supplier_man_id, e.full_name as supplier_man_name FROM customers c LEFT JOIN employees e ON c.supplier_man_id = e.id WHERE (c.tenant_id = ? OR c.tenant_id = 0) AND c.status = 'ACTIVE'";
     $params = [$tenant_id];
     $sql .= " ORDER BY c.customer_name";
     $stmt = $pdo->prepare($sql);

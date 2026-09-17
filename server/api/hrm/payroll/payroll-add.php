@@ -36,7 +36,10 @@ try {
     // keep getting the old always-final behavior; only a caller that
     // explicitly opts in (the new attendance-aware salary flow) starts as
     // 'draft' so it can still be reviewed/corrected before locking.
-    $status = in_array($data['status'] ?? 'finalized', ['draft', 'finalized'], true) ? $data['status'] : 'finalized';
+    $status = $data['status'] ?? 'finalized';
+    if (!in_array($status, ['draft', 'finalized'], true)) {
+        $status = 'finalized';
+    }
 
     if (!$payroll_date || !$payroll_code || empty($items)) {
         throw new Exception('Missing required fields');

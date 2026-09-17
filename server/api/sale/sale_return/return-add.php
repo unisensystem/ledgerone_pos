@@ -67,12 +67,12 @@ if (!$lockCheck['allowed']) {
     // Insert sale return
     $stmt = $pdo->prepare("
         INSERT INTO sale_return (
-            tenant_id, company_id, currency_id, bill_no, sale_date, customer_id, branch_id,
+            tenant_id, company_id, currency_id, bill_no, sale_date, customer_id, customer_phone, branch_id,
             previous_balance, total_bill, total_discount_percent,
             total_discount_amount, extra_discount_1_amount, extra_discount_2_amount, shipping_fees,
             net_amount, sale_invoice_no, amount_refunded, project_id,
             payment_method, bank_account_id, sale_officer_id, supplier_man_id, sub_account_id, remarks, status, created_by, updated_by
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ");
 
     $stmt->execute([
@@ -82,6 +82,7 @@ if (!$lockCheck['allowed']) {
         $billNo,
         $input['saleDate'],
         $input['customerId'],
+        $input['customerPhone'] ?? null,
         $input['branchId'],
         extractBalanceAmount($input['previousBalance'] ?? '0.00'),
         $input['totalBill'],

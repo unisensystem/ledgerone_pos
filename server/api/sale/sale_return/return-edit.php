@@ -34,7 +34,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
                 c.customer_name,
                 c.customer_code,
                 c.address as customer_address,
-                c.primary_phone as customer_phone,
+                c.primary_phone as customer_primary_phone,
                 c.email as customer_email,
                 b.branch_name,
                 b.branch_code,
@@ -157,7 +157,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
 
     try {
         // Snapshot old header + items for the Activity Log (before mutation)
-        $stOld = $pdo->prepare("SELECT bill_no, company_id, currency_id, sale_date, customer_id, branch_id, net_amount, sale_invoice_no, project_id, amount_refunded, payment_method, bank_account_id, sale_officer_id, supplier_man_id, sub_account_id, remarks, status FROM sale_return WHERE id = ? AND tenant_id = ?");
+        $stOld = $pdo->prepare("SELECT bill_no, company_id, currency_id, sale_date, customer_id, customer_phone, branch_id, net_amount, sale_invoice_no, project_id, amount_refunded, payment_method, bank_account_id, sale_officer_id, supplier_man_id, sub_account_id, remarks, status FROM sale_return WHERE id = ? AND tenant_id = ?");
         $stOld->execute([$invoice_id, $tenant_id]);
         $oldReturn = $stOld->fetch(PDO::FETCH_ASSOC);
         if (!$oldReturn) throw new Exception('Sale return not found');
@@ -171,7 +171,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
         // Update sale return
         $stmt = $pdo->prepare("
             UPDATE sale_return SET
-                company_id = ?, currency_id = ?, sale_date = ?, customer_id = ?, branch_id = ?,
+                company_id = ?, currency_id = ?, sale_date = ?, customer_id = ?, customer_phone = ?, branch_id = ?,
                 previous_balance = ?, total_bill = ?, total_discount_percent = ?,
                 total_discount_amount = ?, extra_discount_1_amount = ?, extra_discount_2_amount = ?, shipping_fees = ?,
                 net_amount = ?, sale_invoice_no = ?, project_id = ?,
@@ -183,6 +183,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
             $input['currencyId'],
             $input['saleDate'],
             $input['customerId'],
+            $input['customerPhone'] ?? null,
             $input['branchId'],
             extractBalanceAmount($input['previousBalance'] ?? '0.00'),
             $input['totalBill'],
@@ -429,6 +430,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
             'currency_id' => $input['currencyId'],
             'sale_date' => $input['saleDate'],
             'customer_id' => $input['customerId'],
+            'customer_phone' => $input['customerPhone'] ?? null,
             'branch_id' => $input['branchId'],
             'net_amount' => $input['netAmount'],
             'sale_invoice_no' => $input['saleInvoiceId'] ?? null,
@@ -444,6 +446,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
         ];
         $changeDescriptions = buildChangeDescription($oldReturn, $newReturn, [
             'currency_id' => 'Currency', 'sale_date' => 'Sale Date', 'customer_id' => 'Customer',
+            'customer_phone' => 'Customer Phone',
             'branch_id' => 'Branch', 'net_amount' => 'Net Amount', 'project_id' => 'Project',
             'amount_refunded' => 'Amount Refunded', 'payment_method' => 'Payment Method',
             'bank_account_id' => 'Bank Account', 'remarks' => 'Remarks', 'status' => 'Status'

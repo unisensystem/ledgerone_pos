@@ -164,10 +164,14 @@ $user_employee_id = $user['employee_id'] ?? null;
                 <div class="form-group">
                     <div class="form-label">CUSTOMER</div>
                     <div style="position: relative;">
-                        <input type="text" id="customerSearch" placeholder="Search customer..." autocomplete="off" style="font-weight: 600;">
+                        <input type="text" id="customerSearch" placeholder="Search by name, code or phone..." autocomplete="off" style="font-weight: 600;">
                         <div id="customerOptions" class="dropdown-options"></div>
                         <input type="hidden" id="customer">
                     </div>
+                </div>
+                <div class="form-group">
+                    <div class="form-label">CUSTOMER PHONE</div>
+                    <input type="text" id="customerPhone" placeholder="Phone number" autocomplete="off">
                 </div>
                 <div class="form-group">
                     <div class="form-label">SUB ACCOUNT (Optional)</div>

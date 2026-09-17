@@ -26,11 +26,15 @@ document.addEventListener('DOMContentLoaded', async function() {
     initDropdown('branchSearch', 'branchOptions', 'branch', branchesData, (b) => `${b.branch_code} - ${b.branch_name} (${b.branch_type})`, (id) => { currentReturn.branch = parseInt(id); localStorage.setItem('lastSelectedBranch', id); });
     // Sync branchesData loaded by loadCompanies into the dropdown
     document.getElementById('branchSearch').updateData(branchesData);
-    initDropdown('customerSearch', 'customerOptions', 'customer', customersData, (c) => `${c.customer_code} - ${c.customer_name}`, (id) => { 
-        currentReturn.customer = parseInt(id); 
-        
-        // Auto-populate Supplier Man
+    initDropdown('customerSearch', 'customerOptions', 'customer', customersData, (c) => `${c.customer_code} - ${c.customer_name}`, (id) => {
+        currentReturn.customer = parseInt(id);
+
         const customer = customersData.find(cust => cust.id == id);
+
+        // Auto-fill phone number from the customer's Primary Phone (still freely editable)
+        document.getElementById('customerPhone').value = customer?.primary_phone || '';
+
+        // Auto-populate Supplier Man
         if (customer && customer.supplier_man_id) {
             const supplierMan = employeesData.find(e => e.id == customer.supplier_man_id);
             if (supplierMan) {
@@ -39,10 +43,10 @@ document.addEventListener('DOMContentLoaded', async function() {
                 currentReturn.supplierMan = parseInt(customer.supplier_man_id);
             }
         }
-        
-        filterInvoicesByCustomer(id); 
-        loadSubAccounts(id); 
-    });
+
+        filterInvoicesByCustomer(id);
+        loadSubAccounts(id);
+    }, (c) => c.primary_phone);
     initDropdown('subAccountSearch', 'subAccountOptions', 'subAccount', subAccountsData, (s) => s.sub_account_name, (id) => currentReturn.subAccount = parseInt(id));
     initDropdown('invoiceSearch', 'invoiceOptions', 'saleInvoice', invoicesData, (i) => `${i.bill_no} - ${i.customer_name} (${i.sale_date})`, (id) => loadInvoiceData(id));
     initDropdown('salesOfficerSearch', 'salesOfficerOptions', 'salesOfficer', employeesData, (e) => `${e.employee_id} - ${e.full_name}`, (id) => currentReturn.salesOfficer = parseInt(id));
@@ -181,7 +185,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     });
 });
 
-function initDropdown(searchId, optionsId, hiddenId, data, textFn, onSelect) {
+function initDropdown(searchId, optionsId, hiddenId, data, textFn, onSelect, extraMatchFn) {
     const search = document.getElementById(searchId);
     const options = document.getElementById(optionsId);
     const hidden = document.getElementById(hiddenId);
@@ -209,7 +213,14 @@ function initDropdown(searchId, optionsId, hiddenId, data, textFn, onSelect) {
     
     search.addEventListener('input', () => {
         const term = search.value.toLowerCase();
-        const filtered = currentData.filter(d => textFn(d).toLowerCase().includes(term));
+        const filtered = currentData.filter(d => {
+            if (textFn(d).toLowerCase().includes(term)) return true;
+            if (extraMatchFn) {
+                const extra = extraMatchFn(d);
+                if (extra && String(extra).toLowerCase().includes(term)) return true;
+            }
+            return false;
+        });
         selectedIndex = -1;
         renderOptions(filtered, options, textFn, (id, text) => { 
             search.value = text; 
@@ -724,6 +735,7 @@ async function saveReturn() {
         companyId: currentReturn.company,
         projectId: currentReturn.project,
         customerId: currentReturn.customer,
+        customerPhone: document.getElementById('customerPhone').value.trim() || null,
         branchId: currentReturn.branch,
         currencyId: currentReturn.currency,
         salesOfficerId: currentReturn.salesOfficer,
@@ -826,6 +838,7 @@ function clearReturn() {
         updateSummary();
         document.getElementById('customerSearch').value = '';
         document.getElementById('customer').value = '';
+        document.getElementById('customerPhone').value = '';
         document.getElementById('company').value = '';
         document.getElementById('returnDiscountPercent').value = 0;
         document.getElementById('returnDiscountAmount').value = 0;
@@ -847,6 +860,7 @@ async function loadInvoiceData(invoiceId) {
             document.getElementById('customerSearch').value = `${invoice.customer_code} - ${invoice.customer_name}`;
             document.getElementById('customer').value = invoice.customer_id;
             currentReturn.customer = invoice.customer_id;
+            document.getElementById('customerPhone').value = invoice.customer_phone || customersData.find(c => c.id == invoice.customer_id)?.primary_phone || '';
             
             // Auto-populate company
             if (invoice.company_id) {
@@ -1043,6 +1057,7 @@ async function loadEditData(returnId) {
             document.getElementById('customer').value = inv.customer_id;
             currentReturn.customer = parseInt(inv.customer_id);
         }
+        document.getElementById('customerPhone').value = inv.customer_phone || customer?.primary_phone || '';
 
         // Sales Officer
         if (inv.sale_officer_id) {
@@ -1263,6 +1278,7 @@ async function loadCompanies() {
             // Clear customer, invoice, branch selections
             document.getElementById('customerSearch').value = '';
             document.getElementById('customer').value = '';
+            document.getElementById('customerPhone').value = '';
             currentReturn.customer = null;
             document.getElementById('invoiceSearch').value = '';
             document.getElementById('saleInvoice').value = '';
@@ -1364,6 +1380,7 @@ function selectCashCustomerDefault() {
     document.getElementById('customerSearch').value = `${cashCustomer.customer_code} - ${cashCustomer.customer_name}`;
     document.getElementById('customer').value = cashCustomer.id;
     currentReturn.customer = parseInt(cashCustomer.id);
+    document.getElementById('customerPhone').value = cashCustomer.primary_phone || '';
 
     if (cashCustomer.supplier_man_id) {
         const supplierMan = employeesData.find(e => e.id == cashCustomer.supplier_man_id);

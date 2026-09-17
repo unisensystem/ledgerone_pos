@@ -75,12 +75,12 @@ $pdo->beginTransaction();
     $stmt = $pdo->prepare("
         INSERT INTO sale_invoice (
             tenant_id, currency_id, bill_no, sale_date, customer_id, sub_account_id, company_id, branch_id,
-            previous_balance, sale_officer_id, supplier_man_id, brand_id, sale_order_id, bilty_no, transport_name,
+            previous_balance, sale_officer_id, supplier_man_id, brand_id, sale_order_id, bilty_no, transport_name, customer_phone,
             total_bill, total_discount_percent, total_discount_amount,
             extra_discount_1_percent, extra_discount_1_amount, extra_discount_2_percent, extra_discount_2_amount,
             shipping_fees, net_amount, withholding_tax_percent, withholding_tax_amount, amount_paid_auto_fill,
             invoice_type, due_date, remarks, status, created_by, updated_by, project_id, container_id
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ");
 
     $stmt->execute([
@@ -99,6 +99,7 @@ $pdo->beginTransaction();
         $input['saleOrderId'] ?? null,
         $input['biltyNo'] ?? null,
         $input['transportName'] ?? null,
+        $input['customerPhone'] ?? null,
         $input['totalBill'],
         $input['totalDiscountPercent'] ?? 0.00,
         $input['totalDiscountAmount'] ?? 0.00,
@@ -492,6 +493,7 @@ if ($status === 'Posted' || $status === 'Draft') {
             'sale_officer_id' => $input['salesOfficerId'] ?? null, 'supplier_man_id' => $input['supplierManId'] ?? null,
             'brand_id' => $input['brandId'] ?? null, 'sale_order_id' => $input['saleOrderId'] ?? null,
             'bilty_no' => $input['biltyNo'] ?? null, 'transport_name' => $input['transportName'] ?? null,
+            'customer_phone' => $input['customerPhone'] ?? null,
             'total_bill' => $input['totalBill'], 'total_discount_percent' => $input['totalDiscountPercent'] ?? 0,
             'total_discount_amount' => $input['totalDiscountAmount'] ?? 0, 'shipping_fees' => $input['shippingFees'] ?? 0,
             'net_amount' => $input['netAmount'], 'invoice_type' => $input['invoiceType'] ?? 'Cash',

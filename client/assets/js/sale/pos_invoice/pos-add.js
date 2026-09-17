@@ -30,7 +30,7 @@
         'hideSalesOfficerStandard','hideSupplierManStandard','hideAreaCityStandard',
         'hideSubAccountStandard','hideSaleOrderStandard','hideCurrencyStandard',
         'hideTransportNameStandard','hideBiltyNoStandard','hideProjectStandard',
-        'hideContainerStandard','hideRemarksStandard'
+        'hideContainerStandard','hideRemarksStandard','hideCustomerPhoneStandard'
     ]);
 
     localStorage.getItem = function(key) {
@@ -1151,6 +1151,7 @@ const invoiceSettingCheckboxes = [
         option.setAttribute('data-value', customer.id);
         option.setAttribute('data-balance', customer.current_balance);
         option.setAttribute('data-address', customer.address || '');
+        option.setAttribute('data-phone', customer.primary_phone || '');
         option.setAttribute('data-discount', customer.default_discount_percentage || 0);
         option.setAttribute('data-sales-officer', customer.associated_sales_officer_id || '');
         option.setAttribute('data-supplier-man', customer.supplier_man_id || '');
@@ -1584,6 +1585,8 @@ const invoiceSettingCheckboxes = [
                 if (biltyNoEl) biltyNoEl.value = invoice.bilty_no || '';
                 const transportNameEl = document.getElementById('transportName');
                 if (transportNameEl) transportNameEl.value = invoice.transport_name || '';
+                const customerPhoneEl = document.getElementById('customerPhone');
+                if (customerPhoneEl) customerPhoneEl.value = invoice.customer_phone || '';
 
                 // Load sub accounts and set value
                 if (invoice.customer_id) {
@@ -2168,6 +2171,12 @@ const invoiceSettingCheckboxes = [
                     const address = e.target.getAttribute('data-address');
                     const customerAddressEl = document.getElementById('customerAddress');
                     if (customerAddressEl) customerAddressEl.textContent = address || 'No address available';
+
+                    // Auto-fill Phone No from the customer's Primary Phone. Still a plain
+                    // editable input — this only sets a starting value, the user can type a
+                    // different number for this specific invoice if needed.
+                    const customerPhoneEl = document.getElementById('customerPhone');
+                    if (customerPhoneEl) customerPhoneEl.value = e.target.getAttribute('data-phone') || '';
 
                     // Load sub accounts for selected customer
                     loadSubAccounts(value);
@@ -4387,6 +4396,7 @@ function saveInvoice(status = 'Posted') {
         dueDate: document.getElementById('dueDate')?.value || null,
         biltyNo: document.getElementById('biltyNo')?.value || null,
         transportName: document.getElementById('transportName')?.value || null,
+        customerPhone: document.getElementById('customerPhone')?.value || null,
         totalBill: parseFloat(document.getElementById('totalBill').textContent),
         totalDiscountPercent: parseFloat(document.getElementById('totalDiscountPercent')?.value) || 0,
         totalDiscountAmount: parseFloat(document.getElementById('totalDiscountAmount')?.value),
@@ -4626,7 +4636,7 @@ function loadFieldSettings() {
         'hideSalesOfficerStandard', 'hideSupplierManStandard', 'hideAreaCityStandard',
         'hideSubAccountStandard', 'hideSaleOrderStandard', 'hideCurrencyStandard',
         'hideTransportNameStandard', 'hideBiltyNoStandard', 'hideProjectStandard',
-        'hideContainerStandard', 'hideRemarksStandard'
+        'hideContainerStandard', 'hideRemarksStandard', 'hideCustomerPhoneStandard'
     ];
     fields.forEach(id => {
         const el = document.getElementById(id);
@@ -4642,7 +4652,7 @@ function saveFieldSettings() {
         'hideSalesOfficerStandard', 'hideSupplierManStandard', 'hideAreaCityStandard',
         'hideSubAccountStandard', 'hideSaleOrderStandard', 'hideCurrencyStandard',
         'hideTransportNameStandard', 'hideBiltyNoStandard', 'hideProjectStandard',
-        'hideContainerStandard', 'hideRemarksStandard'
+        'hideContainerStandard', 'hideRemarksStandard', 'hideCustomerPhoneStandard'
     ];
     fields.forEach(id => {
         const el = document.getElementById(id);
@@ -4668,6 +4678,7 @@ function applyFieldVisibility() {
         { key: 'hideSubAccountStandard',  groupId: 'subAccountGroup' },
         { key: 'hideSaleOrderStandard',   groupId: 'saleOrderGroup' },
         { key: 'hideCurrencyStandard',    groupId: 'currencyGroup' },
+        { key: 'hideCustomerPhoneStandard', groupId: 'customerPhoneGroup' },
         { key: 'hideTransportNameStandard', groupId: 'transportNameGroup' },
         { key: 'hideBiltyNoStandard',     groupId: 'biltyNoGroup' },
         { key: 'hideProjectStandard',     groupId: 'projectGroup' },
@@ -6099,6 +6110,7 @@ async function loadCustomers(companyId = null) {
                 codeOption.setAttribute('data-value', customer.id);
                 codeOption.setAttribute('data-balance', customer.current_balance);
                 codeOption.setAttribute('data-address', customer.address || '');
+                codeOption.setAttribute('data-phone', customer.primary_phone || '');
                 codeOption.setAttribute('data-discount', customer.default_discount_percentage || 0);
                 codeOption.setAttribute('data-sales-officer', customer.associated_sales_officer_id || '');
                 codeOption.setAttribute('data-supplier-man', customer.supplier_man_id || '');
@@ -6958,6 +6970,7 @@ async function quickAddCustomer() {
                 newOpt.setAttribute('data-value', c.id);
                 newOpt.setAttribute('data-balance', c.current_balance || 0);
                 newOpt.setAttribute('data-address', c.address || '');
+                newOpt.setAttribute('data-phone', c.primary_phone || '');
                 newOpt.setAttribute('data-discount', c.default_discount_percentage || 0);
                 newOpt.setAttribute('data-sales-officer', c.associated_sales_officer_id || '');
                 newOpt.setAttribute('data-supplier-man', c.supplier_man_id || '');
