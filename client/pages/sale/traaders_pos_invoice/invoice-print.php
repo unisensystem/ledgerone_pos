@@ -737,16 +737,6 @@
             </div>
         </div>
 
-        <div
-            style="margin-top: 20px; text-align: center; font-size: 10px; color: #999; border-top: 1px solid #eee; padding-top: 10px;">
-            <p><em>This is a System Generated Invoice</em></p>
-            <div style="margin-top: 10px;">
-                <div>Software by: UNISEN SYSTEMS</div>
-                <div>Contact: +92 346 8918711 | +92 335 3789981</div>
-                <div>Email: support@unisensystems.com</div>
-                <div>www.unisensystems.com</div>
-            </div>
-        </div>
     </div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
