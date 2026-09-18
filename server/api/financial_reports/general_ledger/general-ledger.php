@@ -29,6 +29,7 @@ $searchText = $_GET['searchText'] ?? '';
 $company_id = $_GET['company_id'] ?? null;
 
 try {
+    // Account id 110 ("Freight Inward") is deliberately excluded from this report per request.
     $company_filter = ($company_id ? " AND (si.company_id = ? OR pi.company_id = ? OR rv.company_id = ? OR pv.company_id = ? OR ev.company_id = ? OR jv.company_id = ? OR tv.company_id = ?)" : "");
     
     $query = "SELECT 
@@ -50,7 +51,7 @@ try {
     LEFT JOIN expense_voucher ev ON al.reference_table = 'expense_voucher' AND al.reference_id = ev.id
     LEFT JOIN journal_voucher jv ON al.reference_table = 'journal_voucher' AND al.reference_id = jv.id
     LEFT JOIN transfer_voucher tv ON al.reference_table = 'transfer_voucher' AND al.reference_id = tv.id
-    WHERE al.tenant_id = ?{$company_filter}";
+    WHERE al.tenant_id = ? AND al.account_id != 110{$company_filter}";
     
     $params = [$tenant_id];
     if ($company_id) {
