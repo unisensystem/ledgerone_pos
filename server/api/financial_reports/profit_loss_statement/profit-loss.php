@@ -126,6 +126,94 @@ try {
     }
 
     // ---------------------------------------------------------------
+    // Sale Returns — a returned item must reduce both revenue AND COGS,
+    // otherwise a sale that gets returned still counts its full original
+    // profit as if the return never happened. Recorded in the period the
+    // RETURN itself was posted (not retroactively restating the original
+    // sale's period), matching standard "sales returns & allowances"
+    // accounting treatment — a return of a prior-period sale still shows
+    // up as a negative line in the period the customer brought it back.
+    // Only 'Posted' returns count; a Draft return has no real accounting
+    // impact yet. NOTE: sale_return has no container_id column, so the
+    // container filter (if active) does not narrow this bucket.
+    // ---------------------------------------------------------------
+    $sql = "
+        SELECT
+            p.id,
+            p.name as account,
+            p.product_type,
+            sri.net_amount as amount,
+            sri.quantity as qty,
+            sr.currency_id
+        FROM sale_return sr
+        JOIN sale_return_items sri ON sr.id = sri.sale_invoice_id
+        JOIN products p ON sri.product_id = p.id
+        JOIN branches b ON sr.branch_id = b.id
+        WHERE sr.tenant_id = ?
+        AND sr.status = 'Posted'
+        AND sr.sale_date BETWEEN ? AND ?
+        $branch_condition
+        " . ($company_id ? " AND sr.company_id = ?" : "") . "
+        " . ($project_id ? " AND sr.project_id = ?" : "") . "
+    ";
+    $stmt = $pdo->prepare($sql);
+    $params = array_merge([$tenant_id, $start_date, $end_date], $branch_params);
+    if ($company_id) $params[] = $company_id;
+    if ($project_id) $params[] = $project_id;
+    $stmt->execute($params);
+    $sale_returns_raw = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    // Group returned revenue by account name (split physical vs service, so
+    // it nets against the matching revenue bucket below) and returned
+    // quantity by product id (physical only — service items have no COGS).
+    $returned_revenue_physical = [];
+    $returned_revenue_service = [];
+    $returned_qty_by_product_id = [];
+    $returned_product_names = [];
+    foreach ($sale_returns_raw as $row) {
+        $amount = $row['amount'];
+        $from_currency = $row['currency_id'] ?? $base_currency_id;
+        if ($from_currency != $target_currency_id) {
+            $amount = $converter->convert($amount, $from_currency, $target_currency_id);
+        }
+        $account = $row['account'];
+
+        if ($row['product_type'] === 'service') {
+            if (!isset($returned_revenue_service[$account])) $returned_revenue_service[$account] = 0;
+            $returned_revenue_service[$account] += $amount;
+        } else {
+            if (!isset($returned_revenue_physical[$account])) $returned_revenue_physical[$account] = 0;
+            $returned_revenue_physical[$account] += $amount;
+
+            $pid = $row['id'];
+            if (!isset($returned_qty_by_product_id[$pid])) $returned_qty_by_product_id[$pid] = 0;
+            $returned_qty_by_product_id[$pid] += (float)$row['qty'];
+            $returned_product_names[$pid] = $account;
+        }
+    }
+
+    // Subtracts returned amounts from a revenue bucket, matched by account
+    // name. If the original sale fell outside this reporting period (so the
+    // product has no row here yet), adds a negative line instead of
+    // silently dropping the return's impact on this period's revenue.
+    function applyReturnsToRevenue(array &$revenueItems, array $returnsByAccount) {
+        foreach ($returnsByAccount as $account => $returnAmt) {
+            $found = false;
+            foreach ($revenueItems as &$item) {
+                if ($item['account'] === $account) {
+                    $item['amount'] -= $returnAmt;
+                    $found = true;
+                    break;
+                }
+            }
+            unset($item);
+            if (!$found) {
+                $revenueItems[] = ['account' => $account, 'amount' => -$returnAmt];
+            }
+        }
+    }
+
+    // ---------------------------------------------------------------
     // Sales Revenue from station_daily_usage (fuel products)
     // ---------------------------------------------------------------
     $sql = "
@@ -189,6 +277,7 @@ try {
         $other_sales[$account]['amount'] += $amount;
     }
     $other_sales = array_values($other_sales);
+    applyReturnsToRevenue($other_sales, $returned_revenue_physical);
 
     // Merge both arrays
     $sales_revenue = array_merge($sales_revenue, $other_sales);
@@ -238,6 +327,7 @@ try {
         $service_revenue[$account]['amount'] += $amount;
     }
     $service_revenue = array_values($service_revenue);
+    applyReturnsToRevenue($service_revenue, $returned_revenue_service);
 
     // ---------------------------------------------------------------
     // Rent Income (with currency from rent_management)
@@ -314,6 +404,26 @@ try {
     $stmt->execute($params);
     $other_sold = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
+    // Net out returned quantities (physical products) against sale_invoice
+    // qty_sold before it feeds COGS, so a returned item's cost isn't counted
+    // as if it were still sold. A product returned this period but sold in
+    // an earlier one won't have a row here yet — add a negative-qty row so
+    // its COGS reversal still reduces this period's cost.
+    foreach ($returned_qty_by_product_id as $pid => $qty) {
+        $found = false;
+        foreach ($other_sold as &$item) {
+            if ($item['id'] == $pid) {
+                $item['qty_sold'] -= $qty;
+                $found = true;
+                break;
+            }
+        }
+        unset($item);
+        if (!$found) {
+            $other_sold[] = ['id' => $pid, 'account' => $returned_product_names[$pid], 'qty_sold' => -$qty];
+        }
+    }
+
     // Merge both arrays
     $sold_items = array_merge($sold_items, $other_sold);
 
@@ -385,7 +495,11 @@ try {
         $qty_sold = (float)$item['qty_sold'];
         $cogs_amount = $avg_cost * $qty_sold;
 
-        if ($cogs_amount > 0) {
+        // != 0 (not > 0): a net-returned product for this period yields a
+        // negative qty_sold, and its negative cogs_amount must still be
+        // included so returns actually reduce total COGS instead of being
+        // silently dropped.
+        if ($cogs_amount != 0) {
             $cogs[] = [
                 'account' => $item['account'],
                 'amount' => $cogs_amount
