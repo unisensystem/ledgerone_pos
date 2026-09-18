@@ -143,7 +143,7 @@ $pdo->beginTransaction();
                 $isFirstEntry ? $item['discountAmount'] : 0,
                 $item['extraDiscountPercent'] ?? 0.00,
                 $item['tradeOfferPercent'] ?? 0.00,
-                $isFirstEntry ? $item['tradeOfferAmount'] : 0,
+                $isFirstEntry ? ($item['tradeOfferAmount'] ?? 0) : 0,
                 $item['taxPercent'] ?? 0.00,
                 $isFirstEntry ? $item['taxAmount'] : 0,
                 $item['focQty'] ?? 0,

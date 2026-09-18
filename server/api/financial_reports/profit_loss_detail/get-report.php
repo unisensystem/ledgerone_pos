@@ -140,6 +140,62 @@ try {
         $sales_items[$product_id_key]['qty_sold'] += $qty;
         $sales_items[$product_id_key]['revenue'] += $revenue;
     }
+
+    // Sale Returns (item-wise) — a returned item must reduce both revenue and
+    // qty_sold (which feeds COGS below), otherwise a sale that gets returned
+    // still counts its full original profit as if the return never happened.
+    // Recognized in the period the RETURN was recorded (not retroactively
+    // restating the original sale's period) — standard "sales returns &
+    // allowances" treatment. Only 'Posted' returns count.
+    $sql_returns = "
+        SELECT
+            p.id as product_id,
+            p.name as product_name,
+            sri.quantity as qty_returned,
+            sri.net_amount as returned_amount,
+            sr.currency_id
+        FROM sale_return sr
+        JOIN sale_return_items sri ON sr.id = sri.sale_invoice_id
+        JOIN products p ON sri.product_id = p.id
+        JOIN branches b ON sr.branch_id = b.id
+        WHERE sr.tenant_id = ?
+        AND sr.status = 'Posted'
+        AND sr.sale_date BETWEEN ? AND ?
+        AND p.product_type IN ('physical', 'service')
+        $branch_condition
+        " . ($company_id ? " AND sr.company_id = ?" : "") . "
+        " . ($category_id ? " AND p.category_id = ?" : "") . "
+        " . ($customer_id ? " AND sr.customer_id = ?" : "") . "
+        " . ($product_id ? " AND p.id = ?" : "") . "
+    ";
+    $params_ret = array_merge([$tenant_id, $start_date, $end_date], $branch_params);
+    if ($company_id) $params_ret[] = $company_id;
+    if ($category_id) $params_ret[] = $category_id;
+    if ($customer_id) $params_ret[] = $customer_id;
+    if ($product_id) $params_ret[] = $product_id;
+    $stmt = $pdo->prepare($sql_returns);
+    $stmt->execute($params_ret);
+    $item_returns_raw = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    foreach ($item_returns_raw as $row) {
+        $amount = $row['returned_amount'];
+        $from_currency = $row['currency_id'] ?? $base_currency_id;
+        if ($from_currency != $target_currency_id) {
+            $amount = $converter->convert($amount, $from_currency, $target_currency_id);
+        }
+        $pid = $row['product_id'];
+        if (!isset($sales_items[$pid])) {
+            $sales_items[$pid] = [
+                'product_id' => $pid,
+                'product_name' => $row['product_name'],
+                'qty_sold' => 0,
+                'revenue' => 0
+            ];
+        }
+        $sales_items[$pid]['qty_sold'] -= (float)$row['qty_returned'];
+        $sales_items[$pid]['revenue'] -= $amount;
+    }
+
     $sales_items = array_values($sales_items);
 
     // Get sales from station_daily_usage (fuel products) - base currency
@@ -369,6 +425,45 @@ try {
         $customer_sales[$customer_id_key]['invoice_count']++;
         $customer_sales[$customer_id_key]['revenue'] += $revenue;
     }
+
+    // Sale Returns (customer-wise revenue) — same treatment as item-wise above.
+    $sql_cust_returns = "
+        SELECT sr.customer_id, c.customer_name, sr.net_amount as returned_amount, sr.currency_id
+        FROM sale_return sr
+        JOIN customers c ON sr.customer_id = c.id
+        JOIN branches b ON sr.branch_id = b.id
+        WHERE sr.tenant_id = ?
+        AND sr.status = 'Posted'
+        AND sr.sale_date BETWEEN ? AND ?
+        $branch_condition
+        " . ($company_id ? " AND sr.company_id = ?" : "") . "
+        " . ($customer_id ? " AND sr.customer_id = ?" : "") . "
+    ";
+    $params_cust_ret = array_merge([$tenant_id, $start_date, $end_date], $branch_params);
+    if ($company_id) $params_cust_ret[] = $company_id;
+    if ($customer_id) $params_cust_ret[] = $customer_id;
+    $stmt = $pdo->prepare($sql_cust_returns);
+    $stmt->execute($params_cust_ret);
+    $customer_returns_raw = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    foreach ($customer_returns_raw as $row) {
+        $amount = $row['returned_amount'];
+        $from_currency = $row['currency_id'] ?? $base_currency_id;
+        if ($from_currency != $target_currency_id) {
+            $amount = $converter->convert($amount, $from_currency, $target_currency_id);
+        }
+        $cid = $row['customer_id'];
+        if (!isset($customer_sales[$cid])) {
+            $customer_sales[$cid] = [
+                'customer_id' => $cid,
+                'customer_name' => $row['customer_name'],
+                'invoice_count' => 0,
+                'revenue' => 0
+            ];
+        }
+        $customer_sales[$cid]['revenue'] -= $amount;
+    }
+
     $customer_sales = array_values($customer_sales);
 
     // Calculate COGS for each customer
@@ -396,6 +491,41 @@ try {
         $stmt = $pdo->prepare($sql);
         $stmt->execute($params);
         $customer_products = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        // Sale Returns (this customer's returned quantities, for COGS) — net
+        // against qty_sold per product so a returned item's cost isn't
+        // counted as if it were still sold.
+        $sql_cust_prod_returns = "
+            SELECT sri.product_id, SUM(sri.quantity) as qty_returned
+            FROM sale_return sr
+            JOIN sale_return_items sri ON sr.id = sri.sale_invoice_id
+            JOIN branches b ON sr.branch_id = b.id
+            WHERE sr.tenant_id = ?
+            AND sr.status = 'Posted'
+            AND sr.customer_id = ?
+            AND sr.sale_date BETWEEN ? AND ?
+            $branch_condition
+            " . ($company_id ? " AND sr.company_id = ?" : "") . "
+            GROUP BY sri.product_id
+        ";
+        $params_cpr = array_merge([$tenant_id, $customer['customer_id'], $start_date, $end_date], $branch_params);
+        if ($company_id) $params_cpr[] = $company_id;
+        $stmt = $pdo->prepare($sql_cust_prod_returns);
+        $stmt->execute($params_cpr);
+        $cust_prod_returns = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        $cust_products_by_id = [];
+        foreach ($customer_products as $prod) {
+            $cust_products_by_id[$prod['product_id']] = $prod;
+        }
+        foreach ($cust_prod_returns as $ret) {
+            $pid = $ret['product_id'];
+            if (!isset($cust_products_by_id[$pid])) {
+                $cust_products_by_id[$pid] = ['product_id' => $pid, 'qty_sold' => 0];
+            }
+            $cust_products_by_id[$pid]['qty_sold'] -= (float)$ret['qty_returned'];
+        }
+        $customer_products = array_values($cust_products_by_id);
 
         $total_cogs = 0;
         foreach ($customer_products as $prod) {
@@ -567,11 +697,54 @@ try {
         $stmt->execute($params);
         $invoice_products = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
+        // Sale Returns tied to this specific invoice (via sale_invoice_no) —
+        // reduce this invoice's own shown revenue/COGS, regardless of which
+        // period the return itself falls in, since this view is anchored to
+        // "this transaction" rather than the reporting period (unlike the
+        // item/customer breakdowns above, which recognize returns by the
+        // period the return happened in).
+        $sql_inv_returns = "
+            SELECT sri.product_id, SUM(sri.quantity) as qty_returned, SUM(sri.net_amount) as amount_returned, sr.currency_id
+            FROM sale_return sr
+            JOIN sale_return_items sri ON sr.id = sri.sale_invoice_id
+            WHERE sr.tenant_id = ?
+            AND sr.status = 'Posted'
+            AND sr.sale_invoice_no = ?
+            " . ($product_id ? " AND sri.product_id = ?" : "") . "
+            GROUP BY sri.product_id, sr.currency_id
+        ";
+        $params_inv_ret = [$tenant_id, $invoice['invoice_id']];
+        if ($product_id) $params_inv_ret[] = $product_id;
+        $stmt = $pdo->prepare($sql_inv_returns);
+        $stmt->execute($params_inv_ret);
+        $inv_returns = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        $invoice_products_by_id = [];
+        foreach ($invoice_products as $prod) {
+            $invoice_products_by_id[$prod['product_id']] = $prod;
+        }
+        $returned_revenue_for_invoice = 0;
+        foreach ($inv_returns as $ret) {
+            $ret_amount = $ret['amount_returned'];
+            $ret_currency = $ret['currency_id'] ?? $base_currency_id;
+            if ($ret_currency != $target_currency_id) {
+                $ret_amount = $converter->convert($ret_amount, $ret_currency, $target_currency_id);
+            }
+            $returned_revenue_for_invoice += $ret_amount;
+
+            $ret_pid = $ret['product_id'];
+            if (!isset($invoice_products_by_id[$ret_pid])) {
+                $invoice_products_by_id[$ret_pid] = ['product_id' => $ret_pid, 'qty_sold' => 0];
+            }
+            $invoice_products_by_id[$ret_pid]['qty_sold'] -= (float)$ret['qty_returned'];
+        }
+        $invoice_products = array_values($invoice_products_by_id);
+
         $total_cogs = 0;
         foreach ($invoice_products as $prod) {
             // Get purchase data with currency
             $stmt = $pdo->prepare("
-                SELECT 
+                SELECT
                     pii.net_amount,
                     pii.quantity,
                     pi.currency_id
@@ -582,7 +755,7 @@ try {
                 AND pi.purchase_date <= ?
                 " . ($company_id ? " AND pi.company_id = ?" : "") . "
             ");
-            
+
             $params_cogs = [$prod['product_id'], $tenant_id, $invoice['sale_date']];
             if ($company_id) $params_cogs[] = $company_id;
             
@@ -658,14 +831,15 @@ try {
             $total_cogs += $avg_cost * $qty_sold;
         }
 
+        $invoice_net_revenue = $invoice['revenue'] - $returned_revenue_for_invoice;
         $invoicewise_data[] = [
             'invoice_id' => $invoice['invoice_id'],
             'bill_no' => $invoice['bill_no'],
             'sale_date' => $invoice['sale_date'],
             'customer_name' => $invoice['customer_name'],
-            'revenue' => $invoice['revenue'],
+            'revenue' => $invoice_net_revenue,
             'cogs' => $total_cogs,
-            'profit' => $invoice['revenue'] - $total_cogs
+            'profit' => $invoice_net_revenue - $total_cogs
         ];
     }
 

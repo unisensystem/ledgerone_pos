@@ -346,26 +346,29 @@ async function generateReport() {
                 </tr>
             `;
 
-    // Rent Income section
-    tableHTML += `<tr class="subtotal-row"><td colspan="3">RENT INCOME</td></tr>`;
-    if (detailLevel !== 'category') {
-        (data.rent_income || []).forEach(item => {
-            tableHTML += `
+    // Rent Income section — hidden entirely when there's nothing to show,
+    // instead of always printing a "Total Rent Income: 0.00" row.
+    if (totalRentIncome > 0) {
+        tableHTML += `<tr class="subtotal-row"><td colspan="3">RENT INCOME</td></tr>`;
+        if (detailLevel !== 'category') {
+            (data.rent_income || []).forEach(item => {
+                tableHTML += `
                         <tr>
                             <td style="padding-left: 20px;">${item.account}</td>
                             <td class="amount-cell positive">${formatCurrency(item.amount)}</td>
                             <td class="amount-cell">${calculatePercentage(item.amount, totalRevenue)}</td>
                         </tr>
                     `;
-        });
-    }
-    tableHTML += `
+            });
+        }
+        tableHTML += `
                 <tr class="subtotal-row">
                     <td>Total Rent Income</td>
                     <td class="amount-cell positive">${formatCurrency(totalRentIncome)}</td>
                     <td class="amount-cell">${calculatePercentage(totalRentIncome, totalRevenue)}</td>
                 </tr>
             `;
+    }
 
     // Total Revenue
     tableHTML += `

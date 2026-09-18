@@ -729,6 +729,9 @@ if (isGlobalDateLocked && globalLockedDate) {
                 const totalTaxAmountEl = document.getElementById('totalTaxAmount');
                 if (totalTaxAmountEl) totalTaxAmountEl.value = invoice.total_tax_amount || 0;
                 document.getElementById('shippingFees').value = invoice.shipping_fees || 0;
+                const savedShippingType = invoice.shipping_fees_type === 'subtract' ? 'subtract' : 'add';
+                const shippingTypeRadio = document.querySelector(`input[name="shippingFeesType"][value="${savedShippingType}"]`);
+                if (shippingTypeRadio) shippingTypeRadio.checked = true;
                 updateInvoiceSummary();
 
                 // Load invoice-level tax regimes then restore saved taxes
@@ -2271,6 +2274,7 @@ if (supplierHidden && supplierHidden.value && supplierSearch) {
             totalTaxPercent: parseFloat(document.getElementById('totalTaxPercent')?.value) || 0,
             totalTaxAmount: parseFloat(document.getElementById('totalTaxAmount')?.value) || 0,
             shippingFees: parseFloat(document.getElementById('shippingFees')?.value) || 0,
+            shippingFeesType: document.querySelector('input[name="shippingFeesType"]:checked')?.value || 'add',
             netAmount: parseFloat(document.getElementById('netAmount')?.textContent),
             invoiceTaxes: window.getInvoiceTaxData ? window.getInvoiceTaxData() : [],
             remarks: document.getElementById('remarks')?.value,
