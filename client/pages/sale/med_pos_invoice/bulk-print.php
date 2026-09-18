@@ -66,6 +66,7 @@
     <button class="size-btn" onclick="setPaperSize('A4')" id="btnA4">A4</button>
     <button class="size-btn" onclick="setPaperSize('A5')" id="btnA5">A5</button>
     <button class="size-btn" onclick="setPaperSize('A6')" id="btnA6">A6</button>
+    <button class="size-btn" onclick="toggleRoundOff()" id="roundOffToggleBtn">Round Off: OFF</button>
     <span id="statusMsg">Loading invoices...</span>
 </div>
 
@@ -93,6 +94,50 @@
     // guarantees no overlap, regardless of exactly when each async piece settles.
     const POLL_DURATION_MS = 6000;
     const POLL_INTERVAL_MS = 300;
+
+    // ===== Round Off toggle =====
+    // Same localStorage key as invoice-print.php ('invoiceRoundOffEnabled'), so the
+    // setting is shared between the single-invoice page and this bulk page.
+    // Every iframe also reads this key itself on load, so invoices that are still
+    // loading when the button is clicked automatically pick up the right value.
+    let roundOffEnabled = localStorage.getItem('invoiceRoundOffEnabled') === '1';
+
+    function updateRoundOffBtn() {
+        const btn = document.getElementById('roundOffToggleBtn');
+        if (!btn) return;
+        btn.textContent = roundOffEnabled ? 'Round Off: ON' : 'Round Off: OFF';
+        btn.classList.toggle('active', roundOffEnabled);
+    }
+    updateRoundOffBtn();
+
+    // Force one iframe to the desired round-off state.
+    // invoice-print.php only exposes toggleRoundOff() (a flip), so we first read
+    // the iframe's current state and only flip it if it differs from what we want.
+    // toggleRoundOff() there re-renders from cached data — no API re-fetch.
+    function applyRoundOffToFrame(iframe, desired) {
+        try {
+            const w = iframe.contentWindow;
+            // Not loaded yet -> nothing to do; it will read localStorage when it loads.
+            if (!w || typeof w.toggleRoundOff !== 'function') return;
+            let current = null;
+            try { current = w.eval('roundOffEnabled'); } catch (e) {}
+            if (current === desired) return;
+            w.toggleRoundOff();
+        } catch (e) {}
+    }
+
+    function toggleRoundOff() {
+        roundOffEnabled = !roundOffEnabled;
+        localStorage.setItem('invoiceRoundOffEnabled', roundOffEnabled ? '1' : '0');
+        updateRoundOffBtn();
+
+        document.querySelectorAll('iframe').forEach(iframe => {
+            applyRoundOffToFrame(iframe, roundOffEnabled);
+            // Numbers changed width (decimals removed/added) -> re-measure height.
+            setTimeout(() => iframe._measure && iframe._measure(), 50);
+            setTimeout(() => iframe._measure && iframe._measure(), 400);
+        });
+    }
 
     ids.forEach((id, index) => {
         const wrapper = document.createElement('div');
@@ -127,6 +172,9 @@
                 } catch (e) {}
             }
 
+            // Expose so toggleRoundOff()/setPaperSize() can re-measure later.
+            iframe._measure = measureAndApply;
+
             // 1) Measure immediately.
             measureAndApply();
 
@@ -157,6 +205,9 @@
             //    its fetched data has rendered, for a fast first accurate paint.
             try {
                 iframe.contentWindow.addEventListener('invoiceLoaded', function () {
+                    // Make sure this invoice matches the current Round Off state
+                    // (covers the case where the button was clicked while it loaded).
+                    applyRoundOffToFrame(iframe, roundOffEnabled);
                     setTimeout(measureAndApply, 50);
                     setTimeout(measureAndApply, 500);
                 });
@@ -185,13 +236,18 @@
 
     function setPaperSize(size) {
         localStorage.setItem('invoicePaperSize', size);
-        document.querySelectorAll('.size-btn').forEach(btn => btn.classList.remove('active'));
+        document.querySelectorAll('.size-btn').forEach(btn => {
+            if (btn.id && btn.id.startsWith('btnA')) btn.classList.remove('active');
+        });
         document.getElementById('btn' + size).classList.add('active');
         // Propagate to all loaded iframes
         document.querySelectorAll('iframe').forEach(iframe => {
             try {
                 iframe.contentWindow.setPaperSize(size);
             } catch(e) {}
+            // Paper size changes the layout height -> re-measure.
+            setTimeout(() => iframe._measure && iframe._measure(), 50);
+            setTimeout(() => iframe._measure && iframe._measure(), 400);
         });
     }
 

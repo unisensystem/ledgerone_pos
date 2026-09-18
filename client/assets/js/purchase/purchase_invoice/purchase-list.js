@@ -1,9 +1,22 @@
 document.addEventListener('DOMContentLoaded', function () {
+     let permissions = [];  // ✅ Add this line
+    
+    // ✅ Fetch permissions immediately
+    fetch('../../../../server/api/auth/check-permission.php?category=Purchase&form_name=New Purchase')
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                permissions = data.permissions;
+            }
+        });
+
+   
     let invoices = [];
     let currentPage = 1;
     let totalPages = 1;
     const invoicesTable = document.getElementById('invoicesTable').getElementsByTagName('tbody')[0];
     let duplicateInvoiceId = null;
+    
 
     // ===================== Action Buttons Visibility (Show/Hide) =====================
     const ACTION_VISIBILITY_KEY = 'purchaseInvoiceActionVisibility';
@@ -370,12 +383,18 @@ document.addEventListener('DOMContentLoaded', function () {
             actionButtons.appendChild(editBtn);
 
             // Duplicate button
-            const dupBtn = document.createElement('button');
-            dupBtn.className = 'btn btn-secondary btn-sm';
-            dupBtn.innerHTML = '<i class="fas fa-copy"></i>';
-            dupBtn.title = 'Duplicate Invoice';
-            dupBtn.addEventListener('click', () => openDuplicateModal(invoice.id, invoice.invoiceNo, invoice.supplierId, invoice.companyId));
-            actionButtons.appendChild(dupBtn);
+const dupBtn = document.createElement('button');
+dupBtn.className = 'btn btn-secondary btn-sm';
+dupBtn.innerHTML = '<i class="fas fa-copy"></i>';
+dupBtn.title = 'Duplicate Invoice';
+if (permissions.includes('Duplicate')) {
+    dupBtn.addEventListener('click', () => openDuplicateModal(invoice.id, invoice.invoiceNo, invoice.supplierId, invoice.companyId));
+} else {
+    dupBtn.disabled = true;
+    dupBtn.style.opacity = '0.5';
+    dupBtn.style.cursor = 'not-allowed';
+}
+actionButtons.appendChild(dupBtn);
 
             // Print button
             if (actionVisibility.print) {
@@ -560,6 +579,10 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // Duplicate invoice
     function openDuplicateModal(id, currentBillNo, originalSupplierId, invoiceCompanyId) {
+        if (!permissions.includes('Add')) {
+        alert('You do not have permission to duplicate invoices.');
+        return;
+    }
         duplicateInvoiceId = id;
         document.getElementById('duplicateSourceBillNo').textContent = currentBillNo;
         document.getElementById('duplicateNewBillNoDisplay').textContent = 'Generating...';

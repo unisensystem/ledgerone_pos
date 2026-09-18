@@ -249,6 +249,7 @@
         <button class="print-btn" id="downloadPdfBtn" onclick="downloadAsPdf()" style="background:#28a745;">&#8595; Download PDF</button>
         <button class="print-btn" id="warrantyToggleBtn" onclick="toggleWarranty()">Hide Warranty</button>
         <button class="print-btn" onclick="resetWarrantyCustomizations()" style="background:#6c757d;">Reset Warranty Text</button>
+        <button class="print-btn" id="roundOffToggleBtn" onclick="toggleRoundOff()">Round Off: OFF</button>
     </div>
 
     <div class="invoice-container" id="invoiceContainer">
@@ -446,6 +447,31 @@
         }
         setPaperSize(localStorage.getItem('invoicePaperSize') || 'A4');
 
+        // ===== Round Off toggle =====
+        // When ON, every money value rendered via fmt() is rounded to the nearest
+        // whole number (standard rounding rule: .5 and above rounds up) instead of
+        // showing up to 3 decimal places. Last loaded invoice/items are cached so
+        // toggling re-renders instantly without hitting the API again.
+        let roundOffEnabled = localStorage.getItem('invoiceRoundOffEnabled') === '1';
+        let lastInvoiceData = null;
+        let lastItemsData = null;
+
+        function updateRoundOffBtn() {
+            const btn = document.getElementById('roundOffToggleBtn');
+            if (!btn) return;
+            btn.textContent = roundOffEnabled ? 'Round Off: ON' : 'Round Off: OFF';
+            btn.classList.toggle('active', roundOffEnabled);
+        }
+        updateRoundOffBtn();
+
+        function toggleRoundOff() {
+            roundOffEnabled = !roundOffEnabled;
+            localStorage.setItem('invoiceRoundOffEnabled', roundOffEnabled ? '1' : '0');
+            updateRoundOffBtn();
+            // Re-render from cached data instead of re-fetching from the API.
+            if (lastInvoiceData) populateInvoiceData(lastInvoiceData, lastItemsData);
+        }
+
         const urlParams = new URLSearchParams(window.location.search);
         const invoiceId = urlParams.get('id');
         if (!invoiceId) { alert('Invoice ID is required'); window.close(); }
@@ -502,8 +528,15 @@
             document.getElementById('footerSoftware').textContent = company.company_name || '';
         }
 
+        // Round Off ON: whole-number rounding (standard round-half-up rule), 0 decimals.
+        // Round Off OFF (default): original behaviour, up to 3 decimal places.
         function fmt(n) {
-            const v = parseFloat(n || 0); return v.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 3 });
+            let v = parseFloat(n || 0);
+            if (roundOffEnabled) {
+                v = Math.round(v);
+                return v.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+            }
+            return v.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 3 });
         }
         function fmtDate(d) {
             if (!d) return '-';
@@ -513,6 +546,10 @@
         }
 
         function populateInvoiceData(invoice, items) {
+            // Cache the raw data so the Round Off toggle can re-render without a re-fetch.
+            lastInvoiceData = invoice;
+            lastItemsData = items;
+
             document.getElementById('invoiceNo').textContent = invoice.bill_no;
             document.getElementById('invoiceDate').textContent = fmtDate(invoice.sale_date);
             document.getElementById('customerName').textContent = `${invoice.customer_code || ''} / ${invoice.customer_name}`.replace(/^\s*\/\s*/, '');

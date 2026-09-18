@@ -1,6 +1,6 @@
 ﻿document.addEventListener('DOMContentLoaded', function () {
     // Check permissions
-    fetch('../../../../server/api/auth/check-permission.php?category=Sale&form_name=POS Invoice')
+fetch('../../../../server/api/auth/check-permission.php?category=Sale&form_name=Sale Tax Invoice')
         .then(response => {
             if (response.status === 403) {
                 window.location.href = '../../../../../errors/403.php';
@@ -161,13 +161,18 @@ function initializeListPage(permissions) {
                 deleteBtn.style.cursor = 'not-allowed';
             }
 
-            // Duplicate button
-            const dupBtn = document.createElement('button');
-            dupBtn.className = 'btn btn-secondary btn-sm';
-            dupBtn.innerHTML = '<i class="fas fa-copy"></i>';
-            dupBtn.title = 'Duplicate Invoice';
-            dupBtn.addEventListener('click', () => openDuplicateModal(invoice.id, invoice.invoiceNo, invoice.customerId, invoice.companyId));
-
+           // Change to:
+const dupBtn = document.createElement('button');
+dupBtn.className = 'btn btn-secondary btn-sm';
+dupBtn.innerHTML = '<i class="fas fa-copy"></i>';
+dupBtn.title = 'Duplicate Invoice';
+if (permissions.includes('Duplicate')) {
+    dupBtn.addEventListener('click', () => openDuplicateModal(invoice.id, invoice.invoiceNo, invoice.customerId, invoice.companyId));
+} else {
+    dupBtn.disabled = true;
+    dupBtn.style.opacity = '0.5';
+    dupBtn.style.cursor = 'not-allowed';
+}
             actionButtons.appendChild(editBtn);
             actionButtons.appendChild(dupBtn);
             actionButtons.appendChild(printBtn);
@@ -551,6 +556,12 @@ function initializeListPage(permissions) {
     }
 
     function openDuplicateModal(id, billNo, originalCustomerId, companyId) {
+
+         // Add this at the very top:
+    if (!permissions.includes('Add')) {
+        alert('You do not have permission to duplicate invoices.');
+        return;
+    }
         duplicateInvoiceId = id;
         document.getElementById('duplicateSourceBillNo').textContent = billNo;
         document.getElementById('duplicateNewBillNoDisplay').textContent = 'Generating...';

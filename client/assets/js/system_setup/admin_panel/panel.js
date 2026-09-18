@@ -34,11 +34,11 @@ function showRestoreProgress(title = 'Restoring Database') {
 function updateRestoreProgress(percentage, status = null, uploaded = null, total = null, speed = null) {
     const overlay = document.getElementById('restoreProgressOverlay');
     if (!overlay) return;
-    
+
     percentage = Math.min(percentage, 100);
     document.getElementById('restoreProgressPercentage').textContent = Math.round(percentage) + '%';
     document.getElementById('restoreProgressBarFill').style.width = percentage + '%';
-    
+
     if (status) {
         document.getElementById('restoreProgressStatus').textContent = status;
     }
@@ -217,10 +217,10 @@ function renderUsersTable() {
 // ─── Branch Multi-Select Helper ────────────────────────────────────────────
 
 function initPicker(searchId, dropdownId, tagsId, hiddenId, allItems, getLabel, getTag, preselected = [], emptyHint = '') {
-    const searchInput   = document.getElementById(searchId);
-    const dropdown      = document.getElementById(dropdownId);
+    const searchInput = document.getElementById(searchId);
+    const dropdown = document.getElementById(dropdownId);
     const tagsContainer = document.getElementById(tagsId);
-    const hiddenInput   = document.getElementById(hiddenId);
+    const hiddenInput = document.getElementById(hiddenId);
     let selectedIds = [...preselected];
 
     function renderTags() {
@@ -272,7 +272,7 @@ function initPicker(searchId, dropdownId, tagsId, hiddenId, allItems, getLabel, 
 
     searchInput.addEventListener('focus', () => { renderDropdown(searchInput.value); dropdown.style.display = 'block'; });
     searchInput.addEventListener('input', () => { renderDropdown(searchInput.value); dropdown.style.display = 'block'; });
-    searchInput.addEventListener('blur',  () => { setTimeout(() => { dropdown.style.display = 'none'; }, 150); });
+    searchInput.addEventListener('blur', () => { setTimeout(() => { dropdown.style.display = 'none'; }, 150); });
     updateHidden(); renderTags();
 }
 
@@ -313,7 +313,7 @@ async function openEditUserModal(userId) {
         const brRes = await fetch(`../../../../server/api/system_setup/admin_panel/user-branch.php?user_id=${userId}`);
         const brData = await brRes.json();
         if (brData.success) preselectedBranches = brData.branches.map(b => b.branch_id);
-    } catch (_) {}
+    } catch (_) { }
 
     const modalBody = document.querySelector('#editUserModal .modal-body');
     modalBody.innerHTML = `
@@ -393,7 +393,7 @@ async function loadRolePermissions() {
         document.getElementById('permissionsTree').innerHTML = '';
         return;
     }
-    
+
     try {
         const response = await fetch(`../../../../server/api/system_setup/admin_panel/permissions.php?role_id=${roleId}`);
         const data = await response.json();
@@ -407,11 +407,11 @@ async function loadRolePermissions() {
 
 function renderPermissionsTree(permissions) {
     const tree = document.getElementById('permissionsTree');
-    
+
     const permissionsStructure = {
         'Dashboard': [],
         'Customer / Supplier': ['New Customer', 'New Supplier', 'New Customer + Supplier (Both)', 'Leads'],
-'Sale': ['Sale Order', 'Create Quotation', 'Sale Invoice', 'Med Sale Invoice', 'Sale Tax Invoice', 'Meter Invoice', 'POS Invoice', 'Traders Sale Invoice', 'Issue Delivery Challan', 'Sale Reports', 'Discount Report', 'Daily Sale Report', 'Daily Sales Report (DSR) - Multiple Unit', 'Daily Product Sale', 'Sale Return'],
+        'Sale': ['Sale Order', 'Create Quotation', 'Sale Invoice', 'Med Sale Invoice', 'Sale Tax Invoice', 'Meter Invoice', 'POS Invoice', 'Traders Sale Invoice', 'Issue Delivery Challan', 'Sale Reports', 'Discount Report', 'Daily Sale Report', 'Daily Sales Report (DSR) - Multiple Unit', 'Daily Product Sale', 'Sale Return'],
         'Purchase': ['Record Purchase Order', 'New Purchase', 'Purchase Tax Invoice', 'Purchase Reports', 'Purchase Return', 'Project Product Rates'],
         'Inventory': ['New Product', 'Stock Adjustment', 'Stock Transfer', 'Stock Position', 'Inward Gatepass', 'Outward Gatepass', 'Container Setup'],
         'Manufacturing': ['Bill of Materials (BOM)', 'Unit Measurement', 'Machine Setup', 'Production Order', 'WIP Management', 'Production Completion', 'Production Expenses', 'Production Wastage', 'Production Report'],
@@ -419,7 +419,7 @@ function renderPermissionsTree(permissions) {
         'Banking': ['New Bank', 'Post Dated Cheques (PDCs)'],
         'Rent Management': ['Issue Rent', 'Rent List'],
         'Chart of Accounts': [],
-'Financial Reports': ['General Ledger', 'Customer Ledger', 'Our Standing', 'Supplier Ledger', 'Both (Customer + Supplier) Ledger', 'Customer Aging', 'Supplier Aging', 'Recovery Sheet', 'Customer Summary Division Report (CSDR)', 'Sales Officer-wise Recovery', 'Trial Balance', 'Balance Sheet', 'Profit & Loss Statement', 'Cash Flow', 'Financial Summary', 'Pending DSR Sheet', 'Project Tracking', 'Container Tracking'],
+        'Financial Reports': ['General Ledger', 'Customer Ledger', 'Our Standing', 'Supplier Ledger', 'Both (Customer + Supplier) Ledger', 'Customer Aging', 'Supplier Aging', 'Recovery Sheet', 'Customer Summary Division Report (CSDR)', 'Sales Officer-wise Recovery', 'Trial Balance', 'Balance Sheet', 'Profit & Loss Statement', 'Cash Flow', 'Financial Summary', 'Pending DSR Sheet', 'Project Tracking', 'Container Tracking'],
         'HRM': ['New Employee', 'Record Attendance', 'Leave Management', 'New Payroll', 'Employees Ledger'],
         'Master Setup': ['Branch Setup', 'Territory Setup', 'Rate List Setup', 'Tax Rates Setup', 'Tax Regimes Setup', 'Project Setup'],
         'System Setup': ['Company Profile', 'Admin Panel', 'Currency Setup', 'Software Info']
@@ -437,7 +437,7 @@ function renderPermissionsTree(permissions) {
             permMap[key] = p;
         });
     }
-    
+
     let html = '';
     Object.keys(permissionsStructure).forEach(category => {
         html += `<div class="permission-category">
@@ -446,10 +446,10 @@ function renderPermissionsTree(permissions) {
                 <span>${category}</span>
             </div>
             <div class="category-content">`;
-        
+
         const forms = permissionsStructure[category];
         const hasSubPerms = !noSubPermCategories.includes(category) && forms.length > 0;
-        
+
         if (forms.length === 0) {
             const key = `${category}|${category}|Coming Soon`;
             const perm = permMap[key];
@@ -469,15 +469,19 @@ function renderPermissionsTree(permissions) {
                     const viewPerm = permMap[viewKey];
                     const viewChecked = viewPerm && parseInt(viewPerm.allowed) === 1 ? 'checked' : '';
                     const viewPermId = viewPerm ? viewPerm.id : '';
-                    
+
                     html += `<div class="form-item">
                         <div class="form-header">
                             <input type="checkbox" ${viewChecked} ${viewPermId ? `data-id="${viewPermId}"` : ''} data-category="${category}" data-form="${form}" data-sub="View">
                             <strong>${form}</strong>
-                        </div>
-                        <div class="sub-permissions">`;
-                    
-                    subPermissions.forEach(sub => {
+    </div>
+    <div class="sub-permissions">`;
+
+                    const formSubPermissions = ['Sale Tax Invoice', 'New Purchase'].includes(form)
+                        ? ['Add', 'Edit', 'Delete', 'Duplicate']
+                        : ['Add', 'Edit', 'Delete'];
+
+                    formSubPermissions.forEach(sub => {
                         const key = `${category}|${form}|${sub}`;
                         const perm = permMap[key];
                         const isChecked = perm && parseInt(perm.allowed) === 1 ? 'checked' : '';
@@ -488,7 +492,7 @@ function renderPermissionsTree(permissions) {
                             <label for="perm_${category}_${form}_${sub}">${sub}</label>
                         </div>`;
                     });
-                    
+
                     html += `</div></div>`;
                 } else {
                     const key = `${category}|${form}|Coming Soon`;
@@ -505,10 +509,10 @@ function renderPermissionsTree(permissions) {
                 }
             });
         }
-        
+
         html += `</div></div>`;
     });
-    
+
     tree.innerHTML = html;
 }
 
@@ -523,7 +527,7 @@ function openFormatModal() {
     document.getElementById('formatModal').style.display = 'flex';
     const confirmInput = document.getElementById('confirmFormat');
     const formatBtn = document.getElementById('formatBtn');
-    
+
     confirmInput.addEventListener('input', function () {
         formatBtn.disabled = this.value !== 'CONFIRM';
         if (this.value === 'CONFIRM') {
@@ -534,7 +538,7 @@ function openFormatModal() {
             formatBtn.style.cursor = 'not-allowed';
         }
     });
-    
+
     // Reset on open
     confirmInput.value = '';
     formatBtn.disabled = true;
@@ -573,32 +577,32 @@ function closeRestoreModal() {
 async function restoreDatabase() {
     const fileInput = document.getElementById('restoreFile');
     const file = fileInput.files[0];
-    
+
     if (!file) {
         alert('Please select a backup file');
         return;
     }
-    
+
     if (!file.name.endsWith('.sql')) {
         alert('Please select a valid SQL file');
         return;
     }
-    
+
     if (!confirm('Are you sure you want to restore this backup? All current data will be replaced.')) {
         return;
     }
-    
+
     const formData = new FormData();
     formData.append('backup_file', file);
-    
+
     closeRestoreModal();
     showRestoreProgress('Restoring Database');
     updateRestoreProgress(5, 'Uploading file...');
-    
+
     try {
         const xhr = new XMLHttpRequest();
         const startTime = Date.now();
-        
+
         xhr.upload.addEventListener('progress', (e) => {
             if (e.lengthComputable) {
                 const percentComplete = (e.loaded / e.total) * 50;
@@ -612,18 +616,18 @@ async function restoreDatabase() {
                 );
             }
         });
-        
+
         xhr.addEventListener('loadend', async () => {
             if (xhr.status === 200) {
                 try {
                     const data = JSON.parse(xhr.responseText);
                     updateRestoreProgress(75, 'Processing data...');
-                    
+
                     await new Promise(resolve => setTimeout(resolve, 500));
                     updateRestoreProgress(90, 'Finalizing...');
-                    
+
                     await new Promise(resolve => setTimeout(resolve, 500));
-                    
+
                     if (data.success) {
                         showRestoreSuccess('Database Restored Successfully!');
                         setTimeout(() => {
@@ -647,7 +651,7 @@ async function restoreDatabase() {
                 }
             }
         });
-        
+
         xhr.addEventListener('error', () => {
             showRestoreError('Connection Error');
             setTimeout(() => {
@@ -655,10 +659,10 @@ async function restoreDatabase() {
                 alert('Error: Could not connect to server');
             }, 2000);
         });
-        
+
         xhr.open('POST', '../../../../server/api/backup/restore_backup.php');
         xhr.send(formData);
-        
+
     } catch (error) {
         showRestoreError('Error');
         setTimeout(() => {
@@ -682,7 +686,7 @@ async function createBackup() {
         closeBackupModal();
         showRestoreProgress('Creating Backup');
         updateRestoreProgress(10, 'Preparing database...');
-        
+
         try {
             const startTime = Date.now();
             const response = await fetch(`../../../../server/api/backup/generate_backup.php?name=${encodeURIComponent(backupName)}`);
@@ -703,12 +707,12 @@ async function createBackup() {
             }
 
             updateRestoreProgress(50, 'Downloading backup...');
-            
+
             const blob = await response.blob();
             const fileSize = blob.size;
-            
+
             updateRestoreProgress(90, 'Saving file...');
-            
+
             const url = URL.createObjectURL(blob);
             const link = document.createElement('a');
             link.href = url;
@@ -720,10 +724,10 @@ async function createBackup() {
 
             const elapsed = (Date.now() - startTime) / 1000;
             const speed = (fileSize / 1024 / 1024) / elapsed;
-            
+
             updateRestoreProgress(100, 'Backup complete!', fileSize, fileSize, speed.toFixed(2) + ' MB/s');
             showRestoreSuccess('Backup Created Successfully!');
-            
+
             setTimeout(() => {
                 hideRestoreProgress();
                 alert('Backup downloaded successfully. Check your Downloads folder.');
@@ -740,9 +744,9 @@ async function createBackup() {
 
 // User actions
 async function createUser() {
-    const form     = document.getElementById('createUserForm');
+    const form = document.getElementById('createUserForm');
     const formData = new FormData(form);
-    const roleId   = formData.get('role');
+    const roleId = formData.get('role');
 
     // Parse selected branch IDs
     let branchIds = [];
@@ -810,16 +814,16 @@ function editUser(userId) {
 async function saveUser() {
     if (!window.currentEditingUserId) return;
 
-    const userId     = window.currentEditingUserId;
-    const fullName   = document.getElementById('editFullName').value;
-    const email      = document.getElementById('editEmail').value;
+    const userId = window.currentEditingUserId;
+    const fullName = document.getElementById('editFullName').value;
+    const email = document.getElementById('editEmail').value;
     const employeeId = document.getElementById('editEmployee').value;
-    const roleId     = document.getElementById('editRole').value;
-    const status     = document.getElementById('editStatus').value;
-    const password   = document.getElementById('editPassword').value;
+    const roleId = document.getElementById('editRole').value;
+    const status = document.getElementById('editStatus').value;
+    const password = document.getElementById('editPassword').value;
 
     let branchIds = [];
-    try { branchIds = JSON.parse(document.getElementById('editBranchIds').value || '[]'); } catch (_) {}
+    try { branchIds = JSON.parse(document.getElementById('editBranchIds').value || '[]'); } catch (_) { }
 
     try {
         // Step 1 — update user details
@@ -884,7 +888,7 @@ async function deleteUser(userId) {
             const response = await fetch(`../../../../server/api/system_setup/admin_panel/user-delete.php?id=${userId}`, {
                 method: 'DELETE'
             });
-            
+
             const data = await response.json();
             if (data.success) {
                 alert('User deleted successfully!');
@@ -915,7 +919,7 @@ async function toggleBlockUser(userId) {
                     is_active: newStatus
                 })
             });
-            
+
             const data = await response.json();
             if (data.success) {
                 alert(`User ${action}ed successfully!`);
@@ -935,11 +939,11 @@ async function saveAccessSettings() {
         alert('Please select a role');
         return;
     }
-    
+
     const checkboxes = document.querySelectorAll('#permissionsTree input[type="checkbox"]');
     const updates = [];
     const creates = [];
-    
+
     checkboxes.forEach(cb => {
         if (!cb.dataset.sub) return;
         if (cb.dataset.id) {
@@ -953,7 +957,7 @@ async function saveAccessSettings() {
             });
         }
     });
-    
+
     try {
         if (updates.length > 0) {
             const response = await fetch('../../../../server/api/system_setup/admin_panel/permissions.php', {
@@ -967,7 +971,7 @@ async function saveAccessSettings() {
                 return;
             }
         }
-        
+
         if (creates.length > 0) {
             const response = await fetch('../../../../server/api/system_setup/admin_panel/permissions.php', {
                 method: 'POST',
@@ -980,7 +984,7 @@ async function saveAccessSettings() {
                 return;
             }
         }
-        
+
         alert('Permissions saved successfully!');
         closeAccessModal();
     } catch (error) {
@@ -994,7 +998,7 @@ async function formatDatabase() {
             const response = await fetch('../../../../database/format_database.php', {
                 method: 'POST'
             });
-            
+
             const data = await response.json();
             if (data.success) {
                 alert('Database formatted successfully!');
@@ -1026,7 +1030,7 @@ async function fetchRoles() {
 function renderRolesTable() {
     const tableBody = document.getElementById('rolesTableBody');
     if (!tableBody) return;
-    
+
     tableBody.innerHTML = '';
     roles.forEach(role => {
         const row = document.createElement('tr');
@@ -1089,7 +1093,7 @@ function closeEditRoleModal() {
 async function createRole() {
     const form = document.getElementById('createRoleForm');
     const formData = new FormData(form);
-    
+
     try {
         const response = await fetch('../../../../server/api/system_setup/admin_panel/roles.php', {
             method: 'POST',
@@ -1099,7 +1103,7 @@ async function createRole() {
                 description: formData.get('description')
             })
         });
-        
+
         const data = await response.json();
         if (data.success) {
             alert('Role created successfully!');
@@ -1123,7 +1127,7 @@ async function saveRole() {
     if (window.currentEditingRoleId) {
         const form = document.getElementById('editRoleForm');
         const inputs = form.querySelectorAll('input, textarea');
-        
+
         try {
             const response = await fetch('../../../../server/api/system_setup/admin_panel/roles.php', {
                 method: 'PUT',
@@ -1134,7 +1138,7 @@ async function saveRole() {
                     description: inputs[1].value
                 })
             });
-            
+
             const data = await response.json();
             if (data.success) {
                 alert('Role updated successfully!');
@@ -1155,7 +1159,7 @@ async function deleteRole(roleId) {
             const response = await fetch(`../../../../server/api/system_setup/admin_panel/roles.php?id=${roleId}`, {
                 method: 'DELETE'
             });
-            
+
             const data = await response.json();
             if (data.success) {
                 alert('Role deleted successfully!');
@@ -1173,10 +1177,10 @@ async function deleteRole(roleId) {
 function previewImage(input) {
     const preview = document.getElementById('preview');
     const previewContainer = document.getElementById('imagePreview');
-    
+
     if (input.files && input.files[0]) {
         const reader = new FileReader();
-        reader.onload = function(e) {
+        reader.onload = function (e) {
             preview.src = e.target.result;
             previewContainer.style.display = 'block';
         };
@@ -1190,7 +1194,7 @@ function previewImage(input) {
 function removeImage() {
     const fileInput = document.querySelector('input[name="profile_picture"]');
     const previewContainer = document.getElementById('imagePreview');
-    
+
     fileInput.value = '';
     previewContainer.style.display = 'none';
 }

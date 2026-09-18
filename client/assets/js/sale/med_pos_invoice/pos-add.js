@@ -143,7 +143,8 @@ function getProductDisplayText(product) {
 
 document.addEventListener('DOMContentLoaded', function () {
     // Check permissions
-    fetch('../../../../server/api/auth/check-permission.php?category=Sale&form_name=POS Invoice')
+    const formName = window.location.pathname.includes('med_pos_invoice') ? 'Med Sale Invoice' : 'Sale Invoice';
+    fetch(`../../../../server/api/auth/check-permission.php?category=Sale&form_name=${encodeURIComponent(formName)}`)
         .then(response => {
             if (response.status === 403) {
                 window.location.href = '../../../../../errors/403.php';
