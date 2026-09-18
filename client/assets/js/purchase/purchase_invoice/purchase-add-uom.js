@@ -22,11 +22,27 @@ function getProductUOMDetails(product) {
             };
         });
     } else if (product.default_unit_id) {
-        // Single unit
+        // Single unit.
+        // FIX: for a "per_product" scoped unit (e.g. Carton), uom.conversion_factor
+        // is just a placeholder (1) — the real per-product packing factor lives on
+        // products.product_conversion_factor (product_uom_conversions is only used
+        // by real UOM-Group products, handled above). Without this fallback, a
+        // single-unit product priced/entered in Carton silently used factor 1.
+        let conversionFactor = 1;
+        if (product.is_base_unit == 1) {
+            conversionFactor = 1;
+        } else if (product.unit_scope === 'universal') {
+            conversionFactor = parseFloat(product.unit_conversion_factor) || 1;
+        } else if (parseFloat(product.product_conversion_factor) > 0) {
+            conversionFactor = parseFloat(product.product_conversion_factor);
+        } else {
+            conversionFactor = parseFloat(product.unit_conversion_factor) || 1;
+        }
+
         details.units = [{
             id: product.default_unit_id,
             name: product.default_unit_name || 'Unit',
-            conversionFactor: product.is_base_unit == 1 ? 1 : (parseFloat(product.unit_conversion_factor) || 1)
+            conversionFactor: conversionFactor
         }];
     }
 

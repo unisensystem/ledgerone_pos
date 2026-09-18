@@ -45,14 +45,23 @@ try {
     $baseUnitId = $productData['base_unit_id'];
     
     // Get stock from stock_ledger — total across the whole tenant
+    // FIX: product_uom_conversions is essentially never populated for single-unit
+    // (non-Group-UOM) products — the real per-product packing factor lives on
+    // products.product_conversion_factor. Without this fallback, a stock_ledger
+    // row recorded in the product's own default unit (e.g. 5 Carton) fell through
+    // to factor=1 and was reported as "5 <base unit>" instead of the correct
+    // 5 x product_conversion_factor. Scoped to sl.unit_id = p.default_unit_id so
+    // it never fires for real Group-UOM products, which correctly use
+    // product_uom_conversions when it's actually populated.
     $query = "
         SELECT
             COALESCE(SUM(
-                (sl.qty_in * COALESCE(CASE WHEN u.base_unit_id IS NOT NULL AND u.unit_scope = 'universal' THEN u.conversion_factor WHEN puc.conversion_factor IS NOT NULL THEN puc.conversion_factor ELSE 1 END, 1)) -
-                (sl.qty_out * COALESCE(CASE WHEN u.base_unit_id IS NOT NULL AND u.unit_scope = 'universal' THEN u.conversion_factor WHEN puc.conversion_factor IS NOT NULL THEN puc.conversion_factor ELSE 1 END, 1))
+                (sl.qty_in * COALESCE(CASE WHEN u.base_unit_id IS NOT NULL AND u.unit_scope = 'universal' THEN u.conversion_factor WHEN puc.conversion_factor IS NOT NULL THEN puc.conversion_factor WHEN sl.unit_id = p.default_unit_id AND p.product_conversion_factor > 0 THEN p.product_conversion_factor ELSE 1 END, 1)) -
+                (sl.qty_out * COALESCE(CASE WHEN u.base_unit_id IS NOT NULL AND u.unit_scope = 'universal' THEN u.conversion_factor WHEN puc.conversion_factor IS NOT NULL THEN puc.conversion_factor WHEN sl.unit_id = p.default_unit_id AND p.product_conversion_factor > 0 THEN p.product_conversion_factor ELSE 1 END, 1))
             ), 0) as stock
         FROM stock_ledger sl
         LEFT JOIN uom u ON sl.unit_id = u.id
+        LEFT JOIN products p ON sl.product_id = p.id
         LEFT JOIN product_uom_conversions puc ON sl.product_id = puc.product_id AND sl.unit_id = puc.uom_id
         WHERE sl.tenant_id = ? AND sl.product_id = ? AND sl.account_id = ?
     ";

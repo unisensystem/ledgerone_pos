@@ -20,8 +20,8 @@ try {
 
     $sql = "
         SELECT 
-            p.id, p.code, p.name, p.purchase_price, p.default_unit_id, p.barcode, p.qr_code, p.photo, 
-            p.carton_conversion, p.default_discount, p.trade_offer_discount, p.default_foc, p.sales_tax, 
+            p.id, p.code, p.name, p.purchase_price, p.default_unit_id, p.barcode, p.qr_code, p.photo,
+            p.carton_conversion, p.product_conversion_factor, p.default_discount, p.trade_offer_discount, p.default_foc, p.sales_tax,
             p.inventory_account_id, p.uom_type, p.uom_group_id,
             u.uom_name as default_unit_name, u.unit_scope, u.is_base_unit, u.conversion_factor as unit_conversion_factor
         FROM products p
