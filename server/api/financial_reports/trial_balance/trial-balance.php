@@ -44,7 +44,7 @@ try {
         LEFT JOIN sub_accounts sa2 ON sa.parent_id = sa2.id AND sa2.id != 1 AND (sa2.tenant_id = ? OR sa2.tenant_id = 0)
         LEFT JOIN sub_accounts sa3 ON sa2.parent_id = sa3.id AND sa3.id != 1 AND (sa3.tenant_id = ? OR sa3.tenant_id = 0)
         LEFT JOIN accounts_head ah ON COALESCE(sa.account_head_id, sa2.account_head_id, sa3.account_head_id) = ah.id AND (ah.tenant_id = ? OR ah.tenant_id = 0)
-        WHERE l.tenant_id = ? AND (a.sub_account_id IS NULL OR a.sub_account_id != 1)
+        WHERE l.tenant_id = ? AND (a.sub_account_id IS NULL OR a.sub_account_id != 1) AND a.id != 110
         GROUP BY a.id, a.name, a.sub_account_id, sa.id, sa.name, sa.parent_id, sa.account_head_id,
                  sa2.id, sa2.name, sa2.parent_id, sa2.account_head_id,
                  sa3.id, sa3.name, sa3.parent_id, sa3.account_head_id, ah.name

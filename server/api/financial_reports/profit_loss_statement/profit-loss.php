@@ -539,6 +539,7 @@ try {
             OR a.sub_account_id IN (96, 94)
         )
         AND al.account_id != 19
+        AND al.account_id != 110
         $expense_filter
         ORDER BY a.name
     ");

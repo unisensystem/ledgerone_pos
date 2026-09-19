@@ -253,6 +253,40 @@ h3 {
   }
 }
 
+/* Gross/Net split (Revenue & Purchases KPI cards): two stacked value rows
+   with a thin divider between them, so "Total Bill (Gross)" and
+   "Net Amount (Net)" read as clearly separate figures, same distinction
+   as on a single invoice. */
+.kpi-value-row {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.kpi-value-compact {
+  font-size: 16px;
+  margin-bottom: 0;
+}
+
+@media (min-width: 768px) {
+  .kpi-value-compact {
+    font-size: 18px;
+  }
+}
+
+.kpi-value-tag {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  color: var(--subtext);
+}
+
+.kpi-gross-net-divider {
+  border-top: 1px dashed var(--border-default);
+  margin: 4px 0;
+}
+
 .kpi-label {
   color: var(--subtext);
   font-size: 12px;

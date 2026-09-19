@@ -190,8 +190,52 @@ $pdo->beginTransaction();
             
             $isFirstEntry = false;
         }
+
+        // Insert stock ledger for FOC quantity if exists — matches Sale
+        // Invoice's handling ("Sale Invoice - FOC"). Added once per item
+        // (not per unit entry) so a bonus quantity isn't multiplied across
+        // a multi-unit line. Without this, FOC units were saved on the item
+        // row but never entered stock_ledger, so they never showed up in
+        // Stock Position even though they were physically received.
+        if (($stockAffects ?? 1) == 1 && !empty($item['focQty']) && $item['focQty'] > 0) {
+            $focUnitId = $item['focUnitId'] ?? null;
+            if (!$focUnitId) {
+                $refUnitId = $item['unitEntries'][0]['uomId'] ?? null;
+                if ($refUnitId) {
+                    $unitStmt = $pdo->prepare("SELECT is_base_unit, base_unit_id FROM uom WHERE id = ?");
+                    $unitStmt->execute([$refUnitId]);
+                    $unitData = $unitStmt->fetch();
+                    if ($unitData) {
+                        $focUnitId = $unitData['is_base_unit'] == 1 ? $refUnitId : ($unitData['base_unit_id'] ?? $refUnitId);
+                    } else {
+                        $focUnitId = $refUnitId;
+                    }
+                }
+            }
+            if ($focUnitId && isset($account_id)) {
+                $foc_stmt = $pdo->prepare("
+                    INSERT INTO stock_ledger (
+                        tenant_id, account_id, branch_id, product_id, reference_table, reference_id,
+                        qty_in, unit_cost, unit_id, batch_no, expiry_date, transaction_type, transaction_date
+                    ) VALUES (?, ?, ?, ?, 'purchase_invoice', ?, ?, ?, ?, ?, ?, 'Purchase Invoice - FOC', ?)
+                ");
+                $foc_stmt->execute([
+                    $tenant_id,
+                    $account_id,
+                    $input['branchId'],
+                    $item['productId'],
+                    $invoice_id,
+                    $item['focQty'],
+                    0,
+                    $focUnitId,
+                    $item['batchNo'] ?? null,
+                    $item['batchExpiryDate'] ?? null,
+                    $input['purchaseDate']
+                ]);
+            }
+        }
     }
-    
+
     // Accounting entries
     $ledger_stmt = $pdo->prepare("
         INSERT INTO accounting_ledger (

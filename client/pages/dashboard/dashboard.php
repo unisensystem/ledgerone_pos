@@ -43,6 +43,32 @@ $currencySymbol = $stmt->fetchColumn();
 if (!$currencySymbol) {
     $currencySymbol = 'Rs';
 }
+
+// Revenue & Purchases KPIs — Gross (Total Bill, before invoice-level discount/
+// shipping/tax) vs Net (Net Amount, the final total) summed directly from the
+// invoice header tables, so these match exactly what a single invoice's own
+// "Total Bill" / "Net Amount" fields show (e.g. pos-add.php?edit=...).
+if ($hasDateFilter) {
+    $revStmt = $pdo->prepare("SELECT COALESCE(SUM(total_bill), 0) as gross, COALESCE(SUM(net_amount), 0) as net FROM sale_invoice WHERE tenant_id = ? AND sale_date BETWEEN ? AND ?");
+    $revStmt->execute([$tenant_id, $dateFrom, $dateTo]);
+} else {
+    $revStmt = $pdo->prepare("SELECT COALESCE(SUM(total_bill), 0) as gross, COALESCE(SUM(net_amount), 0) as net FROM sale_invoice WHERE tenant_id = ?");
+    $revStmt->execute([$tenant_id]);
+}
+$revenueTotals = $revStmt->fetch(PDO::FETCH_ASSOC);
+$revenueGross = (float) $revenueTotals['gross'];
+$revenueNet = (float) $revenueTotals['net'];
+
+if ($hasDateFilter) {
+    $purStmt = $pdo->prepare("SELECT COALESCE(SUM(total_bill), 0) as gross, COALESCE(SUM(net_amount), 0) as net FROM purchase_invoice WHERE tenant_id = ? AND purchase_date BETWEEN ? AND ?");
+    $purStmt->execute([$tenant_id, $dateFrom, $dateTo]);
+} else {
+    $purStmt = $pdo->prepare("SELECT COALESCE(SUM(total_bill), 0) as gross, COALESCE(SUM(net_amount), 0) as net FROM purchase_invoice WHERE tenant_id = ?");
+    $purStmt->execute([$tenant_id]);
+}
+$purchasesTotals = $purStmt->fetch(PDO::FETCH_ASSOC);
+$purchasesGross = (float) $purchasesTotals['gross'];
+$purchasesNet = (float) $purchasesTotals['net'];
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -51,7 +77,7 @@ if (!$currencySymbol) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>LedgerOne ERP - Dashboard</title>
-    <link rel="stylesheet" href="../../assets/css/dashboard/dashboard.css">
+    <link rel="stylesheet" href="../../assets/css/dashboard/dashboard.css?v=<?php echo time(); ?>">
     <style>
         @media (max-width: 768px) {
             .dashboard-header {
@@ -1172,18 +1198,28 @@ if (!$currencySymbol) {
                     </div>
                 </div>
                 <div class="kpi-card">
-                    <div class="kpi-value" id="kpi-revenue">Loading...</div>
-                    <div class="kpi-label">Revenue <?= $hasDateFilter ? 'Selected Period' : 'All Time' ?></div>
-                    <div class="kpi-change" id="kpi-revenue-change">
-                        <span>Calculating...</span>
+                    <div class="kpi-value-row">
+                        <span class="kpi-value kpi-value-compact"><?= htmlspecialchars($currencySymbol) ?> <?= number_format($revenueGross, 0) ?></span>
+                        <span class="kpi-value-tag">Gross</span>
                     </div>
+                    <div class="kpi-gross-net-divider"></div>
+                    <div class="kpi-value-row">
+                        <span class="kpi-value kpi-value-compact"><?= htmlspecialchars($currencySymbol) ?> <?= number_format($revenueNet, 0) ?></span>
+                        <span class="kpi-value-tag">Net</span>
+                    </div>
+                    <div class="kpi-label">Revenue <?= $hasDateFilter ? 'Selected Period' : 'All Time' ?></div>
                 </div>
                 <div class="kpi-card">
-                    <div class="kpi-value" id="kpi-purchases">Loading...</div>
-                    <div class="kpi-label">Purchases <?= $hasDateFilter ? 'Selected Period' : 'All Time' ?></div>
-                    <div class="kpi-change" id="kpi-purchases-change">
-                        <span>Calculating...</span>
+                    <div class="kpi-value-row">
+                        <span class="kpi-value kpi-value-compact"><?= htmlspecialchars($currencySymbol) ?> <?= number_format($purchasesGross, 0) ?></span>
+                        <span class="kpi-value-tag">Gross</span>
                     </div>
+                    <div class="kpi-gross-net-divider"></div>
+                    <div class="kpi-value-row">
+                        <span class="kpi-value kpi-value-compact"><?= htmlspecialchars($currencySymbol) ?> <?= number_format($purchasesNet, 0) ?></span>
+                        <span class="kpi-value-tag">Net</span>
+                    </div>
+                    <div class="kpi-label">Purchases <?= $hasDateFilter ? 'Selected Period' : 'All Time' ?></div>
                 </div>
                 <div class="kpi-card">
                     <div class="kpi-value" id="kpi-stock-value">Loading...</div>
@@ -1626,91 +1662,6 @@ if (!$currencySymbol) {
                     <div id="territorySalesChart"></div>
                 </div>
 
-                <!-- Product Inventory -->
-                <div class="card">
-                    <h3 class="card-title">Inventory Status</h3>
-                    <div class="table-container">
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th>Product</th>
-                                    <th>Stock</th>
-                                    <th>Status</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <?php
-                                $stmt = $pdo->prepare("
-                                SELECT p.name, 
-                                       COALESCE(SUM(sl.qty_in - sl.qty_out), 0) as current_stock,
-                                       COALESCE(p.min_stock_level, 0) as min_stock
-                                FROM products p
-                                LEFT JOIN stock_ledger sl ON p.id = sl.product_id
-                                WHERE p.tenant_id = ? AND p.parent_product_id IS NULL
-                                GROUP BY p.id, p.name, p.min_stock_level
-                                ORDER BY current_stock ASC
-                                LIMIT 5
-                            ");
-                                $stmt->execute([$tenant_id]);
-                                $inventory = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-                                foreach ($inventory as $item):
-                                    $stock = (float) $item['current_stock'];
-                                    $minStock = (float) $item['min_stock'];
-
-                                    if ($stock <= 0) {
-                                        $status = 'Out';
-                                        $color = 'var(--danger)';
-                                    } elseif ($minStock > 0 && $stock <= $minStock) {
-                                        $status = 'Low';
-                                        $color = 'var(--warning)';
-                                    } else {
-                                        $status = 'OK';
-                                        $color = 'var(--success)';
-                                    }
-                                    ?>
-                                    <tr>
-                                        <td><?= htmlspecialchars($item['name']) ?></td>
-                                        <td><?= number_format($stock, 0) ?></td>
-                                        <td style="color: <?= $color ?>;"><?= $status ?></td>
-                                    </tr>
-                                <?php endforeach; ?>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-
-                <!-- Mini Balance Sheet -->
-                <div class="card">
-                    <h3 class="card-title">Balance Sheet</h3>
-                    <div class="table-container">
-                        <table id="balanceSheetTable">
-                            <thead>
-                                <tr>
-                                    <th>Assets</th>
-                                    <th>Amount</th>
-                                </tr>
-                            </thead>
-                            <tbody id="assetsBody">
-                                <tr>
-                                    <td colspan="2" style="text-align: center; color: #64748b;">Loading...</td>
-                                </tr>
-                            </tbody>
-                            <thead>
-                                <tr>
-                                    <th>Liabilities & Equity</th>
-                                    <th>Amount</th>
-                                </tr>
-                            </thead>
-                            <tbody id="liabilitiesBody">
-                                <tr>
-                                    <td colspan="2" style="text-align: center; color: #64748b;">Loading...</td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-
                 <!-- Recent Activity -->
                 <div class="card" style="grid-column: 1 / -1;">
                     <h3 class="card-title" style="display: flex; justify-content: space-between; align-items: center;">
@@ -1899,7 +1850,8 @@ if (!$currencySymbol) {
                         document.getElementById('kpi-stock-value').textContent = currencySymbol + ' ' + totalValue.toLocaleString('en-PK', {maximumFractionDigits: 0});
                     }
 
-                    // Units Sold and Revenue from sale-reports API
+                    // Units Sold from sale-reports API (Revenue Gross/Net is rendered
+                    // server-side above, straight from sale_invoice.total_bill/net_amount)
                     let saleUrl = '../../../server/api/sale/sales_report/sales-report.php';
                     if (hasDateFilter) {
                         saleUrl += `?date_from=${dateFrom}&date_to=${dateTo}`;
@@ -1908,22 +1860,9 @@ if (!$currencySymbol) {
                     const saleData = await saleRes.json();
                     if (saleData.success && saleData.data && saleData.data.product_sales) {
                         const totalUnits = saleData.data.product_sales.reduce((sum, item) => sum + parseFloat(item.quantity_sold || 0), 0);
-                        const totalRevenue = saleData.data.product_sales.reduce((sum, item) => sum + parseFloat(item.revenue || 0), 0);
                         document.getElementById('kpi-units-sold').textContent = totalUnits.toLocaleString('en-PK', {maximumFractionDigits: 0}) + ' Units';
-                        document.getElementById('kpi-revenue').textContent = currencySymbol + ' ' + totalRevenue.toLocaleString('en-PK', {maximumFractionDigits: 0});
                     }
 
-                    // Purchases from purchase-reports API
-                    let purchaseUrl = '../../../server/api/purchase/purchase_reports/purchase-reports.php?type=invoice';
-                    if (hasDateFilter) {
-                        purchaseUrl += `&date_range=${dateFrom}_${dateTo}`;
-                    }
-                    const purchaseRes = await fetch(purchaseUrl);
-                    const purchaseData = await purchaseRes.json();
-                    if (purchaseData.success && purchaseData.summary && purchaseData.summary.invoice) {
-                        const totalPurchases = parseFloat(purchaseData.summary.invoice.total_invoice_value || 0);
-                        document.getElementById('kpi-purchases').textContent = currencySymbol + ' ' + totalPurchases.toLocaleString('en-PK', {maximumFractionDigits: 0});
-                    }
 
                     // Accounts Receivable from customer-ledger API
                     const customerRes = await fetch('../../../server/api/financial_reports/customer_ledger/customer-ledger.php?type=summary');
@@ -2512,52 +2451,6 @@ if (!$currencySymbol) {
                     btn.classList.remove('active');
                 });
             });
-
-            // Load Balance Sheet
-            fetch('../../../server/api/financial_reports/balance_sheet/balance-sheet.php')
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        const bs = data.data;
-                        let totalAssets = 0, totalLiabilities = 0, totalEquity = 0;
-
-                        let assetsHTML = '';
-                        if (bs[1]) {
-                            Object.values(bs[1]).forEach(sub => {
-                                sub.accounts.forEach(acc => {
-                                    assetsHTML += `<tr><td>${acc.name}</td><td>${currencySymbol} ${acc.balance.toLocaleString()}</td></tr>`;
-                                    totalAssets += acc.balance;
-                                });
-                            });
-                        }
-                        assetsHTML += `<tr style="font-weight: 600; background: #f0f9ff;"><td>Total Assets</td><td>${currencySymbol} ${totalAssets.toLocaleString()}</td></tr>`;
-
-                        let liabilitiesHTML = '';
-                        if (bs[2]) {
-                            Object.values(bs[2]).forEach(sub => {
-                                sub.accounts.forEach(acc => {
-                                    liabilitiesHTML += `<tr><td>${acc.name}</td><td>${currencySymbol} ${acc.balance.toLocaleString()}</td></tr>`;
-                                    totalLiabilities += acc.balance;
-                                });
-                            });
-                        }
-                        liabilitiesHTML += `<tr style="font-weight: 600; background: #fef2f2;"><td>Total Liabilities</td><td>${currencySymbol} ${totalLiabilities.toLocaleString()}</td></tr>`;
-
-                        if (bs[3]) {
-                            Object.values(bs[3]).forEach(sub => {
-                                sub.accounts.forEach(acc => {
-                                    liabilitiesHTML += `<tr><td>${acc.name}</td><td>${currencySymbol} ${acc.balance.toLocaleString()}</td></tr>`;
-                                    totalEquity += acc.balance;
-                                });
-                            });
-                        }
-                        liabilitiesHTML += `<tr style="font-weight: 600; background: #f0fdf4;"><td>Total Equity</td><td>${currencySymbol} ${totalEquity.toLocaleString()}</td></tr>`;
-
-                        document.getElementById('assetsBody').innerHTML = assetsHTML;
-                        document.getElementById('liabilitiesBody').innerHTML = liabilitiesHTML;
-                    }
-                })
-                .catch(error => console.error('Balance sheet error:', error));
 
             // Branch-wise Sales Chart
             <?php
