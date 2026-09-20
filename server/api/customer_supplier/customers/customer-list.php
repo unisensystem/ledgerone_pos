@@ -97,12 +97,15 @@ $sql = "SELECT c.id, c.customer_code, c.customer_name, c.shop_name, c.address, c
                 WHERE rv.tenant_id = c.tenant_id
                   AND rv.customer_id = c.id
             ), 0)
-            - COALESCE((
-                SELECT SUM(sr.net_amount)
-                FROM sale_return sr
-                WHERE sr.tenant_id = c.tenant_id
-                  AND sr.customer_id = c.id
-                  AND sr.status = 'Posted'
+                      -- ===== NEW: Adjustment Party 1 =====
+            + COALESCE((
+                SELECT SUM(l.debit - l.credit)
+                FROM journal_voucher jv
+                JOIN journal_voucher_line l ON l.voucher_id = jv.id AND l.tenant_id = jv.tenant_id
+                 AND l.account_id = 2
+                WHERE jv.tenant_id = c.tenant_id AND jv.status = 'posted'
+                  AND jv.adj_mode = 'single'
+                  AND jv.party_type = 'customer' AND jv.party_id = c.id
             ), 0)
         ) as current_balance_real
         FROM customers c
