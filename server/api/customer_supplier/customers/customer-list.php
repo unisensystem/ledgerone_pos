@@ -156,9 +156,28 @@ try {
                  )
                 WHERE jv.tenant_id = c.tenant_id
                   AND jv.status = 'posted'
-                  AND jv.adj_mode = 'cross'
+                                   AND jv.adj_mode = 'cross'
                   AND jv.party_type2 = 'customer'
                   AND jv.party_id2 = c.id
+            ), 0)
+
+            -- ===== NEW: Transfer voucher, customer is FROM (-) =====
+            - COALESCE((
+                SELECT SUM(tv.amount)
+                FROM transfer_voucher tv
+                WHERE tv.tenant_id = c.tenant_id
+                  AND tv.from_type = 'customer'
+                  AND tv.from_customer_id = c.id
+            ), 0)
+
+            -- ===== NEW: Transfer voucher, customer is TO =====
+            -- From customer => (+), From supplier => (-)
+            + COALESCE((
+                SELECT SUM(CASE WHEN tv.from_type = 'customer' THEN tv.amount ELSE -tv.amount END)
+                FROM transfer_voucher tv
+                WHERE tv.tenant_id = c.tenant_id
+                  AND tv.to_type = 'customer'
+                  AND tv.to_customer_id = c.id
             ), 0)
         ) as current_balance_real
         FROM customers c
