@@ -51,7 +51,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
         list.forEach((supplier, index) => {
             const status = supplier.is_blacklisted ? 'blacklisted' : 'active';
-            const balance = parseFloat(supplier.current_balance || 0);
+const balance = parseFloat(supplier.current_balance_real ?? supplier.current_balance ?? 0);
 
             const editBtn = userPermissions.includes('Edit')
                 ? `<button class="action-btn edit" title="Edit Supplier"><i class="fas fa-edit"></i></button>` : '';
