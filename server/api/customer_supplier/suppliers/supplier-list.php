@@ -79,10 +79,100 @@ try {
     $total = $stmt->fetch()['total'];
 
     // Get suppliers — includes category_name via LEFT JOIN for the list table
+    // current_balance_real: supplier is credit-normal (positive = we owe supplier)
     $limitClause = $showAll ? '' : "LIMIT $limit OFFSET $offset";
     $sql = "SELECT s.id, s.supplier_code, s.supplier_name, s.brand_name, s.address, s.city, s.credit_days,
                    s.salesman_id, s.primary_phone, s.email, s.current_balance, s.is_blacklisted, s.created_at,
-                   s.supplier_category_id, sc.category_name
+                   s.supplier_category_id, sc.category_name,
+                   (
+                       s.opening_credit_amount - s.opening_debit_amount
+
+                       -- Purchase invoices (+)
+                       + COALESCE((
+                           SELECT SUM(pi.net_amount)
+                           FROM purchase_invoice pi
+                           WHERE pi.tenant_id = s.tenant_id
+                             AND pi.supplier_id = s.id
+                       ), 0)
+
+                       -- Payment vouchers (-)
+                       - COALESCE((
+                           SELECT SUM(pv.amount)
+                           FROM payment_voucher pv
+                           WHERE pv.tenant_id = s.tenant_id
+                             AND pv.supplier_id = s.id
+                       ), 0)
+
+                       -- Transfer voucher: supplier is FROM => ledger Debit => payable reduces (-)
+                       - COALESCE((
+                           SELECT SUM(tv.amount)
+                           FROM transfer_voucher tv
+                           WHERE tv.tenant_id = s.tenant_id
+                             AND tv.from_type = 'supplier'
+                             AND tv.from_supplier_id = s.id
+                       ), 0)
+
+                       -- Transfer voucher: supplier is TO
+                       -- From customer => Debit (-) | From supplier => Credit (+)
+                       + COALESCE((
+                           SELECT SUM(CASE WHEN tv.from_type = 'supplier' THEN tv.amount ELSE -tv.amount END)
+                           FROM transfer_voucher tv
+                           WHERE tv.tenant_id = s.tenant_id
+                             AND tv.to_type = 'supplier'
+                             AND tv.to_supplier_id = s.id
+                       ), 0)
+
+                       -- Adjustment: single party (supplier line = account_id 14), credit - debit
+                       + COALESCE((
+                           SELECT SUM(l.credit - l.debit)
+                           FROM journal_voucher jv
+                           JOIN journal_voucher_line l
+                             ON l.voucher_id = jv.id
+                            AND l.tenant_id = jv.tenant_id
+                            AND l.account_id = 14
+                           WHERE jv.tenant_id = s.tenant_id
+                             AND jv.status = 'posted'
+                             AND jv.adj_mode = 'single'
+                             AND jv.party_type = 'supplier'
+                             AND jv.party_id = s.id
+                       ), 0)
+
+                       -- Adjustment: cross mode, supplier is Party 1 (first line)
+                       + COALESCE((
+                           SELECT SUM(l.credit - l.debit)
+                           FROM journal_voucher jv
+                           JOIN journal_voucher_line l
+                             ON l.voucher_id = jv.id
+                            AND l.tenant_id = jv.tenant_id
+                            AND l.id = (
+                                SELECT MIN(l2.id) FROM journal_voucher_line l2
+                                WHERE l2.voucher_id = jv.id AND l2.tenant_id = jv.tenant_id
+                            )
+                           WHERE jv.tenant_id = s.tenant_id
+                             AND jv.status = 'posted'
+                             AND jv.adj_mode = 'cross'
+                             AND jv.party_type = 'supplier'
+                             AND jv.party_id = s.id
+                       ), 0)
+
+                       -- Adjustment: cross mode, supplier is Party 2 (last line)
+                       + COALESCE((
+                           SELECT SUM(l.credit - l.debit)
+                           FROM journal_voucher jv
+                           JOIN journal_voucher_line l
+                             ON l.voucher_id = jv.id
+                            AND l.tenant_id = jv.tenant_id
+                            AND l.id = (
+                                SELECT MAX(l2.id) FROM journal_voucher_line l2
+                                WHERE l2.voucher_id = jv.id AND l2.tenant_id = jv.tenant_id
+                            )
+                           WHERE jv.tenant_id = s.tenant_id
+                             AND jv.status = 'posted'
+                             AND jv.adj_mode = 'cross'
+                             AND jv.party_type2 = 'supplier'
+                             AND jv.party_id2 = s.id
+                       ), 0)
+                   ) as current_balance_real
             FROM suppliers s
             LEFT JOIN supplier_categories sc ON sc.id = s.supplier_category_id
             $whereClause
