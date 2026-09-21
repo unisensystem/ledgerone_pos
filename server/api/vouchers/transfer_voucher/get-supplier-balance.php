@@ -35,7 +35,52 @@ try {
     $stmt->execute([$tenant_id, $sid]);
     $tv_in = $stmt->fetch()['total'];
 
-    echo json_encode(['success' => true, 'balance' => $opening + $invoices - $payments + $tv_out - $tv_in]);
+    // Supplier is credit-normal, so adjustment effect = credit - debit
+    // ===== Journal adjustment: single party (supplier line = account_id 14) =====
+    $stmt = $pdo->prepare("
+        SELECT COALESCE(SUM(l.credit - l.debit), 0) as total
+        FROM journal_voucher jv
+        JOIN journal_voucher_line l
+          ON l.voucher_id = jv.id AND l.tenant_id = jv.tenant_id AND l.account_id = 14
+        WHERE jv.tenant_id = ? AND jv.status = 'posted'
+          AND jv.adj_mode = 'single'
+          AND jv.party_type = 'supplier' AND jv.party_id = ?
+    ");
+    $stmt->execute([$tenant_id, $sid]);
+    $adj_single = $stmt->fetch()['total'];
+
+    // ===== Journal adjustment: cross mode, supplier is Party 1 (first line) =====
+    $stmt = $pdo->prepare("
+        SELECT COALESCE(SUM(l.credit - l.debit), 0) as total
+        FROM journal_voucher jv
+        JOIN journal_voucher_line l
+          ON l.voucher_id = jv.id AND l.tenant_id = jv.tenant_id
+         AND l.id = (SELECT MIN(l2.id) FROM journal_voucher_line l2 WHERE l2.voucher_id = jv.id AND l2.tenant_id = jv.tenant_id)
+        WHERE jv.tenant_id = ? AND jv.status = 'posted'
+          AND jv.adj_mode = 'cross'
+          AND jv.party_type = 'supplier' AND jv.party_id = ?
+    ");
+    $stmt->execute([$tenant_id, $sid]);
+    $adj_cross1 = $stmt->fetch()['total'];
+
+    // ===== Journal adjustment: cross mode, supplier is Party 2 (last line) =====
+    $stmt = $pdo->prepare("
+        SELECT COALESCE(SUM(l.credit - l.debit), 0) as total
+        FROM journal_voucher jv
+        JOIN journal_voucher_line l
+          ON l.voucher_id = jv.id AND l.tenant_id = jv.tenant_id
+         AND l.id = (SELECT MAX(l2.id) FROM journal_voucher_line l2 WHERE l2.voucher_id = jv.id AND l2.tenant_id = jv.tenant_id)
+        WHERE jv.tenant_id = ? AND jv.status = 'posted'
+          AND jv.adj_mode = 'cross'
+          AND jv.party_type2 = 'supplier' AND jv.party_id2 = ?
+    ");
+    $stmt->execute([$tenant_id, $sid]);
+    $adj_cross2 = $stmt->fetch()['total'];
+
+    $balance = $opening + $invoices - $payments + $tv_out - $tv_in
+             + $adj_single + $adj_cross1 + $adj_cross2;
+
+    echo json_encode(['success' => true, 'balance' => $balance]);
 } catch (Exception $e) {
     http_response_code(500); echo json_encode(['error' => 'Database error', 'message' => $e->getMessage()]);
 }

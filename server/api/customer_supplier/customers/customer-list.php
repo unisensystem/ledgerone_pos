@@ -30,32 +30,32 @@ try {
     $page = max(1, (int)($_GET['page'] ?? 1));
     $limit = min(100, max(10, (int)($_GET['limit'] ?? 10)));
     $offset = ($page - 1) * $limit;
-    
+
     // Build WHERE clause
     $where = ['c.tenant_id = ?'];
     $params = [$tenant_id];
 
     if ($search) {
-             $where[] = '(c.customer_name LIKE ? OR c.shop_name LIKE ? OR c.customer_code LIKE ? OR c.address LIKE ? OR c.email LIKE ? OR c.primary_phone LIKE ? OR ct.type_name LIKE ? OR cc.category_name LIKE ? OR s.brand_name LIKE ? OR ci.city_name LIKE ? OR cz.city_zone_name LIKE ? OR ar.area_name LIKE ? OR e.full_name LIKE ?)';
+        $where[] = '(c.customer_name LIKE ? OR c.shop_name LIKE ? OR c.customer_code LIKE ? OR c.address LIKE ? OR c.email LIKE ? OR c.primary_phone LIKE ? OR ct.type_name LIKE ? OR cc.category_name LIKE ? OR s.brand_name LIKE ? OR ci.city_name LIKE ? OR cz.city_zone_name LIKE ? OR ar.area_name LIKE ? OR e.full_name LIKE ?)';
         $searchTerm = '%' . $search . '%';
         $params = array_merge($params, array_fill(0, 13, $searchTerm));
     }
-    
+
     if ($status === 'active') {
         $where[] = 'c.is_blacklisted = FALSE';
     } elseif ($status === 'blacklisted') {
         $where[] = 'c.is_blacklisted = TRUE';
     }
-    
+
     if ($company) {
         $where[] = 'c.company_id = ?';
         $params[] = (int)$company;
     }
-    
+
     $whereClause = 'WHERE ' . implode(' AND ', $where);
 
     // Shared joins used by both count and list queries
-   $joins = "LEFT JOIN companies comp ON c.company_id = comp.id AND comp.tenant_id = c.tenant_id
+    $joins = "LEFT JOIN companies comp ON c.company_id = comp.id AND comp.tenant_id = c.tenant_id
         LEFT JOIN customer_types ct ON c.customer_type_id = ct.id AND (ct.tenant_id = 0 OR ct.tenant_id = c.tenant_id)
         LEFT JOIN customer_categories cc ON c.customer_category_id = cc.id AND cc.tenant_id = c.tenant_id
         LEFT JOIN suppliers s ON c.brand_id = s.id
@@ -63,16 +63,15 @@ try {
         LEFT JOIN city_zones cz ON c.city_zone_id = cz.id AND cz.tenant_id = c.tenant_id
         LEFT JOIN areas ar ON c.area_id = ar.id AND ar.tenant_id = c.tenant_id
         LEFT JOIN employees e ON c.associated_sales_officer_id = e.id AND e.tenant_id = c.tenant_id";
-    
+
     // Get total count
     $countSql = "SELECT COUNT(*) as total FROM customers c $joins $whereClause";
     $stmt = $pdo->prepare($countSql);
     $stmt->execute($params);
     $total = $stmt->fetch()['total'];
-    
+
     // Get customers
-   // Get customers
-$sql = "SELECT c.id, c.customer_code, c.customer_name, c.shop_name, c.address, c.primary_phone, c.email,
+    $sql = "SELECT c.id, c.customer_code, c.customer_name, c.shop_name, c.address, c.primary_phone, c.email,
         c.current_balance, c.opening_debit_amount, c.opening_credit_amount, c.is_blacklisted, c.created_at,
         comp.company_name as company_name,
         ct.type_name as customer_group_name,
@@ -84,6 +83,8 @@ $sql = "SELECT c.id, c.customer_code, c.customer_name, c.shop_name, c.address, c
         e.full_name as salesman_name,
         (
             c.opening_debit_amount - c.opening_credit_amount
+
+            -- Sale invoices (+)
             + COALESCE((
                 SELECT SUM(si.net_amount)
                 FROM sale_invoice si
@@ -91,12 +92,16 @@ $sql = "SELECT c.id, c.customer_code, c.customer_name, c.shop_name, c.address, c
                   AND si.customer_id = c.id
                   AND si.status = 'Posted'
             ), 0)
+
+            -- Receive vouchers (-)
             - COALESCE((
                 SELECT SUM(rv.amount)
                 FROM receive_voucher rv
                 WHERE rv.tenant_id = c.tenant_id
                   AND rv.customer_id = c.id
             ), 0)
+
+            -- Sale returns (-)
             - COALESCE((
                 SELECT SUM(sr.net_amount)
                 FROM sale_return sr
@@ -104,29 +109,99 @@ $sql = "SELECT c.id, c.customer_code, c.customer_name, c.shop_name, c.address, c
                   AND sr.customer_id = c.id
                   AND sr.status = 'Posted'
             ), 0)
+
+            -- Adjustment: single party (customer line = account_id 2)
+            + COALESCE((
+                SELECT SUM(l.debit - l.credit)
+                FROM journal_voucher jv
+                JOIN journal_voucher_line l
+                  ON l.voucher_id = jv.id
+                 AND l.tenant_id = jv.tenant_id
+                 AND l.account_id = 2
+                WHERE jv.tenant_id = c.tenant_id
+                  AND jv.status = 'posted'
+                  AND jv.adj_mode = 'single'
+                  AND jv.party_type = 'customer'
+                  AND jv.party_id = c.id
+            ), 0)
+
+            -- Adjustment: cross mode, this customer is Party 1 (first line)
+            + COALESCE((
+                SELECT SUM(l.debit - l.credit)
+                FROM journal_voucher jv
+                JOIN journal_voucher_line l
+                  ON l.voucher_id = jv.id
+                 AND l.tenant_id = jv.tenant_id
+                 AND l.id = (
+                     SELECT MIN(l2.id) FROM journal_voucher_line l2
+                     WHERE l2.voucher_id = jv.id AND l2.tenant_id = jv.tenant_id
+                 )
+                WHERE jv.tenant_id = c.tenant_id
+                  AND jv.status = 'posted'
+                  AND jv.adj_mode = 'cross'
+                  AND jv.party_type = 'customer'
+                  AND jv.party_id = c.id
+            ), 0)
+
+            -- Adjustment: cross mode, this customer is Party 2 (last line)
+            + COALESCE((
+                SELECT SUM(l.debit - l.credit)
+                FROM journal_voucher jv
+                JOIN journal_voucher_line l
+                  ON l.voucher_id = jv.id
+                 AND l.tenant_id = jv.tenant_id
+                 AND l.id = (
+                     SELECT MAX(l2.id) FROM journal_voucher_line l2
+                     WHERE l2.voucher_id = jv.id AND l2.tenant_id = jv.tenant_id
+                 )
+                WHERE jv.tenant_id = c.tenant_id
+                  AND jv.status = 'posted'
+                                   AND jv.adj_mode = 'cross'
+                  AND jv.party_type2 = 'customer'
+                  AND jv.party_id2 = c.id
+            ), 0)
+
+            -- ===== NEW: Transfer voucher, customer is FROM (-) =====
+            - COALESCE((
+                SELECT SUM(tv.amount)
+                FROM transfer_voucher tv
+                WHERE tv.tenant_id = c.tenant_id
+                  AND tv.from_type = 'customer'
+                  AND tv.from_customer_id = c.id
+            ), 0)
+
+            -- ===== NEW: Transfer voucher, customer is TO =====
+            -- From customer => (+), From supplier => (-)
+            + COALESCE((
+                SELECT SUM(CASE WHEN tv.from_type = 'customer' THEN tv.amount ELSE -tv.amount END)
+                FROM transfer_voucher tv
+                WHERE tv.tenant_id = c.tenant_id
+                  AND tv.to_type = 'customer'
+                  AND tv.to_customer_id = c.id
+            ), 0)
         ) as current_balance_real
         FROM customers c
         $joins
-        $whereClause 
-        ORDER BY c.created_at DESC 
+        $whereClause
+        ORDER BY c.created_at DESC
         LIMIT $limit OFFSET $offset";
-    
+
     $stmt = $pdo->prepare($sql);
     $stmt->execute($params);
     $customers = $stmt->fetchAll(PDO::FETCH_ASSOC);
-    
+
     // Get stats
-    $statsSql = "SELECT 
+    $statsSql = "SELECT
         COUNT(*) as total_customers,
         COUNT(CASE WHEN is_blacklisted = FALSE THEN 1 END) as active_customers,
         COUNT(CASE WHEN is_blacklisted = TRUE THEN 1 END) as blacklisted_customers,
         SUM(CASE WHEN current_balance > 0 THEN current_balance ELSE 0 END) as total_receivables
         FROM customers WHERE tenant_id = ?";
-    
+
     $stmt = $pdo->prepare($statsSql);
     $stmt->execute([$tenant_id]);
     $stats = $stmt->fetch(PDO::FETCH_ASSOC);
-    
+
     echo json_encode([
         'success' => true,
         'customers' => $customers,
@@ -138,7 +213,7 @@ $sql = "SELECT c.id, c.customer_code, c.customer_name, c.shop_name, c.address, c
         ],
         'stats' => $stats
     ]);
-    
+
 } catch (Exception $e) {
     http_response_code(500);
     echo json_encode([

@@ -29,16 +29,62 @@ try {
     $stmt->execute([$tenant_id, $cid]);
     $returns = $stmt->fetch()['total'];
 
-    // Transfer voucher: FROM this customer = balance reduces (credit), TO this customer = balance increases (debit)
+    // Transfer voucher: FROM this customer = balance reduces (credit)
     $stmt = $pdo->prepare("SELECT COALESCE(SUM(amount), 0) as total FROM transfer_voucher WHERE tenant_id = ? AND from_customer_id = ?");
     $stmt->execute([$tenant_id, $cid]);
     $tv_out = $stmt->fetch()['total'];
 
-    $stmt = $pdo->prepare("SELECT COALESCE(SUM(amount), 0) as total FROM transfer_voucher WHERE tenant_id = ? AND to_customer_id = ?");
+    // Transfer voucher: TO this customer
+    // From customer => debit (+) | From supplier => credit (-)  (matches accounting_ledger)
+    $stmt = $pdo->prepare("SELECT COALESCE(SUM(CASE WHEN from_type = 'customer' THEN amount ELSE -amount END), 0) as total FROM transfer_voucher WHERE tenant_id = ? AND to_customer_id = ?");
     $stmt->execute([$tenant_id, $cid]);
     $tv_in = $stmt->fetch()['total'];
 
-    echo json_encode(['success' => true, 'balance' => $opening + $invoices - $payments - $returns - $tv_out + $tv_in]);
+    // ===== Journal adjustment: single party (customer line = account_id 2) =====
+    $stmt = $pdo->prepare("
+        SELECT COALESCE(SUM(l.debit - l.credit), 0) as total
+        FROM journal_voucher jv
+        JOIN journal_voucher_line l
+          ON l.voucher_id = jv.id AND l.tenant_id = jv.tenant_id AND l.account_id = 2
+        WHERE jv.tenant_id = ? AND jv.status = 'posted'
+          AND jv.adj_mode = 'single'
+          AND jv.party_type = 'customer' AND jv.party_id = ?
+    ");
+    $stmt->execute([$tenant_id, $cid]);
+    $adj_single = $stmt->fetch()['total'];
+
+    // ===== Journal adjustment: cross mode, customer is Party 1 (first line) =====
+    $stmt = $pdo->prepare("
+        SELECT COALESCE(SUM(l.debit - l.credit), 0) as total
+        FROM journal_voucher jv
+        JOIN journal_voucher_line l
+          ON l.voucher_id = jv.id AND l.tenant_id = jv.tenant_id
+         AND l.id = (SELECT MIN(l2.id) FROM journal_voucher_line l2 WHERE l2.voucher_id = jv.id AND l2.tenant_id = jv.tenant_id)
+        WHERE jv.tenant_id = ? AND jv.status = 'posted'
+          AND jv.adj_mode = 'cross'
+          AND jv.party_type = 'customer' AND jv.party_id = ?
+    ");
+    $stmt->execute([$tenant_id, $cid]);
+    $adj_cross1 = $stmt->fetch()['total'];
+
+    // ===== Journal adjustment: cross mode, customer is Party 2 (last line) =====
+    $stmt = $pdo->prepare("
+        SELECT COALESCE(SUM(l.debit - l.credit), 0) as total
+        FROM journal_voucher jv
+        JOIN journal_voucher_line l
+          ON l.voucher_id = jv.id AND l.tenant_id = jv.tenant_id
+         AND l.id = (SELECT MAX(l2.id) FROM journal_voucher_line l2 WHERE l2.voucher_id = jv.id AND l2.tenant_id = jv.tenant_id)
+        WHERE jv.tenant_id = ? AND jv.status = 'posted'
+          AND jv.adj_mode = 'cross'
+          AND jv.party_type2 = 'customer' AND jv.party_id2 = ?
+    ");
+    $stmt->execute([$tenant_id, $cid]);
+    $adj_cross2 = $stmt->fetch()['total'];
+
+    $balance = $opening + $invoices - $payments - $returns - $tv_out + $tv_in
+             + $adj_single + $adj_cross1 + $adj_cross2;
+
+    echo json_encode(['success' => true, 'balance' => $balance]);
 } catch (Exception $e) {
     http_response_code(500); echo json_encode(['error' => 'Database error', 'message' => $e->getMessage()]);
 }
