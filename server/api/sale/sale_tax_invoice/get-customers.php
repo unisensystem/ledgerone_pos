@@ -34,7 +34,12 @@ try {
     $params = [$tenant_id];
 
     if ($company_id) {
-        $sql .= " AND c.company_id = ?";
+        // "Cash Customer" (and any similar catch-all customer) has
+        // company_id = NULL, meant to be usable under any company —
+        // "= ?" alone never matches NULL, so it was silently excluded
+        // from this page's search whenever a company was selected, even
+        // though it's a normal ACTIVE customer.
+        $sql .= " AND (c.company_id = ? OR c.company_id IS NULL)";
         $params[] = $company_id;
     }
 

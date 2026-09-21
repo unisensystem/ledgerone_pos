@@ -26,7 +26,12 @@ try {
     $type = $_GET['type'] ?? '';
     $base_only = $_GET['base_only'] ?? 0;
     
-    $sql = "SELECT id, uom_name, uom_type, unit_scope, is_base_unit FROM uom WHERE tenant_id = ? OR tenant_id = 0";
+    // Parenthesized: without it, "AND uom_type = ?" / "AND is_base_unit = 1"
+    // below only bound to the "tenant_id = 0" side (AND binds tighter than
+    // OR), so ANY unit belonging to this tenant matched regardless of type
+    // or is_base_unit — e.g. a brand-new non-base "50 kg" unit showed up as
+    // a selectable Base Unit option for itself.
+    $sql = "SELECT id, uom_name, uom_type, unit_scope, is_base_unit FROM uom WHERE (tenant_id = ? OR tenant_id = 0)";
     $params = [$tenant_id];
     
     if ($type) {

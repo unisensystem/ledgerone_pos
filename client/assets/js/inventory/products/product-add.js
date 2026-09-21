@@ -1157,15 +1157,44 @@ function editUnit(unitId, unitName) {
         `What would you like to do with "${unitName}"?`,
         'Edit',
         'Delete',
-        () => {
-            // Edit unit
+        async () => {
+            // Edit unit — fetch this unit's actual saved data first. Without
+            // this, the form was left showing whatever was already in its
+            // fields (HTML defaults / the last unit added), not the real
+            // Unit Type / Base Unit / Conversion Factor of the unit being
+            // edited, even though the title said "Edit Unit".
+            const response = await fetch(`../../../../server/api/inventory/products/unit-edit.php?id=${unitId}`);
+            const data = await response.json();
+            if (!data.success || !data.unit) {
+                alert('Error loading unit: ' + (data.message || 'Unit not found'));
+                return;
+            }
+            const unit = data.unit;
+
             document.getElementById('unitModalTitle').textContent = 'Edit Unit';
             document.getElementById('saveUnit').textContent = 'Update Unit';
-            document.getElementById('unitName').value = unitName;
+            document.getElementById('unitName').value = unit.uom_name;
             document.getElementById('unitForm').dataset.editId = unitId;
+
+            // Scope radio
+            document.getElementById('perProduct').checked = unit.unit_scope === 'per_product';
+            document.getElementById('universal').checked = unit.unit_scope !== 'per_product';
+
+            // Unit type, then reload the Base Unit dropdown for THIS type
+            // before trying to select the unit's actual base unit in it.
+            document.getElementById('unitType').value = unit.uom_type;
+            await loadBaseUnits();
+
+            document.getElementById('isBaseUnit').checked = unit.is_base_unit == 1;
+            document.getElementById('baseUnit').value = unit.base_unit_id || '';
+            document.getElementById('conversionFactor').value = unit.conversion_factor || 1;
+
+            // Re-derive which groups should be visible now that scope /
+            // isBaseUnit reflect the real saved values, not stale defaults.
+            handleUnitScopeChange();
+
             document.getElementById('unitModal').style.display = 'flex';
             document.getElementById('unitName').focus();
-            loadBaseUnits();
         },
         () => {
             // Delete unit - show second confirmation
@@ -1386,7 +1415,9 @@ function loadBaseUnits() {
     baseUnitSelect.innerHTML = '<option value="">Select Base Unit</option>';
     
     // Load base units of same type via API
-    fetch(`../../../../server/api/inventory/products/unit-list.php?type=${unitType}&base_only=1`)
+    // (returns the fetch promise so callers — e.g. editUnit() — can await
+    // it before setting a specific baseUnit value on top of this list)
+    return fetch(`../../../../server/api/inventory/products/unit-list.php?type=${unitType}&base_only=1`)
     .then(response => response.json())
     .then(data => {
         if (data.success && data.units) {

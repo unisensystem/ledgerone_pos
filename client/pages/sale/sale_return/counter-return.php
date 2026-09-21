@@ -171,7 +171,10 @@ $user_employee_id = $user['employee_id'] ?? null;
                 </div>
                 <div class="form-group">
                     <div class="form-label">CUSTOMER PHONE</div>
-                    <input type="text" id="customerPhone" placeholder="Phone number" autocomplete="off">
+                    <div style="position: relative;">
+                        <input type="text" id="customerPhone" placeholder="Phone number — search to find by past invoice" autocomplete="off">
+                        <div id="customerPhoneOptions" class="dropdown-options"></div>
+                    </div>
                 </div>
                 <div class="form-group">
                     <div class="form-label">SUB ACCOUNT (Optional)</div>

@@ -52,7 +52,8 @@ document.addEventListener('DOMContentLoaded', async function() {
     initDropdown('salesOfficerSearch', 'salesOfficerOptions', 'salesOfficer', employeesData, (e) => `${e.employee_id} - ${e.full_name}`, (id) => currentReturn.salesOfficer = parseInt(id));
     initDropdown('supplierManSearch', 'supplierManOptions', 'supplierMan', employeesData, (e) => `${e.employee_id} - ${e.full_name}`, (id) => currentReturn.supplierMan = parseInt(id));
     initDropdown('projectSearch', 'projectOptions', 'project', projectsData, (p) => `${p.project_code} - ${p.project_name}${p.city_name ? ' - ' + p.city_name : ''}`, (id) => { currentReturn.project = parseInt(id); localStorage.setItem('lastSelectedProject', id); });
-    
+    setupCustomerPhoneSearch();
+
     const savedProjectId = localStorage.getItem('lastSelectedProject');
     if (savedProjectId && projectsData.find(p => p.id == savedProjectId)) {
         const project = projectsData.find(p => p.id == savedProjectId);
@@ -181,6 +182,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         if (!e.target.closest('#salesOfficerSearch') && !e.target.closest('#salesOfficerOptions')) document.getElementById('salesOfficerOptions').style.display = 'none';
         if (!e.target.closest('#supplierManSearch') && !e.target.closest('#supplierManOptions')) document.getElementById('supplierManOptions').style.display = 'none';
         if (!e.target.closest('#projectSearch') && !e.target.closest('#projectOptions')) document.getElementById('projectOptions').style.display = 'none';
+        if (!e.target.closest('#customerPhone') && !e.target.closest('#customerPhoneOptions')) document.getElementById('customerPhoneOptions').style.display = 'none';
         if (!e.target.closest('.quick-entry')) document.getElementById('productSuggestions').style.display = 'none';
     });
 });
@@ -1402,11 +1404,81 @@ function selectCashCustomerDefault() {
 function filterInvoicesByCustomer(customerId) {
     const invoiceSearch = document.getElementById('invoiceSearch');
     const filteredInvoices = invoicesData.filter(inv => inv.customer_id == customerId);
-    
+
     invoiceSearch.value = '';
     document.getElementById('saleInvoice').value = '';
-    
+
     // Update dropdown data
+    invoiceSearch.updateData(filteredInvoices);
+}
+
+// "Cash Customer" (and any shared/walk-in customer record) is used across
+// many unrelated real sales — the only thing that tells them apart is the
+// phone number typed in at sale time (saved per-invoice as
+// sale_invoice.customer_phone), NOT the customer record itself. So instead
+// of one Primary Phone, the Customer Phone field here becomes a searchable
+// list of every distinct phone number that customer's past invoices used —
+// picking one narrows Sale Invoice down to just that phone's invoice(s).
+function getDistinctPhonesForCustomer(customerId) {
+    const seen = new Set();
+    const phones = [];
+    invoicesData
+        .filter(inv => inv.customer_id == customerId && inv.customer_phone)
+        .forEach(inv => {
+            if (!seen.has(inv.customer_phone)) {
+                seen.add(inv.customer_phone);
+                phones.push(inv.customer_phone);
+            }
+        });
+    return phones;
+}
+
+function renderCustomerPhoneOptions(phones) {
+    const optionsDiv = document.getElementById('customerPhoneOptions');
+    optionsDiv.innerHTML = '';
+    if (phones.length === 0) {
+        optionsDiv.style.display = 'none';
+        return;
+    }
+    phones.forEach(phone => {
+        const div = document.createElement('div');
+        div.className = 'dropdown-option';
+        div.textContent = phone;
+        div.addEventListener('click', () => {
+            document.getElementById('customerPhone').value = phone;
+            optionsDiv.style.display = 'none';
+            if (currentReturn.customer) filterInvoicesByPhone(currentReturn.customer, phone);
+        });
+        optionsDiv.appendChild(div);
+    });
+    optionsDiv.style.display = 'block';
+}
+
+function setupCustomerPhoneSearch() {
+    const phoneInput = document.getElementById('customerPhone');
+
+    phoneInput.addEventListener('focus', () => {
+        if (!currentReturn.customer) return;
+        renderCustomerPhoneOptions(getDistinctPhonesForCustomer(currentReturn.customer));
+    });
+
+    phoneInput.addEventListener('input', () => {
+        if (!currentReturn.customer) return;
+        const term = phoneInput.value.toLowerCase();
+        const matches = getDistinctPhonesForCustomer(currentReturn.customer).filter(p => p.toLowerCase().includes(term));
+        renderCustomerPhoneOptions(matches);
+    });
+}
+
+// Narrows the Sale Invoice dropdown to invoices billed to this customer
+// AND recorded with this exact phone number, so a specific walk-in sale
+// can be found even though many others share the same "Cash Customer".
+function filterInvoicesByPhone(customerId, phone) {
+    const invoiceSearch = document.getElementById('invoiceSearch');
+    const filteredInvoices = invoicesData.filter(inv => inv.customer_id == customerId && inv.customer_phone === phone);
+
+    invoiceSearch.value = '';
+    document.getElementById('saleInvoice').value = '';
     invoiceSearch.updateData(filteredInvoices);
 }
 

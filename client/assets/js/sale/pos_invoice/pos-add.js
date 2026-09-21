@@ -2167,6 +2167,17 @@ const invoiceSettingCheckboxes = [
                     const balance = parseFloat(e.target.getAttribute('data-balance'));
                     showBalanceNotification(`${balance >= 0 ? 'Dr' : 'Cr'} ${Math.abs(balance).toFixed(3)}`);
 
+                    // Cash Customer (id 1) is always a cash transaction — force
+                    // Invoice Type to Cash so backend/accounting treats it correctly,
+                    // even if the Invoice Type field is hidden via display settings.
+                    if (String(value) === '1') {
+                        const invoiceTypeEl = document.getElementById('invoiceType');
+                        if (invoiceTypeEl && invoiceTypeEl.value !== 'Cash') {
+                            invoiceTypeEl.value = 'Cash';
+                            invoiceTypeEl.dispatchEvent(new Event('change'));
+                        }
+                    }
+
                     // Update customer address
                     const address = e.target.getAttribute('data-address');
                     const customerAddressEl = document.getElementById('customerAddress');

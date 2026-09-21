@@ -25,6 +25,7 @@ try {
             si.sale_date,
             si.net_amount,
             si.customer_id,
+            si.customer_phone,
             c.customer_name,
             cur.symbol as currency_symbol
         FROM sale_invoice si

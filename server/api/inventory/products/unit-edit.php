@@ -3,14 +3,8 @@ require_once '../../../../includes/connection.php';
 
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
-header('Access-Control-Allow-Methods: POST');
+header('Access-Control-Allow-Methods: GET, POST');
 header('Access-Control-Allow-Headers: Content-Type');
-
-if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    http_response_code(405);
-    echo json_encode(['success' => false, 'message' => 'Method not allowed']);
-    exit;
-}
 
 session_start();
 $user_id = $_SESSION['user_id'] ?? null;
@@ -19,6 +13,47 @@ $tenant_id = $_SESSION['tenant_id'] ?? null;
 if (!$user_id || !$tenant_id) {
     http_response_code(401);
     echo json_encode(['success' => false, 'message' => 'Unauthorized']);
+    exit;
+}
+
+// GET — fetch a single unit's full data, used by the Edit Unit modal to
+// populate its fields. Previously missing entirely, so the edit form only
+// ever showed whatever was already sitting in the fields (defaults / the
+// last-used values) instead of the unit actually being edited.
+if ($_SERVER['REQUEST_METHOD'] === 'GET') {
+    $unit_id = $_GET['id'] ?? '';
+    if (empty($unit_id)) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'message' => 'Unit ID is required']);
+        exit;
+    }
+
+    try {
+        $stmt = $pdo->prepare("
+            SELECT id, uom_name, uom_type, unit_scope, is_base_unit, base_unit_id, conversion_factor
+            FROM uom
+            WHERE id = ? AND (tenant_id = ? OR tenant_id = 0)
+        ");
+        $stmt->execute([$unit_id, $tenant_id]);
+        $unit = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if (!$unit) {
+            http_response_code(404);
+            echo json_encode(['success' => false, 'message' => 'Unit not found']);
+            exit;
+        }
+
+        echo json_encode(['success' => true, 'unit' => $unit]);
+    } catch (PDOException $e) {
+        http_response_code(500);
+        echo json_encode(['success' => false, 'message' => 'Database error: ' . $e->getMessage()]);
+    }
+    exit;
+}
+
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    http_response_code(405);
+    echo json_encode(['success' => false, 'message' => 'Method not allowed']);
     exit;
 }
 
