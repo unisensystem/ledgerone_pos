@@ -28,15 +28,16 @@ try {
 
     if ($type === 'invoice') {
         $stmt = $pdo->prepare("
-            SELECT pii.quantity, p.name as product_name, u.uom_name
+            SELECT pii.quantity, pii.purchase_price, pii.parent_row_id, p.name as product_name, u.uom_name
             FROM purchase_invoice_items pii
             JOIN products p ON pii.product_id = p.id
             JOIN uom u ON pii.uom_id = u.id
             WHERE pii.purchase_invoice_id = ? AND pii.tenant_id = ?
+            ORDER BY COALESCE(pii.parent_row_id, pii.id), pii.id
         ");
     } else {
         $stmt = $pdo->prepare("
-            SELECT pri.quantity, p.name as product_name, u.uom_name
+            SELECT pri.quantity, pri.purchase_price, p.name as product_name, u.uom_name
             FROM purchase_return_items pri
             JOIN products p ON pri.product_id = p.id
             JOIN uom u ON pri.uom_id = u.id

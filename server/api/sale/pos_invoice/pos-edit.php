@@ -202,7 +202,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
                 currency_id = ?, sale_date = ?, customer_id = ?, sub_account_id = ?, company_id = ?, branch_id = ?,
                 previous_balance = ?, sale_officer_id = ?, supplier_man_id = ?, brand_id = ?, sale_order_id = ?, bilty_no = ?, transport_name = ?, customer_phone = ?, total_bill = ?, total_discount_percent = ?,
                 total_discount_amount = ?, extra_discount_1_percent = ?, extra_discount_1_amount = ?, extra_discount_2_percent = ?, extra_discount_2_amount = ?,
-                net_amount = ?, withholding_tax_percent = ?, withholding_tax_amount = ?, amount_paid_auto_fill = ?, remarks = ?, ship_to = ?, status = ?, project_id = ?, container_id = ?, updated_by = ?
+                net_amount = ?, withholding_tax_percent = ?, withholding_tax_amount = ?, amount_paid_auto_fill = ?, amount_returned = ?, remarks = ?, ship_to = ?, status = ?, project_id = ?, container_id = ?, updated_by = ?
             WHERE id = ? AND tenant_id = ?
         ");
         $stmt->execute([
@@ -231,6 +231,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
             $withholdingTaxPercent,
             $withholdingTaxAmount,
             $input['amountPaidAutoFill'] ?? 'yes',
+            $input['amountReturned'] ?? 0.00,
             $input['remarks'] ?? null,
             $input['shipTo'] ?? null,
             $input['status'] ?? 'Posted',
@@ -448,7 +449,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
 
         // Insert receive voucher(s) if amount paid > 0 and status is Posted — see
         // pos-add.php for the full explanation of the one-voucher-per-split design.
-        if ($status === 'Posted' && isset($input['amountPaid']) && $input['amountPaid'] > 0) {
+        // Change given back to the customer (amountReturned) was never retained as
+        // revenue, so the Receive Voucher must reflect only the net amount that
+        // actually stayed against this invoice, not the full cash tendered.
+        $netAmountPaid = floatval($input['amountPaid'] ?? 0) - floatval($input['amountReturned'] ?? 0);
+        if ($status === 'Posted' && $netAmountPaid > 0) {
             $paymentSplits = (!empty($input['paymentSplits']) && is_array($input['paymentSplits']))
                 ? array_values(array_filter($input['paymentSplits'], function ($s) {
                     return floatval($s['amount'] ?? 0) > 0;
@@ -459,7 +464,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
                 $paymentSplits = [[
                     'method' => $input['paymentMethod'],
                     'bankAccountId' => $input['bankAccountId'] ?? null,
-                    'amount' => $input['amountPaid']
+                    'amount' => $netAmountPaid
                 ]];
             }
 

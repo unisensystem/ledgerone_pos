@@ -689,11 +689,16 @@
             
             document.getElementById('netAmount').textContent = `${currencySymbol}${parseFloat(invoice.net_amount).toFixed(2)}`;
             
-            // Calculate received, returned and balance
-            const amountPaid = parseFloat(invoice.amount_paid) || 0;
+            // invoice.amount_paid is the SUM of Receive Voucher amounts — the net money
+            // actually retained against this invoice (change given back is excluded from
+            // it, see pos-add.php). "Received" on the receipt should show what the
+            // customer physically tendered, so it's reconstructed as netCollected +
+            // amountReturned; Balance only compares against the net collected amount.
+            const netCollected = parseFloat(invoice.amount_paid) || 0;
             const amountReturned = parseFloat(invoice.amount_returned) || 0;
-            const remainingBalance = parseFloat(invoice.net_amount) - amountPaid + amountReturned;
-            
+            const amountPaid = netCollected + amountReturned;
+            const remainingBalance = parseFloat(invoice.net_amount) - netCollected;
+
             document.getElementById('amountPaid').textContent = `${currencySymbol}${amountPaid.toFixed(2)}`;
             document.getElementById('amountReturned').textContent = `${currencySymbol}${amountReturned.toFixed(2)}`;
             document.getElementById('remainingBalance').textContent = `${currencySymbol}${remainingBalance.toFixed(2)}`;

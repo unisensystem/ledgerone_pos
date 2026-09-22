@@ -226,7 +226,7 @@
                 }
                 if (invoiceData.success) {
                     populateCompanyData(invoiceData.invoice);
-                    populateInvoiceData(invoiceData.invoice, invoiceData.items, invoiceData.invoice_taxes || []);
+                    populateInvoiceData(invoiceData.invoice, invoiceData.items, invoiceData.invoice_taxes || [], invoiceData.children || []);
                 } else {
                     alert('Error loading invoice: ' + invoiceData.message);
                 }
@@ -251,7 +251,7 @@
             }
         }
 
-        function populateInvoiceData(invoice, items, invoiceTaxes) {
+        function populateInvoiceData(invoice, items, invoiceTaxes, children = []) {
             document.getElementById('invoiceNo').textContent   = invoice.bill_no;
             document.getElementById('invoiceDate').textContent = new Date(invoice.purchase_date).toLocaleDateString();
             document.getElementById('supplierName').textContent = `${invoice.supplier_code} - ${invoice.supplier_name}`;
@@ -286,10 +286,28 @@
                 });
                 const unitQtyDisplay = Object.entries(unitMap).map(([u, q]) => `${q.toFixed(3)} ${u}`).join(', ') || '-';
 
+                // Product Variants (see "Select Product Variants" on the invoice form) are
+                // saved as child rows against this parent row — they carry no amount of
+                // their own (the parent's gross/net already covers the full quantity), so
+                // they're shown here as a breakdown note under the parent product rather
+                // than as separate priced line items, to avoid double-counting totals.
+                const itemVariants = children.filter(c => c.parent_row_id == item.id);
+                const variantsHtml = itemVariants.length > 0
+                    ? `<div style="margin-top: 5px; padding-left: 8px; border-left: 2px solid #ddd;">
+                        <div style="font-size: 9px; color: #999; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 2px;">Variants</div>
+                        ${itemVariants.map(c => `
+                            <div style="display: flex; justify-content: space-between; gap: 10px; font-size: 10px; padding: 1px 0;">
+                                <span style="font-weight: 700; color: #333;">${c.product_name}</span>
+                                <span style="color: #777; white-space: nowrap;">Qty: ${parseFloat(c.quantity).toFixed(0)} &bull; ${currencySymbol} ${parseFloat(c.purchase_price).toFixed(3)}</span>
+                            </div>
+                        `).join('')}
+                    </div>`
+                    : '';
+
                 const row = tbody.insertRow();
                 row.innerHTML = `
                     <td class="text-center">${index + 1}</td>
-                    <td>${item.product_name}</td>
+                    <td><span style="font-weight: 700;">${item.product_name}</span>${variantsHtml}</td>
                     <td data-col="size" style="display:${enableSize ? '' : 'none'}">${item.size || '-'}</td>
                     <td>${unitQtyDisplay}</td>
                     <td class="text-right">${currencySymbol} ${parseFloat(item.purchase_price).toFixed(3)}</td>

@@ -2898,6 +2898,12 @@ function showVariantsModal(parentRow, children) {
                         <input type="checkbox" id="selectAllVariants" style="width: auto;">
                         <strong>Select All</strong>
                     </label>
+                    <div style="display: flex; align-items: center; gap: 12px; padding: 0 8px 6px; font-size: 11px; font-weight: 600; color: var(--subtext); text-transform: uppercase;">
+                        <div style="width: 16px;"></div>
+                        <span style="flex: 1;">Product</span>
+                        <span style="width: 80px;">Qty</span>
+                        <span style="width: 100px;">Price</span>
+                    </div>
                     <div id="variantsContainer">
                         ${childrenHtml}
                     </div>

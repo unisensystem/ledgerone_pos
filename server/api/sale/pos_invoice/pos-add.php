@@ -79,8 +79,8 @@ $pdo->beginTransaction();
             total_bill, total_discount_percent, total_discount_amount,
             extra_discount_1_percent, extra_discount_1_amount, extra_discount_2_percent, extra_discount_2_amount,
             shipping_fees, net_amount, withholding_tax_percent, withholding_tax_amount, amount_paid_auto_fill,
-            invoice_type, due_date, remarks, status, created_by, updated_by, project_id, container_id
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            amount_returned, invoice_type, due_date, remarks, status, created_by, updated_by, project_id, container_id
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ");
 
     $stmt->execute([
@@ -112,6 +112,7 @@ $pdo->beginTransaction();
         $withholdingTaxPercent,
         $withholdingTaxAmount,
         $input['amountPaidAutoFill'] ?? 'yes',
+        $input['amountReturned'] ?? 0.00,
         $input['invoiceType'] ?? 'Cash',
         $input['dueDate'] ?? null,
         $input['remarks'] ?? null,
@@ -375,7 +376,11 @@ if ($status === 'Posted' || $status === 'Draft') {
     // one combined row, so the Receive Voucher list/ledger genuinely reflects how the
     // customer paid. Falls back to a single voucher when paymentSplits isn't sent (e.g.
     // the plain pos_invoice UI, which has no split payment option).
-    if ($status === 'Posted' && isset($input['amountPaid']) && $input['amountPaid'] > 0) {
+    // Change given back to the customer (amountReturned) was never retained as
+    // revenue, so the Receive Voucher must reflect only the net amount that
+    // actually stayed against this invoice, not the full cash tendered.
+    $netAmountPaid = floatval($input['amountPaid'] ?? 0) - floatval($input['amountReturned'] ?? 0);
+    if ($status === 'Posted' && $netAmountPaid > 0) {
         $paymentSplits = (!empty($input['paymentSplits']) && is_array($input['paymentSplits']))
             ? array_values(array_filter($input['paymentSplits'], function ($s) {
                 return floatval($s['amount'] ?? 0) > 0;
@@ -386,7 +391,7 @@ if ($status === 'Posted' || $status === 'Draft') {
             $paymentSplits = [[
                 'method' => $input['paymentMethod'],
                 'bankAccountId' => $input['bankAccountId'] ?? null,
-                'amount' => $input['amountPaid']
+                'amount' => $netAmountPaid
             ]];
         }
 
