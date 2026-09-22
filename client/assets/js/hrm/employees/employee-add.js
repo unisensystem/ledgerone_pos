@@ -127,6 +127,8 @@ document.getElementById('employeeForm').addEventListener('submit', async functio
         employeeType: document.getElementById('employeeType').value,
         baseSalary: document.getElementById('baseSalary').value,
         salaryFrequency: document.getElementById('salaryFrequency').value,
+           overtimeRate: document.getElementById('overtimeRate').value || 0,        // ✅ ADD THIS
+    overtimeRateType: document.getElementById('overtimeRateType').value, 
         housingAllowance: document.getElementById('housingAllowance').value || 0,
         transportAllowance: document.getElementById('transportAllowance').value || 0,
         medicalAllowance: document.getElementById('medicalAllowance').value || 0,
@@ -282,6 +284,24 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     });
     
+
+    // Add this at the end of DOMContentLoaded or in a separate section
+
+// Update rate unit display when type changes
+document.getElementById('overtimeRateType').addEventListener('change', function() {
+    const rateUnit = document.getElementById('rateUnit');
+    const rateHint = document.getElementById('rateHint');
+    
+    if (this.value === 'per_hour') {
+        rateUnit.textContent = 'PKR/Hour';
+        rateHint.textContent = 'Daily rate ÷ 8 hours';
+    } else {
+        rateUnit.textContent = 'PKR/Day';
+        rateHint.textContent = 'Monthly rate ÷ 30 days (approximately)';
+    }
+});
+
+
     // Set default next reset date to next January 1st
     const nextYear = new Date().getFullYear() + 1;
     document.getElementById('nextResetDate').value = `${nextYear}-01-01`;

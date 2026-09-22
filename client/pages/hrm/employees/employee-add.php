@@ -358,6 +358,7 @@ $page_title = $mode === 'view' ? 'View Employee' : ($mode === 'edit' ? 'Edit Emp
                                 <input type="number" id="baseSalary" name="baseSalary" placeholder="50000" min="0" step="100" value="<?php echo $employee['base_salary'] ?? ''; ?>" <?php echo $readonly; ?>>
                             </div>
                         </div>
+                 <!-- ✅ ADD THIS NEW SECTION -->
                         <div class="form-group">
                             <label for="salaryFrequency" class="required">Payment Frequency</label>
                             <select id="salaryFrequency" name="salaryFrequency" <?php echo $readonly; ?>>
@@ -370,6 +371,25 @@ $page_title = $mode === 'view' ? 'View Employee' : ($mode === 'edit' ? 'Edit Emp
                                 <option value="yearly" <?php echo ($employee['salary_frequency'] ?? '') === 'yearly' ? 'selected' : ''; ?>>Yearly</option>
                             </select>
                         </div>
+
+     <div class="form-group">
+    <label for="overtimeRateType">Overtime Rate Type</label>
+    <select id="overtimeRateType" name="overtimeRateType" <?php echo $readonly; ?>>
+        <option value="per_hour" <?php echo ($employee['overtime_rate_type'] ?? 'per_hour') === 'per_hour' ? 'selected' : ''; ?>>Per Hour</option>
+        <option value="per_day" <?php echo ($employee['overtime_rate_type'] ?? '') === 'per_day' ? 'selected' : ''; ?>>Per Day</option>
+    </select>
+</div>
+
+<div class="form-group">
+    <label for="overtimeRate">Overtime Rate</label>
+    <div style="display: flex; gap: 10px; align-items: center;">
+        <input type="number" id="overtimeRate" name="overtimeRate" step="0.01"
+               value="<?php echo $employee['overtime_rate'] ?? '0'; ?>"
+               placeholder="e.g., 300" min="0" style="flex: 1;" <?php echo $readonly; ?>>
+        <span id="rateUnit"><?php echo ($employee['overtime_rate_type'] ?? 'per_hour') === 'per_day' ? 'PKR/Day' : 'PKR/Hour'; ?></span>
+    </div>
+    <small class="text-muted" id="rateHint"><?php echo ($employee['overtime_rate_type'] ?? 'per_hour') === 'per_day' ? 'Monthly rate ÷ 30 days (approximately)' : 'Daily rate ÷ 8 hours'; ?></small>
+</div>
                     </div>
                 </div>
 

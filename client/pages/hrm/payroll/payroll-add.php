@@ -37,14 +37,21 @@ $currency_symbol = $currency['symbol'] ?? '$';
 </head>
 <body>
     <div class="container">
+        
         <!-- Header -->
         <div class="header">
             <h1>Payroll Entry</h1>
             <p>Enter payroll information for employees. Fields marked with * are required.</p>
+            
         </div>
+        
 
         <!-- Main Content Grid -->
         <div class="main-content">
+            <a href="/client/pages/hrm/employees/monthly-employee-report.php" class="btn btn-primary">
+  <i class="fas fa-chart-line"></i> Monthly Report
+</a>
+            
             <!-- Notification for Opening Balance -->
             <div class="notification" id="balanceNotification">
                 <div class="notification-icon">

@@ -337,17 +337,40 @@ try {
             </div>
 
             <!-- Salary & Benefits Tab -->
-            <div class="tab-content" id="salary-tab">
-                <div class="form-grid">
-                    <div class="form-group">
-                        <label>Base Salary:</label>
-                        <input type="number" name="basic_salary" class="form-control" step="0.01" value="<?php echo htmlspecialchars($salary['basic_salary'] ?? '0'); ?>">
-                    </div>
+         <!-- Add to Salary & Benefits Tab -->
+<div class="tab-content" id="salary-tab">
+    <div class="form-grid">
+        <div class="form-group">
+            <label>Base Salary:</label>
+            <input type="number" name="basic_salary" class="form-control" 
+                   step="0.01" value="<?php echo htmlspecialchars($salary['basic_salary'] ?? '0'); ?>">
+        </div>
 
-                    <div class="form-group">
-                        <label>Monthly Bonus:</label>
-                        <input type="number" name="monthly_bonus" class="form-control" step="0.01" value="<?php echo htmlspecialchars($salary['monthly_bonus'] ?? '0'); ?>">
-                    </div>
+        <!-- ✅ ADD THIS NEW SECTION -->
+        <div class="form-group">
+            <label>Overtime Rate Type:</label>
+            <select name="overtime_rate_type" class="form-control" onchange="updateRateUnit(this)">
+                <option value="per_hour" <?php echo ($employee['overtime_rate_type'] ?? 'per_hour') === 'per_hour' ? 'selected' : ''; ?>>Per Hour</option>
+                <option value="per_day" <?php echo ($employee['overtime_rate_type'] ?? '') === 'per_day' ? 'selected' : ''; ?>>Per Day</option>
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label>Overtime Rate:</label>
+            <div style="display: flex; gap: 10px; align-items: center;">
+                <input type="number" name="overtime_rate" class="form-control" 
+                       step="0.01" value="<?php echo htmlspecialchars($employee['overtime_rate'] ?? '0'); ?>"
+                       placeholder="e.g., 300" min="0">
+                <span id="editRateUnit" style="min-width: 80px;">PKR/Hour</span>
+            </div>
+            <small class="text-muted" id="editRateHint">Daily rate ÷ 8 hours</small>
+        </div>
+
+        <div class="form-group">
+            <label>Monthly Bonus:</label>
+            <input type="number" name="monthly_bonus" class="form-control" 
+                   step="0.01" value="<?php echo htmlspecialchars($salary['monthly_bonus'] ?? '0'); ?>">
+        </div>
 
                     <div class="form-group">
                         <label>Quarterly Bonus:</label>
@@ -530,5 +553,28 @@ try {
         calculateSalary();
     });
     </script>
+
+    <script>
+function updateRateUnit(selectElement) {
+    const rateUnit = document.getElementById('editRateUnit');
+    const rateHint = document.getElementById('editRateHint');
+    
+    if (selectElement.value === 'per_hour') {
+        rateUnit.textContent = 'PKR/Hour';
+        rateHint.textContent = 'Daily rate ÷ 8 hours';
+    } else {
+        rateUnit.textContent = 'PKR/Day';
+        rateHint.textContent = 'Monthly rate ÷ 30 days (approximately)';
+    }
+}
+
+// Initialize on page load
+document.addEventListener('DOMContentLoaded', function() {
+    const typeSelect = document.querySelector('select[name="overtime_rate_type"]');
+    if (typeSelect) {
+        updateRateUnit(typeSelect);
+    }
+});
+</script>
 </body>
 </html>

@@ -1,11 +1,20 @@
 <?php
-// Given an employee + payroll period, reads their APPROVED leave requests and
-// APPROVED overtime from the Leave module (leave_records table) for that
-// period and returns a suggested Salary amount with a traceable breakdown
-// (paid leave days, unpaid leave days, daily rate, deduction, overtime).
-// Read-only — never writes anything. The payroll UI shows this as a starting
-// point; HR can still override the final amount before saving (see
-// payroll-add.php).
+// Given an employee + payroll period, reads their APPROVED leave requests,
+// APPROVED overtime, and attendance (present/absent) from the period and
+// returns a suggested Salary amount with a traceable breakdown (present
+// days, absent days, paid leave days, unpaid leave days, daily rate,
+// deduction, overtime). Read-only — never writes anything. The payroll UI
+// shows this as a starting point; HR can still override the final amount
+// before saving (see payroll-add.php).
+//
+// Deduction rule: Unpaid leave, absent days, and UNMARKED days (no
+// attendance record) are deducted at the same daily_rate (base_salary / 30).
+// Unmarked days that have no attendance mark and no leave request are now
+// treated as ABSENT to prevent silent under-payment when HR forgets to mark
+// attendance. Overtime is the only thing priced at the employee's per-hour
+// overtime_rate_per_hour — that rate never touches present/absent/leave math,
+// it only feeds ot_amount which is already computed and stored on the
+// leave_records row when the OT entry was approved (see hrm/leave/leave-request.php).
 //
 // Pending and rejected leave/overtime are never counted here — only
 // 'approved' rows affect the suggested amount. Pending rows in the period
@@ -28,12 +37,13 @@ if (!$user_id || !$tenant_id) {
 }
 
 // Same formula as hrm/leave/leave-request.php's calculateDailyRate() so the
-// rate used to deduct unpaid leave here always matches the rate the leave
-// request itself was filed and priced against.
+// rate used to deduct unpaid leave / absent days here always matches the
+// rate a leave request itself is priced against.
 function calculateDailyRate(array $emp): float {
     $salary = (float) ($emp['base_salary'] ?? 0);
     return round($salary / 30, 2);
 }
+
 try {
     $employeeCode = $_GET['employee_id'] ?? '';
     $periodStart = $_GET['period_start'] ?? '';
@@ -96,7 +106,9 @@ try {
     $stmt->execute([$tenant_id, $employeeCode, $periodStart, $periodEnd]);
     $pendingLeaveCount = (int) $stmt->fetchColumn();
 
-    // Approved overtime logged in this period.
+    // Approved overtime logged in this period. ot_amount here is already
+    // priced at the employee's own overtime_rate_per_hour at the time the OT
+    // was approved — this file never re-derives or re-prices it.
     $stmt = $pdo->prepare("
         SELECT start_date AS ot_date, ot_hours, ot_rate_multiplier, ot_amount
         FROM leave_records
@@ -120,6 +132,44 @@ try {
     }
     $otAmountTotal = round($otAmountTotal, 2);
 
+    // UPDATED: Attendance for the period. Count explicit 'present' / 'absent' marks.
+    // Unmarked days (no attendance record) that aren't covered by leave are now
+    // treated as ABSENT — prevents silent under-payment when HR forgets to mark
+    // attendance. Working days calculated from calendar days - (total marked days).
+    $stmt = $pdo->prepare("
+        SELECT status, COUNT(*) AS cnt
+        FROM attendance
+        WHERE tenant_id = ? AND employee_id = ? AND attendance_date BETWEEN ? AND ?
+        GROUP BY status
+    ");
+    $stmt->execute([$tenant_id, $employeeCode, $periodStart, $periodEnd]);
+    $attendanceRows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    $presentDays = 0.0; $absentDays = 0.0;
+    foreach ($attendanceRows as $r) {
+        if ($r['status'] === 'present') $presentDays += (float) $r['cnt'];
+        if ($r['status'] === 'absent')  $absentDays  += (float) $r['cnt'];
+    }
+
+    // Calculate calendar days in the period
+    $startDate = new DateTime($periodStart);
+    $endDate = new DateTime($periodEnd);
+    $calendarDays = (int) $endDate->diff($startDate)->format('%a') + 1; // +1 to include end date
+    
+    // Total marked days (present + absent + all leaves)
+    $totalMarkedDays = $presentDays + $absentDays + $paidLeaveDays + $unpaidLeaveDays;
+    
+    // Unmarked days = days with no attendance record at all
+    $unmarkedDays = $calendarDays - $totalMarkedDays;
+    
+    // CRITICAL FIX: If there are unmarked days AND employee has no present days
+    // recorded, treat unmarked as ABSENT. This prevents full salary when attendance
+    // isn't marked. If employee has ANY present days marked, we keep unmarked as
+    // ambiguous (could be weekends/holidays) and don't deduct.
+    if ($unmarkedDays > 0 && $presentDays === 0.0) {
+        $absentDays += $unmarkedDays;
+    }
+
     $baseSalary = (float) $employee['base_salary'];
     $grossAmount = $baseSalary
         + (float) $employee['housing_allowance'] + (float) $employee['transport_allowance']
@@ -127,10 +177,15 @@ try {
         + (float) $employee['communication_allowance'] + (float) $employee['education_allowance']
         + (float) $employee['travel_allowance'] + (float) $employee['other_allowance'];
 
-    $unpaidDeduction = round($unpaidLeaveDays * $dailyRate, 2);
-    // Clamp at 0 — unpaid leave should never push the suggested figure below
+    // Two separate deduction buckets so the breakdown stays traceable, but
+    // both priced at the same daily_rate — only OT uses a different rate.
+    $unpaidLeaveDeduction = round($unpaidLeaveDays * $dailyRate, 2);
+    $absentDeduction = round($absentDays * $dailyRate, 2);
+    $totalDeduction = round($unpaidLeaveDeduction + $absentDeduction, 2);
+
+    // Clamp at 0 — deductions should never push the suggested figure below
     // zero. Overtime is added back in as a straight plus.
-    $netAmount = max(0, round($grossAmount - $unpaidDeduction + $otAmountTotal, 2));
+    $netAmount = max(0, round($grossAmount - $totalDeduction + $otAmountTotal, 2));
 
     echo json_encode([
         'success' => true,
@@ -138,6 +193,8 @@ try {
         'period' => ['start' => $periodStart, 'end' => $periodEnd],
         'daily_rate' => $dailyRate,
         'attendance' => [
+            'present_days' => $presentDays,
+            'absent_days' => $absentDays,
             'paid_leave_days' => $paidLeaveDays,
             'unpaid_leave_days' => $unpaidLeaveDays,
             'pending_leave_requests' => $pendingLeaveCount,
@@ -150,7 +207,9 @@ try {
             'records' => $otRecords,
         ],
         'gross_amount' => $grossAmount,
-        'unpaid_leave_deduction' => $unpaidDeduction,
+        'unpaid_leave_deduction' => $unpaidLeaveDeduction,
+        'absent_deduction' => $absentDeduction,
+        'total_deduction' => $totalDeduction,
         'suggested_net_amount' => $netAmount,
     ]);
 
