@@ -23,11 +23,23 @@ const clearBtn = document.getElementById('clearBtn');
 const attendanceTableBody = document.getElementById('attendanceTableBody');
 const alertContainer = document.getElementById('alertContainer');
 
+// Modal Elements
+const editModal = document.getElementById('editModal');
+const editEmployeeIdEl = document.getElementById('editEmployeeId');
+const editDateEl = document.getElementById('editDate');
+const editCheckInTimeEl = document.getElementById('editCheckInTime');
+const editCheckOutTimeEl = document.getElementById('editCheckOutTime');
+const editStatusEl = document.getElementById('editStatus');
+const editNotesEl = document.getElementById('editNotes');
+
 // Error elements
 const employeeIdError = document.getElementById('employeeIdError');
 const departmentError = document.getElementById('departmentError');
 const checkInError = document.getElementById('checkInError');
 const checkOutError = document.getElementById('checkOutError');
+
+// Variable to store current record being edited
+let currentEditingRecord = null;
 
 // Remembers the grace period across page reloads (it's a personal
 // preference, not a tenant setting) — defaults to 15 minutes.
@@ -449,6 +461,102 @@ async function saveAttendanceRecord(isCheckout = false) {
     }
 }
 
+// Open Edit Modal
+function openEditModal(recordId, recordData) {
+    currentEditingRecord = recordId;
+    editEmployeeIdEl.value = recordData.employee_id;
+    editDateEl.value = recordData.attendance_date;
+    editCheckInTimeEl.value = recordData.check_in;
+    editCheckOutTimeEl.value = recordData.check_out;
+    editStatusEl.value = recordData.status;
+    editNotesEl.value = recordData.notes || '';
+    editModal.classList.add('show');
+}
+
+// Close Edit Modal
+function closeEditModal() {
+    editModal.classList.remove('show');
+    currentEditingRecord = null;
+}
+
+// Save Edited Record
+async function saveEditedRecord() {
+    const checkInTime = editCheckInTimeEl.value;
+    const checkOutTime = editCheckOutTimeEl.value;
+    const status = editStatusEl.value;
+    const notes = editNotesEl.value;
+
+    // Validate times
+    if (!checkInTime || !checkOutTime) {
+        showAlert('Check-in and check-out times are required', 'error');
+        return;
+    }
+
+    const checkInTimeObj = new Date(`2000-01-01T${checkInTime}`);
+    const checkOutTimeObj = new Date(`2000-01-01T${checkOutTime}`);
+
+    if (checkOutTimeObj <= checkInTimeObj) {
+        showAlert('Check-out time must be after check-in time', 'error');
+        return;
+    }
+
+    try {
+        const response = await fetch('../../../../server/api/hrm/attendance/attendance.php', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                id: currentEditingRecord,
+                checkIn: checkInTime,
+                checkOut: checkOutTime,
+                status: status,
+                notes: notes
+            })
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+            showAlert('Attendance record updated successfully', 'success');
+            closeEditModal();
+            updateAttendanceTable();
+        } else {
+            showAlert(result.message || 'Failed to update attendance', 'error');
+        }
+    } catch (error) {
+        console.error('Error updating attendance:', error);
+        showAlert('Error updating attendance record', 'error');
+    }
+}
+
+// Delete Attendance Record
+async function deleteAttendanceRecord(recordId, employeeId, date) {
+    if (!confirm(`Are you sure you want to delete attendance record for ${employeeId} on ${date}? This action cannot be undone.`)) {
+        return;
+    }
+
+    try {
+        const response = await fetch('../../../../server/api/hrm/attendance/attendance.php', {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                id: recordId
+            })
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+            showAlert('Attendance record deleted successfully', 'success');
+            updateAttendanceTable();
+        } else {
+            showAlert(result.message || 'Failed to delete attendance', 'error');
+        }
+    } catch (error) {
+        console.error('Error deleting attendance:', error);
+        showAlert('Error deleting attendance record', 'error');
+    }
+}
+
 // Update attendance table
 async function updateAttendanceTable() {
     try {
@@ -468,7 +576,7 @@ async function updateAttendanceTable() {
         if (!result.success || result.data.length === 0) {
             attendanceTableBody.innerHTML = `
                 <tr>
-                    <td colspan="7" style="text-align: center; color: var(--subtext);">
+                    <td colspan="8" style="text-align: center; color: var(--subtext);">
                         No attendance records found.
                     </td>
                 </tr>
@@ -498,7 +606,7 @@ async function updateAttendanceTable() {
         if (filteredData.length === 0) {
             attendanceTableBody.innerHTML = `
                 <tr>
-                    <td colspan="7" style="text-align: center; color: var(--subtext);">
+                    <td colspan="8" style="text-align: center; color: var(--subtext);">
                         No attendance records found.
                     </td>
                 </tr>
@@ -506,47 +614,72 @@ async function updateAttendanceTable() {
             return;
         }
 
-        filteredData.forEach(record => {
-            const row = document.createElement('tr');
+       filteredData.forEach(record => {
+    const row = document.createElement('tr');
 
-            let statusBadgeClass = 'badge-present';
-            let statusText = 'Present';
+    let statusBadgeClass = 'badge-present';
+    let statusText = 'Present';
 
-            if (record.status === 'late') {
-                statusBadgeClass = 'badge-late';
-                statusText = 'Late';
-            } else if (record.status === 'absent') {
-                statusBadgeClass = 'badge-absent';
-                statusText = 'Absent';
-            } else if (record.status === 'halfday') {
-                statusBadgeClass = 'badge-late';
-                statusText = 'Half Day';
-            } else if (record.status === 'on_leave') {
-                statusBadgeClass = record.leave_is_paid == 1 ? 'badge-late' : 'badge-absent';
-                statusText = record.leave_type_name || 'On Leave';
-            }
+    if (record.status === 'late') {
+        statusBadgeClass = 'badge-late';
+        statusText = 'Late';
+    } else if (record.status === 'absent') {
+        statusBadgeClass = 'badge-absent';
+        statusText = 'Absent';
+    } else if (record.status === 'halfday') {
+        statusBadgeClass = 'badge-late';
+        statusText = 'Half Day';
+    } else if (record.status === 'on_leave') {
+        statusBadgeClass = record.leave_is_paid == 1 ? 'badge-late' : 'badge-absent';
+        statusText = record.leave_type_name || 'On Leave';
+    }
 
-            row.innerHTML = `
-                <td>${record.attendance_date}</td>
-                <td>${record.employee_id}</td>
-                <td>${record.full_name || '-'}</td>
-                <td>${record.department_name || '-'}</td>
-                <td>${formatTimeForDisplay(record.check_in)}</td>
-                <td>${formatTimeForDisplay(record.check_out)}</td>
-                <td><span class="status-badge ${statusBadgeClass}">${statusText}</span></td>
-            `;
+    row.innerHTML = `
+        <td>${record.attendance_date}</td>
+        <td>${record.employee_id}</td>
+        <td>${record.full_name || '-'}</td>
+        <td>${record.department_name || '-'}</td>
+        <td>${formatTimeForDisplay(record.check_in)}</td>
+        <td>${formatTimeForDisplay(record.check_out)}</td>
+        <td><span class="status-badge ${statusBadgeClass}">${statusText}</span></td>
+        <td>
+            <div class="action-buttons">
+                <button class="btn-icon btn-edit" title="Edit Record" type="button">
+                    <i class="fas fa-edit"></i>
+                </button>
 
-            attendanceTableBody.appendChild(row);
-        });
+                <button class="btn-icon btn-delete" title="Delete Record" type="button">
+                    <i class="fas fa-trash"></i>
+                </button>
+            </div>
+        </td>
+    `;
+
+    // Edit button
+    const editButton = row.querySelector('.btn-edit');
+
+    editButton.addEventListener('click', function () {
+        openEditModal(record.id, record);
+    });
+
+    // Delete button
+    const deleteButton = row.querySelector('.btn-delete');
+
+    deleteButton.addEventListener('click', function () {
+        deleteAttendanceRecord(
+            record.id,
+            record.employee_id,
+            record.attendance_date
+        );
+    });
+
+    attendanceTableBody.appendChild(row);
+});
     } catch (error) {
-        // Was colspan="6" here while every other state above uses colspan="7"
-        // (there are 7 columns: Date, Employee ID, Name, Department,
-        // Check-in, Check-out, Status) — fixed so the row doesn't look
-        // misaligned when this state shows.
         console.error('Error loading attendance records:', error);
         attendanceTableBody.innerHTML = `
             <tr>
-                <td colspan="7" style="text-align: center; color: var(--error);">
+                <td colspan="8" style="text-align: center; color: var(--error);">
                     Error loading attendance records. Please refresh and try again.
                 </td>
             </tr>
@@ -623,6 +756,13 @@ async function setCheckOutNow() {
         showAlert('Check-out time set. Please select employee and department to save.', 'success');
     }
 }
+
+// Close modal when clicking outside
+window.addEventListener('click', function(event) {
+    if (event.target === editModal) {
+        closeEditModal();
+    }
+});
 
 // Initialize the application
 function init() {
@@ -729,8 +869,6 @@ function init() {
     filterDateEl.addEventListener('change', updateAttendanceTable);
     filterEmployeeEl.addEventListener('input', updateAttendanceTable);
     filterDepartmentEl.addEventListener('change', updateAttendanceTable);
-
-
 }
 
 // Initialize when DOM is loaded

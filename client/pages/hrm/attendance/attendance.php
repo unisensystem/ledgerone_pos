@@ -23,6 +23,170 @@ if (!$user_id) {
     <title>LedgerOne ERP - Attendance Entry</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="../../../assets/css/hrm/attendance/attendance.css">
+    <style>
+        .action-buttons {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .btn-icon {
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 16px;
+            padding: 6px 10px;
+            border-radius: 4px;
+            transition: all 0.2s ease;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .btn-edit {
+            color: var(--primary, #3498db);
+            background-color: rgba(52, 152, 219, 0.1);
+        }
+
+        .btn-edit:hover {
+            background-color: rgba(52, 152, 219, 0.2);
+            transform: scale(1.1);
+        }
+
+        .btn-delete {
+            color: var(--error, #e74c3c);
+            background-color: rgba(231, 76, 60, 0.1);
+        }
+
+        .btn-delete:hover {
+            background-color: rgba(231, 76, 60, 0.2);
+            transform: scale(1.1);
+        }
+
+        /* Modal Styles */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+        }
+
+        .modal.show {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-content {
+            background-color: var(--bg-secondary, #fff);
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            width: 90%;
+            max-width: 500px;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            border-bottom: 2px solid var(--border, #e0e0e0);
+            padding-bottom: 15px;
+        }
+
+        .modal-header h2 {
+            margin: 0;
+            font-size: 20px;
+        }
+
+        .close-btn {
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            color: var(--text-secondary, #666);
+        }
+
+        .close-btn:hover {
+            color: var(--text, #333);
+        }
+
+        .modal-body {
+            margin-bottom: 20px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+            color: var(--text, #333);
+        }
+
+        .form-group input,
+        .form-group select,
+        .form-group textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid var(--border, #ddd);
+            border-radius: 4px;
+            font-size: 14px;
+            font-family: inherit;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: var(--primary, #3498db);
+            box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1);
+        }
+
+        .modal-footer {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+        }
+
+        .btn-modal {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.2s ease;
+        }
+
+        .btn-modal-primary {
+            background-color: var(--primary, #3498db);
+            color: white;
+        }
+
+        .btn-modal-primary:hover {
+            background-color: var(--primary-dark, #2980b9);
+        }
+
+        .btn-modal-secondary {
+            background-color: var(--border, #e0e0e0);
+            color: var(--text, #333);
+        }
+
+        .btn-modal-secondary:hover {
+            background-color: var(--border-dark, #d0d0d0);
+        }
+    </style>
 </head>
 
 <body>
@@ -65,8 +229,6 @@ if (!$user_id) {
                         </label>
                         <div class="helper-text">Automatically check-in/out when employee is selected</div>
                     </div>
-
-
 
                     <div class="form-group">
                         <label for="department" class="required">Department</label>
@@ -187,6 +349,7 @@ if (!$user_id) {
                         <th>Check-in</th>
                         <th>Check-out</th>
                         <th>Status</th>
+                        <th>Actions</th>
                     </tr>
                 </thead>
                 <tbody id="attendanceTableBody">
@@ -195,6 +358,51 @@ if (!$user_id) {
             </table>
             <div class="helper-text" style="margin-top: var(--spacing-md);">
                 Showing today's attendance records. Use the form above to add new entries.
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Modal -->
+    <div id="editModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Edit Attendance Record</h2>
+                <button class="close-btn" onclick="closeEditModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>Employee ID</label>
+                    <input type="text" id="editEmployeeId" readonly>
+                </div>
+                <div class="form-group">
+                    <label>Date</label>
+                    <input type="text" id="editDate" readonly>
+                </div>
+                <div class="form-group">
+                    <label for="editCheckInTime">Check-in Time</label>
+                    <input type="time" id="editCheckInTime">
+                </div>
+                <div class="form-group">
+                    <label for="editCheckOutTime">Check-out Time</label>
+                    <input type="time" id="editCheckOutTime">
+                </div>
+                <div class="form-group">
+                    <label for="editStatus">Status</label>
+                    <select id="editStatus">
+                        <option value="present">Present</option>
+                        <option value="late">Late Arrival</option>
+                        <option value="halfday">Half Day</option>
+                        <option value="absent">Absent</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="editNotes">Notes</label>
+                    <textarea id="editNotes" rows="3" placeholder="Add any notes..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-modal btn-modal-secondary" onclick="closeEditModal()">Cancel</button>
+                <button class="btn-modal btn-modal-primary" onclick="saveEditedRecord()">Save Changes</button>
             </div>
         </div>
     </div>

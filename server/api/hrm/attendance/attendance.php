@@ -1,12 +1,7 @@
 <?php
-// Errors are LOGGED, never echoed, from an API endpoint. display_errors=1
-// here was the cause of the intermittent "Error loading attendance records"
-// error on the frontend: whenever PHP emitted any notice/warning (even a
-// harmless one, e.g. a duplicate session_start(), or a PHP 8 deprecation
-// notice), that warning text was printed into the response BEFORE the
-// json_encode() output. The browser's response.json() then failed to parse
-// the now-invalid JSON and the frontend fell into its catch block. Logging
-// instead of displaying keeps every response valid JSON.
+
+// Errors are LOGGED, never echoed, from an API endpoint.
+// This prevents PHP warnings/notices from corrupting JSON responses.
 ini_set('display_errors', 0);
 ini_set('log_errors', 1);
 error_reporting(E_ALL);
@@ -25,38 +20,81 @@ $tenant_id = $_SESSION['tenant_id'] ?? null;
 
 if (!$user_id || !$tenant_id) {
     http_response_code(401);
-    echo json_encode(['success' => false, 'message' => 'Unauthorized']);
+    echo json_encode([
+        'success' => false,
+        'message' => 'Unauthorized'
+    ]);
     exit;
 }
 
-// Wrapping the whole body in try/catch so that ANY unexpected error (a
-// failed query, a missing column, etc.) still comes back as valid JSON
-// with a message, instead of a half-printed PHP error breaking the
-// frontend's response.json() call again in some other way later.
 try {
+
+    /*
+    |--------------------------------------------------------------------------
+    | GET - FETCH ATTENDANCE RECORDS
+    |--------------------------------------------------------------------------
+    */
     if ($_SERVER['REQUEST_METHOD'] === 'GET') {
+
         $date = $_GET['date'] ?? date('Y-m-d');
 
         $stmt = $pdo->prepare("
-            SELECT a.id, a.employee_id, e.full_name, d.department_name,
-                   a.attendance_date,
-                   DATE_FORMAT(a.check_in_time, '%H:%i') as check_in,
-                   DATE_FORMAT(a.check_out_time, '%H:%i') as check_out,
-                   a.status, a.notes, lt.name AS leave_type_name, lt.is_paid AS leave_is_paid
+            SELECT
+                a.id,
+                a.employee_id,
+                e.full_name,
+                d.department_name,
+                a.attendance_date,
+                DATE_FORMAT(a.check_in_time, '%H:%i') AS check_in,
+                DATE_FORMAT(a.check_out_time, '%H:%i') AS check_out,
+                a.status,
+                a.notes,
+                lt.name AS leave_type_name,
+                lt.is_paid AS leave_is_paid
             FROM attendance a
-            LEFT JOIN employees e ON a.employee_id = e.employee_id AND e.tenant_id = ?
-            LEFT JOIN departments d ON e.department_id = d.id
-            LEFT JOIN leave_types lt ON lt.id = a.leave_type_id
-            WHERE a.tenant_id = ? AND a.attendance_date = ?
+            LEFT JOIN employees e
+                ON a.employee_id = e.employee_id
+                AND e.tenant_id = ?
+            LEFT JOIN departments d
+                ON e.department_id = d.id
+            LEFT JOIN leave_types lt
+                ON lt.id = a.leave_type_id
+            WHERE a.tenant_id = ?
+              AND a.attendance_date = ?
             ORDER BY a.check_in_time DESC
         ");
-        $stmt->execute([$tenant_id, $tenant_id, $date]);
+
+        $stmt->execute([
+            $tenant_id,
+            $tenant_id,
+            $date
+        ]);
+
         $records = $stmt->fetchAll();
 
-        echo json_encode(['success' => true, 'data' => $records]);
+        echo json_encode([
+            'success' => true,
+            'data' => $records
+        ]);
+        exit;
+    }
 
-    } elseif ($_SERVER['REQUEST_METHOD'] === 'POST') {
-        $data = json_decode(file_get_contents('php://input'), true);
+
+    /*
+    |--------------------------------------------------------------------------
+    | POST - CREATE / CHECK-OUT ATTENDANCE
+    |--------------------------------------------------------------------------
+    */
+    elseif ($_SERVER['REQUEST_METHOD'] === 'POST') {
+
+        $data = json_decode(
+            file_get_contents('php://input'),
+            true
+        );
+
+        if (!is_array($data)) {
+            $data = [];
+        }
 
         $employee_id = $data['employeeId'] ?? '';
         $check_in = $data['checkIn'] ?? '';
@@ -68,46 +106,127 @@ try {
 
         if (empty($employee_id)) {
             http_response_code(400);
-            echo json_encode(['success' => false, 'message' => 'Employee ID is required']);
+
+            echo json_encode([
+                'success' => false,
+                'message' => 'Employee ID is required'
+            ]);
             exit;
         }
 
-        // Check if record exists for today
+        // Check if record already exists for this employee/date.
         $checkStmt = $pdo->prepare("
-            SELECT id, status as old_status, notes as old_notes FROM attendance
-            WHERE tenant_id = ? AND employee_id = ? AND attendance_date = ?
+            SELECT
+                id,
+                status AS old_status,
+                notes AS old_notes
+            FROM attendance
+            WHERE tenant_id = ?
+              AND employee_id = ?
+              AND attendance_date = ?
         ");
-        $checkStmt->execute([$tenant_id, $employee_id, $date]);
+
+        $checkStmt->execute([
+            $tenant_id,
+            $employee_id,
+            $date
+        ]);
+
         $existing = $checkStmt->fetch(PDO::FETCH_ASSOC);
 
+        /*
+        |--------------------------------------------------------------------------
+        | CHECK-OUT EXISTING RECORD
+        |--------------------------------------------------------------------------
+        */
         if ($existing && $is_checkout) {
-            // Update existing record with check-out time
-            $check_out_datetime = $date . ' ' . $check_out . ':00';
-            $stmt = $pdo->prepare("
-                UPDATE attendance
-                SET check_out_time = ?, status = ?, notes = ?
-                WHERE id = ?
-            ");
 
-            $result = $stmt->execute([$check_out_datetime, $status, $notes, $existing['id']]);
+            if (empty($check_out)) {
+                http_response_code(400);
+
+                echo json_encode([
+                    'success' => false,
+                    'message' => 'Check-out time is required'
+                ]);
+                exit;
+            }
+
+            $check_out_datetime = $date . ' ' . $check_out . ':00';
+
+      $stmt = $pdo->prepare("
+    UPDATE attendance
+    SET
+        check_out_time = ?,
+        status = ?,
+        notes = ?
+    WHERE id = ?
+      AND tenant_id = ?
+");
+
+$result = $stmt->execute([
+    $check_out_datetime,
+    $status,
+    $notes,
+    $existing['id'],
+    $tenant_id
+]);
+            
 
             if ($result) {
+
                 logActivity(
-                    $pdo, $tenant_id, $user_id, 'update', 'Attendance', $existing['id'], "$employee_id - $date",
+                    $pdo,
+                    $tenant_id,
+                    $user_id,
+                    'update',
+                    'Attendance',
+                    $existing['id'],
+                    "$employee_id - $date",
                     "Recorded check-out for employee \"$employee_id\" on $date at $check_out (status: $status)",
-                    ['status' => $existing['old_status'], 'notes' => $existing['old_notes'], 'check_out_time' => null],
-                    ['status' => $status, 'notes' => $notes, 'check_out_time' => $check_out_datetime]
+                    [
+                        'status' => $existing['old_status'],
+                        'notes' => $existing['old_notes'],
+                        'check_out_time' => null
+                    ],
+                    [
+                        'status' => $status,
+                        'notes' => $notes,
+                        'check_out_time' => $check_out_datetime
+                    ]
                 );
-                echo json_encode(['success' => true, 'message' => 'Check-out saved successfully']);
+
+                echo json_encode([
+                    'success' => true,
+                    'message' => 'Check-out saved successfully'
+                ]);
             } else {
+
                 http_response_code(500);
-                echo json_encode(['success' => false, 'message' => 'Failed to save check-out']);
+
+                echo json_encode([
+                    'success' => false,
+                    'message' => 'Failed to save check-out'
+                ]);
             }
-        } else {
-            // Insert new record with check-in
+
+            exit;
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | CREATE NEW ATTENDANCE RECORD
+        |--------------------------------------------------------------------------
+        */
+        else {
+
             if (empty($check_in) || empty($check_out)) {
                 http_response_code(400);
-                echo json_encode(['success' => false, 'message' => 'Check-in and check-out times are required']);
+
+                echo json_encode([
+                    'success' => false,
+                    'message' => 'Check-in and check-out times are required'
+                ]);
                 exit;
             }
 
@@ -116,35 +235,414 @@ try {
 
             $stmt = $pdo->prepare("
                 INSERT INTO attendance
-                (tenant_id, employee_id, check_in_time, check_out_time, attendance_date, status, notes)
+                (
+                    tenant_id,
+                    employee_id,
+                    check_in_time,
+                    check_out_time,
+                    attendance_date,
+                    status,
+                    notes
+                )
                 VALUES (?, ?, ?, ?, ?, ?, ?)
             ");
 
-            if ($stmt->execute([$tenant_id, $employee_id, $check_in_datetime, $check_out_datetime, $date, $status, $notes])) {
+            $result = $stmt->execute([
+                $tenant_id,
+                $employee_id,
+                $check_in_datetime,
+                $check_out_datetime,
+                $date,
+                $status,
+                $notes
+            ]);
+
+            if ($result) {
+
                 $newAttendanceId = $pdo->lastInsertId();
+
                 logActivity(
-                    $pdo, $tenant_id, $user_id, 'create', 'Attendance', $newAttendanceId, "$employee_id - $date",
+                    $pdo,
+                    $tenant_id,
+                    $user_id,
+                    'create',
+                    'Attendance',
+                    $newAttendanceId,
+                    "$employee_id - $date",
                     "Recorded attendance for employee \"$employee_id\" on $date: $check_in - $check_out (status: $status)",
                     null,
-                    ['employee_id' => $employee_id, 'attendance_date' => $date, 'check_in_time' => $check_in_datetime, 'check_out_time' => $check_out_datetime, 'status' => $status, 'notes' => $notes]
+                    [
+                        'employee_id' => $employee_id,
+                        'attendance_date' => $date,
+                        'check_in_time' => $check_in_datetime,
+                        'check_out_time' => $check_out_datetime,
+                        'status' => $status,
+                        'notes' => $notes
+                    ]
                 );
-                echo json_encode(['success' => true, 'message' => 'Attendance saved successfully']);
+
+                echo json_encode([
+                    'success' => true,
+                    'message' => 'Attendance saved successfully'
+                ]);
             } else {
+
                 http_response_code(500);
-                echo json_encode(['success' => false, 'message' => 'Failed to save attendance']);
+
+                echo json_encode([
+                    'success' => false,
+                    'message' => 'Failed to save attendance'
+                ]);
             }
+
+            exit;
         }
-    } else {
-        http_response_code(405);
-        echo json_encode(['success' => false, 'message' => 'Method not allowed']);
     }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | PUT - UPDATE ATTENDANCE RECORD
+    |--------------------------------------------------------------------------
+    */
+    elseif ($_SERVER['REQUEST_METHOD'] === 'PUT') {
+
+        $input = json_decode(
+            file_get_contents('php://input'),
+            true
+        );
+
+        if (!is_array($input)) {
+            $input = [];
+        }
+
+        $id = isset($input['id'])
+            ? (int)$input['id']
+            : 0;
+
+        $checkIn = isset($input['checkIn'])
+            ? trim($input['checkIn'])
+            : '';
+
+        $checkOut = isset($input['checkOut'])
+            ? trim($input['checkOut'])
+            : '';
+
+        $status = isset($input['status'])
+            ? trim($input['status'])
+            : '';
+
+        $notes = isset($input['notes'])
+            ? trim($input['notes'])
+            : '';
+
+        if ($id <= 0) {
+            http_response_code(400);
+
+            echo json_encode([
+                'success' => false,
+                'message' => 'Invalid attendance record ID'
+            ]);
+            exit;
+        }
+
+        if ($checkIn === '' || $checkOut === '') {
+            http_response_code(400);
+
+            echo json_encode([
+                'success' => false,
+                'message' => 'Check-in and check-out times are required'
+            ]);
+            exit;
+        }
+
+        // Make sure this record belongs to the current tenant.
+        $checkStmt = $pdo->prepare("
+            SELECT id
+            FROM attendance
+            WHERE id = ?
+              AND tenant_id = ?
+            LIMIT 1
+        ");
+
+        $checkStmt->execute([
+            $id,
+            $tenant_id
+        ]);
+
+        $existingRecord = $checkStmt->fetch(PDO::FETCH_ASSOC);
+
+        if (!$existingRecord) {
+            http_response_code(404);
+
+            echo json_encode([
+                'success' => false,
+                'message' => 'Attendance record not found'
+            ]);
+            exit;
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | UPDATE RECORD
+        |--------------------------------------------------------------------------
+        |
+        | IMPORTANT:
+        | The rest of this file uses check_in_time and check_out_time.
+        | Therefore PUT also updates those same database columns.
+        |
+        */
+        $updateStmt = $pdo->prepare("
+            UPDATE attendance
+            SET
+                check_in_time = ?,
+                check_out_time = ?,
+                status = ?,
+                notes = ?
+            WHERE id = ?
+              AND tenant_id = ?
+        ");
+
+        /*
+        | Convert HH:MM to the same datetime format used by POST.
+        */
+        $recordStmt = $pdo->prepare("
+            SELECT attendance_date
+            FROM attendance
+            WHERE id = ?
+              AND tenant_id = ?
+            LIMIT 1
+        ");
+
+        $recordStmt->execute([
+            $id,
+            $tenant_id
+        ]);
+
+        $record = $recordStmt->fetch(PDO::FETCH_ASSOC);
+
+        if (!$record) {
+            http_response_code(404);
+
+            echo json_encode([
+                'success' => false,
+                'message' => 'Attendance record not found'
+            ]);
+            exit;
+        }
+
+        $attendanceDate = $record['attendance_date'];
+
+        $checkInDateTime = $attendanceDate . ' ' . $checkIn . ':00';
+        $checkOutDateTime = $attendanceDate . ' ' . $checkOut . ':00';
+
+        $updated = $updateStmt->execute([
+            $checkInDateTime,
+            $checkOutDateTime,
+            $status,
+            $notes,
+            $id,
+            $tenant_id
+        ]);
+
+        if ($updated) {
+
+            // Activity log
+            try {
+
+                logActivity(
+                    $pdo,
+                    $tenant_id,
+                    $user_id,
+                    'update',
+                    'Attendance',
+                    $id,
+                    'Attendance record updated',
+                    null,
+                    [
+                        'check_in_time' => $checkInDateTime,
+                        'check_out_time' => $checkOutDateTime,
+                        'status' => $status,
+                        'notes' => $notes
+                    ]
+                );
+
+            } catch (Throwable $logError) {
+
+                error_log(
+                    'Attendance update activity log error: ' .
+                    $logError->getMessage()
+                );
+            }
+
+            echo json_encode([
+                'success' => true,
+                'message' => 'Attendance record updated successfully'
+            ]);
+
+        } else {
+
+            http_response_code(500);
+
+            echo json_encode([
+                'success' => false,
+                'message' => 'Failed to update attendance record'
+            ]);
+        }
+
+        exit;
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | DELETE - DELETE ATTENDANCE RECORD
+    |--------------------------------------------------------------------------
+    */
+    elseif ($_SERVER['REQUEST_METHOD'] === 'DELETE') {
+
+        $input = json_decode(
+            file_get_contents('php://input'),
+            true
+        );
+
+        if (!is_array($input)) {
+            $input = [];
+        }
+
+        $id = isset($input['id'])
+            ? (int)$input['id']
+            : 0;
+
+        if ($id <= 0) {
+            http_response_code(400);
+
+            echo json_encode([
+                'success' => false,
+                'message' => 'Invalid attendance record ID'
+            ]);
+            exit;
+        }
+
+        // Make sure this record belongs to the current tenant.
+        $checkStmt = $pdo->prepare("
+            SELECT id
+            FROM attendance
+            WHERE id = ?
+              AND tenant_id = ?
+            LIMIT 1
+        ");
+
+        $checkStmt->execute([
+            $id,
+            $tenant_id
+        ]);
+
+        $existingRecord = $checkStmt->fetch(PDO::FETCH_ASSOC);
+
+        if (!$existingRecord) {
+            http_response_code(404);
+
+            echo json_encode([
+                'success' => false,
+                'message' => 'Attendance record not found'
+            ]);
+            exit;
+        }
+
+        // Delete record.
+        $deleteStmt = $pdo->prepare("
+            DELETE FROM attendance
+            WHERE id = ?
+              AND tenant_id = ?
+        ");
+
+        $deleted = $deleteStmt->execute([
+            $id,
+            $tenant_id
+        ]);
+
+        if ($deleted && $deleteStmt->rowCount() > 0) {
+
+            // Activity log.
+            try {
+
+                logActivity(
+                    $pdo,
+                    $tenant_id,
+                    $user_id,
+                    'delete',
+                    'Attendance',
+                    $id,
+                    'Attendance record deleted',
+                    null,
+                    null
+                );
+
+            } catch (Throwable $logError) {
+
+                error_log(
+                    'Attendance delete activity log error: ' .
+                    $logError->getMessage()
+                );
+            }
+
+            echo json_encode([
+                'success' => true,
+                'message' => 'Attendance record deleted successfully'
+            ]);
+
+        } else {
+
+            http_response_code(500);
+
+            echo json_encode([
+                'success' => false,
+                'message' => 'Failed to delete attendance record'
+            ]);
+        }
+
+        exit;
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | METHOD NOT ALLOWED
+    |--------------------------------------------------------------------------
+    */
+    else {
+
+        http_response_code(405);
+
+        echo json_encode([
+            'success' => false,
+            'message' => 'Method not allowed'
+        ]);
+
+        exit;
+    }
+
+
 } catch (Throwable $e) {
-    error_log('Attendance API Error: ' . $e->getMessage());
+
+    error_log(
+        'Attendance API Error: ' .
+        $e->getMessage() .
+        ' in ' .
+        $e->getFile() .
+        ':' .
+        $e->getLine()
+    );
+
     http_response_code(500);
+
     echo json_encode([
         'success' => false,
         'message' => $e->getMessage(),
         'file' => $e->getFile(),
         'line' => $e->getLine()
     ]);
+
+    exit;
 }
