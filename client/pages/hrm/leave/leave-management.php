@@ -9,13 +9,17 @@ if (!$user_id) {
     header('Location: ../../auth/login.html');
     exit();
 }
-// This page is now wired to server/api/hrm/leave/leave-request.php:
-//   - GET  ?action=bootstrap  -> employees, leave types, daily/hourly rates, used-quota balances
-//   - POST action=submit      -> creates the record; replies "needs_decision" if the request
-//                                 goes past the paid quota, so HR can choose Paid/Unpaid for the excess
-//   - POST action=add_type / delete_type -> manage custom leave types
-// Run sql/leave-management-migration.sql once before using this page (adds leave_types
-// table + a few columns on leave_records — nothing existing is dropped or renamed).
+// This page is wired to server/api/hrm/leave/leave-request.php:
+//   - GET  ?action=bootstrap  -> employees, leave types (Annual/Casual/Sick/Over Time),
+//                                 daily/hourly rates
+//   - POST action=submit      -> creates the record. Payment is decided up front via
+//                                 a Paid / Unpaid / Split dropdown, sent as pay_mode
+//                                 ('paid' | 'unpaid' | 'split' + unpaid_days) — no quota
+//                                 tracking, no over-quota approval round trip.
+//   - POST action=edit        -> updates a pending record in place
+//   - POST action=delete / update_status -> remove / approve-reject a record
+// Leave types are fixed (seeded once by ensureBuiltinTypes()) — there is no
+// "add custom leave type" feature.
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -66,17 +70,18 @@ if (!$user_id) {
                     </div>
                     <div class="card-body">
                         <div class="type-list" id="typeList"></div>
-                        <div class="add-type-card" id="addTypeBtn">
-                            <i class="fas fa-plus"></i> Add Leave Type
-                        </div>
 
-                        <div class="new-type-form" id="newTypeForm">
-                            <input type="text" id="newTypeName" placeholder="e.g. Maternity Leave">
-                            <label for="newTypeQuota">Paid days per year (0 = fully unpaid)</label>
-                            <input type="number" min="0" step="1" value="5" id="newTypeQuota">
-                            <div class="new-type-actions">
-                                <button class="btn" id="cancelNewType">Cancel</button>
-                                <button class="btn btn-primary" id="saveNewType">Save</button>
+                        <!-- Payment: chosen right after picking a type, no quota calculation -->
+                        <div class="field" id="payModeRow" style="margin-top:12px;">
+                            <label>Payment <span class="req">*</span></label>
+                            <select class="text-input" id="payModeSelect">
+                                <option value="paid">Paid — all days paid</option>
+                                <option value="unpaid">Unpaid — all days unpaid</option>
+                                <option value="split">Split — some paid, some unpaid</option>
+                            </select>
+                            <div class="split-box" id="splitBox" style="display:none;">
+                                <label for="splitUnpaidInput">Unpaid days (out of <span id="splitTotalDays">0</span>)</label>
+                                <input type="number" class="text-input" id="splitUnpaidInput" min="0" step="0.5" value="0">
                             </div>
                         </div>
                     </div>
@@ -89,7 +94,7 @@ if (!$user_id) {
                     <h2>3. Request Details</h2>
                 </div>
                 <div class="card-body">
-                    <span class="mode-tag" id="modeTag"><i class="fas fa-sun"></i> Annual Leave — Paid</span>
+                    <span class="mode-tag" id="modeTag"><i class="fas fa-sun"></i> Annual Leave</span>
                     <div class="rate-info" id="rateInfo" style="display:none;"></div>
 
                     <div class="details-grid">
@@ -111,17 +116,6 @@ if (!$user_id) {
                                         <input type="checkbox" id="halfDay"> <label for="halfDay">Half-day leave</label>
                                     </div>
                                     <div class="days-out" id="daysOut">Pick a date to see the total</div>
-
-                                    <!-- Shown only when a request goes past the paid quota -->
-                                    <div class="decision-box" id="decisionBox" style="display:none;">
-                                        <div class="decision-msg" id="decisionMsg"></div>
-                                        <input type="text" id="overrideReason" placeholder="Reason (optional) — e.g. approved by manager">
-                                        <div class="decision-actions">
-                                            <button type="button" class="btn" id="decisionUnpaid"><i class="fas fa-ban"></i> Mark Extra as Unpaid</button>
-                                            <button type="button" class="btn btn-primary" id="decisionPaid"><i class="fas fa-check"></i> Mark Extra as Paid</button>
-                                            
-                                        </div>
-                                    </div>
                                 </div>
                             </div>
 
@@ -166,13 +160,7 @@ if (!$user_id) {
                                     </select>
                                 </div>
                             </div>
-                           <button type="button" class="btn btn-full" id="sendToDashboardBtn" style="margin-top:8px;">
-    <i class="fas fa-bell"></i> Send to Dashboard for Approval
-</button>
-<button type="button" class="btn btn-full" id="decisionPending" style="margin-top:8px; display:none;">
-    <i class="fas fa-bell"></i> Send to Dashboard for Approval
-</button>
-                            <button class="btn btn-primary btn-full" id="submitBtn" disabled  style="display:none;">
+                            <button class="btn btn-primary btn-full" id="submitBtn" disabled style="margin-top:8px;">
                                 <i class="fas fa-paper-plane"></i> Submit Request
                             </button>
                         </div>
@@ -181,7 +169,7 @@ if (!$user_id) {
             </div>
         </div>
 
-              <!-- Recent requests -->
+        <!-- Recent requests -->
         <div class="card table-card">
             <div class="card-head req-head" id="reqHead">
                 <h2>Recent Requests</h2>

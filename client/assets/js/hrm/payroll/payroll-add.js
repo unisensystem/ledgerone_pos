@@ -89,7 +89,7 @@ function initializeForm() {
     const urlParams = new URLSearchParams(window.location.search);
     const viewId = urlParams.get('view');
     const editId = urlParams.get('edit');
-    
+
     if (viewId || editId) {
         loadPayrollData(viewId || editId, !!viewId);
     } else {
@@ -143,7 +143,7 @@ function loadPayrollData(id, isViewMode) {
                     payroll.items.forEach((item, index) => {
                         addTableRow();
                     });
-                    
+
                     setTimeout(() => {
                         const rows = tableBody.querySelectorAll('tr');
                         payroll.items.forEach((item, index) => {
@@ -189,7 +189,7 @@ function loadPayrollData(id, isViewMode) {
                             }
                         });
                     }, 200);
-                    
+
                     if (isViewMode) {
                         // Disable all inputs in view mode
                         document.querySelectorAll('input, select, button').forEach(el => {
@@ -213,21 +213,21 @@ function loadPayrollData(id, isViewMode) {
 function addTableRow() {
     const rowIndex = tableBody.children.length;
     const row = document.createElement('tr');
-    
+
     let paymentMethodOptions = '';
     if (paymentMethods && paymentMethods.length > 0) {
-        paymentMethodOptions = paymentMethods.map(method => 
+        paymentMethodOptions = paymentMethods.map(method =>
             `<option value="${method.id}">${method.name}</option>`
         ).join('');
     }
-    
+
     let bankAccountOptions = '';
     if (bankAccounts && bankAccounts.length > 0) {
-        bankAccountOptions = bankAccounts.map(account => 
+        bankAccountOptions = bankAccounts.map(account =>
             `<option value="${account.id}">${account.name}</option>`
         ).join('');
     }
-    
+
     row.innerHTML = `
                 <td>
                     <div class="dropdown">
@@ -395,7 +395,7 @@ function addRowEventListeners(row, rowIndex) {
 
     paymentMethodSelect.addEventListener('change', () => {
         const methodId = paymentMethodSelect.value;
-        
+
         // Show bank account if payment method is not Cash (7)
         if (methodId && methodId != '7') {
             bankAccountSelect.style.display = 'block';
@@ -403,7 +403,7 @@ function addRowEventListeners(row, rowIndex) {
             bankAccountSelect.style.display = 'none';
             bankAccountSelect.value = '';
         }
-        
+
         // Show cheque date if payment method is Cheque (6)
         if (methodId == '6') {
             chequeDateInput.style.display = 'block';
@@ -605,37 +605,125 @@ function showDetailModal(employeeLabel, leaveRecords, otRecords, pendingCount) {
     modal.querySelector('#detailModalTitle').textContent = `${employeeLabel} — Leave & Overtime`;
     const body = modal.querySelector('#detailModalBody');
 
-    let html = '<h4>Approved Leave</h4>';
+    // Find the row to get breakdown numbers
+    const rows = tableBody.querySelectorAll('tr');
+    let grossAmount = 0, unpaidDeduction = 0, otAmount = 0, netAmount = 0, dailyRate = 0, paidLeaveDays = 0, unpaidLeaveDays = 0, otHours = 0;
+    rows.forEach(row => {
+        const empCode = row.querySelector('.employee-code').value;
+        if (empCode && employeeLabel.includes(empCode.split(' - ')[0])) {
+            grossAmount     = Number(row.dataset.grossAmount || 0);
+            unpaidDeduction = Number(row.dataset.deductionAmount || 0);
+            otAmount        = Number(row.dataset.otAmount || 0);
+            dailyRate       = Number(row.dataset.dailyRate || 0);
+            paidLeaveDays   = Number(row.dataset.paidLeaveDays || 0);
+            unpaidLeaveDays = Number(row.dataset.unpaidLeaveDays || 0);
+            otHours         = Number(row.dataset.otHours || 0);
+            netAmount       = grossAmount - unpaidDeduction + otAmount;
+        }
+    });
+
+    let html = '';
+
+    // ── Summary Card ──
+    html += `
+        <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:14px 16px; margin-bottom:16px;">
+            <div style="font-size:12px; font-weight:700; color:#64748b; text-transform:uppercase; letter-spacing:.6px; margin-bottom:10px;">Salary Breakdown</div>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+                <div style="background:white; border:1px solid #e2e8f0; border-radius:8px; padding:10px 12px;">
+                    <div style="font-size:11px; color:#94a3b8; margin-bottom:3px;">Gross Salary</div>
+                    <div style="font-size:15px; font-weight:700; color:#0f172a;">${currencySymbol} ${grossAmount.toLocaleString('en-PK', {minimumFractionDigits:2, maximumFractionDigits:2})}</div>
+                </div>
+                <div style="background:white; border:1px solid #e2e8f0; border-radius:8px; padding:10px 12px;">
+                    <div style="font-size:11px; color:#94a3b8; margin-bottom:3px;">Daily Rate</div>
+                    <div style="font-size:15px; font-weight:700; color:#0f172a;">${currencySymbol} ${dailyRate.toLocaleString('en-PK', {minimumFractionDigits:2, maximumFractionDigits:2})}</div>
+                </div>
+                <div style="background:#fef2f2; border:1px solid #fecaca; border-radius:8px; padding:10px 12px;">
+                    <div style="font-size:11px; color:#94a3b8; margin-bottom:3px;">Unpaid Leave Deduction</div>
+                    <div style="font-size:15px; font-weight:700; color:#dc2626;">
+                        − ${currencySymbol} ${unpaidDeduction.toLocaleString('en-PK', {minimumFractionDigits:2, maximumFractionDigits:2})}
+                    </div>
+                    <div style="font-size:11px; color:#94a3b8; margin-top:2px;">${unpaidLeaveDays} day(s) × ${currencySymbol}${dailyRate.toFixed(2)}</div>
+                </div>
+                <div style="background:#f0fdf4; border:1px solid #bbf7d0; border-radius:8px; padding:10px 12px;">
+                    <div style="font-size:11px; color:#94a3b8; margin-bottom:3px;">Overtime Added</div>
+                    <div style="font-size:15px; font-weight:700; color:#16a34a;">
+                        + ${currencySymbol} ${otAmount.toLocaleString('en-PK', {minimumFractionDigits:2, maximumFractionDigits:2})}
+                    </div>
+                    <div style="font-size:11px; color:#94a3b8; margin-top:2px;">${otHours} hour(s)</div>
+                </div>
+            </div>
+            <!-- Net total -->
+            <div style="margin-top:10px; padding:10px 12px; background:linear-gradient(135deg,#1f7bff,#1559b8); border-radius:8px; display:flex; justify-content:space-between; align-items:center;">
+                <span style="font-size:13px; font-weight:600; color:rgba(255,255,255,.85);">Net Salary</span>
+                <span style="font-size:18px; font-weight:800; color:white;">${currencySymbol} ${netAmount.toLocaleString('en-PK', {minimumFractionDigits:2, maximumFractionDigits:2})}</span>
+            </div>
+        </div>`;
+
+    // ── Approved Leave ──
+    html += `<h4 style="margin:14px 0 8px; font-size:13px; color:#374151;">Approved Leave</h4>`;
     if (leaveRecords.length === 0) {
-        html += '<p class="detail-empty">No approved leave this month.</p>';
+        html += `<p class="detail-empty">No approved leave this month.</p>`;
     } else {
-        html += '<table class="detail-table"><thead><tr><th>Dates</th><th>Type</th><th>Paid Days</th><th>Unpaid Days</th></tr></thead><tbody>';
+        html += `<table class="detail-table">
+            <thead><tr><th>Dates</th><th>Type</th><th>Total</th><th>Paid</th><th>Unpaid</th></tr></thead><tbody>`;
         leaveRecords.forEach(r => {
             const dates = r.start_date === r.end_date ? r.start_date : `${r.start_date} – ${r.end_date}`;
-            html += `<tr><td>${dates}</td><td>${r.leave_type}</td><td>${r.paid_days}</td><td>${r.unpaid_days}</td></tr>`;
+            html += `<tr>
+                <td>${dates}</td>
+                <td>${r.leave_type}</td>
+                <td>${r.total_days} day(s)</td>
+                <td style="color:#16a34a; font-weight:600;">${r.paid_days}</td>
+                <td style="color:#dc2626; font-weight:600;">${r.unpaid_days}</td>
+            </tr>`;
         });
-        html += '</tbody></table>';
+        // Leave totals row
+        const totalPaid   = leaveRecords.reduce((s, r) => s + r.paid_days, 0);
+        const totalUnpaid = leaveRecords.reduce((s, r) => s + r.unpaid_days, 0);
+        html += `<tr style="background:#f8fafc; font-weight:700; border-top:2px solid #e2e8f0;">
+            <td colspan="2">Total</td>
+            <td>${(totalPaid + totalUnpaid)} day(s)</td>
+            <td style="color:#16a34a;">${totalPaid}</td>
+            <td style="color:#dc2626;">${totalUnpaid}</td>
+        </tr>`;
+        html += `</tbody></table>`;
     }
 
-    html += '<h4>Overtime</h4>';
+    // ── Overtime ──
+    html += `<h4 style="margin:14px 0 8px; font-size:13px; color:#374151;">Overtime</h4>`;
     if (otRecords.length === 0) {
-        html += '<p class="detail-empty">No approved overtime this month.</p>';
+        html += `<p class="detail-empty">No approved overtime this month.</p>`;
     } else {
-        html += '<table class="detail-table"><thead><tr><th>Date</th><th>Hours</th><th>Rate</th><th>Amount</th></tr></thead><tbody>';
+        html += `<table class="detail-table">
+            <thead><tr><th>Date</th><th>Hours</th><th>Rate</th><th>Amount</th></tr></thead><tbody>`;
         otRecords.forEach(r => {
-            html += `<tr><td>${r.date}</td><td>${r.hours}</td><td>${r.rate_multiplier}x</td><td>+${currencySymbol}${Number(r.amount).toFixed(2)}</td></tr>`;
+            html += `<tr>
+                <td>${r.date}</td>
+                <td>${r.hours} hrs</td>
+                <td>${r.rate_multiplier}x</td>
+                <td style="color:#16a34a; font-weight:600;">+ ${currencySymbol}${Number(r.amount).toFixed(2)}</td>
+            </tr>`;
         });
-        html += '</tbody></table>';
+        // OT totals row
+        const totalOtHrs = otRecords.reduce((s, r) => s + r.hours, 0);
+        const totalOtAmt = otRecords.reduce((s, r) => s + r.amount, 0);
+        html += `<tr style="background:#f8fafc; font-weight:700; border-top:2px solid #e2e8f0;">
+            <td colspan="2">Total</td>
+            <td>${totalOtHrs} hrs</td>
+            <td style="color:#16a34a;">+ ${currencySymbol}${totalOtAmt.toFixed(2)}</td>
+        </tr>`;
+        html += `</tbody></table>`;
     }
 
     if (pendingCount > 0) {
-        html += `<p class="detail-empty">${pendingCount} pending leave request(s) this month are not counted yet — approve them on the Leave page first.</p>`;
+        html += `<div style="margin-top:12px; padding:10px 12px; background:#fef3c7; border:1px solid #fde68a; border-radius:8px; font-size:13px; color:#92400e;">
+            <i class="fas fa-triangle-exclamation"></i>
+            <strong>${pendingCount}</strong> pending leave request(s) this month are not counted yet — approve them on the Leave page first.
+        </div>`;
     }
 
     body.innerHTML = html;
     modal.classList.add('show');
 }
-
 // Form validation
 function validateForm() {
     const rows = tableBody.querySelectorAll('tr');
@@ -745,7 +833,7 @@ function submitPayroll() {
 
     submitBtn.disabled = true;
 
-    const apiUrl = editPayrollId 
+    const apiUrl = editPayrollId
         ? '../../../../server/api/hrm/payroll/payroll-edit.php'
         : '../../../../server/api/hrm/payroll/payroll-add.php';
 
@@ -754,20 +842,20 @@ function submitPayroll() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
     })
-    .then(res => res.json())
-    .then(data => {
-        if (data.success) {
-            alert('Payroll submitted successfully!');
-            window.location.href = 'payroll-list.php';
-        } else {
-            alert('Error: ' + data.message);
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                alert('Payroll submitted successfully!');
+                window.location.href = 'payroll-list.php';
+            } else {
+                alert('Error: ' + data.message);
+                submitBtn.disabled = false;
+            }
+        })
+        .catch(err => {
+            alert('Error submitting payroll: ' + err.message);
             submitBtn.disabled = false;
-        }
-    })
-    .catch(err => {
-        alert('Error submitting payroll: ' + err.message);
-        submitBtn.disabled = false;
-    });
+        });
 }
 
 // Styles for the "View Details" popup — injected here (rather than the CSS file)

@@ -1,22 +1,23 @@
 /* =========================================================================
    Leave Management — wired to server/api/hrm/leave/leave-request.php
-   UPDATED: Includes edit/delete features for pending requests
-   UPDATED: Name search + fixed Clear Filters + per-column hide/unhide
+   SIMPLIFIED: Only 4 fixed leave types (Annual, Casual, Sick, Over Time).
+   No custom leave types. Payment for a request is chosen manually via a
+   Paid / Unpaid / Split dropdown — no quota tracking, no excess-approval flow.
+   Includes edit/delete for pending requests + name/date/status filters +
+   per-column hide/unhide.
    ========================================================================= */
 
 const API_URL = '../../../../server/api/hrm/leave/leave-request.php';
 
 let employees = [];
 let leaveTypes = [];
-let usedPaid = {};
 let allRequests = []; // Store all requests for edit/delete operations
-const BUILT_IN_NAMES = ['Annual Leave', 'Casual Leave', 'Sick Leave', 'Over Time'];
 
 let selectedEmployee = null;
 let selectedType = null;
 let rangeStart = null, rangeEnd = null;
 let calView = new Date();
-let pendingExcess = null;
+let payMode = 'paid'; // 'paid' | 'unpaid' | 'split' — how this request is paid
 let editingRecordId = null; // Track if we're editing an existing record
 
 /* ---------- Helpers ---------- */
@@ -52,20 +53,12 @@ async function api(action, payload) {
     return res.json();
 }
 
-function getBalance(empCode, type) {
-    if (isOT(type)) return null;
-    const used = (usedPaid[empCode] && usedPaid[empCode][type.id]) || 0;
-    const quota = type.quota || 0;
-    return { quota, used, remaining: Math.max(0, quota - used) };
-}
-
 /* ---------- Bootstrap ---------- */
 async function init() {
     const data = await api('bootstrap');
     if (!data.success) { alert(data.message || 'Failed to load leave data'); return; }
     employees = data.employees;
     leaveTypes = data.leave_types;
-    usedPaid = data.used_paid || {};
     allRequests = data.recent_requests || [];
     selectedType = leaveTypes[0];
     renderEmpList();
@@ -100,9 +93,10 @@ function renderEmpList(filter = '') {
 
 function selectEmployee(e) {
     selectedEmployee = e;
-    pendingExcess = null;
-    editingRecordId = null;
-    hideDecisionBox();
+    // Don't reset editingRecordId — let edit mode continue if already active
+    if (!editingRecordId) {  // Only reset if NOT editing
+        editingRecordId = null;
+    }
     renderEmpList(document.getElementById('empSearch').value);
     empComboLabel.innerHTML = `<span class="picked"><span class="emp-avatar">${initials(e.name)}</span>${esc(e.name)} — ${esc(e.id)}</span>`;
     empComboLabel.classList.remove('placeholder');
@@ -120,87 +114,66 @@ document.addEventListener('click', ev => { if (!empCombo.contains(ev.target)) cl
 document.getElementById('empSearch').addEventListener('input', ev => renderEmpList(ev.target.value));
 document.getElementById('empSearch').addEventListener('click', ev => ev.stopPropagation());
 
-/* ---------- Leave types ---------- */
+/* ---------- Leave types (fixed: Annual, Casual, Sick, Over Time) ---------- */
 const typeList = document.getElementById('typeList');
-
-function balanceLine(t) {
-    if (isOT(t) || !t.quota) return '';
-    if (!selectedEmployee) return `<span class="type-bal">${fmt(t.quota)} paid days / year</span>`;
-    const b = getBalance(selectedEmployee.id, t);
-    const cls = b.remaining === 0 ? 'zero' : (b.remaining <= 3 ? 'low' : '');
-    return `<span class="type-bal ${cls}">${fmt(b.remaining)} of ${fmt(b.quota)} paid days left</span>`;
-}
 
 function renderTypeList() {
     typeList.innerHTML = '';
     leaveTypes.forEach(t => {
-        const paid = isOT(t) || t.quota > 0;
         const card = document.createElement('div');
         card.className = 'type-card' + (selectedType && selectedType.id === t.id ? ' active' : '');
         card.innerHTML = `
             <div class="type-icon"><i class="fas ${t.icon}"></i></div>
-            <div>
-                <div class="type-name">${esc(t.name)}</div>
-                <span class="type-badge ${paid ? 'paid' : 'unpaid'}">${paid ? 'Paid' : 'Unpaid'}</span>
-                ${balanceLine(t)}
-            </div>
-            ${!BUILT_IN_NAMES.includes(t.name) ? '<button class="type-remove" title="Remove"><i class="fas fa-times"></i></button>' : ''}
+            <div class="type-name">${esc(t.name)}</div>
         `;
-        card.onclick = (ev) => { if (!ev.target.closest('.type-remove')) selectType(t); };
-        const rm = card.querySelector('.type-remove');
-        if (rm) {
-            rm.onclick = async (ev) => {
-                ev.stopPropagation();
-                if (!confirm(`Remove "${t.name}"?`)) return;
-                const res = await api('delete_type', { id: t.id });
-                if (!res.success) { alert(res.message || 'Could not remove this type'); return; }
-                leaveTypes = leaveTypes.filter(x => x.id !== t.id);
-                if (selectedType.id === t.id) selectType(leaveTypes[0]);
-                renderTypeList();
-            };
-        }
+        card.onclick = () => selectType(t);
         typeList.appendChild(card);
     });
 }
 
 function selectType(t) {
     selectedType = t;
-    pendingExcess = null;
-    editingRecordId = null;
-    hideDecisionBox();
+    // Don't reset editingRecordId — let edit mode continue if already active
+    if (!editingRecordId) {  // Only reset if NOT editing
+        editingRecordId = null;
+    }
     renderTypeList();
     const modeTag = document.getElementById('modeTag');
-    const paidLabel = isOT(t) ? 'Paid (hours)' : (t.quota > 0 ? `${fmt(t.quota)} paid days / year` : 'Unpaid');
-    modeTag.innerHTML = `<i class="fas ${t.icon}"></i> ${esc(t.name)} — ${paidLabel}`;
+    modeTag.innerHTML = `<i class="fas ${t.icon}"></i> ${esc(t.name)}`;
     document.getElementById('rangeMode').style.display = isOT(t) ? 'none' : 'block';
     document.getElementById('otMode').style.display = isOT(t) ? 'block' : 'none';
+    document.getElementById('payModeRow').style.display = isOT(t) ? 'none' : 'block';
     updateRateInfo();
+    setPayMode('paid');
     updateDaysOut();
     updateSubmitState();
 }
 
-/* Add new type */
-const addTypeBtn = document.getElementById('addTypeBtn');
-const newTypeForm = document.getElementById('newTypeForm');
-addTypeBtn.onclick = () => newTypeForm.classList.add('show');
-function resetNewTypeForm() {
-    newTypeForm.classList.remove('show');
-    document.getElementById('newTypeName').value = '';
-    document.getElementById('newTypeQuota').value = '5';
+/* ---------- Payment mode (Paid / Unpaid / Split) ---------- */
+const payModeSelect = document.getElementById('payModeSelect');
+const splitBox = document.getElementById('splitBox');
+const splitUnpaidInput = document.getElementById('splitUnpaidInput');
+
+function setPayMode(mode, unpaidVal = 0) {
+    payMode = mode;
+    payModeSelect.value = mode;
+    splitBox.style.display = mode === 'split' ? 'block' : 'none';
+    if (mode === 'split') splitUnpaidInput.value = unpaidVal;
+    updateDaysOut();
 }
-document.getElementById('cancelNewType').onclick = resetNewTypeForm;
-document.getElementById('saveNewType').onclick = async () => {
-    const name = document.getElementById('newTypeName').value.trim();
-    const quota = parseFloat(document.getElementById('newTypeQuota').value);
-    if (!name) { alert('Enter a name for the leave type'); return; }
-    if (isNaN(quota) || quota < 0) { alert('Paid days per year must be 0 or more'); return; }
-    const res = await api('add_type', { name, quota_days_per_year: quota });
-    if (!res.success) { alert(res.message || 'Could not save this leave type'); return; }
-    leaveTypes.push(res.leave_type);
-    renderTypeList();
-    selectType(res.leave_type);
-    resetNewTypeForm();
-};
+
+payModeSelect.addEventListener('change', () => {
+    // Agar dates select nahi hain toh message dikhao aur dropdown reset karo
+    if (!rangeStart) {
+        alert('Please select dates from calendar first');
+        payModeSelect.value = payMode; // purani value restore karo
+        return;
+    }
+    payMode = payModeSelect.value;
+    splitBox.style.display = payMode === 'split' ? 'block' : 'none';
+    updateDaysOut();
+});
+splitUnpaidInput.addEventListener('input', updateDaysOut);
 
 /* ---------- Calendar ---------- */
 const calGrid = document.getElementById('calGrid');
@@ -238,7 +211,6 @@ function renderCalendar() {
 }
 
 function pickDate(date) {
-    pendingExcess = null; hideDecisionBox();
     if (!rangeStart || (rangeStart && rangeEnd)) { rangeStart = date; rangeEnd = null; }
     else if (sameDay(date, rangeStart)) { rangeEnd = date; }
     else if (date < rangeStart) { rangeEnd = rangeStart; rangeStart = date; }
@@ -262,7 +234,6 @@ function countDays() {
 }
 
 document.getElementById('halfDay').addEventListener('change', () => {
-    pendingExcess = null; hideDecisionBox();
     if (rangeStart) rangeEnd = rangeStart;
     renderCalendar();
     updateDaysOut();
@@ -287,45 +258,30 @@ function updateDaysOut() {
     out.className = 'days-out';
     if (!rangeStart) { out.textContent = 'Pick a date to see the total'; return; }
     const total = countDays();
-    if (!selectedEmployee) { out.textContent = `${dayWord(total)} — select an employee to see the paid/unpaid split`; return; }
 
-    const b = getBalance(selectedEmployee.id, selectedType);
-    let label, amountNote = '';
-    if (!b || b.quota <= 0) {
-        label = 'all Unpaid';
-    } else if (total <= b.remaining) {
-        label = 'all Paid';
-        amountNote = ` · est. ${money(selectedEmployee.daily_rate * total, selectedEmployee.currency)}`;
+    document.getElementById('splitTotalDays').textContent = fmt(total);
+    splitUnpaidInput.max = total;
+    if (parseFloat(splitUnpaidInput.value) > total) splitUnpaidInput.value = total;
+
+    if (!selectedEmployee) { out.textContent = `${dayWord(total)} — select an employee to see the amount`; return; }
+
+    let paidDays, unpaidDays, label;
+    if (payMode === 'unpaid') {
+        paidDays = 0; unpaidDays = total; label = 'All Unpaid';
+    } else if (payMode === 'split') {
+        unpaidDays = Math.min(Math.max(parseFloat(splitUnpaidInput.value) || 0, 0), total);
+        paidDays = round1(total - unpaidDays);
+        label = `${fmt(paidDays)} Paid + ${fmt(unpaidDays)} Unpaid`;
     } else {
-        const excess = total - b.remaining;
-        label = b.remaining > 0 ? `${fmt(b.remaining)} Paid + ${fmt(excess)} over quota (HR decides)` : `all ${fmt(excess)} day(s) over quota (HR decides)`;
-        out.classList.add('unpaid-out');
+        paidDays = total; unpaidDays = 0; label = 'All Paid';
     }
+
+    if (unpaidDays > 0 && paidDays === 0) out.classList.add('unpaid-out');
+    const amountNote = paidDays > 0 ? ` · est. ${money(selectedEmployee.daily_rate * paidDays, selectedEmployee.currency)}` : '';
     out.textContent = `${dayWord(total)} — ${label}${amountNote} (${selectedType.name})`;
 }
+function round1(n) { return Math.round(n * 10) / 10; }
 
-/* ---------- Excess decision box ---------- */
-function showDecisionBox(payload) {
-    pendingExcess = payload;
-    const box = document.getElementById('decisionBox');
-    box.style.display = 'block';
-    document.getElementById('decisionMsg').textContent = payload.message;
-}
-
-function hideDecisionBox() {
-    const box = document.getElementById('decisionBox');
-    if (box) box.style.display = 'none';
-}
-
-document.getElementById('decisionPaid')?.addEventListener('click', () => submitLeave('paid'));
-document.getElementById('decisionUnpaid')?.addEventListener('click', () => submitLeave('unpaid'));
-document.getElementById('decisionPending')?.addEventListener('click', () => submitLeave('pending'));
-// NEW: Handle "Send to Dashboard" button for normal leaves
-document.getElementById('sendToDashboardBtn')?.addEventListener('click', () => {
-    const reason = document.getElementById('reason').value.trim();
-    if (!reason) { alert('Please enter a reason'); return; }
-    submitLeave('pending');
-});
 /* ---------- Submit ---------- */
 function updateSubmitState() {
     const btn = document.getElementById('submitBtn');
@@ -336,9 +292,9 @@ function updateSubmitState() {
 
 ['otDate', 'otHours'].forEach(id => document.getElementById(id)?.addEventListener('input', updateSubmitState));
 
-document.getElementById('submitBtn').onclick = () => submitLeave(null);
+document.getElementById('submitBtn').onclick = () => submitLeave();
 
-async function submitLeave(excessDecision) {
+async function submitLeave() {
     const reason = document.getElementById('reason').value.trim();
     if (!reason) { alert('Please enter a reason'); return; }
 
@@ -366,30 +322,16 @@ async function submitLeave(excessDecision) {
         payload.start_date = ymd(rangeStart);
         payload.end_date = ymd(end);
         payload.is_half_day = document.getElementById('halfDay').checked;
-        if (excessDecision) {
-            payload.excess_decision = excessDecision;
-            payload.override_reason = document.getElementById('overrideReason')?.value.trim() || '';
-        }
-        // NEW: If sending to dashboard for approval
-        if (excessDecision === 'pending') {
-            payload.send_to_dashboard = true;
+        payload.pay_mode = payMode;
+        if (payMode === 'split') {
+            payload.unpaid_days = parseFloat(splitUnpaidInput.value) || 0;
         }
     }
 
-    // If editing, add edit action and record ID
-    if (editingRecordId) {
-        payload.action = 'edit';
-        payload.id = editingRecordId;
-    }
+    if (editingRecordId) payload.id = editingRecordId;
 
     const action = editingRecordId ? 'edit' : 'submit';
     const res = await api(action, payload);
-
-    if (!res.success && res.status === 'needs_decision') {
-        showDecisionBox(res);
-        updateSubmitState();
-        return;
-    }
 
     if (!res.success) {
         alert(res.message || 'Could not submit the request');
@@ -397,68 +339,17 @@ async function submitLeave(excessDecision) {
         return;
     }
 
-      hideDecisionBox();
-
-    // Refresh from server so the table (and any active filters) reflect the true state
-    const freshData = await api('bootstrap');
-    allRequests = freshData.recent_requests || [];
-    applyReqFilters();
-
-    if (!isOT(selectedType) && res.record.paid_days && !editingRecordId) {
-
-        usedPaid[selectedEmployee.id] = usedPaid[selectedEmployee.id] || {};
-        usedPaid[selectedEmployee.id][selectedType.id] = (usedPaid[selectedEmployee.id][selectedType.id] || 0) + res.record.paid_days;
-    }
-
-    document.getElementById('reason').value = '';
-    document.getElementById('contact').value = '';
-    rangeStart = null; rangeEnd = null;
-    document.getElementById('halfDay').checked = false;
-    editingRecordId = null;
-    renderCalendar();
-    renderTypeList();
-    updateDaysOut();
-    updateSubmitState();
-    openReqTable();
-}
-
-function addRequestRow(record, payload) {
-    const body = document.getElementById('reqBody');
-    if (body.querySelector('.empty-row')) body.innerHTML = '';
-    const tr = document.createElement('tr');
-    const isOt = !!payload.ot_date;
-    const dateStr = isOt ? payload.ot_date : `${payload.start_date} → ${payload.end_date}`;
-    const totalStr = isOt ? `${payload.ot_hours} hrs @ ${payload.ot_rate} = ${money(record.ot_amount, selectedEmployee.currency)}` : dayWord(record.total_days);
-       const paidStr = isOt ? 'Paid'
-        : record.excess_pending
-            ? `${fmt(record.paid_days)} Paid + ${fmt(record.excess_days)} Awaiting approval`
-            : (record.unpaid_days > 0
-                ? (record.paid_days > 0 ? `${fmt(record.paid_days)} Paid + ${fmt(record.unpaid_days)} Unpaid` : 'Unpaid')
-                : 'Paid');
-    tr.innerHTML = `
-        <td>${esc(selectedEmployee.name)}</td>
-        <td><span class="type-pill"><span class="dot"></span>${esc(selectedType.name)}</span></td>
-        <td>${esc(paidStr)}</td>
-        <td>${esc(dateStr)}</td>
-        <td>${esc(totalStr)}</td>
-        <td><span class="status-pill status-${record.status}">${record.status === 'approved' ? 'Approved' : (record.status === 'rejected' ? 'Rejected' : 'Pending')}</span></td>
-                    <td>
-            ${record.status === 'pending' ? `
-                <button class="req-btn-edit" onclick="editRequest(${record.id})" title="Edit"><i class="fas fa-edit"></i></button>
-                <button class="req-btn-delete" onclick="deleteRequest(${record.id})" title="Delete"><i class="fas fa-trash"></i></button>
-            ` : ''}
-        </td>
-    `;
-    body.prepend(tr);
+    // ✅ Auto-refresh page on successful submit/edit
+    setTimeout(() => {
+        window.location.reload();
+    }, 500);
 }
 
 /* ---------- Edit & Delete ---------- */
 async function editRequest(recordId) {
     const req = allRequests.find(r => r.id === recordId);
     if (!req) { alert('Request not found'); return; }
-    // if (req.status !== 'pending') { alert('Only pending requests can be edited'); return; }
 
-    // Populate form
     const emp = employees.find(e => e.id === req.employee_id);
     if (emp) selectEmployee(emp);
 
@@ -467,41 +358,50 @@ async function editRequest(recordId) {
 
     document.getElementById('reason').value = req.reason || '';
     document.getElementById('contact').value = req.contact_during_leave || '';
+    document.getElementById('approvalStatus').value = req.status === 'approved' ? 'approved' : 'pending';
 
-    // For range leaves, set dates
-    if (req.start_date && req.end_date && !req.ot_hours) {
+    if (req.ot_hours !== null && req.ot_hours !== undefined) {
+        document.getElementById('otDate').value = req.start_date;
+        document.getElementById('otHours').value = req.ot_hours;
+        if (req.ot_rate_multiplier) {
+            const rateMap = { 1: '1x', 1.5: '1.5x', 2: '2x' };
+            document.getElementById('otRate').value = rateMap[req.ot_rate_multiplier] || '1x';
+        }
+    } else if (req.start_date && req.end_date) {
         rangeStart = new Date(req.start_date + 'T00:00:00');
         rangeEnd = new Date(req.end_date + 'T00:00:00');
         renderCalendar();
+
+        const total = req.total_days || 0;
+        const unpaid = req.unpaid_days || 0;
+        if (total > 0 && unpaid >= total) setPayMode('unpaid');
+        else if (unpaid > 0) setPayMode('split', unpaid);
+        else setPayMode('paid');
     }
 
     editingRecordId = recordId;
     updateSubmitState();
-    
-    // Scroll to form
+
     document.querySelector('.card').scrollIntoView({ behavior: 'smooth' });
 }
 
 async function deleteRequest(recordId) {
     if (!confirm('Delete this leave request? This cannot be undone.')) return;
-    
+
     const res = await api('delete', { id: recordId });
     if (!res.success) { alert(res.message || 'Could not delete request'); return; }
 
-    // Reload requests
     const data = await api('bootstrap');
     allRequests = data.recent_requests || [];
     applyReqFilters();
 }
 
-/* ---------- Collapsible requests table ---------- */
 /* ---------- Requests table: always visible, manual hide/show ---------- */
 const reqTableWrap = document.getElementById('reqTableWrap');
 const reqFilters = document.getElementById('reqFilters');
 const reqToggleBtn = document.getElementById('reqToggleBtn');
 let reqTableHidden = false;
 
-// Force visible on load, regardless of any older CSS collapse state.
 reqTableWrap.style.display = 'block';
 reqFilters.style.display = 'flex';
 
@@ -524,8 +424,6 @@ function openReqTable() {
 }
 
 /* ---------- Column visibility (per-column hide/unhide) ---------- */
-// "Hide" button (above) hides the whole table; this panel lets HR pick which
-// individual columns to keep visible — e.g. hide Amount, keep everything else.
 const reqTable = document.getElementById('reqTable');
 const colToggle = document.getElementById('colToggle');
 const colToggleBtn = document.getElementById('colToggleBtn');
@@ -540,8 +438,6 @@ document.addEventListener('click', ev => {
 document.querySelectorAll('.col-check').forEach(cb => {
     cb.addEventListener('change', () => {
         const col = cb.dataset.col;
-        // Table keeps this class even after renderRecentRequests() rebuilds <tbody>,
-        // so a hidden column stays hidden for newly rendered rows too.
         reqTable.classList.toggle(`hide-col-${col}`, !cb.checked);
     });
 });
@@ -614,16 +510,16 @@ function renderRecentRequests(rows) {
             <td>${esc(totalStr)}</td>
             <td>${amountCell(r, cur)}</td>
             <td><span class="status-pill status-${r.status}">${statusLabel}</span></td>
-          <td>
-    <button class="req-btn-edit" onclick="editRequest(${r.id})" title="Edit"><i class="fas fa-edit"></i></button>
-    <button class="req-btn-delete" onclick="deleteRequest(${r.id})" title="Delete"><i class="fas fa-trash"></i></button>
-</td>
+            <td>
+<button class="req-btn-edit" onclick="editRequest(${r.id})" title="Edit"><i class="fas fa-edit"></i></button>
+<button class="req-btn-delete" onclick="deleteRequest(${r.id})" title="Delete"><i class="fas fa-trash"></i></button>
+            </td>
         `;
         body.appendChild(tr);
     });
 }
 
-// Add styles for edit/delete buttons + per-column hide/unhide panel
+// Add styles for edit/delete buttons + per-column hide/unhide panel + pay-mode split box
 const style = document.createElement('style');
 style.textContent = `
     .req-btn-edit, .req-btn-delete {
@@ -673,5 +569,9 @@ style.textContent = `
     .leave-table.hide-col-6 th:nth-child(6), .leave-table.hide-col-6 td:nth-child(6) { display: none; }
     .leave-table.hide-col-7 th:nth-child(7), .leave-table.hide-col-7 td:nth-child(7) { display: none; }
     .leave-table.hide-col-8 th:nth-child(8), .leave-table.hide-col-8 td:nth-child(8) { display: none; }
+
+    #payModeRow { margin-top: 10px; }
+    .split-box { margin-top: 8px; }
+    .split-box label { display: block; font-size: 13px; margin-bottom: 4px; color: #475569; }
 `;
 document.head.appendChild(style);

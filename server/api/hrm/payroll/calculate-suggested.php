@@ -32,25 +32,8 @@ if (!$user_id || !$tenant_id) {
 // request itself was filed and priced against.
 function calculateDailyRate(array $emp): float {
     $salary = (float) ($emp['base_salary'] ?? 0);
-    $freq   = $emp['salary_frequency'] ?? 'monthly';
-    $workDaysPerWeek = (float) ($emp['work_days_per_week'] ?? 6);
-    if ($workDaysPerWeek <= 0) $workDaysPerWeek = 6;
-
-    switch ($freq) {
-        case 'daily':
-            return round($salary, 2);
-        case 'weekly':
-            return round($salary / $workDaysPerWeek, 2);
-        case 'yearly':
-        case 'annual':
-            return round($salary / ($workDaysPerWeek * 52), 2);
-        case 'monthly':
-        default:
-            $workDaysPerMonth = $workDaysPerWeek * 4.345;
-            return $workDaysPerMonth > 0 ? round($salary / $workDaysPerMonth, 2) : 0.0;
-    }
+    return round($salary / 30, 2);
 }
-
 try {
     $employeeCode = $_GET['employee_id'] ?? '';
     $periodStart = $_GET['period_start'] ?? '';

@@ -235,7 +235,7 @@ $purchasesNet = (float) $purchasesTotals['net'];
 
         .ledger-input {
             flex: 1;
-           min-width: 113px;
+            min-width: 113px;
             height: 44px;
             padding: 0 1rem;
             border: 1.5px solid #d6dbe4;
@@ -338,8 +338,13 @@ $purchasesNet = (float) $purchasesTotals['net'];
         }
 
         @keyframes fadeIn {
-            from { opacity: 0; }
-            to { opacity: 1; }
+            from {
+                opacity: 0;
+            }
+
+            to {
+                opacity: 1;
+            }
         }
 
         .ledger-modal-content {
@@ -360,6 +365,7 @@ $purchasesNet = (float) $purchasesTotals['net'];
                 transform: translateY(20px);
                 opacity: 0;
             }
+
             to {
                 transform: translateY(0);
                 opacity: 1;
@@ -591,8 +597,13 @@ $purchasesNet = (float) $purchasesTotals['net'];
         }
 
         @keyframes spin {
-            from { transform: rotate(0deg); }
-            to { transform: rotate(360deg); }
+            from {
+                transform: rotate(0deg);
+            }
+
+            to {
+                transform: rotate(360deg);
+            }
         }
 
         .ledger-error {
@@ -871,263 +882,265 @@ $purchasesNet = (float) $purchasesTotals['net'];
         }
 
         .todo-trigger-badge {
-    position: absolute;
-    top: -6px;
-    right: -6px;
-    background: #dc2626;
-    color: white;
-    font-size: 11px;
-    font-weight: 700;
-    min-width: 18px;
-    height: 18px;
-    border-radius: 9999px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 0 4px;
-}
+            position: absolute;
+            top: -6px;
+            right: -6px;
+            background: #dc2626;
+            color: white;
+            font-size: 11px;
+            font-weight: 700;
+            min-width: 18px;
+            height: 18px;
+            border-radius: 9999px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0 4px;
+        }
 
-.todo-modal {
-    display: none !important;
-    position: fixed !important;
-    top: 0;
-    left: 0;
-    width: 100vw;
-    height: 100vh;
-    background: rgba(0, 0, 0, 0.6);
-    z-index: 99999 !important;
-    align-items: center;
-    justify-content: center;
-    backdrop-filter: blur(4px);
-    margin: 0;
-    padding: 0;
-}
+        .todo-modal {
+            display: none !important;
+            position: fixed !important;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: rgba(0, 0, 0, 0.6);
+            z-index: 99999 !important;
+            align-items: center;
+            justify-content: center;
+            backdrop-filter: blur(4px);
+            margin: 0;
+            padding: 0;
+        }
 
-.todo-modal.show {
-    display: flex !important;
-    animation: fadeIn 0.2s ease;
-}
+        .todo-modal.show {
+            display: flex !important;
+            animation: fadeIn 0.2s ease;
+        }
 
-.todo-modal-content {
-    background: white;
-    width: 95%;
-    max-width: 1000px;
-    max-height: 85vh;
-    border-radius: 12px;
-    overflow: hidden;
-    display: flex;
-    flex-direction: column;
-    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
-    animation: slideUp 0.3s ease;
-}
+        .todo-modal-content {
+            background: white;
+            width: 95%;
+            max-width: 1000px;
+            max-height: 85vh;
+            border-radius: 12px;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+            animation: slideUp 0.3s ease;
+        }
 
-.todo-modal-header {
-    padding: 1.25rem 1.5rem;
-    background: linear-gradient(135deg, #1f7bff 0%, #1559b8 100%);
-    color: white;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    flex-shrink: 0;
-}
+        .todo-modal-header {
+            padding: 1.25rem 1.5rem;
+            background: linear-gradient(135deg, #1f7bff 0%, #1559b8 100%);
+            color: white;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-shrink: 0;
+        }
 
-.todo-modal-header h3 {
-    margin: 0;
-    font-size: 1.2rem;
-    font-weight: 600;
-    color: white !important;
-}
+        .todo-modal-header h3 {
+            margin: 0;
+            font-size: 1.2rem;
+            font-weight: 600;
+            color: white !important;
+        }
 
-.todo-modal-close {
-    background: rgba(255, 255, 255, 0.1);
-    border: none;
-    color: white;
-    font-size: 1.5rem;
-    cursor: pointer;
-    width: 36px;
-    height: 36px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 8px;
-}
+        .todo-modal-close {
+            background: rgba(255, 255, 255, 0.1);
+            border: none;
+            color: white;
+            font-size: 1.5rem;
+            cursor: pointer;
+            width: 36px;
+            height: 36px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 8px;
+        }
 
-.todo-modal-close:hover {
-    background: rgba(255, 255, 255, 0.2);
-}
+        .todo-modal-close:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
 
-.todo-modal-body {
-    flex: 1;
-    overflow-y: auto;
-    padding: 1.5rem;
-    background: #f8fafc;
-}
+        .todo-modal-body {
+            flex: 1;
+            overflow-y: auto;
+            padding: 1.5rem;
+            background: #f8fafc;
+        }
 
-.todo-add-form {
-    display: grid;
-    grid-template-columns: 1.2fr 1.8fr 140px 110px auto;
-    gap: 0.75rem;
-    margin-bottom: 1.25rem;
-    align-items: start;
-}
+        .todo-add-form {
+            display: grid;
+            grid-template-columns: 1.2fr 1.8fr 140px 110px auto;
+            gap: 0.75rem;
+            margin-bottom: 1.25rem;
+            align-items: start;
+        }
 
-.todo-add-form textarea {
-    resize: vertical;
-    min-height: 44px;
-    padding: 0.6rem 1rem;
-    border: 1.5px solid #d6dbe4;
-    border-radius: 0.5rem;
-    font-size: 14px;
-    font-family: inherit;
-}
+        .todo-add-form textarea {
+            resize: vertical;
+            min-height: 44px;
+            padding: 0.6rem 1rem;
+            border: 1.5px solid #d6dbe4;
+            border-radius: 0.5rem;
+            font-size: 14px;
+            font-family: inherit;
+        }
 
-.todo-add-form .btn {
-    height: 44px;
-    white-space: nowrap;
-}
+        .todo-add-form .btn {
+            height: 44px;
+            white-space: nowrap;
+        }
 
-.todo-table-wrap {
-    background: white;
-    border-radius: 10px;
-    overflow: hidden;
-    border: 1px solid #e2e8f0;
-}
+        .todo-table-wrap {
+            background: white;
+            border-radius: 10px;
+            overflow: hidden;
+            border: 1px solid #e2e8f0;
+        }
 
-.todo-table {
-    width: 100%;
-    border-collapse: collapse;
-}
+        .todo-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
 
-.todo-table thead {
-    background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
-    border-bottom: 2px solid #e2e8f0;
-}
+        .todo-table thead {
+            background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+            border-bottom: 2px solid #e2e8f0;
+        }
 
-.todo-table th {
-    padding: 0.85rem 1rem;
-    text-align: left;
-    font-weight: 700;
-    font-size: 11px;
-    color: #475569;
-    text-transform: uppercase;
-    letter-spacing: 0.6px;
-    white-space: nowrap;
-}
+        .todo-table th {
+            padding: 0.85rem 1rem;
+            text-align: left;
+            font-weight: 700;
+            font-size: 11px;
+            color: #475569;
+            text-transform: uppercase;
+            letter-spacing: 0.6px;
+            white-space: nowrap;
+        }
 
-.todo-table td {
-    padding: 0.85rem 1rem;
-    border-bottom: 1px solid #f1f5f9;
-    font-size: 13.5px;
-    color: #334155;
-    vertical-align: top;
-}
+        .todo-table td {
+            padding: 0.85rem 1rem;
+            border-bottom: 1px solid #f1f5f9;
+            font-size: 13.5px;
+            color: #334155;
+            vertical-align: top;
+        }
 
-.todo-table tbody tr:last-child td {
-    border-bottom: none;
-}
+        .todo-table tbody tr:last-child td {
+            border-bottom: none;
+        }
 
-.todo-table tbody tr:hover {
-    background: #f8fafc;
-}
+        .todo-table tbody tr:hover {
+            background: #f8fafc;
+        }
 
-.todo-table tbody tr.overdue {
-    background: #fef2f2;
-}
+        .todo-table tbody tr.overdue {
+            background: #fef2f2;
+        }
 
-.todo-table tbody tr.done .todo-heading {
-    text-decoration: line-through;
-    color: #94a3b8;
-}
+        .todo-table tbody tr.done .todo-heading {
+            text-decoration: line-through;
+            color: #94a3b8;
+        }
 
-.todo-heading {
-    font-weight: 600;
-    color: #0f172a;
-}
+        .todo-heading {
+            font-weight: 600;
+            color: #0f172a;
+        }
 
-.todo-desc {
-    color: #64748b;
-    font-size: 12.5px;
-    max-width: 260px;
-    word-break: break-word;
-}
+        .todo-desc {
+            color: #64748b;
+            font-size: 12.5px;
+            max-width: 260px;
+            word-break: break-word;
+        }
 
-.todo-day-tag {
-    font-size: 11px;
-    color: #64748b;
-    font-weight: 600;
-    text-transform: uppercase;
-}
+        .todo-day-tag {
+            font-size: 11px;
+            color: #64748b;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
 
-.todo-overdue-tag {
-    display: inline-block;
-    margin-top: 0.25rem;
-    font-size: 10px;
-    font-weight: 700;
-    color: #dc2626;
-    background: #fee2e2;
-    padding: 0.15rem 0.5rem;
-    border-radius: 9999px;
-    text-transform: uppercase;
-}
+        .todo-overdue-tag {
+            display: inline-block;
+            margin-top: 0.25rem;
+            font-size: 10px;
+            font-weight: 700;
+            color: #dc2626;
+            background: #fee2e2;
+            padding: 0.15rem 0.5rem;
+            border-radius: 9999px;
+            text-transform: uppercase;
+        }
 
-.todo-delete {
-    cursor: pointer;
-    color: #cbd5e1;
-    font-size: 15px;
-}
+        .todo-delete {
+            cursor: pointer;
+            color: #cbd5e1;
+            font-size: 15px;
+        }
 
-.todo-delete:hover {
-    color: #dc2626;
-}
+        .todo-delete:hover {
+            color: #dc2626;
+        }
 
-.todo-empty {
-    text-align: center;
-    color: #94a3b8;
-    padding: 2.5rem 1rem;
-    font-size: 14px;
-}
+        .todo-empty {
+            text-align: center;
+            color: #94a3b8;
+            padding: 2.5rem 1rem;
+            font-size: 14px;
+        }
 
-.todo-toast {
-    position: fixed;
-    bottom: 24px;
-    right: 24px;
-    background: #dc2626;
-    color: white;
-    padding: 1rem 1.25rem;
-    border-radius: 0.75rem;
-    box-shadow: 0 10px 25px rgba(0,0,0,0.2);
-    z-index: 100000;
-    max-width: 320px;
-    font-size: 14px;
-    display: flex;
-    gap: 0.75rem;
-    align-items: flex-start;
-    animation: slideUp 0.3s ease;
-}
+        .todo-toast {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            background: #dc2626;
+            color: white;
+            padding: 1rem 1.25rem;
+            border-radius: 0.75rem;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+            z-index: 100000;
+            max-width: 320px;
+            font-size: 14px;
+            display: flex;
+            gap: 0.75rem;
+            align-items: flex-start;
+            animation: slideUp 0.3s ease;
+        }
 
-.todo-toast i {
-    font-size: 1.25rem;
-    margin-top: 2px;
-}
+        .todo-toast i {
+            font-size: 1.25rem;
+            margin-top: 2px;
+        }
 
-@media (max-width: 768px) {
-    .todo-add-form {
-        grid-template-columns: 1fr;
-    }
-    .todo-modal-content {
-        width: 100%;
-        height: 100vh;
-        max-height: 100vh;
-        border-radius: 0;
-    }
-    .todo-table-wrap {
-        overflow-x: auto;
-    }
-    .todo-table {
-        min-width: 650px;
-    }
-}
-        
+        @media (max-width: 768px) {
+            .todo-add-form {
+                grid-template-columns: 1fr;
+            }
+
+            .todo-modal-content {
+                width: 100%;
+                height: 100vh;
+                max-height: 100vh;
+                border-radius: 0;
+            }
+
+            .todo-table-wrap {
+                overflow-x: auto;
+            }
+
+            .todo-table {
+                min-width: 650px;
+            }
+        }
     </style>
 </head>
 
@@ -1158,22 +1171,22 @@ $purchasesNet = (float) $purchasesTotals['net'];
             </div>
 
             <!-- Global Date Lock Widget (collapsible, tucked into right edge) -->
-<div id="dateLockWidgetWrap" style="position: fixed; top: 60px; right: 0; z-index: 9999; display: flex; align-items: center; font-family: sans-serif; font-size: 13px;">
+            <div id="dateLockWidgetWrap" style="position: fixed; top: 60px; right: 0; z-index: 9999; display: flex; align-items: center; font-family: sans-serif; font-size: 13px;">
 
-    <!-- Sliding panel -->
-    <div id="dateLockPanel" style="display: flex; align-items: center; gap: 6px; background: #fff; padding: 6px 10px; border-radius: 8px 0 0 8px; box-shadow: -2px 2px 6px rgba(0,0,0,0.15);
+                <!-- Sliding panel -->
+                <div id="dateLockPanel" style="display: flex; align-items: center; gap: 6px; background: #fff; padding: 6px 10px; border-radius: 8px 0 0 8px; box-shadow: -2px 2px 6px rgba(0,0,0,0.15);
          max-width: 0; overflow: hidden; opacity: 0; transition: max-width 0.25s ease, opacity 0.2s ease; white-space: nowrap;">
-        <input type="date" id="globalLockDate" style="border: 1px solid #ccc; border-radius: 4px; padding: 4px 6px; font-size: 13px;">
-        <button type="button" id="globalDateLockBtn" style="border: none; background: transparent; cursor: pointer; font-size: 16px; padding: 4px;">
-            <i class="fas fa-lock-open" id="globalDateLockIcon" style="color: #888;"></i>
-        </button>
-    </div>
+                    <input type="date" id="globalLockDate" style="border: 1px solid #ccc; border-radius: 4px; padding: 4px 6px; font-size: 13px;">
+                    <button type="button" id="globalDateLockBtn" style="border: none; background: transparent; cursor: pointer; font-size: 16px; padding: 4px;">
+                        <i class="fas fa-lock-open" id="globalDateLockIcon" style="color: #888;"></i>
+                    </button>
+                </div>
 
-    <!-- Always-visible tab handle -->
-    <button type="button" id="dateLockToggleTab" title="Date Lock" style="border: none; cursor: pointer; background: #fff; box-shadow: -2px 2px 6px rgba(0,0,0,0.15); border-radius: 8px 0 0 8px; padding: 8px 6px; display: flex; align-items: center; justify-content: center;">
-        <i class="fas fa-lock" id="dateLockTabIcon" style="color: #888; font-size: 14px;"></i>
-    </button>
-</div>
+                <!-- Always-visible tab handle -->
+                <button type="button" id="dateLockToggleTab" title="Date Lock" style="border: none; cursor: pointer; background: #fff; box-shadow: -2px 2px 6px rgba(0,0,0,0.15); border-radius: 8px 0 0 8px; padding: 8px 6px; display: flex; align-items: center; justify-content: center;">
+                    <i class="fas fa-lock" id="dateLockTabIcon" style="color: #888; font-size: 14px;"></i>
+                </button>
+            </div>
             <!-- Global Search -->
             <div class="quick-actions" style="position: relative;">
                 <div class="ledger-search-box" style="position: relative;">
@@ -1188,7 +1201,7 @@ $purchasesNet = (float) $purchasesTotals['net'];
                     box-shadow: 0 8px 24px rgba(0,0,0,0.12);">
                 </div>
             </div>
-      
+
             <!-- KPI Cards -->
             <div class="kpi-grid">
                 <div class="kpi-card">
@@ -1269,7 +1282,7 @@ $purchasesNet = (float) $purchasesTotals['net'];
                 </div>
             </div>
 
-             <!-- Keyboard Shortcuts -->
+            <!-- Keyboard Shortcuts -->
             <div class="quick-actions">
                 <h2 class="section-title">Keyboard Shortcuts</h2>
                 <div class="ledger-search-box" style="flex-direction: column; align-items: stretch;">
@@ -1343,17 +1356,17 @@ $purchasesNet = (float) $purchasesTotals['net'];
                         <span>Bank Statement</span>
                     </a>
                     <a href="#" class="action-btn" style="position: relative;" onclick="openTodoModal(); return false;">
-    <i class="fas fa-list-check"></i>
-    <span>Todo List</span>
-    <span id="todoBadge" class="todo-trigger-badge" style="display:none;">0</span>
-</a>
+                        <i class="fas fa-list-check"></i>
+                        <span>Todo List</span>
+                        <span id="todoBadge" class="todo-trigger-badge" style="display:none;">0</span>
+                    </a>
 
-<a href="../settings/posting_lock/posting-lock.php" class="action-btn">
-    <i class="fas fa-lock"></i>
-    <span>Posting Lock</span>
-</a>
+                    <a href="../settings/posting_lock/posting-lock.php" class="action-btn">
+                        <i class="fas fa-lock"></i>
+                        <span>Posting Lock</span>
+                    </a>
 
-   
+
                 </div>
             </div>
 
@@ -1379,9 +1392,21 @@ $purchasesNet = (float) $purchasesTotals['net'];
                 // impact (invoices, payments, stock, user/permission changes) - not every delete
                 // counts (e.g. deleting an unused tax rate isn't "critical").
                 $criticalModules = [
-                    'Sale Invoice', 'Sale Tax Invoice', 'Meter Invoice', 'Purchase Invoice', 'Purchase Tax Invoice',
-                    'Payment Voucher', 'Receive Voucher', 'Journal Voucher', 'Expense Voucher',
-                    'Stock Adjustment', 'User', 'Role', 'Role Permission', 'Bank Account', 'Post Dated Cheque',
+                    'Sale Invoice',
+                    'Sale Tax Invoice',
+                    'Meter Invoice',
+                    'Purchase Invoice',
+                    'Purchase Tax Invoice',
+                    'Payment Voucher',
+                    'Receive Voucher',
+                    'Journal Voucher',
+                    'Expense Voucher',
+                    'Stock Adjustment',
+                    'User',
+                    'Role',
+                    'Role Permission',
+                    'Bank Account',
+                    'Post Dated Cheque',
                 ];
                 $criticalPlaceholders = implode(',', array_fill(0, count($criticalModules), '?'));
 
@@ -1496,19 +1521,20 @@ $purchasesNet = (float) $purchasesTotals['net'];
                         <h3 class="card-title">Module Activity (30 Days)</h3>
                         <?php if (empty($moduleBreakdown)): ?>
                             <p style="text-align: center; color: #64748b; padding: 1.5rem 0; margin: 0;">No activity yet</p>
-                        <?php else: foreach ($moduleBreakdown as $mb):
-                            $pct = max(4, round(($mb['cnt'] / $moduleMax) * 100));
-                        ?>
-                            <div style="margin-bottom: 0.65rem;">
-                                <div style="display: flex; justify-content: space-between; font-size: 12.5px; color: #334155; margin-bottom: 3px;">
-                                    <span><?= htmlspecialchars($mb['module']) ?></span>
-                                    <span style="color: #94a3b8;"><?= $mb['cnt'] ?></span>
+                            <?php else: foreach ($moduleBreakdown as $mb):
+                                $pct = max(4, round(($mb['cnt'] / $moduleMax) * 100));
+                            ?>
+                                <div style="margin-bottom: 0.65rem;">
+                                    <div style="display: flex; justify-content: space-between; font-size: 12.5px; color: #334155; margin-bottom: 3px;">
+                                        <span><?= htmlspecialchars($mb['module']) ?></span>
+                                        <span style="color: #94a3b8;"><?= $mb['cnt'] ?></span>
+                                    </div>
+                                    <div style="background: #f1f5f9; border-radius: 4px; height: 8px; overflow: hidden;">
+                                        <div style="background: var(--primary); height: 100%; width: <?= $pct ?>%; border-radius: 4px;"></div>
+                                    </div>
                                 </div>
-                                <div style="background: #f1f5f9; border-radius: 4px; height: 8px; overflow: hidden;">
-                                    <div style="background: var(--primary); height: 100%; width: <?= $pct ?>%; border-radius: 4px;"></div>
-                                </div>
-                            </div>
-                        <?php endforeach; endif; ?>
+                        <?php endforeach;
+                        endif; ?>
                     </div>
                 </div>
 
@@ -1611,7 +1637,7 @@ $purchasesNet = (float) $purchasesTotals['net'];
                                 $productSales = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
                                 foreach ($productSales as $product):
-                                    ?>
+                                ?>
                                     <tr>
                                         <td><?= htmlspecialchars($product['name']) ?></td>
                                         <td><?= number_format($product['total_qty'], 0) ?></td>
@@ -1736,46 +1762,48 @@ $purchasesNet = (float) $purchasesTotals['net'];
     <?php endif; ?>
 
     <!-- Todo List Modal -->
-<div id="todoModal" class="todo-modal">
-    <div class="todo-modal-content" onclick="event.stopPropagation()">
-        <div class="todo-modal-header">
-            <h3><i class="fas fa-list-check"></i> Todo List</h3>
-            <button class="todo-modal-close" onclick="closeTodoModal()">&times;</button>
-        </div>
-        <div class="todo-modal-body">
-            <div class="todo-add-form">
-                <input type="text" id="todoHeading" class="ledger-input" placeholder="Heading (e.g. Follow up on invoice)">
-                <textarea id="todoDescription" placeholder="Description (optional)"></textarea>
-                <input type="date" id="todoDueDate" class="ledger-input">
-                <input type="time" id="todoDueTime" class="ledger-input">
-                <button class="btn btn-primary" onclick="addTodo()"><i class="fas fa-plus"></i> Add</button>
+    <div id="todoModal" class="todo-modal">
+        <div class="todo-modal-content" onclick="event.stopPropagation()">
+            <div class="todo-modal-header">
+                <h3><i class="fas fa-list-check"></i> Todo List</h3>
+                <button class="todo-modal-close" onclick="closeTodoModal()">&times;</button>
             </div>
+            <div class="todo-modal-body">
+                <div class="todo-add-form">
+                    <input type="text" id="todoHeading" class="ledger-input" placeholder="Heading (e.g. Follow up on invoice)">
+                    <textarea id="todoDescription" placeholder="Description (optional)"></textarea>
+                    <input type="date" id="todoDueDate" class="ledger-input">
+                    <input type="time" id="todoDueTime" class="ledger-input">
+                    <button class="btn btn-primary" onclick="addTodo()"><i class="fas fa-plus"></i> Add</button>
+                </div>
 
-            <div style="display:flex; justify-content:flex-end; margin-bottom:0.75rem;">
-                <button class="btn btn-secondary" onclick="clearTodos()"><i class="fas fa-trash-alt"></i> Clear All</button>
-            </div>
+                <div style="display:flex; justify-content:flex-end; margin-bottom:0.75rem;">
+                    <button class="btn btn-secondary" onclick="clearTodos()"><i class="fas fa-trash-alt"></i> Clear All</button>
+                </div>
 
-            <div class="todo-table-wrap">
-                <table class="todo-table">
-                    <thead>
-                        <tr>
-                            <th style="width:40px;"></th>
-                            <th>Date</th>
-                            <th>Day</th>
-                            <th>Time</th>
-                            <th>Heading</th>
-                            <th>Description</th>
-                            <th style="width:40px;"></th>
-                        </tr>
-                    </thead>
-                    <tbody id="todoTableBody">
-                        <tr><td colspan="7" class="todo-empty">Loading...</td></tr>
-                    </tbody>
-                </table>
+                <div class="todo-table-wrap">
+                    <table class="todo-table">
+                        <thead>
+                            <tr>
+                                <th style="width:40px;"></th>
+                                <th>Date</th>
+                                <th>Day</th>
+                                <th>Time</th>
+                                <th>Heading</th>
+                                <th>Description</th>
+                                <th style="width:40px;"></th>
+                            </tr>
+                        </thead>
+                        <tbody id="todoTableBody">
+                            <tr>
+                                <td colspan="7" class="todo-empty">Loading...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
     </div>
-</div>
 
     <!-- Bank Statement Modal -->
     <div id="bankStatementModal" class="bank-modal">
@@ -1787,7 +1815,7 @@ $purchasesNet = (float) $purchasesTotals['net'];
             <div class="bank-modal-body">
                 <!-- Bank Accounts Selection -->
                 <div id="bankAccountsView" class="bank-accounts-grid"></div>
-                
+
                 <!-- Bank Statement View -->
                 <div id="bankStatementView" class="bank-statement-view">
                     <div class="statement-header">
@@ -1809,9 +1837,9 @@ $purchasesNet = (float) $purchasesTotals['net'];
                             </button>
                         </div>
                     </div>
-                    
+
                     <div id="statementSummary" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;"></div>
-                    
+
                     <div class="statement-table">
                         <table>
                             <thead>
@@ -1860,7 +1888,9 @@ $purchasesNet = (float) $purchasesTotals['net'];
                     const stockData = await stockRes.json();
                     if (stockData.success && stockData.data) {
                         const totalValue = parseFloat(stockData.data.total_value || 0);
-                        document.getElementById('kpi-stock-value').textContent = currencySymbol + ' ' + totalValue.toLocaleString('en-PK', {maximumFractionDigits: 0});
+                        document.getElementById('kpi-stock-value').textContent = currencySymbol + ' ' + totalValue.toLocaleString('en-PK', {
+                            maximumFractionDigits: 0
+                        });
                     }
 
                     // Units Sold from sale-reports API (Revenue Gross/Net is rendered
@@ -1873,7 +1903,9 @@ $purchasesNet = (float) $purchasesTotals['net'];
                     const saleData = await saleRes.json();
                     if (saleData.success && saleData.data && saleData.data.product_sales) {
                         const totalUnits = saleData.data.product_sales.reduce((sum, item) => sum + parseFloat(item.quantity_sold || 0), 0);
-                        document.getElementById('kpi-units-sold').textContent = totalUnits.toLocaleString('en-PK', {maximumFractionDigits: 0}) + ' Units';
+                        document.getElementById('kpi-units-sold').textContent = totalUnits.toLocaleString('en-PK', {
+                            maximumFractionDigits: 0
+                        }) + ' Units';
                     }
 
 
@@ -1882,7 +1914,9 @@ $purchasesNet = (float) $purchasesTotals['net'];
                     const customerData = await customerRes.json();
                     if (customerData.success && Array.isArray(customerData.data)) {
                         const totalReceivables = customerData.data.reduce((sum, item) => sum + parseFloat(item.closing_balance || 0), 0);
-                        document.getElementById('kpi-receivables').textContent = currencySymbol + ' ' + totalReceivables.toLocaleString('en-PK', {maximumFractionDigits: 0});
+                        document.getElementById('kpi-receivables').textContent = currencySymbol + ' ' + totalReceivables.toLocaleString('en-PK', {
+                            maximumFractionDigits: 0
+                        });
                     }
 
                     // Accounts Payable from supplier-ledger API
@@ -1890,7 +1924,9 @@ $purchasesNet = (float) $purchasesTotals['net'];
                     const supplierData = await supplierRes.json();
                     if (supplierData.success && Array.isArray(supplierData.data)) {
                         const totalPayables = supplierData.data.reduce((sum, item) => sum + parseFloat(item.closing_balance || 0), 0);
-                        document.getElementById('kpi-payables').textContent = currencySymbol + ' ' + Math.abs(totalPayables).toLocaleString('en-PK', {maximumFractionDigits: 0});
+                        document.getElementById('kpi-payables').textContent = currencySymbol + ' ' + Math.abs(totalPayables).toLocaleString('en-PK', {
+                            maximumFractionDigits: 0
+                        });
                     }
                 } catch (error) {
                     console.error('Error loading KPIs:', error);
@@ -1926,22 +1962,61 @@ $purchasesNet = (float) $purchasesTotals['net'];
             }
             ?>
             new ApexCharts(document.querySelector('#fuelSalesChart'), {
-                chart: { type: 'area', height: 200, toolbar: { show: false } },
-                series: [{ name: 'Sales', data: <?= json_encode($chartData) ?> }],
-                xaxis: { categories: <?= json_encode($chartLabels) ?> },
+                chart: {
+                    type: 'area',
+                    height: 200,
+                    toolbar: {
+                        show: false
+                    }
+                },
+                series: [{
+                    name: 'Sales',
+                    data: <?= json_encode($chartData) ?>
+                }],
+                xaxis: {
+                    categories: <?= json_encode($chartLabels) ?>
+                },
                 colors: ['#3b82f6'],
-                stroke: { curve: 'smooth', width: 2 },
-                fill: { type: 'gradient', gradient: { shadeIntensity: 1, opacityFrom: 0.4, opacityTo: 0.1 } }
+                stroke: {
+                    curve: 'smooth',
+                    width: 2
+                },
+                fill: {
+                    type: 'gradient',
+                    gradient: {
+                        shadeIntensity: 1,
+                        opacityFrom: 0.4,
+                        opacityTo: 0.1
+                    }
+                }
             }).render();
 
             // Activity Trend (Audit & Activity Analytics)
             new ApexCharts(document.querySelector('#activityTrendChart'), {
-                chart: { type: 'bar', height: 200, toolbar: { show: false } },
-                series: [{ name: 'Activities', data: <?= json_encode($trendData) ?> }],
-                xaxis: { categories: <?= json_encode($trendLabels) ?> },
+                chart: {
+                    type: 'bar',
+                    height: 200,
+                    toolbar: {
+                        show: false
+                    }
+                },
+                series: [{
+                    name: 'Activities',
+                    data: <?= json_encode($trendData) ?>
+                }],
+                xaxis: {
+                    categories: <?= json_encode($trendLabels) ?>
+                },
                 colors: ['#1f7bff'],
-                dataLabels: { enabled: false },
-                plotOptions: { bar: { columnWidth: '55%', borderRadius: 3 } }
+                dataLabels: {
+                    enabled: false
+                },
+                plotOptions: {
+                    bar: {
+                        columnWidth: '55%',
+                        borderRadius: 3
+                    }
+                }
             }).render();
 
             // Receivables vs Payables
@@ -1977,11 +2052,16 @@ $purchasesNet = (float) $purchasesTotals['net'];
             }
             ?>
             new ApexCharts(document.querySelector('#accountsChart'), {
-                chart: { type: 'donut', height: 200 },
+                chart: {
+                    type: 'donut',
+                    height: 200
+                },
                 series: [<?= $accountsReceivable ?>, <?= abs($accountsPayable) ?>],
                 labels: ['Receivable', 'Payable'],
                 colors: ['#22c55e', '#ef4444'],
-                legend: { position: 'bottom' }
+                legend: {
+                    position: 'bottom'
+                }
             }).render();
 
             // Revenue vs Expenses
@@ -2001,12 +2081,32 @@ $purchasesNet = (float) $purchasesTotals['net'];
             }
             ?>
             new ApexCharts(document.querySelector('#revenueExpenseChart'), {
-                chart: { type: 'bar', height: 200, toolbar: { show: false } },
-                series: [{ name: 'Revenue', data: <?= json_encode($revenueData) ?> }, { name: 'Expenses', data: <?= json_encode($expenseData) ?> }],
-                xaxis: { categories: <?= json_encode($revenueExpenseLabels) ?> },
+                chart: {
+                    type: 'bar',
+                    height: 200,
+                    toolbar: {
+                        show: false
+                    }
+                },
+                series: [{
+                    name: 'Revenue',
+                    data: <?= json_encode($revenueData) ?>
+                }, {
+                    name: 'Expenses',
+                    data: <?= json_encode($expenseData) ?>
+                }],
+                xaxis: {
+                    categories: <?= json_encode($revenueExpenseLabels) ?>
+                },
                 colors: ['#22c55e', '#ef4444'],
-                dataLabels: { enabled: false },
-                plotOptions: { bar: { columnWidth: '60%' } }
+                dataLabels: {
+                    enabled: false
+                },
+                plotOptions: {
+                    bar: {
+                        columnWidth: '60%'
+                    }
+                }
             }).render();
 
             // Cash Flow
@@ -2017,7 +2117,7 @@ $purchasesNet = (float) $purchasesTotals['net'];
             for ($i = 6; $i >= 0; $i--) {
                 $date = date('Y-m-d', strtotime("-$i days"));
                 $cashFlowLabels[] = date('M j', strtotime("-$i days"));
-                
+
                 // Cash In = All debits to Cash/Bank accounts from accounting_ledger
                 $stmt = $pdo->prepare("
                     SELECT COALESCE(SUM(al.debit), 0) 
@@ -2030,7 +2130,7 @@ $purchasesNet = (float) $purchasesTotals['net'];
                 ");
                 $stmt->execute([$tenant_id, $date]);
                 $cashInData[] = (float) $stmt->fetchColumn();
-                
+
                 // Cash Out = All credits to Cash/Bank accounts from accounting_ledger
                 $stmt = $pdo->prepare("
                     SELECT COALESCE(SUM(al.credit), 0)
@@ -2046,11 +2146,28 @@ $purchasesNet = (float) $purchasesTotals['net'];
             }
             ?>
             new ApexCharts(document.querySelector('#cashFlowChart'), {
-                chart: { type: 'line', height: 200, toolbar: { show: false } },
-                series: [{ name: 'Cash In', data: <?= json_encode($cashInData) ?> }, { name: 'Cash Out', data: <?= json_encode($cashOutData) ?> }],
-                xaxis: { categories: <?= json_encode($cashFlowLabels) ?> },
+                chart: {
+                    type: 'line',
+                    height: 200,
+                    toolbar: {
+                        show: false
+                    }
+                },
+                series: [{
+                    name: 'Cash In',
+                    data: <?= json_encode($cashInData) ?>
+                }, {
+                    name: 'Cash Out',
+                    data: <?= json_encode($cashOutData) ?>
+                }],
+                xaxis: {
+                    categories: <?= json_encode($cashFlowLabels) ?>
+                },
                 colors: ['#22c55e', '#ef4444'],
-                stroke: { curve: 'smooth', width: 2 }
+                stroke: {
+                    curve: 'smooth',
+                    width: 2
+                }
             }).render();
 
             function filterDashboard() {
@@ -2077,7 +2194,7 @@ $purchasesNet = (float) $purchasesTotals['net'];
 
                 try {
                     let apiUrl, searchField;
-                    
+
                     if (type === 'customer') {
                         apiUrl = '../../../server/api/financial_reports/customer_ledger/customer-ledger.php?type=customers';
                         searchField = 'customer';
@@ -2094,11 +2211,11 @@ $purchasesNet = (float) $purchasesTotals['net'];
 
                     if (data.success) {
                         let dataArray = type === 'account' ? data.accounts : data.data;
-                        
+
                         if (dataArray && dataArray.length > 0) {
                             const searchLower = search.toLowerCase();
                             let found;
-                            
+
                             if (type === 'account') {
                                 found = dataArray.find(item => {
                                     const name = (item.name || '').toLowerCase();
@@ -2114,7 +2231,7 @@ $purchasesNet = (float) $purchasesTotals['net'];
 
                             if (found) {
                                 let id, name;
-                                
+
                                 if (type === 'account') {
                                     id = found.sub_account_id || found.id;
                                     name = found.name;
@@ -2124,7 +2241,7 @@ $purchasesNet = (float) $purchasesTotals['net'];
                                     id = found.id;
                                     name = found.customer_name || found.supplier_name;
                                 }
-                                
+
                                 loadLedgerModal(id, name, type);
                             } else {
                                 alert('No ' + searchField + ' found with that name or code');
@@ -2156,18 +2273,18 @@ $purchasesNet = (float) $purchasesTotals['net'];
                 } else if (type === 'account') {
                     titleText = 'General Ledger - ' + name;
                 }
-                
+
                 if (dateFrom && dateTo) {
                     titleText += ` (${dateFrom} to ${dateTo})`;
                 }
                 modalTitle.textContent = titleText;
-                
+
                 modalBody.innerHTML = '<div class="ledger-loading"><i class="fas fa-spinner fa-spin"></i><p>Loading ledger data...</p></div>';
                 modal.classList.add('show');
 
                 try {
                     let apiUrl;
-                    
+
                     if (type === 'customer') {
                         apiUrl = `../../../server/api/financial_reports/customer_ledger/customer-ledger.php?type=detailed&customer_id=${id}`;
                     } else if (type === 'supplier') {
@@ -2175,7 +2292,7 @@ $purchasesNet = (float) $purchasesTotals['net'];
                     } else if (type === 'account') {
                         apiUrl = `../../../server/api/financial_reports/general_ledger/general-ledger.php?accountNumber=${id}`;
                     }
-                    
+
                     if (dateFrom && dateTo) {
                         if (type === 'account') {
                             apiUrl += `&startDate=${dateFrom}&endDate=${dateTo}`;
@@ -2429,15 +2546,15 @@ $purchasesNet = (float) $purchasesTotals['net'];
                 const dateFrom = document.getElementById('ledgerDateFrom');
                 const dateTo = document.getElementById('ledgerDateTo');
                 const today = new Date();
-                
+
                 // Remove active class from all buttons
                 document.querySelectorAll('.date-bucket-btn').forEach(btn => {
                     btn.classList.remove('active');
                 });
-                
+
                 // Add active class to clicked button
                 event.target.classList.add('active');
-                
+
                 if (days === 0) {
                     // All time
                     dateFrom.value = '';
@@ -2446,7 +2563,7 @@ $purchasesNet = (float) $purchasesTotals['net'];
                     // Calculate date range
                     const fromDate = new Date();
                     fromDate.setDate(today.getDate() - days);
-                    
+
                     dateFrom.value = fromDate.toISOString().split('T')[0];
                     dateTo.value = today.toISOString().split('T')[0];
                 }
@@ -2485,12 +2602,30 @@ $purchasesNet = (float) $purchasesTotals['net'];
             $branchData = array_column($branchSales, 'total_sales');
             ?>
             new ApexCharts(document.querySelector('#branchSalesChart'), {
-                chart: { type: 'bar', height: 200, toolbar: { show: false } },
-                series: [{ name: 'Sales', data: <?= json_encode($branchData) ?> }],
-                xaxis: { categories: <?= json_encode($branchLabels) ?> },
+                chart: {
+                    type: 'bar',
+                    height: 200,
+                    toolbar: {
+                        show: false
+                    }
+                },
+                series: [{
+                    name: 'Sales',
+                    data: <?= json_encode($branchData) ?>
+                }],
+                xaxis: {
+                    categories: <?= json_encode($branchLabels) ?>
+                },
                 colors: ['#3b82f6'],
-                plotOptions: { bar: { horizontal: true, barHeight: '70%' } },
-                dataLabels: { enabled: false }
+                plotOptions: {
+                    bar: {
+                        horizontal: true,
+                        barHeight: '70%'
+                    }
+                },
+                dataLabels: {
+                    enabled: false
+                }
             }).render();
 
             // Territory-wise Sales Chart
@@ -2513,12 +2648,30 @@ $purchasesNet = (float) $purchasesTotals['net'];
             $territoryData = array_column($territorySales, 'total_sales');
             ?>
             new ApexCharts(document.querySelector('#territorySalesChart'), {
-                chart: { type: 'bar', height: 200, toolbar: { show: false } },
-                series: [{ name: 'Sales', data: <?= json_encode($territoryData) ?> }],
-                xaxis: { categories: <?= json_encode($territoryLabels) ?> },
+                chart: {
+                    type: 'bar',
+                    height: 200,
+                    toolbar: {
+                        show: false
+                    }
+                },
+                series: [{
+                    name: 'Sales',
+                    data: <?= json_encode($territoryData) ?>
+                }],
+                xaxis: {
+                    categories: <?= json_encode($territoryLabels) ?>
+                },
                 colors: ['#22c55e'],
-                plotOptions: { bar: { horizontal: true, barHeight: '70%' } },
-                dataLabels: { enabled: false }
+                plotOptions: {
+                    bar: {
+                        horizontal: true,
+                        barHeight: '70%'
+                    }
+                },
+                dataLabels: {
+                    enabled: false
+                }
             }).render();
 
             // Bank Statement Functions
@@ -2549,10 +2702,10 @@ $purchasesNet = (float) $purchasesTotals['net'];
                     if (result.success && result.bank_accounts && result.bank_accounts.length > 0) {
                         let html = '';
                         result.bank_accounts.forEach(bank => {
-                            const logoPath = bank.bank_logo_path 
-                                ? `../../assets/uploads/bank_logo/${bank.bank_logo_path}` 
-                                : '../../assets/uploads/bank_logo/default-bank.png';
-                            
+                            const logoPath = bank.bank_logo_path ?
+                                `../../assets/uploads/bank_logo/${bank.bank_logo_path}` :
+                                '../../assets/uploads/bank_logo/default-bank.png';
+
                             html += `
                                 <div class="bank-account-card" onclick="selectBankAccount(${bank.id}, '${bank.bank_name.replace(/'/g, "\\\'")}')">
                                     <img src="${logoPath}" alt="${bank.bank_name}" class="bank-logo" onerror="this.src='../../assets/uploads/bank_logo/default-bank.png'">
@@ -2575,7 +2728,10 @@ $purchasesNet = (float) $purchasesTotals['net'];
             }
 
             function selectBankAccount(bankId, bankName) {
-                selectedBankAccount = { id: bankId, name: bankName };
+                selectedBankAccount = {
+                    id: bankId,
+                    name: bankName
+                };
                 document.getElementById('bankModalTitle').textContent = `Bank Statement - ${bankName}`;
                 document.getElementById('bankAccountsView').style.display = 'none';
                 document.getElementById('bankStatementView').classList.add('active');
@@ -2594,7 +2750,7 @@ $purchasesNet = (float) $purchasesTotals['net'];
 
                 const tableBody = document.getElementById('statementTableBody');
                 const summaryDiv = document.getElementById('statementSummary');
-                
+
                 tableBody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 3rem; color: #64748b;"><i class="fas fa-spinner fa-spin" style="font-size: 2rem; margin-bottom: 1rem;"></i><br>Loading statement...</td></tr>';
                 summaryDiv.innerHTML = '';
 
@@ -2604,7 +2760,7 @@ $purchasesNet = (float) $purchasesTotals['net'];
                     const toDate = document.getElementById('statementToDate').value;
 
                     let url = `../../../server/api/financial_reports/cash_flow/cash-flow.php?bank_account=${selectedBankAccount.id}&date_range=${dateRange}`;
-                    
+
                     if (dateRange === 'custom' && fromDate && toDate) {
                         url += `&from_date=${fromDate}&to_date=${toDate}`;
                     }
@@ -2666,7 +2822,7 @@ $purchasesNet = (float) $purchasesTotals['net'];
             document.getElementById('statementDateRange')?.addEventListener('change', function() {
                 const fromDate = document.getElementById('statementFromDate');
                 const toDate = document.getElementById('statementToDate');
-                
+
                 if (this.value === 'custom') {
                     fromDate.style.display = 'block';
                     toDate.style.display = 'block';
@@ -2683,7 +2839,7 @@ $purchasesNet = (float) $purchasesTotals['net'];
                 }
             });
 
-           document.getElementById('bankStatementModal')?.addEventListener('click', function(e) {
+            document.getElementById('bankStatementModal')?.addEventListener('click', function(e) {
                 if (e.target === this) {
                     closeBankStatementModal();
                 }
@@ -2693,7 +2849,7 @@ $purchasesNet = (float) $purchasesTotals['net'];
             let capturedCombo = '';
 
             const shortcutKeyInput = document.getElementById('shortcutKeyInput');
-            shortcutKeyInput?.addEventListener('keydown', function (e) {
+            shortcutKeyInput?.addEventListener('keydown', function(e) {
                 e.preventDefault();
                 if (['Control', 'Alt', 'Shift', 'Meta'].includes(e.key)) return;
 
@@ -2707,56 +2863,72 @@ $purchasesNet = (float) $purchasesTotals['net'];
                 shortcutKeyInput.value = capturedCombo;
             });
 
-           async function saveShortcut() {
-    const select = document.getElementById('shortcutPageSelect');
-    const pageKey = select.value;
-    const pageLabel = select.options[select.selectedIndex]?.dataset.label || '';
+            async function saveShortcut() {
+                const select = document.getElementById('shortcutPageSelect');
+                const pageKey = select.value;
+                const pageLabel = select.options[select.selectedIndex]?.dataset.label || '';
 
-    if (!pageKey) { alert('Pehle koi page select karein'); return; }
-    if (!capturedCombo) { alert('Key box par click karke shortcut key press karein'); return; }
+                if (!pageKey) {
+                    alert('Pehle koi page select karein');
+                    return;
+                }
+                if (!capturedCombo) {
+                    alert('Key box par click karke shortcut key press karein');
+                    return;
+                }
 
-    try {
-        const res = await fetch('../../../server/api/shortcuts/shortcuts.php?action=save', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ key_combo: capturedCombo, page_key: pageKey, page_label: pageLabel })
-        });
-        const data = await res.json();
-        if (data.success) {
-            capturedCombo = '';
-            shortcutKeyInput.value = '';
-            select.value = '';
-            loadShortcutsUI();
-            if (window.DashboardCore) await window.DashboardCore.loadShortcuts();   // ?? ye line add karo
-        } else {
-            alert(data.message || 'Save failed');
-        }
-    } catch (err) {
-        console.error(err);
-        alert('Error saving shortcut');
-    }
-}
+                try {
+                    const res = await fetch('../../../server/api/shortcuts/shortcuts.php?action=save', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            key_combo: capturedCombo,
+                            page_key: pageKey,
+                            page_label: pageLabel
+                        })
+                    });
+                    const data = await res.json();
+                    if (data.success) {
+                        capturedCombo = '';
+                        shortcutKeyInput.value = '';
+                        select.value = '';
+                        loadShortcutsUI();
+                        if (window.DashboardCore) await window.DashboardCore.loadShortcuts(); // ?? ye line add karo
+                    } else {
+                        alert(data.message || 'Save failed');
+                    }
+                } catch (err) {
+                    console.error(err);
+                    alert('Error saving shortcut');
+                }
+            }
 
-          async function deleteShortcut(id) {
-    try {
-        await fetch('../../../server/api/shortcuts/shortcuts.php?action=delete', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ id })
-        });
-        loadShortcutsUI();
-        if (window.DashboardCore) await window.DashboardCore.loadShortcuts();   // ?? ye line add karo
-    } catch (err) {
-        console.error(err);
-    }
-}
+            async function deleteShortcut(id) {
+                try {
+                    await fetch('../../../server/api/shortcuts/shortcuts.php?action=delete', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            id
+                        })
+                    });
+                    loadShortcutsUI();
+                    if (window.DashboardCore) await window.DashboardCore.loadShortcuts(); // ?? ye line add karo
+                } catch (err) {
+                    console.error(err);
+                }
+            }
 
-// ---------- Global Search ----------
+            // ---------- Global Search ----------
             let searchDebounceTimer;
             const globalSearchInput = document.getElementById('globalSearchInput');
             const globalSearchResults = document.getElementById('globalSearchResults');
 
-            globalSearchInput?.addEventListener('input', function () {
+            globalSearchInput?.addEventListener('input', function() {
                 clearTimeout(searchDebounceTimer);
                 const q = this.value.trim();
 
@@ -2804,7 +2976,7 @@ $purchasesNet = (float) $purchasesTotals['net'];
             }
 
             // Close dropdown on outside click
-            document.addEventListener('click', function (e) {
+            document.addEventListener('click', function(e) {
                 if (!e.target.closest('#globalSearchInput') && !e.target.closest('#globalSearchResults')) {
                     globalSearchResults.style.display = 'none';
                 }
@@ -2830,66 +3002,73 @@ $purchasesNet = (float) $purchasesTotals['net'];
                     console.error(err);
                 }
             }
-let todoNotifiedIds = new Set();
+            let todoNotifiedIds = new Set();
 
-function escapeHtml(str) {
-    const div = document.createElement('div');
-    div.textContent = str;
-    return div.innerHTML;
-}
-
-function openTodoModal() {
-    document.getElementById('todoModal').classList.add('show');
-    loadTodos();
-}
-
-function closeTodoModal() {
-    document.getElementById('todoModal').classList.remove('show');
-}
-
-document.getElementById('todoModal')?.addEventListener('click', function () {
-    closeTodoModal();
-});
-
-document.addEventListener('keydown', function (e) {
-    if (e.key === 'Escape') closeTodoModal();
-});
-
-function isOverdue(dueDate, dueTime, isDone) {
-    if (!dueDate || isDone) return false;
-    const now = new Date();
-    const target = new Date(dueDate + 'T' + (dueTime || '23:59:59'));
-    return target < now;
-}
-
-async function loadTodos() {
-    const tbody = document.getElementById('todoTableBody');
-    try {
-        const res = await fetch('../../../server/api/todos/todos.php?action=list');
-        const data = await res.json();
-        if (!data.success) return;
-
-        const todos = data.data;
-        const overdueCount = todos.filter(t => isOverdue(t.due_date, t.due_time, t.is_done)).length;
-        updateTodoBadge(overdueCount);
-        checkOverdueNotifications(todos);
-
-        if (!todos.length) {
-            tbody.innerHTML = '<tr><td colspan="7" class="todo-empty"><i class="fas fa-clipboard-check" style="font-size:1.5rem; display:block; margin-bottom:0.5rem;"></i>No tasks yet. Add one above.</td></tr>';
-            return;
-        }
-
-        tbody.innerHTML = todos.map(t => {
-            const overdue = isOverdue(t.due_date, t.due_time, t.is_done);
-            let dateLabel = '-', dayLabel = '-';
-            if (t.due_date) {
-                const d = new Date(t.due_date + 'T00:00:00');
-                dateLabel = d.toLocaleDateString('en-PK', { day: 'numeric', month: 'short', year: 'numeric' });
-                dayLabel = d.toLocaleDateString('en-PK', { weekday: 'short' });
+            function escapeHtml(str) {
+                const div = document.createElement('div');
+                div.textContent = str;
+                return div.innerHTML;
             }
-            const timeLabel = t.due_time ? t.due_time.slice(0, 5) : '-';
 
-            return `
+            function openTodoModal() {
+                document.getElementById('todoModal').classList.add('show');
+                loadTodos();
+            }
+
+            function closeTodoModal() {
+                document.getElementById('todoModal').classList.remove('show');
+            }
+
+            document.getElementById('todoModal')?.addEventListener('click', function() {
+                closeTodoModal();
+            });
+
+            document.addEventListener('keydown', function(e) {
+                if (e.key === 'Escape') closeTodoModal();
+            });
+
+            function isOverdue(dueDate, dueTime, isDone) {
+                if (!dueDate || isDone) return false;
+                const now = new Date();
+                const target = new Date(dueDate + 'T' + (dueTime || '23:59:59'));
+                return target < now;
+            }
+
+            async function loadTodos() {
+                const tbody = document.getElementById('todoTableBody');
+                try {
+                    const res = await fetch('../../../server/api/todos/todos.php?action=list');
+                    const data = await res.json();
+                    if (!data.success) return;
+
+                    const todos = data.data;
+                    const overdueCount = todos.filter(t => isOverdue(t.due_date, t.due_time, t.is_done)).length;
+                    updateTodoBadge(overdueCount);
+                    checkOverdueNotifications(todos);
+
+                    if (!todos.length) {
+                        tbody.innerHTML = '<tr><td colspan="7" class="todo-empty"><i class="fas fa-clipboard-check" style="font-size:1.5rem; display:block; margin-bottom:0.5rem;"></i>No tasks yet. Add one above.</td></tr>';
+                        return;
+                    }
+
+                    tbody.innerHTML = todos.map(t => {
+                        const overdue = isOverdue(t.due_date, t.due_time, t.is_done);
+                        let dateLabel = '-',
+                            dayLabel = '-';
+                        if (t.due_date) {
+                            const d = new Date(t.due_date + 'T00:00:00');
+                            dateLabel = d.toLocaleDateString('en-PK', {
+                                day: 'numeric',
+                                month: 'short',
+                                year: 'numeric'
+                            });
+                            dayLabel = d.toLocaleDateString('en-PK', {
+                                weekday: 'short'
+                            });
+                        }
+                        const timeLabel = t.due_time ? t.due_time.slice(0, 5) : '-';
+
+                        return `
                 <tr class="${t.is_done == 1 ? 'done' : ''} ${overdue ? 'overdue' : ''}" data-id="${t.id}">
                     <td><input type="checkbox" class="todo-checkbox" ${t.is_done == 1 ? 'checked' : ''} onchange="toggleTodo(${t.id})"></td>
                     <td>${dateLabel}</td>
@@ -2903,389 +3082,468 @@ async function loadTodos() {
                     <td><i class="fas fa-times todo-delete" onclick="deleteTodo(${t.id})"></i></td>
                 </tr>
             `;
-        }).join('');
-    } catch (err) {
-        console.error(err);
-        tbody.innerHTML = '<tr><td colspan="7" class="todo-empty" style="color:#dc2626;">Failed to load todo list</td></tr>';
-    }
-}
+                    }).join('');
+                } catch (err) {
+                    console.error(err);
+                    tbody.innerHTML = '<tr><td colspan="7" class="todo-empty" style="color:#dc2626;">Failed to load todo list</td></tr>';
+                }
+            }
 
-function updateTodoBadge(count) {
-    const badge = document.getElementById('todoBadge');
-    if (!badge) return;
-    if (count > 0) {
-        badge.textContent = count;
-        badge.style.display = 'flex';
-    } else {
-        badge.style.display = 'none';
-    }
-}
+            function updateTodoBadge(count) {
+                const badge = document.getElementById('todoBadge');
+                if (!badge) return;
+                if (count > 0) {
+                    badge.textContent = count;
+                    badge.style.display = 'flex';
+                } else {
+                    badge.style.display = 'none';
+                }
+            }
 
-function checkOverdueNotifications(todos) {
-    todos.forEach(t => {
-        if (isOverdue(t.due_date, t.due_time, t.is_done) && !todoNotifiedIds.has(t.id)) {
-            todoNotifiedIds.add(t.id);
-            showTodoToast(t);
-        }
-    });
-}
+            function checkOverdueNotifications(todos) {
+                todos.forEach(t => {
+                    if (isOverdue(t.due_date, t.due_time, t.is_done) && !todoNotifiedIds.has(t.id)) {
+                        todoNotifiedIds.add(t.id);
+                        showTodoToast(t);
+                    }
+                });
+            }
 
-function showTodoToast(todo) {
-    const toast = document.createElement('div');
-    toast.className = 'todo-toast';
-    toast.innerHTML = `
+            function showTodoToast(todo) {
+                const toast = document.createElement('div');
+                toast.className = 'todo-toast';
+                toast.innerHTML = `
         <i class="fas fa-triangle-exclamation"></i>
         <div>
             <div style="font-weight:700; margin-bottom:0.25rem;">Task overdue</div>
             <div>${escapeHtml(todo.heading)}</div>
         </div>
     `;
-    document.body.appendChild(toast);
-    setTimeout(() => toast.remove(), 6000);
-}
+                document.body.appendChild(toast);
+                setTimeout(() => toast.remove(), 6000);
+            }
 
-async function addTodo() {
-    const headingInput = document.getElementById('todoHeading');
-    const descInput = document.getElementById('todoDescription');
-    const dateInput = document.getElementById('todoDueDate');
-    const timeInput = document.getElementById('todoDueTime');
+            async function addTodo() {
+                const headingInput = document.getElementById('todoHeading');
+                const descInput = document.getElementById('todoDescription');
+                const dateInput = document.getElementById('todoDueDate');
+                const timeInput = document.getElementById('todoDueTime');
 
-    const heading = headingInput.value.trim();
-    if (!heading) return;
+                const heading = headingInput.value.trim();
+                if (!heading) return;
 
-    try {
-        const res = await fetch('../../../server/api/todos/todos.php?action=add', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                heading,
-                description: descInput.value.trim(),
-                due_date: dateInput.value || null,
-                due_time: timeInput.value || null
-            })
-        });
-        const data = await res.json();
-        if (data.success) {
-            headingInput.value = '';
-            descInput.value = '';
-            dateInput.value = '';
-            timeInput.value = '';
+                try {
+                    const res = await fetch('../../../server/api/todos/todos.php?action=add', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            heading,
+                            description: descInput.value.trim(),
+                            due_date: dateInput.value || null,
+                            due_time: timeInput.value || null
+                        })
+                    });
+                    const data = await res.json();
+                    if (data.success) {
+                        headingInput.value = '';
+                        descInput.value = '';
+                        dateInput.value = '';
+                        timeInput.value = '';
+                        loadTodos();
+                    } else {
+                        alert(data.message || 'Could not add task');
+                    }
+                } catch (err) {
+                    console.error(err);
+                }
+            }
+
+            async function toggleTodo(id) {
+                try {
+                    await fetch('../../../server/api/todos/todos.php?action=toggle', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            id
+                        })
+                    });
+                    loadTodos();
+                } catch (err) {
+                    console.error(err);
+                }
+            }
+
+            async function deleteTodo(id) {
+                try {
+                    await fetch('../../../server/api/todos/todos.php?action=delete', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            id
+                        })
+                    });
+                    loadTodos();
+                } catch (err) {
+                    console.error(err);
+                }
+            }
+
+            async function clearTodos() {
+                if (!confirm('Clear the entire todo list? This cannot be undone.')) return;
+                try {
+                    await fetch('../../../server/api/todos/todos.php?action=clear', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        }
+                    });
+                    loadTodos();
+                } catch (err) {
+                    console.error(err);
+                }
+            }
+
             loadTodos();
-        } else {
-            alert(data.message || 'Could not add task');
-        }
-    } catch (err) {
-        console.error(err);
-    }
-}
-
-async function toggleTodo(id) {
-    try {
-        await fetch('../../../server/api/todos/todos.php?action=toggle', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ id })
-        });
-        loadTodos();
-    } catch (err) {
-        console.error(err);
-    }
-}
-
-async function deleteTodo(id) {
-    try {
-        await fetch('../../../server/api/todos/todos.php?action=delete', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ id })
-        });
-        loadTodos();
-    } catch (err) {
-        console.error(err);
-    }
-}
-
-async function clearTodos() {
-    if (!confirm('Clear the entire todo list? This cannot be undone.')) return;
-    try {
-        await fetch('../../../server/api/todos/todos.php?action=clear', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' }
-        });
-        loadTodos();
-    } catch (err) {
-        console.error(err);
-    }
-}
-
-loadTodos();
-setInterval(loadTodos, 5 * 60 * 1000);
+            setInterval(loadTodos, 5 * 60 * 1000);
             loadShortcutsUI();
         </script>
-    
+
 
 
         <script src="../../assets/js/dashboard/dashboard-main.js"></script>
 
         <script>
-(function () {
-    const DATE_KEY = 'global_locked_date';
-    const FLAG_KEY = 'global_date_locked';
+            (function() {
+                const DATE_KEY = 'global_locked_date';
+                const FLAG_KEY = 'global_date_locked';
 
-    function init() {
-        const wrap     = document.getElementById('dateLockWidgetWrap');
-        const panel    = document.getElementById('dateLockPanel');
-        const toggle   = document.getElementById('dateLockToggleTab');
-        const tabIcon  = document.getElementById('dateLockTabIcon');
-        const dateInput= document.getElementById('globalLockDate');
-        const lockBtn  = document.getElementById('globalDateLockBtn');
-        const lockIcon = document.getElementById('globalDateLockIcon');
-        if (!wrap || !panel || !toggle || !dateInput || !lockBtn || !lockIcon) return;
+                function init() {
+                    const wrap = document.getElementById('dateLockWidgetWrap');
+                    const panel = document.getElementById('dateLockPanel');
+                    const toggle = document.getElementById('dateLockToggleTab');
+                    const tabIcon = document.getElementById('dateLockTabIcon');
+                    const dateInput = document.getElementById('globalLockDate');
+                    const lockBtn = document.getElementById('globalDateLockBtn');
+                    const lockIcon = document.getElementById('globalDateLockIcon');
+                    if (!wrap || !panel || !toggle || !dateInput || !lockBtn || !lockIcon) return;
 
-        const isLocked  = localStorage.getItem(FLAG_KEY) === 'true';
-        const savedDate = localStorage.getItem(DATE_KEY);
+                    const isLocked = localStorage.getItem(FLAG_KEY) === 'true';
+                    const savedDate = localStorage.getItem(DATE_KEY);
 
-        function renderLocked() {
-            dateInput.value = savedDate;
-            dateInput.disabled = true;
-            lockIcon.className = 'fas fa-lock';
-            lockIcon.style.color = '#e74c3c';
-            lockBtn.title = 'Click to unlock date';
-            tabIcon.className = 'fas fa-lock';
-            tabIcon.style.color = '#e74c3c';
-        }
-        function renderUnlocked() {
-            if (!dateInput.value) dateInput.value = new Date().toISOString().split('T')[0];
-            dateInput.disabled = false;
-            lockIcon.className = 'fas fa-lock-open';
-            lockIcon.style.color = '#888';
-            lockBtn.title = 'Select a date and click to lock it for all forms';
-            tabIcon.className = 'fas fa-lock-open';
-            tabIcon.style.color = '#888';
-        }
+                    function renderLocked() {
+                        dateInput.value = savedDate;
+                        dateInput.disabled = true;
+                        lockIcon.className = 'fas fa-lock';
+                        lockIcon.style.color = '#e74c3c';
+                        lockBtn.title = 'Click to unlock date';
+                        tabIcon.className = 'fas fa-lock';
+                        tabIcon.style.color = '#e74c3c';
+                    }
 
-        if (isLocked && savedDate) renderLocked(); else renderUnlocked();
+                    function renderUnlocked() {
+                        if (!dateInput.value) dateInput.value = new Date().toISOString().split('T')[0];
+                        dateInput.disabled = false;
+                        lockIcon.className = 'fas fa-lock-open';
+                        lockIcon.style.color = '#888';
+                        lockBtn.title = 'Select a date and click to lock it for all forms';
+                        tabIcon.className = 'fas fa-lock-open';
+                        tabIcon.style.color = '#888';
+                    }
 
-        // Toggle open/close panel
-        function openPanel() {
-            panel.style.maxWidth = '220px';
-            panel.style.opacity = '1';
-        }
-        function closePanel() {
-            panel.style.maxWidth = '0';
-            panel.style.opacity = '0';
-        }
+                    if (isLocked && savedDate) renderLocked();
+                    else renderUnlocked();
 
-        toggle.addEventListener('click', function (e) {
-            e.stopPropagation();
-            const isOpen = panel.style.maxWidth && panel.style.maxWidth !== '0px';
-            if (isOpen) closePanel(); else openPanel();
-        });
+                    // Toggle open/close panel
+                    function openPanel() {
+                        panel.style.maxWidth = '220px';
+                        panel.style.opacity = '1';
+                    }
 
-        // Click outside closes the panel
-        document.addEventListener('click', function (e) {
-            if (!wrap.contains(e.target)) closePanel();
-        });
+                    function closePanel() {
+                        panel.style.maxWidth = '0';
+                        panel.style.opacity = '0';
+                    }
 
-        lockBtn.addEventListener('click', function (e) {
-            e.stopPropagation();
-            const currentlyLocked = localStorage.getItem(FLAG_KEY) === 'true';
+                    toggle.addEventListener('click', function(e) {
+                        e.stopPropagation();
+                        const isOpen = panel.style.maxWidth && panel.style.maxWidth !== '0px';
+                        if (isOpen) closePanel();
+                        else openPanel();
+                    });
 
-          if (currentlyLocked) {
-    // UNLOCK
-    localStorage.removeItem(FLAG_KEY);
-    localStorage.removeItem(DATE_KEY);
+                    // Click outside closes the panel
+                    document.addEventListener('click', function(e) {
+                        if (!wrap.contains(e.target)) closePanel();
+                    });
 
-    renderUnlocked();
+                    lockBtn.addEventListener('click', function(e) {
+                        e.stopPropagation();
+                        const currentlyLocked = localStorage.getItem(FLAG_KEY) === 'true';
 
-    window.dispatchEvent(new CustomEvent('global-date-lock-changed', {
-        detail: {
-            locked: false,
-            date: new Date().toISOString().split('T')[0]
-        }
-    }));
+                        if (currentlyLocked) {
+                            // UNLOCK
+                            localStorage.removeItem(FLAG_KEY);
+                            localStorage.removeItem(DATE_KEY);
 
-} else {
-    // LOCK
-    if (!dateInput.value) {
-        alert('Please select a date first.');
-        return;
-    }
+                            renderUnlocked();
 
-    const lockedDate = dateInput.value;
+                            window.dispatchEvent(new CustomEvent('global-date-lock-changed', {
+                                detail: {
+                                    locked: false,
+                                    date: new Date().toISOString().split('T')[0]
+                                }
+                            }));
 
-    localStorage.setItem(DATE_KEY, lockedDate);
-    localStorage.setItem(FLAG_KEY, 'true');
+                        } else {
+                            // LOCK
+                            if (!dateInput.value) {
+                                alert('Please select a date first.');
+                                return;
+                            }
 
-    renderLocked();
+                            const lockedDate = dateInput.value;
 
-    window.dispatchEvent(new CustomEvent('global-date-lock-changed', {
-        detail: {
-            locked: true,
-            date: lockedDate
-        }
-    }));
-}
-        });
-    }
+                            localStorage.setItem(DATE_KEY, lockedDate);
+                            localStorage.setItem(FLAG_KEY, 'true');
 
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', init);
-    } else {
-        init();
-    }
-})();
+                            renderLocked();
+
+                            window.dispatchEvent(new CustomEvent('global-date-lock-changed', {
+                                detail: {
+                                    locked: true,
+                                    date: lockedDate
+                                }
+                            }));
+                        }
+                    });
+                }
+
+                if (document.readyState === 'loading') {
+                    document.addEventListener('DOMContentLoaded', init);
+                } else {
+                    init();
+                }
+            })();
 
 
-const LEAVE_API = '../../../server/api/hrm/leave/leave-request.php';
+            const LEAVE_API = '../../../server/api/hrm/leave/leave-request.php';
 
-async function loadLeaveApprovals() {
-    const card = document.getElementById('leaveApprovalsCard');
-    const list = document.getElementById('leaveApprovalsList');
-    if (!card) return;
-    try {
-        const res = await fetch(LEAVE_API + '?action=pending_excess');
-        const data = await res.json();
-        if (!data.success || !data.data.length) { card.style.display = 'none'; return; }
+            async function loadLeaveApprovals() {
+                const card = document.getElementById('leaveApprovalsCard');
+                const list = document.getElementById('leaveApprovalsList');
+                if (!card) return;
+                try {
+                    const res = await fetch(LEAVE_API + '?action=pending_excess');
+                    const data = await res.json();
+                    if (!data.success || !data.data.length) {
+                        card.style.display = 'none';
+                        return;
+                    }
 
-               document.getElementById('leaveApprovalsCount').textContent = data.data.length;
-      list.innerHTML = data.data.map(r => {
-    // Overtime rows never carry excess_status (only range leaves do), so they're
-    // told apart here by ot_hours being present - and shown with hours/rate/amount
-    // and a plain Approve/Reject pair instead of the excess Paid-days split form.
+                    document.getElementById('leaveApprovalsCount').textContent = data.data.length;
+               list.innerHTML = data.data.map(r => {
     const isOvertime = r.ot_hours !== null && r.ot_hours !== undefined;
+    
     if (isOvertime) {
         const otAmount = parseFloat(r.ot_amount || 0).toLocaleString('en-PK', { maximumFractionDigits: 0 });
         return `
-            <div style="padding:0.85rem 0; border-bottom:1px solid #f1f5f9;">
-                <div style="font-size:14px; color:#0f172a;">
-                    <strong>${escapeHtml(r.employee_name || r.employee_id)}</strong>
-                    · <strong>Overtime</strong>
-                    · <strong>${parseFloat(r.ot_hours)}</strong> hrs @ ${parseFloat(r.ot_rate_multiplier)}x
-                    (${escapeHtml(r.start_date)})
+            <div style="padding:1rem 0; border-bottom:1px solid #f1f5f9;">
+                <div style="display:flex; flex-wrap:wrap; gap:0.5rem 1.5rem; margin-bottom:6px;">
+                    <span style="font-size:14px; font-weight:700; color:#0f172a;">${escapeHtml(r.employee_name || r.employee_id)}</span>
+                    <span style="font-size:13px; background:#eff6ff; color:#1d4ed8; padding:2px 10px; border-radius:20px; font-weight:600;">Overtime</span>
+                    <span style="font-size:13px; color:#475569;"><i class="fas fa-calendar" style="color:#94a3b8;"></i> ${escapeHtml(r.start_date)}</span>
+                    <span style="font-size:13px; color:#475569;"><i class="fas fa-clock" style="color:#94a3b8;"></i> ${parseFloat(r.ot_hours)} hrs @ ${parseFloat(r.ot_rate_multiplier)}x</span>
+                    <span style="font-size:13px; font-weight:700; color:#16a34a;"><i class="fas fa-coins" style="color:#94a3b8;"></i> ${currencySymbol} ${otAmount}</span>
                 </div>
-                <div style="font-size:12px; color:#64748b; margin:3px 0 8px;">
-                    Reason: ${escapeHtml(r.reason || '-')} · Amount: ${currencySymbol} ${otAmount}
+                <div style="font-size:12.5px; color:#64748b; margin-bottom:10px; background:#f8fafc; padding:6px 10px; border-radius:6px; border-left:3px solid #e2e8f0;">
+                    <i class="fas fa-comment-alt" style="color:#94a3b8;"></i> <strong>Reason:</strong> ${escapeHtml(r.reason || '—')}
                 </div>
-                <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
-                    <button class="btn btn-primary" onclick="approveLeave(${r.id})">
+                <div style="display:flex; gap:0.5rem;">
+                    <button class="btn btn-primary" onclick="approveLeave(${r.id})" style="font-size:13px; padding:6px 16px;">
                         <i class="fas fa-check"></i> Approve
                     </button>
-                    <button class="btn btn-secondary" onclick="rejectLeave(${r.id})">
+                    <button class="btn btn-secondary" onclick="rejectLeave(${r.id})" style="font-size:13px; padding:6px 16px;">
                         <i class="fas fa-times"></i> Reject
                     </button>
                 </div>
             </div>`;
     }
 
-    const totalDays = parseFloat(r.total_days || 0);
+    const totalDays  = parseFloat(r.total_days  || 0);
+    const paidDays   = parseFloat(r.paid_days   || 0);
+    const unpaidDays = parseFloat(r.unpaid_days || 0);
+    const dailyRate  = parseFloat(r.daily_rate  || 0);
+    const paidAmount   = (paidDays   * dailyRate).toLocaleString('en-PK', { maximumFractionDigits: 0 });
+    const unpaidAmount = (unpaidDays * dailyRate).toLocaleString('en-PK', { maximumFractionDigits: 0 });
     const isPendingExcess = parseFloat(r.excess_days || 0) > 0;
-    const extraCost = (parseFloat(r.excess_days || 0) * parseFloat(r.daily_rate || 0))
-        .toLocaleString('en-PK', { maximumFractionDigits: 0 });
+
+    const paymentBadge = unpaidDays >= totalDays
+        ? `<span style="background:#fee2e2; color:#dc2626; padding:2px 10px; border-radius:20px; font-size:12px; font-weight:700;">Fully Unpaid</span>`
+        : unpaidDays > 0
+            ? `<span style="background:#fef3c7; color:#b45309; padding:2px 10px; border-radius:20px; font-size:12px; font-weight:700;">Split — ${paidDays} Paid / ${unpaidDays} Unpaid</span>`
+            : `<span style="background:#dcfce7; color:#16a34a; padding:2px 10px; border-radius:20px; font-size:12px; font-weight:700;">Fully Paid</span>`;
 
     const buttons = isPendingExcess
         ? `<div style="display:flex; align-items:center; gap:0.5rem; flex-wrap:wrap;">
-               <label style="font-size:12px; color:#64748b;">Paid days:</label>
+               <label style="font-size:12px; color:#64748b; font-weight:600;">Paid Days:</label>
                <input type="number" min="0" max="${totalDays}" step="0.5"
-                      value="${parseFloat(r.paid_days || 0)}" id="paidInput-${r.id}"
-                      style="width:70px; padding:4px 6px; border:1px solid #d6dbe4; border-radius:4px;">
-               <span style="font-size:12px; color:#64748b;">of ${totalDays} din (baqi unpaid)</span>
-               <button class="btn btn-primary" onclick="resolveLeaveExcess(${r.id}, ${totalDays})">
-                   <i class="fas fa-check"></i> Save
+                      value="${paidDays}" id="paidInput-${r.id}"
+                      style="width:70px; padding:4px 8px; border:1.5px solid #d6dbe4; border-radius:6px; font-size:13px;">
+               <span style="font-size:12px; color:#64748b;">of ${totalDays} days (rest unpaid)</span>
+               <button class="btn btn-primary" onclick="resolveLeaveExcess(${r.id}, ${totalDays})" style="font-size:13px; padding:6px 16px;">
+                   <i class="fas fa-check"></i> Save Decision
                </button>
            </div>`
-        : `<button class="btn btn-primary" onclick="approveLeave(${r.id})">
-               <i class="fas fa-check"></i> Approve
-           </button>
-           <button class="btn btn-secondary" onclick="rejectLeave(${r.id})">
-               <i class="fas fa-times"></i> Reject
-           </button>`;
-
-    const extraInfo = isPendingExcess
-        ? `<strong style="color:#dc2626;">${parseFloat(r.excess_days)} din zyada</strong> — 
-           Sab paid karne par: ${currencySymbol} ${extraCost}`
-        : `<span style="color:#e8b23f;">Normal approval pending</span>`;
+        : `<div style="display:flex; gap:0.5rem;">
+               <button class="btn btn-primary" onclick="approveLeave(${r.id})" style="font-size:13px; padding:6px 16px;">
+                   <i class="fas fa-check"></i> Approve
+               </button>
+               <button class="btn btn-secondary" onclick="rejectLeave(${r.id})" style="font-size:13px; padding:6px 16px;">
+                   <i class="fas fa-times"></i> Reject
+               </button>
+           </div>`;
 
     return `
-        <div style="padding:0.85rem 0; border-bottom:1px solid #f1f5f9;">
-            <div style="font-size:14px; color:#0f172a;">
-                <strong>${escapeHtml(r.employee_name || r.employee_id)}</strong>
-                · <strong>${escapeHtml(r.type_name || 'Leave')}</strong>
-                · <strong>${totalDays}</strong> din
-                (${escapeHtml(r.start_date)} → ${escapeHtml(r.end_date)})
+        <div style="padding:1rem 0; border-bottom:1px solid #f1f5f9;">
+            <!-- Row 1: Name + Type + Date range + Payment badge -->
+            <div style="display:flex; flex-wrap:wrap; gap:0.5rem 1.5rem; align-items:center; margin-bottom:8px;">
+                <span style="font-size:14px; font-weight:700; color:#0f172a;">${escapeHtml(r.employee_name || r.employee_id)}</span>
+                <span style="font-size:13px; background:#eff6ff; color:#1d4ed8; padding:2px 10px; border-radius:20px; font-weight:600;">${escapeHtml(r.type_name || 'Leave')}</span>
+                <span style="font-size:13px; color:#475569;"><i class="fas fa-calendar" style="color:#94a3b8;"></i> ${escapeHtml(r.start_date)} → ${escapeHtml(r.end_date || r.start_date)}</span>
+                <span style="font-size:13px; color:#475569; font-weight:600;"><i class="fas fa-sun" style="color:#94a3b8;"></i> ${totalDays} day${totalDays !== 1 ? 's' : ''}</span>
+                ${paymentBadge}
             </div>
-            <div style="font-size:12px; color:#64748b; margin:3px 0 8px;">
-                Reason: ${escapeHtml(r.reason || '-')} · ${extraInfo}
+
+            <!-- Row 2: Paid / Unpaid breakdown -->
+            <div style="display:flex; flex-wrap:wrap; gap:0.75rem; margin-bottom:8px;">
+                <div style="background:#f0fdf4; border:1px solid #bbf7d0; border-radius:8px; padding:6px 14px; font-size:12.5px;">
+                    <span style="color:#64748b;">Paid:</span>
+                    <strong style="color:#16a34a; margin-left:4px;">${paidDays} days</strong>
+                    <span style="color:#94a3b8; margin-left:4px;">(${currencySymbol} ${paidAmount})</span>
+                </div>
+                <div style="background:#fef2f2; border:1px solid #fecaca; border-radius:8px; padding:6px 14px; font-size:12.5px;">
+                    <span style="color:#64748b;">Unpaid:</span>
+                    <strong style="color:#dc2626; margin-left:4px;">${unpaidDays} days</strong>
+                    <span style="color:#94a3b8; margin-left:4px;">(${currencySymbol} ${unpaidAmount})</span>
+                </div>
+                <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:6px 14px; font-size:12.5px;">
+                    <span style="color:#64748b;">Daily Rate:</span>
+                    <strong style="color:#334155; margin-left:4px;">${currencySymbol} ${dailyRate.toLocaleString('en-PK', { maximumFractionDigits: 0 })}</strong>
+                </div>
             </div>
-            <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
-                ${buttons}
+
+            <!-- Row 3: Reason -->
+            <div style="font-size:12.5px; color:#64748b; margin-bottom:10px; background:#f8fafc; padding:7px 12px; border-radius:6px; border-left:3px solid #e2e8f0;">
+                <i class="fas fa-comment-alt" style="color:#94a3b8; margin-right:4px;"></i>
+                <strong>Reason:</strong> ${escapeHtml(r.reason || '—')}
+                ${isPendingExcess ? `<span style="margin-left:12px; color:#dc2626; font-weight:700;"><i class="fas fa-triangle-exclamation"></i> ${parseFloat(r.excess_days)} excess days — requires decision</span>` : ''}
             </div>
+
+            <!-- Row 4: Action buttons -->
+            ${buttons}
         </div>`;
 }).join('');
-        card.style.display = 'block';
-    } catch (err) {
-        console.error('Leave approvals error:', err);
-    }
-}
+                    card.style.display = 'block';
+                } catch (err) {
+                    console.error('Leave approvals error:', err);
+                }
+            }
 
-async function resolveLeaveExcess(id, totalDays) {
+         async function resolveLeaveExcess(id, totalDays) {
     const input = document.getElementById('paidInput-' + id);
     const paidDays = parseFloat(input.value);
 
     if (isNaN(paidDays) || paidDays < 0 || paidDays > totalDays) {
-        alert(`Paid days 0 aur ${totalDays} ke beech honi chahiye`);
+        alert(`Paid days must be between 0 and ${totalDays}`);
         return;
     }
     const unpaidDays = Math.round((totalDays - paidDays) * 100) / 100;
-    if (!confirm(`${paidDays} Paid + ${unpaidDays} Unpaid mark karna hai?`)) return;
+    if (!confirm(`Confirm: ${paidDays} Paid days + ${unpaidDays} Unpaid days?`)) return;
 
-    try {
-        const res = await fetch(LEAVE_API, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ action: 'resolve_excess', id, paid_days: paidDays })
-        });
-        const data = await res.json();
-        if (!data.success) { alert(data.message || 'Could not save decision'); return; }
-        loadLeaveApprovals();
-    } catch (err) {
-        console.error(err);
-    }
-}
-
-
-async function approveLeave(id) {
-    if (!confirm('Yeh leave approve karna hai?')) return;
-    try {
-        const res = await fetch(LEAVE_API, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ action: 'update_status', id, status: 'approved' })
-        });
-        const data = await res.json();
-        if (!data.success) { alert(data.message || 'Error'); return; }
-        loadLeaveApprovals();
-    } catch (err) { console.error(err); }
-}
-
-async function rejectLeave(id) {
-    if (!confirm('Yeh leave reject karna hai?')) return;
-    try {
-        const res = await fetch(LEAVE_API, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ action: 'update_status', id, status: 'rejected' })
-        });
-        const data = await res.json();
-        if (!data.success) { alert(data.message || 'Error'); return; }
-        loadLeaveApprovals();
-    } catch (err) { console.error(err); }
-}
+                try {
+                    const res = await fetch(LEAVE_API, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            action: 'resolve_excess',
+                            id,
+                            paid_days: paidDays
+                        })
+                    });
+                    const data = await res.json();
+                    if (!data.success) {
+                        alert(data.message || 'Could not save decision');
+                        return;
+                    }
+                    loadLeaveApprovals();
+                } catch (err) {
+                    console.error(err);
+                }
+            }
 
 
-loadLeaveApprovals();
-setInterval(loadLeaveApprovals, 5 * 60 * 1000);
-</script>
+            async function approveLeave(id) {
+    if (!confirm('Are you sure you want to approve this leave request?')) return;
+                try {
+                    const res = await fetch(LEAVE_API, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            action: 'update_status',
+                            id,
+                            status: 'approved'
+                        })
+                    });
+                    const data = await res.json();
+                    if (!data.success) {
+                        alert(data.message || 'Error');
+                        return;
+                    }
+                    loadLeaveApprovals();
+                } catch (err) {
+                    console.error(err);
+                }
+            }
+
+            async function rejectLeave(id) {
+    if (!confirm('Are you sure you want to reject this leave request?')) return;
+                try {
+                    const res = await fetch(LEAVE_API, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            action: 'update_status',
+                            id,
+                            status: 'rejected'
+                        })
+                    });
+                    const data = await res.json();
+                    if (!data.success) {
+                        alert(data.message || 'Error');
+                        return;
+                    }
+                    loadLeaveApprovals();
+                } catch (err) {
+                    console.error(err);
+                }
+            }
+
+
+            loadLeaveApprovals();
+            setInterval(loadLeaveApprovals, 5 * 60 * 1000);
+        </script>
     <?php endif; ?>
 
     <!-- Ledger Modal -->
