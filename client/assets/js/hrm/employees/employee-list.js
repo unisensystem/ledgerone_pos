@@ -178,12 +178,7 @@ function renderTable() {
                             <button class="action-btn" title="Employee Card" onclick="window.open('card.php?id=${employee.id}', '_blank')">
                                 <i class="fas fa-id-card"></i>
                             </button>
-                            <button class="action-btn leave" title="Manage Leave" onclick="manageLeave('${employee.id}')">
-                                <i class="fas fa-umbrella-beach"></i>
-                            </button>
-                            <button class="action-btn" title="Leave Balance" onclick="manageLeaveBalance('${employee.id}')">
-                                <i class="fas fa-calendar-plus"></i>
-                            </button>
+                          
                             <button class="action-btn" title="Change Status" onclick="changeStatus('${employee.id}')">
                                 <i class="fas fa-sync-alt"></i>
                             </button>

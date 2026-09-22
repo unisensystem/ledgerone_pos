@@ -115,7 +115,7 @@ try {
                     'id'         => $e['employee_id'],
                     'name'       => $e['full_name'],
                     'dept'       => $e['department_name'] ?: 'N/A',
-'currency'   => $e['salary_currency'] ?: 'PKR',
+'currency'   => 'PKR',
                     'daily_rate' => $dailyRate,
                     'hourly_rate'=> calculateHourlyRate($e, $dailyRate),
                 ];
