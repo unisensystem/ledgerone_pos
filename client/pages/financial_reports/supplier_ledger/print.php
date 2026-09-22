@@ -302,10 +302,18 @@ $company_timezone = $company['timezone'] ?? 'UTC';
                 if (result.success && result.data.length > 0) {
                     let itemsHtml = '';
                     result.data.forEach(item => {
+                        // Product Variants (parent_row_id set) are a breakdown of the main
+                        // product row above them — indent further and mark distinctly so
+                        // they don't read as separate main products.
+                        const isVariant = !!item.parent_row_id;
+                        const price = parseFloat(item.purchase_price || 0).toFixed(3);
+                        const label = isVariant
+                            ? `<span style="padding-left: 20px; color: #6b7280; font-style: italic;">↳ ${item.product_name} <span style="font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; margin-left: 4px;">(variant)</span> — ${item.quantity} ${item.uom_name} @ ${currencySymbol}${price}</span>`
+                            : `<span style="font-weight: 700; color: #111827;">→ ${item.product_name}</span> — ${item.quantity} ${item.uom_name} @ ${currencySymbol}${price}`;
                         itemsHtml += `
                             <tr style="background: #f9fafb; font-size: 12px;">
                                 <td></td>
-                                <td style="padding-left: 30px;">→ ${item.product_name} (${item.quantity} ${item.uom_name})</td>
+                                <td style="padding-left: 30px;">${label}</td>
                                 <td></td>
                                 <td></td>
                                 <td></td>

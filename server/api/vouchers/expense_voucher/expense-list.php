@@ -18,10 +18,13 @@ if (!$user_id || $tenant_id === null) {
 
 try {
     $project_id = $_GET['project_id'] ?? null;
-    
-    // ✅ CHANGE: Remove GROUP_CONCAT—har line ek separate row return karega
+
+    // One row per voucher (not per line) — expense_accounts/cost_centers/expense_amounts/
+    // expense_account_ids/cost_center_ids are comma-lists, one entry per line item in the
+    // same order, which is what the frontend's per-voucher stats, charts, and the
+    // Expense Account / Cost Center filters (filterData() in expense-list.js) all expect.
     $stmt = $pdo->prepare("
-        SELECT 
+        SELECT
             ev.id as voucher_id,
             ev.voucher_no,
             ev.date,
@@ -32,11 +35,11 @@ try {
             ev.project_id,
             ev.is_cash_flow,
             p.project_name,
-            a.name as expense_accounts,
-            cc.name as cost_centers,
-            evl.amount as expense_amounts,
-            evl.account_id as expense_account_ids,
-            evl.cost_center_id as cost_center_ids
+            GROUP_CONCAT(a.name ORDER BY evl.id SEPARATOR ',') as expense_accounts,
+            GROUP_CONCAT(cc.name ORDER BY evl.id SEPARATOR ',') as cost_centers,
+            GROUP_CONCAT(evl.amount ORDER BY evl.id SEPARATOR ',') as expense_amounts,
+            GROUP_CONCAT(evl.account_id ORDER BY evl.id SEPARATOR ',') as expense_account_ids,
+            GROUP_CONCAT(evl.cost_center_id ORDER BY evl.id SEPARATOR ',') as cost_center_ids
         FROM expense_voucher ev
         LEFT JOIN projects p ON ev.project_id = p.id
         LEFT JOIN expense_voucher_line evl ON evl.voucher_id = ev.id
@@ -44,7 +47,8 @@ try {
         LEFT JOIN cost_centers cc ON evl.cost_center_id = cc.id
         WHERE ev.tenant_id = ?
         " . ($project_id ? "AND ev.project_id = ?" : "") . "
-        ORDER BY ev.id DESC, evl.id ASC
+        GROUP BY ev.id
+        ORDER BY ev.id DESC
     ");
     
     if ($project_id) {

@@ -996,6 +996,9 @@ function setupSearchableDropdown(inputId, dropdownId, data, displayKey, valueKey
         items.forEach((item, index) => {
             item.classList.toggle('highlighted', index === highlightedIndex);
         });
+        if (highlightedIndex >= 0 && items[highlightedIndex]) {
+            items[highlightedIndex].scrollIntoView({ block: 'nearest' });
+        }
     }
 
     input.addEventListener('focus', function() {
@@ -1381,6 +1384,9 @@ function setupBulkCustomerDropdown(row) {
         items.forEach((item, index) => {
             item.classList.toggle('highlighted', index === highlightedIndex);
         });
+        if (highlightedIndex >= 0 && items[highlightedIndex]) {
+            items[highlightedIndex].scrollIntoView({ block: 'nearest' });
+        }
     }
 
     input.addEventListener('focus', function() {

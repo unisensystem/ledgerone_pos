@@ -252,7 +252,7 @@ function renderTable() {
         return;
     }
 
-    // Pagination - ab filteredData khud individual lines hai
+    // Pagination - one row per voucher
     const startIndex = (currentPage - 1) * itemsPerPage;
     const endIndex = startIndex + itemsPerPage;
     const pageData = filteredData.slice(startIndex, endIndex);
@@ -268,7 +268,9 @@ function renderTable() {
             day: 'numeric'
         });
 
-        const formattedAmount = CURRENCY_SYMBOL + parseFloat(expense.expense_amounts).toFixed(2);
+        // expense.expense_amounts is a comma-list (one per line item) — the voucher's
+        // own total (already computed server-side) is what belongs in this column.
+        const formattedAmount = CURRENCY_SYMBOL + parseFloat(expense.total_amount).toFixed(2);
 
         const cfVal = parseInt(expense.is_cash_flow);
         const cashFlowBadge = cfVal === 1

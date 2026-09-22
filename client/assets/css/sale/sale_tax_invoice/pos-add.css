@@ -199,8 +199,9 @@ tbody tr:hover {
   padding: 3px 4px;
   width: 100%;
   background: var(--surface-0);
-  color: var(--body);
+  color: var(--heading);
   font-size: 11px;
+  font-weight: 600;
 }
 
 .table-input:focus {
@@ -424,7 +425,8 @@ tbody tr:hover {
   border-radius: var(--radius);
   margin-bottom: 8px;
   background: var(--surface-0);
-  color: var(--body);
+  color: var(--heading);
+  font-weight: 600;
 }
 
 .dropdown-options {
@@ -694,7 +696,7 @@ td .unit-input {
 }
 
 /* Disabled unit cells (product doesn't have this unit) */
-td:has(+ td):not(:has(.unit-input)) {
+td:has(+ td):not(:has(.unit-input)):not(:has(.search-input)):not(.scheme-cell):not(.price-cell):not(.gross-cell):not(.disc-percent-cell):not(.disc-amount-cell):not(.to-percent-cell):not(.to-amount-cell):not(.tax-percent-cell):not(.tax-amount-cell):not(.gst-percent-cell):not(.gst-amount-cell):not(.foc-cell):not(.net-cell) {
   background: repeating-linear-gradient(
     45deg,
     var(--surface-2),
@@ -710,7 +712,7 @@ td:has(+ td):not(:has(.unit-input)) {
 }
 
 /* Disabled unit cells (product doesn't have this unit) */
-td:not(:has(.unit-input)):not(:has(button)):not(.price-cell):not(.gross-cell):not(.disc-percent-cell):not(.disc-amount-cell):not(.to-percent-cell):not(.to-amount-cell):not(.gst-percent-cell):not(.gst-amount-cell):not(.foc-cell):not(.net-cell) {
+td:not(:has(.unit-input)):not(:has(.search-input)):not(:has(button)):not(.scheme-cell):not(.price-cell):not(.gross-cell):not(.disc-percent-cell):not(.disc-amount-cell):not(.to-percent-cell):not(.to-amount-cell):not(.tax-percent-cell):not(.tax-amount-cell):not(.gst-percent-cell):not(.gst-amount-cell):not(.foc-cell):not(.net-cell) {
   text-align: center;
   color: var(--subtext);
   font-size: 16px;
@@ -721,7 +723,7 @@ td:not(:has(.unit-input)):not(:has(button)):not(.price-cell):not(.gross-cell):no
 }
 
 /* Add a subtle border to disabled cells */
-td:not(:has(.unit-input)):not(:has(button)):not(.price-cell):not(.gross-cell):not(.disc-percent-cell):not(.disc-amount-cell):not(.to-percent-cell):not(.to-amount-cell):not(.gst-percent-cell):not(.gst-amount-cell):not(.foc-cell):not(.net-cell)::before {
+td:not(:has(.unit-input)):not(:has(.search-input)):not(:has(button)):not(.scheme-cell):not(.price-cell):not(.gross-cell):not(.disc-percent-cell):not(.disc-amount-cell):not(.to-percent-cell):not(.to-amount-cell):not(.tax-percent-cell):not(.tax-amount-cell):not(.gst-percent-cell):not(.gst-amount-cell):not(.foc-cell):not(.net-cell)::before {
   content: '';
   position: absolute;
   top: 0;
@@ -803,6 +805,39 @@ td:not(:has(.unit-input)):not(:has(button)):not(.price-cell):not(.gross-cell):no
   font-weight: 700;
   color: var(--success);
   font-size: 13px;
+}
+
+/* Product Code / Name cell styling — matches pos_invoice/pos-add.php's
+   per-column accent so this page's item table isn't missing the same colors. */
+td:nth-child(2) input,
+td:nth-child(2) .search-input {
+  background: linear-gradient(135deg, #fef3c7 0%, #ffffff 100%);
+  border-color: #d97706;
+  border: 1.5px solid #d97706;
+  color: #92400e;
+  font-weight: 600;
+}
+
+td:nth-child(2) input:focus,
+td:nth-child(2) .search-input:focus {
+  border-color: #d97706;
+  box-shadow: 0 0 0 3px rgba(217, 119, 6, 0.15);
+}
+
+/* Scheme cell styling */
+td:nth-child(3) input,
+td:nth-child(3) select {
+  background: linear-gradient(135deg, #dbeafe 0%, #ffffff 100%);
+  border-color: #3b82f6;
+  border: 1.5px solid #3b82f6;
+  color: #1e40af;
+  font-weight: 600;
+}
+
+td:nth-child(3) input:focus,
+td:nth-child(3) select:focus {
+  border-color: #1e40af;
+  box-shadow: 0 0 0 3px rgba(30, 64, 175, 0.15);
 }
 
 /* Table header for dynamic columns */

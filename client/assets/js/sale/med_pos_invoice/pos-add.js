@@ -1725,6 +1725,7 @@ data.items.forEach(item => {
                         lastRow.dataset.invoiceAffects = item.invoice_affects || 1;
                                              recalculateMaxColumns();
                         ensureBatchNo2HeaderCells();
+                        ensureBatchNo2FooterCells();
                         ensureBatchNo2CellsAllRows();
                         
                         // Set quantities for each unit
@@ -2031,6 +2032,7 @@ data.items.forEach(item => {
                         lastRow.dataset.productUomData = JSON.stringify(uomDetails);
                                                recalculateMaxColumns();
                         ensureBatchNo2HeaderCells();
+                        ensureBatchNo2FooterCells();
                         ensureBatchNo2CellsAllRows();
 
                         productGroup.units.forEach(unit => {
@@ -6473,6 +6475,8 @@ const batchNo2Input = document.createElement('input');
 batchNo2Input.type = 'text';
 batchNo2Input.className = 'table-input batch-no-2-input';
 batchNo2Input.placeholder = 'Batch No 2';
+batchNo2Input.style.color = '#000000';
+batchNo2Input.style.fontWeight = '600';
 batchNo2Cell.appendChild(batchNo2Input);
 
 const batchExpiry2Cell = row.insertCell(6);
@@ -6480,6 +6484,8 @@ batchExpiry2Cell.className = 'batch-expiry-2-cell';
 const batchExpiry2Input = document.createElement('input');
 batchExpiry2Input.type = 'date';
 batchExpiry2Input.className = 'table-input batch-expiry-2-input';
+batchExpiry2Input.style.color = '#000000';
+batchExpiry2Input.style.fontWeight = '600';
 batchExpiry2Cell.appendChild(batchExpiry2Input);
     // Price
     const priceCell = row.insertCell(3 + batchOffset);
@@ -6715,6 +6721,7 @@ batchExpiry2Cell.appendChild(batchExpiry2Input);
             updateSerialNumbers();
                     recalculateMaxColumns();
             ensureBatchNo2HeaderCells();
+            ensureBatchNo2FooterCells();
             ensureBatchNo2CellsAllRows();
             updateInvoiceSummaryDynamic();
         } else {
@@ -6788,6 +6795,8 @@ function ensureBatchNo2Cells(row) {
     batchNo2Input.className = 'table-input batch-no-2-input';
     batchNo2Input.placeholder = 'Batch No 2';
     batchNo2Input.value = savedBatchNo2;
+    batchNo2Input.style.color = '#000000';
+    batchNo2Input.style.fontWeight = '600';
     batchNo2Input.addEventListener('input', function () {
         row.dataset.batchNo2Value = this.value;
     });
@@ -6799,6 +6808,8 @@ function ensureBatchNo2Cells(row) {
     batchExpiry2Input.type = 'date';
     batchExpiry2Input.className = 'table-input batch-expiry-2-input';
     batchExpiry2Input.value = savedExpiry2;
+    batchExpiry2Input.style.color = '#000000';
+    batchExpiry2Input.style.fontWeight = '600';
     batchExpiry2Input.addEventListener('input', function () {
         row.dataset.batchExpiry2Value = this.value;
     });
@@ -6845,6 +6856,38 @@ function ensureBatchNo2HeaderCells() {
     batchExpiry2Th.style.display = enableExpiryDate2 ? '' : 'none';
 
     batchExpiryHeader.after(batchNo2Th, batchExpiry2Th);
+}
+
+// Same problem again, this time for the <tfoot> Totals row: updateFooterTotals()
+// (pos-add-uom.js) deletes any cell at index 5 that isn't one of its known total
+// ids, which silently drops our Batch No 2 / Expiry Date 2 footer cells too —
+// permanently shifting every total (Price, Gross, Discount, ...) two columns out
+// of alignment with the body above them. Puts the two blank <th> cells back,
+// right after "Expiry Date", whenever they're missing.
+function ensureBatchNo2FooterCells() {
+    const tfoot = document.getElementById('itemsTable')?.getElementsByTagName('tfoot')[0];
+    if (!tfoot) return;
+    const footerRow = tfoot.rows[0];
+    if (!footerRow) return;
+    if (footerRow.querySelector('.batch-no-2-cell')) return; // already there
+
+    const batchExpiryFooter = footerRow.querySelector('.batch-expiry-cell');
+    if (!batchExpiryFooter) return;
+
+    const enableBatchNo2 = localStorage.getItem('enableBatchNo2') !== 'false';
+    const enableExpiryDate2 = localStorage.getItem('enableExpiryDate2') !== 'false';
+
+    const batchNo2Th = document.createElement('th');
+    batchNo2Th.className = 'batch-no-2-cell';
+    batchNo2Th.style.textAlign = 'left';
+    batchNo2Th.style.display = enableBatchNo2 ? '' : 'none';
+
+    const batchExpiry2Th = document.createElement('th');
+    batchExpiry2Th.className = 'batch-expiry-2-cell';
+    batchExpiry2Th.style.textAlign = 'left';
+    batchExpiry2Th.style.display = enableExpiryDate2 ? '' : 'none';
+
+    batchExpiryFooter.after(batchNo2Th, batchExpiry2Th);
 }
 // Initialize dropdown for dynamic rows
 function initTableDropdownDynamic(container, row) {
@@ -7023,6 +7066,7 @@ function initTableDropdownDynamic(container, row) {
             // Recalculate columns
                        recalculateMaxColumns();
             ensureBatchNo2HeaderCells();
+            ensureBatchNo2FooterCells();
             ensureBatchNo2CellsAllRows();
             
             // Load price history and stock

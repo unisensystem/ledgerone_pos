@@ -382,9 +382,11 @@ tbody tr:hover {
 
   background: var(--surface-0);
 
-  color: var(--body);
+  color: var(--heading);
 
   font-size: 11px;
+
+  font-weight: 600;
 
 }
 
@@ -832,9 +834,9 @@ tbody tr:hover {
 
   background: var(--surface-0);
 
-  color: var(--body);
+  color: var(--heading);
 
-  font-weight: 500;
+  font-weight: 600;
 
 }
 
@@ -1346,7 +1348,7 @@ td .unit-input {
 
 /* Disabled unit cells (product doesn't have this unit) */
 
-td:has(+ td):not(:has(.unit-input)) {
+td:has(+ td):not(:has(.unit-input)):not(:has(.search-input)):not(.scheme-cell):not(.batch-no-cell):not(.batch-expiry-cell):not(.batch-no-2-cell):not(.batch-expiry-2-cell):not(.price-cell):not(.gross-cell):not(.disc-percent-cell):not(.disc-amount-cell):not(.extra-disc-cell):not(.to-percent-cell):not(.to-amount-cell):not(.tax-percent-cell):not(.tax-amount-cell):not(.gst-percent-cell):not(.gst-amount-cell):not(.foc-cell):not(.net-cell) {
 
   /* background: repeating-linear-gradient(
 
@@ -1378,7 +1380,7 @@ td:has(+ td):not(:has(.unit-input)) {
 
 /* Disabled unit cells (product doesn't have this unit) */
 
-td:not(:has(.unit-input)):not(:has(button)):not(.price-cell):not(.gross-cell):not(.disc-percent-cell):not(.disc-amount-cell):not(.to-percent-cell):not(.to-amount-cell):not(.gst-percent-cell):not(.gst-amount-cell):not(.foc-cell):not(.net-cell) {
+td:not(:has(.unit-input)):not(:has(.search-input)):not(:has(button)):not(.scheme-cell):not(.batch-no-cell):not(.batch-expiry-cell):not(.batch-no-2-cell):not(.batch-expiry-2-cell):not(.price-cell):not(.gross-cell):not(.disc-percent-cell):not(.disc-amount-cell):not(.extra-disc-cell):not(.to-percent-cell):not(.to-amount-cell):not(.tax-percent-cell):not(.tax-amount-cell):not(.gst-percent-cell):not(.gst-amount-cell):not(.foc-cell):not(.net-cell) {
 
   text-align: center;
 
@@ -1400,7 +1402,7 @@ td:not(:has(.unit-input)):not(:has(button)):not(.price-cell):not(.gross-cell):no
 
 /* Add a subtle border to disabled cells */
 
-td:not(:has(.unit-input)):not(:has(button)):not(.price-cell):not(.gross-cell):not(.disc-percent-cell):not(.disc-amount-cell):not(.to-percent-cell):not(.to-amount-cell):not(.gst-percent-cell):not(.gst-amount-cell):not(.foc-cell):not(.net-cell)::before {
+td:not(:has(.unit-input)):not(:has(.search-input)):not(:has(button)):not(.scheme-cell):not(.batch-no-cell):not(.batch-expiry-cell):not(.batch-no-2-cell):not(.batch-expiry-2-cell):not(.price-cell):not(.gross-cell):not(.disc-percent-cell):not(.disc-amount-cell):not(.extra-disc-cell):not(.to-percent-cell):not(.to-amount-cell):not(.tax-percent-cell):not(.tax-amount-cell):not(.gst-percent-cell):not(.gst-amount-cell):not(.foc-cell):not(.net-cell)::before {
 
   content: '';
 
