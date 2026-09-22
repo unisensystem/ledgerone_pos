@@ -45,17 +45,18 @@ let currentEditingRecord = null;
 // preference, not a tenant setting) — defaults to 15 minutes.
 const GRACE_PERIOD_STORAGE_KEY = 'attendance_grace_period_minutes';
 
-// Initialize current date and time
 function updateCurrentDateTime() {
     const now = new Date();
-    const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
-    currentDateEl.textContent = now.toLocaleDateString('en-US', options);
+
+    // Current date ko date input mein set karein
+    if (!currentDateEl.value) {
+        currentDateEl.value = now.toISOString().split('T')[0];
+    }
 
     // Update time displays every minute
     const timeOptions = { hour: '2-digit', minute: '2-digit', hour12: true };
     const currentTime = now.toLocaleTimeString('en-US', timeOptions);
 
-    // If check-in/check-out times are not manually set, show current time as placeholder
     if (checkInTimeEl.textContent === '--:-- --') {
         checkInTimeEl.textContent = currentTime;
     }
@@ -64,6 +65,7 @@ function updateCurrentDateTime() {
         checkOutTimeEl.textContent = currentTime;
     }
 }
+
 
 // Format time for display
 function formatTimeForDisplay(timeString) {
@@ -243,7 +245,7 @@ async function scanBarcode() {
 async function autoCheckInOut(employeeId) {
     console.log('autoCheckInOut called for:', employeeId);
     try {
-        const date = new Date().toISOString().split('T')[0];
+const date = currentDateEl.value;
         const response = await fetch(`../../../../server/api/hrm/attendance/attendance.php?date=${date}`);
         const result = await response.json();
         console.log('Attendance records:', result);
@@ -257,13 +259,16 @@ async function autoCheckInOut(employeeId) {
                 setCheckOutNow();
                 
                 const record = {
-                    employeeId: employeeIdEl.value,
-                    checkOut: checkOutInputEl.value,
-                    status: attendanceStatusEl.value,
-                    notes: notesEl.value.trim(),
-                    date: date,
-                    isCheckout: true
-                };
+    employeeId: employeeIdEl.value,
+    department: departmentEl.value,
+    checkIn: checkInInputEl.value,
+    checkOut: checkOutInputEl.value,
+    status: attendanceStatusEl.value,
+    notes: notesEl.value.trim(),
+    date: currentDateEl.value,
+    isCheckout: isCheckout
+};
+
                 
                 const saveResponse = await fetch('../../../../server/api/hrm/attendance/attendance.php', {
                     method: 'POST',
@@ -425,7 +430,14 @@ function updateAttendanceStatus() {
 
 // Save attendance record
 async function saveAttendanceRecord(isCheckout = false) {
+
+    if (!currentDateEl.value) {
+        showAlert('Please select attendance date.', 'error');
+        return;
+    }
+
     if (!validateForm()) {
+
         showAlert('Please fix the errors in the form before saving.', 'error');
         return;
     }
@@ -437,7 +449,7 @@ async function saveAttendanceRecord(isCheckout = false) {
         checkOut: checkOutInputEl.value,
         status: attendanceStatusEl.value,
         notes: notesEl.value.trim(),
-        date: new Date().toISOString().split('T')[0],
+date: currentDateEl.value,
         isCheckout: isCheckout
     };
 
@@ -795,10 +807,39 @@ function init() {
     }
     
     // Set filter date to today
-    if (filterDateEl) {
-        filterDateEl.value = new Date().toISOString().split('T')[0];
-    }
-    
+    // Set attendance date to today
+if (currentDateEl) {
+    currentDateEl.value = new Date().toISOString().split('T')[0];
+
+    // Jab user attendance date change kare
+    currentDateEl.addEventListener('change', function () {
+        if (filterDateEl) {
+            filterDateEl.value = this.value;
+        }
+
+        updateAttendanceTable();
+    });
+}
+
+// Set attendance date to today
+if (currentDateEl) {
+    currentDateEl.value = new Date().toISOString().split('T')[0];
+
+    // Jab user attendance date change kare
+    currentDateEl.addEventListener('change', function () {
+        if (filterDateEl) {
+            filterDateEl.value = this.value;
+        }
+
+        updateAttendanceTable();
+    });
+}
+
+// Set filter date to today
+if (filterDateEl) {
+    filterDateEl.value = new Date().toISOString().split('T')[0];
+}
+
     // Set current date and time
     updateCurrentDateTime();
 

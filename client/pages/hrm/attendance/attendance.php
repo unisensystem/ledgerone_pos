@@ -174,6 +174,30 @@ if (!$user_id) {
             color: white;
         }
 
+
+        .date-display {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.date-display input[type="date"] {
+    background: transparent;
+    border: 1px solid var(--border, #ddd);
+    border-radius: 4px;
+    padding: 6px 10px;
+    font-size: 14px;
+    color: inherit;
+    font-family: inherit;
+    cursor: pointer;
+}
+
+.date-display input[type="date"]:focus {
+    outline: none;
+    border-color: var(--primary, #3498db);
+    box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1);
+}
+
         .btn-modal-primary:hover {
             background-color: var(--primary-dark, #2980b9);
         }
@@ -194,9 +218,10 @@ if (!$user_id) {
         <!-- Header -->
         <div class="header">
             <h1>Attendance Entry Form</h1>
-            <div class="date-display">
-                <i class="fas fa-calendar-alt"></i> <span id="currentDate">Loading...</span>
-            </div>
+           <div class="date-display">
+    <i class="fas fa-calendar-alt"></i>
+    <input type="date" id="currentDate" title="Select attendance date">
+</div>
         </div>
 
         <!-- Alert Messages -->
