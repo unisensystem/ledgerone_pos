@@ -115,7 +115,7 @@ try {
                     'id'         => $e['employee_id'],
                     'name'       => $e['full_name'],
                     'dept'       => $e['department_name'] ?: 'N/A',
-                    'currency'   => $e['salary_currency'] ?: 'USD',
+'currency'   => $e['salary_currency'] ?: 'PKR',
                     'daily_rate' => $dailyRate,
                     'hourly_rate'=> calculateHourlyRate($e, $dailyRate),
                 ];
@@ -278,7 +278,7 @@ try {
             if (!$id) throw new Exception('Record ID is required');
 
             // Soft delete or hard delete based on your preference
-            $stmt = $pdo->prepare("DELETE FROM leave_records WHERE id = ? AND tenant_id = ? AND status = 'pending'");
+$stmt = $pdo->prepare("DELETE FROM leave_records WHERE id = ? AND tenant_id = ?");
             $stmt->execute([$id, $tenant_id]);
 
             echo json_encode(['success' => true, 'message' => 'Leave request deleted']);

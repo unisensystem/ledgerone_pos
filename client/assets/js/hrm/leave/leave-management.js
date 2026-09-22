@@ -456,7 +456,7 @@ function addRequestRow(record, payload) {
 async function editRequest(recordId) {
     const req = allRequests.find(r => r.id === recordId);
     if (!req) { alert('Request not found'); return; }
-    if (req.status !== 'pending') { alert('Only pending requests can be edited'); return; }
+    // if (req.status !== 'pending') { alert('Only pending requests can be edited'); return; }
 
     // Populate form
     const emp = employees.find(e => e.id === req.employee_id);
@@ -614,12 +614,10 @@ function renderRecentRequests(rows) {
             <td>${esc(totalStr)}</td>
             <td>${amountCell(r, cur)}</td>
             <td><span class="status-pill status-${r.status}">${statusLabel}</span></td>
-            <td>
-                ${r.status === 'pending' ? `
-                    <button class="req-btn-edit" onclick="editRequest(${r.id})" title="Edit"><i class="fas fa-edit"></i></button>
-                    <button class="req-btn-delete" onclick="deleteRequest(${r.id})" title="Delete"><i class="fas fa-trash"></i></button>
-                ` : ''}
-            </td>
+          <td>
+    <button class="req-btn-edit" onclick="editRequest(${r.id})" title="Edit"><i class="fas fa-edit"></i></button>
+    <button class="req-btn-delete" onclick="deleteRequest(${r.id})" title="Delete"><i class="fas fa-trash"></i></button>
+</td>
         `;
         body.appendChild(tr);
     });
