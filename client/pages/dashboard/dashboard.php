@@ -1188,6 +1188,7 @@ $purchasesNet = (float) $purchasesTotals['net'];
                     box-shadow: 0 8px 24px rgba(0,0,0,0.12);">
                 </div>
             </div>
+      
             <!-- KPI Cards -->
             <div class="kpi-grid">
                 <div class="kpi-card">
@@ -1351,7 +1352,19 @@ $purchasesNet = (float) $purchasesTotals['net'];
     <i class="fas fa-lock"></i>
     <span>Posting Lock</span>
 </a>
+
+   
                 </div>
+            </div>
+
+            <!-- ✅ SAHI: bahar hai grid ke -->
+            <div id="leaveApprovalsCard" class="card" style="display:none; margin-bottom:1rem; border-left:4px solid #e8b23f;">
+                <h3 class="card-title" style="display:flex; align-items:center; gap:0.5rem;">
+                    <i class="fas fa-user-clock" style="color:#e8b23f;"></i>
+                    Leave Approvals Pending
+                    <span id="leaveApprovalsCount" class="todo-trigger-badge" style="position:static;">0</span>
+                </h3>
+                <div id="leaveApprovalsList"></div>
             </div>
 
             <!-- Audit & Activity Analytics -->
@@ -3122,6 +3135,156 @@ setInterval(loadTodos, 5 * 60 * 1000);
         init();
     }
 })();
+
+
+const LEAVE_API = '../../../server/api/hrm/leave/leave-request.php';
+
+async function loadLeaveApprovals() {
+    const card = document.getElementById('leaveApprovalsCard');
+    const list = document.getElementById('leaveApprovalsList');
+    if (!card) return;
+    try {
+        const res = await fetch(LEAVE_API + '?action=pending_excess');
+        const data = await res.json();
+        if (!data.success || !data.data.length) { card.style.display = 'none'; return; }
+
+               document.getElementById('leaveApprovalsCount').textContent = data.data.length;
+      list.innerHTML = data.data.map(r => {
+    // Overtime rows never carry excess_status (only range leaves do), so they're
+    // told apart here by ot_hours being present - and shown with hours/rate/amount
+    // and a plain Approve/Reject pair instead of the excess Paid-days split form.
+    const isOvertime = r.ot_hours !== null && r.ot_hours !== undefined;
+    if (isOvertime) {
+        const otAmount = parseFloat(r.ot_amount || 0).toLocaleString('en-PK', { maximumFractionDigits: 0 });
+        return `
+            <div style="padding:0.85rem 0; border-bottom:1px solid #f1f5f9;">
+                <div style="font-size:14px; color:#0f172a;">
+                    <strong>${escapeHtml(r.employee_name || r.employee_id)}</strong>
+                    · <strong>Overtime</strong>
+                    · <strong>${parseFloat(r.ot_hours)}</strong> hrs @ ${parseFloat(r.ot_rate_multiplier)}x
+                    (${escapeHtml(r.start_date)})
+                </div>
+                <div style="font-size:12px; color:#64748b; margin:3px 0 8px;">
+                    Reason: ${escapeHtml(r.reason || '-')} · Amount: ${currencySymbol} ${otAmount}
+                </div>
+                <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
+                    <button class="btn btn-primary" onclick="approveLeave(${r.id})">
+                        <i class="fas fa-check"></i> Approve
+                    </button>
+                    <button class="btn btn-secondary" onclick="rejectLeave(${r.id})">
+                        <i class="fas fa-times"></i> Reject
+                    </button>
+                </div>
+            </div>`;
+    }
+
+    const totalDays = parseFloat(r.total_days || 0);
+    const isPendingExcess = parseFloat(r.excess_days || 0) > 0;
+    const extraCost = (parseFloat(r.excess_days || 0) * parseFloat(r.daily_rate || 0))
+        .toLocaleString('en-PK', { maximumFractionDigits: 0 });
+
+    const buttons = isPendingExcess
+        ? `<div style="display:flex; align-items:center; gap:0.5rem; flex-wrap:wrap;">
+               <label style="font-size:12px; color:#64748b;">Paid days:</label>
+               <input type="number" min="0" max="${totalDays}" step="0.5"
+                      value="${parseFloat(r.paid_days || 0)}" id="paidInput-${r.id}"
+                      style="width:70px; padding:4px 6px; border:1px solid #d6dbe4; border-radius:4px;">
+               <span style="font-size:12px; color:#64748b;">of ${totalDays} din (baqi unpaid)</span>
+               <button class="btn btn-primary" onclick="resolveLeaveExcess(${r.id}, ${totalDays})">
+                   <i class="fas fa-check"></i> Save
+               </button>
+           </div>`
+        : `<button class="btn btn-primary" onclick="approveLeave(${r.id})">
+               <i class="fas fa-check"></i> Approve
+           </button>
+           <button class="btn btn-secondary" onclick="rejectLeave(${r.id})">
+               <i class="fas fa-times"></i> Reject
+           </button>`;
+
+    const extraInfo = isPendingExcess
+        ? `<strong style="color:#dc2626;">${parseFloat(r.excess_days)} din zyada</strong> — 
+           Sab paid karne par: ${currencySymbol} ${extraCost}`
+        : `<span style="color:#e8b23f;">Normal approval pending</span>`;
+
+    return `
+        <div style="padding:0.85rem 0; border-bottom:1px solid #f1f5f9;">
+            <div style="font-size:14px; color:#0f172a;">
+                <strong>${escapeHtml(r.employee_name || r.employee_id)}</strong>
+                · <strong>${escapeHtml(r.type_name || 'Leave')}</strong>
+                · <strong>${totalDays}</strong> din
+                (${escapeHtml(r.start_date)} → ${escapeHtml(r.end_date)})
+            </div>
+            <div style="font-size:12px; color:#64748b; margin:3px 0 8px;">
+                Reason: ${escapeHtml(r.reason || '-')} · ${extraInfo}
+            </div>
+            <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
+                ${buttons}
+            </div>
+        </div>`;
+}).join('');
+        card.style.display = 'block';
+    } catch (err) {
+        console.error('Leave approvals error:', err);
+    }
+}
+
+async function resolveLeaveExcess(id, totalDays) {
+    const input = document.getElementById('paidInput-' + id);
+    const paidDays = parseFloat(input.value);
+
+    if (isNaN(paidDays) || paidDays < 0 || paidDays > totalDays) {
+        alert(`Paid days 0 aur ${totalDays} ke beech honi chahiye`);
+        return;
+    }
+    const unpaidDays = Math.round((totalDays - paidDays) * 100) / 100;
+    if (!confirm(`${paidDays} Paid + ${unpaidDays} Unpaid mark karna hai?`)) return;
+
+    try {
+        const res = await fetch(LEAVE_API, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'resolve_excess', id, paid_days: paidDays })
+        });
+        const data = await res.json();
+        if (!data.success) { alert(data.message || 'Could not save decision'); return; }
+        loadLeaveApprovals();
+    } catch (err) {
+        console.error(err);
+    }
+}
+
+
+async function approveLeave(id) {
+    if (!confirm('Yeh leave approve karna hai?')) return;
+    try {
+        const res = await fetch(LEAVE_API, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'update_status', id, status: 'approved' })
+        });
+        const data = await res.json();
+        if (!data.success) { alert(data.message || 'Error'); return; }
+        loadLeaveApprovals();
+    } catch (err) { console.error(err); }
+}
+
+async function rejectLeave(id) {
+    if (!confirm('Yeh leave reject karna hai?')) return;
+    try {
+        const res = await fetch(LEAVE_API, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'update_status', id, status: 'rejected' })
+        });
+        const data = await res.json();
+        if (!data.success) { alert(data.message || 'Error'); return; }
+        loadLeaveApprovals();
+    } catch (err) { console.error(err); }
+}
+
+
+loadLeaveApprovals();
+setInterval(loadLeaveApprovals, 5 * 60 * 1000);
 </script>
     <?php endif; ?>
 

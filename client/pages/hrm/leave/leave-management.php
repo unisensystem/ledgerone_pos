@@ -9,133 +9,237 @@ if (!$user_id) {
     header('Location: ../../auth/login.html');
     exit();
 }
+// This page is now wired to server/api/hrm/leave/leave-request.php:
+//   - GET  ?action=bootstrap  -> employees, leave types, daily/hourly rates, used-quota balances
+//   - POST action=submit      -> creates the record; replies "needs_decision" if the request
+//                                 goes past the paid quota, so HR can choose Paid/Unpaid for the excess
+//   - POST action=add_type / delete_type -> manage custom leave types
+// Run sql/leave-management-migration.sql once before using this page (adds leave_types
+// table + a few columns on leave_records — nothing existing is dropped or renamed).
 ?>
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LedgerOne ERP - Leave Management</title>
+    <title>Leave Management - LedgerOne ERP</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="stylesheet" href="../../../assets/css/hrm/leave/leave-management.css?v=<?php echo time(); ?>">
+    <link rel="stylesheet" href="../../../assets/css/hrm/leave/leave-management.css">
 </head>
-
 <body>
     <div class="container">
+        <!-- Header -->
         <div class="header">
-            <h1>Leave Management</h1>
-            <div class="header-stats" id="headerStats">
-                <div class="stat-chip stat-pending"><span id="statPending">0</span> Pending</div>
-                <div class="stat-chip stat-approved"><span id="statApproved">0</span> Approved</div>
-                <div class="stat-chip stat-rejected"><span id="statRejected">0</span> Rejected</div>
+            <div>
+                <h1>Leave Management</h1>
+                <p>Select an employee, pick a leave type, and set the dates</p>
             </div>
         </div>
 
-        <div id="alertContainer"></div>
+        <div class="layout">
+            <!-- Sidebar: employee + leave type -->
+            <div class="sidebar">
+                <div class="card">
+                    <div class="card-head">
+                        <h2>1. Employee</h2>
+                    </div>
+                    <div class="card-body">
+                        <div class="combo" id="empCombo">
+                            <button type="button" class="combo-trigger" id="empComboTrigger">
+                                <span class="placeholder" id="empComboLabel">Select employee…</span>
+                                <i class="fas fa-chevron-down"></i>
+                            </button>
+                            <div class="combo-panel" id="empComboPanel">
+                                <div class="emp-search">
+                                    <i class="fas fa-search"></i>
+                                    <input type="text" id="empSearch" placeholder="Search name, ID or dept...">
+                                </div>
+                                <div class="emp-list" id="empList"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
 
-        <div class="card">
-            <div class="filters-row">
-                <input type="text" id="filterEmployee" placeholder="Employee code (e.g. SALES-0002)">
-                <select id="filterLeaveType"><option value="">All Leave Types</option></select>
-                <select id="filterStatus">
-                    <option value="">All Statuses</option>
-                    <option value="pending" selected>Pending</option>
-                    <option value="approved">Approved</option>
-                    <option value="rejected">Rejected</option>
-                    <option value="cancelled">Cancelled</option>
-                </select>
-                <input type="date" id="filterStartDate">
-                <input type="date" id="filterEndDate">
-                <button class="btn btn-secondary" onclick="loadLeaveRequests()"><i class="fas fa-filter"></i> Filter</button>
-                <button class="btn btn-secondary" onclick="clearFilters()">Clear</button>
+                <div class="card">
+                    <div class="card-head">
+                        <h2>2. Leave Type</h2>
+                    </div>
+                    <div class="card-body">
+                        <div class="type-list" id="typeList"></div>
+                        <div class="add-type-card" id="addTypeBtn">
+                            <i class="fas fa-plus"></i> Add Leave Type
+                        </div>
+
+                        <div class="new-type-form" id="newTypeForm">
+                            <input type="text" id="newTypeName" placeholder="e.g. Maternity Leave">
+                            <label for="newTypeQuota">Paid days per year (0 = fully unpaid)</label>
+                            <input type="number" min="0" step="1" value="5" id="newTypeQuota">
+                            <div class="new-type-actions">
+                                <button class="btn" id="cancelNewType">Cancel</button>
+                                <button class="btn btn-primary" id="saveNewType">Save</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
 
-            <div class="table-wrap">
-                <table class="data-table">
+            <!-- Request details -->
+            <div class="card">
+                <div class="card-head">
+                    <h2>3. Request Details</h2>
+                </div>
+                <div class="card-body">
+                    <span class="mode-tag" id="modeTag"><i class="fas fa-sun"></i> Annual Leave — Paid</span>
+                    <div class="rate-info" id="rateInfo" style="display:none;"></div>
+
+                    <div class="details-grid">
+                        <div>
+                            <!-- Date-range calendar mode -->
+                            <div id="rangeMode">
+                                <div class="field">
+                                    <label>Dates <span class="req">*</span></label>
+                                    <div class="cal">
+                                        <div class="cal-head">
+                                            <button id="calPrev"><i class="fas fa-chevron-left"></i></button>
+                                            <span id="calLabel"></span>
+                                            <button id="calNext"><i class="fas fa-chevron-right"></i></button>
+                                        </div>
+                                        <div class="cal-grid" id="calGrid"></div>
+                                        <div class="cal-help">Click a start date, then an end date.</div>
+                                    </div>
+                                    <div class="halfday-row">
+                                        <input type="checkbox" id="halfDay"> <label for="halfDay">Half-day leave</label>
+                                    </div>
+                                    <div class="days-out" id="daysOut">Pick a date to see the total</div>
+
+                                    <!-- Shown only when a request goes past the paid quota -->
+                                    <div class="decision-box" id="decisionBox" style="display:none;">
+                                        <div class="decision-msg" id="decisionMsg"></div>
+                                        <input type="text" id="overrideReason" placeholder="Reason (optional) — e.g. approved by manager">
+                                        <div class="decision-actions">
+                                            <button type="button" class="btn" id="decisionUnpaid"><i class="fas fa-ban"></i> Mark Extra as Unpaid</button>
+                                            <button type="button" class="btn btn-primary" id="decisionPaid"><i class="fas fa-check"></i> Mark Extra as Paid</button>
+                                            
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Overtime mode -->
+                            <div id="otMode" style="display:none;">
+                                <div class="field">
+                                    <label>Date <span class="req">*</span></label>
+                                    <input type="date" class="text-input" id="otDate">
+                                </div>
+                                <div class="row2">
+                                    <div class="field">
+                                        <label>Hours <span class="req">*</span></label>
+                                        <input type="number" step="0.5" min="0" class="text-input" id="otHours" placeholder="e.g. 3">
+                                    </div>
+                                    <div class="field">
+                                        <label>Rate</label>
+                                        <select class="text-input" id="otRate">
+                                            <option value="1x">1x (Standard)</option>
+                                            <option value="1.5x">1.5x</option>
+                                            <option value="2x">2x (Holiday/Sunday)</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div>
+                            <div class="field">
+                                <label>Reason <span class="req">*</span></label>
+                                <textarea id="reason" placeholder="Enter reason..."></textarea>
+                            </div>
+                            <div class="row2">
+                                <div class="field">
+                                    <label>Contact during leave</label>
+                                    <input type="text" class="text-input" id="contact" placeholder="Emergency contact">
+                                </div>
+                                <div class="field">
+                                    <label>Approval status</label>
+                                    <select class="text-input" id="approvalStatus">
+                                        <option value="pending">Pending approval</option>
+                                        <option value="approved">Auto-approve</option>
+                                    </select>
+                                </div>
+                            </div>
+                           <button type="button" class="btn btn-full" id="sendToDashboardBtn" style="margin-top:8px;">
+    <i class="fas fa-bell"></i> Send to Dashboard for Approval
+</button>
+<button type="button" class="btn btn-full" id="decisionPending" style="margin-top:8px; display:none;">
+    <i class="fas fa-bell"></i> Send to Dashboard for Approval
+</button>
+                            <button class="btn btn-primary btn-full" id="submitBtn" disabled  style="display:none;">
+                                <i class="fas fa-paper-plane"></i> Submit Request
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+              <!-- Recent requests -->
+        <div class="card table-card">
+            <div class="card-head req-head" id="reqHead">
+                <h2>Recent Requests</h2>
+                <div class="req-head-actions">
+                    <!-- Per-column show/hide panel -->
+                    <div class="col-toggle" id="colToggle">
+                        <button type="button" class="btn" id="colToggleBtn"><i class="fas fa-columns"></i> Columns</button>
+                        <div class="col-panel" id="colPanel">
+                            <label><input type="checkbox" class="col-check" data-col="1" checked> Employee</label>
+                            <label><input type="checkbox" class="col-check" data-col="2" checked> Type</label>
+                            <label><input type="checkbox" class="col-check" data-col="3" checked> Paid</label>
+                            <label><input type="checkbox" class="col-check" data-col="4" checked> Dates</label>
+                            <label><input type="checkbox" class="col-check" data-col="5" checked> Total</label>
+                            <label><input type="checkbox" class="col-check" data-col="6" checked> Amount</label>
+                            <label><input type="checkbox" class="col-check" data-col="7" checked> Status</label>
+                            <label><input type="checkbox" class="col-check" data-col="8" checked> Actions</label>
+                        </div>
+                    </div>
+                    <button type="button" class="btn" id="reqToggleBtn"><i class="fas fa-eye-slash"></i> Hide</button>
+                </div>
+            </div>
+            <div class="req-filters" id="reqFilters">
+                <div class="field">
+                    <label>Employee Name</label>
+                    <input type="text" class="text-input" id="reqFilterName" placeholder="Search by name...">
+                </div>
+                <div class="field">
+                    <label>From</label>
+                    <input type="date" class="text-input" id="reqFilterFrom">
+                </div>
+                <div class="field">
+                    <label>To</label>
+                    <input type="date" class="text-input" id="reqFilterTo">
+                </div>
+                <div class="field">
+                    <label>Status</label>
+                    <select class="text-input" id="reqFilterStatus">
+                        <option value="">All</option>
+                        <option value="pending">Pending</option>
+                        <option value="approved">Approved</option>
+                        <option value="rejected">Rejected</option>
+                    </select>
+                </div>
+                <button type="button" class="btn" id="reqFilterClear">Clear Filters</button>
+            </div>
+            <div class="table-wrap" id="reqTableWrap">
+                <table id="reqTable" class="leave-table">
                     <thead>
-                        <tr>
-                            <th>#</th><th>Employee</th><th>Leave Type</th><th>Dates</th><th>Days</th>
-                            <th>Reason</th><th>Status</th><th>Returned</th><th>Actions</th>
-                        </tr>
+                        <tr><th>Employee</th><th>Type</th><th>Paid</th><th>Dates</th><th>Total</th><th>Amount</th><th>Status</th><th></th></tr>
                     </thead>
-                    <tbody id="leaveTableBody">
-                        <tr><td colspan="9" class="text-center">Loading...</td></tr>
+                    <tbody id="reqBody">
+                        <tr><td colspan="8" class="empty-row">No requests submitted yet</td></tr>
                     </tbody>
                 </table>
             </div>
         </div>
     </div>
 
-    <!-- Reject Modal -->
-    <div class="modal" id="rejectModal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3>Reject Leave Request</h3>
-                <button class="modal-close" onclick="closeModal('rejectModal')"><i class="fas fa-times"></i></button>
-            </div>
-            <div class="modal-body">
-                <div class="form-group">
-                    <label class="required">Reason for rejection</label>
-                    <textarea id="rejectReason" placeholder="Why is this request being rejected?"></textarea>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button class="btn btn-secondary" onclick="closeModal('rejectModal')">Cancel</button>
-                <button class="btn btn-danger" onclick="confirmReject()"><i class="fas fa-times-circle"></i> Reject</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Cancel Modal -->
-    <div class="modal" id="cancelModal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3>Cancel Leave</h3>
-                <button class="modal-close" onclick="closeModal('cancelModal')"><i class="fas fa-times"></i></button>
-            </div>
-            <div class="modal-body">
-                <div class="form-group">
-                    <label class="required">Reason for cancellation</label>
-                    <textarea id="cancelReason" placeholder="Why is this leave being cancelled?"></textarea>
-                </div>
-                <div class="warning-box" id="cancelWarning" style="display:none;"></div>
-                <div class="form-group" id="cancelAckBox" style="display:none;">
-                    <div class="checkbox-group">
-                        <input type="checkbox" id="cancelAcknowledge">
-                        <label for="cancelAcknowledge">I understand and want to cancel anyway</label>
-                    </div>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button class="btn btn-secondary" onclick="closeModal('cancelModal')">Close</button>
-                <button class="btn btn-danger" onclick="confirmCancel()"><i class="fas fa-ban"></i> Cancel Leave</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Return Modal -->
-    <div class="modal" id="returnModal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3>Employee Returned From Leave</h3>
-                <button class="modal-close" onclick="closeModal('returnModal')"><i class="fas fa-times"></i></button>
-            </div>
-            <div class="modal-body">
-                <p id="returnLeaveInfo"></p>
-                <div class="form-group">
-                    <label class="required">Actual return date</label>
-                    <input type="date" id="returnActualDate">
-                </div>
-                <div class="helper-text">If this is after the approved end date, the extra days are automatically recorded as Unpaid Leave. If it's before, the unused days are refunded to the balance.</div>
-            </div>
-            <div class="modal-footer">
-                <button class="btn btn-secondary" onclick="closeModal('returnModal')">Cancel</button>
-                <button class="btn btn-primary" onclick="confirmReturn()"><i class="fas fa-door-open"></i> Confirm Return</button>
-            </div>
-        </div>
-    </div>
-
-    <script src="../../../assets/js/hrm/leave/leave-management.js?v=<?php echo time(); ?>"></script>
+    <script src="../../../assets/js/hrm/leave/leave-management.js"></script>
 </body>
 </html>

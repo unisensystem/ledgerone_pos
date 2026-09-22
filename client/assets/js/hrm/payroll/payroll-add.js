@@ -70,6 +70,20 @@ const typeDropdown = document.getElementById('typeDropdown');
 const cancelBtn = document.getElementById('cancelBtn');
 const submitBtn = document.getElementById('submitBtn');
 
+// Salary rows are auto-calculated against the calendar month that the
+// payroll Date falls in (1st to last day of that month) — there's no
+// separate Attendance Period field on this form anymore; the standalone
+// Leave module page is the single source of truth for leave/overtime.
+function getPayrollPeriod() {
+    const d = dateInput.value ? new Date(dateInput.value) : new Date();
+    const year = d.getFullYear();
+    const month = d.getMonth();
+    const start = new Date(year, month, 1);
+    const end = new Date(year, month + 1, 0);
+    const fmt = (dt) => dt.toISOString().split('T')[0];
+    return { start: fmt(start), end: fmt(end) };
+}
+
 // Initialize form
 function initializeForm() {
     const urlParams = new URLSearchParams(window.location.search);
@@ -123,8 +137,6 @@ function loadPayrollData(id, isViewMode) {
                 if (payroll.company_id) {
                     document.getElementById('companyId').value = payroll.company_id;
                 }
-                if (payroll.period_start) document.getElementById('periodStart').value = payroll.period_start;
-                if (payroll.period_end) document.getElementById('periodEnd').value = payroll.period_end;
 
                 // Wait for data to load
                 setTimeout(() => {
@@ -146,26 +158,30 @@ function loadPayrollData(id, isViewMode) {
                                 row.querySelector('.description').value = item.description || '';
                                 row.querySelector('.amount').value = item.amount;
 
-                                // Show the Calculate button for Salary rows, matching the
+                                // Show the Details button for Salary rows, matching the
                                 // type-dropdown-selection behavior (see typeDropdown handler).
-                                const calcBtn = row.querySelector('[data-action="calculate"]');
-                                if (calcBtn) calcBtn.style.display = item.type === 'Salary' ? 'inline-flex' : 'none';
+                                const detailsBtn = row.querySelector('[data-action="details"]');
+                                if (detailsBtn) detailsBtn.style.display = item.type === 'Salary' ? 'inline-flex' : 'none';
 
-                                // If this item already carries a Calculate breakdown, restore it onto
-                                // the row so re-submitting without re-calculating doesn't drop it.
+                                // If this item already carries a breakdown (from auto-calculate
+                                // at save time), restore it onto the row so re-submitting
+                                // without recalculating doesn't drop it.
                                 if (item.daily_rate !== null && item.daily_rate !== undefined) {
-                                    row.dataset.presentDays = item.present_days;
-                                    row.dataset.paidLeaveDays = item.paid_leave_days;
-                                    row.dataset.unpaidLeaveDays = item.unpaid_leave_days;
-                                    row.dataset.absentDays = item.absent_days;
+                                    row.dataset.paidLeaveDays = item.paid_leave_days || 0;
+                                    row.dataset.unpaidLeaveDays = item.unpaid_leave_days || 0;
                                     row.dataset.dailyRate = item.daily_rate;
                                     row.dataset.grossAmount = item.gross_amount;
                                     row.dataset.deductionAmount = item.deduction_amount;
+                                    row.dataset.otHours = item.ot_hours || 0;
+                                    row.dataset.otAmount = item.ot_amount || 0;
                                     const hint = row.querySelector('.breakdown-hint');
                                     hint.style.display = 'block';
-                                    hint.textContent = `Present ${item.present_days} · Paid Leave ${item.paid_leave_days} · `
-                                        + `Unpaid Leave ${item.unpaid_leave_days} · Absent ${item.absent_days} · `
-                                        + `Deduction ${currencySymbol}${Number(item.deduction_amount).toFixed(2)} (@ ${currencySymbol}${Number(item.daily_rate).toFixed(2)}/day)`;
+                                    hint.textContent = `Paid Leave ${item.paid_leave_days || 0} · Unpaid Leave ${item.unpaid_leave_days || 0} · `
+                                        + `Deduction ${currencySymbol}${Number(item.deduction_amount).toFixed(2)} (@ ${currencySymbol}${Number(item.daily_rate).toFixed(2)}/day)`
+                                        + (item.ot_hours > 0 ? ` · Overtime ${item.ot_hours} hrs = +${currencySymbol}${Number(item.ot_amount).toFixed(2)}` : '');
+                                    // Day-by-day leave/OT rows aren't stored with a saved payroll
+                                    // item (only the totals are), so "View Details" on a loaded row
+                                    // re-fetches them fresh from calculate-suggested.php on click.
                                 }
 
                                 // Trigger payment method change to show/hide fields
@@ -248,8 +264,8 @@ function addTableRow() {
                 </td>
                 <td>
                     <div class="table-actions">
-                        <button class="btn btn-icon btn-calculate" data-action="calculate" title="Calculate from attendance/leave (Salary rows only)" style="display:none;">
-                            <i class="fas fa-calculator"></i>
+                        <button class="btn btn-icon btn-details" data-action="details" title="View this month's approved leave & overtime (Salary rows only)" style="display:none;">
+                            <i class="fas fa-list-ul"></i>
                         </button>
                         <button class="btn btn-icon btn-add" data-action="add" title="Add row">
                             <i class="fas fa-plus"></i>
@@ -327,6 +343,23 @@ function addEventListeners() {
             submitPayroll();
         }
     });
+
+    // If the payroll Date changes after a Salary row already has an
+    // auto-filled amount, its figure was computed for the old month — clear
+    // the stale breakdown so it doesn't silently look current.
+    dateInput.addEventListener('change', () => {
+        tableBody.querySelectorAll('tr').forEach(row => autoFillSalaryIfReady(row));
+    });
+}
+
+// If a row has both an employee and "Salary" selected, fetch and fill the
+// suggested amount automatically — no manual "Calculate" click needed.
+function autoFillSalaryIfReady(row) {
+    const employeeId = row.querySelector('.employee-id').value;
+    const type = row.querySelector('.type').value;
+    if (employeeId && type === 'Salary') {
+        calculateSuggestedSalary(row, true);
+    }
 }
 
 // Add event listeners to a table row
@@ -387,9 +420,9 @@ function addRowEventListeners(row, rowIndex) {
     // Action buttons
     const addBtn = row.querySelector('[data-action="add"]');
     const removeBtn = row.querySelector('[data-action="remove"]');
-    const calcBtn = row.querySelector('[data-action="calculate"]');
+    const detailsBtn = row.querySelector('[data-action="details"]');
 
-    calcBtn.addEventListener('click', () => calculateSuggestedSalary(row));
+    detailsBtn.addEventListener('click', () => viewLeaveDetails(row));
     addBtn.addEventListener('click', () => addTableRow());
     removeBtn.addEventListener('click', () => {
         if (tableBody.children.length > 1) {
@@ -439,6 +472,10 @@ document.addEventListener('click', (e) => {
                 item.classList.remove('selected');
             });
             e.target.classList.add('selected');
+
+            // Employee is set — if the row's type is already "Salary", fetch
+            // the suggested amount right away.
+            autoFillSalaryIfReady(row);
         }
 
         employeeDropdown.classList.remove('show');
@@ -458,9 +495,15 @@ document.addEventListener('click', (e) => {
             // Set value
             typeInput.value = e.target.dataset.value;
 
-            // "Calculate from attendance/leave" only makes sense for a Salary row.
-            const calcBtn = row.querySelector('[data-action="calculate"]');
-            if (calcBtn) calcBtn.style.display = typeInput.value === 'Salary' ? 'inline-flex' : 'none';
+            // "View Details" only makes sense for a Salary row.
+            const detailsBtn = row.querySelector('[data-action="details"]');
+            if (detailsBtn) detailsBtn.style.display = typeInput.value === 'Salary' ? 'inline-flex' : 'none';
+
+            // Type is now "Salary" (or changed away from it) — fetch the
+            // suggested amount if an employee is already selected.
+            if (typeInput.value === 'Salary') {
+                autoFillSalaryIfReady(row);
+            }
         }
 
         // Close dropdown
@@ -468,40 +511,129 @@ document.addEventListener('click', (e) => {
     }
 });
 
-// Reads the row's selected employee + the form's attendance period, and
-// fills the Amount field with a suggested net Salary computed from actual
-// attendance/leave for that period (see server/api/hrm/payroll/calculate-suggested.php).
-// HR can still edit the amount afterward — this is a starting point, not a lock-in.
-async function calculateSuggestedSalary(row) {
+// Reads the row's selected employee + the calendar month of the payroll
+// Date, and fills the Amount field with a suggested net Salary computed from
+// APPROVED leave and APPROVED overtime for that month (see
+// server/api/hrm/payroll/calculate-suggested.php). HR can still edit the
+// amount afterward — this is a starting point, not a lock-in.
+// `silent` suppresses alert popups for the automatic (non-button) triggers.
+async function calculateSuggestedSalary(row, silent = false) {
     const employeeId = row.querySelector('.employee-id').value;
-    const periodStart = document.getElementById('periodStart').value;
-    const periodEnd = document.getElementById('periodEnd').value;
     const hint = row.querySelector('.breakdown-hint');
 
-    if (!employeeId) { alert('Please select an employee for this row first.'); return; }
-    if (!periodStart || !periodEnd) { alert('Please set the Attendance Period (From/To) near the top of the form first.'); return; }
+    if (!employeeId) { if (!silent) alert('Please select an employee for this row first.'); return; }
+    if (!dateInput.value) { if (!silent) alert('Please set the payroll Date first — it decides which month\'s leave/overtime is used.'); return; }
+
+    const period = getPayrollPeriod();
 
     try {
-        const res = await fetch(`../../../../server/api/hrm/payroll/calculate-suggested.php?employee_id=${encodeURIComponent(employeeId)}&period_start=${periodStart}&period_end=${periodEnd}`);
+        const res = await fetch(`../../../../server/api/hrm/payroll/calculate-suggested.php?employee_id=${encodeURIComponent(employeeId)}&period_start=${period.start}&period_end=${period.end}`);
         const data = await res.json();
-        if (!data.success) { alert('Error: ' + data.message); return; }
+        if (!data.success) { if (!silent) alert('Error: ' + data.message); return; }
 
         row.querySelector('.amount').value = data.suggested_net_amount;
-        row.dataset.presentDays = data.attendance.present_days;
         row.dataset.paidLeaveDays = data.attendance.paid_leave_days;
         row.dataset.unpaidLeaveDays = data.attendance.unpaid_leave_days;
-        row.dataset.absentDays = data.attendance.absent_days;
         row.dataset.dailyRate = data.daily_rate;
         row.dataset.grossAmount = data.gross_amount;
-        row.dataset.deductionAmount = data.total_deduction;
+        row.dataset.deductionAmount = data.unpaid_leave_deduction;
+        row.dataset.otHours = data.overtime.total_hours;
+        row.dataset.otAmount = data.overtime.total_amount;
+        row.dataset.leaveRecords = JSON.stringify(data.leave_records || []);
+        row.dataset.otRecords = JSON.stringify(data.overtime.records || []);
+        row.dataset.pendingLeaveCount = data.attendance.pending_leave_requests;
 
         hint.style.display = 'block';
-        hint.textContent = `Present ${data.attendance.present_days} · Paid Leave ${data.attendance.paid_leave_days} · `
-            + `Unpaid Leave ${data.attendance.unpaid_leave_days} · Absent ${data.attendance.absent_days} · `
-            + `Deduction ${currencySymbol}${data.total_deduction.toFixed(2)} (@ ${currencySymbol}${data.daily_rate.toFixed(2)}/day)`;
+        hint.textContent = `Paid Leave ${data.attendance.paid_leave_days} · Unpaid Leave ${data.attendance.unpaid_leave_days} · `
+            + `Deduction ${currencySymbol}${Number(data.unpaid_leave_deduction).toFixed(2)} (@ ${currencySymbol}${Number(data.daily_rate).toFixed(2)}/day)`
+            + (data.overtime.total_hours > 0 ? ` · Overtime ${data.overtime.total_hours} hrs = +${currencySymbol}${Number(data.overtime.total_amount).toFixed(2)}` : '')
+            + (data.attendance.pending_leave_requests > 0 ? ` · ${data.attendance.pending_leave_requests} pending leave request(s) not counted yet` : '');
     } catch (err) {
-        alert('Error calculating suggested salary');
+        if (!silent) alert('Error calculating suggested salary');
     }
+}
+
+// Opens the popup for a row: which approved leave dates fell in this month
+// (paid/unpaid) and which approved overtime was logged, for the selected
+// employee. Reuses data already fetched automatically; if the row somehow
+// hasn't been calculated yet, runs it first so Amount, the hint, and the
+// popup all stay consistent.
+async function viewLeaveDetails(row) {
+    const employeeId = row.querySelector('.employee-id').value;
+
+    if (!employeeId) { alert('Please select an employee for this row first.'); return; }
+    if (!dateInput.value) { alert('Please set the payroll Date first.'); return; }
+
+    if (!row.dataset.leaveRecords) {
+        await calculateSuggestedSalary(row);
+    }
+    if (!row.dataset.leaveRecords) return; // calculate failed — alert already shown
+
+    const employeeLabel = row.querySelector('.employee-code').value;
+    const leaveRecords = JSON.parse(row.dataset.leaveRecords || '[]');
+    const otRecords = JSON.parse(row.dataset.otRecords || '[]');
+    const pendingCount = Number(row.dataset.pendingLeaveCount || 0);
+    showDetailModal(employeeLabel, leaveRecords, otRecords, pendingCount);
+}
+
+// Singleton detail popup — built once, reused for every row.
+let detailModal = null;
+function ensureDetailModal() {
+    if (detailModal) return detailModal;
+    detailModal = document.createElement('div');
+    detailModal.id = 'attendanceDetailModal';
+    detailModal.className = 'detail-modal-overlay';
+    detailModal.innerHTML = `
+        <div class="detail-modal">
+            <div class="detail-modal-header">
+                <h3 id="detailModalTitle">Leave & Overtime</h3>
+                <button type="button" class="detail-modal-close" id="detailModalClose"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="detail-modal-body" id="detailModalBody"></div>
+        </div>
+    `;
+    document.body.appendChild(detailModal);
+    detailModal.querySelector('#detailModalClose').addEventListener('click', () => detailModal.classList.remove('show'));
+    detailModal.addEventListener('click', (e) => {
+        if (e.target === detailModal) detailModal.classList.remove('show');
+    });
+    return detailModal;
+}
+
+function showDetailModal(employeeLabel, leaveRecords, otRecords, pendingCount) {
+    const modal = ensureDetailModal();
+    modal.querySelector('#detailModalTitle').textContent = `${employeeLabel} — Leave & Overtime`;
+    const body = modal.querySelector('#detailModalBody');
+
+    let html = '<h4>Approved Leave</h4>';
+    if (leaveRecords.length === 0) {
+        html += '<p class="detail-empty">No approved leave this month.</p>';
+    } else {
+        html += '<table class="detail-table"><thead><tr><th>Dates</th><th>Type</th><th>Paid Days</th><th>Unpaid Days</th></tr></thead><tbody>';
+        leaveRecords.forEach(r => {
+            const dates = r.start_date === r.end_date ? r.start_date : `${r.start_date} – ${r.end_date}`;
+            html += `<tr><td>${dates}</td><td>${r.leave_type}</td><td>${r.paid_days}</td><td>${r.unpaid_days}</td></tr>`;
+        });
+        html += '</tbody></table>';
+    }
+
+    html += '<h4>Overtime</h4>';
+    if (otRecords.length === 0) {
+        html += '<p class="detail-empty">No approved overtime this month.</p>';
+    } else {
+        html += '<table class="detail-table"><thead><tr><th>Date</th><th>Hours</th><th>Rate</th><th>Amount</th></tr></thead><tbody>';
+        otRecords.forEach(r => {
+            html += `<tr><td>${r.date}</td><td>${r.hours}</td><td>${r.rate_multiplier}x</td><td>+${currencySymbol}${Number(r.amount).toFixed(2)}</td></tr>`;
+        });
+        html += '</tbody></table>';
+    }
+
+    if (pendingCount > 0) {
+        html += `<p class="detail-empty">${pendingCount} pending leave request(s) this month are not counted yet — approve them on the Leave page first.</p>`;
+    }
+
+    body.innerHTML = html;
+    modal.classList.add('show');
 }
 
 // Form validation
@@ -572,34 +704,37 @@ function submitPayroll() {
             amount: amount
         };
 
-        // If this row was populated via "Calculate from attendance/leave", carry the
+        // If this row was auto-filled from approved leave/overtime, carry the
         // breakdown along so it's stored with the payroll entry for later review.
         if (row.dataset.dailyRate !== undefined) {
             anyCalculated = true;
-            item.present_days = Number(row.dataset.presentDays);
-            item.paid_leave_days = Number(row.dataset.paidLeaveDays);
-            item.unpaid_leave_days = Number(row.dataset.unpaidLeaveDays);
-            item.absent_days = Number(row.dataset.absentDays);
+            item.paid_leave_days = Number(row.dataset.paidLeaveDays || 0);
+            item.unpaid_leave_days = Number(row.dataset.unpaidLeaveDays || 0);
             item.daily_rate = Number(row.dataset.dailyRate);
             item.gross_amount = Number(row.dataset.grossAmount);
             item.deduction_amount = Number(row.dataset.deductionAmount);
+            item.ot_hours = Number(row.dataset.otHours || 0);
+            item.ot_amount = Number(row.dataset.otAmount || 0);
         }
 
         items.push(item);
     });
 
+    const period = getPayrollPeriod();
+
     const payload = {
         payroll_date: dateInput.value,
         payroll_code: payrollIdInput.value,
         company_id: document.getElementById('companyId').value || null,
-        period_start: document.getElementById('periodStart').value || null,
-        period_end: document.getElementById('periodEnd').value || null,
+        period_start: period.start,
+        period_end: period.end,
         items: items
     };
 
-    // Payroll built from calculated attendance/leave data starts as a draft so HR can
-    // review before it's locked in — existing manual-entry payrolls keep defaulting to
-    // 'finalized' server-side (unchanged behavior) when this is omitted.
+    // Payroll built from approved leave/overtime starts as a draft so HR can
+    // review before it's locked in — existing manual-entry payrolls keep
+    // defaulting to 'finalized' server-side (unchanged behavior) when this
+    // is omitted.
     if (anyCalculated && !editPayrollId) {
         payload.status = 'draft';
     }
@@ -634,6 +769,51 @@ function submitPayroll() {
         submitBtn.disabled = false;
     });
 }
+
+// Styles for the "View Details" popup — injected here (rather than the CSS file)
+// since the modal markup itself is also built entirely in JS.
+const detailModalStyle = document.createElement('style');
+detailModalStyle.textContent = `
+    .detail-modal-overlay {
+        display: none;
+        position: fixed;
+        inset: 0;
+        background: rgba(0,0,0,.45);
+        z-index: 1000;
+        align-items: center;
+        justify-content: center;
+    }
+    .detail-modal-overlay.show { display: flex; }
+    .detail-modal {
+        background: #fff;
+        border-radius: 10px;
+        width: min(560px, 92vw);
+        max-height: 80vh;
+        overflow-y: auto;
+        box-shadow: 0 10px 30px rgba(0,0,0,.2);
+    }
+    .detail-modal-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 14px 18px;
+        border-bottom: 1px solid #e5e7eb;
+        position: sticky;
+        top: 0;
+        background: #fff;
+    }
+    .detail-modal-header h3 { margin: 0; font-size: 16px; }
+    .detail-modal-close { background: none; border: none; cursor: pointer; font-size: 16px; color: #6b7280; }
+    .detail-modal-close:hover { color: #111827; }
+    .detail-modal-body { padding: 14px 18px; }
+    .detail-modal-body h4 { margin: 14px 0 8px; font-size: 13px; color: #374151; }
+    .detail-modal-body h4:first-child { margin-top: 0; }
+    .detail-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .detail-table th, .detail-table td { text-align: left; padding: 6px 8px; border-bottom: 1px solid #f1f5f9; }
+    .detail-table th { color: #6b7280; font-weight: 600; }
+    .detail-empty { font-size: 13px; color: #9ca3af; margin: 0; }
+`;
+document.head.appendChild(detailModalStyle);
 
 // Initialize the form when page loads
 document.addEventListener('DOMContentLoaded', initializeForm);

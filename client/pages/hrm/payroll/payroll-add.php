@@ -67,7 +67,7 @@ $currency_symbol = $currency['symbol'] ?? '$';
                     <div class="form-field">
                         <label for="date" class="required">Date</label>
                         <input type="date" id="date" required>
-                        <div class="helper-text">Defaults to current date</div>
+                        <div class="helper-text">Defaults to current date. Salary rows use this date's month as the leave/overtime period.</div>
                     </div>
                     
                     <div class="form-field">
@@ -81,18 +81,6 @@ $currency_symbol = $currency['symbol'] ?? '$';
                         <select id="companyId">
                             <option value="">Select Company</option>
                         </select>
-                    </div>
-                </div>
-
-                <div class="form-row">
-                    <div class="form-field">
-                        <label for="periodStart">Attendance Period — From</label>
-                        <input type="date" id="periodStart">
-                        <div class="helper-text">Used by "Calculate" on Salary rows to read attendance/leave</div>
-                    </div>
-                    <div class="form-field">
-                        <label for="periodEnd">Attendance Period — To</label>
-                        <input type="date" id="periodEnd">
                     </div>
                 </div>
             </div>

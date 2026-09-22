@@ -14,6 +14,7 @@ const checkOutTimeEl = document.getElementById('checkOutTime');
 const checkInStatusEl = document.getElementById('checkInStatus');
 const checkOutStatusEl = document.getElementById('checkOutStatus');
 const attendanceStatusEl = document.getElementById('attendanceStatus');
+const gracePeriodEl = document.getElementById('gracePeriod');
 const notesEl = document.getElementById('notes');
 const checkInBtn = document.getElementById('checkInBtn');
 const checkOutBtn = document.getElementById('checkOutBtn');
@@ -27,6 +28,10 @@ const employeeIdError = document.getElementById('employeeIdError');
 const departmentError = document.getElementById('departmentError');
 const checkInError = document.getElementById('checkInError');
 const checkOutError = document.getElementById('checkOutError');
+
+// Remembers the grace period across page reloads (it's a personal
+// preference, not a tenant setting) — defaults to 15 minutes.
+const GRACE_PERIOD_STORAGE_KEY = 'attendance_grace_period_minutes';
 
 // Initialize current date and time
 function updateCurrentDateTime() {
@@ -370,12 +375,23 @@ function validateForm() {
     return isValid;
 }
 
+// Reads the grace-period input, falling back to 15 minutes if it's empty,
+// non-numeric, or negative.
+function getGracePeriodMinutes() {
+    const raw = gracePeriodEl ? parseInt(gracePeriodEl.value, 10) : NaN;
+    return (!isNaN(raw) && raw >= 0) ? raw : 15;
+}
+
 // Update attendance status based on check-in time
+// Grace period is now read from the on-page "Late Arrival Grace Period"
+// field instead of a fixed 15 minutes, so traffic-heavy days can get more
+// leeway without editing code — just bump the number before checking people in.
 function updateAttendanceStatus() {
     if (!checkInInputEl.value) return;
 
     const employeeId = employeeIdEl.value.trim();
     const employee = employeesData.find(emp => emp.employee_id === employeeId);
+    const graceMinutes = getGracePeriodMinutes();
     
     if (employee && employee.shift_timing) {
         const [expectedCheckIn] = employee.shift_timing.split('-');
@@ -385,8 +401,7 @@ function updateAttendanceStatus() {
         const expectedMinutes = expHour * 60 + expMin;
         const actualMinutes = actHour * 60 + actMin;
         
-        // Allow 15 minutes grace period
-        if (actualMinutes > expectedMinutes + 15) {
+        if (actualMinutes > expectedMinutes + graceMinutes) {
             attendanceStatusEl.value = 'late';
         } else {
             attendanceStatusEl.value = 'present';
@@ -439,6 +454,13 @@ async function updateAttendanceTable() {
     try {
         const date = filterDateEl.value || new Date().toISOString().split('T')[0];
         const response = await fetch(`../../../../server/api/hrm/attendance/attendance.php?date=${date}`);
+
+        if (!response.ok) {
+            // Server returned a non-2xx status (401/500/etc.) — surface that
+            // instead of trying (and failing) to parse a body as attendance data.
+            throw new Error(`Server responded with ${response.status}`);
+        }
+
         const result = await response.json();
 
         attendanceTableBody.innerHTML = '';
@@ -517,10 +539,15 @@ async function updateAttendanceTable() {
             attendanceTableBody.appendChild(row);
         });
     } catch (error) {
+        // Was colspan="6" here while every other state above uses colspan="7"
+        // (there are 7 columns: Date, Employee ID, Name, Department,
+        // Check-in, Check-out, Status) — fixed so the row doesn't look
+        // misaligned when this state shows.
+        console.error('Error loading attendance records:', error);
         attendanceTableBody.innerHTML = `
             <tr>
-                <td colspan="6" style="text-align: center; color: var(--error);">
-                    Error loading attendance records
+                <td colspan="7" style="text-align: center; color: var(--error);">
+                    Error loading attendance records. Please refresh and try again.
                 </td>
             </tr>
         `;
@@ -611,6 +638,21 @@ function init() {
     
     checkInInputEl.value = currentTime;
     checkOutInputEl.value = currentTime;
+
+    // Restore the last-used grace period (per-browser convenience, not a
+    // tenant-wide setting) so HR doesn't have to re-type it every day.
+    if (gracePeriodEl) {
+        const savedGrace = localStorage.getItem(GRACE_PERIOD_STORAGE_KEY);
+        if (savedGrace !== null) {
+            gracePeriodEl.value = savedGrace;
+        }
+        gracePeriodEl.addEventListener('change', () => {
+            const val = getGracePeriodMinutes();
+            gracePeriodEl.value = val;
+            localStorage.setItem(GRACE_PERIOD_STORAGE_KEY, String(val));
+            updateAttendanceStatus();
+        });
+    }
     
     // Set filter date to today
     if (filterDateEl) {

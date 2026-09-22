@@ -61,12 +61,18 @@ try {
         $pdo->prepare("UPDATE payroll_entries SET finalized_at = NOW(), finalized_by = ? WHERE id = ?")->execute([$user_id, $payroll_id]);
     }
 
-    // Insert payroll items
+    // Insert payroll items.
+    // ot_hours / ot_amount carry the Overtime a "Calculate" row was suggested with
+    // (see calculate-suggested.php) so it stays traceable alongside the existing
+    // present/paid-leave/unpaid-leave/absent breakdown — run
+    // sql/payroll-ot-migration.sql once before using this (adds those 2 columns,
+    // nothing existing is dropped or renamed).
     $stmt = $pdo->prepare("
         INSERT INTO payroll_entries_items
         (tenant_id, payroll_id, employee_id, type, payment_method_id, bank_account_id, cheque_date, description, amount,
-         present_days, paid_leave_days, unpaid_leave_days, absent_days, daily_rate, gross_amount, deduction_amount, period_start, period_end)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         present_days, paid_leave_days, unpaid_leave_days, absent_days, daily_rate, gross_amount, deduction_amount,
+         ot_hours, ot_amount, period_start, period_end)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ");
 
     foreach ($items as $item) {
@@ -87,6 +93,8 @@ try {
             $item['daily_rate'] ?? null,
             $item['gross_amount'] ?? null,
             $item['deduction_amount'] ?? null,
+            $item['ot_hours'] ?? null,
+            $item['ot_amount'] ?? null,
             $period_start,
             $period_end,
         ]);
@@ -128,6 +136,9 @@ try {
             } else {
                 // FIX: was account_id 28 ('Salaries Payable' - a Liability account),
                 // now correctly debiting account_id 60 ('Salaries Expense')
+                // Note: item['amount'] already includes any Overtime the row was
+                // calculated with (see calculate-suggested.php), so it's posted as
+                // one combined Salaries Expense figure — no separate OT ledger line.
                 $stmt->execute([$tenant_id, $payroll_id, 60, $payroll_date, $description, $item['amount'], 0]);
                 $stmt->execute([$tenant_id, $payroll_id, $payment_account_id, $payroll_date, $description, 0, $item['amount']]);
             }

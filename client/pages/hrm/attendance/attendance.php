@@ -110,15 +110,23 @@ if (!$user_id) {
                 </div>
 
                 <!-- Attendance Status -->
-                <div class="form-group">
-                    <label for="attendanceStatus">Attendance Status</label>
-                    <select id="attendanceStatus">
-                        <option value="present">Present</option>
-                        <option value="late">Late Arrival</option>
-                        <option value="halfday">Half Day</option>
-                        <option value="absent">Absent</option>
-                    </select>
-                    <div class="helper-text">Select the overall attendance status for the day</div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="attendanceStatus">Attendance Status</label>
+                        <select id="attendanceStatus">
+                            <option value="present">Present</option>
+                            <option value="late">Late Arrival</option>
+                            <option value="halfday">Half Day</option>
+                            <option value="absent">Absent</option>
+                        </select>
+                        <div class="helper-text">Auto-set from check-in time vs. shift start + grace period below</div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="gracePeriod">Late Arrival Grace Period (minutes)</label>
+                        <input type="number" id="gracePeriod" min="0" max="120" step="1" value="15">
+                        <div class="helper-text">Leeway for traffic etc. — check-in within this many minutes of shift start still counts as Present</div>
+                    </div>
                 </div>
 
                 <!-- Notes -->
