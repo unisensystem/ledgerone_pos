@@ -58,9 +58,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
         $stmt = $pdo->prepare("DELETE FROM production_order_materials WHERE production_order_id = ?");
         $stmt->execute([$id]);
 
-        $insertStmt = $pdo->prepare("INSERT INTO production_order_materials (production_order_id, material_id, required_qty, uom_id, status) VALUES (?, ?, ?, ?, 'Pending')");
+        $insertStmt = $pdo->prepare("INSERT INTO production_order_materials (tenant_id, production_order_id, material_id, required_qty, uom_id, status) VALUES (?, ?, ?, ?, ?, 'Pending')");
         foreach ($materials as $mat) {
-            $insertStmt->execute([$id, $mat['material_id'], $mat['required_qty'], $mat['uom_id']]);
+            $insertStmt->execute([$tenant_id, $id, $mat['material_id'], $mat['required_qty'], $mat['uom_id']]);
         }
 
         $newOrder = ['order_no' => $oldOrder['order_no'], 'product_id' => $product_id, 'bom_id' => $bom_id, 'branch_id' => $branch_id, 'machine_id' => $machine_id, 'order_qty' => $order_qty, 'start_date' => $start_date, 'end_date' => $end_date, 'status' => $oldOrder['status']];

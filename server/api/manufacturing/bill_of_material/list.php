@@ -149,9 +149,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
         $stmt = $pdo->prepare("DELETE FROM bom_materials WHERE bom_id = ?");
         $stmt->execute([$bom_id]);
 
-        $stmt = $pdo->prepare("INSERT INTO bom_materials (bom_id, raw_material_id, quantity, unit_id) VALUES (?, ?, ?, ?)");
+        $stmt = $pdo->prepare("INSERT INTO bom_materials (tenant_id, bom_id, raw_material_id, quantity, unit_id) VALUES (?, ?, ?, ?, ?)");
         foreach ($materials as $material) {
-            $stmt->execute([$bom_id, $material['raw_material_id'], $material['quantity'], $material['unit_id']]);
+            $stmt->execute([$tenant_id, $bom_id, $material['raw_material_id'], $material['quantity'], $material['unit_id']]);
         }
 
         $newBom = ['bom_code' => $oldBom['bom_code'], 'version' => $version, 'is_active' => $is_active, 'bom_base_qty' => $bom_base_qty, 'batch_locked' => $batch_locked, 'remarks' => $data['remarks'] ?? null];

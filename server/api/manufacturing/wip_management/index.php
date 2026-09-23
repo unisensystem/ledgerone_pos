@@ -391,10 +391,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 // Insert as Adhoc
                 $insertStmt = $pdo->prepare("
                     INSERT INTO production_order_materials
-                    (production_order_id, material_id, required_qty, issued_qty, uom_id, status)
-                    VALUES (?, ?, 0, ?, ?, 'Adhoc')
+                    (tenant_id, production_order_id, material_id, required_qty, issued_qty, uom_id, status)
+                    VALUES (?, ?, ?, 0, ?, ?, 'Adhoc')
                 ");
-                $insertStmt->execute([$po_id, $material_id, $issue_qty, $uom_id]);
+                $insertStmt->execute([$tenant_id, $po_id, $material_id, $issue_qty, $uom_id]);
             }
             
             // Generate WIP Number
@@ -437,10 +437,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             // Insert WIP Line
             $lineStmt = $pdo->prepare("
                 INSERT INTO work_in_progress_items
-                (work_in_progress_id, material_id, required_qty, issued_qty, available_qty, issue_qty, uom_id, unit_cost, total_cost)
-                VALUES (?, ?, 0, 0, ?, ?, ?, ?, ?)
+                (tenant_id, work_in_progress_id, material_id, required_qty, issued_qty, available_qty, issue_qty, uom_id, unit_cost, total_cost)
+                VALUES (?, ?, ?, 0, 0, ?, ?, ?, ?, ?)
             ");
             $lineStmt->execute([
+                $tenant_id,
                 $wipHeaderId,
                 $material_id,
                 $stock['available_stock'],
@@ -962,8 +963,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         
         $lineStmt = $pdo->prepare("
             INSERT INTO work_in_progress_items
-            (work_in_progress_id, material_id, required_qty, issued_qty, available_qty, issue_qty, uom_id, unit_cost, total_cost)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            (tenant_id, work_in_progress_id, material_id, required_qty, issued_qty, available_qty, issue_qty, uom_id, unit_cost, total_cost)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ");
         
         $updateStmt = $pdo->prepare("
@@ -1027,6 +1028,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             ]);
             
             $lineStmt->execute([
+                $tenant_id,
                 $wipHeaderId,
                 $mat['material_id'],
                 $mat['required_qty'] ?? 0,

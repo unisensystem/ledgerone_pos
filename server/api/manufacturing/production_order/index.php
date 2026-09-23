@@ -223,9 +223,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $po_id = $pdo->lastInsertId();
         
         // Insert materials
-        $stmt = $pdo->prepare("INSERT INTO production_order_materials (production_order_id, material_id, required_qty, uom_id, status) VALUES (?, ?, ?, ?, 'Pending')");
+        $stmt = $pdo->prepare("INSERT INTO production_order_materials (tenant_id, production_order_id, material_id, required_qty, uom_id, status) VALUES (?, ?, ?, ?, ?, 'Pending')");
         foreach ($materials as $mat) {
-            $stmt->execute([$po_id, $mat['material_id'], $mat['required_qty'], $mat['uom_id']]);
+            $stmt->execute([$tenant_id, $po_id, $mat['material_id'], $mat['required_qty'], $mat['uom_id']]);
         }
         
         logActivity(

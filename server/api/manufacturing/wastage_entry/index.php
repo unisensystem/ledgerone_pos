@@ -181,8 +181,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (!empty($items)) {
             $itemStmt = $pdo->prepare("
                 INSERT INTO production_wastage_items
-                (wastage_id, material_id, uom_id, ordered_qty, wastage_input, wastage_qty)
-                VALUES (?, ?, ?, ?, ?, ?)
+                (tenant_id, wastage_id, material_id, uom_id, ordered_qty, wastage_input, wastage_qty)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
             ");
             $stockStmt = $pdo->prepare("
                 INSERT INTO stock_ledger
@@ -196,6 +196,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if ($wastage_qty <= 0) continue;
 
                 $itemStmt->execute([
+                    $tenant_id,
                     $wastage_id,
                     $item['material_id'],
                     $item['uom_id'],

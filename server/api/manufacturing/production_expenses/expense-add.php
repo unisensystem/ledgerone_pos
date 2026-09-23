@@ -131,8 +131,8 @@ function processExpenseLines($pdo, $expense_id, $lines, $tenant_id, $entry_date,
     // Prepare statements for items and ledger
     $stmt_item = $pdo->prepare("
         INSERT INTO production_expense_items
-        (expense_id, gl_account_id, expense_type, description, hours, rate, amount, vendor_id, payment_status, payment_mode, bank_account_id, cheque_no, cheque_date, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
+        (tenant_id, expense_id, gl_account_id, expense_type, description, hours, rate, amount, vendor_id, payment_status, payment_mode, bank_account_id, cheque_no, cheque_date, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
     ");
     
     $stmt_ledger = $pdo->prepare("
@@ -150,6 +150,7 @@ function processExpenseLines($pdo, $expense_id, $lines, $tenant_id, $entry_date,
     foreach ($lines as $line) {
         // Insert expense item
         $stmt_item->execute([
+            $tenant_id,
             $expense_id,
             $line['gl_account_id'],
             $line['expense_type'] ?? null,

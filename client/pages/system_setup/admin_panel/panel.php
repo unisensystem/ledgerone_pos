@@ -22,7 +22,7 @@ if (!$user_id) {
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>LedgerOne ERP | Admin Panel</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="stylesheet" href="../../../assets/css/system_setup/admin_panel/panel.css">
+    <link rel="stylesheet" href="../../../assets/css/system_setup/admin_panel/panel.css?v=<?php echo time(); ?>">
 </head>
 <style>
 /* ========== PROGRESS BAR STYLES ========== */
@@ -303,34 +303,51 @@ if (!$user_id) {
                     <div class="card-header">
                         <div class="card-title">System Management</div>
                     </div>
-                    <div class="form-grid">
-                        <div>
-                            <h4 style="margin-bottom: 16px; color: var(--heading);">Database Operations</h4>
-                            <div class="d-flex flex-column gap-12">
-                                <button class="btn btn-warning" onclick="openFormatModal()">
+                    <div class="sysmgmt-grid">
+                        <div class="sysmgmt-group">
+                            <div class="sysmgmt-group-header">
+                                <span class="sysmgmt-group-icon"><i class="fas fa-database"></i></span>
+                                <div>
+                                    <div class="sysmgmt-group-title">Database Operations</div>
+                                    <div class="sysmgmt-group-desc">Backup, restore, or reset this tenant's data</div>
+                                </div>
+                            </div>
+                            <div class="sysmgmt-actions">
+                                <button class="btn btn-error btn-block" onclick="openFormatModal()">
                                     <i class="fas fa-eraser"></i> Format Database
                                 </button>
-                                <!-- <button class="btn btn-secondary" onclick="openBackupModal()">
+                                <button class="btn btn-primary btn-block" onclick="openBackupModal()">
                                     <i class="fas fa-download"></i> Backup Database
                                 </button>
-                                <button class="btn btn-secondary" onclick="openRestoreModal()">
+                                <button class="btn btn-warning btn-block" onclick="openRestoreModal()">
                                     <i class="fas fa-upload"></i> Restore Database
-                                </button> -->
-                                
-                            </div>
-                        </div>
-                        <div>
-                            <h4 style="margin-bottom: 16px; color: var(--heading);">Access Management</h4>
-                            <div class="d-flex flex-column gap-12">
-                                <button class="btn btn-secondary" onclick="openAccessModal()">
-                                    <i class="fas fa-user-shield"></i> Role Permissions
                                 </button>
                             </div>
                         </div>
-                        <div>
-                            <h4 style="margin-bottom: 16px; color: var(--heading);">Activity & Audit</h4>
-                            <div class="d-flex flex-column gap-12">
-                                <button class="btn btn-secondary" onclick="window.location.href='activity-center.php'">
+                        <div class="sysmgmt-group">
+                            <div class="sysmgmt-group-header">
+                                <span class="sysmgmt-group-icon"><i class="fas fa-user-shield"></i></span>
+                                <div>
+                                    <div class="sysmgmt-group-title">Access Management</div>
+                                    <div class="sysmgmt-group-desc">Control what each role can see and do</div>
+                                </div>
+                            </div>
+                            <div class="sysmgmt-actions">
+                                <button class="btn btn-secondary btn-block" onclick="openAccessModal()">
+                                    <i class="fas fa-key"></i> Role Permissions
+                                </button>
+                            </div>
+                        </div>
+                        <div class="sysmgmt-group">
+                            <div class="sysmgmt-group-header">
+                                <span class="sysmgmt-group-icon"><i class="fas fa-clipboard-list"></i></span>
+                                <div>
+                                    <div class="sysmgmt-group-title">Activity & Audit</div>
+                                    <div class="sysmgmt-group-desc">Review who did what, and when</div>
+                                </div>
+                            </div>
+                            <div class="sysmgmt-actions">
+                                <button class="btn btn-secondary btn-block" onclick="window.location.href='activity-center.php'">
                                     <i class="fas fa-clipboard-list"></i> Activity & Audit Center
                                 </button>
                             </div>
