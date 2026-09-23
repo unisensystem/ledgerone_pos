@@ -29,7 +29,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update'])) {
     try {
         $pdo->beginTransaction();
 
-        // First, update employee details
+        // First, update employee details.
+        // NOTE: every placeholder in this statement is named (:name) —
+        // never mix ? and :name in the same prepared statement, PDO
+        // throws "Invalid parameter number: mixed named and positional
+        // parameters" if you do.
         $sql = "UPDATE employees SET 
                 first_name = :first_name,
                 last_name = :last_name,
@@ -49,7 +53,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update'])) {
                 gender = :gender,
                 marital_status = :marital_status,
                 religion = :religion,
-                nationality = :nationality
+                nationality = :nationality,
+                overtime_rate_type = :overtime_rate_type,
+                overtime_rate = :overtime_rate
                 WHERE id = :id";
 
         $stmt = $pdo->prepare($sql);
@@ -73,11 +79,59 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update'])) {
             'marital_status' => $_POST['marital_status'] ?? '',
             'religion' => $_POST['religion'] ?? '',
             'nationality' => $_POST['nationality'] ?? '',
+            'overtime_rate_type' => $_POST['overtime_rate_type'] ?? 'per_hour',
+            'overtime_rate' => $_POST['overtime_rate'] ?? 0,
             'id' => $_POST['id'] ?? ''
         ]);
 
         if (!$update_result) {
             throw new Exception("Failed to update employee details");
+        }
+
+        // Then, save salary components — update the existing row if one
+        // exists for this employee, otherwise insert a new one. Again,
+        // every placeholder here is named (:name) only.
+        $salary_check_stmt = $pdo->prepare("SELECT id FROM salary_components WHERE employee_id = :employee_id");
+        $salary_check_stmt->execute(['employee_id' => $_POST['id'] ?? '']);
+        $existing_salary = $salary_check_stmt->fetch(PDO::FETCH_ASSOC);
+
+        $salary_params = [
+            'employee_id' => $_POST['id'] ?? '',
+            'basic_salary' => $_POST['basic_salary'] ?? 0,
+            'monthly_bonus' => $_POST['monthly_bonus'] ?? 0,
+            'quarterly_bonus' => $_POST['quarterly_bonus'] ?? 0,
+            'yearly_bonus' => $_POST['yearly_bonus'] ?? 0,
+            'sales_commission_percentage' => $_POST['sales_commission_percentage'] ?? 0,
+            'housing_allowance' => $_POST['housing_allowance'] ?? 0,
+            'transport_allowance' => $_POST['transport_allowance'] ?? 0,
+            'medical_allowance' => $_POST['medical_allowance'] ?? 0
+        ];
+
+        if ($existing_salary) {
+            $salary_sql = "UPDATE salary_components SET
+                    basic_salary = :basic_salary,
+                    monthly_bonus = :monthly_bonus,
+                    quarterly_bonus = :quarterly_bonus,
+                    yearly_bonus = :yearly_bonus,
+                    sales_commission_percentage = :sales_commission_percentage,
+                    housing_allowance = :housing_allowance,
+                    transport_allowance = :transport_allowance,
+                    medical_allowance = :medical_allowance
+                    WHERE employee_id = :employee_id";
+        } else {
+            $salary_sql = "INSERT INTO salary_components
+                    (employee_id, basic_salary, monthly_bonus, quarterly_bonus, yearly_bonus,
+                     sales_commission_percentage, housing_allowance, transport_allowance, medical_allowance)
+                    VALUES
+                    (:employee_id, :basic_salary, :monthly_bonus, :quarterly_bonus, :yearly_bonus,
+                     :sales_commission_percentage, :housing_allowance, :transport_allowance, :medical_allowance)";
+        }
+
+        $salary_stmt_save = $pdo->prepare($salary_sql);
+        $salary_result = $salary_stmt_save->execute($salary_params);
+
+        if (!$salary_result) {
+            throw new Exception("Failed to update salary details");
         }
 
         $pdo->commit();
@@ -124,6 +178,13 @@ try {
         if (!$employee) {
             die('Employee not found');
         }
+    }
+
+    // Fetch salary components if not already fetched (POST re-render case)
+    if (!isset($salary)) {
+        $salary_stmt = $pdo->prepare("SELECT * FROM salary_components WHERE employee_id = ?");
+        $salary_stmt->execute([$employee_id]);
+        $salary = $salary_stmt->fetch(PDO::FETCH_ASSOC);
     }
     
     // Fetch departments for dropdown

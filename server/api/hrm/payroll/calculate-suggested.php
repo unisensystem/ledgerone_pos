@@ -7,6 +7,14 @@
 // shows this as a starting point; HR can still override the final amount
 // before saving (see payroll-add.php).
 //
+// PRORATION: gross salary (base + allowances) is prorated to the number of
+// calendar days actually in [period_start, period_end], not always paid as
+// a full month. The period itself is decided by the caller — payroll-add.js
+// sends 1st-of-month..Date (or the full month if Date is on/after
+// month-end) — so running payroll mid-month (e.g. Date = the 23rd) pays
+// 23/30 of the month's gross rather than the whole month. This keeps
+// gross_amount consistent with whatever period the caller asks about.
+//
 // Deduction rule: Unpaid leave, absent days, and UNMARKED days (no
 // attendance record) are deducted at the same daily_rate (base_salary / 30).
 // Unmarked days that have no attendance mark and no leave request are now
@@ -38,7 +46,9 @@ if (!$user_id || !$tenant_id) {
 
 // Same formula as hrm/leave/leave-request.php's calculateDailyRate() so the
 // rate used to deduct unpaid leave / absent days here always matches the
-// rate a leave request itself is priced against.
+// rate a leave request itself is priced against. This does NOT change with
+// proration — a day of unpaid leave/absence always costs one daily_rate,
+// regardless of how many days are in the period.
 function calculateDailyRate(array $emp): float {
     $salary = (float) ($emp['base_salary'] ?? 0);
     return round($salary / 30, 2);
@@ -151,7 +161,10 @@ try {
         if ($r['status'] === 'absent')  $absentDays  += (float) $r['cnt'];
     }
 
-    // Calculate calendar days in the period
+    // Calculate calendar days in the period. This now drives BOTH the
+    // unmarked-days-as-absent check below AND the gross salary proration —
+    // a shorter period (e.g. 1st to the 23rd) naturally works out to fewer
+    // calendar days, which is exactly what should reduce the payout.
     $startDate = new DateTime($periodStart);
     $endDate = new DateTime($periodEnd);
     $calendarDays = (int) $endDate->diff($startDate)->format('%a') + 1; // +1 to include end date
@@ -171,11 +184,18 @@ try {
     }
 
     $baseSalary = (float) $employee['base_salary'];
-    $grossAmount = $baseSalary
+    $fullMonthGrossAmount = $baseSalary
         + (float) $employee['housing_allowance'] + (float) $employee['transport_allowance']
         + (float) $employee['medical_allowance'] + (float) $employee['meal_allowance']
         + (float) $employee['communication_allowance'] + (float) $employee['education_allowance']
         + (float) $employee['travel_allowance'] + (float) $employee['other_allowance'];
+
+    // Prorate gross (base + allowances) to the days actually in this period,
+    // on the same /30 basis as dailyRate above. A full-month period
+    // (calendarDays == 30, or 31/28/29 — still divided by 30 to match the
+    // existing daily_rate convention) naturally comes out close to the full
+    // figure; a shorter period (e.g. 23 days) pays only that fraction.
+    $grossAmount = round(($fullMonthGrossAmount / 30) * $calendarDays, 2);
 
     // Two separate deduction buckets so the breakdown stays traceable, but
     // both priced at the same daily_rate — only OT uses a different rate.
@@ -191,6 +211,7 @@ try {
         'success' => true,
         'employee' => ['employee_id' => $employeeCode, 'full_name' => $employee['full_name'], 'base_salary' => $baseSalary],
         'period' => ['start' => $periodStart, 'end' => $periodEnd],
+        'calendar_days' => $calendarDays,
         'daily_rate' => $dailyRate,
         'attendance' => [
             'present_days' => $presentDays,
@@ -206,6 +227,7 @@ try {
             'total_amount' => $otAmountTotal,
             'records' => $otRecords,
         ],
+        'full_month_gross' => $fullMonthGrossAmount,
         'gross_amount' => $grossAmount,
         'unpaid_leave_deduction' => $unpaidLeaveDeduction,
         'absent_deduction' => $absentDeduction,

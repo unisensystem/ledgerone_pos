@@ -349,12 +349,18 @@ if (!$user_id) {
             <!-- Search Filters -->
             <div class="form-row" style="margin-bottom: var(--spacing-lg);">
                 <div class="form-group">
-                    <label for="filterDate">Date</label>
-                    <input type="date" id="filterDate">
+                    <label for="filterDateFrom">From Date</label>
+                    <input type="date" id="filterDateFrom">
+                </div>
+                <div class="form-group">
+                    <label for="filterDateTo">To Date</label>
+                    <input type="date" id="filterDateTo">
                 </div>
                 <div class="form-group">
                     <label for="filterEmployee">Employee</label>
-                    <input type="text" id="filterEmployee" placeholder="Search by ID or name">
+                    <select id="filterEmployee">
+                        <option value="">All Employees</option>
+                    </select>
                 </div>
                 <div class="form-group">
                     <label for="filterDepartment">Department</label>
@@ -382,7 +388,7 @@ if (!$user_id) {
                 </tbody>
             </table>
             <div class="helper-text" style="margin-top: var(--spacing-md);">
-                Showing today's attendance records. Use the form above to add new entries.
+                Showing attendance for the selected date range and filters (defaults to today). Use the form above to add new entries.
             </div>
         </div>
     </div>

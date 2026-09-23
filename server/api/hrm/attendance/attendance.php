@@ -33,12 +33,31 @@ try {
     |--------------------------------------------------------------------------
     | GET - FETCH ATTENDANCE RECORDS
     |--------------------------------------------------------------------------
+    |
+    | Supports, in priority order:
+    |   ?date=YYYY-MM-DD                    -> a single day (kept for
+    |                                          backward compatibility / the
+    |                                          attendance-entry form's
+    |                                          auto check-in/out lookup)
+    |   ?date_from=YYYY-MM-DD&date_to=...   -> a date range (used by the
+    |                                          history table's From/To
+    |                                          filters). If only one side is
+    |                                          given, the other is treated
+    |                                          as the same date.
+    |   ?month=YYYY-MM                      -> every record in that month
+    |                                          (kept for backward
+    |                                          compatibility)
+    | If none are given, defaults to just today — so the history table
+    | normally shows today's attendance until a range is picked.
     */
     if ($_SERVER['REQUEST_METHOD'] === 'GET') {
 
-        $date = $_GET['date'] ?? date('Y-m-d');
+        $date = $_GET['date'] ?? null;
+        $dateFrom = $_GET['date_from'] ?? null;
+        $dateTo = $_GET['date_to'] ?? null;
+        $month = $_GET['month'] ?? null;
 
-        $stmt = $pdo->prepare("
+        $baseSelect = "
             SELECT
                 a.id,
                 a.employee_id,
@@ -59,16 +78,44 @@ try {
                 ON e.department_id = d.id
             LEFT JOIN leave_types lt
                 ON lt.id = a.leave_type_id
-            WHERE a.tenant_id = ?
-              AND a.attendance_date = ?
-            ORDER BY a.check_in_time DESC
-        ");
+        ";
 
-        $stmt->execute([
-            $tenant_id,
-            $tenant_id,
-            $date
-        ]);
+        if ($date) {
+            // Single-day lookup (e.g. attendance-entry form checking today's records)
+            $stmt = $pdo->prepare($baseSelect . "
+                WHERE a.tenant_id = ?
+                  AND a.attendance_date = ?
+                ORDER BY a.check_in_time DESC
+            ");
+            $stmt->execute([$tenant_id, $tenant_id, $date]);
+        } elseif ($dateFrom || $dateTo) {
+            // Date range lookup — used by the history table's From/To filters.
+            $dateFrom = $dateFrom ?: $dateTo;
+            $dateTo = $dateTo ?: $dateFrom;
+            $stmt = $pdo->prepare($baseSelect . "
+                WHERE a.tenant_id = ?
+                  AND a.attendance_date BETWEEN ? AND ?
+                ORDER BY a.attendance_date DESC, a.check_in_time DESC
+            ");
+            $stmt->execute([$tenant_id, $tenant_id, $dateFrom, $dateTo]);
+        } elseif ($month) {
+            // Month lookup (kept for backward compatibility)
+            $stmt = $pdo->prepare($baseSelect . "
+                WHERE a.tenant_id = ?
+                  AND DATE_FORMAT(a.attendance_date, '%Y-%m') = ?
+                ORDER BY a.attendance_date DESC, a.check_in_time DESC
+            ");
+            $stmt->execute([$tenant_id, $tenant_id, $month]);
+        } else {
+            // Nothing given — default to today only.
+            $today = date('Y-m-d');
+            $stmt = $pdo->prepare($baseSelect . "
+                WHERE a.tenant_id = ?
+                  AND a.attendance_date = ?
+                ORDER BY a.check_in_time DESC
+            ");
+            $stmt->execute([$tenant_id, $tenant_id, $today]);
+        }
 
         $records = $stmt->fetchAll();
 

@@ -70,18 +70,29 @@ const typeDropdown = document.getElementById('typeDropdown');
 const cancelBtn = document.getElementById('cancelBtn');
 const submitBtn = document.getElementById('submitBtn');
 
-// Salary rows are auto-calculated against the calendar month that the
-// payroll Date falls in (1st to last day of that month) — there's no
-// separate Attendance Period field on this form anymore; the standalone
+// Salary rows are auto-calculated against the payroll Date's month — from
+// the 1st up to the Date itself (not always the full month). If the Date
+// falls mid-month, the period stops there so a Salary row is priced only
+// for days actually elapsed (see calculate-suggested.php, which prorates
+// gross salary against this shorter period). If the Date is on/after the
+// month's last day, the period naturally covers the whole month as before.
+// There's no separate Attendance Period field on this form; the standalone
 // Leave module page is the single source of truth for leave/overtime.
 function getPayrollPeriod() {
     const d = dateInput.value ? new Date(dateInput.value) : new Date();
     const year = d.getFullYear();
     const month = d.getMonth();
     const start = new Date(year, month, 1);
-    const end = new Date(year, month + 1, 0);
+    const monthEnd = new Date(year, month + 1, 0);
     const fmt = (dt) => dt.toISOString().split('T')[0];
-    return { start: fmt(start), end: fmt(end) };
+
+    // Compare as YYYY-MM-DD strings (not Date objects) to avoid timezone
+    // round-trip issues between the <input type="date"> value and Date math.
+    const selectedStr = dateInput.value || fmt(d);
+    const monthEndStr = fmt(monthEnd);
+    const end = selectedStr < monthEndStr ? selectedStr : monthEndStr;
+
+    return { start: fmt(start), end: end };
 }
 
 // Initialize form
@@ -345,7 +356,7 @@ function addEventListeners() {
     });
 
     // If the payroll Date changes after a Salary row already has an
-    // auto-filled amount, its figure was computed for the old month — clear
+    // auto-filled amount, its figure was computed for the old period — clear
     // the stale breakdown so it doesn't silently look current.
     dateInput.addEventListener('change', () => {
         tableBody.querySelectorAll('tr').forEach(row => autoFillSalaryIfReady(row));
@@ -511,9 +522,11 @@ document.addEventListener('click', (e) => {
     }
 });
 
-// Reads the row's selected employee + the calendar month of the payroll
-// Date, and fills the Amount field with a suggested net Salary computed from
-// APPROVED leave and APPROVED overtime for that month (see
+// Reads the row's selected employee + the period from getPayrollPeriod()
+// (1st of the month up to the payroll Date, or the full month if the Date
+// is on/after month-end), and fills the Amount field with a suggested net
+// Salary — gross salary prorated to that period, plus APPROVED overtime,
+// minus APPROVED unpaid leave / absent days in that period (see
 // server/api/hrm/payroll/calculate-suggested.php). HR can still edit the
 // amount afterward — this is a starting point, not a lock-in.
 // `silent` suppresses alert popups for the automatic (non-button) triggers.
@@ -522,7 +535,7 @@ async function calculateSuggestedSalary(row, silent = false) {
     const hint = row.querySelector('.breakdown-hint');
 
     if (!employeeId) { if (!silent) alert('Please select an employee for this row first.'); return; }
-    if (!dateInput.value) { if (!silent) alert('Please set the payroll Date first — it decides which month\'s leave/overtime is used.'); return; }
+    if (!dateInput.value) { if (!silent) alert('Please set the payroll Date first — it decides which days\' leave/overtime is used.'); return; }
 
     const period = getPayrollPeriod();
 
@@ -544,7 +557,8 @@ async function calculateSuggestedSalary(row, silent = false) {
         row.dataset.pendingLeaveCount = data.attendance.pending_leave_requests;
 
         hint.style.display = 'block';
-        hint.textContent = `Paid Leave ${data.attendance.paid_leave_days} · Unpaid Leave ${data.attendance.unpaid_leave_days} · `
+        hint.textContent = (data.calendar_days < 30 ? `Prorated ${data.calendar_days}/30 days · ` : '')
+            + `Paid Leave ${data.attendance.paid_leave_days} · Unpaid Leave ${data.attendance.unpaid_leave_days} · `
             + `Deduction ${currencySymbol}${Number(data.unpaid_leave_deduction).toFixed(2)} (@ ${currencySymbol}${Number(data.daily_rate).toFixed(2)}/day)`
             + (data.overtime.total_hours > 0 ? ` · Overtime ${data.overtime.total_hours} hrs = +${currencySymbol}${Number(data.overtime.total_amount).toFixed(2)}` : '')
             + (data.attendance.pending_leave_requests > 0 ? ` · ${data.attendance.pending_leave_requests} pending leave request(s) not counted yet` : '');
@@ -553,7 +567,7 @@ async function calculateSuggestedSalary(row, silent = false) {
     }
 }
 
-// Opens the popup for a row: which approved leave dates fell in this month
+// Opens the popup for a row: which approved leave dates fell in the period
 // (paid/unpaid) and which approved overtime was logged, for the selected
 // employee. Reuses data already fetched automatically; if the row somehow
 // hasn't been calculated yet, runs it first so Amount, the hint, and the
@@ -662,7 +676,7 @@ function showDetailModal(employeeLabel, leaveRecords, otRecords, pendingCount) {
     // ── Approved Leave ──
     html += `<h4 style="margin:14px 0 8px; font-size:13px; color:#374151;">Approved Leave</h4>`;
     if (leaveRecords.length === 0) {
-        html += `<p class="detail-empty">No approved leave this month.</p>`;
+        html += `<p class="detail-empty">No approved leave this period.</p>`;
     } else {
         html += `<table class="detail-table">
             <thead><tr><th>Dates</th><th>Type</th><th>Total</th><th>Paid</th><th>Unpaid</th></tr></thead><tbody>`;
@@ -691,7 +705,7 @@ function showDetailModal(employeeLabel, leaveRecords, otRecords, pendingCount) {
     // ── Overtime ──
     html += `<h4 style="margin:14px 0 8px; font-size:13px; color:#374151;">Overtime</h4>`;
     if (otRecords.length === 0) {
-        html += `<p class="detail-empty">No approved overtime this month.</p>`;
+        html += `<p class="detail-empty">No approved overtime this period.</p>`;
     } else {
         html += `<table class="detail-table">
             <thead><tr><th>Date</th><th>Hours</th><th>Rate</th><th>Amount</th></tr></thead><tbody>`;
@@ -717,7 +731,7 @@ function showDetailModal(employeeLabel, leaveRecords, otRecords, pendingCount) {
     if (pendingCount > 0) {
         html += `<div style="margin-top:12px; padding:10px 12px; background:#fef3c7; border:1px solid #fde68a; border-radius:8px; font-size:13px; color:#92400e;">
             <i class="fas fa-triangle-exclamation"></i>
-            <strong>${pendingCount}</strong> pending leave request(s) this month are not counted yet — approve them on the Leave page first.
+            <strong>${pendingCount}</strong> pending leave request(s) this period are not counted yet — approve them on the Leave page first.
         </div>`;
     }
 

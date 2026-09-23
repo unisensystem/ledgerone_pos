@@ -2,7 +2,8 @@
 const currentDateEl = document.getElementById('currentDate');
 const employeeIdEl = document.getElementById('employeeId');
 const departmentEl = document.getElementById('department');
-const filterDateEl = document.getElementById('filterDate');
+const filterDateFromEl = document.getElementById('filterDateFrom');
+const filterDateToEl = document.getElementById('filterDateTo');
 const filterEmployeeEl = document.getElementById('filterEmployee');
 const filterDepartmentEl = document.getElementById('filterDepartment');
 const scanBarcodeBtn = document.getElementById('scanBarcodeBtn');
@@ -114,7 +115,7 @@ async function loadDepartments() {
                 option.value = dept.department_name;
                 option.textContent = dept.department_name;
                 departmentEl.appendChild(option);
-                
+
                 // Also add to filter dropdown
                 const filterOption = document.createElement('option');
                 filterOption.value = dept.department_name;
@@ -135,27 +136,49 @@ async function loadEmployees() {
 
         if (result.success) {
             employeesData = result.data;
+            populateEmployeeFilter();
         }
     } catch (error) {
         console.error('Error loading employees:', error);
     }
 }
 
+// Fill the "Employee" filter dropdown in the history section from the
+// same employee list used by the entry form's autocomplete.
+function populateEmployeeFilter() {
+    if (!filterEmployeeEl) return;
+
+    const previousValue = filterEmployeeEl.value;
+
+    filterEmployeeEl.innerHTML = '<option value="">All Employees</option>';
+
+    employeesData.forEach(emp => {
+        const option = document.createElement('option');
+        option.value = emp.employee_id;
+        option.textContent = `${emp.employee_id} - ${emp.full_name}`;
+        filterEmployeeEl.appendChild(option);
+    });
+
+    if (previousValue) {
+        filterEmployeeEl.value = previousValue;
+    }
+}
+
 // Show dropdown with filtered employees
 function showEmployeeDropdown(filter = '') {
     const filterLower = filter.toLowerCase();
-    const filtered = employeesData.filter(emp => 
-        emp.employee_id.toLowerCase().includes(filterLower) || 
+    const filtered = employeesData.filter(emp =>
+        emp.employee_id.toLowerCase().includes(filterLower) ||
         emp.full_name.toLowerCase().includes(filterLower)
     );
-    
+
     employeeDropdown.innerHTML = '';
-    
+
     if (filtered.length === 0) {
         employeeDropdown.classList.remove('show');
         return;
     }
-    
+
     filtered.forEach(emp => {
         const item = document.createElement('div');
         item.className = 'dropdown-item';
@@ -163,7 +186,7 @@ function showEmployeeDropdown(filter = '') {
         item.onclick = () => selectEmployee(emp);
         employeeDropdown.appendChild(item);
     });
-    
+
     employeeDropdown.classList.add('show');
 }
 
@@ -172,14 +195,14 @@ async function selectEmployee(emp) {
     employeeIdEl.value = emp.employee_id;
     employeeDropdown.classList.remove('show');
     populateDepartment();
-    
+
     // Update expected times from shift timing
     if (emp.shift_timing) {
         const [checkInTime, checkOutTime] = emp.shift_timing.split('-');
         document.querySelector('.time-card:nth-child(1) .helper-text').textContent = `Expected time: ${formatTimeForDisplay(checkInTime)}`;
         document.querySelector('.time-card:nth-child(2) .helper-text').textContent = `Expected time: ${formatTimeForDisplay(checkOutTime)}`;
     }
-    
+
     if (autoAttendanceEl.checked) {
         await autoCheckInOut(emp.employee_id);
     }
@@ -194,17 +217,17 @@ function hideEmployeeDropdown() {
 async function scanBarcode() {
     try {
         const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
-        
+
         // Create video element
         const video = document.createElement('video');
         video.srcObject = stream;
         video.setAttribute('playsinline', true);
         video.play();
-        
+
         // Create modal overlay
         const modal = document.createElement('div');
         modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.9);z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;';
-        
+
         const closeBtn = document.createElement('button');
         closeBtn.textContent = 'Close';
         closeBtn.className = 'btn btn-secondary';
@@ -213,18 +236,18 @@ async function scanBarcode() {
             stream.getTracks().forEach(track => track.stop());
             modal.remove();
         };
-        
+
         video.style.cssText = 'max-width:90%;max-height:70%;';
         modal.appendChild(video);
         modal.appendChild(closeBtn);
         document.body.appendChild(modal);
-        
+
         // Import and use barcode scanner library
         const { BrowserMultiFormatReader } = await import('https://cdn.jsdelivr.net/npm/@zxing/library@latest/esm/index.min.js');
         const codeReader = new BrowserMultiFormatReader();
-        
+
         const result = await codeReader.decodeOnceFromVideoDevice(undefined, video);
-        
+
         if (result) {
             employeeIdEl.value = result.text;
             populateDepartment();
@@ -232,7 +255,7 @@ async function scanBarcode() {
                 await autoCheckInOut(result.text);
             }
         }
-        
+
         stream.getTracks().forEach(track => track.stop());
         modal.remove();
     } catch (error) {
@@ -241,79 +264,27 @@ async function scanBarcode() {
     }
 }
 
-// Auto check-in or check-out based on existing attendance
+// Auto check-in or check-out based on existing attendance.
+// Only decides WHICH action to fire (check-in vs check-out) — the actual
+// save + status calculation is done by setCheckInNow()/setCheckOutNow(),
+// so it stays in sync with manual entry and always shift-timing aware.
 async function autoCheckInOut(employeeId) {
-    console.log('autoCheckInOut called for:', employeeId);
     try {
-const date = currentDateEl.value;
+        const date = currentDateEl.value;
         const response = await fetch(`../../../../server/api/hrm/attendance/attendance.php?date=${date}`);
         const result = await response.json();
-        console.log('Attendance records:', result);
-        
+
         if (result.success) {
             const existingRecord = result.data.find(record => record.employee_id === employeeId);
-            console.log('Existing record:', existingRecord);
-            
-            if (existingRecord) {
-                // Employee already checked in, auto check-out
-                setCheckOutNow();
-                
-                const record = {
-    employeeId: employeeIdEl.value,
-    department: departmentEl.value,
-    checkIn: checkInInputEl.value,
-    checkOut: checkOutInputEl.value,
-    status: attendanceStatusEl.value,
-    notes: notesEl.value.trim(),
-    date: currentDateEl.value,
-    isCheckout: isCheckout
-};
 
-                
-                const saveResponse = await fetch('../../../../server/api/hrm/attendance/attendance.php', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(record)
-                });
-                
-                const saveResult = await saveResponse.json();
-                console.log('Check-out result:', saveResult);
-                if (saveResult.success) {
-                    showAlert(`Check-out successful for ${employeeId}`, 'success');
-                    updateAttendanceTable();
-                    clearForm();
-                } else {
-                    showAlert(saveResult.message || 'Failed to check-out', 'error');
-                }
+            if (existingRecord) {
+                // Employee already checked in today -> auto check-out
+                await setCheckOutNow();
+                clearForm();
             } else {
-                // Employee not checked in, auto check-in
-                setCheckInNow();
-                
-                const record = {
-                    employeeId: employeeIdEl.value,
-                    checkIn: checkInInputEl.value,
-                    checkOut: checkOutInputEl.value,
-                    status: attendanceStatusEl.value,
-                    notes: notesEl.value.trim(),
-                    date: date,
-                    isCheckout: false
-                };
-                
-                const saveResponse = await fetch('../../../../server/api/hrm/attendance/attendance.php', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(record)
-                });
-                
-                const saveResult = await saveResponse.json();
-                console.log('Check-in result:', saveResult);
-                if (saveResult.success) {
-                    showAlert(`Check-in successful for ${employeeId}`, 'success');
-                    updateAttendanceTable();
-                    clearForm();
-                } else {
-                    showAlert(saveResult.message || 'Failed to check-in', 'error');
-                }
+                // Employee not checked in yet -> auto check-in
+                await setCheckInNow();
+                clearForm();
             }
         }
     } catch (error) {
@@ -326,7 +297,7 @@ const date = currentDateEl.value;
 function populateDepartment() {
     const employeeId = employeeIdEl.value.trim();
     const employee = employeesData.find(emp => emp.employee_id === employeeId);
-    
+
     if (employee && employee.department_name) {
         departmentEl.value = employee.department_name;
     } else {
@@ -399,30 +370,52 @@ function getGracePeriodMinutes() {
     return (!isNaN(raw) && raw >= 0) ? raw : 15;
 }
 
-// Update attendance status based on check-in time
-// Grace period is now read from the on-page "Late Arrival Grace Period"
-// field instead of a fixed 15 minutes, so traffic-heavy days can get more
-// leeway without editing code — just bump the number before checking people in.
+function timeStringToMinutes(timeStr) {
+    const [h, m] = timeStr.split(':').map(Number);
+    return (h * 60) + m;
+}
+
+// Update attendance status based on BOTH check-in (vs shift start) and
+// check-out (vs shift end), compared against the employee's shift_timing.
+// Grace period is read from the on-page "Late Arrival Grace Period" field
+// and applies to both ends.
+//
+// Runs on every check-in/check-out change — typed manually or set via the
+// Check-in/Check-out Now buttons — regardless of whether "Auto Attendance"
+// is ticked. That checkbox only controls whether selecting/scanning an
+// employee automatically fires a check-in or check-out; it never gates
+// this status calculation.
 function updateAttendanceStatus() {
     if (!checkInInputEl.value) return;
 
     const employeeId = employeeIdEl.value.trim();
     const employee = employeesData.find(emp => emp.employee_id === employeeId);
+
+    if (!employee || !employee.shift_timing) {
+        attendanceStatusEl.value = 'present';
+        return;
+    }
+
     const graceMinutes = getGracePeriodMinutes();
-    
-    if (employee && employee.shift_timing) {
-        const [expectedCheckIn] = employee.shift_timing.split('-');
-        const [expHour, expMin] = expectedCheckIn.split(':').map(Number);
-        const [actHour, actMin] = checkInInputEl.value.split(':').map(Number);
-        
-        const expectedMinutes = expHour * 60 + expMin;
-        const actualMinutes = actHour * 60 + actMin;
-        
-        if (actualMinutes > expectedMinutes + graceMinutes) {
-            attendanceStatusEl.value = 'late';
-        } else {
-            attendanceStatusEl.value = 'present';
-        }
+    const [expectedCheckIn, expectedCheckOut] = employee.shift_timing.split('-');
+
+    const expectedInMinutes = timeStringToMinutes(expectedCheckIn);
+    const actualInMinutes = timeStringToMinutes(checkInInputEl.value);
+    const isLate = actualInMinutes > (expectedInMinutes + graceMinutes);
+
+    let isEarlyLeave = false;
+    if (checkOutInputEl.value && expectedCheckOut) {
+        const expectedOutMinutes = timeStringToMinutes(expectedCheckOut);
+        const actualOutMinutes = timeStringToMinutes(checkOutInputEl.value);
+        isEarlyLeave = actualOutMinutes < (expectedOutMinutes - graceMinutes);
+    }
+
+    if (isLate && isEarlyLeave) {
+        attendanceStatusEl.value = 'halfday';
+    } else if (isLate) {
+        attendanceStatusEl.value = 'late';
+    } else if (isEarlyLeave) {
+        attendanceStatusEl.value = 'halfday';
     } else {
         attendanceStatusEl.value = 'present';
     }
@@ -569,11 +562,17 @@ async function deleteAttendanceRecord(recordId, employeeId, date) {
     }
 }
 
-// Update attendance table
+// Update attendance table — driven by the From/To date range filters (plus
+// Employee and Department filters applied client-side on top of that
+// range's data). If either date is left empty, it defaults to today, so
+// with nothing selected yet the table normally just shows today's
+// attendance.
 async function updateAttendanceTable() {
     try {
-        const date = filterDateEl.value || new Date().toISOString().split('T')[0];
-        const response = await fetch(`../../../../server/api/hrm/attendance/attendance.php?date=${date}`);
+        const today = new Date().toISOString().split('T')[0];
+        const dateFrom = (filterDateFromEl && filterDateFromEl.value) || today;
+        const dateTo = (filterDateToEl && filterDateToEl.value) || today;
+        const response = await fetch(`../../../../server/api/hrm/attendance/attendance.php?date_from=${dateFrom}&date_to=${dateTo}`);
 
         if (!response.ok) {
             // Server returned a non-2xx status (401/500/etc.) — surface that
@@ -596,25 +595,25 @@ async function updateAttendanceTable() {
             return;
         }
 
-        // Apply client-side filters
-        const filterEmployee = filterEmployeeEl.value.toLowerCase();
+        // Apply client-side filters (employee = exact match from dropdown,
+        // department = exact match from dropdown)
+        const filterEmployee = filterEmployeeEl.value;
         const filterDepartment = filterDepartmentEl.value;
-        
+
         let filteredData = result.data;
-        
+
         if (filterEmployee) {
-            filteredData = filteredData.filter(record => 
-                record.employee_id.toLowerCase().includes(filterEmployee) ||
-                (record.full_name && record.full_name.toLowerCase().includes(filterEmployee))
+            filteredData = filteredData.filter(record =>
+                record.employee_id === filterEmployee
             );
         }
-        
+
         if (filterDepartment) {
-            filteredData = filteredData.filter(record => 
+            filteredData = filteredData.filter(record =>
                 record.department_name === filterDepartment
             );
         }
-        
+
         if (filteredData.length === 0) {
             attendanceTableBody.innerHTML = `
                 <tr>
@@ -738,7 +737,7 @@ async function setCheckInNow() {
     checkInStatusEl.textContent = 'Completed';
     checkInStatusEl.className = 'time-status status-completed';
 
-    // Update attendance status based on check-in time
+    // Update attendance status based on check-in time (and check-out, if set)
     updateAttendanceStatus();
 
     // Save to database
@@ -761,6 +760,9 @@ async function setCheckOutNow() {
     checkOutStatusEl.textContent = 'Completed';
     checkOutStatusEl.className = 'time-status status-completed';
 
+    // Update attendance status based on check-out time vs shift end too
+    updateAttendanceStatus();
+
     // Save to database
     if (employeeIdEl.value && departmentEl.value) {
         await saveAttendanceRecord(true);
@@ -781,13 +783,13 @@ function init() {
     // Load departments and employees
     loadDepartments();
     loadEmployees();
-    
+
     // Set current time for check-in and check-out
     const now = new Date();
     const hours = now.getHours().toString().padStart(2, '0');
     const minutes = now.getMinutes().toString().padStart(2, '0');
     const currentTime = `${hours}:${minutes}`;
-    
+
     checkInInputEl.value = currentTime;
     checkOutInputEl.value = currentTime;
 
@@ -805,40 +807,20 @@ function init() {
             updateAttendanceStatus();
         });
     }
-    
-    // Set filter date to today
-    // Set attendance date to today
-if (currentDateEl) {
-    currentDateEl.value = new Date().toISOString().split('T')[0];
 
-    // Jab user attendance date change kare
-    currentDateEl.addEventListener('change', function () {
-        if (filterDateEl) {
-            filterDateEl.value = this.value;
-        }
+    // Set attendance date (entry form) to today
+    if (currentDateEl) {
+        currentDateEl.value = new Date().toISOString().split('T')[0];
+    }
 
-        updateAttendanceTable();
-    });
-}
-
-// Set attendance date to today
-if (currentDateEl) {
-    currentDateEl.value = new Date().toISOString().split('T')[0];
-
-    // Jab user attendance date change kare
-    currentDateEl.addEventListener('change', function () {
-        if (filterDateEl) {
-            filterDateEl.value = this.value;
-        }
-
-        updateAttendanceTable();
-    });
-}
-
-// Set filter date to today
-if (filterDateEl) {
-    filterDateEl.value = new Date().toISOString().split('T')[0];
-}
+    // Set the history table's date range filter to today by default, so
+    // the list normally shows just today's attendance until HR picks a
+    // different From/To range.
+    if (filterDateFromEl && filterDateToEl) {
+        const today = new Date().toISOString().split('T')[0];
+        filterDateFromEl.value = today;
+        filterDateToEl.value = today;
+    }
 
     // Set current date and time
     updateCurrentDateTime();
@@ -872,6 +854,7 @@ if (filterDateEl) {
         checkOutTimeEl.textContent = formatTimeForDisplay(this.value);
         checkOutStatusEl.textContent = 'Manual';
         checkOutStatusEl.className = 'time-status status-completed';
+        updateAttendanceStatus();
     });
 
     // Show dropdown on focus and input
@@ -881,7 +864,7 @@ if (filterDateEl) {
         populateDepartment();
     });
     employeeIdEl.addEventListener('blur', hideEmployeeDropdown);
-    
+
     // Auto-select first option on Enter key and auto check-in/out
     employeeIdEl.addEventListener('keydown', async function(e) {
         if (e.key === 'Enter') {
@@ -890,7 +873,7 @@ if (filterDateEl) {
             if (items.length > 0) {
                 items[0].click();
             }
-            
+
             // Check if employee is already checked in today
             if (autoAttendanceEl.checked) {
                 const employeeId = employeeIdEl.value.trim();
@@ -900,15 +883,16 @@ if (filterDateEl) {
             }
         }
     });
-    
+
     // Validate form on input
     departmentEl.addEventListener('change', validateForm);
     checkInInputEl.addEventListener('change', validateForm);
     checkOutInputEl.addEventListener('change', validateForm);
-    
-    // Filter event listeners
-    filterDateEl.addEventListener('change', updateAttendanceTable);
-    filterEmployeeEl.addEventListener('input', updateAttendanceTable);
+
+    // Filter event listeners (history table)
+    filterDateFromEl.addEventListener('change', updateAttendanceTable);
+    filterDateToEl.addEventListener('change', updateAttendanceTable);
+    filterEmployeeEl.addEventListener('change', updateAttendanceTable);
     filterDepartmentEl.addEventListener('change', updateAttendanceTable);
 }
 
