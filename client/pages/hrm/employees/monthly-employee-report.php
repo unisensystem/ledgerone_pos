@@ -5,8 +5,8 @@
 // deduction/overtime/net) for a selected date range. Tenant-scoped only (no
 // company/department filter — every employee under the logged-in tenant).
 //
-// The salary math (daily_rate, deduction rule, unmarked-days-as-absent rule,
-// overtime pricing) intentionally mirrors hrm/payroll/calculate-suggested.php
+// The salary math (daily_rate, gross proration, deduction rule, unmarked-days-as-absent
+// rule, overtime pricing) intentionally mirrors hrm/payroll/calculate-suggested.php
 // so this report always agrees with what the Payroll "Calculate" button would
 // suggest for the same employee/period.
 //
@@ -129,11 +129,17 @@ function computeEmployeeSummary(PDO $pdo, $tenant_id, array $employee, string $p
     }
 
     $baseSalary = (float) $employee['base_salary'];
-    $grossAmount = $baseSalary
+    $fullMonthGrossAmount = $baseSalary
         + (float) $employee['housing_allowance'] + (float) $employee['transport_allowance']
         + (float) $employee['medical_allowance'] + (float) $employee['meal_allowance']
         + (float) $employee['communication_allowance'] + (float) $employee['education_allowance']
         + (float) $employee['travel_allowance'] + (float) $employee['other_allowance'];
+
+    // Same proration as calculate-suggested.php: gross is prorated to the
+    // calendar days actually in the selected period (on the same /30 basis as
+    // daily_rate). Without this the report showed the full-month gross while
+    // deducting only the period's absent days, so it disagreed with Payroll.
+    $grossAmount = round(($fullMonthGrossAmount / 30) * $calendarDays, 2);
 
     $unpaidLeaveDeduction = round($unpaidLeaveDays * $dailyRate, 2);
     $absentDeduction = round($absentDays * $dailyRate, 2);
@@ -150,7 +156,7 @@ function computeEmployeeSummary(PDO $pdo, $tenant_id, array $employee, string $p
         'absent_days'   => $absentDays,
         'paid_leave_days'   => $paidLeaveDays,
         'unpaid_leave_days' => $unpaidLeaveDays,
-        'gross_amount'  => round($grossAmount, 2),
+        'gross_amount'  => $grossAmount,
         'deduction_amount' => $totalDeduction,
         'ot_hours'      => $otHoursTotal,
         'ot_amount'     => $otAmountTotal,
@@ -379,6 +385,14 @@ $currency_symbol = getCurrencySymbol($pdo, $tenant_id);
   .btn-primary:hover { background: #4338ca; }
   .btn:hover { background: #f1f5f9; }
 
+  .switch-field { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; cursor: pointer; padding-bottom: 9px; user-select: none; }
+  .switch { position: relative; width: 38px; height: 22px; flex-shrink: 0; }
+  .switch input { opacity: 0; width: 0; height: 0; position: absolute; }
+  .switch .slider { position: absolute; inset: 0; background: #cbd5e1; border-radius: 22px; transition: .2s; }
+  .switch .slider::before { content: ''; position: absolute; height: 16px; width: 16px; left: 3px; top: 3px; background: #fff; border-radius: 50%; transition: .2s; }
+  .switch input:checked + .slider { background: var(--primary); }
+  .switch input:checked + .slider::before { transform: translateX(16px); }
+
   .summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 18px; }
   .summary-box { background: #fff; border: 1px solid var(--border); border-radius: 10px; padding: 14px; }
   .summary-box .label { font-size: 11px; color: var(--text-muted); font-weight: 600; text-transform: uppercase; }
@@ -446,6 +460,11 @@ $currency_symbol = getCurrencySymbol($pdo, $tenant_id);
         </div>
       </div>
 
+      <label class="switch-field">
+        <span class="switch"><input type="checkbox" id="showAbsentToggle"><span class="slider"></span></span>
+        <span id="showAbsentLabel">Show fully absent employees</span>
+      </label>
+
       <button class="btn btn-primary" id="generateBtn"><i class="fas fa-chart-line"></i> Generate Report</button>
     </div>
   </div>
@@ -485,7 +504,8 @@ $currency_symbol = getCurrencySymbol($pdo, $tenant_id);
 const currencySymbol = '<?php echo $currency_symbol; ?>';
 let allEmployees = [];
 let selectedEmployeeIds = new Set(); // empty set = all employees
-let currentReportRows = [];
+let allReportRows = [];     // everything the server returned
+let currentReportRows = []; // what is actually shown (after the absent switch filter)
 let currentPeriod = { start: '', end: '' };
 
 function fmtMoney(n) {
@@ -502,7 +522,10 @@ function fmtMonthYear(dateStr) {
 function defaultDates() {
   const now = new Date();
   const first = new Date(now.getFullYear(), now.getMonth(), 1);
-  const iso = d => d.toISOString().slice(0, 10);
+  // Format from LOCAL date parts — toISOString() converts to UTC, which in
+  // timezones ahead of UTC (e.g. Pakistan, UTC+5) shifted "1 Sep 00:00" back
+  // to "31 Aug" and added an extra day to the period.
+  const iso = d => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
   document.getElementById('periodStart').value = iso(first);
   document.getElementById('periodEnd').value = iso(now);
 }
@@ -566,6 +589,7 @@ document.getElementById('empClearAll').addEventListener('click', () => {
 
 document.getElementById('printBtn').addEventListener('click', openPrintView);
 document.getElementById('generateBtn').addEventListener('click', generateReport);
+document.getElementById('showAbsentToggle').addEventListener('change', applyAbsentFilter);
 
 async function generateReport() {
   const periodStart = document.getElementById('periodStart').value;
@@ -584,13 +608,41 @@ async function generateReport() {
     const data = await res.json();
     if (!data.success) throw new Error(data.message || 'Failed to load report');
 
-    currentReportRows = data.employees;
+    allReportRows = data.employees;
     currentPeriod = data.period;
-    renderSummary(data.summary);
-    renderTable(data.employees);
+    applyAbsentFilter();
   } catch (err) {
     body.innerHTML = `<tr><td colspan="13" class="empty-state">Error: ${err.message}</td></tr>`;
   }
+}
+
+// "Fully absent" = no present day, no paid leave and no unpaid leave in the
+// period (only absent / unmarked-counted-as-absent days). Hidden by default
+// until the switch is ticked. The summary boxes and the print view follow the
+// same filter, so they always match what is on screen.
+function isFullyAbsent(r) {
+  return Number(r.present_days) === 0 && Number(r.paid_leave_days) === 0 && Number(r.unpaid_leave_days) === 0;
+}
+
+function applyAbsentFilter() {
+  const showAbsent = document.getElementById('showAbsentToggle').checked;
+  const hiddenCount = showAbsent ? 0 : allReportRows.filter(isFullyAbsent).length;
+  currentReportRows = showAbsent ? allReportRows.slice() : allReportRows.filter(r => !isFullyAbsent(r));
+
+  document.getElementById('showAbsentLabel').textContent =
+    'Show fully absent employees' + (hiddenCount > 0 ? ' (' + hiddenCount + ' hidden)' : '');
+
+  const sum = k => currentReportRows.reduce((t, r) => t + Number(r[k] || 0), 0);
+  renderSummary({
+    total_employees: currentReportRows.length,
+    total_present_days: sum('present_days'),
+    total_absent_days: sum('absent_days'),
+    total_paid_leave_days: sum('paid_leave_days'),
+    total_unpaid_leave_days: sum('unpaid_leave_days'),
+    total_ot_amount: sum('ot_amount'),
+    total_net_payroll: sum('net_amount'),
+  });
+  renderTable(currentReportRows, hiddenCount);
 }
 
 function renderSummary(s) {
@@ -638,10 +690,12 @@ function buildDayTable(dayDetails) {
   `;
 }
 
-function renderTable(rows) {
+function renderTable(rows, hiddenCount = 0) {
   const body = document.getElementById('reportBody');
   if (!rows.length) {
-    body.innerHTML = '<tr><td colspan="13" class="empty-state">No employees found for this selection.</td></tr>';
+    body.innerHTML = hiddenCount > 0
+      ? '<tr><td colspan="13" class="empty-state">All employees are fully absent in this period. Turn on "Show fully absent employees" to see them.</td></tr>'
+      : '<tr><td colspan="13" class="empty-state">No employees found for this selection.</td></tr>';
     return;
   }
 
