@@ -42,6 +42,7 @@ $currency_symbol = $currency['symbol'] ?? '$';
 $product_id = $_GET['product_id'] ?? null;
 $branch_id  = $_GET['branch_id'] ?? null;
 $vendor_id  = $_GET['vendor_id'] ?? null;
+$item_company_id = $_GET['item_company_id'] ?? null;
 $project_id = $_GET['project_id'] ?? null;
 $from_date  = $_GET['from_date'] ?? null;
 $to_date    = $_GET['to_date'] ?? null;
@@ -168,6 +169,11 @@ if ($from_date) {
         $bbf_params[] = $vendor_id;
     }
 
+    if ($item_company_id) {
+        $bbf_sql .= " AND p.item_company_id = ?";
+        $bbf_params[] = $item_company_id;
+    }
+
     // NEW: Project filter (needs the pi/si joins added above)
     if ($project_id) {
         $bbf_sql .= " AND (pi.project_id = ? OR si.project_id = ?)";
@@ -241,6 +247,11 @@ else {
     if ($vendor_id) {
         $opening_sql .= " AND p.vendor_id = ?";
         $opening_params[] = $vendor_id;
+    }
+
+    if ($item_company_id) {
+        $opening_sql .= " AND p.item_company_id = ?";
+        $opening_params[] = $item_company_id;
     }
 
     // NEW: Project filter
@@ -372,6 +383,11 @@ if ($branch_id) {
 if ($vendor_id) {
     $sql .= " AND p.vendor_id = ?";
     $params[] = $vendor_id;
+}
+
+if ($item_company_id) {
+    $sql .= " AND p.item_company_id = ?";
+    $params[] = $item_company_id;
 }
 
 // NEW: Project filter

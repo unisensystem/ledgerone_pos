@@ -98,7 +98,9 @@ document.addEventListener('DOMContentLoaded', function () {
             search: document.getElementById('search').value,
             category: document.getElementById('category').value,
             type: document.getElementById('type').value,
-            status: document.getElementById('status').value
+            status: document.getElementById('status').value,
+            vendor: document.getElementById('vendor').value,
+            item_company: document.getElementById('itemCompany').value
         });
         
         window.open(`print.php?${params}`, '_blank');
@@ -139,6 +141,7 @@ document.getElementById('category').addEventListener('change', () => applyFilter
 document.getElementById('type').addEventListener('change', () => applyFilters());
 document.getElementById('status').addEventListener('change', () => applyFilters());
 document.getElementById('vendor').addEventListener('change', () => applyFilters());
+document.getElementById('itemCompany').addEventListener('change', () => applyFilters());
 document.getElementById('uomFilter').addEventListener('change', () => applyFilters());
     
     // Price type change - auto apply
@@ -152,6 +155,7 @@ document.getElementById('uomFilter').addEventListener('change', () => applyFilte
 initColumnToggle();
     // Load vendors for filter
     loadVendorsFilter();
+    loadItemCompaniesFilter();
 
     // Pagination buttons
     document.getElementById('prevPage').addEventListener('click', function () {
@@ -574,6 +578,7 @@ function resetFilters() {
     document.getElementById('type').value = '';
     document.getElementById('status').value = '';
     document.getElementById('vendor').value = '';
+    document.getElementById('itemCompany').value = '';
     document.getElementById('uomFilter').value = '';
     document.querySelector('input[name="priceType"][value="tp"]').checked = true;
     collapsedParents.clear();
@@ -745,6 +750,7 @@ function loadProducts(page = 1) {
         type: document.getElementById('type').value,
         status: document.getElementById('status').value,
         vendor: document.getElementById('vendor').value,
+        item_company: document.getElementById('itemCompany').value,
         uom_filter: document.getElementById('uomFilter').value,
 page: page,
         per_page: pageSize 
@@ -1208,4 +1214,21 @@ function applyColumnVisibility() {
             el.style.display = hidden ? 'none' : '';
         });
     });
+}
+
+function loadItemCompaniesFilter() {
+    fetch('../../../../server/api/inventory/products/item-company-list.php')
+        .then(response => response.json())
+        .then(data => {
+            if (data.success && data.item_companies) {
+                const select = document.getElementById('itemCompany');
+                data.item_companies.forEach(itemCompany => {
+                    const option = document.createElement('option');
+                    option.value = itemCompany.id;
+                    option.textContent = itemCompany.company_name;
+                    select.appendChild(option);
+                });
+            }
+        })
+        .catch(error => console.error('Error loading item companies:', error));
 }

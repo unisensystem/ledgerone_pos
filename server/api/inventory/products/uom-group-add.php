@@ -42,9 +42,9 @@ try {
     $group_id = $pdo->lastInsertId();
     
     // Insert group units
-    $stmt = $pdo->prepare("INSERT INTO uom_group_units (uom_group_id, uom_id) VALUES (?, ?)");
+    $stmt = $pdo->prepare("INSERT INTO uom_group_units (tenant_id, uom_group_id, uom_id) VALUES (?, ?, ?)");
     foreach ($unit_ids as $unit_id) {
-        $stmt->execute([$group_id, $unit_id]);
+        $stmt->execute([$tenant_id, $group_id, $unit_id]);
     }
     
     echo json_encode([

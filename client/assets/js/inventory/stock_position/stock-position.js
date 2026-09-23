@@ -189,7 +189,6 @@ function printList() {
     const positionProjectId = document.getElementById('position-project')?.value;
 
     let url = `print.php?type=${activeTab}&`;
-
     if (activeTab === 'position') {
         if (branch) url += `branch_id=${branch}&`;
         if (product) url += `product_id=${product}&`;
@@ -215,6 +214,7 @@ function printList() {
             }
         }
         const companyId = document.getElementById('item-company').value;
+        const itemCompanyId = document.getElementById('item-ledger-item-company')?.value;
         const customerName = document.getElementById('item-customer')?.value;
         let customerId = null;
         if (customerName) {
@@ -234,6 +234,7 @@ function printList() {
 
         if (productId) url += `product_id=${productId}&`;
         if (companyId) url += `vendor_id=${companyId}&`;
+        if (itemCompanyId) url += `item_company_id=${itemCompanyId}&`;
         if (customerId) url += `customer_id=${customerId}&`;
         if (projectId) url += `project_id=${projectId}&`;
         if (itemFromDate) url += `from_date=${itemFromDate}&`;
@@ -255,11 +256,13 @@ function printList() {
         const branchFromDate = document.getElementById('from-date-branch')?.value;
         const branchToDate = document.getElementById('to-date-branch')?.value;
         const branchProjectId = document.getElementById('branch-project')?.value;
+        const itemCompanyId = document.getElementById('branch-item-company')?.value;
 
         if (branchId) url += `branch_id=${branchId}&`;
         if (branchFromDate) url += `from_date=${branchFromDate}&`;
         if (branchToDate) url += `to_date=${branchToDate}&`;
         if (branchProjectId) url += `project_id=${branchProjectId}&`;
+        if (itemCompanyId) url += `item_company_id=${itemCompanyId}&`;
     } else if (activeTab === 'detailed-ledger') {
         const branchInput = document.getElementById('detailed-branch').value;
         const productInput = document.getElementById('detailed-product').value;
@@ -288,6 +291,7 @@ function printList() {
         const batchFilter = document.getElementById('detailed-batch-filter')?.value;
         const expiryFilter = document.getElementById('detailed-expiry-filter')?.value;
         const detailedProjectId = document.getElementById('detailed-project')?.value;
+        const itemCompanyId = document.getElementById('detailed-item-company')?.value;
 
         if (branchId) url += `branch_id=${branchId}&`;
         if (productId) url += `product_id=${productId}&`;
@@ -296,6 +300,7 @@ function printList() {
         if (batchFilter) url += `batch_no=${encodeURIComponent(batchFilter)}&`;
         if (expiryFilter) url += `expiry_date=${expiryFilter}&`;
         if (detailedProjectId) url += `project_id=${detailedProjectId}&`;
+        if (itemCompanyId) url += `item_company_id=${itemCompanyId}&`;
     }
 
     window.open(url, '_blank');
@@ -503,6 +508,7 @@ function openCustomerLedgerPreview() {
     const batchFilter = document.getElementById('customer-batch-filter')?.value;
     const expiryFilter = document.getElementById('customer-expiry-filter')?.value;
     const projectId = document.getElementById('customer-project')?.value;
+    const itemCompanyId = document.getElementById('customer-item-company')?.value;
 
     let url = `print_customer_ledger.php?`;
     if (customerId) url += `customer_id=${customerId}&`;
@@ -512,6 +518,7 @@ function openCustomerLedgerPreview() {
     if (batchFilter) url += `batch_no=${encodeURIComponent(batchFilter)}&`;
     if (expiryFilter) url += `expiry_date=${expiryFilter}&`;
     if (projectId) url += `project_id=${projectId}&`;
+    if (itemCompanyId) url += `item_company_id=${itemCompanyId}&`;
 
     window.open(url, '_blank');
 }
@@ -539,6 +546,7 @@ function openItemMovementPreview() {
     }
 
     const companyId  = document.getElementById('movement-company')?.value || '';
+    const itemCompanyId = document.getElementById('movement-item-company')?.value || '';
     const fromDate   = document.getElementById('from-date-movement').value;
     const toDate     = document.getElementById('to-date-movement').value;
     const projectId  = document.getElementById('movement-project')?.value;
@@ -549,6 +557,7 @@ function openItemMovementPreview() {
     if (productId) url += `product_id=${productId}&`;
     if (branchId) url += `branch_id=${branchId}&`;
     if (companyId) url += `vendor_id=${companyId}&`;
+    if (itemCompanyId) url += `item_company_id=${itemCompanyId}&`;
     if (fromDate) url += `from_date=${fromDate}&`;
     if (toDate) url += `to_date=${toDate}&`;
     if (projectId) url += `project_id=${projectId}&`;
@@ -592,6 +601,7 @@ async function loadStockPosition() {
         const product = document.getElementById('product').value;
         const inventoryType = document.getElementById('inventory-type').value;
         const distribution = document.getElementById('distribution').value;
+        const itemCompanyId = document.getElementById('position-item-company')?.value;
         const stockStatus = document.getElementById('stock-status').value;
         const status = document.getElementById('status').value;
         const stockLevelFilter = document.getElementById('stock-level-filter').value;
@@ -638,6 +648,7 @@ async function loadStockPosition() {
         if (productId) url += `&product_id=${productId}`;
         if (inventoryType) url += `&inventory_type_id=${inventoryType}`;
         if (distribution) url += `&vendor_id=${distribution}`;
+        if (itemCompanyId) url += `&item_company_id=${itemCompanyId}`;
         if (stockStatus) url += `&stock_status=${stockStatus}`;
         if (status) url += `&status=${status}`;
         if (fromDate) url += `&from_date=${fromDate}`;
@@ -874,6 +885,7 @@ async function loadItemLedger() {
     try {
         const itemName = document.getElementById('item').value;
         const companyId = document.getElementById('item-company').value;
+        const itemCompanyId = document.getElementById('item-ledger-item-company')?.value;
         const customerName = document.getElementById('item-customer')?.value;
         const projectId = document.getElementById('item-project')?.value;
         const fromDate = document.getElementById('item-from-date').value;
@@ -908,6 +920,7 @@ async function loadItemLedger() {
         let url = `${API_BASE}?action=ledger`;
         if (productId) url += `&product_id=${productId}`;
         if (companyId) url += `&vendor_id=${companyId}`;
+        if (itemCompanyId) url += `&item_company_id=${itemCompanyId}`;
         if (customerId) url += `&customer_id=${customerId}`;
         if (projectId) url += `&project_id=${projectId}`;
         if (fromDate) url += `&from_date=${fromDate}`;
@@ -964,8 +977,10 @@ async function loadDetailedLedger() {
         }
         
         let url = `${API_BASE}?action=detailed-ledger`;
+        const itemCompanyId = document.getElementById('detailed-item-company')?.value;
         if (branchId) url += `&branch_id=${branchId}`;
         if (productId) url += `&product_id=${productId}`;
+        if (itemCompanyId) url += `&item_company_id=${itemCompanyId}`;
         if (projectId) url += `&project_id=${projectId}`;
         if (fromDate) url += `&from_date=${fromDate}`;
         if (toDate) url += `&to_date=${toDate}`;
@@ -1254,8 +1269,10 @@ async function loadCustomerLedger() {
 
     try {
         let url = `${API_BASE}?action=customer-ledger`;
+        const itemCompanyId = document.getElementById('customer-item-company')?.value;
         if (customerId) url += `&customer_id=${customerId}`;
         if (productId) url += `&product_id=${productId}`;
+        if (itemCompanyId) url += `&item_company_id=${itemCompanyId}`;
         if (projectId) url += `&project_id=${projectId}`;
         if (fromDate) url += `&from_date=${fromDate}`;
         if (toDate) url += `&to_date=${toDate}`;
@@ -1358,6 +1375,7 @@ async function loadItemMovement() {
         const productName = document.getElementById('movement-product-input').value;
         const branchName  = document.getElementById('movement-branch-input').value;
         const companyId   = document.getElementById('movement-company')?.value || '';
+        const itemCompanyId = document.getElementById('movement-item-company')?.value || '';
         const projectId   = document.getElementById('movement-project')?.value || '';
         const fromDate    = document.getElementById('from-date-movement').value;
         const toDate      = document.getElementById('to-date-movement').value;
@@ -1384,6 +1402,7 @@ async function loadItemMovement() {
         if (productId) url += `&product_id=${productId}`;
         if (branchId)  url += `&branch_id=${branchId}`;
         if (companyId) url += `&vendor_id=${companyId}`;
+        if (itemCompanyId) url += `&item_company_id=${itemCompanyId}`;
         if (projectId) url += `&project_id=${projectId}`;
         if (fromDate)  url += `&from_date=${fromDate}`;
         if (toDate)    url += `&to_date=${toDate}`;
@@ -1581,6 +1600,28 @@ async function loadDistributions() {
     }
 }
 
+async function loadItemCompanies() {
+    try {
+        const response = await fetch(`${API_BASE}?action=item-companies`);
+        const data = await response.json();
+        if (!data.success) return;
+
+        ['#position-item-company', '#item-ledger-item-company', '#branch-item-company', '#customer-item-company', '#movement-item-company', '#detailed-item-company']
+            .forEach(selector => {
+                const select = document.querySelector(selector);
+                if (!select) return;
+                data.data.forEach(itemCompany => {
+                    const option = document.createElement('option');
+                    option.value = itemCompany.id;
+                    option.textContent = itemCompany.company_name;
+                    select.appendChild(option);
+                });
+            });
+    } catch (error) {
+        console.error('Error loading item companies:', error);
+    }
+}
+
 // Load Companies
 async function loadCompanies() {
     // Removed - no longer needed
@@ -1644,6 +1685,7 @@ document.getElementById('movement-per-page').addEventListener('change', (e) => {
  document.getElementById('clearCustomerFilters').addEventListener('click', () => {
     document.getElementById('customer-ledger-input').value = '';
     document.getElementById('customer-product-input').value = '';
+    document.getElementById('customer-item-company').value = '';
     if (document.getElementById('customer-project')) document.getElementById('customer-project').value = '';
     clearAndSyncDateFilters('from-date-customer', 'to-date-customer');
 
@@ -1682,6 +1724,7 @@ document.getElementById('movement-per-page').addEventListener('change', (e) => {
         document.getElementById('product').value = '';
         document.getElementById('inventory-type').value = '';
         document.getElementById('distribution').value = '';
+        document.getElementById('position-item-company').value = '';
         document.getElementById('stock-status').value = '';
         document.getElementById('status').value = '';
         document.getElementById('stock-level-filter').value = '';
@@ -1696,6 +1739,7 @@ document.getElementById('movement-per-page').addEventListener('change', (e) => {
     document.getElementById('clearItemFilters').addEventListener('click', () => {
         document.getElementById('item').value = '';
         document.getElementById('item-company').value = '';
+        document.getElementById('item-ledger-item-company').value = '';
         if (document.getElementById('item-customer')) document.getElementById('item-customer').value = '';
         if (document.getElementById('item-project')) document.getElementById('item-project').value = '';
         clearAndSyncDateFilters('item-from-date', 'item-to-date');
@@ -1714,6 +1758,7 @@ document.getElementById('movement-per-page').addEventListener('change', (e) => {
     // Clear Branch Filters
     document.getElementById('clearBranchFilters').addEventListener('click', () => {
         document.querySelector('input[list="branch-ledger-list"]').value = '';
+        document.getElementById('branch-item-company').value = '';
         if (document.getElementById('branch-project')) document.getElementById('branch-project').value = '';
         clearAndSyncDateFilters('from-date-branch', 'to-date-branch');
         const tbody = document.querySelector('#branch-ledger .table tbody');
@@ -1725,6 +1770,7 @@ document.getElementById('movement-per-page').addEventListener('change', (e) => {
     // Apply Branch Filters
     document.getElementById('applyBranchFilters').addEventListener('click', async () => {
         const branchName = document.querySelector('input[list="branch-ledger-list"]').value;
+        const itemCompanyId = document.getElementById('branch-item-company')?.value;
         const fromDate = document.getElementById('from-date-branch').value;
         const toDate = document.getElementById('to-date-branch').value;
         const projectId = document.getElementById('branch-project')?.value;
@@ -1753,6 +1799,7 @@ document.getElementById('movement-per-page').addEventListener('change', (e) => {
             let url = `${API_BASE}?action=branch-ledger&branch_id=${branchId}`;
             if (fromDate) url += `&from_date=${fromDate}`;
             if (toDate) url += `&to_date=${toDate}`;
+            if (itemCompanyId) url += `&item_company_id=${itemCompanyId}`;
             if (projectId) url += `&project_id=${projectId}`;
             
             const response = await fetch(url);
@@ -1847,6 +1894,7 @@ document.getElementById('movement-per-page').addEventListener('change', (e) => {
     document.getElementById('clearDetailedFilters').addEventListener('click', () => {
         document.getElementById('detailed-branch').value = '';
         document.getElementById('detailed-product').value = '';
+        document.getElementById('detailed-item-company').value = '';
         if (document.getElementById('detailed-project')) document.getElementById('detailed-project').value = '';
         clearAndSyncDateFilters('detailed-from-date', 'detailed-to-date');
         loadDetailedLedger();
@@ -1861,6 +1909,7 @@ document.getElementById('movement-per-page').addEventListener('change', (e) => {
     loadProducts();
     loadInventoryTypes();
     loadDistributions();
+    loadItemCompanies();
         loadCustomers();
         loadProjects();
         document.getElementById('applyMovementFilters').addEventListener('click', () => {
@@ -1870,6 +1919,7 @@ document.getElementById('movement-per-page').addEventListener('change', (e) => {
 document.getElementById('clearMovementFilters').addEventListener('click', () => {
     document.getElementById('movement-product-input').value = '';
     document.getElementById('movement-branch-input').value = '';
+    document.getElementById('movement-item-company').value = '';
     if (document.getElementById('movement-project')) document.getElementById('movement-project').value = '';
     clearAndSyncDateFilters('from-date-movement', 'to-date-movement');
     if (document.getElementById('movement-sort')) {

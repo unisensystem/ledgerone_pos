@@ -160,17 +160,17 @@ try {
     // Insert group conversion factors if UOM type is group
     if ($uom_type === 'group' && !empty($group_conversion_factors)) {
         $conversionStmt = $pdo->prepare("
-            INSERT INTO product_uom_conversions (product_id, uom_id, conversion_factor)
-            VALUES (?, ?, ?)
+            INSERT INTO product_uom_conversions (tenant_id, product_id, uom_id, conversion_factor)
+            VALUES (?, ?, ?, ?)
         ");
-        
+
         foreach ($group_conversion_factors as $uom_id => $factor) {
             if (!empty($factor)) {
-                $conversionStmt->execute([$product_id, $uom_id, $factor]);
+                $conversionStmt->execute([$tenant_id, $product_id, $uom_id, $factor]);
             }
         }
     }
-    
+
     // Insert stock opening entries
     if (isset($_POST['branch']) && is_array($_POST['branch'])) {
         error_log('Processing ' . count($_POST['branch']) . ' stock opening entries');

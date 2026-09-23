@@ -242,13 +242,13 @@ try {
     
     if ($uom_type === 'group' && !empty($group_conversion_factors)) {
         $conversionStmt = $pdo->prepare("
-            INSERT INTO product_uom_conversions (product_id, uom_id, conversion_factor)
-            VALUES (?, ?, ?)
+            INSERT INTO product_uom_conversions (tenant_id, product_id, uom_id, conversion_factor)
+            VALUES (?, ?, ?, ?)
         ");
-        
+
         foreach ($group_conversion_factors as $uom_id => $factor) {
             if (!empty($factor)) {
-                $conversionStmt->execute([$product_id, $uom_id, $factor]);
+                $conversionStmt->execute([$tenant_id, $product_id, $uom_id, $factor]);
                 error_log("Saved conversion: UOM=$uom_id, Factor=$factor");
             }
         }

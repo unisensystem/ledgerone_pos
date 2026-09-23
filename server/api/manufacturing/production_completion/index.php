@@ -361,11 +361,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             // Insert completed_products (details)
             $stmt = $pdo->prepare("
                 INSERT INTO completed_products
-                (production_completion_id, product_id, planned_qty, remaining_qty, 
+                (tenant_id, production_completion_id, product_id, planned_qty, remaining_qty,
                  completed_qty, uom_id, unit_cost, total_cost)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             ");
             $stmt->execute([
+                $tenant_id,
                 $completion_id,
                 $prod['product_id'],
                 $planned_qty,
@@ -400,10 +401,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             // Store in production_completion_materials
             $stmt = $pdo->prepare("
                 INSERT INTO production_completion_materials
-                (production_completion_id, material_id, consumed_qty, uom_id, unit_cost, total_cost)
-                VALUES (?, ?, ?, ?, ?, ?)
+                (tenant_id, production_completion_id, material_id, consumed_qty, uom_id, unit_cost, total_cost)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
             ");
             $stmt->execute([
+                $tenant_id,
                 $completion_id,
                 $material['material_id'],
                 $consumed_qty,
@@ -594,11 +596,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
             
             $stmt = $pdo->prepare("
                 INSERT INTO completed_products
-                (production_completion_id, product_id, planned_qty, remaining_qty, 
+                (tenant_id, production_completion_id, product_id, planned_qty, remaining_qty,
                  completed_qty, uom_id, unit_cost, total_cost)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             ");
             $stmt->execute([
+                $tenant_id,
                 $completion_id,
                 $prod['product_id'],
                 $planned_qty,
@@ -633,10 +636,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
             // Store in production_completion_materials
             $stmt = $pdo->prepare("
                 INSERT INTO production_completion_materials
-                (production_completion_id, material_id, consumed_qty, uom_id, unit_cost, total_cost)
-                VALUES (?, ?, ?, ?, ?, ?)
+                (tenant_id, production_completion_id, material_id, consumed_qty, uom_id, unit_cost, total_cost)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
             ");
             $stmt->execute([
+                $tenant_id,
                 $completion_id,
                 $material['material_id'],
                 $consumed_qty,

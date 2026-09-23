@@ -173,6 +173,12 @@ $initialSearch = $_GET['search'] ?? '';
                         <option value="">All Vendors</option>
                     </select>
                 </div>
+                <div class="filter-group">
+                    <label for="itemCompany">Item Company</label>
+                    <select id="itemCompany">
+                        <option value="">All Item Companies</option>
+                    </select>
+                </div>
                 <div class="filter-actions">
                     <button class="btn btn-secondary" id="applyFilters">Apply Filters</button>
                     <button class="btn btn-ghost" id="resetFilters">Reset</button>

@@ -176,6 +176,12 @@ $currency_symbol = $currency['symbol'];
                         </select>
                     </div>
                     <div class="form-group">
+                        <label class="form-label" for="position-item-company">Item Company</label>
+                        <select class="form-control" id="position-item-company">
+                            <option value="">All Item Companies</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
                         <label class="form-label" for="stock-status">Inventory Status</label>
                         <select class="form-control" id="stock-status">
                             <option value="">All Status</option>
@@ -318,6 +324,12 @@ $currency_symbol = $currency['symbol'];
                         </select>
                     </div>
                     <div class="form-group">
+                        <label class="form-label" for="item-ledger-item-company">Item Company</label>
+                        <select class="form-control" id="item-ledger-item-company">
+                            <option value="">All Item Companies</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
                         <label class="form-label" for="item-customer">Customer</label>
                         <input type="text" class="form-control" id="item-customer" list="item-customer-list" placeholder="All Customers">
                         <datalist id="item-customer-list"></datalist>
@@ -415,6 +427,12 @@ $currency_symbol = $currency['symbol'];
                         <datalist id="branch-ledger-list"></datalist>
                     </div>
                     <div class="form-group">
+                        <label class="form-label" for="branch-item-company">Item Company</label>
+                        <select class="form-control" id="branch-item-company">
+                            <option value="">All Item Companies</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
                         <label class="form-label" for="branch-project">Project</label>
                         <select class="form-control" id="branch-project">
                             <option value="">All Projects</option>
@@ -495,6 +513,12 @@ $currency_symbol = $currency['symbol'];
                         <label class="form-label" for="customer-product-input">Product</label>
                         <input type="text" class="form-control" id="customer-product-input" list="customer-product-list" placeholder="All Products">
                         <datalist id="customer-product-list"></datalist>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="customer-item-company">Item Company</label>
+                        <select class="form-control" id="customer-item-company">
+                            <option value="">All Item Companies</option>
+                        </select>
                     </div>
                     <div class="form-group">
                         <label class="form-label" for="customer-project">Project</label>
@@ -596,11 +620,17 @@ $currency_symbol = $currency['symbol'];
             <datalist id="movement-branch-list"></datalist>
         </div>
         <div class="form-group">
-    <label class="form-label" for="movement-company">Company</label>
+    <label class="form-label" for="movement-company">Company/Vendor</label>
     <select class="form-control" id="movement-company">
         <option value="">All Companies</option>
     </select>
 </div>
+        <div class="form-group">
+            <label class="form-label" for="movement-item-company">Item Company</label>
+            <select class="form-control" id="movement-item-company">
+                <option value="">All Item Companies</option>
+            </select>
+        </div>
         <div class="form-group">
             <label class="form-label" for="movement-project">Project</label>
             <select class="form-control" id="movement-project">
@@ -710,6 +740,12 @@ $currency_symbol = $currency['symbol'];
                         <label class="form-label" for="detailed-product">Product</label>
                         <input type="text" class="form-control" id="detailed-product" list="detailed-product-list" placeholder="All Products">
                         <datalist id="detailed-product-list"></datalist>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="detailed-item-company">Item Company</label>
+                        <select class="form-control" id="detailed-item-company">
+                            <option value="">All Item Companies</option>
+                        </select>
                     </div>
                     <div class="form-group">
                         <label class="form-label" for="detailed-project">Project</label>

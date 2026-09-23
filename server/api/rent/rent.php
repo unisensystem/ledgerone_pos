@@ -203,11 +203,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $rent_id = $pdo->lastInsertId();
         }
         
-        $stmt_item = $pdo->prepare("INSERT INTO rent_items (rent_id, product_id, item_code, item_name, description, unit_id, quantity, rate) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+        $stmt_item = $pdo->prepare("INSERT INTO rent_items (tenant_id, rent_id, product_id, item_code, item_name, description, unit_id, quantity, rate) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
         $stmt_stock = $pdo->prepare("INSERT INTO stock_ledger (tenant_id, branch_id, product_id, reference_table, reference_id, qty_out, unit_id, unit_cost, transaction_type, transaction_date, created_at) VALUES (?, ?, ?, 'rent_management', ?, ?, ?, ?, 'Rent Out', ?, NOW())");
-        
+
         foreach ($items as $item) {
-            $stmt_item->execute([$rent_id, $item['product_id'], $item['item_code'], $item['item_name'], $item['description'], $item['unit_id'], $item['quantity'], $item['rate']]);
+            $stmt_item->execute([$tenant_id, $rent_id, $item['product_id'], $item['item_code'], $item['item_name'], $item['description'], $item['unit_id'], $item['quantity'], $item['rate']]);
             $stmt_stock->execute([$tenant_id, $_POST['branch_id'], $item['product_id'], $rent_id, $item['quantity'], $item['unit_id'], $item['rate'], $_POST['issue_date']]);
         }
 

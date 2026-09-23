@@ -15,6 +15,8 @@ $search = $_GET['search'] ?? '';
 $category = $_GET['category'] ?? '';
 $type = $_GET['type'] ?? '';
 $status = $_GET['status'] ?? '';
+$vendor = $_GET['vendor'] ?? '';
+$item_company = $_GET['item_company'] ?? '';
 
 // Fetch products with same logic as product-list API
 $sql = "
@@ -54,6 +56,16 @@ if ($status) {
     $active = ($status === 'active') ? 1 : 0;
     $sql .= " AND p.is_active = ?";
     $params[] = $active;
+}
+
+if ($vendor) {
+    $sql .= " AND p.vendor_id = ?";
+    $params[] = $vendor;
+}
+
+if ($item_company) {
+    $sql .= " AND p.item_company_id = ?";
+    $params[] = $item_company;
 }
 
 $sql .= " GROUP BY p.id ORDER BY p.created_at DESC";

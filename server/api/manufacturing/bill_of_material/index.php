@@ -132,10 +132,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $bom_id = $pdo->lastInsertId();
         
         // Insert BOM materials
-        $stmt = $pdo->prepare("INSERT INTO bom_materials (bom_id, raw_material_id, quantity, unit_id) VALUES (?, ?, ?, ?)");
+        $stmt = $pdo->prepare("INSERT INTO bom_materials (tenant_id, bom_id, raw_material_id, quantity, unit_id) VALUES (?, ?, ?, ?, ?)");
         foreach ($materials as $material) {
             if ($material['quantity'] > 0) {
-                $stmt->execute([$bom_id, $material['raw_material_id'], $material['quantity'], $material['unit_id']]);
+                $stmt->execute([$tenant_id, $bom_id, $material['raw_material_id'], $material['quantity'], $material['unit_id']]);
             }
         }
         

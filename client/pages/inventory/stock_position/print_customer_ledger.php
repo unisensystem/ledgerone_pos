@@ -25,11 +25,12 @@ $user = $user_stmt->fetch(PDO::FETCH_ASSOC);
 // Get filters from URL
 $customer_id = $_GET['customer_id'] ?? null;
 $product_id = $_GET['product_id'] ?? null;
+$item_company_id = $_GET['item_company_id'] ?? null;
 $from_date = $_GET['from_date'] ?? null;
 $to_date = $_GET['to_date'] ?? null;
 
-if (!$customer_id && !$product_id) {
-    die('A customer or a product is required to generate this report.');
+if (!$customer_id && !$product_id && !$item_company_id) {
+    die('A customer, product, or item company is required to generate this report.');
 }
 
 // Look up customer name from DB (never trust a name passed via query string)
@@ -273,6 +274,8 @@ if ($product_id) {
                 let url = `${API_BASE}?action=customer-ledger`;
                 if (customerId) url += `&customer_id=${customerId}`;
                 if (productId) url += `&product_id=${productId}`;
+                const itemCompanyId = urlParams.get('item_company_id');
+                if (itemCompanyId) url += `&item_company_id=${itemCompanyId}`;
                 if (urlParams.get('from_date')) url += `&from_date=${urlParams.get('from_date')}`;
                 if (urlParams.get('to_date')) url += `&to_date=${urlParams.get('to_date')}`;
 

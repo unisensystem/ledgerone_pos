@@ -39,6 +39,7 @@ try {
             $product_id = $_GET['product_id'] ?? null;
             $inventory_type_id = $_GET['inventory_type_id'] ?? null;
             $vendor_id = $_GET['vendor_id'] ?? null;
+            $item_company_id = $_GET['item_company_id'] ?? null;
             $stock_status = $_GET['stock_status'] ?? null;
             $status = $_GET['status'] ?? null;
             $from_date = $_GET['from_date'] ?? null;
@@ -123,6 +124,10 @@ try {
                     $sql .= " AND p.vendor_id = ?";
                     $params[] = $vendor_id;
                 }
+                if ($item_company_id) {
+                    $sql .= " AND p.item_company_id = ?";
+                    $params[] = $item_company_id;
+                }
                 if ($stock_status) {
                     $sql .= " AND sl.stock_status = ?";
                     $params[] = $stock_status;
@@ -162,6 +167,12 @@ try {
                     $filterAgg .= " AND p2.vendor_id = ?";
                     $filterParamsSub[] = $vendor_id;
                     $filterParamsAgg[] = $vendor_id;
+                }
+                if ($item_company_id) {
+                    $filterSub .= " AND p.item_company_id = ?";
+                    $filterAgg .= " AND p2.item_company_id = ?";
+                    $filterParamsSub[] = $item_company_id;
+                    $filterParamsAgg[] = $item_company_id;
                 }
                 if ($stock_status) {
                     $filterSub .= " AND sl.stock_status = ?";
@@ -344,6 +355,7 @@ try {
     $product_id = $_GET['product_id'] ?? null;
     $company_id = $_GET['company_id'] ?? null;
     $vendor_id = $_GET['vendor_id'] ?? null;
+    $item_company_id = $_GET['item_company_id'] ?? null;
     $customer_id = $_GET['customer_id'] ?? null;
     $from_date = $_GET['from_date'] ?? null;
     $to_date = $_GET['to_date'] ?? null;
@@ -459,6 +471,11 @@ try {
 
             $bbf_sql .= " AND p.vendor_id = ?";
             $bbf_params[] = $vendor_id;
+        }
+
+        if ($item_company_id) {
+            $bbf_sql .= " AND p.item_company_id = ?";
+            $bbf_params[] = $item_company_id;
         }
 
 
@@ -776,6 +793,11 @@ try {
 
         $sql .= " AND p.vendor_id = ?";
         $params[] = $vendor_id;
+    }
+
+    if ($item_company_id) {
+        $sql .= " AND p.item_company_id = ?";
+        $params[] = $item_company_id;
     }
 
 
@@ -1164,6 +1186,7 @@ try {
         case 'branch-ledger':
             $branch_id = $_GET['branch_id'] ?? null;
             $company_id = $_GET['company_id'] ?? null;
+            $item_company_id = $_GET['item_company_id'] ?? null;
             $from_date = $_GET['from_date'] ?? null;
             $to_date = $_GET['to_date'] ?? null;
 
@@ -1214,6 +1237,11 @@ try {
             if ($to_date) {
                 $sql .= " AND sl.transaction_date <= ?";
                 $params[] = $to_date;
+            }
+
+            if ($item_company_id) {
+                $sql .= " AND p.item_company_id = ?";
+                $params[] = $item_company_id;
             }
 
             if ($company_id) {
@@ -1307,6 +1335,7 @@ try {
         case 'customer-ledger':
             $customer_id = $_GET['customer_id'] ?? null;
             $product_id = $_GET['product_id'] ?? null;
+            $item_company_id = $_GET['item_company_id'] ?? null;
             $from_date = $_GET['from_date'] ?? null;
             $to_date = $_GET['to_date'] ?? null;
 
@@ -1350,6 +1379,11 @@ try {
                 $params[] = $product_id;
             }
 
+            if ($item_company_id) {
+                $sql .= " AND p.item_company_id = ?";
+                $params[] = $item_company_id;
+            }
+
             if ($from_date) {
                 $sql .= " AND sl.transaction_date >= ?";
                 $params[] = $from_date;
@@ -1374,6 +1408,7 @@ try {
     $product_id = $_GET['product_id'] ?? null;
     $branch_id  = $_GET['branch_id'] ?? null;
     $vendor_id  = $_GET['vendor_id'] ?? null;
+    $item_company_id = $_GET['item_company_id'] ?? null;
     $from_date  = $_GET['from_date'] ?? null;
     $to_date    = $_GET['to_date'] ?? null;
 
@@ -1521,6 +1556,11 @@ try {
 
         $opening_sql .= " AND p.vendor_id = ?";
         $opening_params[] = $vendor_id;
+    }
+
+    if ($item_company_id) {
+        $opening_sql .= " AND p.item_company_id = ?";
+        $opening_params[] = $item_company_id;
     }
 
 
@@ -1777,6 +1817,11 @@ try {
 
         $sql .= " AND p.vendor_id = ?";
         $params[] = $vendor_id;
+    }
+
+    if ($item_company_id) {
+        $sql .= " AND p.item_company_id = ?";
+        $params[] = $item_company_id;
     }
 
 
@@ -2212,6 +2257,15 @@ try {
             echo json_encode(['success' => true, 'data' => $distributions]);
             break;
 
+        case 'item-companies':
+            $item_companies_sql = "SELECT id, company_name FROM item_companies WHERE tenant_id = ? ORDER BY company_name";
+            $item_companies_stmt = $pdo->prepare($item_companies_sql);
+            $item_companies_stmt->execute([$tenant_id]);
+            $item_companies = $item_companies_stmt->fetchAll(PDO::FETCH_ASSOC);
+
+            echo json_encode(['success' => true, 'data' => $item_companies]);
+            break;
+
         case 'companies':
             // NOTE: this action actually backs the Supplier/Vendor picker on the
             // "Company-wise Ledger" tab, so it returns Suppliers (not the `companies` table).
@@ -2227,6 +2281,7 @@ try {
         case 'detailed-ledger':
             $branchId = $_GET['branch_id'] ?? null;
             $productId = $_GET['product_id'] ?? null;
+            $itemCompanyId = $_GET['item_company_id'] ?? null;
             $fromDate = $_GET['from_date'] ?? null;
             $toDate = $_GET['to_date'] ?? null;
 
@@ -2262,6 +2317,11 @@ try {
             if ($productId) {
                 $sql .= " AND sl.product_id = ?";
                 $params[] = $productId;
+            }
+
+            if ($itemCompanyId) {
+                $sql .= " AND p.item_company_id = ?";
+                $params[] = $itemCompanyId;
             }
 
             if ($fromDate) {

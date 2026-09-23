@@ -28,6 +28,7 @@ try {
     $type = $_GET['type'] ?? '';
     $status = $_GET['status'] ?? '';
     $vendor = $_GET['vendor'] ?? '';
+    $item_company = $_GET['item_company'] ?? '';
     $uom_filter = $_GET['uom_filter'] ?? '';
     $page = max(1, (int)($_GET['page'] ?? 1));
 
@@ -111,6 +112,11 @@ LEFT JOIN item_companies comp2 ON p.item_company_id = comp2.id
         $sql .= " AND p.vendor_id = ?";
         $params[] = $vendor;
     }
+
+    if ($item_company) {
+        $sql .= " AND p.item_company_id = ?";
+        $params[] = $item_company;
+    }
     
     $sql .= " GROUP BY p.id ORDER BY COALESCE(p.parent_product_id, p.id), p.parent_product_id IS NOT NULL, p.created_at DESC";
     
@@ -146,6 +152,10 @@ LEFT JOIN item_companies comp2 ON p.item_company_id = comp2.id
     if ($vendor) {
         $countSql .= " AND p.vendor_id = ?";
         $countParams[] = $vendor;
+    }
+    if ($item_company) {
+        $countSql .= " AND p.item_company_id = ?";
+        $countParams[] = $item_company;
     }
     
     $countStmt = $pdo->prepare($countSql);

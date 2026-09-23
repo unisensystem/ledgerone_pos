@@ -445,6 +445,7 @@ $config = $report_config[$report_type];
                     if (urlParams.get('from_date')) url += `&from_date=${urlParams.get('from_date')}`;
                     if (urlParams.get('to_date')) url += `&to_date=${urlParams.get('to_date')}`;
                     if (urlParams.get('valuation_method')) url += `&valuation_method=${urlParams.get('valuation_method')}`;
+                    if (urlParams.get('item_company_id')) url += `&item_company_id=${urlParams.get('item_company_id')}`;
 
                     const response = await fetch(url);
                     const data = await response.json();
@@ -462,6 +463,7 @@ $config = $report_config[$report_type];
     let url = `${API_BASE}?action=ledger`;
     if (urlParams.get('product_id'))  url += `&product_id=${urlParams.get('product_id')}`;
     if (urlParams.get('vendor_id'))   url += `&vendor_id=${urlParams.get('vendor_id')}`;
+    if (urlParams.get('item_company_id')) url += `&item_company_id=${urlParams.get('item_company_id')}`;
     if (urlParams.get('customer_id')) url += `&customer_id=${urlParams.get('customer_id')}`;
     if (urlParams.get('from_date'))   url += `&from_date=${urlParams.get('from_date')}`;
     if (urlParams.get('to_date'))     url += `&to_date=${urlParams.get('to_date')}`;
@@ -476,6 +478,7 @@ $config = $report_config[$report_type];
                     if (urlParams.get('branch_id')) url += `&branch_id=${urlParams.get('branch_id')}`;
                     if (urlParams.get('from_date')) url += `&from_date=${urlParams.get('from_date')}`;
                     if (urlParams.get('to_date')) url += `&to_date=${urlParams.get('to_date')}`;
+                    if (urlParams.get('item_company_id')) url += `&item_company_id=${urlParams.get('item_company_id')}`;
 
                     const response = await fetch(url);
                     const data = await response.json();
@@ -486,6 +489,7 @@ $config = $report_config[$report_type];
                     let url = `${API_BASE}?action=detailed-ledger`;
                     if (urlParams.get('branch_id')) url += `&branch_id=${urlParams.get('branch_id')}`;
                     if (urlParams.get('product_id')) url += `&product_id=${urlParams.get('product_id')}`;
+                    if (urlParams.get('item_company_id')) url += `&item_company_id=${urlParams.get('item_company_id')}`;
                     if (urlParams.get('from_date')) url += `&from_date=${urlParams.get('from_date')}`;
                     if (urlParams.get('to_date')) url += `&to_date=${urlParams.get('to_date')}`;
 

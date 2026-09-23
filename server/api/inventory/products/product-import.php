@@ -255,8 +255,8 @@ try {
     // Per-unit conversion factors for UOM Group products (e.g. Carton = 1000 Pieces).
     // Mirrors the product_uom_conversions insert product-add.php does for the manual form.
     $groupConvStmt = $pdo->prepare("
-        INSERT INTO product_uom_conversions (product_id, uom_id, conversion_factor)
-        VALUES (?, ?, ?)
+        INSERT INTO product_uom_conversions (tenant_id, product_id, uom_id, conversion_factor)
+        VALUES (?, ?, ?, ?)
     ");
 
     $inserted = 0;
@@ -497,7 +497,7 @@ try {
             // Per-unit conversion factors for UOM Group products (Carton, Dozen, etc.)
             if ($isGroupMode && !empty($groupConversionsToInsert)) {
                 foreach ($groupConversionsToInsert as $unitId => $factor) {
-                    $groupConvStmt->execute([$product_id, $unitId, $factor]);
+                    $groupConvStmt->execute([$tenant_id, $product_id, $unitId, $factor]);
                 }
             }
 
