@@ -110,9 +110,9 @@ $currency_symbol = $currency['symbol'] ?? '$';
                         <tr>
                             <th>Sr#</th>
                             <th>Supplier Code</th>
-                            <th>Brand Name</th>
-                            <th>Category</th>
                             <th>Supplier Name</th>
+                            <th>Category</th>
+                            <th>Brand Name</th>
                             <th>City</th>
                             <th>Phone</th>
                             <th>Credit Days</th>
@@ -158,11 +158,11 @@ $currency_symbol = $currency['symbol'] ?? '$';
                         <div class="view-field" id="viewSupplierCode"></div>
                     </div>
                     <div class="form-group col-4">
-                        <label>Supplier Name</label>
+                        <label>Brand Name</label>
                         <div class="view-field" id="viewSupplierName"></div>
                     </div>
                     <div class="form-group col-4">
-                        <label>Brand Name</label>
+                        <label>Supplier Name</label>
                         <div class="view-field" id="viewBrandName"></div>
                     </div>
                     <div class="form-group col-4">
@@ -277,11 +277,11 @@ $currency_symbol = $currency['symbol'] ?? '$';
                             <input type="text" id="editSupplierCode" readonly>
                         </div>
                         <div class="form-group col-4">
-                            <label class="required">Supplier Name</label>
+                            <label class="required">Brand Name</label>
                             <input type="text" id="editSupplierName" required>
                         </div>
                         <div class="form-group col-4">
-                            <label>Brand Name</label>
+                            <label>Supplier Name</label>
                             <input type="text" id="editBrandName" maxlength="200">
                         </div>
                         <div class="form-group col-4">

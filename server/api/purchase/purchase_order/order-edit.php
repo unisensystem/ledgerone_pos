@@ -59,7 +59,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
             LEFT JOIN ledgerone_public.currencies c ON pi.currency_id = c.id
             LEFT JOIN companies co ON pi.company_id = co.id
             LEFT JOIN projects p ON pi.project_id = p.id
-            LEFT JOIN project_cities pc ON p.project_city_id = pc.id
+            LEFT JOIN cities pc ON p.city_id = pc.id
             WHERE pi.id = ? AND pi.tenant_id = ?
         ");
         $stmt->execute([$invoice_id, $tenant_id]);
