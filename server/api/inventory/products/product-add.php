@@ -44,7 +44,8 @@ try {
     $product_type = $_POST['productType'] ?? 'physical';
     $uom_type = $_POST['uomType'] ?? 'unit';
     $company = !empty($_POST['company']) ? $_POST['company'] : null;
-    $default_unit = !empty($_POST['defaultUnit']) ? $_POST['defaultUnit'] : null;
+    $item_company = !empty($_POST['itemCompany']) ? $_POST['itemCompany'] : null;
+        $default_unit = !empty($_POST['defaultUnit']) ? $_POST['defaultUnit'] : null;
     $category = !empty($_POST['category']) ? $_POST['category'] : null;
     $subcategory = !empty($_POST['subcategory']) ? $_POST['subcategory'] : null;
     $inventory_account = !empty($_POST['inventoryAccount']) ? $_POST['inventoryAccount'] : null;
@@ -97,15 +98,15 @@ try {
     }
     
     // Insert product
-    $stmt = $pdo->prepare("
+         $stmt = $pdo->prepare("
         INSERT INTO products (
-            tenant_id, company_id, code, name, product_type, uom_type, default_unit_id, uom_group_id, product_conversion_factor, category_id, subcategory_id,
+            tenant_id, company_id, item_company_id, code, name, product_type, uom_type, default_unit_id, uom_group_id, product_conversion_factor, category_id, subcategory_id,
             inventory_account_id, vendor_id, parent_product_id, description, weight_value, weight_unit, qr_code, barcode, purchase_price, trade_price, wholesale_price, mrp,
             price_entry_unit_id, trade_price_entry_value, mrp_entry_value,
             default_discount, trade_offer_discount, default_foc, carton_conversion, tax_regime_id,
             min_stock_level, max_stock_level, manufacturing_date, expiry_date, photo, is_active, stock_affects, invoice_affects, created_by
         ) VALUES (
-            ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+            ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
         )
     ");
 
@@ -113,8 +114,8 @@ try {
     $uom_group_id = !empty($_POST['uomGroup']) ? $_POST['uomGroup'] : null;
     $group_conversion_factors = isset($_POST['groupConversionFactor']) ? $_POST['groupConversionFactor'] : [];
 
-    $stmt->execute([
-        $tenant_id, $company, $code, $name, $product_type, $uom_type, $default_unit, $uom_group_id, $product_conversion_factor, $category, $subcategory,
+      $stmt->execute([
+        $tenant_id, $company, $item_company, $code, $name, $product_type, $uom_type, $default_unit, $uom_group_id, $product_conversion_factor, $category, $subcategory,
         $inventory_account, $vendor_id, $parent_product_id, $description, $weight_value, $weight_unit, $qr_code, $barcode, $purchase_price, $trade_price, $wholesale_price, $mrp,
         $price_entry_unit_id, $trade_price_entry_value, $mrp_entry_value,
         $default_discount, $trade_offer_discount, $default_foc, $carton_conversion, $tax_regime_id,

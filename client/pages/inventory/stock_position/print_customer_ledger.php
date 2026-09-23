@@ -222,6 +222,7 @@ if ($product_id) {
             <tr>
                 <th>Date</th>
                 <th>Product</th>
+                <th>Item Company</th>
                 <th>Branch</th>
                 <th>Transaction</th>
                 <th>Qty In</th>
@@ -265,7 +266,7 @@ if ($product_id) {
 
                 if (!customerId && !productId) {
                     document.querySelector('#reportTable tbody').innerHTML =
-                        '<tr><td colspan="9" class="no-data">No customer or product specified.</td></tr>';
+                        '<tr><td colspan="10" class="no-data">No customer or product specified.</td></tr>';
                     return;
                 }
 
@@ -284,12 +285,12 @@ if ($product_id) {
                     updatePrintTable(currentEntries, currentCurrency);
                 } else {
                     document.querySelector('#reportTable tbody').innerHTML =
-                        `<tr><td colspan="9" class="no-data">${data.message || 'Failed to load data.'}</td></tr>`;
+                        `<tr><td colspan="10" class="no-data">${data.message || 'Failed to load data.'}</td></tr>`;
                 }
             } catch (error) {
                 console.error('Error loading print data:', error);
                 document.querySelector('#reportTable tbody').innerHTML =
-                    '<tr><td colspan="9" class="no-data">Error loading data.</td></tr>';
+                    '<tr><td colspan="10" class="no-data">Error loading data.</td></tr>';
             }
         }
 
@@ -312,7 +313,7 @@ if ($product_id) {
             const tbody = document.querySelector('#reportTable tbody');
 
             if (!entries || entries.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="9" class="no-data">No transactions found for the selected filters.</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="10" class="no-data">No transactions found for the selected filters.</td></tr>';
                 return;
             }
 
@@ -325,6 +326,7 @@ if ($product_id) {
                 <tr>
                     <td>${entry.transaction_date}</td>
                     <td>${entry.product_name}</td>
+                    <td>${entry.item_company_name || '-'}</td>
                     <td>${entry.branch_name}</td>
                     <td>${entry.transaction_type}</td>
                     <td>${entry.qty_in > 0 ? parseFloat(entry.qty_in).toFixed(2) + ' ' + (entry.unit_symbol || 'L') : '-'}</td>
@@ -335,7 +337,7 @@ if ($product_id) {
                 </tr>
             `).join('') + `
                 <tr class="totals-row">
-                    <td colspan="4">Total (${entries.length} transactions)</td>
+                    <td colspan="5">Total (${entries.length} transactions)</td>
                     <td>${totalQtyIn.toFixed(2)} ${unit}</td>
                     <td>${totalQtyOut.toFixed(2)} ${unit}</td>
                     <td>-</td>
@@ -360,6 +362,7 @@ if ($product_id) {
             const rows = currentEntries.map(entry => ({
                 'Date': entry.transaction_date,
                 'Product': entry.product_name,
+                'Item Company': entry.item_company_name || '-',
                 'Branch': entry.branch_name,
                 'Transaction': entry.transaction_type,
                 'Qty In': entry.qty_in > 0 ? `${parseFloat(entry.qty_in).toFixed(2)} ${entry.unit_symbol || 'L'}` : '-',

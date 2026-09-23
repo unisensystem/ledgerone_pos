@@ -547,6 +547,8 @@ try {
 
                 p.name AS product_name,
 
+                ic.company_name AS item_company_name,
+
                 sl.transaction_date,
 
                 sl.transaction_type,
@@ -685,6 +687,10 @@ try {
 
             LEFT JOIN suppliers vs
                 ON p.vendor_id = vs.id
+
+            LEFT JOIN item_companies ic
+                ON p.item_company_id = ic.id
+               AND ic.tenant_id = p.tenant_id
 
 
             LEFT JOIN uom u
@@ -1169,6 +1175,7 @@ try {
             $sql = "SELECT 
                         sl.transaction_date,
                         p.name as product_name,
+                        ic.company_name as item_company_name,
                         sl.transaction_type,
                         sl.batch_no,
                         sl.expiry_date AS batch_expiry_date,
@@ -1178,6 +1185,7 @@ try {
                         COALESCE(base_u.uom_name, u.uom_name, 'L') as unit_symbol
                     FROM stock_ledger sl
                     JOIN products p ON sl.product_id = p.id
+                    LEFT JOIN item_companies ic ON p.item_company_id = ic.id AND ic.tenant_id = p.tenant_id
                     LEFT JOIN uom u ON sl.unit_id = u.id
                     LEFT JOIN uom base_u ON COALESCE(u.base_unit_id, u.id) = base_u.id
                     LEFT JOIN product_uom_conversions puc ON p.id = puc.product_id AND sl.unit_id = puc.uom_id
@@ -1311,6 +1319,7 @@ try {
                         sl.transaction_date,
                         si.bill_no as invoice_number,
                         p.name as product_name,
+                        ic.company_name as item_company_name,
                         COALESCE(b.branch_name, 'No Branch') as branch_name,
                         sl.transaction_type,
                         sl.batch_no,
@@ -1321,6 +1330,7 @@ try {
                         COALESCE(base_u.uom_name, u.uom_name, 'L') as unit_symbol
                     FROM stock_ledger sl
                     JOIN products p ON sl.product_id = p.id
+                    LEFT JOIN item_companies ic ON p.item_company_id = ic.id AND ic.tenant_id = p.tenant_id
                     LEFT JOIN branches b ON sl.branch_id = b.id
                     LEFT JOIN uom u ON sl.unit_id = u.id
                     LEFT JOIN uom base_u ON COALESCE(u.base_unit_id, u.id) = base_u.id
@@ -1598,6 +1608,8 @@ try {
 
             p.name AS product_name,
 
+            ic.company_name AS item_company_name,
+
 
             /*
             |--------------------------------------------------------------------------
@@ -1700,6 +1712,10 @@ try {
 
         LEFT JOIN uom u
             ON sl.unit_id = u.id
+
+        LEFT JOIN item_companies ic
+            ON p.item_company_id = ic.id
+           AND ic.tenant_id = p.tenant_id
 
 
         LEFT JOIN uom base_u
@@ -1818,6 +1834,7 @@ try {
         GROUP BY
             sl.product_id,
             p.name,
+            ic.company_name,
             unit_symbol
 
         ORDER BY
@@ -1922,6 +1939,9 @@ try {
             'product_name' =>
                 $row['product_name'],
 
+            'item_company_name' =>
+                $row['item_company_name'] ?? null,
+
             'unit_symbol' =>
                 $row['unit_symbol'] ?: 'L',
 
@@ -1971,7 +1991,7 @@ try {
         */
 
         $name_stmt = $pdo->prepare("
-            SELECT name
+            SELECT name, item_company_id
             FROM products
             WHERE id = ?
               AND tenant_id = ?
@@ -1985,9 +2005,15 @@ try {
         ]);
 
 
-        $pname =
-            $name_stmt->fetchColumn()
-            ?: 'Unknown';
+        $product_result = $name_stmt->fetch(PDO::FETCH_ASSOC) ?: [];
+        $pname = $product_result['name'] ?? 'Unknown';
+
+        $item_company_name = null;
+        if (!empty($product_result['item_company_id'])) {
+            $item_company_stmt = $pdo->prepare("SELECT company_name FROM item_companies WHERE id = ? AND tenant_id = ?");
+            $item_company_stmt->execute([$product_result['item_company_id'], $tenant_id]);
+            $item_company_name = $item_company_stmt->fetchColumn() ?: null;
+        }
 
 
         /*
@@ -2049,6 +2075,9 @@ try {
 
             'product_name' =>
                 $pname,
+
+            'item_company_name' =>
+                $item_company_name,
 
             'unit_symbol' =>
                 $unit_symbol,
@@ -2205,6 +2234,7 @@ try {
                         sl.id,
                         sl.transaction_date,
                         p.name as product_name,
+                        ic.company_name as item_company_name,
                         b.branch_name,
                         sl.transaction_type,
                         sl.batch_no,
@@ -2216,6 +2246,7 @@ try {
                     FROM stock_ledger sl
                     JOIN products p ON sl.product_id = p.id
                     JOIN branches b ON sl.branch_id = b.id
+                    LEFT JOIN item_companies ic ON p.item_company_id = ic.id AND ic.tenant_id = p.tenant_id
                     LEFT JOIN uom u ON sl.unit_id = u.id
                     LEFT JOIN purchase_invoice pi ON sl.reference_table = 'purchase_invoice' AND sl.reference_id = pi.id
                     LEFT JOIN sale_invoice si ON sl.reference_table = 'sale_invoice' AND sl.reference_id = si.id

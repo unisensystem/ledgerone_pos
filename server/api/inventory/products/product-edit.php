@@ -28,7 +28,8 @@ try {
     $name = $_POST['name'] ?? '';
     $product_type = $_POST['productType'] ?? 'physical';
     $uom_type = $_POST['uomType'] ?? 'unit';
-    $company = !empty($_POST['company']) ? $_POST['company'] : null;
+       $company = !empty($_POST['company']) ? $_POST['company'] : null;
+    $item_company = !empty($_POST['itemCompany']) ? $_POST['itemCompany'] : null;
     $default_unit = !empty($_POST['defaultUnit']) ? $_POST['defaultUnit'] : null;
     $category = !empty($_POST['category']) ? $_POST['category'] : null;
     $subcategory = !empty($_POST['subcategory']) ? $_POST['subcategory'] : null;
@@ -86,8 +87,8 @@ try {
     
     // Verify product belongs to tenant, and grab its current values for the Activity Log diff.
     // Covers every column the UPDATE below can touch, so no edit goes unrecorded.
-    $stmt = $pdo->prepare("
-        SELECT code, name, product_type, uom_type, company_id, default_unit_id, uom_group_id, product_conversion_factor,
+       $stmt = $pdo->prepare("
+        SELECT code, name, product_type, uom_type, company_id, item_company_id, default_unit_id, uom_group_id, product_conversion_factor,
                category_id, subcategory_id, inventory_account_id, vendor_id, parent_product_id, description, weight_value, weight_unit, qr_code, barcode,
                purchase_price, trade_price, wholesale_price, mrp, price_entry_unit_id, trade_price_entry_value, mrp_entry_value,
                default_discount, trade_offer_discount, default_foc, carton_conversion, tax_regime_id,
@@ -117,8 +118,8 @@ try {
     // Update product
     if ($photo_filename) {
         $stmt = $pdo->prepare("
-            UPDATE products SET
-                company_id = ?, name = ?, product_type = ?, uom_type = ?, default_unit_id = ?, uom_group_id = ?, product_conversion_factor = ?, category_id = ?, subcategory_id = ?,
+                     UPDATE products SET
+                company_id = ?, item_company_id = ?, name = ?, product_type = ?, uom_type = ?, default_unit_id = ?, uom_group_id = ?, product_conversion_factor = ?, category_id = ?, subcategory_id = ?,
                 inventory_account_id = ?, vendor_id = ?, parent_product_id = ?, description = ?, weight_value = ?, weight_unit = ?, qr_code = ?, barcode = ?, purchase_price = ?,
                 trade_price = ?, wholesale_price = ?, mrp = ?, price_entry_unit_id = ?, trade_price_entry_value = ?, mrp_entry_value = ?,
                 default_discount = ?, trade_offer_discount = ?, default_foc = ?,
@@ -127,18 +128,18 @@ try {
             WHERE id = ? AND tenant_id = ?
         ");
 
-        $stmt->execute([
-            $company, $name, $product_type, $uom_type, $default_unit, $uom_group_id, $product_conversion_factor, $category, $subcategory,
+               $stmt->execute([
+            $company, $item_company, $name, $product_type, $uom_type, $default_unit, $uom_group_id, $product_conversion_factor, $category, $subcategory,
             $inventory_account, $vendor_id, $parent_product_id, $description, $weight_value, $weight_unit, $qr_code, $barcode, $purchase_price,
             $trade_price, $wholesale_price, $mrp, $price_entry_unit_id, $trade_price_entry_value, $mrp_entry_value,
             $default_discount, $trade_offer_discount, $default_foc,
             $carton_conversion, $tax_regime_id, $min_stock, $max_stock,
             $manufacturing_date, $expiry_date, $photo_filename, $is_active, $stock_affects, $invoice_affects, $product_id, $tenant_id
         ]);
-    } else {
+       } else {
         $stmt = $pdo->prepare("
             UPDATE products SET
-                company_id = ?, name = ?, product_type = ?, uom_type = ?, default_unit_id = ?, uom_group_id = ?, product_conversion_factor = ?, category_id = ?, subcategory_id = ?,
+                company_id = ?, item_company_id = ?, name = ?, product_type = ?, uom_type = ?, default_unit_id = ?, uom_group_id = ?, product_conversion_factor = ?, category_id = ?, subcategory_id = ?,
                 inventory_account_id = ?, vendor_id = ?, parent_product_id = ?, description = ?, weight_value = ?, weight_unit = ?, qr_code = ?, barcode = ?, purchase_price = ?,
                 trade_price = ?, wholesale_price = ?, mrp = ?, price_entry_unit_id = ?, trade_price_entry_value = ?, mrp_entry_value = ?,
                 default_discount = ?, trade_offer_discount = ?, default_foc = ?,
@@ -148,7 +149,7 @@ try {
         ");
 
         $stmt->execute([
-            $company, $name, $product_type, $uom_type, $default_unit, $uom_group_id, $product_conversion_factor, $category, $subcategory,
+            $company, $item_company, $name, $product_type, $uom_type, $default_unit, $uom_group_id, $product_conversion_factor, $category, $subcategory,
             $inventory_account, $vendor_id, $parent_product_id, $description, $weight_value, $weight_unit, $qr_code, $barcode, $purchase_price,
             $trade_price, $wholesale_price, $mrp, $price_entry_unit_id, $trade_price_entry_value, $mrp_entry_value,
             $default_discount, $trade_offer_discount, $default_foc,
@@ -162,7 +163,8 @@ try {
         'name' => $name,
         'product_type' => $product_type,
         'uom_type' => $uom_type,
-        'company_id' => $company,
+               'company_id' => $company,
+        'item_company_id' => $item_company,
         'default_unit_id' => $default_unit,
         'uom_group_id' => $uom_group_id,
         'product_conversion_factor' => $product_conversion_factor,
@@ -201,7 +203,8 @@ try {
         'name' => 'Name',
         'product_type' => 'Type',
         'uom_type' => 'UOM Type',
-        'company_id' => 'Company',
+                'company_id' => 'Company',
+        'item_company_id' => 'Item Company',
         'default_unit_id' => 'Default Unit',
         'uom_group_id' => 'UOM Group',
         'product_conversion_factor' => 'Conversion Factor',

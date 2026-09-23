@@ -47,10 +47,10 @@ $offset = ($page - 1) * $limit;
     $stockConversionFactor = "COALESCE(CASE WHEN slu.base_unit_id IS NOT NULL AND slu.unit_scope = 'universal' THEN slu.conversion_factor WHEN puc.conversion_factor IS NOT NULL THEN puc.conversion_factor ELSE 1 END, 1)";
 
    $sql = "
-    SELECT p.id, p.code, p.name, p.product_type, p.mrp, p.trade_price, p.wholesale_price, p.is_active,
+ SELECT p.id, p.code, p.name, p.product_type, p.mrp, p.trade_price, p.wholesale_price, p.is_active,
            p.parent_product_id, p.qr_code, p.barcode, p.company_id, p.uom_type,
 p.purchase_price, lb.batch_no, lb.expiry_date AS batch_expiry_date,
-           c.category_name, sc.subcategory_name, comp.company_name, s.supplier_name,
+           c.category_name, sc.subcategory_name, comp.company_name, comp2.company_name as item_company_name, s.supplier_name,
            u.uom_name as default_unit_name, ug.group_name as uom_group_name,
            COALESCE(ROUND(SUM(sl.qty_in * {$stockConversionFactor}) - SUM(sl.qty_out * {$stockConversionFactor}), 2), 0) as current_stock,
            CASE WHEN COUNT(sl.id) = 0 THEN 1 ELSE 0 END as no_stock_records,
@@ -58,7 +58,8 @@ p.purchase_price, lb.batch_no, lb.expiry_date AS batch_expiry_date,
     FROM products p
     LEFT JOIN categories c ON p.category_id = c.id
     LEFT JOIN subcategories sc ON p.subcategory_id = sc.id
-    LEFT JOIN companies comp ON p.company_id = comp.id
+       LEFT JOIN companies comp ON p.company_id = comp.id
+LEFT JOIN item_companies comp2 ON p.item_company_id = comp2.id
     LEFT JOIN suppliers s ON p.vendor_id = s.id
     LEFT JOIN uom u ON p.default_unit_id = u.id
     LEFT JOIN uom_groups ug ON p.uom_group_id = ug.id

@@ -192,7 +192,8 @@ $initialSearch = $_GET['search'] ?? '';
         <th data-col="type">Type</th>
         <th data-col="uom">UOM</th>
         <th data-col="category">Category</th>
-        <th data-col="vendor">Vendor</th>
+<th data-col="vendor">Vendor</th>
+<th data-col="itemCompany">Item Company</th>
         <th data-col="price">TP</th>
        <th data-col="purchasePrice">Purchase Price</th>
 <th data-col="batchNo">Batch No</th>
@@ -261,7 +262,7 @@ $initialSearch = $_GET['search'] ?? '';
     <script src="https://cdn.jsdelivr.net/npm/qrious@4.0.2/dist/qrious.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jsbarcode/3.11.5/JsBarcode.all.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-    <script src="../../../assets/js/inventory/products/product-list.js"></script>
+<script src="../../../assets/js/inventory/products/product-list.js?v=2"></script>
     <?php if ($initialSearch): ?>
         <script>
             window.addEventListener('load', function() {

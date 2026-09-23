@@ -38,7 +38,7 @@ $search = $_GET['search'] ?? '';
         .print-header { text-align: center; margin-bottom: 30px; border-bottom: 2px solid #333; padding-bottom: 15px; }
         .print-header h1 { font-size: 24px; margin-bottom: 5px; }
         .print-header .subtitle { font-size: 14px; color: #666; }
-        .report-info { display: flex; justify-content: space-between; margin-bottom: 20px; font-size: 12px; }
+        .report-info { display: flex; justify-content: space-between; margin-bottom: 20px; font-size: 12px; flex-wrap: wrap; gap: 15px; }
         .summary-cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-bottom: 30px; }
         .summary-card { border: 1px solid #ddd; padding: 15px; text-align: center; }
         .summary-card .label { font-size: 11px; color: #666; margin-bottom: 5px; }
@@ -63,6 +63,7 @@ $search = $_GET['search'] ?? '';
         }
         .print-btn { padding: 10px 20px; background: #1f7bff; color: white; border: none; border-radius: 5px; cursor: pointer; margin-bottom: 20px; }
         .print-btn:hover { background: #1a6cdc; }
+        .expiry-soon { color: #d64545; font-weight: 600; }
     </style>
 </head>
 <body>
@@ -75,7 +76,7 @@ $search = $_GET['search'] ?? '';
     
     <div class="report-info">
         <div><strong>Period:</strong> <?php echo date('M d, Y', strtotime($date_from)); ?> - <?php echo date('M d, Y', strtotime($date_to)); ?></div>
-        <div><strong>Report Type:</strong> <?php echo ucfirst($report_type); ?></div>
+        <div><strong>Report Type:</strong> <?php echo ucfirst(str_replace('_', ' ', $report_type)); ?></div>
         <?php if ($company_id): 
             $company_stmt = $pdo->prepare("SELECT company_name FROM companies WHERE id = ? AND tenant_id = ?");
             $company_stmt->execute([$company_id, $_SESSION['tenant_id']]);
@@ -122,34 +123,39 @@ $search = $_GET['search'] ?? '';
         const searchTerm = '<?php echo htmlspecialchars($search, ENT_QUOTES); ?>'.toLowerCase();
         const API_BASE = '../../../../server/api/sale/sales_report';
 
-        // Same field combos the main report page's search boxes match against, so
-        // Print shows exactly what was searched instead of the full dataset.
+        // Search matching: filter rows based on search term from main page
         function matchesSearch(fields) {
             if (!searchTerm) return true;
             return fields.some(f => String(f || '').toLowerCase().includes(searchTerm));
         }
 
+        // HTML entity escape
         function esc(v) {
             return String(v ?? '').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
         }
 
+        // Format batch number cell
         function formatBatchCell(batchValue) {
             return batchValue && batchValue.length ? esc(batchValue) : '-';
         }
 
+        // Format expiry date cell (highlight if expiring soon)
         function formatExpiryCell(expiryValue) {
             if (!expiryValue) return '-';
             const firstDate = expiryValue.split(',')[0].trim();
             const isExpiringSoon = firstDate && !isNaN(new Date(firstDate)) && (new Date(firstDate) - new Date()) / (1000 * 60 * 60 * 24) <= 30;
             const safe = esc(expiryValue);
             return isExpiringSoon
-                ? `<span style="color:#d64545; font-weight:600;">${safe}</span>`
+                ? `<span class="expiry-soon">${safe}</span>`
                 : safe;
         }
 
-        // ---- Detail / breakdown fetch helpers (mirror the dashboard's click handlers,
-        // but run automatically for every row since print has no click interaction) ----
+        // Format item company cell
+        function formatItemCompanyCell(itemCompanyValue) {
+            return itemCompanyValue && itemCompanyValue.length ? esc(itemCompanyValue) : '-';
+        }
 
+        // Fetch breakdown data (daily breakdown for officer, branch, etc.)
         async function fetchBreakdown(type, id) {
             try {
                 const res = await fetch(`${API_BASE}/breakdown.php?type=${type}&id=${encodeURIComponent(id)}&date_from=${dateFrom}&date_to=${dateTo}`);
@@ -161,6 +167,7 @@ $search = $_GET['search'] ?? '';
             }
         }
 
+        // Fetch details data (invoices, items, products, etc.)
         async function fetchDetails(type, id, extraParams = '') {
             try {
                 const res = await fetch(`${API_BASE}/details.php?type=${type}&id=${encodeURIComponent(id)}&date_from=${dateFrom}&date_to=${dateTo}${extraParams}`);
@@ -172,6 +179,7 @@ $search = $_GET['search'] ?? '';
             }
         }
 
+        // Build a sub-table row (always visible on print)
         function subTableRow(colspan, title, headerCells, bodyRowsHtml) {
             const body = bodyRowsHtml && bodyRowsHtml.length
                 ? bodyRowsHtml
@@ -187,10 +195,7 @@ $search = $_GET['search'] ?? '';
             </td></tr>`;
         }
 
-        // Builds: main row + (always-visible) detail sub-table row, for a list of items.
-        // matchFn(item) -> array of fields to search against.
-        // fetchFn(item) -> Promise<Array> of detail rows.
-        // detailRowFn(detailItem) -> html string for one <tr> of the sub-table.
+        // Build expandable section: main table rows + sub-table rows
         async function buildExpandableSection(items, colspan, matchFn, mainRowFn, subTitle, subHeaders, fetchFn, detailRowFn) {
             const visibleItems = items.filter(item => matchesSearch(matchFn(item)));
             if (!visibleItems.length) return '';
@@ -226,7 +231,7 @@ $search = $_GET['search'] ?? '';
         }
         
         async function populateReport(data) {
-            // Summary
+            // Update Summary Cards
             const totalSales = (data.officer_sales || []).reduce((sum, item) => sum + parseFloat(item.total_sales || 0), 0);
             const totalCustomers = (data.customer_sales || []).length;
             const totalTransactions = (data.branch_sales || []).reduce((sum, item) => sum + parseFloat(item.transactions || 0), 0);
@@ -240,144 +245,414 @@ $search = $_GET['search'] ?? '';
             const container = document.getElementById('report-tables');
             const sectionHtmlParts = [];
 
-            // ---- Officer Sales (+ daily breakdown) ----
+            // ========== OFFICER SALES ==========
             if (reportType === 'all' || reportType === 'officer') {
                 const rows = await buildExpandableSection(
                     data.officer_sales || [],
-                    5,
+                    8,
                     item => [item.employee_id, item.officer_name],
-                    item => `<tr><td>${esc(item.employee_id)}</td><td>${esc(item.officer_name)}</td><td>${parseFloat(item.total_invoices || 0).toLocaleString()}</td><td>${CURRENCY_SYMBOL}${parseFloat(item.total_sales || 0).toLocaleString()}</td><td>${esc(item.status)}</td></tr>`,
+                    item => `<tr>
+                        <td>${esc(item.employee_id)}</td>
+                        <td>${esc(item.officer_name)}</td>
+                        <td>${parseFloat(item.total_invoices || 0).toLocaleString()}</td>
+                        <td>${CURRENCY_SYMBOL}${parseFloat(item.total_sales || 0).toLocaleString()}</td>
+                        <td>${formatBatchCell(item.batch_no)}</td>
+                        <td>${formatExpiryCell(item.nearest_expiry)}</td>
+                        <td>${formatItemCompanyCell(item.item_company_name)}</td>
+                        <td>${esc(item.status)}</td>
+                    </tr>`,
                     'Daily Breakdown',
-                    ['Date', 'Invoices', 'Revenue', 'Batch No', 'Expiry Date'],
+                    ['Date', 'Invoices', 'Revenue', 'Batch No', 'Expiry Date', 'Item Company'],
                     item => fetchBreakdown('officer', item.sale_officer_id),
-                    d => `<tr><td>${esc(d.date)}</td><td>${parseFloat(d.invoices || 0).toLocaleString()}</td><td>${CURRENCY_SYMBOL}${parseFloat(d.revenue || 0).toLocaleString()}</td><td>${formatBatchCell(d.batch_no)}</td><td>${formatExpiryCell(d.nearest_expiry)}</td></tr>`
+                    d => `<tr>
+                        <td>${esc(d.date)}</td>
+                        <td>${parseFloat(d.invoices || 0).toLocaleString()}</td>
+                        <td>${CURRENCY_SYMBOL}${parseFloat(d.revenue || 0).toLocaleString()}</td>
+                        <td>${formatBatchCell(d.batch_no)}</td>
+                        <td>${formatExpiryCell(d.nearest_expiry)}</td>
+                        <td>${formatItemCompanyCell(d.item_company_name)}</td>
+                    </tr>`
                 );
-                sectionHtmlParts.push(`<table><caption>Sales Officer Wise Sales</caption><thead><tr><th>Employee ID</th><th>Officer Name</th><th>Total Invoices</th><th>Total Sales</th><th>Status</th></tr></thead><tbody>${rows}</tbody></table>`);
+                sectionHtmlParts.push(`<table>
+                    <caption>Sales Officer Wise Sales</caption>
+                    <thead><tr>
+                        <th>Employee ID</th>
+                        <th>Officer Name</th>
+                        <th>Total Invoices</th>
+                        <th>Total Sales</th>
+                        <th>Batch No</th>
+                        <th>Expiry Date</th>
+                        <th>Item Company</th>
+                        <th>Status</th>
+                    </tr></thead>
+                    <tbody>${rows}</tbody>
+                </table>`);
             }
             
-            // ---- Supplier Man Sales (+ daily breakdown) ----
+            // ========== SUPPLIER MAN SALES ==========
             if (reportType === 'all' || reportType === 'supplier_man') {
                 const rows = await buildExpandableSection(
                     data.supplier_man_sales || [],
-                    5,
+                    8,
                     item => [item.employee_id, item.supplier_man_name],
-                    item => `<tr><td>${esc(item.employee_id)}</td><td>${esc(item.supplier_man_name)}</td><td>${parseFloat(item.total_invoices || 0).toLocaleString()}</td><td>${CURRENCY_SYMBOL}${parseFloat(item.total_sales || 0).toLocaleString()}</td><td>${esc(item.status)}</td></tr>`,
+                    item => `<tr>
+                        <td>${esc(item.employee_id)}</td>
+                        <td>${esc(item.supplier_man_name)}</td>
+                        <td>${parseFloat(item.total_invoices || 0).toLocaleString()}</td>
+                        <td>${CURRENCY_SYMBOL}${parseFloat(item.total_sales || 0).toLocaleString()}</td>
+                        <td>${formatBatchCell(item.batch_no)}</td>
+                        <td>${formatExpiryCell(item.nearest_expiry)}</td>
+                        <td>${formatItemCompanyCell(item.item_company_name)}</td>
+                        <td>${esc(item.status)}</td>
+                    </tr>`,
                     'Daily Breakdown',
-                    ['Date', 'Invoices', 'Revenue', 'Batch No', 'Expiry Date'],
+                    ['Date', 'Invoices', 'Revenue', 'Batch No', 'Expiry Date', 'Item Company'],
                     item => fetchBreakdown('supplier_man', item.supplier_man_id),
-                    d => `<tr><td>${esc(d.date)}</td><td>${parseFloat(d.invoices || 0).toLocaleString()}</td><td>${CURRENCY_SYMBOL}${parseFloat(d.revenue || 0).toLocaleString()}</td><td>${formatBatchCell(d.batch_no)}</td><td>${formatExpiryCell(d.nearest_expiry)}</td></tr>`
+                    d => `<tr>
+                        <td>${esc(d.date)}</td>
+                        <td>${parseFloat(d.invoices || 0).toLocaleString()}</td>
+                        <td>${CURRENCY_SYMBOL}${parseFloat(d.revenue || 0).toLocaleString()}</td>
+                        <td>${formatBatchCell(d.batch_no)}</td>
+                        <td>${formatExpiryCell(d.nearest_expiry)}</td>
+                        <td>${formatItemCompanyCell(d.item_company_name)}</td>
+                    </tr>`
                 );
-                sectionHtmlParts.push(`<table><caption>Supplier Man Wise Sales</caption><thead><tr><th>Employee ID</th><th>Supplier Man Name</th><th>Total Invoices</th><th>Total Sales</th><th>Status</th></tr></thead><tbody>${rows}</tbody></table>`);
+                sectionHtmlParts.push(`<table>
+                    <caption>Supplier Man Wise Sales</caption>
+                    <thead><tr>
+                        <th>Employee ID</th>
+                        <th>Supplier Man Name</th>
+                        <th>Total Invoices</th>
+                        <th>Total Sales</th>
+                        <th>Batch No</th>
+                        <th>Expiry Date</th>
+                        <th>Item Company</th>
+                        <th>Status</th>
+                    </tr></thead>
+                    <tbody>${rows}</tbody>
+                </table>`);
             }
             
-            // ---- Product Sales (+ invoices including this product) ----
+            // ========== PRODUCT SALES ==========
             if (reportType === 'all' || reportType === 'product') {
                 const rows = await buildExpandableSection(
                     data.product_sales || [],
-                    7,
+                    9,
                     item => [item.product_id_display, item.product_name, item.category],
                     item => {
                         const isChild = item.parent_row_id || item.parent_product_id;
                         const indent = isChild ? 'padding-left: 20px;' : '';
                         const prefix = isChild ? '→ ' : '';
-                        const batchNo = item.batch_no || '-';
-                        const expiryDate = item.nearest_expiry || '-';
-                        return `<tr><td>${esc(item.product_id_display)}</td><td style="${indent}">${prefix}${esc(item.product_name)}</td><td>${esc(item.category)}</td><td>${esc(batchNo)}</td><td>${esc(expiryDate)}</td><td>${parseFloat(item.quantity_sold || 0).toLocaleString()}</td><td>${CURRENCY_SYMBOL}${parseFloat(item.revenue || 0).toLocaleString()}</td></tr>`;
+                        return `<tr>
+                            <td>${esc(item.product_id_display)}</td>
+                            <td style="${indent}">${prefix}${esc(item.product_name)}</td>
+                            <td>${esc(item.category)}</td>
+                            <td>${formatBatchCell(item.batch_no)}</td>
+                            <td>${formatExpiryCell(item.nearest_expiry)}</td>
+                            <td>${formatItemCompanyCell(item.item_company_name)}</td>
+                            <td>${parseFloat(item.quantity_sold || 0).toLocaleString()}</td>
+                            <td>${CURRENCY_SYMBOL}${parseFloat(item.revenue || 0).toLocaleString()}</td>
+                        </tr>`;
                     },
                     'Invoices Including This Product',
-                    ['Invoice #', 'Date', 'Customer', 'Quantity', 'Price', 'Batch No', 'Expiry Date', 'Amount'],
+                    ['Invoice #', 'Date', 'Customer', 'Quantity', 'Price', 'Batch No', 'Expiry Date', 'Item Company', 'Amount'],
                     item => fetchDetails('product_invoices', item.product_id),
-                    d => `<tr><td>${esc(d.bill_no)}</td><td>${esc(d.sale_date)}</td><td>${esc(d.customer_name)}</td><td>${parseFloat(d.quantity || 0).toLocaleString()}</td><td>${CURRENCY_SYMBOL}${parseFloat(d.sale_price || 0).toLocaleString()}</td><td>${formatBatchCell(d.batch_no)}</td><td>${formatExpiryCell(d.expiry_date)}</td><td>${CURRENCY_SYMBOL}${parseFloat(d.net_amount || 0).toLocaleString()}</td></tr>`
+                    d => `<tr>
+                        <td>${esc(d.bill_no)}</td>
+                        <td>${esc(d.sale_date)}</td>
+                        <td>${esc(d.customer_name)}</td>
+                        <td>${parseFloat(d.quantity || 0).toLocaleString()}</td>
+                        <td>${CURRENCY_SYMBOL}${parseFloat(d.sale_price || 0).toLocaleString()}</td>
+                        <td>${formatBatchCell(d.batch_no)}</td>
+                        <td>${formatExpiryCell(d.expiry_date)}</td>
+                        <td>${formatItemCompanyCell(d.item_company_name)}</td>
+                        <td>${CURRENCY_SYMBOL}${parseFloat(d.net_amount || 0).toLocaleString()}</td>
+                    </tr>`
                 );
-                sectionHtmlParts.push(`<table><caption>Product Wise Sales</caption><thead><tr><th>Product ID</th><th>Product Name</th><th>Category</th><th>Batch No</th><th>Expiry Date</th><th>Quantity Sold</th><th>Revenue</th></tr></thead><tbody>${rows}</tbody></table>`);
+                sectionHtmlParts.push(`<table>
+                    <caption>Product Wise Sales</caption>
+                    <thead><tr>
+                        <th>Product ID</th>
+                        <th>Product Name</th>
+                        <th>Category</th>
+                        <th>Batch No</th>
+                        <th>Expiry Date</th>
+                        <th>Item Company</th>
+                        <th>Quantity Sold</th>
+                        <th>Revenue</th>
+                    </tr></thead>
+                    <tbody>${rows}</tbody>
+                </table>`);
             }
             
-            // ---- Branch Sales (+ daily breakdown) ----
+            // ========== BRANCH SALES ==========
             if (reportType === 'all' || reportType === 'branch') {
                 const rows = await buildExpandableSection(
                     data.branch_sales || [],
-                    5,
+                    8,
                     item => [item.branch_id_display, item.branch_name],
-                    item => `<tr><td>${esc(item.branch_id_display)}</td><td>${esc(item.branch_name)}</td><td>${CURRENCY_SYMBOL}${parseFloat(item.total_sales || 0).toLocaleString()}</td><td>${parseFloat(item.transactions || 0).toLocaleString()}</td><td>${CURRENCY_SYMBOL}${parseFloat(item.avg_sale || 0).toLocaleString()}</td></tr>`,
+                    item => `<tr>
+                        <td>${esc(item.branch_id_display)}</td>
+                        <td>${esc(item.branch_name)}</td>
+                        <td>${CURRENCY_SYMBOL}${parseFloat(item.total_sales || 0).toLocaleString()}</td>
+                        <td>${parseFloat(item.transactions || 0).toLocaleString()}</td>
+                        <td>${CURRENCY_SYMBOL}${parseFloat(item.avg_sale || 0).toLocaleString()}</td>
+                        <td>${formatBatchCell(item.batch_no)}</td>
+                        <td>${formatExpiryCell(item.nearest_expiry)}</td>
+                        <td>${formatItemCompanyCell(item.item_company_name)}</td>
+                    </tr>`,
                     'Daily Breakdown',
-                    ['Date', 'Quantity', 'Unit', 'Revenue', 'Batch No', 'Expiry Date'],
+                    ['Date', 'Quantity', 'Unit', 'Revenue', 'Batch No', 'Expiry Date', 'Item Company'],
                     item => fetchBreakdown('branch', item.branch_id),
-                    d => `<tr><td>${esc(d.date)}</td><td>${parseFloat(d.volume || 0).toLocaleString()}</td><td>${esc(d.unit || '-')}</td><td>${CURRENCY_SYMBOL}${parseFloat(d.revenue || 0).toLocaleString()}</td><td>${formatBatchCell(d.batch_no)}</td><td>${formatExpiryCell(d.nearest_expiry)}</td></tr>`
+                    d => `<tr>
+                        <td>${esc(d.date)}</td>
+                        <td>${parseFloat(d.volume || 0).toLocaleString()}</td>
+                        <td>${esc(d.unit || '-')}</td>
+                        <td>${CURRENCY_SYMBOL}${parseFloat(d.revenue || 0).toLocaleString()}</td>
+                        <td>${formatBatchCell(d.batch_no)}</td>
+                        <td>${formatExpiryCell(d.nearest_expiry)}</td>
+                        <td>${formatItemCompanyCell(d.item_company_name)}</td>
+                    </tr>`
                 );
-                sectionHtmlParts.push(`<table><caption>Branch Wise Sales</caption><thead><tr><th>Branch ID</th><th>Branch Name</th><th>Total Sales</th><th>Transactions</th><th>Avg Sale</th></tr></thead><tbody>${rows}</tbody></table>`);
+                sectionHtmlParts.push(`<table>
+                    <caption>Branch Wise Sales</caption>
+                    <thead><tr>
+                        <th>Branch ID</th>
+                        <th>Branch Name</th>
+                        <th>Total Sales</th>
+                        <th>Transactions</th>
+                        <th>Avg Sale</th>
+                        <th>Batch No</th>
+                        <th>Expiry Date</th>
+                        <th>Item Company</th>
+                    </tr></thead>
+                    <tbody>${rows}</tbody>
+                </table>`);
             }
             
-            // ---- Category Sales (no expand on the dashboard, kept flat) ----
+            // ========== CATEGORY SALES ==========
             if (reportType === 'all' || reportType === 'category') {
                 const total = (data.categories || []).reduce((sum, item) => sum + parseFloat(item.total || 0), 0);
-                let html = '<table><caption>Category Wise Sales</caption><thead><tr><th>Category</th><th>Total Revenue</th><th>Percentage</th></tr></thead><tbody>';
+                let html = '<table><caption>Category Wise Sales</caption><thead><tr><th>Category</th><th>Total Revenue</th><th>Percentage</th><th>Batch No</th><th>Expiry Date</th><th>Item Company</th></tr></thead><tbody>';
                 (data.categories || []).forEach(item => {
                     if (!matchesSearch([item.category])) return;
                     const percentage = total > 0 ? ((parseFloat(item.total || 0) / total) * 100).toFixed(1) : 0;
-                    html += `<tr><td>${esc(item.category)}</td><td>${CURRENCY_SYMBOL}${parseFloat(item.total || 0).toLocaleString()}</td><td>${percentage}%</td></tr>`;
+                    html += `<tr>
+                        <td>${esc(item.category)}</td>
+                        <td>${CURRENCY_SYMBOL}${parseFloat(item.total || 0).toLocaleString()}</td>
+                        <td>${percentage}%</td>
+                        <td>${formatBatchCell(item.batch_no)}</td>
+                        <td>${formatExpiryCell(item.nearest_expiry)}</td>
+                        <td>${formatItemCompanyCell(item.item_company_name)}</td>
+                    </tr>`;
                 });
                 html += '</tbody></table>';
                 sectionHtmlParts.push(html);
             }
             
-            // ---- Territory Sales (+ territory invoices) ----
+            // ========== TERRITORY SALES ==========
             if (reportType === 'all' || reportType === 'territory') {
                 const rows = await buildExpandableSection(
                     data.territory_sales || [],
-                    7,
+                    10,
                     item => [item.country, item.region, item.city, item.zone, item.area],
-                    item => `<tr><td>${esc(item.country)}</td><td>${esc(item.region)}</td><td>${esc(item.city)}</td><td>${esc(item.zone)}</td><td>${esc(item.area)}</td><td>${parseFloat(item.total_invoices || 0).toLocaleString()}</td><td>${CURRENCY_SYMBOL}${parseFloat(item.total_sales || 0).toLocaleString()}</td></tr>`,
+                    item => `<tr>
+                        <td>${esc(item.country)}</td>
+                        <td>${esc(item.region)}</td>
+                        <td>${esc(item.city)}</td>
+                        <td>${esc(item.zone)}</td>
+                        <td>${esc(item.area)}</td>
+                        <td>${parseFloat(item.total_invoices || 0).toLocaleString()}</td>
+                        <td>${CURRENCY_SYMBOL}${parseFloat(item.total_sales || 0).toLocaleString()}</td>
+                        <td>${formatBatchCell(item.batch_no)}</td>
+                        <td>${formatExpiryCell(item.nearest_expiry)}</td>
+                        <td>${formatItemCompanyCell(item.item_company_name)}</td>
+                    </tr>`,
                     'Territory Invoices',
-                    ['Invoice #', 'Date', 'Customer', 'Net Amount', 'Batch No', 'Expiry Date'],
+                    ['Invoice #', 'Date', 'Customer', 'Net Amount', 'Batch No', 'Expiry Date', 'Item Company'],
                     item => fetchDetails('territory_invoices', 0, `&country=${encodeURIComponent(item.country)}&region=${encodeURIComponent(item.region)}&city=${encodeURIComponent(item.city)}&zone=${encodeURIComponent(item.zone)}&area=${encodeURIComponent(item.area)}`),
-                    d => `<tr><td>${esc(d.bill_no)}</td><td>${esc(d.sale_date)}</td><td>${esc(d.customer_name)}</td><td>${CURRENCY_SYMBOL}${parseFloat(d.net_amount || 0).toLocaleString()}</td><td>${formatBatchCell(d.batch_no)}</td><td>${formatExpiryCell(d.nearest_expiry)}</td></tr>`
+                    d => `<tr>
+                        <td>${esc(d.bill_no)}</td>
+                        <td>${esc(d.sale_date)}</td>
+                        <td>${esc(d.customer_name)}</td>
+                        <td>${CURRENCY_SYMBOL}${parseFloat(d.net_amount || 0).toLocaleString()}</td>
+                        <td>${formatBatchCell(d.batch_no)}</td>
+                        <td>${formatExpiryCell(d.nearest_expiry)}</td>
+                        <td>${formatItemCompanyCell(d.item_company_name)}</td>
+                    </tr>`
                 );
-                sectionHtmlParts.push(`<table><caption>Territory Wise Sales</caption><thead><tr><th>Country</th><th>Region</th><th>City</th><th>Zone</th><th>Area</th><th>Total Invoices</th><th>Total Sales</th></tr></thead><tbody>${rows}</tbody></table>`);
+                sectionHtmlParts.push(`<table>
+                    <caption>Territory Wise Sales</caption>
+                    <thead><tr>
+                        <th>Country</th>
+                        <th>Region</th>
+                        <th>City</th>
+                        <th>Zone</th>
+                        <th>Area</th>
+                        <th>Total Invoices</th>
+                        <th>Total Sales</th>
+                        <th>Batch No</th>
+                        <th>Expiry Date</th>
+                        <th>Item Company</th>
+                    </tr></thead>
+                    <tbody>${rows}</tbody>
+                </table>`);
             }
             
-            // ---- Invoice Sales (+ invoice items) ----
+            // ========== INVOICE SALES ==========
             if (reportType === 'all' || reportType === 'invoice') {
                 const rows = await buildExpandableSection(
                     data.invoice_sales || [],
-                    7,
+                    10,
                     item => [item.bill_no, item.customer_name, item.officer_name],
-                    item => `<tr><td>${esc(item.bill_no)}</td><td>${esc(item.sale_date)}</td><td>${esc(item.customer_name)}</td><td>${esc(item.officer_name)}</td><td>${CURRENCY_SYMBOL}${parseFloat(item.total_bill || 0).toLocaleString()}</td><td>${CURRENCY_SYMBOL}${parseFloat(item.total_discount_amount || 0).toLocaleString()}</td><td>${CURRENCY_SYMBOL}${parseFloat(item.net_amount || 0).toLocaleString()}</td></tr>`,
+                    item => `<tr>
+                        <td>${esc(item.bill_no)}</td>
+                        <td>${esc(item.sale_date)}</td>
+                        <td>${esc(item.customer_name)}</td>
+                        <td>${esc(item.officer_name)}</td>
+                        <td>${CURRENCY_SYMBOL}${parseFloat(item.total_bill || 0).toLocaleString()}</td>
+                        <td>${CURRENCY_SYMBOL}${parseFloat(item.total_discount_amount || 0).toLocaleString()}</td>
+                        <td>${CURRENCY_SYMBOL}${parseFloat(item.net_amount || 0).toLocaleString()}</td>
+                        <td>${formatBatchCell(item.batch_no)}</td>
+                        <td>${formatExpiryCell(item.nearest_expiry)}</td>
+                        <td>${formatItemCompanyCell(item.item_company_name)}</td>
+                    </tr>`,
                     'Invoice Items',
-                    ['Product', 'Batch No', 'Expiry Date', 'Quantity', 'Price', 'Discount', 'Net Amount'],
+                    ['Product', 'Batch No', 'Expiry Date', 'Item Company', 'Quantity', 'Price', 'Discount', 'Net Amount'],
                     item => fetchDetails('invoice_items', item.id),
-                    d => `<tr><td>${esc(d.product_name)}</td><td>${formatBatchCell(d.batch_no)}</td><td>${formatExpiryCell(d.expiry_date)}</td><td>${parseFloat(d.quantity || 0).toLocaleString()}</td><td>${CURRENCY_SYMBOL}${parseFloat(d.sale_price || 0).toLocaleString()}</td><td>${CURRENCY_SYMBOL}${parseFloat(d.discount_amount || 0).toLocaleString()}</td><td>${CURRENCY_SYMBOL}${parseFloat(d.net_amount || 0).toLocaleString()}</td></tr>`
+                    d => `<tr>
+                        <td>${esc(d.product_name)}</td>
+                        <td>${formatBatchCell(d.batch_no)}</td>
+                        <td>${formatExpiryCell(d.expiry_date)}</td>
+                        <td>${formatItemCompanyCell(d.item_company_name)}</td>
+                        <td>${parseFloat(d.quantity || 0).toLocaleString()}</td>
+                        <td>${CURRENCY_SYMBOL}${parseFloat(d.sale_price || 0).toLocaleString()}</td>
+                        <td>${CURRENCY_SYMBOL}${parseFloat(d.discount_amount || 0).toLocaleString()}</td>
+                        <td>${CURRENCY_SYMBOL}${parseFloat(d.net_amount || 0).toLocaleString()}</td>
+                    </tr>`
                 );
-                sectionHtmlParts.push(`<table><caption>Invoice Wise Sales</caption><thead><tr><th>Invoice #</th><th>Date</th><th>Customer</th><th>Sales Officer</th><th>Total Bill</th><th>Discount</th><th>Net Amount</th></tr></thead><tbody>${rows}</tbody></table>`);
+                sectionHtmlParts.push(`<table>
+                    <caption>Invoice Wise Sales</caption>
+                    <thead><tr>
+                        <th>Invoice #</th>
+                        <th>Date</th>
+                        <th>Customer</th>
+                        <th>Sales Officer</th>
+                        <th>Total Bill</th>
+                        <th>Discount</th>
+                        <th>Net Amount</th>
+                        <th>Batch No</th>
+                        <th>Expiry Date</th>
+                        <th>Item Company</th>
+                    </tr></thead>
+                    <tbody>${rows}</tbody>
+                </table>`);
             }
             
-            // ---- Vendor Sales (+ products sold) ----
+            // ========== VENDOR SALES ==========
             if (reportType === 'all' || reportType === 'vendor') {
                 const rows = await buildExpandableSection(
                     data.vendor_sales || [],
-                    5,
+                    8,
                     item => [item.vendor_id_display, item.vendor_name],
-                    item => `<tr><td>${esc(item.vendor_id_display)}</td><td>${esc(item.vendor_name)}</td><td>${parseFloat(item.total_invoices || 0).toLocaleString()}</td><td>${parseFloat(item.total_quantity || 0).toLocaleString()}</td><td>${CURRENCY_SYMBOL}${parseFloat(item.total_sales || 0).toLocaleString()}</td></tr>`,
+                    item => `<tr>
+                        <td>${esc(item.vendor_id_display)}</td>
+                        <td>${esc(item.vendor_name)}</td>
+                        <td>${parseFloat(item.total_invoices || 0).toLocaleString()}</td>
+                        <td>${parseFloat(item.total_quantity || 0).toLocaleString()}</td>
+                        <td>${CURRENCY_SYMBOL}${parseFloat(item.total_sales || 0).toLocaleString()}</td>
+                        <td>${formatBatchCell(item.batch_no)}</td>
+                        <td>${formatExpiryCell(item.nearest_expiry)}</td>
+                        <td>${formatItemCompanyCell(item.item_company_name)}</td>
+                    </tr>`,
                     'Products Sold',
-                    ['Product', 'Batch No', 'Expiry Date', 'Quantity', 'Total Sales'],
+                    ['Product', 'Batch No', 'Expiry Date', 'Item Company', 'Quantity', 'Total Sales'],
                     item => fetchDetails('vendor_products', item.vendor_id),
-                    d => `<tr><td>${esc(d.product_name)}</td><td>${formatBatchCell(d.batch_no)}</td><td>${formatExpiryCell(d.nearest_expiry)}</td><td>${parseFloat(d.total_quantity || 0).toLocaleString()}</td><td>${CURRENCY_SYMBOL}${parseFloat(d.total_sales || 0).toLocaleString()}</td></tr>`
+                    d => `<tr>
+                        <td>${esc(d.product_name)}</td>
+                        <td>${formatBatchCell(d.batch_no)}</td>
+                        <td>${formatExpiryCell(d.nearest_expiry)}</td>
+                        <td>${formatItemCompanyCell(d.item_company_name)}</td>
+                        <td>${parseFloat(d.total_quantity || 0).toLocaleString()}</td>
+                        <td>${CURRENCY_SYMBOL}${parseFloat(d.total_sales || 0).toLocaleString()}</td>
+                    </tr>`
                 );
-                sectionHtmlParts.push(`<table><caption>Vendor Wise Sales</caption><thead><tr><th>Vendor ID</th><th>Vendor Name</th><th>Total Invoices</th><th>Total Quantity</th><th>Total Sales</th></tr></thead><tbody>${rows}</tbody></table>`);
+                sectionHtmlParts.push(`<table>
+                    <caption>Vendor Wise Sales</caption>
+                    <thead><tr>
+                        <th>Vendor ID</th>
+                        <th>Vendor Name</th>
+                        <th>Total Invoices</th>
+                        <th>Total Quantity</th>
+                        <th>Total Sales</th>
+                        <th>Batch No</th>
+                        <th>Expiry Date</th>
+                        <th>Item Company</th>
+                    </tr></thead>
+                    <tbody>${rows}</tbody>
+                </table>`);
             }
             
-            // ---- Customer Sales (+ customer invoices) ----
+            // ========== CUSTOMER SALES ==========
             if (reportType === 'all' || reportType === 'customer') {
                 const rows = await buildExpandableSection(
                     data.customer_sales || [],
-                    4,
+                    7,
                     item => [item.customer_id_display, item.customer_name],
-                    item => `<tr><td>${esc(item.customer_id_display)}</td><td>${esc(item.customer_name)}</td><td>${parseFloat(item.total_invoices || 0).toLocaleString()}</td><td>${CURRENCY_SYMBOL}${parseFloat(item.total_sales || 0).toLocaleString()}</td></tr>`,
+                    item => `<tr>
+                        <td>${esc(item.customer_id_display)}</td>
+                        <td>${esc(item.customer_name)}</td>
+                        <td>${parseFloat(item.total_invoices || 0).toLocaleString()}</td>
+                        <td>${CURRENCY_SYMBOL}${parseFloat(item.total_sales || 0).toLocaleString()}</td>
+                        <td>${formatBatchCell(item.batch_no)}</td>
+                        <td>${formatExpiryCell(item.nearest_expiry)}</td>
+                        <td>${formatItemCompanyCell(item.item_company_name)}</td>
+                    </tr>`,
                     'Customer Invoices',
-                    ['Invoice #', 'Date', 'Total Bill', 'Discount', 'Net Amount', 'Batch No', 'Expiry Date'],
+                    ['Invoice #', 'Date', 'Total Bill', 'Discount', 'Net Amount', 'Batch No', 'Expiry Date', 'Item Company'],
                     item => fetchDetails('customer_invoices', item.customer_id),
-                    d => `<tr><td>${esc(d.bill_no)}</td><td>${esc(d.sale_date)}</td><td>${CURRENCY_SYMBOL}${parseFloat(d.total_bill || 0).toLocaleString()}</td><td>${CURRENCY_SYMBOL}${parseFloat(d.total_discount_amount || 0).toLocaleString()}</td><td>${CURRENCY_SYMBOL}${parseFloat(d.net_amount || 0).toLocaleString()}</td><td>${formatBatchCell(d.batch_no)}</td><td>${formatExpiryCell(d.nearest_expiry)}</td></tr>`
+                    d => `<tr>
+                        <td>${esc(d.bill_no)}</td>
+                        <td>${esc(d.sale_date)}</td>
+                        <td>${CURRENCY_SYMBOL}${parseFloat(d.total_bill || 0).toLocaleString()}</td>
+                        <td>${CURRENCY_SYMBOL}${parseFloat(d.total_discount_amount || 0).toLocaleString()}</td>
+                        <td>${CURRENCY_SYMBOL}${parseFloat(d.net_amount || 0).toLocaleString()}</td>
+                        <td>${formatBatchCell(d.batch_no)}</td>
+                        <td>${formatExpiryCell(d.nearest_expiry)}</td>
+                        <td>${formatItemCompanyCell(d.item_company_name)}</td>
+                    </tr>`
                 );
-                sectionHtmlParts.push(`<table><caption>Customer Wise Sales</caption><thead><tr><th>Customer ID</th><th>Customer Name</th><th>Total Invoices</th><th>Total Sales</th></tr></thead><tbody>${rows}</tbody></table>`);
+                sectionHtmlParts.push(`<table>
+                    <caption>Customer Wise Sales</caption>
+                    <thead><tr>
+                        <th>Customer ID</th>
+                        <th>Customer Name</th>
+                        <th>Total Invoices</th>
+                        <th>Total Sales</th>
+                        <th>Batch No</th>
+                        <th>Expiry Date</th>
+                        <th>Item Company</th>
+                    </tr></thead>
+                    <tbody>${rows}</tbody>
+                </table>`);
+            }
+
+            // ========== ITEM COMPANY SALES ==========
+            if (reportType === 'all' || reportType === 'item_company') {
+                let html = '<table><caption>Item Company Wise Sales</caption><thead><tr><th>Item Company</th><th>Total Invoices</th><th>Total Quantity</th><th>Total Sales</th><th>Batch No</th><th>Expiry Date</th></tr></thead><tbody>';
+                (data.item_company_sales || []).forEach(item => {
+                    if (!matchesSearch([item.item_company_name])) return;
+                    html += `<tr>
+                        <td>${formatItemCompanyCell(item.item_company_name)}</td>
+                        <td>${parseFloat(item.total_invoices || 0).toLocaleString()}</td>
+                        <td>${parseFloat(item.total_quantity || 0).toLocaleString()}</td>
+                        <td>${CURRENCY_SYMBOL}${parseFloat(item.total_sales || 0).toLocaleString()}</td>
+                        <td>${formatBatchCell(item.batch_no)}</td>
+                        <td>${formatExpiryCell(item.nearest_expiry)}</td>
+                    </tr>`;
+                });
+                html += '</tbody></table>';
+                sectionHtmlParts.push(html);
             }
             
             container.innerHTML = sectionHtmlParts.join('');

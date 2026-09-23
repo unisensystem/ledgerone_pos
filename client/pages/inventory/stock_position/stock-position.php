@@ -361,6 +361,7 @@ $currency_symbol = $currency['symbol'];
                                 <th style="white-space: nowrap;">Date</th>
                                 <th style="white-space: nowrap;">Invoice #</th>
                                 <th style="white-space: nowrap;">Name</th>
+                                <th style="white-space: nowrap;">Item Company</th>
                                 <th style="white-space: nowrap;">Company</th>
                                 <th style="white-space: nowrap;">Customer</th>
                                 <th style="white-space: nowrap;">Transaction</th>
@@ -442,6 +443,7 @@ $currency_symbol = $currency['symbol'];
                             <tr>
                                 <th>Date</th>
                                 <th>Product</th>
+                                <th>Item Company</th>
                                 <th>Transaction</th>
                                 <th>Qty In</th>
                                 <th>Qty Out</th>
@@ -534,6 +536,7 @@ $currency_symbol = $currency['symbol'];
         <th>Invoice #</th>
         <th>Customer</th>
         <th>Product</th>
+        <th>Item Company</th>
         <th>Branch</th>
         <th>Transaction</th>
         <th>Batch No</th>
@@ -648,6 +651,7 @@ $currency_symbol = $currency['symbol'];
             <thead>
                 <tr>
                     <th>Product</th>
+                    <th>Item Company</th>
                     <th>Opening</th>
                     <th>Purchase</th>
                     <th>Sale</th>
@@ -745,6 +749,7 @@ $currency_symbol = $currency['symbol'];
                             <tr>
                                 <th>Date</th>
                                 <th>Product</th>
+                                <th>Item Company</th>
                                 <th>Branch</th>
                                 <th>Transaction</th>
                                 <th>Batch No</th>

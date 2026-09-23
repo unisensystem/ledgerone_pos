@@ -257,6 +257,7 @@ function renderProductTable(productsToRender) {
 <td data-col="uom">${product.uomDisplay || '<span style="color: #999;">Not Set</span>'}</td>
 <td data-col="category">${product.category}</td>
 <td data-col="vendor">${product.vendor || '<span style="color: #999;">Not Set</span>'}</td>
+<td data-col="itemCompany">${product.itemCompany || '<span style="color: #999;">-</span>'}</td>
 <td data-col="price">${product.price > 0 ? `${product.currencySymbol}${product.price.toFixed(2)}` : 'Free'}</td>
 <td data-col="purchasePrice">${product.purchasePrice > 0 ? `${product.currencySymbol}${product.purchasePrice.toFixed(2)}` : '-'}</td>
 <td data-col="batchNo">${product.batchNo || '<span style="color: #999;">-</span>'}</td>
@@ -772,7 +773,8 @@ page: page,
     uomDisplay: uomDisplay,
     category: product.category_name || 'Uncategorized',
     vendor: product.supplier_name || '',
-    subcategory: product.subcategory_name || '',
+itemCompany: product.item_company_name || '',
+subcategory: product.subcategory_name || '',
     currentStock: product.current_stock,
     price: parseFloat(priceType === 'tp' ? product.trade_price : product.mrp),
     tradePrice: parseFloat(product.trade_price),
@@ -1146,8 +1148,9 @@ const ALL_COLUMNS = [
     { key: 'type', label: 'Type' },
     { key: 'uom', label: 'UOM' },
     { key: 'category', label: 'Category' },
-    { key: 'vendor', label: 'Vendor' },
-    { key: 'price', label: 'Price' },
+   { key: 'vendor', label: 'Vendor' },
+{ key: 'itemCompany', label: 'Item Company' },
+{ key: 'price', label: 'Price' },
    { key: 'purchasePrice', label: 'Purchase Price' },
 { key: 'batchNo', label: 'Batch No' },
 { key: 'batchExpiryDate', label: 'Batch Expiry Date' },

@@ -273,6 +273,7 @@ $sql = "
         sl.product_id,
 
         p.name AS product_name,
+        ic.company_name AS item_company_name,
 
         COALESCE(
             base_u.uom_name,
@@ -329,6 +330,10 @@ $sql = "
     JOIN products p
         ON sl.product_id = p.id
        AND sl.tenant_id = p.tenant_id
+
+    LEFT JOIN item_companies ic
+        ON p.item_company_id = ic.id
+       AND ic.tenant_id = p.tenant_id
 
     LEFT JOIN uom u
         ON sl.unit_id = u.id
@@ -393,6 +398,7 @@ $sql .= "
     GROUP BY
         sl.product_id,
         p.name,
+        ic.company_name,
         unit_symbol
 
     ORDER BY
@@ -431,6 +437,7 @@ foreach ($rows as $row) {
     $movement[] = [
         'product_id'   => $pid,
         'product_name' => $row['product_name'],
+        'item_company_name' => $row['item_company_name'] ?? null,
         'unit_symbol'  => $row['unit_symbol'] ?: 'L',
         'opening'      => $opening,
         'purchase'     => $purchase,
@@ -449,10 +456,14 @@ foreach ($bbf_by_product as $pid => $opening) {
     }
 
     $name_stmt = $pdo->prepare("
-        SELECT name FROM products WHERE id = ? AND tenant_id = ? LIMIT 1
+        SELECT p.name, ic.company_name AS item_company_name
+        FROM products p
+        LEFT JOIN item_companies ic ON p.item_company_id = ic.id AND ic.tenant_id = p.tenant_id
+        WHERE p.id = ? AND p.tenant_id = ? LIMIT 1
     ");
     $name_stmt->execute([$pid, $tenant_id]);
-    $pname = $name_stmt->fetchColumn() ?: 'Unknown';
+    $product_result = $name_stmt->fetch(PDO::FETCH_ASSOC) ?: [];
+    $pname = $product_result['name'] ?? 'Unknown';
 
     $unit_stmt = $pdo->prepare("
         SELECT COALESCE(base_u.uom_name, u.uom_name, 'L') AS unit_symbol
@@ -469,6 +480,7 @@ foreach ($bbf_by_product as $pid => $opening) {
     $movement[] = [
         'product_id'   => $pid,
         'product_name' => $pname,
+        'item_company_name' => $product_result['item_company_name'] ?? null,
         'unit_symbol'  => $unit_symbol,
         'opening'      => $opening,
         'purchase'     => 0,
@@ -599,6 +611,7 @@ $totalClosing    = array_sum(array_column($movement, 'closing'));
     <thead>
         <tr>
             <th>Product</th>
+            <th>Item Company</th>
             <th>Opening</th>
             <th>Purchase</th>
             <th>Sale</th>
@@ -611,6 +624,7 @@ $totalClosing    = array_sum(array_column($movement, 'closing'));
     <?php foreach ($movement as $row): ?>
         <tr>
             <td><?= htmlspecialchars($row['product_name']) ?></td>
+            <td><?= htmlspecialchars($row['item_company_name'] ?? '-') ?></td>
             <td><?= number_format((float)$row['opening'], 2) ?></td>
             <td><?= number_format((float)$row['purchase'], 2) ?></td>
             <td><?= number_format((float)$row['sale'], 2) ?></td>

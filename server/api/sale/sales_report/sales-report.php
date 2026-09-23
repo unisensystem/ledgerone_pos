@@ -28,15 +28,7 @@ try {
     $stmt->execute($params);
     $summary = ['total_sales' => $stmt->fetchColumn()];
 
-
-    // Sales Officer Wise Sales
-    // NOTE: batch_no / nearest_expiry come from the "ib" (invoice-batch) subquery,
-    // which pre-aggregates sale_invoice_items per invoice. It's LEFT JOINed 1:1 on
-    // si.id, so it does NOT duplicate invoice rows / inflate SUM(si.net_amount) the
-    // way directly joining sale_invoice_items here would.
-    // sale_invoice_items has BOTH "batch_expiry_date" (unused, always NULL) and
-    // "expiry_date" (this is what actually gets populated on sale) columns -
-    // "expiry_date" is the one that holds the item's real expiry.
+    // Sales Officer Wise Sales - UPDATED WITH ITEM COMPANY
     $stmt = $pdo->prepare("
         SELECT 
             si.sale_officer_id,
@@ -47,14 +39,18 @@ try {
             SUM(si.net_amount) as total_sales,
             GROUP_CONCAT(DISTINCT ib.batch_no SEPARATOR ', ') as batch_no,
             MIN(ib.nearest_expiry) as nearest_expiry,
+            GROUP_CONCAT(DISTINCT ib.item_company_name SEPARATOR ', ') as item_company_name,
             'Active' as status
         FROM sale_invoice si
         LEFT JOIN employees e ON si.sale_officer_id = e.id AND e.tenant_id = ?
         LEFT JOIN (
             SELECT sii.sale_invoice_id,
                    GROUP_CONCAT(DISTINCT NULLIF(sii.batch_no,'') SEPARATOR ', ') as batch_no,
-                   MIN(CASE WHEN sii.expiry_date >= CURDATE() THEN sii.expiry_date END) as nearest_expiry
+                   MIN(CASE WHEN sii.expiry_date >= CURDATE() THEN sii.expiry_date END) as nearest_expiry,
+                   GROUP_CONCAT(DISTINCT COALESCE(ic.company_name, 'Unknown') SEPARATOR ', ') as item_company_name
             FROM sale_invoice_items sii
+            LEFT JOIN products p ON sii.product_id = p.id
+            LEFT JOIN item_companies ic ON p.item_company_id = ic.id
             WHERE sii.tenant_id = ?
             GROUP BY sii.sale_invoice_id
         ) ib ON ib.sale_invoice_id = si.id
@@ -67,47 +63,51 @@ try {
     $stmt->execute($params);
     $officer_sales = $stmt->fetchAll();
 
-    // Product Wise Sales
-$stmt = $pdo->prepare("
-    SELECT 
-        current.product_id,
-        CONCAT('PROD-', LPAD(current.product_id, 3, '0')) as product_id_display,
-        COALESCE(p.name, 'Unknown') as product_name,
-        COALESCE(pc.category_name, ppc.category_name, 'Uncategorized') as category,
-        current.batch_no,
-        current.nearest_expiry,
-        current.quantity_sold,
-        current.revenue,
-        CASE 
-            WHEN previous.revenue > 0 THEN ROUND(((current.revenue - previous.revenue) / previous.revenue) * 100, 1)
-            ELSE NULL
-        END as growth,
-        p.parent_product_id,
-        current.parent_row_id
-    FROM (
-        SELECT sii.product_id, sii.parent_row_id,
-               SUM(sii.quantity) as quantity_sold, 
-               SUM(sii.net_amount) as revenue,
-               GROUP_CONCAT(DISTINCT NULLIF(sii.batch_no,'') SEPARATOR ', ') as batch_no,
-               MIN(CASE WHEN sii.expiry_date >= CURDATE() THEN sii.expiry_date END) as nearest_expiry
-        FROM sale_invoice_items sii
-        JOIN sale_invoice si ON sii.sale_invoice_id = si.id AND si.tenant_id = ?
-        WHERE sii.tenant_id = ? AND si.sale_date BETWEEN ? AND ? AND si.status = 'Posted'" . ($company_id ? " AND si.company_id = ?" : "") . "
-        GROUP BY sii.product_id, sii.parent_row_id
-    ) current
-    LEFT JOIN products p ON current.product_id = p.id
-    LEFT JOIN categories pc ON p.category_id = pc.id
-    LEFT JOIN products pp ON p.parent_product_id = pp.id
-    LEFT JOIN categories ppc ON pp.category_id = ppc.id
-    LEFT JOIN (
-        SELECT sii.product_id, SUM(sii.net_amount) as revenue
-        FROM sale_invoice_items sii
-        JOIN sale_invoice si ON sii.sale_invoice_id = si.id AND si.tenant_id = ?
-        WHERE sii.tenant_id = ? AND si.sale_date BETWEEN DATE_SUB(?, INTERVAL DATEDIFF(?, ?) DAY) AND DATE_SUB(?, INTERVAL 1 DAY) AND si.status = 'Posted'" . ($company_id ? " AND si.company_id = ?" : "") . "
-        GROUP BY sii.product_id
-    ) previous ON current.product_id = previous.product_id
-    ORDER BY COALESCE(p.parent_product_id, current.product_id), p.parent_product_id IS NULL DESC, current.revenue DESC
-");
+    // Product Wise Sales - UPDATED WITH ITEM COMPANY
+    $stmt = $pdo->prepare("
+        SELECT 
+            current.product_id,
+            CONCAT('PROD-', LPAD(current.product_id, 3, '0')) as product_id_display,
+            COALESCE(p.name, 'Unknown') as product_name,
+            COALESCE(pc.category_name, ppc.category_name, 'Uncategorized') as category,
+            current.batch_no,
+            current.nearest_expiry,
+            current.item_company_name,
+            current.quantity_sold,
+            current.revenue,
+            CASE 
+                WHEN previous.revenue > 0 THEN ROUND(((current.revenue - previous.revenue) / previous.revenue) * 100, 1)
+                ELSE NULL
+            END as growth,
+            p.parent_product_id,
+            current.parent_row_id
+        FROM (
+            SELECT sii.product_id, sii.parent_row_id,
+                   SUM(sii.quantity) as quantity_sold, 
+                   SUM(sii.net_amount) as revenue,
+                   GROUP_CONCAT(DISTINCT NULLIF(sii.batch_no,'') SEPARATOR ', ') as batch_no,
+                   MIN(CASE WHEN sii.expiry_date >= CURDATE() THEN sii.expiry_date END) as nearest_expiry,
+                   GROUP_CONCAT(DISTINCT COALESCE(ic.company_name, 'Unknown') SEPARATOR ', ') as item_company_name
+            FROM sale_invoice_items sii
+            JOIN sale_invoice si ON sii.sale_invoice_id = si.id AND si.tenant_id = ?
+            LEFT JOIN products p ON sii.product_id = p.id
+            LEFT JOIN item_companies ic ON p.item_company_id = ic.id
+            WHERE sii.tenant_id = ? AND si.sale_date BETWEEN ? AND ? AND si.status = 'Posted'" . ($company_id ? " AND si.company_id = ?" : "") . "
+            GROUP BY sii.product_id, sii.parent_row_id
+        ) current
+        LEFT JOIN products p ON current.product_id = p.id
+        LEFT JOIN categories pc ON p.category_id = pc.id
+        LEFT JOIN products pp ON p.parent_product_id = pp.id
+        LEFT JOIN categories ppc ON pp.category_id = ppc.id
+        LEFT JOIN (
+            SELECT sii.product_id, SUM(sii.net_amount) as revenue
+            FROM sale_invoice_items sii
+            JOIN sale_invoice si ON sii.sale_invoice_id = si.id AND si.tenant_id = ?
+            WHERE sii.tenant_id = ? AND si.sale_date BETWEEN DATE_SUB(?, INTERVAL DATEDIFF(?, ?) DAY) AND DATE_SUB(?, INTERVAL 1 DAY) AND si.status = 'Posted'" . ($company_id ? " AND si.company_id = ?" : "") . "
+            GROUP BY sii.product_id
+        ) previous ON current.product_id = previous.product_id
+        ORDER BY COALESCE(p.parent_product_id, current.product_id), p.parent_product_id IS NULL DESC, current.revenue DESC
+    ");
     $params = [$tenant_id, $tenant_id, $date_from, $date_to];
     if ($company_id) $params[] = $company_id;
     $params = array_merge($params, [$tenant_id, $tenant_id, $date_from, $date_to, $date_from, $date_from]);
@@ -130,20 +130,19 @@ $stmt = $pdo->prepare("
     $stmt->execute($params);
     $trend = $stmt->fetchAll();
 
-    // Category Distribution
-    // sale_invoice_items is already joined at item level here (scoped correctly to
-    // each category's own items), so batch/expiry can be aggregated directly -
-    // no extra params needed.
+    // Category Distribution - UPDATED WITH ITEM COMPANY
     $stmt = $pdo->prepare("
         SELECT 
             COALESCE(pc.category_name, 'Uncategorized') as category,
             SUM(sii.quantity) as total_volume,
             SUM(sii.net_amount) as total,
             GROUP_CONCAT(DISTINCT NULLIF(sii.batch_no,'') SEPARATOR ', ') as batch_no,
-            MIN(CASE WHEN sii.expiry_date >= CURDATE() THEN sii.expiry_date END) as nearest_expiry
+            MIN(CASE WHEN sii.expiry_date >= CURDATE() THEN sii.expiry_date END) as nearest_expiry,
+            GROUP_CONCAT(DISTINCT COALESCE(ic.company_name, 'Unknown') SEPARATOR ', ') as item_company_name
         FROM sale_invoice_items sii
         JOIN sale_invoice si ON sii.sale_invoice_id = si.id AND si.tenant_id = ?
         LEFT JOIN products p ON sii.product_id = p.id
+        LEFT JOIN item_companies ic ON p.item_company_id = ic.id
         LEFT JOIN categories pc ON p.category_id = pc.id
         WHERE sii.tenant_id = ? AND si.sale_date BETWEEN ? AND ? AND si.status = 'Posted'" . ($company_id ? " AND si.company_id = ?" : "") . "
         GROUP BY pc.category_name
@@ -153,9 +152,7 @@ $stmt = $pdo->prepare("
     $stmt->execute($params);
     $categories = $stmt->fetchAll();
 
-    // Branch Wise Sales
-    // sale_invoice_items is already joined here too - add batch/expiry the same
-    // way, no extra params needed.
+    // Branch Wise Sales - UPDATED WITH ITEM COMPANY
     $stmt = $pdo->prepare("
         SELECT 
             COALESCE(b.parent_branch_id, si.branch_id) as branch_id,
@@ -169,11 +166,14 @@ $stmt = $pdo->prepare("
                 ELSE 0
             END as avg_sale,
             GROUP_CONCAT(DISTINCT NULLIF(sii.batch_no,'') SEPARATOR ', ') as batch_no,
-            MIN(CASE WHEN sii.expiry_date >= CURDATE() THEN sii.expiry_date END) as nearest_expiry
+            MIN(CASE WHEN sii.expiry_date >= CURDATE() THEN sii.expiry_date END) as nearest_expiry,
+            GROUP_CONCAT(DISTINCT COALESCE(ic.company_name, 'Unknown') SEPARATOR ', ') as item_company_name
         FROM sale_invoice si
         JOIN sale_invoice_items sii ON si.id = sii.sale_invoice_id AND sii.tenant_id = ?
         LEFT JOIN branches b ON si.branch_id = b.id
         LEFT JOIN branches pb ON b.parent_branch_id = pb.id
+        LEFT JOIN products p ON sii.product_id = p.id
+        LEFT JOIN item_companies ic ON p.item_company_id = ic.id
         WHERE si.tenant_id = ? AND si.sale_date BETWEEN ? AND ? AND si.status = 'Posted'" . ($company_id ? " AND si.company_id = ?" : "") . "
         GROUP BY COALESCE(b.parent_branch_id, si.branch_id), COALESCE(pb.branch_name, b.branch_name)
         ORDER BY total_sales DESC
@@ -183,9 +183,7 @@ $stmt = $pdo->prepare("
     $stmt->execute($params);
     $branch_sales = $stmt->fetchAll();
 
-    // Territory Wise Sales
-    // No item-level join here, so use the "ib" invoice-batch subquery (same
-    // reasoning as Sales Officer above) to avoid inflating total_sales.
+    // Territory Wise Sales - UPDATED WITH ITEM COMPANY
     $stmt = $pdo->prepare("
         SELECT 
             COALESCE(co.country_name, 'Unknown') as country,
@@ -196,7 +194,8 @@ $stmt = $pdo->prepare("
             COUNT(DISTINCT si.id) as total_invoices,
             SUM(si.net_amount) as total_sales,
             GROUP_CONCAT(DISTINCT ib.batch_no SEPARATOR ', ') as batch_no,
-            MIN(ib.nearest_expiry) as nearest_expiry
+            MIN(ib.nearest_expiry) as nearest_expiry,
+            GROUP_CONCAT(DISTINCT ib.item_company_name SEPARATOR ', ') as item_company_name
         FROM sale_invoice si
         LEFT JOIN customers c ON si.customer_id = c.id AND c.tenant_id = ?
         LEFT JOIN countries co ON c.country_id = co.id
@@ -207,8 +206,11 @@ $stmt = $pdo->prepare("
         LEFT JOIN (
             SELECT sii.sale_invoice_id,
                    GROUP_CONCAT(DISTINCT NULLIF(sii.batch_no,'') SEPARATOR ', ') as batch_no,
-                   MIN(CASE WHEN sii.expiry_date >= CURDATE() THEN sii.expiry_date END) as nearest_expiry
+                   MIN(CASE WHEN sii.expiry_date >= CURDATE() THEN sii.expiry_date END) as nearest_expiry,
+                   GROUP_CONCAT(DISTINCT COALESCE(ic.company_name, 'Unknown') SEPARATOR ', ') as item_company_name
             FROM sale_invoice_items sii
+            LEFT JOIN products p ON sii.product_id = p.id
+            LEFT JOIN item_companies ic ON p.item_company_id = ic.id
             WHERE sii.tenant_id = ?
             GROUP BY sii.sale_invoice_id
         ) ib ON ib.sale_invoice_id = si.id
@@ -221,9 +223,7 @@ $stmt = $pdo->prepare("
     $stmt->execute($params);
     $territory_sales = $stmt->fetchAll();
 
-    // Invoice Wise Sales
-    // One row per invoice already, so the "ib" subquery can be joined straight in
-    // without any extra aggregation needed on the outer query.
+    // Invoice Wise Sales - UPDATED WITH ITEM COMPANY
     $stmt = $pdo->prepare("
         SELECT 
             si.id,
@@ -236,15 +236,19 @@ $stmt = $pdo->prepare("
             si.net_amount,
             si.status,
             ib.batch_no,
-            ib.nearest_expiry
+            ib.nearest_expiry,
+            ib.item_company_name
         FROM sale_invoice si
         LEFT JOIN customers c ON si.customer_id = c.id AND c.tenant_id = ?
         LEFT JOIN employees e ON si.sale_officer_id = e.id AND e.tenant_id = ?
         LEFT JOIN (
             SELECT sii.sale_invoice_id,
                    GROUP_CONCAT(DISTINCT NULLIF(sii.batch_no,'') SEPARATOR ', ') as batch_no,
-                   MIN(CASE WHEN sii.expiry_date >= CURDATE() THEN sii.expiry_date END) as nearest_expiry
+                   MIN(CASE WHEN sii.expiry_date >= CURDATE() THEN sii.expiry_date END) as nearest_expiry,
+                   GROUP_CONCAT(DISTINCT COALESCE(ic.company_name, 'Unknown') SEPARATOR ', ') as item_company_name
             FROM sale_invoice_items sii
+            LEFT JOIN products p ON sii.product_id = p.id
+            LEFT JOIN item_companies ic ON p.item_company_id = ic.id
             WHERE sii.tenant_id = ?
             GROUP BY sii.sale_invoice_id
         ) ib ON ib.sale_invoice_id = si.id
@@ -256,9 +260,30 @@ $stmt = $pdo->prepare("
     $stmt->execute($params);
     $invoice_sales = $stmt->fetchAll();
 
-    // Vendor Wise Sales
-    // sale_invoice_items is already joined here (scoped to that vendor's own
-    // products), so batch/expiry can be aggregated directly - no extra params.
+    // Item Company Wise Sales
+    $stmt = $pdo->prepare("
+        SELECT 
+            ic.id as item_company_id,
+            COALESCE(ic.company_name, 'Unknown') as item_company_name,
+            COUNT(DISTINCT si.id) as total_invoices,
+            SUM(sii.quantity) as total_quantity,
+            SUM(sii.net_amount) as total_sales,
+            GROUP_CONCAT(DISTINCT NULLIF(sii.batch_no,'') SEPARATOR ', ') as batch_no,
+            MIN(CASE WHEN sii.expiry_date >= CURDATE() THEN sii.expiry_date END) as nearest_expiry
+        FROM sale_invoice_items sii
+        JOIN sale_invoice si ON sii.sale_invoice_id = si.id AND si.tenant_id = ?
+        JOIN products p ON sii.product_id = p.id AND p.tenant_id = ?
+        LEFT JOIN item_companies ic ON p.item_company_id = ic.id
+        WHERE sii.tenant_id = ? AND si.sale_date BETWEEN ? AND ? AND si.status = 'Posted'" . ($company_id ? " AND si.company_id = ?" : "") . "
+        GROUP BY p.item_company_id, ic.company_name
+        ORDER BY total_sales DESC
+    ");
+    $params = [$tenant_id, $tenant_id, $tenant_id, $date_from, $date_to];
+    if ($company_id) $params[] = $company_id;
+    $stmt->execute($params);
+    $item_company_sales = $stmt->fetchAll();
+
+    // Vendor Wise Sales - UPDATED WITH ITEM COMPANY
     $stmt = $pdo->prepare("
         SELECT 
             p.vendor_id,
@@ -268,11 +293,13 @@ $stmt = $pdo->prepare("
             SUM(sii.quantity) as total_quantity,
             SUM(sii.net_amount) as total_sales,
             GROUP_CONCAT(DISTINCT NULLIF(sii.batch_no,'') SEPARATOR ', ') as batch_no,
-            MIN(CASE WHEN sii.expiry_date >= CURDATE() THEN sii.expiry_date END) as nearest_expiry
+            MIN(CASE WHEN sii.expiry_date >= CURDATE() THEN sii.expiry_date END) as nearest_expiry,
+            GROUP_CONCAT(DISTINCT COALESCE(ic.company_name, 'Unknown') SEPARATOR ', ') as item_company_name
         FROM sale_invoice_items sii
         JOIN sale_invoice si ON sii.sale_invoice_id = si.id AND si.tenant_id = ?
         JOIN products p ON sii.product_id = p.id AND p.tenant_id = ?
         LEFT JOIN suppliers s ON p.vendor_id = s.id AND s.tenant_id = ?
+        LEFT JOIN item_companies ic ON p.item_company_id = ic.id
         WHERE sii.tenant_id = ? AND si.sale_date BETWEEN ? AND ? AND si.status = 'Posted'" . ($company_id ? " AND si.company_id = ?" : "") . "
         GROUP BY p.vendor_id, s.supplier_name
         ORDER BY total_sales DESC
@@ -282,8 +309,7 @@ $stmt = $pdo->prepare("
     $stmt->execute($params);
     $vendor_sales = $stmt->fetchAll();
 
-    // Customer Wise Sales
-    // No item-level join here, so use the "ib" invoice-batch subquery.
+    // Customer Wise Sales - UPDATED WITH ITEM COMPANY
     $stmt = $pdo->prepare("
         SELECT 
             si.customer_id,
@@ -292,14 +318,18 @@ $stmt = $pdo->prepare("
             COUNT(DISTINCT si.id) as total_invoices,
             SUM(si.net_amount) as total_sales,
             GROUP_CONCAT(DISTINCT ib.batch_no SEPARATOR ', ') as batch_no,
-            MIN(ib.nearest_expiry) as nearest_expiry
+            MIN(ib.nearest_expiry) as nearest_expiry,
+            GROUP_CONCAT(DISTINCT ib.item_company_name SEPARATOR ', ') as item_company_name
         FROM sale_invoice si
         LEFT JOIN customers c ON si.customer_id = c.id AND c.tenant_id = ?
         LEFT JOIN (
             SELECT sii.sale_invoice_id,
                    GROUP_CONCAT(DISTINCT NULLIF(sii.batch_no,'') SEPARATOR ', ') as batch_no,
-                   MIN(CASE WHEN sii.expiry_date >= CURDATE() THEN sii.expiry_date END) as nearest_expiry
+                   MIN(CASE WHEN sii.expiry_date >= CURDATE() THEN sii.expiry_date END) as nearest_expiry,
+                   GROUP_CONCAT(DISTINCT COALESCE(ic.company_name, 'Unknown') SEPARATOR ', ') as item_company_name
             FROM sale_invoice_items sii
+            LEFT JOIN products p ON sii.product_id = p.id
+            LEFT JOIN item_companies ic ON p.item_company_id = ic.id
             WHERE sii.tenant_id = ?
             GROUP BY sii.sale_invoice_id
         ) ib ON ib.sale_invoice_id = si.id
@@ -312,8 +342,7 @@ $stmt = $pdo->prepare("
     $stmt->execute($params);
     $customer_sales = $stmt->fetchAll();
 
-    // Supplier Man Wise Sales
-    // No item-level join here either, so use the "ib" invoice-batch subquery.
+    // Supplier Man Wise Sales - UPDATED WITH ITEM COMPANY
     $stmt = $pdo->prepare("
         SELECT 
             si.supplier_man_id,
@@ -324,14 +353,18 @@ $stmt = $pdo->prepare("
             SUM(si.net_amount) as total_sales,
             GROUP_CONCAT(DISTINCT ib.batch_no SEPARATOR ', ') as batch_no,
             MIN(ib.nearest_expiry) as nearest_expiry,
+            GROUP_CONCAT(DISTINCT ib.item_company_name SEPARATOR ', ') as item_company_name,
             'Active' as status
         FROM sale_invoice si
         LEFT JOIN employees e ON si.supplier_man_id = e.id AND e.tenant_id = ?
         LEFT JOIN (
             SELECT sii.sale_invoice_id,
                    GROUP_CONCAT(DISTINCT NULLIF(sii.batch_no,'') SEPARATOR ', ') as batch_no,
-                   MIN(CASE WHEN sii.expiry_date >= CURDATE() THEN sii.expiry_date END) as nearest_expiry
+                   MIN(CASE WHEN sii.expiry_date >= CURDATE() THEN sii.expiry_date END) as nearest_expiry,
+                   GROUP_CONCAT(DISTINCT COALESCE(ic.company_name, 'Unknown') SEPARATOR ', ') as item_company_name
             FROM sale_invoice_items sii
+            LEFT JOIN products p ON sii.product_id = p.id
+            LEFT JOIN item_companies ic ON p.item_company_id = ic.id
             WHERE sii.tenant_id = ?
             GROUP BY sii.sale_invoice_id
         ) ib ON ib.sale_invoice_id = si.id
@@ -349,6 +382,7 @@ $stmt = $pdo->prepare("
         'data' => [
             'summary' => $summary,
             'officer_sales' => $officer_sales,
+            'item_company_sales' => $item_company_sales,
             'product_sales' => $product_sales,
             'branch_sales' => $branch_sales,
             'territory_sales' => $territory_sales,
@@ -363,3 +397,4 @@ $stmt = $pdo->prepare("
 } catch (Exception $e) {
     echo json_encode(['success' => false, 'error' => $e->getMessage()]);
 }
+?>

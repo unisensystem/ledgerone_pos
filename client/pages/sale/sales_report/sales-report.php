@@ -28,6 +28,7 @@ $currency_symbol = $currency['symbol'];
 ?>
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -36,6 +37,7 @@ $currency_symbol = $currency['symbol'];
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link rel="stylesheet" href="../../../assets/css/sale/sales_report/sales-report.css">
 </head>
+
 <body>
     <div class="container">
         <!-- Header -->
@@ -50,7 +52,7 @@ $currency_symbol = $currency['symbol'];
                 </button>
             </div>
         </div>
-        
+
         <!-- Date Filter -->
         <div class="date-filter">
             <div class="filter-group">
@@ -85,6 +87,7 @@ $currency_symbol = $currency['symbol'];
                     <option value="vendor">Vendor Wise</option>
                     <option value="customer">Customer Wise</option>
                     <option value="supplier_man">Supplier Man Wise</option>
+                    <option value="item_company">Item Company Wise</option>
                     <option value="category">Category Wise</option>
                 </select>
             </div>
@@ -94,7 +97,7 @@ $currency_symbol = $currency['symbol'];
                 </button>
             </div>
         </div>
-        
+
         <!-- Summary Cards -->
         <div class="reports-grid">
             <div class="report-card">
@@ -108,7 +111,7 @@ $currency_symbol = $currency['symbol'];
                     </div>
                 </div>
             </div>
-            
+
             <div class="report-card">
                 <div class="card-header">
                     <div>
@@ -120,7 +123,7 @@ $currency_symbol = $currency['symbol'];
                     </div>
                 </div>
             </div>
-            
+
             <div class="report-card">
                 <div class="card-header">
                     <div>
@@ -132,7 +135,7 @@ $currency_symbol = $currency['symbol'];
                     </div>
                 </div>
             </div>
-            
+
             <div class="report-card">
                 <div class="card-header">
                     <div>
@@ -145,7 +148,7 @@ $currency_symbol = $currency['symbol'];
                 </div>
             </div>
         </div>
-        
+
         <!-- Charts Section -->
         <div class="charts-section">
             <div class="chart-card">
@@ -159,7 +162,7 @@ $currency_symbol = $currency['symbol'];
                     <canvas id="salesTrendChart"></canvas>
                 </div>
             </div>
-            
+
             <div class="chart-card">
                 <div class="chart-header">
                     <div class="chart-title">Sales Distribution by Category</div>
@@ -171,7 +174,7 @@ $currency_symbol = $currency['symbol'];
                     <canvas id="categoryChart"></canvas>
                 </div>
             </div>
-            
+
             <div class="chart-card">
                 <div class="chart-header">
                     <div class="chart-title">Top 5 Sales Officers</div>
@@ -183,7 +186,7 @@ $currency_symbol = $currency['symbol'];
                     <canvas id="topOfficersChart"></canvas>
                 </div>
             </div>
-            
+
             <div class="chart-card">
                 <div class="chart-header">
                     <div class="chart-title">Top 5 Products</div>
@@ -195,7 +198,7 @@ $currency_symbol = $currency['symbol'];
                     <canvas id="topProductsChart"></canvas>
                 </div>
             </div>
-            
+
             <div class="chart-card">
                 <div class="chart-header">
                     <div class="chart-title">Top 5 Vendors</div>
@@ -207,7 +210,7 @@ $currency_symbol = $currency['symbol'];
                     <canvas id="topVendorsChart"></canvas>
                 </div>
             </div>
-            
+
             <div class="chart-card">
                 <div class="chart-header">
                     <div class="chart-title">Branch Sales Comparison</div>
@@ -219,7 +222,7 @@ $currency_symbol = $currency['symbol'];
                     <canvas id="branchComparisonChart"></canvas>
                 </div>
             </div>
-            
+
             <div class="chart-card">
                 <div class="chart-header">
                     <div class="chart-title">Monthly Sales Comparison</div>
@@ -232,7 +235,7 @@ $currency_symbol = $currency['symbol'];
                 </div>
             </div>
         </div>
-        
+
         <!-- Sales Officer Wise Sales Table -->
         <div class="table-card">
             <div class="table-title">Sales Officer Wise Sales Details</div>
@@ -249,6 +252,7 @@ $currency_symbol = $currency['symbol'];
                             <th>Total Sales (<?php echo $currency_symbol; ?>)</th>
                             <th>Batch No</th>
                             <th>Expiry Date</th>
+                            <th>Item Company</th>
                             <th>Status</th>
                         </tr>
                     </thead>
@@ -258,7 +262,7 @@ $currency_symbol = $currency['symbol'];
                 </table>
             </div>
         </div>
-        
+
         <!-- Supplier Man Wise Sales Table -->
         <div class="table-card">
             <div class="table-title">Supplier Man Wise Sales Details</div>
@@ -275,6 +279,7 @@ $currency_symbol = $currency['symbol'];
                             <th>Total Sales (<?php echo $currency_symbol; ?>)</th>
                             <th>Batch No</th>
                             <th>Expiry Date</th>
+                            <th>Item Company</th>
                             <th>Status</th>
                         </tr>
                     </thead>
@@ -284,36 +289,37 @@ $currency_symbol = $currency['symbol'];
                 </table>
             </div>
         </div>
-        
+
         <!-- Product Wise Sales Table -->
-      <div class="table-card">
-    <div class="table-title">Product Wise Sales Details</div>
-    <div style="margin-bottom: 16px; display:flex; gap:12px; align-items:center; flex-wrap:wrap;">
-        <input type="text" id="search-product" class="form-input" placeholder="Search by Product ID, Name or Category..." style="max-width: 400px;">
-        <div style="position:relative;">
-            <button type="button" class="btn btn-secondary" id="product-columns-btn"><i class="fas fa-columns"></i> Columns</button>
-            <div id="product-columns-menu" style="display:none; position:absolute; top:110%; left:0; background:#fff; border:1px solid #e1e6ee; border-radius:8px; padding:10px; box-shadow:0 4px 14px rgba(0,0,0,0.1); z-index:20; min-width:190px;"></div>
+        <div class="table-card">
+            <div class="table-title">Product Wise Sales Details</div>
+            <div style="margin-bottom: 16px; display:flex; gap:12px; align-items:center; flex-wrap:wrap;">
+                <input type="text" id="search-product" class="form-input" placeholder="Search by Product ID, Name or Category..." style="max-width: 400px;">
+                <div style="position:relative;">
+                    <button type="button" class="btn btn-secondary" id="product-columns-btn"><i class="fas fa-columns"></i> Columns</button>
+                    <div id="product-columns-menu" style="display:none; position:absolute; top:110%; left:0; background:#fff; border:1px solid #e1e6ee; border-radius:8px; padding:10px; box-shadow:0 4px 14px rgba(0,0,0,0.1); z-index:20; min-width:190px;"></div>
+                </div>
+            </div>
+            <div class="table-responsive">
+                <table>
+                    <thead>
+                        <tr>
+                            <th data-col="product_id">Product ID</th>
+                            <th data-col="product_name">Product Name</th>
+                            <th data-col="category">Category</th>
+                            <th data-col="batch_no">Batch No</th>
+                            <th data-col="expiry_date">Expiry Date</th>
+                            <th data-col="item_company">Item Company</th>
+                            <th data-col="quantity_sold">Quantity Sold</th>
+                            <th data-col="revenue">Revenue (<?php echo $currency_symbol; ?>)</th>
+                            <th data-col="growth">Growth</th>
+                        </tr>
+                    </thead>
+                    <tbody id="productTableBody"></tbody>
+                </table>
+            </div>
         </div>
-    </div>
-    <div class="table-responsive">
-        <table>
-            <thead>
-                <tr>
-                    <th data-col="product_id">Product ID</th>
-                    <th data-col="product_name">Product Name</th>
-                    <th data-col="category">Category</th>
-                    <th data-col="batch_no">Batch No</th>
-                    <th data-col="expiry_date">Expiry Date</th>
-                    <th data-col="quantity_sold">Quantity Sold</th>
-                    <th data-col="revenue">Revenue (<?php echo $currency_symbol; ?>)</th>
-                    <th data-col="growth">Growth</th>
-                </tr>
-            </thead>
-            <tbody id="productTableBody"></tbody>
-        </table>
-    </div>
-</div>
-        
+
         <!-- Branch Wise Sales Table -->
         <div class="table-card">
             <div class="table-title">Branch Wise Sales Details</div>
@@ -331,6 +337,7 @@ $currency_symbol = $currency['symbol'];
                             <th>Avg Sale (<?php echo $currency_symbol; ?>)</th>
                             <th>Batch No</th>
                             <th>Expiry Date</th>
+                            <th>Item Company</th>
                         </tr>
                     </thead>
                     <tbody id="branchTableBody">
@@ -339,7 +346,7 @@ $currency_symbol = $currency['symbol'];
                 </table>
             </div>
         </div>
-        
+
         <!-- Category Wise Sales Table -->
         <div class="table-card">
             <div class="table-title">Category Wise Sales Details</div>
@@ -355,6 +362,7 @@ $currency_symbol = $currency['symbol'];
                             <th>Percentage</th>
                             <th>Batch No</th>
                             <th>Expiry Date</th>
+                            <th>Item Company</th>
                         </tr>
                     </thead>
                     <tbody id="categoryTableBody">
@@ -363,7 +371,7 @@ $currency_symbol = $currency['symbol'];
                 </table>
             </div>
         </div>
-        
+
         <!-- Territory Wise Sales Table -->
         <div class="table-card">
             <div class="table-title">Territory Wise Sales Details</div>
@@ -383,6 +391,7 @@ $currency_symbol = $currency['symbol'];
                             <th>Total Sales (<?php echo $currency_symbol; ?>)</th>
                             <th>Batch No</th>
                             <th>Expiry Date</th>
+                            <th>Item Company</th>
                         </tr>
                     </thead>
                     <tbody id="territoryTableBody">
@@ -391,7 +400,7 @@ $currency_symbol = $currency['symbol'];
                 </table>
             </div>
         </div>
-        
+
         <!-- Invoice Wise Sales Table -->
         <div class="table-card">
             <div class="table-title">Invoice Wise Sales Details</div>
@@ -411,6 +420,7 @@ $currency_symbol = $currency['symbol'];
                             <th>Net Amount (<?php echo $currency_symbol; ?>)</th>
                             <th>Batch No</th>
                             <th>Expiry Date</th>
+                            <th>Item Company</th>
                         </tr>
                     </thead>
                     <tbody id="invoiceTableBody">
@@ -419,7 +429,30 @@ $currency_symbol = $currency['symbol'];
                 </table>
             </div>
         </div>
-        
+
+        <!-- Item Company Wise Sales Table -->
+        <div class="table-card">
+            <div class="table-title">Item Company Wise Sales Details</div>
+            <div style="margin-bottom: 16px;">
+                <input type="text" id="search-item-company" class="form-input" placeholder="Search by Item Company Name..." style="max-width: 400px;">
+            </div>
+            <div class="table-responsive">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Item Company</th>
+                            <th>Total Invoices</th>
+                            <th>Total Quantity</th>
+                            <th>Total Sales (<?php echo $currency_symbol; ?>)</th>
+                            <th>Batch No</th>
+                            <th>Expiry Date</th>
+                        </tr>
+                    </thead>
+                    <tbody id="itemCompanyTableBody"></tbody>
+                </table>
+            </div>
+        </div>
+
         <!-- Vendor Wise Sales Table -->
         <div class="table-card">
             <div class="table-title">Vendor Wise Sales Details</div>
@@ -437,6 +470,7 @@ $currency_symbol = $currency['symbol'];
                             <th>Total Sales (<?php echo $currency_symbol; ?>)</th>
                             <th>Batch No</th>
                             <th>Expiry Date</th>
+                            <th>Item Company</th>
                         </tr>
                     </thead>
                     <tbody id="vendorTableBody">
@@ -445,7 +479,7 @@ $currency_symbol = $currency['symbol'];
                 </table>
             </div>
         </div>
-        
+
         <!-- Customer Wise Sales Table -->
         <div class="table-card">
             <div class="table-title">Customer Wise Sales Details</div>
@@ -462,6 +496,7 @@ $currency_symbol = $currency['symbol'];
                             <th>Total Sales (<?php echo $currency_symbol; ?>)</th>
                             <th>Batch No</th>
                             <th>Expiry Date</th>
+                            <th>Item Company</th>
                         </tr>
                     </thead>
                     <tbody id="customerTableBody">
@@ -470,16 +505,17 @@ $currency_symbol = $currency['symbol'];
                 </table>
             </div>
         </div>
-        
+
         <!-- Footer -->
         <div class="footer">
             <p>LedgerOne ERP Sales Reports • Data as of <span id="current-date"></span> • Confidential</p>
         </div>
     </div>
-    
+
     <script>
         const CURRENCY_SYMBOL = '<?php echo $currency_symbol; ?>';
     </script>
     <script src="../../../assets/js/sale/sales_report/sales-report.js?v=<?= filemtime(__DIR__ . '/../../../assets/js/sale/sales_report/sales-report.js') ?>"></script>
 </body>
+
 </html>

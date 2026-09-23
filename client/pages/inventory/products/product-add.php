@@ -82,12 +82,14 @@ if ($tenant_id) {
                         <input type="text" id="name" name="name" required>
                     </div>
                     
-                    <div class="form-group optional-field" data-field="company">
+                                      <div class="form-group optional-field" data-field="company">
                         <label>Company</label>
                         <select id="company" name="company">
                             <option value="">Select Company</option>
                         </select>
                     </div>
+
+                   
                     
                     <div class="form-group full-width">
                         <label class="required">UOM Type</label>
@@ -187,6 +189,18 @@ if ($tenant_id) {
                     <div class="form-group full-width optional-field" data-field="description">
                         <label>Description</label>
                         <textarea id="description" name="description"></textarea>
+                    </div>
+                     <div class="form-group optional-field" data-field="itemCompany">
+                        <label>Item Company</label>
+                        <div class="input-with-buttons">
+                            <select id="itemCompany" name="itemCompany">
+                                <option value="">Select Item Company</option>
+                            </select>
+                            <div class="input-buttons">
+                                <button type="button" class="input-button" id="addItemCompany">+</button>
+                                <button type="button" class="input-button" id="removeItemCompany">-</button>
+                            </div>
+                        </div>
                     </div>
 
                     <div class="form-group optional-field" data-field="weight">
@@ -450,6 +464,7 @@ if ($tenant_id) {
     <?php include 'unit-modal.php'; ?>
     <?php include 'uom-group-modal.php'; ?>
     <?php include 'category-modal.php'; ?>
+        <?php include 'item-company-modal.php'; ?>
     <?php include 'confirm-modal.php'; ?>
     <?php include 'customize-fields-modal.php'; ?>
     <?php include 'scheme-modal.php'; ?>

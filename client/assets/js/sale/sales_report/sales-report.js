@@ -45,6 +45,7 @@ function updateDashboard() {
     populateCategoryTable();
     populateTerritoryTable();
     populateInvoiceTable();
+    populateItemCompanyTable();
     populateVendorTable();
     populateCustomerTable();
     populateSupplierManTable();
@@ -52,12 +53,15 @@ function updateDashboard() {
     filterReportType();
 }
 
-// Helper to render batch/expiry cell text (flags near-expiry batches in red)
+// Helper to render batch/expiry cell text (flags near-expiry batches in red).
+// Item Company is NOT shown here anymore - it has its own dedicated column.
 function formatExpiryCell(expiryValue) {
-    if (!expiryValue) return '-';
-    // expiryValue can be a single date or a comma separated list; check earliest for "expiring soon" styling
+    if (!expiryValue) {
+        return '-';
+    }
     const firstDate = expiryValue.split(',')[0].trim();
     const isExpiringSoon = firstDate && !isNaN(new Date(firstDate)) && (new Date(firstDate) - new Date()) / (1000*60*60*24) <= 30;
+
     return isExpiringSoon
         ? `<span style="color:#d64545; font-weight:600;">${expiryValue}</span>`
         : expiryValue;
@@ -65,6 +69,11 @@ function formatExpiryCell(expiryValue) {
 
 function formatBatchCell(batchValue) {
     return batchValue && batchValue.length ? batchValue : '-';
+}
+
+// Helper for the dedicated Item Company column
+function formatItemCompanyCell(itemCompanyValue) {
+    return itemCompanyValue && itemCompanyValue.length ? itemCompanyValue : '-';
 }
 
 // Load Projects
@@ -112,7 +121,7 @@ function populateBranchTable() {
     tableBody.innerHTML = '';
 
     if (!reportData || !reportData.branch_sales.length) {
-        tableBody.innerHTML = '<tr><td colspan="7" style="text-align:center">No data available</td></tr>';
+        tableBody.innerHTML = '<tr><td colspan="8" style="text-align:center">No data available</td></tr>';
         return;
     }
 
@@ -129,12 +138,13 @@ function populateBranchTable() {
             <td>${CURRENCY_SYMBOL}${parseFloat(item.avg_sale || 0).toLocaleString()}</td>
             <td>${formatBatchCell(item.batch_no)}</td>
             <td>${formatExpiryCell(item.nearest_expiry)}</td>
+            <td>${formatItemCompanyCell(item.item_company_name)}</td>
         `;
         
         const detailRow = document.createElement('tr');
         detailRow.style.display = 'none';
         detailRow.innerHTML = `
-            <td colspan="7" style="padding: 0;">
+            <td colspan="8" style="padding: 0;">
                 <div style="padding: 16px; background: #f7f9fc; border-left: 3px solid #E8B23F;">
                     <div style="font-weight: 600; margin-bottom: 8px;">Daily Breakdown</div>
                     <div id="branch-breakdown-${index}">Loading...</div>
@@ -156,7 +166,7 @@ function populateCategoryTable() {
     tableBody.innerHTML = '';
 
     if (!reportData || !reportData.categories.length) {
-        tableBody.innerHTML = '<tr><td colspan="5" style="text-align:center">No data available</td></tr>';
+        tableBody.innerHTML = '<tr><td colspan="6" style="text-align:center">No data available</td></tr>';
         return;
     }
 
@@ -173,6 +183,7 @@ function populateCategoryTable() {
             <td>${percentage}%</td>
             <td>${formatBatchCell(item.batch_no)}</td>
             <td>${formatExpiryCell(item.nearest_expiry)}</td>
+            <td>${formatItemCompanyCell(item.item_company_name)}</td>
         `;
         tableBody.appendChild(row);
     });
@@ -191,12 +202,12 @@ function filterReportType() {
     const categoryTable = tables[4];
     const territoryTable = tables[5];
     const invoiceTable = tables[6];
-    const vendorTable = tables[7];
-    const customerTable = tables[8];
+    const itemCompanyTable = tables[7];
+    const vendorTable = tables[8];
+    const customerTable = tables[9];
     
-    if (!officerTable || !supplierManTable || !productTable || !branchTable || !categoryTable || !territoryTable || !invoiceTable || !vendorTable || !customerTable) return;
-    
-    // Hide all tables and charts first
+    if (!officerTable || !supplierManTable || !productTable || !branchTable || !categoryTable || !territoryTable || !invoiceTable || !itemCompanyTable || !vendorTable || !customerTable) return;
+
     tables.forEach(table => table.style.display = 'none');
     charts.forEach(chart => chart.style.display = 'none');
     
@@ -208,50 +219,52 @@ function filterReportType() {
         categoryTable.style.display = 'block';
         territoryTable.style.display = 'block';
         invoiceTable.style.display = 'block';
+        itemCompanyTable.style.display = 'block';
         vendorTable.style.display = 'block';
         customerTable.style.display = 'block';
         charts.forEach(chart => chart.style.display = 'block');
     } else if (reportType === 'officer') {
         officerTable.style.display = 'block';
-        charts[2].style.display = 'block'; // Top 5 Officers
-        charts[4].style.display = 'block'; // Monthly Comparison
+        charts[2].style.display = 'block';
+        charts[4].style.display = 'block';
     } else if (reportType === 'product') {
         productTable.style.display = 'block';
-        charts[3].style.display = 'block'; // Top 5 Products
-        charts[1].style.display = 'block'; // Category Distribution
+        charts[3].style.display = 'block';
+        charts[1].style.display = 'block';
     } else if (reportType === 'branch') {
         branchTable.style.display = 'block';
-        charts[5].style.display = 'block'; // Branch Comparison
-        charts[6].style.display = 'block'; // Monthly Comparison
+        charts[5].style.display = 'block';
+        charts[6].style.display = 'block';
     } else if (reportType === 'territory') {
         territoryTable.style.display = 'block';
-        charts[0].style.display = 'block'; // Sales Trend
+        charts[0].style.display = 'block';
     } else if (reportType === 'invoice') {
         invoiceTable.style.display = 'block';
-        charts[0].style.display = 'block'; // Sales Trend
-        charts[4].style.display = 'block'; // Monthly Comparison
+        charts[0].style.display = 'block';
+        charts[4].style.display = 'block';
     } else if (reportType === 'vendor') {
         vendorTable.style.display = 'block';
-        charts[4].style.display = 'block'; // Top 5 Vendors
+        charts[4].style.display = 'block';
     } else if (reportType === 'customer') {
         customerTable.style.display = 'block';
-        charts[0].style.display = 'block'; // Sales Trend
-        charts[4].style.display = 'block'; // Monthly Comparison
+        charts[0].style.display = 'block';
+        charts[4].style.display = 'block';
     } else if (reportType === 'supplier_man') {
         supplierManTable.style.display = 'block';
-        charts[0].style.display = 'block'; // Sales Trend
-        charts[4].style.display = 'block'; // Monthly Comparison
+        charts[0].style.display = 'block';
+        charts[4].style.display = 'block';
+    } else if (reportType === 'item_company') {
+        itemCompanyTable.style.display = 'block';
     } else if (reportType === 'category') {
         categoryTable.style.display = 'block';
-        charts[1].style.display = 'block'; // Category Distribution
-        charts[3].style.display = 'block'; // Top 5 Products
+        charts[1].style.display = 'block';
+        charts[3].style.display = 'block';
     }
 }
 
 function updateSummaryCards() {
     const cards = document.querySelectorAll('.card-value');
     
-    // Calculate metrics from data
     const totalSales = (reportData.officer_sales || []).reduce((sum, item) => sum + parseFloat(item.total_sales || 0), 0);
     const totalCustomers = (reportData.customer_sales || []).length;
     const totalTransactions = (reportData.branch_sales || []).reduce((sum, item) => sum + parseFloat(item.transactions || 0), 0);
@@ -268,7 +281,7 @@ function populateOfficerTable() {
     tableBody.innerHTML = '';
 
     if (!reportData || !reportData.officer_sales.length) {
-        tableBody.innerHTML = '<tr><td colspan="7" style="text-align:center">No data available</td></tr>';
+        tableBody.innerHTML = '<tr><td colspan="8" style="text-align:center">No data available</td></tr>';
         return;
     }
 
@@ -284,13 +297,14 @@ function populateOfficerTable() {
             <td>${CURRENCY_SYMBOL}${parseFloat(item.total_sales || 0).toLocaleString()}</td>
             <td>${formatBatchCell(item.batch_no)}</td>
             <td>${formatExpiryCell(item.nearest_expiry)}</td>
+            <td>${formatItemCompanyCell(item.item_company_name)}</td>
             <td><span class="badge ${item.status === 'Active' ? 'badge-success' : 'badge-warning'}">${item.status}</span></td>
         `;
         
         const detailRow = document.createElement('tr');
         detailRow.style.display = 'none';
         detailRow.innerHTML = `
-            <td colspan="7" style="padding: 0;">
+            <td colspan="8" style="padding: 0;">
                 <div style="padding: 16px; background: #f7f9fc; border-left: 3px solid #1F7BFF;">
                     <div style="font-weight: 600; margin-bottom: 8px;">Daily Breakdown</div>
                     <div id="officer-breakdown-${index}">Loading...</div>
@@ -312,7 +326,7 @@ function populateProductTable() {
     tableBody.innerHTML = '';
 
     if (!reportData || !reportData.product_sales.length) {
-        tableBody.innerHTML = '<tr><td colspan="8" style="text-align:center">No data available</td></tr>';
+        tableBody.innerHTML = '<tr><td colspan="10" style="text-align:center">No data available</td></tr>';
         return;
     }
 
@@ -335,6 +349,7 @@ function populateProductTable() {
         const expiryHtml = isExpiringSoon
             ? `<span style="color:#d64545; font-weight:600;">${expiryDate}</span>`
             : expiryDate;
+        const itemCompany = formatItemCompanyCell(item.item_company_name);
 
         const row = document.createElement('tr');
         row.style.cursor = 'pointer';
@@ -346,6 +361,7 @@ function populateProductTable() {
             <td data-col="category">${item.category}</td>
             <td data-col="batch_no">${batchNo}</td>
             <td data-col="expiry_date">${expiryHtml}</td>
+            <td data-col="item_company">${itemCompany}</td>
             <td data-col="quantity_sold">${parseFloat(item.quantity_sold || 0).toLocaleString()}</td>
             <td data-col="revenue">${CURRENCY_SYMBOL}${parseFloat(item.revenue || 0).toLocaleString()}</td>
             <td data-col="growth">${growthHtml}</td>
@@ -354,7 +370,7 @@ function populateProductTable() {
         const detailRow = document.createElement('tr');
         detailRow.style.display = 'none';
         detailRow.innerHTML = `
-            <td colspan="8" style="padding: 0;">
+            <td colspan="10" style="padding: 0;">
                 <div style="padding: 16px; background: #f7f9fc; border-left: 3px solid #2FBF71;">
                     <div style="font-weight: 600; margin-bottom: 8px;">Invoices Including This Product</div>
                     <div id="product-details-${index}">Loading...</div>
@@ -377,7 +393,7 @@ function populateTerritoryTable() {
     tableBody.innerHTML = '';
 
     if (!reportData || !reportData.territory_sales.length) {
-        tableBody.innerHTML = '<tr><td colspan="9" style="text-align:center">No data available</td></tr>';
+        tableBody.innerHTML = '<tr><td colspan="10" style="text-align:center">No data available</td></tr>';
         return;
     }
 
@@ -396,12 +412,13 @@ function populateTerritoryTable() {
             <td>${CURRENCY_SYMBOL}${parseFloat(item.total_sales || 0).toLocaleString()}</td>
             <td>${formatBatchCell(item.batch_no)}</td>
             <td>${formatExpiryCell(item.nearest_expiry)}</td>
+            <td>${formatItemCompanyCell(item.item_company_name)}</td>
         `;
         
         const detailRow = document.createElement('tr');
         detailRow.style.display = 'none';
         detailRow.innerHTML = `
-            <td colspan="9" style="padding: 0;">
+            <td colspan="10" style="padding: 0;">
                 <div style="padding: 16px; background: #f7f9fc; border-left: 3px solid #2FBF71;">
                     <div style="font-weight: 600; margin-bottom: 8px;">Territory Invoices</div>
                     <div id="territory-details-${index}">Loading...</div>
@@ -423,7 +440,7 @@ function populateInvoiceTable() {
     tableBody.innerHTML = '';
 
     if (!reportData || !reportData.invoice_sales.length) {
-        tableBody.innerHTML = '<tr><td colspan="9" style="text-align:center">No data available</td></tr>';
+        tableBody.innerHTML = '<tr><td colspan="10" style="text-align:center">No data available</td></tr>';
         return;
     }
 
@@ -442,12 +459,13 @@ function populateInvoiceTable() {
             <td>${CURRENCY_SYMBOL}${parseFloat(item.net_amount || 0).toLocaleString()}</td>
             <td>${formatBatchCell(item.batch_no)}</td>
             <td>${formatExpiryCell(item.nearest_expiry)}</td>
+            <td>${formatItemCompanyCell(item.item_company_name)}</td>
         `;
         
         const detailRow = document.createElement('tr');
         detailRow.style.display = 'none';
         detailRow.innerHTML = `
-            <td colspan="9" style="padding: 0;">
+            <td colspan="10" style="padding: 0;">
                 <div style="padding: 16px; background: #f7f9fc; border-left: 3px solid #E8B23F;">
                     <div style="font-weight: 600; margin-bottom: 8px;">Invoice Items</div>
                     <div id="invoice-details-${item.id}">Loading...</div>
@@ -469,7 +487,7 @@ function populateVendorTable() {
     tableBody.innerHTML = '';
 
     if (!reportData || !reportData.vendor_sales.length) {
-        tableBody.innerHTML = '<tr><td colspan="7" style="text-align:center">No data available</td></tr>';
+        tableBody.innerHTML = '<tr><td colspan="8" style="text-align:center">No data available</td></tr>';
         return;
     }
 
@@ -486,12 +504,13 @@ function populateVendorTable() {
             <td>${CURRENCY_SYMBOL}${parseFloat(item.total_sales || 0).toLocaleString()}</td>
             <td>${formatBatchCell(item.batch_no)}</td>
             <td>${formatExpiryCell(item.nearest_expiry)}</td>
+            <td>${formatItemCompanyCell(item.item_company_name)}</td>
         `;
         
         const detailRow = document.createElement('tr');
         detailRow.style.display = 'none';
         detailRow.innerHTML = `
-            <td colspan="7" style="padding: 0;">
+            <td colspan="8" style="padding: 0;">
                 <div style="padding: 16px; background: #f7f9fc; border-left: 3px solid #946CE6;">
                     <div style="font-weight: 600; margin-bottom: 8px;">Products Sold</div>
                     <div id="vendor-details-${item.vendor_id}">Loading...</div>
@@ -508,12 +527,39 @@ function populateVendorTable() {
     setupPagination('vendorTableBody', 50);
 }
 
+function populateItemCompanyTable() {
+    const tableBody = document.getElementById('itemCompanyTableBody');
+    tableBody.innerHTML = '';
+
+    if (!reportData || !reportData.item_company_sales || !reportData.item_company_sales.length) {
+        tableBody.innerHTML = '<tr><td colspan="6" style="text-align:center">No data available</td></tr>';
+        return;
+    }
+
+    reportData.item_company_sales.forEach(item => {
+        const row = document.createElement('tr');
+        row.className = 'item-company-row';
+        row.setAttribute('data-search', (item.item_company_name || '').toLowerCase());
+        row.innerHTML = `
+            <td>${item.item_company_name || 'Unknown'}</td>
+            <td>${parseFloat(item.total_invoices || 0).toLocaleString()}</td>
+            <td>${parseFloat(item.total_quantity || 0).toLocaleString()}</td>
+            <td>${CURRENCY_SYMBOL}${parseFloat(item.total_sales || 0).toLocaleString()}</td>
+            <td>${formatBatchCell(item.batch_no)}</td>
+            <td>${formatExpiryCell(item.nearest_expiry)}</td>
+        `;
+        tableBody.appendChild(row);
+    });
+    setupSearch('search-item-company', '.item-company-row', ['data-search']);
+    setupPagination('itemCompanyTableBody', 50);
+}
+
 function populateCustomerTable() {
     const tableBody = document.getElementById('customerTableBody');
     tableBody.innerHTML = '';
 
     if (!reportData || !reportData.customer_sales.length) {
-        tableBody.innerHTML = '<tr><td colspan="6" style="text-align:center">No data available</td></tr>';
+        tableBody.innerHTML = '<tr><td colspan="7" style="text-align:center">No data available</td></tr>';
         return;
     }
 
@@ -529,12 +575,13 @@ function populateCustomerTable() {
             <td>${CURRENCY_SYMBOL}${parseFloat(item.total_sales || 0).toLocaleString()}</td>
             <td>${formatBatchCell(item.batch_no)}</td>
             <td>${formatExpiryCell(item.nearest_expiry)}</td>
+            <td>${formatItemCompanyCell(item.item_company_name)}</td>
         `;
         
         const detailRow = document.createElement('tr');
         detailRow.style.display = 'none';
         detailRow.innerHTML = `
-            <td colspan="6" style="padding: 0;">
+            <td colspan="7" style="padding: 0;">
                 <div style="padding: 16px; background: #f7f9fc; border-left: 3px solid #1F7BFF;">
                     <div style="font-weight: 600; margin-bottom: 8px;">Customer Invoices</div>
                     <div id="customer-details-${item.customer_id}">Loading...</div>
@@ -556,12 +603,11 @@ function populateSupplierManTable() {
     tableBody.innerHTML = '';
 
     if (!reportData || !reportData.supplier_man_sales.length) {
-        tableBody.innerHTML = '<tr><td colspan="7" style="text-align:center">No data available</td></tr>';
+        tableBody.innerHTML = '<tr><td colspan="8" style="text-align:center">No data available</td></tr>';
         return;
     }
 
     reportData.supplier_man_sales.forEach((item, index) => {
-        // Skip if supplier_man_id is null or undefined
         if (!item.supplier_man_id) return;
         
         const row = document.createElement('tr');
@@ -575,13 +621,14 @@ function populateSupplierManTable() {
             <td>${CURRENCY_SYMBOL}${parseFloat(item.total_sales || 0).toLocaleString()}</td>
             <td>${formatBatchCell(item.batch_no)}</td>
             <td>${formatExpiryCell(item.nearest_expiry)}</td>
+            <td>${formatItemCompanyCell(item.item_company_name)}</td>
             <td><span class="badge ${item.status === 'Active' ? 'badge-success' : 'badge-warning'}">${item.status}</span></td>
         `;
         
         const detailRow = document.createElement('tr');
         detailRow.style.display = 'none';
         detailRow.innerHTML = `
-            <td colspan="7" style="padding: 0;">
+            <td colspan="8" style="padding: 0;">
                 <div style="padding: 16px; background: #f7f9fc; border-left: 3px solid #946CE6;">
                     <div style="font-weight: 600; margin-bottom: 8px;">Daily Breakdown</div>
                     <div id="supplier_man-breakdown-${index}">Loading...</div>
@@ -598,6 +645,7 @@ function populateSupplierManTable() {
     setupPagination('supplierManTableBody', 50);
 }
 
+// Chart initialization (unchanged - kept same for brevity)
 let trendChart = null;
 let categoryChart = null;
 let topOfficersChart = null;
@@ -672,7 +720,6 @@ function initializeCharts() {
         }
     });
 
-    // Top 5 Sales Officers
     const topOfficers = (reportData.officer_sales || []).slice(0, 5);
     const officerLabels = topOfficers.map(o => o.officer_name);
     const officerData = topOfficers.map(o => parseFloat(o.total_sales || 0));
@@ -705,7 +752,6 @@ function initializeCharts() {
         }
     });
 
-    // Top 5 Products
     const topProducts = (reportData.product_sales || []).filter(p => !p.parent_product_id && !p.parent_row_id).slice(0, 5);
     const productLabels = topProducts.map(p => p.product_name);
     const productData = topProducts.map(p => parseFloat(p.revenue || 0));
@@ -739,7 +785,6 @@ function initializeCharts() {
         }
     });
 
-    // Top 5 Vendors
     const topVendors = (reportData.vendor_sales || []).slice(0, 5);
     const vendorLabels = topVendors.map(v => v.vendor_name);
     const vendorData = topVendors.map(v => parseFloat(v.total_sales || 0));
@@ -772,7 +817,6 @@ function initializeCharts() {
         }
     });
 
-    // Branch Sales Comparison
     const topBranches = (reportData.branch_sales || []).slice(0, 5);
     const branchLabels = topBranches.map(b => b.branch_name);
     const branchData = topBranches.map(b => parseFloat(b.total_sales || 0));
@@ -805,7 +849,6 @@ function initializeCharts() {
         }
     });
 
-    // Monthly Sales Comparison
     const monthlyLabels = (reportData.trend || []).map(t => t.month);
     const currentData = (reportData.trend || []).map(t => parseFloat(t.total || 0));
     const previousData = currentData.map((val, idx) => idx > 0 ? currentData[idx - 1] * 0.85 : val * 0.85);
@@ -870,9 +913,6 @@ document.getElementById('refresh-btn').addEventListener('click', function () {
     });
 });
 
-// Report type -> the on-page search box that filters its table, so Print can
-// carry over whatever the user has currently searched for instead of always
-// printing the full unfiltered dataset.
 const REPORT_TYPE_SEARCH_INPUT = {
     officer: 'search-officer',
     supplier_man: 'search-supplier-man',
@@ -924,9 +964,9 @@ async function toggleBreakdown(row, detailRow, type, id, index) {
                 
                 const data = result.data;
                 
-                const headers = type === 'branch' ? '<tr><th>Date</th><th>Quantity</th><th>Unit</th><th>Revenue</th><th>Batch No</th><th>Expiry Date</th></tr>' : 
-                               type === 'officer' ? '<tr><th>Date</th><th>Invoices</th><th>Revenue</th><th>Batch No</th><th>Expiry Date</th></tr>' : 
-                               type === 'supplier_man' ? '<tr><th>Date</th><th>Invoices</th><th>Revenue</th><th>Batch No</th><th>Expiry Date</th></tr>' : 
+                const headers = type === 'branch' ? '<tr><th>Date</th><th>Quantity</th><th>Unit</th><th>Revenue</th><th>Batch No</th><th>Expiry Date</th><th>Item Company</th></tr>' : 
+                               type === 'officer' ? '<tr><th>Date</th><th>Invoices</th><th>Revenue</th><th>Batch No</th><th>Expiry Date</th><th>Item Company</th></tr>' : 
+                               type === 'supplier_man' ? '<tr><th>Date</th><th>Invoices</th><th>Revenue</th><th>Batch No</th><th>Expiry Date</th><th>Item Company</th></tr>' : 
                                '<tr><th>Date</th><th>Quantity</th><th>Revenue</th></tr>';
                 
                 let html = `
@@ -944,10 +984,11 @@ async function toggleBreakdown(row, detailRow, type, id, index) {
                 data.forEach(item => {
                     const batchCell = formatBatchCell(item.batch_no);
                     const expiryCell = formatExpiryCell(item.nearest_expiry);
+                    const itemCompanyCell = formatItemCompanyCell(item.item_company_name);
                     if (type === 'branch') {
-                        html += `<tr class="breakdown-row"><td>${item.date}</td><td>${parseFloat(item.volume || 0).toLocaleString()}</td><td>${item.unit || '-'}</td><td>${CURRENCY_SYMBOL}${parseFloat(item.revenue || 0).toLocaleString()}</td><td>${batchCell}</td><td>${expiryCell}</td></tr>`;
+                        html += `<tr class="breakdown-row"><td>${item.date}</td><td>${parseFloat(item.volume || 0).toLocaleString()}</td><td>${item.unit || '-'}</td><td>${CURRENCY_SYMBOL}${parseFloat(item.revenue || 0).toLocaleString()}</td><td>${batchCell}</td><td>${expiryCell}</td><td>${itemCompanyCell}</td></tr>`;
                     } else if (type === 'officer' || type === 'supplier_man') {
-                        html += `<tr class="breakdown-row"><td>${item.date}</td><td>${parseFloat(item.invoices || 0).toLocaleString()}</td><td>${CURRENCY_SYMBOL}${parseFloat(item.revenue || 0).toLocaleString()}</td><td>${batchCell}</td><td>${expiryCell}</td></tr>`;
+                        html += `<tr class="breakdown-row"><td>${item.date}</td><td>${parseFloat(item.invoices || 0).toLocaleString()}</td><td>${CURRENCY_SYMBOL}${parseFloat(item.revenue || 0).toLocaleString()}</td><td>${batchCell}</td><td>${expiryCell}</td><td>${itemCompanyCell}</td></tr>`;
                     } else {
                         html += `<tr class="breakdown-row"><td>${item.date}</td><td>${parseFloat(item.volume || 0).toLocaleString()}</td><td>${CURRENCY_SYMBOL}${parseFloat(item.revenue || 0).toLocaleString()}</td></tr>`;
                     }
@@ -956,7 +997,6 @@ async function toggleBreakdown(row, detailRow, type, id, index) {
                 html += '</table></div>';
                 container.innerHTML = html;
                 
-                // Add search functionality
                 document.getElementById(`search-${type}-${index}`).addEventListener('input', function(e) {
                     const searchValue = e.target.value;
                     const rows = document.querySelectorAll(`#table-${type}-${index} .breakdown-row`);
@@ -1005,36 +1045,36 @@ async function toggleDetails(row, detailRow, type, id, index) {
                 let html = '<div style="max-height: 300px; overflow-y: auto;"><table style="width: 100%; font-size: 13px;">';
                 
                 if (type === 'product_invoices') {
-                    html += '<tr><th>Invoice #</th><th>Date</th><th>Customer</th><th>Quantity</th><th>Price</th><th>Batch No</th><th>Expiry Date</th><th>Amount</th></tr>';
+                    html += '<tr><th>Invoice #</th><th>Date</th><th>Customer</th><th>Quantity</th><th>Price</th><th>Batch No</th><th>Expiry Date</th><th>Item Company</th><th>Amount</th></tr>';
                     data.forEach(item => {
                         const expiringSoon = item.expiry_date && (new Date(item.expiry_date) - new Date()) / (1000*60*60*24) <= 30;
                         const expiryCell = item.expiry_date
                             ? (expiringSoon ? `<span style="color:#d64545; font-weight:600;">${item.expiry_date}</span>` : item.expiry_date)
                             : '-';
-                        html += `<tr><td>${item.bill_no}</td><td>${item.sale_date}</td><td>${item.customer_name}</td><td>${parseFloat(item.quantity || 0).toLocaleString()}</td><td>${CURRENCY_SYMBOL}${parseFloat(item.sale_price || 0).toLocaleString()}</td><td>${item.batch_no || '-'}</td><td>${expiryCell}</td><td>${CURRENCY_SYMBOL}${parseFloat(item.net_amount || 0).toLocaleString()}</td></tr>`;
+                        html += `<tr><td>${item.bill_no}</td><td>${item.sale_date}</td><td>${item.customer_name}</td><td>${parseFloat(item.quantity || 0).toLocaleString()}</td><td>${CURRENCY_SYMBOL}${parseFloat(item.sale_price || 0).toLocaleString()}</td><td>${item.batch_no || '-'}</td><td>${expiryCell}</td><td>${item.item_company_name || '-'}</td><td>${CURRENCY_SYMBOL}${parseFloat(item.net_amount || 0).toLocaleString()}</td></tr>`;
                     });
                 } else if (type === 'vendor_products') {
-                    html += '<tr><th>Product</th><th>Batch No</th><th>Expiry Date</th><th>Quantity</th><th>Total Sales</th></tr>';
+                    html += '<tr><th>Product</th><th>Batch No</th><th>Expiry Date</th><th>Item Company</th><th>Quantity</th><th>Total Sales</th></tr>';
                     data.forEach(item => {
                         const expiringSoon = item.nearest_expiry && (new Date(item.nearest_expiry) - new Date()) / (1000*60*60*24) <= 30;
                         const expiryCell = item.nearest_expiry
                             ? (expiringSoon ? `<span style="color:#d64545; font-weight:600;">${item.nearest_expiry}</span>` : item.nearest_expiry)
                             : '-';
-                        html += `<tr><td>${item.product_name}</td><td>${item.batch_no || '-'}</td><td>${expiryCell}</td><td>${parseFloat(item.total_quantity || 0).toLocaleString()}</td><td>${CURRENCY_SYMBOL}${parseFloat(item.total_sales || 0).toLocaleString()}</td></tr>`;
+                        html += `<tr><td>${item.product_name}</td><td>${item.batch_no || '-'}</td><td>${expiryCell}</td><td>${item.item_company_name || '-'}</td><td>${parseFloat(item.total_quantity || 0).toLocaleString()}</td><td>${CURRENCY_SYMBOL}${parseFloat(item.total_sales || 0).toLocaleString()}</td></tr>`;
                     });
                 } else if (type === 'customer_invoices') {
-                    html += '<tr><th>Invoice #</th><th>Date</th><th>Total Bill</th><th>Discount</th><th>Net Amount</th><th>Batch No</th><th>Expiry Date</th></tr>';
+                    html += '<tr><th>Invoice #</th><th>Date</th><th>Total Bill</th><th>Discount</th><th>Net Amount</th><th>Batch No</th><th>Expiry Date</th><th>Item Company</th></tr>';
                     data.forEach(item => {
-                        html += `<tr><td>${item.bill_no}</td><td>${item.sale_date}</td><td>${CURRENCY_SYMBOL}${parseFloat(item.total_bill || 0).toLocaleString()}</td><td>${CURRENCY_SYMBOL}${parseFloat(item.total_discount_amount || 0).toLocaleString()}</td><td>${CURRENCY_SYMBOL}${parseFloat(item.net_amount || 0).toLocaleString()}</td><td>${formatBatchCell(item.batch_no)}</td><td>${formatExpiryCell(item.nearest_expiry)}</td></tr>`;
+                        html += `<tr><td>${item.bill_no}</td><td>${item.sale_date}</td><td>${CURRENCY_SYMBOL}${parseFloat(item.total_bill || 0).toLocaleString()}</td><td>${CURRENCY_SYMBOL}${parseFloat(item.total_discount_amount || 0).toLocaleString()}</td><td>${CURRENCY_SYMBOL}${parseFloat(item.net_amount || 0).toLocaleString()}</td><td>${formatBatchCell(item.batch_no)}</td><td>${formatExpiryCell(item.nearest_expiry)}</td><td>${item.item_company_name || '-'}</td></tr>`;
                     });
                 } else if (type === 'invoice_items') {
-                    html += '<tr><th>Product</th><th>Batch No</th><th>Expiry Date</th><th>Quantity</th><th>Price</th><th>Discount</th><th>Net Amount</th></tr>';
+                    html += '<tr><th>Product</th><th>Batch No</th><th>Expiry Date</th><th>Item Company</th><th>Quantity</th><th>Price</th><th>Discount</th><th>Net Amount</th></tr>';
                     data.forEach(item => {
                         const expiringSoon = item.expiry_date && (new Date(item.expiry_date) - new Date()) / (1000*60*60*24) <= 30;
                         const expiryCell = item.expiry_date
                             ? (expiringSoon ? `<span style="color:#d64545; font-weight:600;">${item.expiry_date}</span>` : item.expiry_date)
                             : '-';
-                        html += `<tr><td>${item.product_name}</td><td>${item.batch_no || '-'}</td><td>${expiryCell}</td><td>${parseFloat(item.quantity || 0).toLocaleString()}</td><td>${CURRENCY_SYMBOL}${parseFloat(item.sale_price || 0).toLocaleString()}</td><td>${CURRENCY_SYMBOL}${parseFloat(item.discount_amount || 0).toLocaleString()}</td><td>${CURRENCY_SYMBOL}${parseFloat(item.net_amount || 0).toLocaleString()}</td></tr>`;
+                        html += `<tr><td>${item.product_name}</td><td>${item.batch_no || '-'}</td><td>${expiryCell}</td><td>${item.item_company_name || '-'}</td><td>${parseFloat(item.quantity || 0).toLocaleString()}</td><td>${CURRENCY_SYMBOL}${parseFloat(item.sale_price || 0).toLocaleString()}</td><td>${CURRENCY_SYMBOL}${parseFloat(item.discount_amount || 0).toLocaleString()}</td><td>${CURRENCY_SYMBOL}${parseFloat(item.net_amount || 0).toLocaleString()}</td></tr>`;
                     });
                 }
                 
@@ -1071,9 +1111,9 @@ async function toggleTerritoryDetails(row, detailRow, item, index) {
                 const data = result.data;
                 
                 let html = '<div style="max-height: 300px; overflow-y: auto;"><table style="width: 100%; font-size: 13px;">';
-                html += '<tr><th>Invoice #</th><th>Date</th><th>Customer</th><th>Net Amount</th><th>Batch No</th><th>Expiry Date</th></tr>';
+                html += '<tr><th>Invoice #</th><th>Date</th><th>Customer</th><th>Net Amount</th><th>Batch No</th><th>Expiry Date</th><th>Item Company</th></tr>';
                 data.forEach(d => {
-                    html += `<tr><td>${d.bill_no}</td><td>${d.sale_date}</td><td>${d.customer_name}</td><td>${CURRENCY_SYMBOL}${parseFloat(d.net_amount || 0).toLocaleString()}</td><td>${formatBatchCell(d.batch_no)}</td><td>${formatExpiryCell(d.nearest_expiry)}</td></tr>`;
+                    html += `<tr><td>${d.bill_no}</td><td>${d.sale_date}</td><td>${d.customer_name}</td><td>${CURRENCY_SYMBOL}${parseFloat(d.net_amount || 0).toLocaleString()}</td><td>${formatBatchCell(d.batch_no)}</td><td>${formatExpiryCell(d.nearest_expiry)}</td><td>${d.item_company_name || '-'}</td></tr>`;
                 });
                 html += '</table></div>';
                 container.innerHTML = data.length > 0 ? html : 'No data available';
@@ -1125,7 +1165,7 @@ function setupSearch(inputId, rowSelector, dataAttributes) {
 function setupColumnToggle(prefix) {
     const btn = document.getElementById(`${prefix}-columns-btn`);
     const menu = document.getElementById(`${prefix}-columns-menu`);
-    if (!btn || !menu || menu.dataset.built) return; // build only once
+    if (!btn || !menu || menu.dataset.built) return;
 
     const table = btn.closest('.table-card').querySelector('table');
     const headers = table.querySelectorAll('thead th[data-col]');

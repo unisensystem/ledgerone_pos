@@ -88,13 +88,96 @@ window.addEventListener('load', function () {
     // Initialize parent product dropdown
     initParentProductDropdown();
     
-    // Load companies
+        // Load companies
     loadCompanies();
-    
+
+    // Load item companies
+    loadItemCompanies();
     // Load tax regimes
     loadTaxRegimes();
     
 
+
+        // Item Company modal functionality
+    document.getElementById('addItemCompany').addEventListener('click', function () {
+        document.getElementById('itemCompanyModalTitle').textContent = 'Add New Item Company';
+        document.getElementById('saveItemCompany').textContent = 'Save Item Company';
+        document.getElementById('itemCompanyModal').style.display = 'flex';
+        document.getElementById('itemCompanyName').focus();
+    });
+
+    document.getElementById('removeItemCompany').addEventListener('click', function () {
+        const select = document.getElementById('itemCompany');
+        if (select.selectedIndex > 0) {
+            const itemCompanyId = select.value;
+            const itemCompanyName = select.options[select.selectedIndex].text;
+            editItemCompany(itemCompanyId, itemCompanyName);
+        } else {
+            alert('Please select an item company to edit');
+        }
+    });
+
+    document.getElementById('closeItemCompanyModal').addEventListener('click', function() {
+        document.getElementById('itemCompanyModal').style.display = 'none';
+        document.getElementById('itemCompanyForm').reset();
+        delete document.getElementById('itemCompanyForm').dataset.editId;
+    });
+
+    document.getElementById('cancelItemCompany').addEventListener('click', function() {
+        document.getElementById('itemCompanyModal').style.display = 'none';
+        document.getElementById('itemCompanyForm').reset();
+        delete document.getElementById('itemCompanyForm').dataset.editId;
+    });
+
+    document.getElementById('itemCompanyModal').addEventListener('click', function(e) {
+        if (e.target === this) {
+            this.style.display = 'none';
+            document.getElementById('itemCompanyForm').reset();
+        }
+    });
+
+    document.getElementById('itemCompanyForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+
+        const form = document.getElementById('itemCompanyForm');
+        const editId = form.dataset.editId;
+        const formData = new FormData(form);
+        const endpoint = editId ? 'item-company-edit.php' : 'item-company-add.php';
+        if (editId) formData.append('id', editId);
+
+        fetch(`../../../../server/api/inventory/products/${endpoint}`, {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                if (editId) {
+                    const select = document.getElementById('itemCompany');
+                    const option = select.querySelector(`option[value="${editId}"]`);
+                    if (option) option.textContent = data.item_company.name;
+                    alert('Item Company updated successfully!');
+                } else {
+                    const select = document.getElementById('itemCompany');
+                    const option = document.createElement('option');
+                    option.value = data.item_company.id;
+                    option.textContent = data.item_company.name;
+                    select.appendChild(option);
+                    select.value = option.value;
+                    alert('Item Company added successfully!');
+                }
+                document.getElementById('itemCompanyModal').style.display = 'none';
+                form.reset();
+                delete form.dataset.editId;
+            } else {
+                alert('Error: ' + data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('An error occurred while saving the item company');
+        });
+    });
     
     // Category change handler to load subcategories
     document.getElementById('category').addEventListener('change', function() {
@@ -1380,6 +1463,75 @@ function deleteCategory(categoryId) {
         alert('An error occurred while deleting the category');
     });
 }
+function editItemCompany(itemCompanyId, itemCompanyName) {
+    showConfirmModal(
+        'Item Company Action',
+        `What would you like to do with "${itemCompanyName}"?`,
+        'Edit',
+        'Delete',
+        () => {
+            document.getElementById('itemCompanyModalTitle').textContent = 'Edit Item Company';
+            document.getElementById('saveItemCompany').textContent = 'Update Item Company';
+            document.getElementById('itemCompanyName').value = itemCompanyName;
+            document.getElementById('itemCompanyForm').dataset.editId = itemCompanyId;
+            document.getElementById('itemCompanyModal').style.display = 'flex';
+            document.getElementById('itemCompanyName').focus();
+        },
+        () => {
+            showConfirmModal(
+                'Delete Item Company',
+                `Are you sure you want to delete "${itemCompanyName}"? This action cannot be undone.`,
+                'Cancel',
+                'Delete',
+                () => {},
+                () => deleteItemCompany(itemCompanyId)
+            );
+        }
+    );
+}
+
+function deleteItemCompany(itemCompanyId) {
+    fetch('../../../../server/api/inventory/products/item-company-delete.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: `id=${itemCompanyId}`
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            const select = document.getElementById('itemCompany');
+            const option = select.querySelector(`option[value="${itemCompanyId}"]`);
+            if (option) {
+                option.remove();
+                select.selectedIndex = 0;
+            }
+            alert('Item Company deleted successfully!');
+        } else {
+            alert('Error: ' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('An error occurred while deleting the item company');
+    });
+}
+
+function loadItemCompanies() {
+    fetch('../../../../server/api/inventory/products/item-company-list.php')
+    .then(response => response.json())
+    .then(data => {
+        if (data.success && data.item_companies) {
+            const select = document.getElementById('itemCompany');
+            data.item_companies.forEach(ic => {
+                const option = document.createElement('option');
+                option.value = ic.id;
+                option.textContent = ic.company_name;
+                select.appendChild(option);
+            });
+        }
+    })
+    .catch(error => console.error('Error loading item companies:', error));
+}
 
 function deleteSubcategory(subcategoryId) {
     fetch('../../../../server/api/inventory/products/subcategory-delete.php', {
@@ -2098,8 +2250,11 @@ function loadProductForEdit(productId) {
             
             // Set dropdown values after they are loaded
             setTimeout(() => {
-                if (product.company_id) {
+                                if (product.company_id) {
                     safeSetValue('company', product.company_id);
+                }
+                if (product.item_company_id) {
+                    safeSetValue('itemCompany', product.item_company_id);
                 }
                 
                 // Handle UOM Type selection based on what's saved

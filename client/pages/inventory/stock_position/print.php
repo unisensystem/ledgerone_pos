@@ -72,6 +72,7 @@ $report_config = [
         ['key' => 'date',        'label' => 'Date'],
         ['key' => 'invoice',     'label' => 'Invoice #'],
         ['key' => 'name',        'label' => 'Name'],
+        ['key' => 'item_company','label' => 'Item Company'],
         ['key' => 'company',     'label' => 'Company'],
         ['key' => 'customer',    'label' => 'Customer'],
         ['key' => 'transaction', 'label' => 'Transaction'],
@@ -89,6 +90,7 @@ $report_config = [
         'columns' => [
             ['key' => 'date',        'label' => 'Date'],
             ['key' => 'product',     'label' => 'Product'],
+            ['key' => 'item_company','label' => 'Item Company'],
             ['key' => 'transaction', 'label' => 'Transaction'],
             ['key' => 'qty_in',      'label' => 'Qty In'],
             ['key' => 'qty_out',     'label' => 'Qty Out'],
@@ -102,6 +104,7 @@ $report_config = [
         'columns' => [
             ['key' => 'date',        'label' => 'Date'],
             ['key' => 'product',     'label' => 'Product'],
+            ['key' => 'item_company','label' => 'Item Company'],
             ['key' => 'branch',      'label' => 'Branch'],
             ['key' => 'transaction', 'label' => 'Transaction'],
             ['key' => 'batch_no',    'label' => 'Batch No'],
@@ -535,6 +538,7 @@ $config = $report_config[$report_type];
             <td>${entry.transaction_date}</td>
             <td>${entry.invoice_number || '-'}</td>
             <td>${entry.product_name || '-'}</td>
+            <td>${entry.item_company_name || '-'}</td>
             <td>${entry.company_name || '-'}</td>
             <td>${entry.customer_name || '-'}</td>
             <td>${entry.transaction_type}</td>
@@ -553,6 +557,7 @@ $config = $report_config[$report_type];
                 <tr>
                     <td>${entry.transaction_date}</td>
                     <td>${entry.product_name}</td>
+                    <td>${entry.item_company_name || '-'}</td>
                     <td>${entry.transaction_type}</td>
                     <td>${entry.qty_in > 0 ? fmtQty(entry.qty_in, entry.unit_symbol) : '-'}</td>
                     <td>${entry.qty_out > 0 ? fmtQty(entry.qty_out, entry.unit_symbol) : '-'}</td>
@@ -567,6 +572,7 @@ $config = $report_config[$report_type];
                 <tr>
                     <td>${entry.transaction_date}</td>
                     <td>${entry.product_name}</td>
+                    <td>${entry.item_company_name || '-'}</td>
                     <td>${entry.branch_name}</td>
                     <td>${entry.transaction_type}</td>
                     <td>${entry.batch_no || '-'}</td>
@@ -622,7 +628,7 @@ $config = $report_config[$report_type];
     const unit = rows[0]?.unit_symbol || 'L';
     totalsHtml = `
         <tr class="totals-row">
-            <td colspan="8">Total (${rows.length} transactions)</td>
+            <td colspan="9">Total (${rows.length} transactions)</td>
             <td>${totalQtyIn.toFixed(2)} ${unit}</td>
             <td>${totalQtyOut.toFixed(2)} ${unit}</td>
             <td>${finalBalance.toFixed(2)} ${unit}</td>
@@ -637,7 +643,7 @@ $config = $report_config[$report_type];
                 const unit = rows[0]?.unit_symbol || 'L';
                 totalsHtml = `
                     <tr class="totals-row">
-                        <td colspan="3">Total (${rows.length} transactions)</td>
+                        <td colspan="4">Total (${rows.length} transactions)</td>
                         <td>${totalQtyIn.toFixed(2)} ${unit}</td>
                         <td>${totalQtyOut.toFixed(2)} ${unit}</td>
                         <td>${(totalQtyIn - totalQtyOut).toFixed(2)} ${unit}</td>
@@ -657,7 +663,7 @@ $config = $report_config[$report_type];
                 const unit = rows[0]?.unit_symbol || 'L';
                 totalsHtml = `
                     <tr class="totals-row">
-                        <td colspan="6">Total (${rows.length} transactions)</td>
+                        <td colspan="7">Total (${rows.length} transactions)</td>
                         <td>${totalQtyIn.toFixed(2)} ${unit}</td>
                         <td>${totalQtyOut.toFixed(2)} ${unit}</td>
                         <td>${totalBalance.toFixed(2)} ${unit}</td>

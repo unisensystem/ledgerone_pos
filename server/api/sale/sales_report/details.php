@@ -13,10 +13,7 @@ $date_to = $_GET['date_to'] ?? date('Y-m-d');
 try {
     if ($type === 'product_invoices') {
         // Get invoices for a specific product
-        // Row-level (one sale_invoice_items row per line), so batch_no / expiry_date
-        // are read directly off sii - no aggregation needed here.
-        // FIX: sale_invoice_items.batch_expiry_date is unused and always NULL -
-        // the column that actually gets populated on sale is "expiry_date".
+        // Includes item_company_name from the product's item company relationship
         $stmt = $pdo->prepare("
             SELECT 
                 si.bill_no,
@@ -26,39 +23,42 @@ try {
                 sii.sale_price,
                 sii.batch_no,
                 sii.expiry_date as expiry_date,
-                sii.net_amount
+                sii.net_amount,
+                COALESCE(ic.company_name, 'Unknown') as item_company_name
             FROM sale_invoice_items sii
             JOIN sale_invoice si ON sii.sale_invoice_id = si.id AND si.tenant_id = ?
             LEFT JOIN customers c ON si.customer_id = c.id AND c.tenant_id = ?
+            LEFT JOIN products p ON sii.product_id = p.id AND p.tenant_id = ?
+            LEFT JOIN item_companies ic ON p.item_company_id = ic.id
             WHERE sii.tenant_id = ? AND sii.product_id = ? AND si.sale_date BETWEEN ? AND ? AND si.status = 'Posted'
             ORDER BY si.sale_date DESC
         ");
-        $stmt->execute([$tenant_id, $tenant_id, $tenant_id, $id, $date_from, $date_to]);
-    } elseif ($type === 'vendor_products') {
+        $stmt->execute([$tenant_id, $tenant_id, $tenant_id, $tenant_id, $id, $date_from, $date_to]);
+    } 
+    elseif ($type === 'vendor_products') {
         // Get products sold for a specific vendor
-        // sale_invoice_items is already joined and grouped per product, so
-        // batch/expiry are aggregated the same way as in sales-report.php.
-        // FIX: use expiry_date, not the always-NULL batch_expiry_date.
+        // Includes item_company_name aggregated from sale_invoice_items
         $stmt = $pdo->prepare("
             SELECT 
                 p.name as product_name,
                 SUM(sii.quantity) as total_quantity,
                 SUM(sii.net_amount) as total_sales,
                 GROUP_CONCAT(DISTINCT NULLIF(sii.batch_no,'') SEPARATOR ', ') as batch_no,
-                MIN(CASE WHEN sii.expiry_date >= CURDATE() THEN sii.expiry_date END) as nearest_expiry
+                MIN(CASE WHEN sii.expiry_date >= CURDATE() THEN sii.expiry_date END) as nearest_expiry,
+                COALESCE(ic.company_name, 'Unknown') as item_company_name
             FROM sale_invoice_items sii
             JOIN sale_invoice si ON sii.sale_invoice_id = si.id AND si.tenant_id = ?
             JOIN products p ON sii.product_id = p.id AND p.tenant_id = ?
+            LEFT JOIN item_companies ic ON p.item_company_id = ic.id
             WHERE sii.tenant_id = ? AND p.vendor_id = ? AND si.sale_date BETWEEN ? AND ? AND si.status = 'Posted'
-            GROUP BY p.id, p.name
+            GROUP BY p.id, p.name, ic.company_name
             ORDER BY total_sales DESC
         ");
         $stmt->execute([$tenant_id, $tenant_id, $tenant_id, $id, $date_from, $date_to]);
-    } elseif ($type === 'customer_invoices') {
+    } 
+    elseif ($type === 'customer_invoices') {
         // Get invoices for a specific customer
-        // No item-level join here, so use the "ib" invoice-batch subquery
-        // (same pattern as Customer Wise Sales in sales-report.php).
-        // FIX: use expiry_date, not the always-NULL batch_expiry_date.
+        // Uses invoice-batch subquery to aggregate item_company_name
         $stmt = $pdo->prepare("
             SELECT 
                 si.bill_no,
@@ -67,13 +67,17 @@ try {
                 si.total_discount_amount,
                 si.net_amount,
                 ib.batch_no,
-                ib.nearest_expiry
+                ib.nearest_expiry,
+                ib.item_company_name
             FROM sale_invoice si
             LEFT JOIN (
                 SELECT sii.sale_invoice_id,
                        GROUP_CONCAT(DISTINCT NULLIF(sii.batch_no,'') SEPARATOR ', ') as batch_no,
-                       MIN(CASE WHEN sii.expiry_date >= CURDATE() THEN sii.expiry_date END) as nearest_expiry
+                       MIN(CASE WHEN sii.expiry_date >= CURDATE() THEN sii.expiry_date END) as nearest_expiry,
+                       GROUP_CONCAT(DISTINCT COALESCE(ic.company_name, 'Unknown') SEPARATOR ', ') as item_company_name
                 FROM sale_invoice_items sii
+                LEFT JOIN products p ON sii.product_id = p.id
+                LEFT JOIN item_companies ic ON p.item_company_id = ic.id
                 WHERE sii.tenant_id = ?
                 GROUP BY sii.sale_invoice_id
             ) ib ON ib.sale_invoice_id = si.id
@@ -81,10 +85,10 @@ try {
             ORDER BY si.sale_date DESC
         ");
         $stmt->execute([$tenant_id, $tenant_id, $id, $date_from, $date_to]);
-    } elseif ($type === 'invoice_items') {
+    } 
+    elseif ($type === 'invoice_items') {
         // Get items for a specific invoice
-        // Row-level, sii already joined for this exact invoice - read batch/expiry directly.
-        // FIX: use expiry_date, not the always-NULL batch_expiry_date.
+        // Includes item_company_name directly from product relationship
         $stmt = $pdo->prepare("
             SELECT 
                 p.name as product_name,
@@ -93,17 +97,19 @@ try {
                 sii.batch_no,
                 sii.expiry_date as expiry_date,
                 sii.discount_amount,
-                sii.net_amount
+                sii.net_amount,
+                COALESCE(ic.company_name, 'Unknown') as item_company_name
             FROM sale_invoice_items sii
             JOIN products p ON sii.product_id = p.id AND p.tenant_id = ?
+            LEFT JOIN item_companies ic ON p.item_company_id = ic.id
             WHERE sii.tenant_id = ? AND sii.sale_invoice_id = ?
             ORDER BY sii.id
         ");
         $stmt->execute([$tenant_id, $tenant_id, $id]);
-    } elseif ($type === 'territory_invoices') {
-        // Get invoices for a specific territory
-        // No item-level join here either, so use the "ib" invoice-batch subquery.
-        // FIX: use expiry_date, not the always-NULL batch_expiry_date.
+    } 
+    elseif ($type === 'territory_invoices') {
+        // Get invoices for a specific territory (Country, Region, City, Zone, Area)
+        // Uses invoice-batch subquery to aggregate item_company_name
         $country = $_GET['country'] ?? '';
         $region = $_GET['region'] ?? '';
         $city = $_GET['city'] ?? '';
@@ -117,7 +123,8 @@ try {
                 COALESCE(c.customer_name, 'Walk-in') as customer_name,
                 si.net_amount,
                 ib.batch_no,
-                ib.nearest_expiry
+                ib.nearest_expiry,
+                ib.item_company_name
             FROM sale_invoice si
             LEFT JOIN customers c ON si.customer_id = c.id AND c.tenant_id = ?
             LEFT JOIN countries co ON c.country_id = co.id
@@ -128,8 +135,11 @@ try {
             LEFT JOIN (
                 SELECT sii.sale_invoice_id,
                        GROUP_CONCAT(DISTINCT NULLIF(sii.batch_no,'') SEPARATOR ', ') as batch_no,
-                       MIN(CASE WHEN sii.expiry_date >= CURDATE() THEN sii.expiry_date END) as nearest_expiry
+                       MIN(CASE WHEN sii.expiry_date >= CURDATE() THEN sii.expiry_date END) as nearest_expiry,
+                       GROUP_CONCAT(DISTINCT COALESCE(ic.company_name, 'Unknown') SEPARATOR ', ') as item_company_name
                 FROM sale_invoice_items sii
+                LEFT JOIN products p ON sii.product_id = p.id
+                LEFT JOIN item_companies ic ON p.item_company_id = ic.id
                 WHERE sii.tenant_id = ?
                 GROUP BY sii.sale_invoice_id
             ) ib ON ib.sale_invoice_id = si.id
@@ -144,8 +154,9 @@ try {
             ORDER BY si.sale_date DESC
         ");
         $stmt->execute([$tenant_id, $tenant_id, $tenant_id, $date_from, $date_to, $country, $region, $city, $zone, $area]);
-    } else {
-        throw new Exception('Invalid type');
+    } 
+    else {
+        throw new Exception('Invalid type: ' . $type);
     }
     
     $details = $stmt->fetchAll();
