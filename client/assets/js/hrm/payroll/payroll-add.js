@@ -78,13 +78,29 @@ const submitBtn = document.getElementById('submitBtn');
 // month's last day, the period naturally covers the whole month as before.
 // There's no separate Attendance Period field on this form; the standalone
 // Leave module page is the single source of truth for leave/overtime.
+// Format a Date as YYYY-MM-DD from its LOCAL parts. toISOString() converts to
+// UTC first, which in timezones ahead of UTC (e.g. Pakistan, UTC+5) shifts
+// local midnight back to the previous day (1 Sep -> 31 Aug, 30 Sep -> 29 Sep).
+function formatLocalDate(dt) {
+    return dt.getFullYear() + '-' + String(dt.getMonth() + 1).padStart(2, '0') + '-' + String(dt.getDate()).padStart(2, '0');
+}
+
 function getPayrollPeriod() {
     const d = dateInput.value ? new Date(dateInput.value) : new Date();
     const year = d.getFullYear();
     const month = d.getMonth();
     const start = new Date(year, month, 1);
     const monthEnd = new Date(year, month + 1, 0);
-    const fmt = (dt) => dt.toISOString().split('T')[0];
+
+    // FIX: format using LOCAL date parts, not toISOString() (which converts
+    // to UTC and shifts the date backward for positive UTC offsets like
+    // Pakistan's UTC+5 — local midnight becomes previous day in UTC).
+    const fmt = (dt) => {
+        const y = dt.getFullYear();
+        const m = String(dt.getMonth() + 1).padStart(2, '0');
+        const day = String(dt.getDate()).padStart(2, '0');
+        return `${y}-${m}-${day}`;
+    };
 
     // Compare as YYYY-MM-DD strings (not Date objects) to avoid timezone
     // round-trip issues between the <input type="date"> value and Date math.
@@ -178,6 +194,8 @@ function loadPayrollData(id, isViewMode) {
                                 // at save time), restore it onto the row so re-submitting
                                 // without recalculating doesn't drop it.
                                 if (item.daily_rate !== null && item.daily_rate !== undefined) {
+                                    row.dataset.presentDays = item.present_days || 0;
+                                    row.dataset.absentDays = item.absent_days || 0;
                                     row.dataset.paidLeaveDays = item.paid_leave_days || 0;
                                     row.dataset.unpaidLeaveDays = item.unpaid_leave_days || 0;
                                     row.dataset.dailyRate = item.daily_rate;
@@ -187,7 +205,8 @@ function loadPayrollData(id, isViewMode) {
                                     row.dataset.otAmount = item.ot_amount || 0;
                                     const hint = row.querySelector('.breakdown-hint');
                                     hint.style.display = 'block';
-                                    hint.textContent = `Paid Leave ${item.paid_leave_days || 0} · Unpaid Leave ${item.unpaid_leave_days || 0} · `
+                                    hint.textContent = `Present ${item.present_days || 0} · Absent ${item.absent_days || 0} · `
+                                        + `Paid Leave ${item.paid_leave_days || 0} · Unpaid Leave ${item.unpaid_leave_days || 0} · `
                                         + `Deduction ${currencySymbol}${Number(item.deduction_amount).toFixed(2)} (@ ${currencySymbol}${Number(item.daily_rate).toFixed(2)}/day)`
                                         + (item.ot_hours > 0 ? ` · Overtime ${item.ot_hours} hrs = +${currencySymbol}${Number(item.ot_amount).toFixed(2)}` : '');
                                     // Day-by-day leave/OT rows aren't stored with a saved payroll
@@ -526,9 +545,9 @@ document.addEventListener('click', (e) => {
 // (1st of the month up to the payroll Date, or the full month if the Date
 // is on/after month-end), and fills the Amount field with a suggested net
 // Salary — gross salary prorated to that period, plus APPROVED overtime,
-// minus APPROVED unpaid leave / absent days in that period (see
-// server/api/hrm/payroll/calculate-suggested.php). HR can still edit the
-// amount afterward — this is a starting point, not a lock-in.
+// minus APPROVED unpaid leave / absent days (unmarked days count as absent)
+// in that period (see server/api/hrm/payroll/calculate-suggested.php). HR can
+// still edit the amount afterward — this is a starting point, not a lock-in.
 // `silent` suppresses alert popups for the automatic (non-button) triggers.
 async function calculateSuggestedSalary(row, silent = false) {
     const employeeId = row.querySelector('.employee-id').value;
@@ -545,11 +564,14 @@ async function calculateSuggestedSalary(row, silent = false) {
         if (!data.success) { if (!silent) alert('Error: ' + data.message); return; }
 
         row.querySelector('.amount').value = data.suggested_net_amount;
+        row.dataset.presentDays = data.attendance.present_days;
+        row.dataset.absentDays = data.attendance.absent_days;
         row.dataset.paidLeaveDays = data.attendance.paid_leave_days;
         row.dataset.unpaidLeaveDays = data.attendance.unpaid_leave_days;
         row.dataset.dailyRate = data.daily_rate;
         row.dataset.grossAmount = data.gross_amount;
-        row.dataset.deductionAmount = data.unpaid_leave_deduction;
+        // Total deduction = unpaid leave + absent (incl. unmarked days)
+        row.dataset.deductionAmount = data.total_deduction;
         row.dataset.otHours = data.overtime.total_hours;
         row.dataset.otAmount = data.overtime.total_amount;
         row.dataset.leaveRecords = JSON.stringify(data.leave_records || []);
@@ -558,8 +580,9 @@ async function calculateSuggestedSalary(row, silent = false) {
 
         hint.style.display = 'block';
         hint.textContent = (data.calendar_days < 30 ? `Prorated ${data.calendar_days}/30 days · ` : '')
+            + `Present ${data.attendance.present_days} · Absent ${data.attendance.absent_days} · `
             + `Paid Leave ${data.attendance.paid_leave_days} · Unpaid Leave ${data.attendance.unpaid_leave_days} · `
-            + `Deduction ${currencySymbol}${Number(data.unpaid_leave_deduction).toFixed(2)} (@ ${currencySymbol}${Number(data.daily_rate).toFixed(2)}/day)`
+            + `Deduction ${currencySymbol}${Number(data.total_deduction).toFixed(2)} (@ ${currencySymbol}${Number(data.daily_rate).toFixed(2)}/day)`
             + (data.overtime.total_hours > 0 ? ` · Overtime ${data.overtime.total_hours} hrs = +${currencySymbol}${Number(data.overtime.total_amount).toFixed(2)}` : '')
             + (data.attendance.pending_leave_requests > 0 ? ` · ${data.attendance.pending_leave_requests} pending leave request(s) not counted yet` : '');
     } catch (err) {
@@ -621,18 +644,19 @@ function showDetailModal(employeeLabel, leaveRecords, otRecords, pendingCount) {
 
     // Find the row to get breakdown numbers
     const rows = tableBody.querySelectorAll('tr');
-    let grossAmount = 0, unpaidDeduction = 0, otAmount = 0, netAmount = 0, dailyRate = 0, paidLeaveDays = 0, unpaidLeaveDays = 0, otHours = 0;
+    let grossAmount = 0, totalDeduction = 0, otAmount = 0, netAmount = 0, dailyRate = 0, paidLeaveDays = 0, unpaidLeaveDays = 0, absentDays = 0, otHours = 0;
     rows.forEach(row => {
         const empCode = row.querySelector('.employee-code').value;
         if (empCode && employeeLabel.includes(empCode.split(' - ')[0])) {
             grossAmount     = Number(row.dataset.grossAmount || 0);
-            unpaidDeduction = Number(row.dataset.deductionAmount || 0);
+            totalDeduction  = Number(row.dataset.deductionAmount || 0);
             otAmount        = Number(row.dataset.otAmount || 0);
             dailyRate       = Number(row.dataset.dailyRate || 0);
             paidLeaveDays   = Number(row.dataset.paidLeaveDays || 0);
             unpaidLeaveDays = Number(row.dataset.unpaidLeaveDays || 0);
+            absentDays      = Number(row.dataset.absentDays || 0);
             otHours         = Number(row.dataset.otHours || 0);
-            netAmount       = grossAmount - unpaidDeduction + otAmount;
+            netAmount       = Math.max(0, grossAmount - totalDeduction + otAmount);
         }
     });
 
@@ -652,11 +676,11 @@ function showDetailModal(employeeLabel, leaveRecords, otRecords, pendingCount) {
                     <div style="font-size:15px; font-weight:700; color:#0f172a;">${currencySymbol} ${dailyRate.toLocaleString('en-PK', {minimumFractionDigits:2, maximumFractionDigits:2})}</div>
                 </div>
                 <div style="background:#fef2f2; border:1px solid #fecaca; border-radius:8px; padding:10px 12px;">
-                    <div style="font-size:11px; color:#94a3b8; margin-bottom:3px;">Unpaid Leave Deduction</div>
+                    <div style="font-size:11px; color:#94a3b8; margin-bottom:3px;">Absent + Unpaid Leave Deduction</div>
                     <div style="font-size:15px; font-weight:700; color:#dc2626;">
-                        − ${currencySymbol} ${unpaidDeduction.toLocaleString('en-PK', {minimumFractionDigits:2, maximumFractionDigits:2})}
+                        − ${currencySymbol} ${totalDeduction.toLocaleString('en-PK', {minimumFractionDigits:2, maximumFractionDigits:2})}
                     </div>
-                    <div style="font-size:11px; color:#94a3b8; margin-top:2px;">${unpaidLeaveDays} day(s) × ${currencySymbol}${dailyRate.toFixed(2)}</div>
+                    <div style="font-size:11px; color:#94a3b8; margin-top:2px;">${absentDays} absent + ${unpaidLeaveDays} unpaid leave day(s) × ${currencySymbol}${dailyRate.toFixed(2)}</div>
                 </div>
                 <div style="background:#f0fdf4; border:1px solid #bbf7d0; border-radius:8px; padding:10px 12px;">
                     <div style="font-size:11px; color:#94a3b8; margin-bottom:3px;">Overtime Added</div>
@@ -810,6 +834,8 @@ function submitPayroll() {
         // breakdown along so it's stored with the payroll entry for later review.
         if (row.dataset.dailyRate !== undefined) {
             anyCalculated = true;
+            item.present_days = Number(row.dataset.presentDays || 0);
+            item.absent_days = Number(row.dataset.absentDays || 0);
             item.paid_leave_days = Number(row.dataset.paidLeaveDays || 0);
             item.unpaid_leave_days = Number(row.dataset.unpaidLeaveDays || 0);
             item.daily_rate = Number(row.dataset.dailyRate);

@@ -17,9 +17,10 @@
 //
 // Deduction rule: Unpaid leave, absent days, and UNMARKED days (no
 // attendance record) are deducted at the same daily_rate (base_salary / 30).
-// Unmarked days that have no attendance mark and no leave request are now
+// Unmarked days that have no attendance mark and no leave request are
 // treated as ABSENT to prevent silent under-payment when HR forgets to mark
-// attendance. Overtime is the only thing priced at the employee's per-hour
+// attendance. This is the same rule used by the Monthly Employee Report, so
+// both always agree. Overtime is the only thing priced at the employee's per-hour
 // overtime_rate_per_hour — that rate never touches present/absent/leave math,
 // it only feeds ot_amount which is already computed and stored on the
 // leave_records row when the OT entry was approved (see hrm/leave/leave-request.php).
@@ -142,8 +143,8 @@ try {
     }
     $otAmountTotal = round($otAmountTotal, 2);
 
-    // UPDATED: Attendance for the period. Count explicit 'present' / 'absent' marks.
-    // Unmarked days (no attendance record) that aren't covered by leave are now
+    // Attendance for the period. Count explicit 'present' / 'absent' marks.
+    // Unmarked days (no attendance record) that aren't covered by leave are
     // treated as ABSENT — prevents silent under-payment when HR forgets to mark
     // attendance. Working days calculated from calendar days - (total marked days).
     $stmt = $pdo->prepare("
@@ -161,25 +162,25 @@ try {
         if ($r['status'] === 'absent')  $absentDays  += (float) $r['cnt'];
     }
 
-    // Calculate calendar days in the period. This now drives BOTH the
+    // Calculate calendar days in the period. This drives BOTH the
     // unmarked-days-as-absent check below AND the gross salary proration —
     // a shorter period (e.g. 1st to the 23rd) naturally works out to fewer
     // calendar days, which is exactly what should reduce the payout.
     $startDate = new DateTime($periodStart);
     $endDate = new DateTime($periodEnd);
     $calendarDays = (int) $endDate->diff($startDate)->format('%a') + 1; // +1 to include end date
-    
+
     // Total marked days (present + absent + all leaves)
     $totalMarkedDays = $presentDays + $absentDays + $paidLeaveDays + $unpaidLeaveDays;
-    
-    // Unmarked days = days with no attendance record at all
+
+    // Unmarked days = days with no attendance record and no approved leave
     $unmarkedDays = $calendarDays - $totalMarkedDays;
-    
-    // CRITICAL FIX: If there are unmarked days AND employee has no present days
-    // recorded, treat unmarked as ABSENT. This prevents full salary when attendance
-    // isn't marked. If employee has ANY present days marked, we keep unmarked as
-    // ambiguous (could be weekends/holidays) and don't deduct.
-    if ($unmarkedDays > 0 && $presentDays === 0.0) {
+
+    // FIX: every unmarked day counts as absent — same rule as the Monthly
+    // Employee Report. Previously this only applied when the employee had ZERO
+    // present days, so an employee with even 1 present day got all their
+    // unmarked days paid in full (e.g. 3 present + 24 unmarked showed full gross).
+    if ($unmarkedDays > 0) {
         $absentDays += $unmarkedDays;
     }
 

@@ -163,6 +163,6 @@ $currency_symbol = $currency['symbol'] ?? '$';
     <script>
         const currencySymbol = '<?php echo $currency_symbol; ?>';
     </script>
-    <script src="../../../assets/js/hrm/payroll/payroll-add.js"></script>
+<script src="../../../assets/js/hrm/payroll/payroll-add.js?v=<?php echo time(); ?>"></script>
 </body>
 </html>

@@ -1,9 +1,9 @@
 <?php
-// Monthly Employee Report — single-page dashboard (backend + frontend + JS in one file).
+// Monthly Employee Report â€” single-page dashboard (backend + frontend + JS in one file).
 // Shows, per employee, day-wise attendance/leave (who came on which date) plus a
 // salary breakdown (present/absent/paid-leave/unpaid-leave/daily-rate/gross/
 // deduction/overtime/net) for a selected date range. Tenant-scoped only (no
-// company/department filter — every employee under the logged-in tenant).
+// company/department filter â€” every employee under the logged-in tenant).
 //
 // The salary math (daily_rate, gross proration, deduction rule, unmarked-days-as-absent
 // rule, overtime pricing) intentionally mirrors hrm/payroll/calculate-suggested.php
@@ -62,7 +62,7 @@ function calculateDailyRate(array $emp): float {
     return round($salary / 30, 2);
 }
 
-// Per-employee summary — same aggregate rules as calculate-suggested.php.
+// Per-employee summary â€” same aggregate rules as calculate-suggested.php.
 function computeEmployeeSummary(PDO $pdo, $tenant_id, array $employee, string $periodStart, string $periodEnd): array {
     $employeeCode = $employee['employee_id'];
     $dailyRate = calculateDailyRate($employee);
@@ -85,7 +85,7 @@ function computeEmployeeSummary(PDO $pdo, $tenant_id, array $employee, string $p
     // Approved overtime logged in this period.
     // Status compared case-insensitively (LOWER(status)) since OT approvals
     // have been seen stored as "Approved" while leave approvals use lowercase
-    // "approved" — the exact-match version was silently matching zero rows.
+    // "approved" â€” the exact-match version was silently matching zero rows.
     $stmt = $pdo->prepare("
         SELECT ot_hours, ot_amount
         FROM leave_records
@@ -121,10 +121,9 @@ function computeEmployeeSummary(PDO $pdo, $tenant_id, array $employee, string $p
     $totalMarkedDays = $presentDays + $absentDays + $paidLeaveDays + $unpaidLeaveDays;
     $unmarkedDays = $calendarDays - $totalMarkedDays;
 
-    // Same rule as calculate-suggested.php: unmarked days only count as absent
-    // when the employee has zero present days in the period (otherwise they're
-    // ambiguous — could be weekends/holidays — and are left undeducted).
-    if ($unmarkedDays > 0 && $presentDays === 0.0) {
+    // Every unmarked day (no attendance mark and no approved leave covering it)
+    // counts as absent â€” same rule as calculate-suggested.php.
+    if ($unmarkedDays > 0) {
         $absentDays += $unmarkedDays;
     }
 
@@ -165,7 +164,7 @@ function computeEmployeeSummary(PDO $pdo, $tenant_id, array $employee, string $p
 }
 
 // Day-by-day "who came on which date" detail for one employee. Informational
-// only — it does NOT feed the salary math above (that stays aggregate-based,
+// only â€” it does NOT feed the salary math above (that stays aggregate-based,
 // same as calculate-suggested.php), it's just for the expandable detail row
 // (and for the print view), and now also carries check-in / check-out time
 // for each date so both views can render a real attendance table.
@@ -522,7 +521,7 @@ function fmtMonthYear(dateStr) {
 function defaultDates() {
   const now = new Date();
   const first = new Date(now.getFullYear(), now.getMonth(), 1);
-  // Format from LOCAL date parts — toISOString() converts to UTC, which in
+  // Format from LOCAL date parts â€” toISOString() converts to UTC, which in
   // timezones ahead of UTC (e.g. Pakistan, UTC+5) shifted "1 Sep 00:00" back
   // to "31 Aug" and added an extra day to the period.
   const iso = d => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
