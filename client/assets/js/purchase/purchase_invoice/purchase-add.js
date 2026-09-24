@@ -741,9 +741,11 @@ if (isGlobalDateLocked && globalLockedDate) {
                     const savedTaxes = data.invoice_taxes || [];
 
                     if (window.loadInvoiceLevelTaxRegimes) {
-                        // Override the global array after load so restoreInvoiceTaxes can use saved values
+                        // Always restore after load (even with an empty savedTaxes array) so that
+                        // an invoice explicitly saved with 0 tax doesn't get overwritten by the
+                        // supplier's default tax regime that loadInvoiceLevelTaxRegimes just applied.
                         window.loadInvoiceLevelTaxRegimes(supplierId, companyId).then(() => {
-                            if (savedTaxes.length > 0 && window.restoreInvoiceTaxes) {
+                            if (window.restoreInvoiceTaxes) {
                                 window.restoreInvoiceTaxes(savedTaxes);
                             }
                         });

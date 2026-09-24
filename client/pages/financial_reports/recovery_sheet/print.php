@@ -12,6 +12,7 @@ if (!$user_id || !$tenant_id) {
 }
 
 require_once '../../../../includes/connection.php';
+require_once '../../../../server/api/financial_reports/recovery_sheet/recovery-sheet-query.php';
 
 // ── Currency ────────────────────────────────────────────────────────────────
 $stmt = $pdo->prepare("
@@ -102,249 +103,37 @@ if ($area_id) {
     $area_name = $s->fetchColumn() ?: '';
 }
 
-// ── Data query (exact same logic as API, with invoice_date + days_overdue) ──
-$query = "
-    SELECT
-        c.customer_name,
-        c.address,
-        c.primary_phone,
-        obi.invoice_number AS bill_no,
-        obi.invoice_date,
-        DATEDIFF(CURDATE(), obi.invoice_date) AS days_overdue,
-        obi.debit - COALESCE((
-            SELECT SUM(rv.amount)
-            FROM receive_voucher rv
-            WHERE rv.bill_no = obi.invoice_number
-            AND rv.customer_id = c.id
-            AND rv.tenant_id = ?
-        ), 0) AS current_balance,
-        COALESCE((
-            SELECT SUM(rv.amount)
-            FROM receive_voucher rv
-            WHERE rv.customer_id = c.id
-            AND rv.tenant_id = ?
-            " . ($date_from ? " AND rv.voucher_date >= ?" : "") . "
-            " . ($date_to   ? " AND rv.voucher_date <= ?" : "") . "
-            " . ($recovery_officer_id ? " AND rv.recovery_officer_id = ?" : "") . "
-        ), 0) AS total_received,
-        COALESCE((
-            SELECT SUM(sr.net_amount)
-            FROM sale_return sr
-            WHERE sr.customer_id = c.id
-            AND sr.tenant_id = ?
-            AND sr.status = 'Posted'
-            " . ($date_from ? " AND sr.sale_date >= ?" : "") . "
-            " . ($date_to   ? " AND sr.sale_date <= ?" : "") . "
-        ), 0) AS total_returns,
-        COALESCE((
-            SELECT SUM(rv.amount)
-            FROM receive_voucher rv
-            WHERE rv.customer_id = c.id
-            AND rv.tenant_id = ?
-            AND (rv.bill_no IS NULL OR rv.bill_no = '' OR rv.bill_no = 'null')
-        ), 0) AS unallocated_received,
-        COALESCE((
-            SELECT SUM(sr.net_amount)
-            FROM sale_return sr
-            WHERE sr.customer_id = c.id
-            AND sr.tenant_id = ?
-            AND sr.status = 'Posted'
-            AND (sr.sale_invoice_no IS NULL OR sr.sale_invoice_no = 0)
-        ), 0) AS unallocated_returns
-    FROM opening_balance_invoices obi
-    JOIN customers c ON obi.customer_id = c.id
-    WHERE obi.tenant_id = ?
-    AND c.status = 'ACTIVE'
-    AND obi.debit > 0
-    " . ($company_id   ? " AND c.company_id = ?"   : "") . "
-    " . ($country_id   ? " AND c.country_id = ?"   : "") . "
-    " . ($region_id    ? " AND c.region_id = ?"    : "") . "
-    " . ($city_id      ? " AND c.city_id = ?"      : "") . "
-    " . ($city_zone_id ? " AND c.city_zone_id = ?" : "") . "
-    " . ($area_id      ? " AND c.area_id = ?"      : "") . "
+// ── Data query — shared helper, same as the live report API and its 4 UNION
+// parts (opening balances, sale invoices, unbilled receive vouchers, unbilled
+// sale returns), so print never drifts from what the page shows again. ──────
+$filters = [
+    'date_from'           => $date_from,
+    'date_to'             => $date_to,
+    'recovery_officer_id' => $recovery_officer_id,
+    'country_id'          => $country_id,
+    'region_id'           => $region_id,
+    'city_id'             => $city_id,
+    'city_zone_id'        => $city_zone_id,
+    'area_id'             => $area_id,
+    'company_id'          => $company_id,
+];
+$rows = getRecoverySheetRows($pdo, $tenant_id, $filters);
 
-    UNION ALL
-
-    SELECT
-        c.customer_name,
-        c.address,
-        c.primary_phone,
-        si.bill_no,
-        si.sale_date AS invoice_date,
-        DATEDIFF(CURDATE(), si.sale_date) AS days_overdue,
-        si.net_amount - COALESCE((
-            SELECT SUM(rv.amount)
-            FROM receive_voucher rv
-            WHERE rv.bill_no = si.bill_no
-            AND rv.customer_id = c.id
-            AND rv.tenant_id = ?
-        ), 0) - COALESCE((
-            SELECT SUM(sr.net_amount)
-            FROM sale_return sr
-            WHERE sr.sale_invoice_no = si.id
-            AND sr.tenant_id = ?
-            AND sr.status = 'Posted'
-        ), 0) AS current_balance,
-        COALESCE((
-            SELECT SUM(rv.amount)
-            FROM receive_voucher rv
-            WHERE rv.customer_id = c.id
-            AND rv.tenant_id = ?
-            " . ($date_from ? " AND rv.voucher_date >= ?" : "") . "
-            " . ($date_to   ? " AND rv.voucher_date <= ?" : "") . "
-            " . ($recovery_officer_id ? " AND rv.recovery_officer_id = ?" : "") . "
-        ), 0) AS total_received,
-        COALESCE((
-            SELECT SUM(sr.net_amount)
-            FROM sale_return sr
-            WHERE sr.customer_id = c.id
-            AND sr.tenant_id = ?
-            AND sr.status = 'Posted'
-            " . ($date_from ? " AND sr.sale_date >= ?" : "") . "
-            " . ($date_to   ? " AND sr.sale_date <= ?" : "") . "
-        ), 0) AS total_returns,
-        COALESCE((
-            SELECT SUM(rv.amount)
-            FROM receive_voucher rv
-            WHERE rv.customer_id = c.id
-            AND rv.tenant_id = ?
-            AND (rv.bill_no IS NULL OR rv.bill_no = '' OR rv.bill_no = 'null')
-        ), 0) AS unallocated_received,
-        COALESCE((
-            SELECT SUM(sr.net_amount)
-            FROM sale_return sr
-            WHERE sr.customer_id = c.id
-            AND sr.tenant_id = ?
-            AND sr.status = 'Posted'
-            AND (sr.sale_invoice_no IS NULL OR sr.sale_invoice_no = 0)
-        ), 0) AS unallocated_returns
-    FROM sale_invoice si
-    JOIN customers c ON si.customer_id = c.id
-    WHERE si.tenant_id = ?
-    AND c.status = 'ACTIVE'
-    AND si.status = 'Posted'
-    AND si.net_amount > 0
-    " . ($recovery_officer_id ? " AND si.sale_officer_id = ?" : "") . "
-    " . ($date_from ? " AND si.sale_date >= ?" : "") . "
-    " . ($date_to   ? " AND si.sale_date <= ?" : "") . "
-    " . ($company_id   ? " AND si.company_id = ?"  : "") . "
-    " . ($country_id   ? " AND c.country_id = ?"   : "") . "
-    " . ($region_id    ? " AND c.region_id = ?"    : "") . "
-    " . ($city_id      ? " AND c.city_id = ?"      : "") . "
-    " . ($city_zone_id ? " AND c.city_zone_id = ?" : "") . "
-    " . ($area_id      ? " AND c.area_id = ?"      : "") . "
-
-    ORDER BY customer_name
-";
-
-$query = "SELECT * FROM ($query) AS recovery_data WHERE current_balance > 0";
-
-// UNION Part 1: opening_balance_invoices
-$params = [$tenant_id];                          // balance subquery
-$params[] = $tenant_id;                          // received subquery tenant
-if ($date_from)           $params[] = $date_from;
-if ($date_to)             $params[] = $date_to;
-if ($recovery_officer_id) $params[] = $recovery_officer_id;
-$params[] = $tenant_id;                          // returns subquery tenant
-if ($date_from) $params[] = $date_from;
-if ($date_to)   $params[] = $date_to;
-$params[] = $tenant_id;                          // unallocated_received subquery
-$params[] = $tenant_id;                          // unallocated_returns subquery
-$params[] = $tenant_id;                          // WHERE obi.tenant_id
-if ($company_id)   $params[] = $company_id;
-if ($country_id)   $params[] = $country_id;
-if ($region_id)    $params[] = $region_id;
-if ($city_id)      $params[] = $city_id;
-if ($city_zone_id) $params[] = $city_zone_id;
-if ($area_id)      $params[] = $area_id;
-
-// UNION Part 2: sale_invoice
-$params[] = $tenant_id;                          // balance subquery rv.tenant_id
-$params[] = $tenant_id;                          // balance subquery sr.tenant_id
-$params[] = $tenant_id;                          // received subquery tenant
-if ($date_from)           $params[] = $date_from;
-if ($date_to)             $params[] = $date_to;
-if ($recovery_officer_id) $params[] = $recovery_officer_id;
-$params[] = $tenant_id;                          // returns subquery tenant
-if ($date_from) $params[] = $date_from;
-if ($date_to)   $params[] = $date_to;
-$params[] = $tenant_id;                          // unallocated_received subquery
-$params[] = $tenant_id;                          // unallocated_returns subquery
-$params[] = $tenant_id;                          // WHERE si.tenant_id
-if ($recovery_officer_id) $params[] = $recovery_officer_id;
-if ($date_from) $params[] = $date_from;
-if ($date_to)   $params[] = $date_to;
-if ($company_id)   $params[] = $company_id;
-if ($country_id)   $params[] = $country_id;
-if ($region_id)    $params[] = $region_id;
-if ($city_id)      $params[] = $city_id;
-if ($city_zone_id) $params[] = $city_zone_id;
-if ($area_id)      $params[] = $area_id;
-
-$stmt = $pdo->prepare($query);
-$stmt->execute($params);
-$rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-// ── Customer View grouping + FIFO simulation ────────────────────────────────
-function groupByCustomerAndSimulate($rows) {
-    $map = [];
-    foreach ($rows as $row) {
-        $name = $row['customer_name'];
-        if (!isset($map[$name])) {
-            $map[$name] = [
-                'customer_name'        => $row['customer_name'],
-                'address'              => $row['address'],
-                'primary_phone'        => $row['primary_phone'],
-                'total_received'       => floatval($row['total_received']),
-                'total_returns'        => floatval($row['total_returns']),
-                'unallocated_received' => floatval($row['unallocated_received']),
-                'unallocated_returns'  => floatval($row['unallocated_returns']),
-                'bills'                => []
-            ];
-        }
-        $map[$name]['bills'][] = $row;
-    }
-    foreach ($map as &$customer) {
-        usort($customer['bills'], fn($a, $b) => strcmp($a['invoice_date'], $b['invoice_date']));
-        $remaining     = $customer['total_received'];
-        $total_balance = 0;
-        foreach ($customer['bills'] as &$bill) {
-            $balance        = floatval($bill['current_balance']);
-            $total_balance += $balance;
-            if ($remaining <= 0) {
-                $bill['sim_cleared'] = 0;
-                $bill['sim_balance'] = $balance;
-                $bill['sim_status']  = 'pending';
-            } else {
-                $cleared             = min($remaining, $balance);
-                $remaining          -= $cleared;
-                $sim_balance         = $balance - $cleared;
-                $bill['sim_cleared'] = $cleared;
-                $bill['sim_balance'] = $sim_balance;
-                $bill['sim_status']  = $sim_balance <= 0 ? 'cleared' : ($cleared > 0 ? 'partial' : 'pending');
-            }
-        }
-        $customer['total_balance'] = $total_balance;
-    }
-    return array_values($map);
-}
-
-// ────── FIX: Filter out zero-balance customers in customer view ──────────────
+// ────── Filter out zero-balance customers in customer view ──────────────
 // This ensures print and page display show identical data (same as JavaScript)
-$customers_grouped = ($view_mode === 'customer') ? array_filter(
-    groupByCustomerAndSimulate($rows),
+$customers_grouped = ($view_mode === 'customer') ? array_values(array_filter(
+    groupRecoverySheetByCustomer($rows),
     function($customer) {
-        $net_bal = $customer['total_balance'] - $customer['unallocated_received'] - $customer['unallocated_returns'];
-        return abs($net_bal) > 0.01; // ZERO_BALANCE_EPSILON matches JavaScript
+        return abs(recoverySheetNetBalance($customer)) > 0.01; // ZERO_BALANCE_EPSILON matches JavaScript
     }
-) : [];
+)) : [];
 
 $total_balance  = 0;
 $total_received = 0;
 $total_returns  = 0;
 if ($view_mode === 'customer') {
     foreach ($customers_grouped as $customer) {
-        $total_balance  += $customer['total_balance'] - $customer['unallocated_received'] - $customer['unallocated_returns'];
+        $total_balance  += recoverySheetNetBalance($customer);
         $total_received += $customer['total_received'];
         $total_returns  += $customer['total_returns'];
     }
@@ -647,7 +436,7 @@ $territory_str   = implode(' > ', $territory_parts);
         <tbody>
         <?php $cIdx = 0; foreach ($customers_grouped as $customer):
             $cIdx++;
-            $net_bal  = $customer['total_balance'] - $customer['unallocated_received'] - $customer['unallocated_returns'];
+            $net_bal  = recoverySheetNetBalance($customer);
             $balClass = $net_bal < 0 ? 'color:#c00;' : '';
             $balText  = ($net_bal < 0 ? '-' : '') . $currency_symbol . number_format(abs($net_bal), 2);
             $oldestDays = $customer['bills'][0]['days_overdue'] ?? '';

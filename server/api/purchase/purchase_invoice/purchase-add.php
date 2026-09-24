@@ -263,14 +263,13 @@ $pdo->beginTransaction();
     $ledger_stmt->execute([$tenant_id, $invoice_id, 14, $input['purchaseDate'], 'Purchase Invoice - ' . $billNo, 0, $input['netAmount']]);
 
     // 6. Save invoice-level taxes
-    if (!empty($input['invoiceTaxes']) && is_array($input['invoiceTaxes'])) {
-        savePurchaseInvoiceTaxes($pdo, $tenant_id, $invoice_id, $input['invoiceTaxes'], $user_id);
-        // Debit each invoice-level tax to Input Tax Receivable (account 107)
-        foreach ($input['invoiceTaxes'] as $tax) {
-            $taxAmt = floatval($tax['taxAmount'] ?? 0);
-            if ($taxAmt > 0) {
-                $ledger_stmt->execute([$tenant_id, $invoice_id, 107, $input['purchaseDate'], 'Purchase Invoice Tax - ' . $billNo, $taxAmt, 0]);
-            }
+    $invoiceTaxesInput = (isset($input['invoiceTaxes']) && is_array($input['invoiceTaxes'])) ? $input['invoiceTaxes'] : [];
+    savePurchaseInvoiceTaxes($pdo, $tenant_id, $invoice_id, $invoiceTaxesInput, $user_id);
+    // Debit each invoice-level tax to Input Tax Receivable (account 107)
+    foreach ($invoiceTaxesInput as $tax) {
+        $taxAmt = floatval($tax['taxAmount'] ?? 0);
+        if ($taxAmt > 0) {
+            $ledger_stmt->execute([$tenant_id, $invoice_id, 107, $input['purchaseDate'], 'Purchase Invoice Tax - ' . $billNo, $taxAmt, 0]);
         }
     }
 

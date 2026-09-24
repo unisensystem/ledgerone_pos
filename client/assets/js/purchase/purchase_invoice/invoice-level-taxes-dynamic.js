@@ -187,11 +187,19 @@ window.getInvoiceTaxData = function() {
  * savedTaxes: array from DB { tax_regime_id, tax_name, rate_percentage, base_amount, tax_amount }
  */
 window.restoreInvoiceTaxes = function(savedTaxes) {
-    if (!savedTaxes || savedTaxes.length === 0) return;
-    savedTaxes.forEach(tax => {
-        const regimeId = tax.tax_regime_id;
-        const percentEl = document.getElementById(`invoiceTax_${regimeId}_percent`);
-        if (percentEl) percentEl.value = parseFloat(tax.rate_percentage).toFixed(3);
+    savedTaxes = savedTaxes || [];
+    const savedByRegime = {};
+    savedTaxes.forEach(tax => { savedByRegime[tax.tax_regime_id] = tax; });
+
+    // For every currently-rendered regime column (loaded from the supplier's default
+    // tax config), set it to the saved value, or explicitly 0 if this invoice has no
+    // saved tax for it — an empty savedTaxes means the user removed the tax, not that
+    // the supplier default should be left in place.
+    (window.invoiceLevelTaxRegimes || []).forEach(regime => {
+        const percentEl = document.getElementById(`invoiceTax_${regime.id}_percent`);
+        if (!percentEl) return;
+        const saved = savedByRegime[regime.id];
+        percentEl.value = saved ? parseFloat(saved.rate_percentage).toFixed(3) : '0.000';
     });
     calculateInvoiceLevelTaxes();
 };

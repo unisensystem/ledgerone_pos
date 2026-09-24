@@ -411,7 +411,7 @@ function renderPermissionsTree(permissions) {
     const permissionsStructure = {
         'Dashboard': [],
         'Customer / Supplier': ['New Customer', 'New Supplier', 'New Customer + Supplier (Both)', 'Leads'],
-        'Sale': ['Sale Order', 'Create Quotation', 'Sale Invoice', 'Med Sale Invoice', 'Sale Tax Invoice', 'Meter Invoice', 'POS Invoice', 'Traders Sale Invoice', 'Issue Delivery Challan', 'Sale Reports', 'Discount Report', 'Daily Sale Report', 'Daily Sales Report (DSR) - Multiple Unit', 'Daily Product Sale', 'Sale Return'],
+        'Sale': ['Sale Order', 'Create Quotation', 'Sale Invoice', 'Med Sale Invoice', 'Sale Tax Invoice', 'Meter Invoice', 'POS Invoice', 'Traders Sale Invoice', 'Issue Delivery Challan', 'Sale Reports', 'Discount Report', 'Daily Sale Report', 'Daily Sales Report (DSR) - Multiple Unit', 'Daily Product Sale', 'Daily Product Sale 2', 'Sale Return'],
         'Purchase': ['Record Purchase Order', 'New Purchase', 'Purchase Tax Invoice', 'Purchase Reports', 'Purchase Return', 'Project Product Rates'],
         'Inventory': ['New Product', 'Stock Adjustment', 'Stock Transfer', 'Stock Position', 'Inward Gatepass', 'Outward Gatepass', 'Container Setup'],
         'Manufacturing': ['Bill of Materials (BOM)', 'Unit Measurement', 'Machine Setup', 'Production Order', 'WIP Management', 'Production Completion', 'Production Expenses', 'Production Wastage', 'Production Report'],
@@ -427,7 +427,7 @@ function renderPermissionsTree(permissions) {
 
     const subPermissions = ['Add', 'Edit', 'Delete'];
     const noSubPermCategories = ['Dashboard', 'Financial Reports'];
-    const noSubPermForms = ['Sale Reports', 'Discount Report', 'Purchase Reports', 'Stock Position', 'Software Info', 'Company Profile', 'Employees Ledger', 'Post Dated Cheques (PDCs)', 'Daily Sale Report', 'Daily Sales Report (DSR) - Multiple Unit', 'Daily Product Sale', 'Bill of Materials (BOM)', 'Production Wastage', 'Production Report', 'Tax Rates Setup', 'Tax Regimes Setup', 'Project Product Rates', 'Container Tracking'];
+    const noSubPermForms = ['Sale Reports', 'Discount Report', 'Purchase Reports', 'Stock Position', 'Software Info', 'Company Profile', 'Employees Ledger', 'Post Dated Cheques (PDCs)', 'Daily Sale Report', 'Daily Sales Report (DSR) - Multiple Unit', 'Daily Product Sale', 'Daily Product Sale 2', 'Bill of Materials (BOM)', 'Production Wastage', 'Production Report', 'Tax Rates Setup', 'Tax Regimes Setup', 'Project Product Rates', 'Container Tracking'];
 
     // Create permission lookup map
     const permMap = {};
@@ -617,8 +617,39 @@ async function restoreDatabase() {
             }
         });
 
+        // The upload itself is usually near-instant — the real wait is the server
+        // running every INSERT statement in the dump, which has no progress signal
+        // of its own (this is a single synchronous request/response). Without this,
+        // the bar sits frozen at 55% still saying "Uploading file..." for however
+        // long the restore actually takes, which looks stuck even when it isn't.
+        // Switch the label the moment the upload finishes, then nudge the bar up
+        // slowly so it stays visibly alive until the real server response arrives.
+        let serverWaitInterval = null;
+        xhr.upload.addEventListener('load', () => {
+            updateRestoreProgress(55, 'Upload complete — restoring data on the server (large backups can take a while)...');
+            let simulated = 55;
+            serverWaitInterval = setInterval(() => {
+                if (simulated < 70) {
+                    simulated += 1;
+                    updateRestoreProgress(simulated, 'Restoring data on the server (large backups can take a while)...');
+                }
+            }, 1000);
+        });
+
         xhr.addEventListener('loadend', async () => {
-            if (xhr.status === 200) {
+            if (serverWaitInterval) {
+                clearInterval(serverWaitInterval);
+                serverWaitInterval = null;
+            }
+            // NOTE: restore_backup.php sends http_response_code(500) on failure (e.g. a
+            // statement in the dump doesn't match the current schema) — it still sends a
+            // valid JSON body either way. The old code here only handled xhr.status===200,
+            // so on any error response this whole block was skipped: no alert, no
+            // hideRestoreProgress() — the modal just sat frozen at whatever percentage it
+            // was on forever, looking exactly like a hang even though the server had
+            // already responded (often within seconds). Parse the body regardless of
+            // status and branch on data.success instead.
+            if (xhr.status === 200 || xhr.status === 500 || xhr.status === 400) {
                 try {
                     const data = JSON.parse(xhr.responseText);
                     updateRestoreProgress(75, 'Processing data...');
@@ -649,6 +680,14 @@ async function restoreDatabase() {
                         alert('Error: Invalid server response');
                     }, 2000);
                 }
+            } else {
+                // Any other status (network-level failure, unexpected server error with no
+                // JSON body, etc.) — surface it instead of leaving the modal frozen.
+                showRestoreError('Restore Failed');
+                setTimeout(() => {
+                    hideRestoreProgress();
+                    alert('Error: Server returned status ' + xhr.status + '. Check the server error log for details.');
+                }, 2000);
             }
         });
 

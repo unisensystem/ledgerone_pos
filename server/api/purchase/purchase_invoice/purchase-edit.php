@@ -445,14 +445,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
         // 4. Credit - Trade Creditors (Net Amount)
         $ledger_stmt->execute([$tenant_id, $invoice_id, 14, $input['purchaseDate'], 'Purchase Invoice - ' . $billNo, 0, $input['netAmount']]);
 
-        // 6. Save invoice-level taxes
-        if (!empty($input['invoiceTaxes']) && is_array($input['invoiceTaxes'])) {
-            savePurchaseInvoiceTaxes($pdo, $tenant_id, $invoice_id, $input['invoiceTaxes'], $user_id);
-            foreach ($input['invoiceTaxes'] as $tax) {
-                $taxAmt = floatval($tax['taxAmount'] ?? 0);
-                if ($taxAmt > 0) {
-                    $ledger_stmt->execute([$tenant_id, $invoice_id, 107, $input['purchaseDate'], 'Purchase Invoice Tax - ' . $billNo, $taxAmt, 0]);
-                }
+        // 6. Save invoice-level taxes — always reconcile (even when the new list is
+        // empty) so a removed/zeroed tax doesn't leave a stale row behind for
+        // print/edit to keep reading.
+        $invoiceTaxesInput = (isset($input['invoiceTaxes']) && is_array($input['invoiceTaxes'])) ? $input['invoiceTaxes'] : [];
+        savePurchaseInvoiceTaxes($pdo, $tenant_id, $invoice_id, $invoiceTaxesInput, $user_id);
+        foreach ($invoiceTaxesInput as $tax) {
+            $taxAmt = floatval($tax['taxAmount'] ?? 0);
+            if ($taxAmt > 0) {
+                $ledger_stmt->execute([$tenant_id, $invoice_id, 107, $input['purchaseDate'], 'Purchase Invoice Tax - ' . $billNo, $taxAmt, 0]);
             }
         }
 

@@ -4,10 +4,15 @@
  */
 
 function savePurchaseInvoiceTaxes($pdo, $tenant_id, $invoice_id, $taxes, $user_id) {
-    if (empty($taxes) || !is_array($taxes)) return true;
+    if (!is_array($taxes)) $taxes = [];
 
+    // Always clear existing taxes first, even when $taxes is empty — otherwise
+    // removing/zeroing a previously-saved invoice-level tax leaves the old row
+    // in place and print/edit keep showing the stale rate.
     $pdo->prepare("DELETE FROM purchase_invoice_taxes WHERE purchase_invoice_id = ? AND tenant_id = ?")
         ->execute([$invoice_id, $tenant_id]);
+
+    if (empty($taxes)) return true;
 
     $stmt = $pdo->prepare("
         INSERT INTO purchase_invoice_taxes
