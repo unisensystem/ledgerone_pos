@@ -63,16 +63,16 @@ async function fetchDropdownData() {
             fetch('../../../../server/api/vouchers/expense_voucher/get-companies.php'),
             fetch('../../../../server/api/master_setup/project_setup/get-projects-dropdown.php')
         ]);
-        
+
         const expenseAccountsRes = await expenseRes.json();
         const companyData = await companyRes.json();
         const projectData = await projectRes.json();
-        
+
         if (expenseAccountsRes.success) {
             allExpenseAccounts = expenseAccountsRes.data;
             initSearchableDropdown('filterExpenseAccountOptions', allExpenseAccounts, filterExpenseAccount);
         }
-        
+
         if (companyData.success) {
             allCompanies = companyData.data;
             companyData.data.forEach(company => {
@@ -82,7 +82,7 @@ async function fetchDropdownData() {
                 filterCompany.appendChild(option);
             });
         }
-        
+
         if (projectData.success) {
             allProjects = projectData.projects;
             projectData.projects.forEach(project => {
@@ -101,7 +101,7 @@ async function fetchDropdownData() {
 function updateStats() {
     const totalVouchers = filteredData.length;
     const totalAmount = filteredData.reduce((sum, v) => sum + parseFloat(v.total_amount), 0);
-    
+
     document.querySelector('.stat-card:nth-child(1) .stat-value').textContent = totalVouchers;
     document.getElementById('totalAmountStat').textContent = CURRENCY_SYMBOL + totalAmount.toFixed(2);
 }
@@ -122,7 +122,7 @@ function renderExpenseTrendChart() {
         date.setDate(today.getDate() - i);
         last30Days.push(date.toISOString().split('T')[0]);
     }
-    
+
     const expensesByDate = {};
     last30Days.forEach(date => expensesByDate[date] = 0);
     filteredData.forEach(expense => {
@@ -130,7 +130,7 @@ function renderExpenseTrendChart() {
             expensesByDate[expense.date] += parseFloat(expense.total_amount);
         }
     });
-    
+
     const seriesData = last30Days.map(date => expensesByDate[date]);
     const categories = last30Days.map(date => new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }));
 
@@ -139,7 +139,7 @@ function renderExpenseTrendChart() {
         trendChart.updateSeries([{ name: 'Expenses', data: seriesData }]);
         return;
     }
-    
+
     trendChart = new ApexCharts(document.querySelector('#expenseTrendChart'), {
         series: [{ name: 'Expenses', data: seriesData }],
         chart: { type: 'area', height: 300, toolbar: { show: false }, zoom: { enabled: false } },
@@ -232,6 +232,8 @@ function renderTopCostCentersChart(data) {
     costCentersChart.render();
 }
 
+// Render table - each voucher's line items (account / cost center / amount) get
+// their own row via rowspan on the voucher-level columns.
 function renderTable() {
     tableBody.innerHTML = '';
 
@@ -252,15 +254,12 @@ function renderTable() {
         return;
     }
 
-    // Pagination - one row per voucher
+    // Pagination - by voucher; each voucher may render as multiple line-item rows
     const startIndex = (currentPage - 1) * itemsPerPage;
     const endIndex = startIndex + itemsPerPage;
     const pageData = filteredData.slice(startIndex, endIndex);
 
-    // Render table rows
     pageData.forEach(expense => {
-        const row = document.createElement('tr');
-
         const dateObj = new Date(expense.date);
         const formattedDate = dateObj.toLocaleDateString('en-US', {
             year: 'numeric',
@@ -268,46 +267,72 @@ function renderTable() {
             day: 'numeric'
         });
 
-        // expense.expense_amounts is a comma-list (one per line item) — the voucher's
-        // own total (already computed server-side) is what belongs in this column.
-        const formattedAmount = CURRENCY_SYMBOL + parseFloat(expense.total_amount).toFixed(2);
-
         const cfVal = parseInt(expense.is_cash_flow);
         const cashFlowBadge = cfVal === 1
             ? `<span class="status-badge status-approved"><i class="fas fa-check-circle"></i> Yes</span>`
             : `<span class="status-badge status-rejected"><i class="fas fa-times-circle"></i> No</span>`;
 
-        row.innerHTML = `
-            <td><strong>${expense.voucher_no}</strong></td>
-            <td>${formattedDate}</td>
-            <td>${expense.description}</td>
-            <td>${expense.project_name || '-'}</td>
-            <td>${expense.expense_accounts || '-'}</td>
-            <td>${expense.cost_centers || '-'}</td>
-            <td class="amount">${formattedAmount}</td>
-            <td>${cashFlowBadge}</td>
-            <td>
-                <div class="action-buttons">
-                    <button class="action-btn view" title="View Full Details" onclick="viewVoucher(${expense.voucher_id})">
-                        <i class="fas fa-eye"></i>
-                    </button>
-                    <button class="action-btn edit" title="Edit" onclick="editVoucher(${expense.voucher_id})">
-                        <i class="fas fa-edit"></i>
-                    </button>
-                    <button class="action-btn cash-flow ${cfVal === 1 ? 'cf-yes' : 'cf-no'}" title="Toggle Cash Flow" onclick="toggleCashFlow(${expense.voucher_id}, ${cfVal}, this)">
-                        <i class="fas fa-water"></i>
-                    </button>
-                    <button class="action-btn print" title="Print" onclick="printVoucher(${expense.voucher_id})">
-                        <i class="fas fa-print"></i>
-                    </button>
-                    <button class="action-btn delete" title="Delete" onclick="openDeleteModal(${expense.voucher_id}, '${expense.voucher_no}')">
-                        <i class="fas fa-trash"></i>
-                    </button>
-                </div>
-            </td>
+        const actionButtons = `
+            <div class="action-buttons">
+                <button class="action-btn view" title="View Full Details" onclick="viewVoucher(${expense.voucher_id})">
+                    <i class="fas fa-eye"></i>
+                </button>
+                <button class="action-btn edit" title="Edit" onclick="editVoucher(${expense.voucher_id})">
+                    <i class="fas fa-edit"></i>
+                </button>
+                <button class="action-btn cash-flow ${cfVal === 1 ? 'cf-yes' : 'cf-no'}" title="Toggle Cash Flow" onclick="toggleCashFlow(${expense.voucher_id}, ${cfVal}, this)">
+                    <i class="fas fa-water"></i>
+                </button>
+                <button class="action-btn print" title="Print" onclick="printVoucher(${expense.voucher_id})">
+                    <i class="fas fa-print"></i>
+                </button>
+                <button class="action-btn delete" title="Delete" onclick="openDeleteModal(${expense.voucher_id}, '${expense.voucher_no}')">
+                    <i class="fas fa-trash"></i>
+                </button>
+            </div>
         `;
 
-        tableBody.appendChild(row);
+        // Split the comma-lists into individual line items
+        const accounts = expense.expense_accounts ? expense.expense_accounts.split(',') : ['-'];
+        const costCenters = expense.cost_centers ? expense.cost_centers.split(',') : [];
+        const amounts = expense.expense_amounts ? expense.expense_amounts.split(',') : [];
+        const lineCount = accounts.length || 1;
+
+        for (let i = 0; i < lineCount; i++) {
+            const row = document.createElement('tr');
+
+            const accName = (accounts[i] || '-').trim();
+            const ccName = (costCenters[i] || '-').trim() || '-';
+            // Fall back to voucher total only if a per-line amount isn't available
+            const lineAmount = amounts[i] !== undefined
+                ? parseFloat(amounts[i])
+                : parseFloat(expense.total_amount);
+            const formattedAmount = CURRENCY_SYMBOL + lineAmount.toFixed(2);
+
+            if (i === 0) {
+                // First line: include voucher-level columns, spanning all its lines
+                row.innerHTML = `
+                    <td rowspan="${lineCount}"><strong>${expense.voucher_no}</strong></td>
+                    <td rowspan="${lineCount}">${formattedDate}</td>
+                    <td rowspan="${lineCount}">${expense.description}</td>
+                    <td rowspan="${lineCount}">${expense.project_name || '-'}</td>
+                    <td>${accName}</td>
+                    <td>${ccName}</td>
+                    <td class="amount">${formattedAmount}</td>
+                    <td rowspan="${lineCount}">${cashFlowBadge}</td>
+                    <td rowspan="${lineCount}">${actionButtons}</td>
+                `;
+            } else {
+                // Subsequent lines: only the per-line columns
+                row.innerHTML = `
+                    <td>${accName}</td>
+                    <td>${ccName}</td>
+                    <td class="amount">${formattedAmount}</td>
+                `;
+            }
+
+            tableBody.appendChild(row);
+        }
     });
 
     // Update pagination
@@ -455,12 +480,12 @@ function filterData() {
         if (amount < minAmount || amount > maxAmount) {
             return false;
         }
-        
+
         // Company filter
         if (companyId && expense.company_id != companyId) {
             return false;
         }
-        
+
         // Project filter
         if (projectId && expense.project_id != projectId) {
             return false;
@@ -492,7 +517,7 @@ function viewVoucher(id) {
         .then(data => {
             if (data.success) {
                 const voucher = data.data;
-                
+
                 // Populate header info
                 document.getElementById('viewVoucherNo').textContent = voucher.voucher_no;
                 document.getElementById('viewDate').textContent = new Date(voucher.date).toLocaleDateString('en-US', {
@@ -512,7 +537,7 @@ function viewVoucher(id) {
                 cfEl.style.color = parseInt(voucher.is_cash_flow) === 1 ? '#2fbf71' : '#e34f4f';
                 document.getElementById('viewDescription').textContent = voucher.description;
                 document.getElementById('viewTotalAmount').textContent = CURRENCY_SYMBOL + parseFloat(voucher.total_amount).toFixed(2);
-                
+
                 // Populate lines
                 const linesBody = document.getElementById('viewLinesBody');
                 linesBody.innerHTML = voucher.lines.map(line => `
@@ -526,7 +551,7 @@ function viewVoucher(id) {
                         <td>${line.cheque_date ? new Date(line.cheque_date).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) : '-'}</td>
                     </tr>
                 `).join('');
-                
+
                 document.getElementById('viewVoucherModal').classList.add('active');
             } else {
                 alert('Error: ' + data.error);
@@ -564,17 +589,8 @@ async function toggleCashFlow(id, currentVal, btn) {
             if (record) record.is_cash_flow = newVal;
             const fRecord = filteredData.find(e => e.id == id);
             if (fRecord) fRecord.is_cash_flow = newVal;
-            // Update button
-            btn.classList.toggle('cf-yes', newVal === 1);
-            btn.classList.toggle('cf-no', newVal === 0);
-            btn.title = `Toggle Cash Flow (${newVal === 1 ? 'Yes' : 'No'})`;
-            btn.setAttribute('onclick', `toggleCashFlow(${id}, ${newVal}, this)`);
-            // Update badge in same row
-            const row = btn.closest('tr');
-            const badgeCell = row.cells[7];
-            badgeCell.innerHTML = newVal === 1
-                ? `<span class="status-badge status-approved"><i class="fas fa-check-circle"></i> Yes</span>`
-                : `<span class="status-badge status-rejected"><i class="fas fa-times-circle"></i> No</span>`;
+            // Full re-render since a voucher's rows can now span multiple <tr> elements
+            renderTable();
         } else {
             alert('Error: ' + data.error);
         }
@@ -638,11 +654,11 @@ function exportToExcel() {
         'Total Items': expense.total_items,
         'Total Amount': parseFloat(expense.total_amount).toFixed(2)
     }));
-    
+
     const worksheet = data.map(row => Object.values(row));
     const headers = Object.keys(data[0] || {});
     worksheet.unshift(headers);
-    
+
     let csv = worksheet.map(row => row.join(',')).join('\n');
     const blob = new Blob([csv], { type: 'text/csv' });
     const url = window.URL.createObjectURL(blob);
@@ -688,7 +704,7 @@ function resetFilters() {
     delete filterCostCenter.dataset.id;
     filterCompany.value = '';
     filterProject.value = '';
-    
+
     // Reload all data
     fetchExpenseVouchers();
 }
@@ -703,7 +719,7 @@ function init() {
         const accountId = this.dataset.id;
         filterCostCenter.value = '';
         delete filterCostCenter.dataset.id;
-        
+
         if (accountId) {
             allCostCenters = await fetchCostCenters(accountId);
             initSearchableDropdown('filterCostCenterOptions', allCostCenters, filterCostCenter);
@@ -718,16 +734,16 @@ function init() {
     newEntryBtn.addEventListener('click', newExpenseEntry);
     applyFiltersBtn.addEventListener('click', filterData);
     resetFiltersBtn.addEventListener('click', resetFilters);
-    
+
     // Export dropdown
     exportBtn.addEventListener('click', (e) => {
         e.stopPropagation();
         exportDropdown.classList.toggle('active');
     });
-    
+
     exportExcel.addEventListener('click', exportToExcel);
     exportJSON.addEventListener('click', exportToJSON);
-    
+
     // Close dropdown when clicking outside
     document.addEventListener('click', () => {
         exportDropdown.classList.remove('active');

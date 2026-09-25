@@ -69,6 +69,16 @@ if ($employee_id && in_array($mode, ['view', 'edit'])) {
     }
 }
 
+// Overtime rate for display: overtime_rate_per_hour is the source of truth (this is
+// what the payroll/report calculations always read), NOT the legacy overtime_rate
+// column. The employee-add.js submit handler normalizes whatever the user types into
+// overtime_rate_per_hour before saving (per_day value ÷ 8 -> per_hour). So here on
+// pre-fill we do the reverse conversion, so the number shown in the field matches
+// what the user would have originally typed for the saved rate type.
+$otRateType = $employee['overtime_rate_type'] ?? 'per_hour';
+$otRatePerHour = (float) ($employee['overtime_rate_per_hour'] ?? 0);
+$otRateDisplay = $otRateType === 'per_day' ? round($otRatePerHour * 8, 2) : $otRatePerHour;
+
 $readonly = ($mode === 'view') ? 'readonly disabled' : '';
 $page_title = $mode === 'view' ? 'View Employee' : ($mode === 'edit' ? 'Edit Employee' : 'Add Employee');
 ?>
@@ -375,20 +385,23 @@ $page_title = $mode === 'view' ? 'View Employee' : ($mode === 'edit' ? 'Edit Emp
      <div class="form-group">
     <label for="overtimeRateType">Overtime Rate Type</label>
     <select id="overtimeRateType" name="overtimeRateType" <?php echo $readonly; ?>>
-        <option value="per_hour" <?php echo ($employee['overtime_rate_type'] ?? 'per_hour') === 'per_hour' ? 'selected' : ''; ?>>Per Hour</option>
-        <option value="per_day" <?php echo ($employee['overtime_rate_type'] ?? '') === 'per_day' ? 'selected' : ''; ?>>Per Day</option>
+        <option value="per_hour" <?php echo $otRateType === 'per_hour' ? 'selected' : ''; ?>>Per Hour</option>
+        <option value="per_day" <?php echo $otRateType === 'per_day' ? 'selected' : ''; ?>>Per Day</option>
     </select>
 </div>
 
 <div class="form-group">
     <label for="overtimeRate">Overtime Rate</label>
     <div style="display: flex; gap: 10px; align-items: center;">
+        <!-- Value is derived from overtime_rate_per_hour (the column payroll/report
+             actually use), converted back to the selected rate type for display,
+             not from the legacy overtime_rate column. -->
         <input type="number" id="overtimeRate" name="overtimeRate" step="0.01"
-               value="<?php echo $employee['overtime_rate'] ?? '0'; ?>"
+               value="<?php echo $otRateDisplay; ?>"
                placeholder="e.g., 300" min="0" style="flex: 1;" <?php echo $readonly; ?>>
-        <span id="rateUnit"><?php echo ($employee['overtime_rate_type'] ?? 'per_hour') === 'per_day' ? 'PKR/Day' : 'PKR/Hour'; ?></span>
+        <span id="rateUnit"><?php echo $otRateType === 'per_day' ? 'PKR/Day' : 'PKR/Hour'; ?></span>
     </div>
-    <small class="text-muted" id="rateHint"><?php echo ($employee['overtime_rate_type'] ?? 'per_hour') === 'per_day' ? 'Monthly rate ÷ 30 days (approximately)' : 'Daily rate ÷ 8 hours'; ?></small>
+    <small class="text-muted" id="rateHint"><?php echo $otRateType === 'per_day' ? 'Monthly rate ÷ 30 days (approximately)' : 'Daily rate ÷ 8 hours'; ?></small>
 </div>
                     </div>
                 </div>

@@ -1,14 +1,20 @@
 <?php
-// Monthly Employee Report â€” single-page dashboard (backend + frontend + JS in one file).
+// Monthly Employee Report — single-page dashboard (backend + frontend + JS in one file).
 // Shows, per employee, day-wise attendance/leave (who came on which date) plus a
 // salary breakdown (present/absent/paid-leave/unpaid-leave/daily-rate/gross/
 // deduction/overtime/net) for a selected date range. Tenant-scoped only (no
-// company/department filter â€” every employee under the logged-in tenant).
+// company/department filter — every employee under the logged-in tenant).
 //
 // The salary math (daily_rate, gross proration, deduction rule, unmarked-days-as-absent
 // rule, overtime pricing) intentionally mirrors hrm/payroll/calculate-suggested.php
 // so this report always agrees with what the Payroll "Calculate" button would
 // suggest for the same employee/period.
+//
+// OVERTIME (two sources, merged — same logic as calculate-suggested.php):
+//   1. Approved leave_records OT entries (manually logged OT).
+//   2. Attendance-derived OT — check_out_time past shift end time, priced at
+//      overtime_rate_per_hour (fallback: daily_rate / 8). >= 15 min threshold.
+//      Dates already in source 1 are skipped to avoid double-counting.
 //
 // This one file serves two roles:
 //   - No ?action= param  -> renders the full HTML/CSS/JS page (requires login)
@@ -62,7 +68,9 @@ function calculateDailyRate(array $emp): float {
     return round($salary / 30, 2);
 }
 
-// Per-employee summary â€” same aggregate rules as calculate-suggested.php.
+// Per-employee summary — same aggregate rules as calculate-suggested.php.
+// OT is merged from two sources: approved leave_records entries + attendance-derived
+// surplus hours past shift end time.
 function computeEmployeeSummary(PDO $pdo, $tenant_id, array $employee, string $periodStart, string $periodEnd): array {
     $employeeCode = $employee['employee_id'];
     $dailyRate = calculateDailyRate($employee);
@@ -82,22 +90,61 @@ function computeEmployeeSummary(PDO $pdo, $tenant_id, array $employee, string $p
         $unpaidLeaveDays += (float) $r['unpaid_days'];
     }
 
-    // Approved overtime logged in this period.
-    // Status compared case-insensitively (LOWER(status)) since OT approvals
-    // have been seen stored as "Approved" while leave approvals use lowercase
-    // "approved" â€” the exact-match version was silently matching zero rows.
+    // ── SOURCE 1: Approved overtime from leave_records ──────────────────────
     $stmt = $pdo->prepare("
-        SELECT ot_hours, ot_amount
+        SELECT start_date AS ot_date, ot_hours, ot_amount
         FROM leave_records
         WHERE tenant_id = ? AND employee_id = ? AND ot_hours IS NOT NULL
           AND LOWER(status) = 'approved' AND start_date BETWEEN ? AND ?
     ");
     $stmt->execute([$tenant_id, $employeeCode, $periodStart, $periodEnd]);
     $otHoursTotal = 0.0; $otAmountTotal = 0.0;
+    $approvedOtDates = [];
     foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $r) {
         $otHoursTotal += (float) $r['ot_hours'];
         $otAmountTotal += (float) $r['ot_amount'];
+        $approvedOtDates[] = $r['ot_date'];
     }
+
+    // ── SOURCE 2: Attendance-derived overtime ────────────────────────────────
+    $shiftTiming   = $employee['shift_timing'] ?? '';
+    $otRatePerHour = (float) ($employee['overtime_rate_per_hour'] ?? 0);
+    if ($otRatePerHour <= 0) {
+        $otRatePerHour = round($dailyRate / 8, 4);
+    }
+
+    if (!empty($shiftTiming)) {
+        $shiftParts  = explode('-', $shiftTiming);
+        $shiftEndStr = isset($shiftParts[1]) ? trim($shiftParts[1]) : null;
+
+        if ($shiftEndStr) {
+            $stmt = $pdo->prepare("
+                SELECT attendance_date, check_out_time
+                FROM attendance
+                WHERE tenant_id = ? AND employee_id = ?
+                  AND attendance_date BETWEEN ? AND ?
+                  AND status = 'present'
+                  AND check_out_time IS NOT NULL
+            ");
+            $stmt->execute([$tenant_id, $employeeCode, $periodStart, $periodEnd]);
+            foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $pr) {
+                $dateStr = $pr['attendance_date'];
+                if (in_array($dateStr, $approvedOtDates, true)) continue;
+
+                $shiftEndDt = new DateTime($dateStr . ' ' . $shiftEndStr . ':00');
+                $checkOutDt = new DateTime($pr['check_out_time']);
+                if ($checkOutDt <= $shiftEndDt) continue;
+
+                $diffMinutes = ($checkOutDt->getTimestamp() - $shiftEndDt->getTimestamp()) / 60;
+                if ($diffMinutes < 15) continue;
+
+                $extraHours   = round($diffMinutes / 60, 2);
+                $otHoursTotal  += $extraHours;
+                $otAmountTotal += round($extraHours * $otRatePerHour, 2);
+            }
+        }
+    }
+
     $otAmountTotal = round($otAmountTotal, 2);
 
     // Attendance present/absent counts for the period.
@@ -121,8 +168,6 @@ function computeEmployeeSummary(PDO $pdo, $tenant_id, array $employee, string $p
     $totalMarkedDays = $presentDays + $absentDays + $paidLeaveDays + $unpaidLeaveDays;
     $unmarkedDays = $calendarDays - $totalMarkedDays;
 
-    // Every unmarked day (no attendance mark and no approved leave covering it)
-    // counts as absent â€” same rule as calculate-suggested.php.
     if ($unmarkedDays > 0) {
         $absentDays += $unmarkedDays;
     }
@@ -134,10 +179,6 @@ function computeEmployeeSummary(PDO $pdo, $tenant_id, array $employee, string $p
         + (float) $employee['communication_allowance'] + (float) $employee['education_allowance']
         + (float) $employee['travel_allowance'] + (float) $employee['other_allowance'];
 
-    // Same proration as calculate-suggested.php: gross is prorated to the
-    // calendar days actually in the selected period (on the same /30 basis as
-    // daily_rate). Without this the report showed the full-month gross while
-    // deducting only the period's absent days, so it disagreed with Payroll.
     $grossAmount = round(($fullMonthGrossAmount / 30) * $calendarDays, 2);
 
     $unpaidLeaveDeduction = round($unpaidLeaveDays * $dailyRate, 2);
@@ -163,16 +204,12 @@ function computeEmployeeSummary(PDO $pdo, $tenant_id, array $employee, string $p
     ];
 }
 
-// Day-by-day "who came on which date" detail for one employee. Informational
-// only â€” it does NOT feed the salary math above (that stays aggregate-based,
-// same as calculate-suggested.php), it's just for the expandable detail row
-// (and for the print view), and now also carries check-in / check-out time
-// for each date so both views can render a real attendance table.
+// Day-by-day detail for one employee.
 function computeEmployeeDayDetails(PDO $pdo, $tenant_id, string $employeeCode, string $periodStart, string $periodEnd): array {
     $stmt = $pdo->prepare("
         SELECT a.attendance_date, a.status, lt.name AS leave_type_name,
-               DATE_FORMAT(a.check_in_time, '%H:%i') AS check_in,
-               DATE_FORMAT(a.check_out_time, '%H:%i') AS check_out
+               DATE_FORMAT(a.check_in_time, '%l:%i %p') AS check_in,
+               DATE_FORMAT(a.check_out_time, '%l:%i %p') AS check_out
         FROM attendance a
         LEFT JOIN leave_types lt ON lt.id = a.leave_type_id
         WHERE a.tenant_id = ? AND a.employee_id = ? AND a.attendance_date BETWEEN ? AND ?
@@ -486,6 +523,7 @@ $currency_symbol = getCurrencySymbol($pdo, $tenant_id);
             <th class="num">Daily Rate</th>
             <th class="num">Gross</th>
             <th class="num">Deduction</th>
+            <th class="num">OT Hours</th>
             <th class="num">OT Amount</th>
             <th class="num">Net Salary</th>
             <th>Details</th>
@@ -502,9 +540,9 @@ $currency_symbol = getCurrencySymbol($pdo, $tenant_id);
 <script>
 const currencySymbol = '<?php echo $currency_symbol; ?>';
 let allEmployees = [];
-let selectedEmployeeIds = new Set(); // empty set = all employees
-let allReportRows = [];     // everything the server returned
-let currentReportRows = []; // what is actually shown (after the absent switch filter)
+let selectedEmployeeIds = new Set();
+let allReportRows = [];
+let currentReportRows = [];
 let currentPeriod = { start: '', end: '' };
 
 function fmtMoney(n) {
@@ -521,9 +559,6 @@ function fmtMonthYear(dateStr) {
 function defaultDates() {
   const now = new Date();
   const first = new Date(now.getFullYear(), now.getMonth(), 1);
-  // Format from LOCAL date parts â€” toISOString() converts to UTC, which in
-  // timezones ahead of UTC (e.g. Pakistan, UTC+5) shifted "1 Sep 00:00" back
-  // to "31 Aug" and added an extra day to the period.
   const iso = d => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
   document.getElementById('periodStart').value = iso(first);
   document.getElementById('periodEnd').value = iso(now);
@@ -615,10 +650,6 @@ async function generateReport() {
   }
 }
 
-// "Fully absent" = no present day, no paid leave and no unpaid leave in the
-// period (only absent / unmarked-counted-as-absent days). Hidden by default
-// until the switch is ticked. The summary boxes and the print view follow the
-// same filter, so they always match what is on screen.
 function isFullyAbsent(r) {
   return Number(r.present_days) === 0 && Number(r.paid_leave_days) === 0 && Number(r.unpaid_leave_days) === 0;
 }
@@ -638,6 +669,7 @@ function applyAbsentFilter() {
     total_absent_days: sum('absent_days'),
     total_paid_leave_days: sum('paid_leave_days'),
     total_unpaid_leave_days: sum('unpaid_leave_days'),
+    total_ot_hours: sum('ot_hours'),
     total_ot_amount: sum('ot_amount'),
     total_net_payroll: sum('net_amount'),
   });
@@ -652,6 +684,7 @@ function renderSummary(s) {
     ['Absent Days', fmtNum(s.total_absent_days)],
     ['Paid Leave', fmtNum(s.total_paid_leave_days)],
     ['Unpaid Leave', fmtNum(s.total_unpaid_leave_days)],
+    ['OT Hours', fmtNum(s.total_ot_hours)],
     ['OT Amount', fmtMoney(s.total_ot_amount)],
     ['Total Net Payroll', fmtMoney(s.total_net_payroll)],
   ];
@@ -668,8 +701,6 @@ function statusClass(status) {
   return 's-unmarked';
 }
 
-// Builds the "Date | Status | Check In | Check Out" table used both in the
-// expandable detail row and in the print view.
 function buildDayTable(dayDetails) {
   const rows = dayDetails.map(d => `
     <tr>
@@ -711,6 +742,7 @@ function renderTable(rows, hiddenCount = 0) {
       <td class="num">${fmtMoney(r.daily_rate)}</td>
       <td class="num">${fmtMoney(r.gross_amount)}</td>
       <td class="num">${fmtMoney(r.deduction_amount)}</td>
+      <td class="num">${fmtNum(r.ot_hours)}</td>
       <td class="num">${fmtMoney(r.ot_amount)}</td>
       <td class="num net-cell">${fmtMoney(r.net_amount)}</td>
       <td><button class="link-btn" data-idx="${idx}">Show Dates</button></td>
@@ -734,10 +766,6 @@ function renderTable(rows, hiddenCount = 0) {
   });
 }
 
-// Opens a separate, print-only page: one section per employee currently in
-// the report (respects the same date range / employee filter as the table
-// on screen), each with a "{Name} Salary - {Month Year}" heading, the
-// from/to range, the salary summary, and the day-by-day attendance table.
 function openPrintView() {
   if (!currentReportRows.length) { alert('Generate a report first.'); return; }
 
@@ -766,6 +794,7 @@ function openPrintView() {
           <tr><th>Present</th><td>${fmtNum(r.present_days)}</td><th>Absent</th><td>${fmtNum(r.absent_days)}</td></tr>
           <tr><th>Paid Leave</th><td>${fmtNum(r.paid_leave_days)}</td><th>Unpaid Leave</th><td>${fmtNum(r.unpaid_leave_days)}</td></tr>
           <tr><th>Daily Rate</th><td>${fmtMoney(r.daily_rate)}</td><th>Gross</th><td>${fmtMoney(r.gross_amount)}</td></tr>
+          <tr><th>OT Hours</th><td>${fmtNum(r.ot_hours)}</td><th>OT Amount</th><td>${fmtMoney(r.ot_amount)}</td></tr>
           <tr><th>Net Salary</th><td colspan="3" class="net">${fmtMoney(r.net_amount)}</td></tr>
         </tbody>
       </table>
@@ -822,7 +851,7 @@ function openPrintView() {
 
 defaultDates();
 loadEmployees();
-generateReport(); // auto-load the current month's data on page open
+generateReport();
 </script>
 </body>
 </html>

@@ -319,7 +319,7 @@ $currency_symbol = $currency['symbol'];
         </div>
     </div>
 
-   <script src="../../../assets/js/vouchers/expense_voucher/expense-list.js"></script>
+<script src="../../../assets/js/vouchers/expense_voucher/expense-list.js?v=<?php echo filemtime(__DIR__ . '/../../../assets/js/vouchers/expense_voucher/expense-list.js'); ?>"></script>
 <?php if ($initialSearch): ?>
 <script>
     window.addEventListener('load', function() {

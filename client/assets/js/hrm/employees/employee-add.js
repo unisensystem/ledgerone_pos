@@ -102,6 +102,17 @@ document.getElementById('employeeForm').addEventListener('submit', async functio
         return;
     }
 
+    // Overtime rate: the single "overtimeRate" input holds the value the user typed,
+    // interpreted according to overtimeRateType (per_hour or per_day). The report and
+    // payroll calculation always read the *per-hour* value (overtime_rate_per_hour),
+    // so we normalize it here before sending, instead of relying on the backend to
+    // guess/convert it.
+    const overtimeRateTypeVal = document.getElementById('overtimeRateType').value || 'per_hour';
+    const overtimeRateRaw = parseFloat(document.getElementById('overtimeRate').value) || 0;
+    const overtimeRatePerHour = overtimeRateTypeVal === 'per_day'
+        ? Math.round((overtimeRateRaw / 8) * 10000) / 10000
+        : overtimeRateRaw;
+
     // Collect form data
     const formData = {
         firstName: document.getElementById('firstName').value,
@@ -127,8 +138,9 @@ document.getElementById('employeeForm').addEventListener('submit', async functio
         employeeType: document.getElementById('employeeType').value,
         baseSalary: document.getElementById('baseSalary').value,
         salaryFrequency: document.getElementById('salaryFrequency').value,
-           overtimeRate: document.getElementById('overtimeRate').value || 0,        // ✅ ADD THIS
-    overtimeRateType: document.getElementById('overtimeRateType').value, 
+        overtimeRate: overtimeRateRaw,               // raw value as typed (respects overtimeRateType)
+        overtimeRatePerHour: overtimeRatePerHour,     // normalized per-hour value used by payroll/report
+        overtimeRateType: overtimeRateTypeVal,
         housingAllowance: document.getElementById('housingAllowance').value || 0,
         transportAllowance: document.getElementById('transportAllowance').value || 0,
         medicalAllowance: document.getElementById('medicalAllowance').value || 0,

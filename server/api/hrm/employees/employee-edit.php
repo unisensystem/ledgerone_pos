@@ -72,7 +72,7 @@ try {
         department_id = ?, position_id = ?, employment_type = ?, employee_category = ?, hire_date = ?,
         probation_end_date = ?, work_location = ?, shift_timing = ?, reporting_manager_id = ?,
         work_hours_per_week = ?,
-        base_salary = ?, salary_currency = ?, salary_frequency = ?, overtime_rate = ?, overtime_rate_type = ?,
+        base_salary = ?, salary_currency = ?, salary_frequency = ?, overtime_rate_per_hour = ?, overtime_rate = ?, overtime_rate_type = ?,
         housing_allowance = ?, transport_allowance = ?, medical_allowance = ?, meal_allowance = ?,
         communication_allowance = ?, education_allowance = ?, travel_allowance = ?, other_allowance = ?,
         annual_bonus_percentage = ?, provident_fund_percentage = ?, gratuity_eligibility = ?,
@@ -83,11 +83,12 @@ try {
         WHERE id = ? AND tenant_id = ?";
     
     $stmt = $pdo->prepare($sql);
-    // Order below matches the SQL column order above exactly — this is
-    // what was previously scrambled (overtime fields were slotted in near
-    // emergencyContact instead of after salary_frequency), which would
-    // have written wrong values into wrong columns even once the ?/:name
-    // mix was fixed.
+    // Order below matches the SQL column order above exactly. overtime_rate_per_hour
+    // was previously missing from this UPDATE entirely (only overtime_rate and
+    // overtime_rate_type were being saved on edit), so the per-hour OT rate used by
+    // the payroll/report calculations could never be updated once an employee was
+    // saved. Added here, right before overtime_rate, to match employee-add.php's
+    // column order.
     $stmt->execute([
         $fullName,
         $data['dateOfBirth'] ?? null,
@@ -117,6 +118,7 @@ try {
         $data['baseSalary'],
         strtoupper($data['currency'] ?? 'USD'),
         $data['salaryFrequency'],
+        $data['overtimeRatePerHour'] ?? 0,
         $data['overtimeRate'] ?? 0,
         $data['overtimeRateType'] ?? 'per_hour',
         $data['housingAllowance'] ?? 0,
