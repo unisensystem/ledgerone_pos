@@ -58,6 +58,8 @@ function formatDate(date) {
 startDateEl.value = formatDate(firstDay);
 endDateEl.value = formatDate(today);
 
+let lastCurrencySymbol = CURRENCY_SYMBOL; // updated on each generateReport(), used by Print/Export
+
 // Searchable dropdown functionality
 function initSearchableDropdown(searchInput, optionsContainer, hiddenInput, data, valueKey, labelKey) {
     let filteredData = data;
@@ -332,6 +334,45 @@ async function fetchReportData(startDate, endDate, branchId, companyId, category
     return result.data;
 }
 
+// Authoritative Net Profit/Loss for the Partner-wise tab.
+//
+// BUG FIX: this used to be computed locally here as
+// `(itemwise revenue sum - itemwise COGS sum) - total_expenses`, which is
+// NOT the same Net Profit shown on the main Profit & Loss Statement page —
+// the item-wise breakdown only covers physical-product sale_invoice_items,
+// so it silently missed Service Revenue and Rent Income, and didn't account
+// for Other Income either. That produced a different (and wrong) "TOTAL
+// PROFIT" on the Partner-wise tab than the "NET PROFIT/LOSS" figure on
+// profit-loss.php for the exact same period/filters.
+//
+// Fixed by calling the SAME API profit-loss.php itself uses
+// (server/api/financial_reports/profit_loss_statement/profit-loss.php) and
+// reducing it with the exact same formula profit-loss.js uses, so partner
+// distribution is guaranteed to match the real Net Profit/Loss instead of
+// drifting from a second, incomplete calculation.
+async function fetchAuthoritativeNetProfit(startDate, endDate, branchId, companyId, currencyId) {
+    let url = `../../../../server/api/financial_reports/profit_loss_statement/profit-loss.php?start_date=${startDate}&end_date=${endDate}`;
+    if (branchId && branchId !== 'all') url += `&branch_id=${branchId}`;
+    if (companyId) url += `&company_id=${companyId}`;
+    if (currencyId) url += `&currency_id=${currencyId}`;
+
+    const response = await fetch(url);
+    const result = await response.json();
+    if (!result.success) {
+        throw new Error(result.message || 'Failed to fetch Profit & Loss data');
+    }
+
+    const data = result.data;
+    const sum = items => (items || []).reduce((s, item) => s + parseFloat(item.amount), 0);
+
+    const totalRevenue = sum(data.sales_revenue) + sum(data.service_revenue) + sum(data.rent_income);
+    const totalCOGS = sum(data.cogs);
+    const totalExpenses = sum(data.expenses);
+    const totalOtherIncome = sum(data.other_income);
+    const grossProfit = totalRevenue - totalCOGS;
+    return grossProfit - totalExpenses - totalOtherIncome;
+}
+
 // Fetch partner accounts and render the Partner-wise distribution table
 // based on the given total profit figure for the period.
 async function renderPartnerTable(totalProfit) {
@@ -430,6 +471,15 @@ async function generateReport() {
         supplierFilterEl.value
     );
 
+    // BUG FIX: window.currentData was read/written all over this file
+    // (Print/Export PDF/Export CSV, renderPartnerTable's stashing) but never
+    // actually initialized anywhere, so Print/Export threw
+    // "Cannot read properties of undefined" for every tab. `data` already
+    // carries itemwise/categorywise/customerwise/invoicewise/supplierwise as
+    // top-level keys (used directly below), so it doubles as the base object;
+    // renderPartnerTable() adds .partnerwise onto this same object later.
+    window.currentData = data;
+
     // Calculate totals
     let totalRevenue = 0;
     let totalCOGS = 0;
@@ -441,17 +491,13 @@ async function generateReport() {
     });
 
     let grossProfit = totalRevenue - totalCOGS;
-    let netProfit = grossProfit - totalExpenses;  // ✅ Calculate Net Profit
     let profitMargin = totalRevenue > 0 ? ((grossProfit / totalRevenue) * 100).toFixed(2) : 0;
-
-    // ✅ Pass Net Profit to partner distribution instead of Gross Profit
-    await renderPartnerTable(netProfit);
-
 
         // Update summary cards
         const selectedOption = currencyFilterEl.options[currencyFilterEl.selectedIndex];
         const currentSymbol = selectedOption && selectedOption.dataset.symbol ? selectedOption.dataset.symbol : CURRENCY_SYMBOL;
-        
+        lastCurrencySymbol = currentSymbol;
+
         totalRevenueEl.textContent = currentSymbol + totalRevenue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         totalCOGSEl.textContent = currentSymbol + totalCOGS.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         grossProfitEl.textContent = currentSymbol + grossProfit.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -687,8 +733,13 @@ async function generateReport() {
 
         supplierTableBody.innerHTML = supplierHTML;
 
-                // Build partner-wise distribution table (based on Net Profit)
-        await renderPartnerTable(netProfit);
+        // Build partner-wise distribution table — based on the authoritative
+        // Net Profit/Loss (same figure the main P&L Statement page shows for
+        // this period/company/branch/currency), not a locally re-derived one.
+        const authoritativeNetProfit = await fetchAuthoritativeNetProfit(
+            startDateEl.value, endDateEl.value, branchFilterEl.value, companyFilterEl.value, currencyFilterEl.value
+        );
+        await renderPartnerTable(authoritativeNetProfit);
 
         // Show results
         summaryCards.style.display = 'grid';
@@ -735,19 +786,23 @@ function resetForm() {
     validationMessage.style.display = 'flex';
 }
 
-// Export functions
-function exportToPDF() {
-    alert('PDF export functionality will be implemented.');
-}
+// Maps each tab to the on-screen table that holds its already-rendered data.
+const TAB_TABLE_ID = {
+    itemwise: 'itemTable',
+    categorywise: 'categoryTable',
+    customerwise: 'customerTable',
+    invoicewise: 'invoiceTable',
+    supplierwise: 'supplierTable',
+    partnerwise: 'partnerTable'
+};
 
-function exportToCSV() {
-    alert('CSV export functionality will be implemented.');
-}
-
-function printReport() {
+// Collects the active tab's data (same source printReport() uses) and stores
+// it in sessionStorage for print.php. Returns the active tab name, or null if
+// there's nothing to export (also alerts in that case).
+function stashActiveTabForPrint() {
     const activeTab = document.querySelector('.tab-btn.active').getAttribute('data-tab');
     let reportData = [];
-    
+
     if (activeTab === 'itemwise') {
         reportData = window.currentData.itemwise;
     } else if (activeTab === 'categorywise') {
@@ -763,14 +818,84 @@ function printReport() {
         // stashes it on window.currentData.partnerwise for printing.
         if (!window.currentData.partnerwise || !window.currentData.partnerwise.partners || window.currentData.partnerwise.partners.length === 0) {
             alert('No partner data available to print. Add partners from Chart of Accounts first.');
-            return;
+            return null;
         }
         reportData = window.currentData.partnerwise;
     }
-    
-    const dataJson = encodeURIComponent(JSON.stringify(reportData));
-    const url = `print.php?start_date=${startDateEl.value}&end_date=${endDateEl.value}&report_type=${activeTab}&data=${dataJson}&currency_id=${currencyFilterEl.value}`;
-    window.open(url, '_blank');
+
+    if (!window.currentData || !reportData) {
+        alert('Please generate a report first.');
+        return null;
+    }
+
+    const payload = {
+        generatedAt: new Date().toISOString(),
+        currencySymbol: lastCurrencySymbol,
+        startDate: startDateEl.value,
+        endDate: endDateEl.value,
+        reportType: activeTab,
+        data: reportData
+    };
+
+    try {
+        sessionStorage.setItem('plDetailPrintData', JSON.stringify(payload));
+    } catch (e) {
+        console.error('Could not prepare report for export:', e);
+        alert('Could not prepare the report for export. Please try again.');
+        return null;
+    }
+    return activeTab;
+}
+
+// Export to PDF — opens the same print.php used by Print Report, which
+// (when given ?pdf=1) renders the report then auto-downloads it as a PDF via
+// html2pdf.js and closes itself.
+function exportToPDF() {
+    if (!stashActiveTabForPrint()) return;
+    window.open('print.php?pdf=1', '_blank');
+}
+
+// Export to CSV — reads the active tab's already-rendered table directly, so
+// the CSV always matches exactly what's on screen.
+function exportToCSV() {
+    const activeTab = document.querySelector('.tab-btn.active').getAttribute('data-tab');
+    const table = document.getElementById(TAB_TABLE_ID[activeTab]);
+    if (!table || !table.querySelector('tbody tr')) {
+        alert('Please generate a report first.');
+        return;
+    }
+    const csv = tableToCSV(table);
+    downloadCSV(csv, `profit-loss-detail-${activeTab}_${new Date().toISOString().slice(0, 10)}.csv`);
+}
+
+function escapeCsvCell(val) {
+    let str = (val === undefined || val === null) ? '' : String(val);
+    if (/[",\n]/.test(str)) str = '"' + str.replace(/"/g, '""') + '"';
+    return str;
+}
+
+function tableToCSV(table) {
+    return Array.from(table.querySelectorAll('tr')).map(row =>
+        Array.from(row.querySelectorAll('th,td')).map(cell => escapeCsvCell(cell.textContent.trim())).join(',')
+    ).join('\r\n');
+}
+
+function downloadCSV(csvContent, filename) {
+    const blob = new Blob(['﻿' + csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    link.style.display = 'none';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+}
+
+function printReport() {
+    if (!stashActiveTabForPrint()) return;
+    window.open('print.php', '_blank');
 }
 
 function toggleHelp() {

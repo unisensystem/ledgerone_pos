@@ -40,6 +40,7 @@ const zakatPercentageEl = document.getElementById('zakatPercentage');
 const zakatAmountEl = document.getElementById('zakatAmount');
 let currentNetProfit = 0;
 let currentCurrencySymbol = CURRENCY_SYMBOL;
+let lastReportPayload = null; // snapshot of the last generated report, handed to print.php via sessionStorage
 
 // Set default dates (current month)
 const today = new Date();
@@ -478,6 +479,35 @@ async function generateReport() {
         chartsSection.style.display = 'none';
     }
 
+    // Snapshot everything the print view needs — captured here (not
+    // re-derived in print.php) so the printed report can never drift from
+    // what's on screen, and so print doesn't have to re-run this report's
+    // heavy multi-currency/COGS-averaging query a second time.
+    const optText = el => el.options[el.selectedIndex]?.text || '';
+    lastReportPayload = {
+        generatedAt: new Date().toISOString(),
+        currencySymbol: currentCurrencySymbol,
+        periodLabel: reportPeriod.textContent,
+        detailLevel,
+        filters: {
+            company: optText(companyFilterEl) || 'All Companies',
+            branch: optText(branchFilterEl) || 'All Branches',
+            currency: optText(currencyFilterEl),
+            project: optText(projectFilterEl) || 'All Projects',
+            container: optText(containerFilterEl) || 'All Containers'
+        },
+        data,
+        totals: {
+            totalSalesRevenue, totalServiceRevenue, totalRentIncome, totalRevenue,
+            totalCOGS, totalExpenses, totalOtherIncome, grossProfit, netProfit,
+            profitMargin: parseFloat(profitMargin)
+        },
+        charts: includeGraphsEl.value === 'yes' ? {
+            revenue: document.getElementById('revenueChart')?.toDataURL('image/png') || null,
+            expense: document.getElementById('expenseChart')?.toDataURL('image/png') || null
+        } : null
+    };
+
         // Scroll to results
         reportResults.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     } catch (error) {
@@ -514,33 +544,81 @@ function resetForm() {
     validationMessage.style.display = 'flex';
 }
 
-// Export to PDF (simulated)
+// Stashes the last generated report into sessionStorage for print.php to
+// pick up. Shared by Print, Export PDF (print.php renders then auto-
+// downloads via html2pdf) and window.open() calls below.
+function stashReportForPrint() {
+    if (!lastReportPayload) {
+        alert('Please generate a report first.');
+        return false;
+    }
+    try {
+        sessionStorage.setItem('plPrintData', JSON.stringify(lastReportPayload));
+        return true;
+    } catch (e) {
+        console.error('Could not prepare report for printing:', e);
+        alert('Could not prepare the report for export. Please try again.');
+        return false;
+    }
+}
+
+// Export to PDF — opens the same print.php used by Print Report, which
+// (when given ?pdf=1) renders the report then auto-downloads it as a PDF via
+// html2pdf.js and closes itself, instead of duplicating the report's layout
+// in a second place.
 function exportToPDF() {
-    validationMessage.className = 'validation-message validation-success';
-    validationText.textContent = 'PDF export started. Your file will download shortly.';
-    validationMessage.style.display = 'flex';
-
-    // In a real application, this would generate and download a PDF
-    setTimeout(() => {
-        alert('In a real application, this would download a PDF file containing the P&L report.');
-    }, 500);
+    if (!stashReportForPrint()) return;
+    window.open('print.php?pdf=1', '_blank');
 }
 
-// Export to CSV (simulated)
+// Export to CSV — reads the already-rendered P&L table directly, so the CSV
+// always matches exactly what's on screen.
 function exportToCSV() {
-    validationMessage.className = 'validation-message validation-success';
-    validationText.textContent = 'CSV export started. Your file will download shortly.';
-    validationMessage.style.display = 'flex';
-
-    // In a real application, this would generate and download a CSV
-    setTimeout(() => {
-        alert('In a real application, this would download a CSV file containing the P&L data.');
-    }, 500);
+    if (!lastReportPayload) {
+        alert('Please generate a report first.');
+        return;
+    }
+    const table = document.getElementById('plTable');
+    const csv = tableToCSV(table);
+    downloadCSV(csv, `profit-loss-statement_${todayStr()}.csv`);
 }
 
-// Print report
+function todayStr() {
+    return new Date().toISOString().slice(0, 10);
+}
+
+function escapeCsvCell(val) {
+    let str = (val === undefined || val === null) ? '' : String(val);
+    if (/[",\n]/.test(str)) str = '"' + str.replace(/"/g, '""') + '"';
+    return str;
+}
+
+function tableToCSV(table) {
+    return Array.from(table.querySelectorAll('tr')).map(row =>
+        Array.from(row.querySelectorAll('th,td')).map(cell => escapeCsvCell(cell.textContent.trim())).join(',')
+    ).join('\r\n');
+}
+
+function downloadCSV(csvContent, filename) {
+    const blob = new Blob(['﻿' + csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    link.style.display = 'none';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+}
+
+// Print report — hands the already-computed report off to a dedicated,
+// professionally-formatted print page instead of window.print()-ing the raw
+// screen (which used to print the sidebar/dashboard chrome, on-screen card
+// styling and un-paginated Chart.js canvases as-is).
 function printReport() {
-    window.print();
+    if (!stashReportForPrint()) return;
+    window.open('print.php', '_blank');
 }
 
 // Toggle help section
