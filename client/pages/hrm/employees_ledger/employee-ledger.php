@@ -25,6 +25,14 @@ $stmt = $pdo->prepare("
 $stmt->execute([$_SESSION['tenant_id']]);
 $currency = $stmt->fetch();
 $currency_symbol = $currency['symbol'];
+
+// Cache-busting version for the JS asset: uses the file's last-modified
+// timestamp so browsers automatically fetch the new file after a deploy,
+// instead of serving a stale cached copy (this was causing the running
+// balance in Individual View to show old/incorrect values even after the
+// JS logic was fixed on the server).
+$js_path = __DIR__ . '/../../../assets/js/hrm/employees_ledger/employee-ledger.js';
+$js_version = file_exists($js_path) ? filemtime($js_path) : time();
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -217,6 +225,6 @@ $currency_symbol = $currency['symbol'];
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
     <script src="https://unpkg.com/@zxing/library@latest"></script>
-    <script src="../../../assets/js/hrm/employees_ledger/employee-ledger.js"></script>
+    <script src="../../../assets/js/hrm/employees_ledger/employee-ledger.js?v=<?php echo $js_version; ?>"></script>
 </body>
 </html>

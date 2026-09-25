@@ -41,9 +41,10 @@ try {
     $stOld->execute([$payroll_id, $tenant_id]);
     $oldPayroll = $stOld->fetch(PDO::FETCH_ASSOC);
     if (!$oldPayroll) throw new Exception('Payroll entry not found');
-    if ($oldPayroll['status'] === 'finalized' && empty($data['acknowledge_finalized'])) {
-        throw new Exception("This payroll (\"{$oldPayroll['payroll_code']}\") is finalized and locked. Resubmit with acknowledge_finalized=true to make a controlled correction.");
-    }
+    // NOTE: there is no draft/approval workflow — every payroll is finalized
+    // and posted immediately on save, so edits are never blocked/locked here.
+    // (A previous version of this endpoint required acknowledge_finalized to
+    // edit a finalized payroll; that gate has been removed by design.)
 
     $stOldItems = $pdo->prepare("SELECT employee_id, type, payment_method_id, bank_account_id, amount FROM payroll_entries_items WHERE tenant_id = ? AND payroll_id = ? ORDER BY id");
     $stOldItems->execute([$tenant_id, $payroll_id]);
@@ -54,21 +55,31 @@ try {
     // Calculate total amount
     $total_amount = array_sum(array_column($items, 'amount'));
 
-    // Update payroll entry
+    // Update payroll entry — status is always forced to 'finalized' here.
+    // FIX: this query used to leave `status` untouched entirely, so a
+    // payroll that was saved as 'draft' (back when the auto-calculate flow
+    // still set that) stayed 'draft' forever, no matter how many times it
+    // was edited/saved afterward. There is no draft state anymore, so every
+    // edit finalizes the record.
     $stmt = $pdo->prepare("
         UPDATE payroll_entries
-        SET payroll_date = ?, total_amount = ?, company_id = ?
+        SET payroll_date = ?, total_amount = ?, company_id = ?, status = 'finalized'
         WHERE id = ? AND tenant_id = ?
     ");
     $stmt->execute([$payroll_date, $total_amount, $company_id, $payroll_id, $tenant_id]);
-
-    // Delete old accounting entries — only relevant if this payroll was ever posted
-    // (i.e. it's finalized). A draft payroll being edited never had ledger entries
-    // in the first place (see payroll-add.php), so there's nothing to remove.
-    if ($oldPayroll['status'] === 'finalized') {
-        $stmt = $pdo->prepare("DELETE FROM accounting_ledger WHERE tenant_id = ? AND transaction_type = 'payroll' AND reference_table = 'payroll_entries' AND reference_id = ?");
-        $stmt->execute([$tenant_id, $payroll_id]);
+    if (empty($oldPayroll['finalized_at'] ?? null)) {
+        $pdo->prepare("UPDATE payroll_entries SET finalized_at = COALESCE(finalized_at, NOW()), finalized_by = COALESCE(finalized_by, ?) WHERE id = ?")->execute([$user_id, $payroll_id]);
     }
+
+    // Delete old accounting entries. FIX: this used to be gated on
+    // `$oldPayroll['status'] === 'finalized'`, so editing a payroll that was
+    // still sitting as 'draft' (never posted) would skip this — harmless on
+    // its own, but paired with the insert gate below it meant a legacy draft
+    // record's ledger entries were never created even after this edit set it
+    // to finalized. Since every payroll is finalized now, always clear the
+    // old entries before re-posting.
+    $stmt = $pdo->prepare("DELETE FROM accounting_ledger WHERE tenant_id = ? AND transaction_type = 'payroll' AND reference_table = 'payroll_entries' AND reference_id = ?");
+    $stmt->execute([$tenant_id, $payroll_id]);
 
     // Delete old payroll items
     $stmt = $pdo->prepare("DELETE FROM payroll_entries_items WHERE tenant_id = ? AND payroll_id = ?");
@@ -105,43 +116,41 @@ try {
         ]);
     }
     
-    // Create new accounting entries — same gating as the delete above: only a
-    // finalized payroll is on the books at all, so only re-post for one.
-    if ($oldPayroll['status'] === 'finalized') {
-        $stmt = $pdo->prepare("
-            INSERT INTO accounting_ledger
-            (tenant_id, transaction_type, reference_table, reference_id, account_id, date, description, debit, credit)
-            VALUES (?, 'payroll', 'payroll_entries', ?, ?, ?, ?, ?, ?)
-        ");
+    // Create new accounting entries. FIX: same gate removed as the delete
+    // above — always re-post, since every payroll is finalized now.
+    $stmt = $pdo->prepare("
+        INSERT INTO accounting_ledger
+        (tenant_id, transaction_type, reference_table, reference_id, account_id, date, description, debit, credit)
+        VALUES (?, 'payroll', 'payroll_entries', ?, ?, ?, ?, ?, ?)
+    ");
 
-        foreach ($items as $item) {
-            $description = $item['type'] . ' - ' . $item['employee_code'];
+    foreach ($items as $item) {
+        $description = $item['type'] . ' - ' . $item['employee_code'];
 
-            // Get payment account_id
-            if ($item['payment_method_id'] == 7) {
-                $payment_account_id = 1; // Cash
-            } else {
-                $bankStmt = $pdo->prepare("SELECT account_id FROM bank_accounts WHERE id = ? AND tenant_id = ?");
-                $bankStmt->execute([$item['bank_account_id'], $tenant_id]);
-                $payment_account_id = $bankStmt->fetchColumn() ?: 1;
-            }
+        // Get payment account_id
+        if ($item['payment_method_id'] == 7) {
+            $payment_account_id = 1; // Cash
+        } else {
+            $bankStmt = $pdo->prepare("SELECT account_id FROM bank_accounts WHERE id = ? AND tenant_id = ?");
+            $bankStmt->execute([$item['bank_account_id'], $tenant_id]);
+            $payment_account_id = $bankStmt->fetchColumn() ?: 1;
+        }
 
-            // Determine accounts based on type
-            if (in_array($item['type'], ['Advance', 'Advance Return'])) {
-                if ($item['type'] === 'Advance') {
-                    $stmt->execute([$tenant_id, $payroll_id, 31, $payroll_date, $description, $item['amount'], 0]);
-                    $stmt->execute([$tenant_id, $payroll_id, $payment_account_id, $payroll_date, $description, 0, $item['amount']]);
-                } else {
-                    $stmt->execute([$tenant_id, $payroll_id, $payment_account_id, $payroll_date, $description, $item['amount'], 0]);
-                    $stmt->execute([$tenant_id, $payroll_id, 31, $payroll_date, $description, 0, $item['amount']]);
-                }
-            } else {
-                // account_id 60 = Salaries Expense. (This used to post to 28,
-                // Salaries Payable — a Liability account — which payroll-add.php
-                // already had a fix for; this edit path had been missed.)
-                $stmt->execute([$tenant_id, $payroll_id, 60, $payroll_date, $description, $item['amount'], 0]);
+        // Determine accounts based on type
+        if (in_array($item['type'], ['Advance', 'Advance Return'])) {
+            if ($item['type'] === 'Advance') {
+                $stmt->execute([$tenant_id, $payroll_id, 31, $payroll_date, $description, $item['amount'], 0]);
                 $stmt->execute([$tenant_id, $payroll_id, $payment_account_id, $payroll_date, $description, 0, $item['amount']]);
+            } else {
+                $stmt->execute([$tenant_id, $payroll_id, $payment_account_id, $payroll_date, $description, $item['amount'], 0]);
+                $stmt->execute([$tenant_id, $payroll_id, 31, $payroll_date, $description, 0, $item['amount']]);
             }
+        } else {
+            // account_id 60 = Salaries Expense. (This used to post to 28,
+            // Salaries Payable — a Liability account — which payroll-add.php
+            // already had a fix for; this edit path had been missed.)
+            $stmt->execute([$tenant_id, $payroll_id, 60, $payroll_date, $description, $item['amount'], 0]);
+            $stmt->execute([$tenant_id, $payroll_id, $payment_account_id, $payroll_date, $description, 0, $item['amount']]);
         }
     }
 

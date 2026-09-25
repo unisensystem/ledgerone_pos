@@ -335,19 +335,26 @@ function renderIndividualView(transactions) {
         // Get employee's transactions sorted by date
         const empTransactions = transactionsByEmployee[empId].sort((a, b) => new Date(a.date) - new Date(b.date));
 
+        // FIX: runningBalance is now always kept as a MAGNITUDE (absolute
+        // value) between iterations, with runningType tracking the sign
+        // separately. The old code stored the signed result of one
+        // iteration directly into runningBalance, then blindly re-negated
+        // it on the next iteration if runningType was 'Cr' — double-negating
+        // an already-signed number and corrupting the balance (e.g. a Cr
+        // 12400 line following a Dr 12400 line, which should net back to
+        // the exact opening balance, instead ballooned the balance upward).
         let runningBalance = employee.openingBalance || 0;
         let runningType = employee.openingType || null;
 
         // Render each transaction
         empTransactions.forEach(transaction => {
-            // Calculate running balance
-            if (runningType === 'Cr') {
-                runningBalance = -runningBalance; // Convert to negative for calculation
-            }
+            // Convert the stored magnitude to a signed value for this step
+            let signedBalance = runningType === 'Cr' ? -runningBalance : runningBalance;
+            signedBalance = signedBalance + transaction.debit - transaction.credit;
 
-            runningBalance = runningBalance + transaction.debit - transaction.credit;
-            runningType = runningBalance >= 0 ? 'Dr' : 'Cr';
-            const absRunningBalance = Math.abs(runningBalance);
+            runningType = signedBalance >= 0 ? 'Dr' : 'Cr';
+            runningBalance = Math.abs(signedBalance); // store back as magnitude
+            const absRunningBalance = runningBalance;
 
             const row = document.createElement('tr');
             const debitDisplay = transaction.debit > 0 ? window.currencySymbol + transaction.debit.toLocaleString() : (transaction.displayAmount > 0 ? window.currencySymbol + transaction.displayAmount.toLocaleString() : '');
@@ -364,7 +371,7 @@ function renderIndividualView(transactions) {
         });
 
         // Add closing balance row
-        const absRunningBalance = Math.abs(runningBalance);
+        const absRunningBalance = runningBalance;
         const closingRow = document.createElement('tr');
         closingRow.className = 'balance-row';
         closingRow.innerHTML = `
@@ -421,19 +428,20 @@ function renderIndividualTransactions(employeeId) {
             `;
     individualTableBody.appendChild(openingRow);
 
+    // FIX: same magnitude/sign bug as renderIndividualView above — kept
+    // consistent since this function duplicates the same rendering logic
+    // for the "click a summary row" entry point.
     let runningBalance = employee.openingBalance || 0;
     let runningType = employee.openingType || null;
 
     // Render each transaction
     empTransactions.forEach(transaction => {
-        // Calculate running balance
-        if (runningType === 'Cr') {
-            runningBalance = -runningBalance; // Convert to negative for calculation
-        }
+        let signedBalance = runningType === 'Cr' ? -runningBalance : runningBalance;
+        signedBalance = signedBalance + transaction.debit - transaction.credit;
 
-        runningBalance = runningBalance + transaction.debit - transaction.credit;
-        runningType = runningBalance >= 0 ? 'Dr' : 'Cr';
-        const absRunningBalance = Math.abs(runningBalance);
+        runningType = signedBalance >= 0 ? 'Dr' : 'Cr';
+        runningBalance = Math.abs(signedBalance);
+        const absRunningBalance = runningBalance;
 
         const row = document.createElement('tr');
         const debitDisplay = transaction.debit > 0 ? window.currencySymbol + transaction.debit.toLocaleString() : (transaction.displayAmount > 0 ? window.currencySymbol + transaction.displayAmount.toLocaleString() : '');
@@ -450,7 +458,7 @@ function renderIndividualTransactions(employeeId) {
     });
 
     // Add closing balance row
-    const absRunningBalance = Math.abs(runningBalance);
+    const absRunningBalance = runningBalance;
     const closingRow = document.createElement('tr');
     closingRow.className = 'balance-row';
     closingRow.innerHTML = `
