@@ -172,6 +172,7 @@ $js_version = file_exists($js_path) ? filemtime($js_path) : time();
                                 <th>Date</th>
                                 <th>Voucher No.</th>
                                 <th>Particulars</th>
+                                <th>Description</th> 
                                 <th>Debit Amount (Dr)</th>
                                 <th>Credit Amount (Cr)</th>
                                 <th>Balance</th>

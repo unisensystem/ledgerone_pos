@@ -68,7 +68,9 @@ $employeesData = $stmt->fetchAll(PDO::FETCH_ASSOC);
 $transactions = [];
 foreach ($employeesData as $emp) {
     $transSql = "SELECT pei.created_at as date, pe.payroll_code as voucher_no, 
-                        pei.type, pei.description, pei.amount, pei.employee_id
+                        pei.type, pei.description, pei.amount, pei.employee_id,
+                        pei.gross_amount, pei.deduction_amount, pei.ot_amount,
+                        pei.absent_days, pei.unpaid_leave_days
                  FROM payroll_entries_items pei
                  JOIN payroll_entries pe ON pei.payroll_id = pe.id
                  WHERE pei.tenant_id = ? AND pei.employee_id = ?";
@@ -89,29 +91,80 @@ foreach ($employeesData as $emp) {
     $transStmt->execute($transParams);
     $empTransactions = $transStmt->fetchAll(PDO::FETCH_ASSOC);
     
-    foreach ($empTransactions as $trans) {
-        $debit = 0;
-        $credit = 0;
-        $displayAmount = 0;
-        
-        if (in_array($trans['type'], ['Advance'])) {
-            $debit = $trans['amount'];
-        } elseif (in_array($trans['type'], ['Advance Return', 'Salary Adjustment'])) {
-            $credit = $trans['amount'];
-        } else {
-            $displayAmount = $trans['amount'];
+        foreach ($empTransactions as $trans) {
+            $date = date('Y-m-d', strtotime($trans['date']));
+
+            if (in_array($trans['type'], ['Advance'])) {
+                // Simple debit — employee owes company
+                $transactions[] = [
+                    'employeeId'    => $trans['employee_id'],
+                    'date'          => $date,
+                    'voucherNo'     => $trans['voucher_no'],
+                    'particulars'   => $trans['type'],
+                    'description'   => $trans['description'] ?? '',
+                    'debit'         => (float)$trans['amount'],
+                    'credit'        => 0,
+                    'displayAmount' => 0,
+                ];
+            } elseif (in_array($trans['type'], ['Advance Return', 'Salary Adjustment'])) {
+                // Simple credit — employee pays back
+                $transactions[] = [
+                    'employeeId'    => $trans['employee_id'],
+                    'date'          => $date,
+                    'voucherNo'     => $trans['voucher_no'],
+                    'particulars'   => $trans['type'],
+                    'description'   => $trans['description'] ?? '',
+                    'debit'         => 0,
+                    'credit'        => (float)$trans['amount'],
+                    'displayAmount' => 0,
+                ];
+            } else {
+                // Salary / Commission / Bonus etc — dual leg (Payable + Paid)
+                // net effect on balance = 0, same as API
+                $hasBreakdown  = isset($trans['gross_amount']) && $trans['gross_amount'] !== null;
+                $displayAmt    = $hasBreakdown ? (float)$trans['gross_amount'] : (float)$trans['amount'];
+
+                $description = '';
+                if ($hasBreakdown) {
+                    $deduction = (float)$trans['deduction_amount'];
+                    $ot        = (float)$trans['ot_amount'];
+                    $netPaid   = (float)$trans['amount'];
+                    $parts = [];
+                    if ($trans['absent_days'] > 0)      $parts[] = $trans['absent_days']      . ' absent day(s)';
+                    if ($trans['unpaid_leave_days'] > 0) $parts[] = $trans['unpaid_leave_days'] . ' unpaid leave day(s)';
+                    $reason = $parts ? implode(' + ', $parts) : 'deductions';
+
+                    $description = 'Gross ' . number_format($displayAmt, 2)
+                        . ($deduction > 0 ? ' − ' . number_format($deduction, 2) . " ({$reason})" : '')
+                        . ($ot        > 0 ? ' + OT ' . number_format($ot, 2)       : '')
+                        . ' = Net Paid ' . number_format($netPaid, 2);
+                }
+
+                // Leg 1 — Payable (Credit)
+                $transactions[] = [
+                    'employeeId'    => $trans['employee_id'],
+                    'date'          => $date,
+                    'voucherNo'     => $trans['voucher_no'],
+                    'particulars'   => $trans['type'] . ' Payable',
+                    'description'   => '',           // description only on Paid leg
+                    'debit'         => 0,
+                    'credit'        => $displayAmt,
+                    'displayAmount' => 0,
+                ];
+
+                // Leg 2 — Paid (Debit)
+                $transactions[] = [
+                    'employeeId'    => $trans['employee_id'],
+                    'date'          => $date,
+                    'voucherNo'     => $trans['voucher_no'],
+                    'particulars'   => ($trans['description'] ? $trans['description'] . ' - Paid' : $trans['type'] . ' Paid'),
+                    'description'   => $description,  // breakdown shown here
+                    'debit'         => $displayAmt,
+                    'credit'        => 0,
+                    'displayAmount' => 0,
+                ];
+            }
         }
-        
-        $transactions[] = [
-            'employeeId' => $trans['employee_id'],
-            'date' => date('Y-m-d', strtotime($trans['date'])),
-            'voucherNo' => $trans['voucher_no'],
-            'particulars' => $trans['description'] ?: $trans['type'],
-            'debit' => (float)$debit,
-            'credit' => (float)$credit,
-            'displayAmount' => (float)$displayAmount
-        ];
-    }
 }
 
 // Format employees
@@ -123,7 +176,8 @@ foreach ($employeesData as $emp) {
     
     $softOpeningBalance = $hardOpeningBalance;
     if ($start_date) {
-        $beforeDateSql = "SELECT pei.type, pei.amount
+        $beforeDateSql = "SELECT pei.type, pei.amount, pei.gross_amount, pei.deduction_amount, pei.ot_amount,
+                                 pei.absent_days, pei.unpaid_leave_days
                          FROM payroll_entries_items pei
                          JOIN payroll_entries pe ON pei.payroll_id = pe.id
                          WHERE pei.tenant_id = ? AND pei.employee_id = ? AND DATE(pei.created_at) < ?";
@@ -141,11 +195,11 @@ foreach ($employeesData as $emp) {
     }
     
     $employees[] = [
-        'id' => $emp['employee_id'],
-        'name' => $emp['full_name'],
-        'department' => $emp['department_name'] ?: 'N/A',
+        'id'             => $emp['employee_id'],
+        'name'           => $emp['full_name'],
+        'department'     => $emp['department_name'] ?: 'N/A',
         'openingBalance' => (float)abs($softOpeningBalance),
-        'openingType' => $softOpeningBalance >= 0 ? 'Dr' : 'Cr'
+        'openingType'    => $softOpeningBalance >= 0 ? 'Dr' : 'Cr',
     ];
 }
 
@@ -214,6 +268,14 @@ foreach ($employeesData as $emp) {
         td {
             padding: 6px 8px;
             border: 1px solid #ddd;
+            vertical-align: top;
+        }
+
+        /* Description column: smaller, muted */
+        .col-description {
+            font-size: 10px;
+            color: #555;
+            max-width: 200px;
         }
         
         .amount-debit {
@@ -261,17 +323,13 @@ foreach ($employeesData as $emp) {
         }
         
         @media print {
-            body {
-                padding: 10px;
-            }
-            
-            .no-print {
-                display: none;
-            }
+            body { padding: 10px; }
+            .no-print { display: none; }
         }
     </style>
 </head>
 <body>
+    <!-- ===== HEADER ===== -->
     <div class="print-header">
         <?php if ($company_logo): ?>
             <img src="../../../assets/uploads/company_logo/<?php echo htmlspecialchars($company_logo); ?>" alt="Company Logo" style="max-height: 60px; margin-bottom: 10px;">
@@ -289,176 +347,191 @@ foreach ($employeesData as $emp) {
         <?php endif; ?>
         <h2 style="margin-top: 10px;">Employee Ledger Report</h2>
     </div>
-    
+
+    <!-- ===== PRINT INFO ===== -->
     <div class="print-info">
         <div>
-            <strong>Period:</strong> <?php echo date('d M Y', strtotime($start_date)); ?> to <?php echo date('d M Y', strtotime($end_date)); ?>
+            <strong>Period:</strong>
+            <?php echo date('d M Y', strtotime($start_date)); ?> to <?php echo date('d M Y', strtotime($end_date)); ?>
         </div>
         <div>
             <strong>Generated By:</strong> <?php echo htmlspecialchars($generated_by); ?><br>
             <strong>Print Date:</strong> <?php echo date('d M Y h:i A'); ?>
         </div>
     </div>
-    
+
     <?php if ($view === 'summary'): ?>
-        <!-- Summary View -->
-        <table>
-            <thead>
-                <tr>
-                    <th>Employee ID</th>
-                    <th>Employee Name</th>
-                    <th>Department</th>
-                    <th class="text-right">Opening Balance</th>
-                    <th class="text-right">Total Debit</th>
-                    <th class="text-right">Total Credit</th>
-                    <th class="text-right">Closing Balance</th>
-                </tr>
-            </thead>
-            <tbody>
-                <?php
-                $employeeIds = array_unique(array_column($transactions, 'employeeId'));
-                if (empty($employeeIds)) {
-                    $employeeIds = array_column($employees, 'id');
-                }
-                
-                foreach ($employeeIds as $empId):
-                    $employee = array_values(array_filter($employees, function($e) use ($empId) {
-                        return $e['id'] === $empId;
-                    }))[0] ?? null;
-                    
-                    if (!$employee) continue;
-                    
-                    $empTransactions = array_filter($transactions, function($t) use ($empId) {
-                        return $t['employeeId'] === $empId;
-                    });
-                    
-                    $totalDebit = array_sum(array_column($empTransactions, 'debit'));
-                    $totalCredit = array_sum(array_column($empTransactions, 'credit'));
-                    
-                    $openingBalance = $employee['openingBalance'] ?? 0;
-                    $openingType = $employee['openingType'] ?? 'Dr';
-                    
-                    if ($openingType === 'Cr') {
-                        $openingBalance = -$openingBalance;
-                    }
-                    
-                    $closingBalance = $openingBalance + $totalDebit - $totalCredit;
-                    $closingType = $closingBalance >= 0 ? 'Dr' : 'Cr';
-                    $absClosingBalance = abs($closingBalance);
-                    
-                    if ($employee_id === 'all' && $absClosingBalance === 0) continue;
-                ?>
-                <tr>
-                    <td><?php echo strtoupper($empId); ?></td>
-                    <td><?php echo htmlspecialchars($employee['name']); ?></td>
-                    <td><?php echo htmlspecialchars($employee['department']); ?></td>
-                    <td class="text-right"><?php echo $currency_symbol . number_format($employee['openingBalance'], 2) . ' ' . $openingType; ?></td>
-                    <td class="amount-debit"><?php echo $currency_symbol . number_format($totalDebit, 2); ?></td>
-                    <td class="amount-credit"><?php echo $currency_symbol . number_format($totalCredit, 2); ?></td>
-                    <td class="<?php echo $closingType === 'Dr' ? 'balance-dr' : 'balance-cr'; ?>">
-                        <?php echo $currency_symbol . number_format($absClosingBalance, 2) . ' ' . $closingType; ?>
-                    </td>
-                </tr>
-                <?php endforeach; ?>
-            </tbody>
-        </table>
+    <!-- ===================================================
+         SUMMARY VIEW  (no Description column here — totals only)
+         =================================================== -->
+    <table>
+        <thead>
+            <tr>
+                <th>Employee ID</th>
+                <th>Employee Name</th>
+                <th>Department</th>
+                <th class="text-right">Opening Balance</th>
+                <th class="text-right">Total Debit</th>
+                <th class="text-right">Total Credit</th>
+                <th class="text-right">Closing Balance</th>
+            </tr>
+        </thead>
+        <tbody>
+            <?php
+            $employeeIds = array_unique(array_column($transactions, 'employeeId'));
+            if (empty($employeeIds)) {
+                $employeeIds = array_column($employees, 'id');
+            }
+
+            foreach ($employeeIds as $empId):
+                $employee = array_values(array_filter($employees, fn($e) => $e['id'] === $empId))[0] ?? null;
+                if (!$employee) continue;
+
+                $empTrans = array_filter($transactions, fn($t) => $t['employeeId'] === $empId);
+                $totalDebit  = array_sum(array_column($empTrans, 'debit'));
+                $totalCredit = array_sum(array_column($empTrans, 'credit'));
+
+                $openingBalance = $employee['openingBalance'];
+                $openingType    = $employee['openingType'];
+                $signedOpening  = $openingType === 'Cr' ? -$openingBalance : $openingBalance;
+
+                $closingBalance = $signedOpening + $totalDebit - $totalCredit;
+                $closingType    = $closingBalance >= 0 ? 'Dr' : 'Cr';
+                $absClosing     = abs($closingBalance);
+
+                if ($employee_id === 'all' && $absClosing === 0 && $openingBalance === 0) continue;
+            ?>
+            <tr>
+                <td><?php echo strtoupper($empId); ?></td>
+                <td><?php echo htmlspecialchars($employee['name']); ?></td>
+                <td><?php echo htmlspecialchars($employee['department']); ?></td>
+                <td class="text-right">
+                    <?php echo $currency_symbol . number_format($employee['openingBalance'], 0) . ' ' . $openingType; ?>
+                </td>
+                <td class="amount-debit"><?php echo $currency_symbol . number_format($totalDebit, 0); ?></td>
+                <td class="amount-credit"><?php echo $currency_symbol . number_format($totalCredit, 0); ?></td>
+                <td class="<?php echo $closingType === 'Dr' ? 'balance-dr' : 'balance-cr'; ?>">
+                    <?php echo $currency_symbol . number_format($absClosing, 0) . ' ' . $closingType; ?>
+                </td>
+            </tr>
+            <?php endforeach; ?>
+        </tbody>
+    </table>
+
     <?php else: ?>
-        <!-- Individual View -->
-        <?php
-        $employeeIds = array_unique(array_column($transactions, 'employeeId'));
-        
-        foreach ($employeeIds as $empId):
-            $employee = array_values(array_filter($employees, function($e) use ($empId) {
-                return $e['id'] === $empId;
-            }))[0] ?? null;
-            
-            if (!$employee) continue;
-            
-            $empTransactions = array_filter($transactions, function($t) use ($empId) {
-                return $t['employeeId'] === $empId;
-            });
-            
-            usort($empTransactions, function($a, $b) {
-                return strtotime($a['date']) - strtotime($b['date']);
-            });
-        ?>
-        <table>
-            <thead>
-                <tr>
-                    <th>Date</th>
-                    <th>Voucher No.</th>
-                    <th>Particulars</th>
-                    <th class="text-right">Debit Amount</th>
-                    <th class="text-right">Credit Amount</th>
-                    <th class="text-right">Balance</th>
-                </tr>
-            </thead>
-            <tbody>
-                <tr class="employee-details-row">
-                    <td colspan="6">
-                        <?php echo htmlspecialchars($employee['name']) . ' (' . strtoupper($empId) . ') - ' . htmlspecialchars($employee['department']); ?>
-                    </td>
-                </tr>
-                <tr class="balance-row">
-                    <td colspan="3">Opening Balance</td>
-                    <td colspan="2"></td>
-                    <td class="<?php echo $employee['openingType'] === 'Dr' ? 'balance-dr' : 'balance-cr'; ?>">
-                        <?php echo $currency_symbol . number_format($employee['openingBalance'], 2) . ' ' . $employee['openingType']; ?>
-                    </td>
-                </tr>
-                <?php
-                $runningBalance = $employee['openingBalance'] ?? 0;
-                $runningType = $employee['openingType'] ?? 'Dr';
-                
-                foreach ($empTransactions as $trans):
-                    if ($runningType === 'Cr') {
-                        $runningBalance = -$runningBalance;
-                    }
-                    
-                    $runningBalance = $runningBalance + $trans['debit'] - $trans['credit'];
-                    $runningType = $runningBalance >= 0 ? 'Dr' : 'Cr';
-                    $absRunningBalance = abs($runningBalance);
-                    
-                    $debitDisplay = $trans['debit'] > 0 ? $currency_symbol . number_format($trans['debit'], 2) : ($trans['displayAmount'] > 0 ? $currency_symbol . number_format($trans['displayAmount'], 2) : '');
-                ?>
-                <tr>
-                    <td><?php echo date('d M Y', strtotime($trans['date'])); ?></td>
-                    <td><?php echo htmlspecialchars($trans['voucherNo']); ?></td>
-                    <td><?php echo htmlspecialchars($trans['particulars']); ?></td>
-                    <td class="amount-debit"><?php echo $debitDisplay; ?></td>
-                    <td class="amount-credit"><?php echo $trans['credit'] > 0 ? $currency_symbol . number_format($trans['credit'], 2) : ''; ?></td>
-                    <td class="<?php echo $runningType === 'Dr' ? 'balance-dr' : 'balance-cr'; ?>">
-                        <?php echo $currency_symbol . number_format($absRunningBalance, 2) . ' ' . $runningType; ?>
-                    </td>
-                </tr>
-                <?php endforeach; ?>
-                <tr class="balance-row">
-                    <td colspan="3">Closing Balance</td>
-                    <td colspan="2"></td>
-                    <td class="<?php echo $runningType === 'Dr' ? 'balance-dr' : 'balance-cr'; ?>">
-                        <?php echo $currency_symbol . number_format($absRunningBalance, 2) . ' ' . $runningType; ?>
-                    </td>
-                </tr>
-            </tbody>
-        </table>
-        <?php endforeach; ?>
+    <!-- ===================================================
+         INDIVIDUAL VIEW  (with Description column)
+         7 columns: Date | Voucher | Particulars | Description | Debit | Credit | Balance
+         =================================================== -->
+    <?php
+    $employeeIds = array_unique(array_column($transactions, 'employeeId'));
+
+    foreach ($employeeIds as $empId):
+        $employee = array_values(array_filter($employees, fn($e) => $e['id'] === $empId))[0] ?? null;
+        if (!$employee) continue;
+
+        $empTrans = array_values(array_filter($transactions, fn($t) => $t['employeeId'] === $empId));
+        usort($empTrans, fn($a, $b) => strtotime($a['date']) - strtotime($b['date']));
+    ?>
+    <table>
+        <thead>
+            <tr>
+                <th>Date</th>
+                <th>Voucher No.</th>
+                <th>Particulars</th>
+                <th>Description</th>
+                <th class="text-right">Debit (Dr)</th>
+                <th class="text-right">Credit (Cr)</th>
+                <th class="text-right">Balance</th>
+            </tr>
+        </thead>
+        <tbody>
+            <!-- Employee header row -->
+            <tr class="employee-details-row">
+                <td colspan="7">
+                    <?php echo htmlspecialchars($employee['name'])
+                        . ' (' . strtoupper($empId) . ')'
+                        . ' - ' . htmlspecialchars($employee['department']); ?>
+                </td>
+            </tr>
+
+            <!-- Opening balance row -->
+            <tr class="balance-row">
+                <td colspan="4">Opening Balance</td>
+                <td colspan="2"></td>
+                <td class="<?php echo $employee['openingType'] === 'Dr' ? 'balance-dr' : 'balance-cr'; ?>">
+                    <?php
+                    echo $employee['openingBalance']
+                        ? $currency_symbol . number_format($employee['openingBalance'], 0) . ' ' . $employee['openingType']
+                        : $currency_symbol . '0';
+                    ?>
+                </td>
+            </tr>
+
+            <?php
+            // FIX: keep runningBalance as a magnitude (absolute value),
+            // track the sign separately in runningType — same logic as JS.
+            $runningBalance = $employee['openingBalance'] ?? 0;
+            $runningType    = $employee['openingType']    ?? null;
+
+            foreach ($empTrans as $trans):
+                // Convert magnitude → signed for this step
+                $signed = ($runningType === 'Cr') ? -$runningBalance : $runningBalance;
+                $signed = $signed + $trans['debit'] - $trans['credit'];
+
+                $runningType    = $signed >= 0 ? 'Dr' : 'Cr';
+                $runningBalance = abs($signed);            // store back as magnitude
+
+                $debitDisplay = $trans['debit'] > 0
+                    ? $currency_symbol . number_format($trans['debit'], 0)
+                    : ($trans['displayAmount'] > 0
+                        ? $currency_symbol . number_format($trans['displayAmount'], 0)
+                        : '');
+
+                // Show description ONLY on debit rows (e.g. Salary Paid, Advance)
+                $showDescription = $trans['debit'] > 0 ? htmlspecialchars($trans['description']) : '';
+            ?>
+            <tr>
+                <td><?php echo date('d M Y', strtotime($trans['date'])); ?></td>
+                <td><?php echo htmlspecialchars($trans['voucherNo']); ?></td>
+                <td><?php echo htmlspecialchars($trans['particulars']); ?></td>
+                <td class="col-description"><?php echo $showDescription; ?></td>
+                <td class="amount-debit"><?php echo $debitDisplay; ?></td>
+                <td class="amount-credit">
+                    <?php echo $trans['credit'] > 0 ? $currency_symbol . number_format($trans['credit'], 0) : ''; ?>
+                </td>
+                <td class="<?php echo $runningType === 'Dr' ? 'balance-dr' : 'balance-cr'; ?>">
+                    <?php echo $currency_symbol . number_format($runningBalance, 0) . ' ' . $runningType; ?>
+                </td>
+            </tr>
+            <?php endforeach; ?>
+
+            <!-- Closing balance row -->
+            <tr class="balance-row">
+                <td colspan="4">Closing Balance</td>
+                <td colspan="2"></td>
+                <td class="<?php echo $runningType === 'Dr' ? 'balance-dr' : 'balance-cr'; ?>">
+                    <?php echo $currency_symbol . number_format($runningBalance, 0) . ' ' . $runningType; ?>
+                </td>
+            </tr>
+        </tbody>
+    </table>
+    <?php endforeach; ?>
     <?php endif; ?>
-    
+
+    <!-- ===== FOOTER ===== -->
     <div class="print-footer">
         <p>This is a computer-generated report and does not require a signature.</p>
     </div>
-    
+
     <div class="no-print" style="text-align: center; margin-top: 20px;">
         <button onclick="window.print()" style="padding: 10px 20px; font-size: 14px; cursor: pointer;">Print Report</button>
         <button onclick="window.close()" style="padding: 10px 20px; font-size: 14px; cursor: pointer; margin-left: 10px;">Close</button>
     </div>
-    
+
     <script>
-        // Auto print on load
-        window.onload = function() {
-            setTimeout(function() {
-                window.print();
-            }, 500);
+        window.onload = function () {
+            setTimeout(function () { window.print(); }, 500);
         };
     </script>
 </body>

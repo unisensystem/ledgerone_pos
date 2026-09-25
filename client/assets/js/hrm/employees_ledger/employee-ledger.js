@@ -313,7 +313,7 @@ function renderIndividualView(transactions) {
         const headerRow = document.createElement('tr');
         headerRow.className = 'employee-details-row';
         headerRow.innerHTML = `
-                    <td colspan="7">
+                    <td colspan="8">
                         <i class="fas fa-user"></i> ${employee.name} (${empId.toUpperCase()}) - ${employee.department}
                     </td>
                 `;
@@ -323,7 +323,7 @@ function renderIndividualView(transactions) {
         const openingRow = document.createElement('tr');
         openingRow.className = 'balance-row';
         openingRow.innerHTML = `
-                    <td colspan="3">Opening Balance</td>
+                    <td colspan="4">Opening Balance</td>
                     <td colspan="2"></td>
                     <td class="${employee.openingType === 'Dr' ? 'balance-dr' : 'balance-cr'}">
                         ${employee.openingBalance ? `${window.currencySymbol}${employee.openingBalance.toLocaleString()} ${employee.openingType || ''}` : `${window.currencySymbol}0`}
@@ -362,7 +362,7 @@ function renderIndividualView(transactions) {
                         <td>${formatDate(transaction.date)}</td>
                         <td>${transaction.voucherNo}</td>
                         <td>${transaction.particulars}</td>
-                        <td class="amount-debit">${debitDisplay}</td>
+<td class="ledger-description">${transaction.particulars === 'Salary Paid' ? (transaction.description || '') : ''}</td>                        <td class="amount-debit">${debitDisplay}</td>
                         <td class="amount-credit">${transaction.credit > 0 ? window.currencySymbol + transaction.credit.toLocaleString() : ''}</td>
                         <td class="${runningType === 'Dr' ? 'balance-dr' : 'balance-cr'}">${window.currencySymbol}${absRunningBalance.toLocaleString()} ${runningType}</td>
                         <td></td>
@@ -375,7 +375,7 @@ function renderIndividualView(transactions) {
         const closingRow = document.createElement('tr');
         closingRow.className = 'balance-row';
         closingRow.innerHTML = `
-                    <td colspan="3">Closing Balance</td>
+                    <td colspan="4">Closing Balance</td>
                     <td colspan="2"></td>
                     <td class="${runningType === 'Dr' ? 'balance-dr' : 'balance-cr'}">
                         ${window.currencySymbol}${absRunningBalance.toLocaleString()} ${runningType}
@@ -386,7 +386,7 @@ function renderIndividualView(transactions) {
 
         // Add a spacer row
         const spacerRow = document.createElement('tr');
-        spacerRow.innerHTML = '<td colspan="7" style="height: 20px;"></td>';
+        spacerRow.innerHTML = '<td colspan="8" style="height: 20px;"></td>';
         individualTableBody.appendChild(spacerRow);
     });
 }
@@ -506,13 +506,13 @@ function exportToCSV() {
             csvContent += rowData + "\n";
         });
     } else {
-        csvContent += "Date,Voucher No.,Particulars,Debit Amount,Credit Amount,Balance\n";
+csvContent += "Date,Voucher No.,Particulars,Debit Amount,Credit Amount,Balance,Description\n";
 
         const rows = document.querySelectorAll('#individualTableBody tr:not(.employee-details-row):not(.balance-row)');
         rows.forEach(row => {
             const cells = row.querySelectorAll('td');
             if (cells.length > 0) {
-                const rowData = Array.from(cells).slice(0, 6).map(cell => {
+                const rowData = Array.from(cells).slice(0, 7).map(cell => {
                     const text = cell.textContent.trim().replace(window.currencySymbol, '').replace(/,/g, '');
                     return `"${text}"`;
                 }).join(',');

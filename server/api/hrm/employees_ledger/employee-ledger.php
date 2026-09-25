@@ -55,11 +55,13 @@ try {
         // Only finalized payroll is actually committed money — a draft hasn't
         // posted to accounting_ledger yet (see payroll-add.php/payroll-finalize.php)
         // and must not show up here as if it had been paid.
-        $transSql = "SELECT pei.created_at as date, pe.payroll_code as voucher_no,
-                            pei.type, pei.description, pei.amount, pei.employee_id
-                     FROM payroll_entries_items pei
-                     JOIN payroll_entries pe ON pei.payroll_id = pe.id
-                     WHERE pei.tenant_id = ? AND pei.employee_id = ? AND pe.status = 'finalized'";
+       $transSql = "SELECT pei.created_at as date, pe.payroll_code as voucher_no,
+                    pei.type, pei.description, pei.amount, pei.employee_id,
+                    pei.gross_amount, pei.deduction_amount, pei.ot_amount,
+                    pei.absent_days, pei.unpaid_leave_days
+             FROM payroll_entries_items pei
+             JOIN payroll_entries pe ON pei.payroll_id = pe.id
+             WHERE pei.tenant_id = ? AND pei.employee_id = ? AND pe.status = 'finalized'";
         $transParams = [$tenant_id, $emp['employee_id']];
         
         if ($start_date) {
@@ -111,26 +113,53 @@ try {
                     'credit' => (float)$trans['amount'],
                     'displayAmount' => 0
                 ];
-            } else {
-                $transactions[] = [
-                    'employeeId' => $trans['employee_id'],
-                    'date' => $date,
-                    'voucherNo' => $trans['voucher_no'],
-                    'particulars' => $trans['type'] . ' Payable',
-                    'debit' => 0,
-                    'credit' => (float)$trans['amount'],
-                    'displayAmount' => 0
-                ];
-                $transactions[] = [
-                    'employeeId' => $trans['employee_id'],
-                    'date' => $date,
-                    'voucherNo' => $trans['voucher_no'],
-                    'particulars' => $trans['description'] ? ($trans['description'] . ' - Paid') : ($trans['type'] . ' Paid'),
-                    'debit' => (float)$trans['amount'],
-                    'credit' => 0,
-                    'displayAmount' => 0
-                ];
-            }
+         } else {
+    // Agar row auto-calculate hui thi (gross_amount stored hai), to Payable
+    // aur Paid dono legs pe GROSS (original) salary post karo — net paid
+    // nahi. Dono legs ab bhi ek-dusre ko cancel karte hain (net effect 0),
+    // isliye balance/closing-balance par koi farq nahi padta — sirf jo
+    // number dikhta hai wo gross ho jata hai, aur Description us gross se
+    // net tak ka justification deti hai.
+    $hasBreakdown = $trans['gross_amount'] !== null;
+    $displayAmt = $hasBreakdown ? (float)$trans['gross_amount'] : (float)$trans['amount'];
+
+    $description = '';
+    if ($hasBreakdown) {
+        $deduction = (float)$trans['deduction_amount'];
+        $ot = (float)$trans['ot_amount'];
+        $netPaid = (float)$trans['amount'];
+        $parts = [];
+        if ($trans['absent_days'] > 0) $parts[] = $trans['absent_days'] . ' absent day(s)';
+        if ($trans['unpaid_leave_days'] > 0) $parts[] = $trans['unpaid_leave_days'] . ' unpaid leave day(s)';
+        $reason = $parts ? implode(' + ', $parts) : 'deductions';
+
+        $description = "Gross " . number_format($displayAmt, 2)
+            . ($deduction > 0 ? " − " . number_format($deduction, 2) . " ({$reason})" : "")
+            . ($ot > 0 ? " + OT " . number_format($ot, 2) : "")
+            . " = Net Paid " . number_format($netPaid, 2);
+    }
+
+    $transactions[] = [
+        'employeeId' => $trans['employee_id'],
+        'date' => $date,
+        'voucherNo' => $trans['voucher_no'],
+        'particulars' => $trans['type'] . ' Payable',
+        'debit' => 0,
+        'credit' => $displayAmt,
+        'displayAmount' => 0,
+        'description' => $description
+    ];
+    $transactions[] = [
+        'employeeId' => $trans['employee_id'],
+        'date' => $date,
+        'voucherNo' => $trans['voucher_no'],
+        'particulars' => $trans['description'] ? ($trans['description'] . ' - Paid') : ($trans['type'] . ' Paid'),
+        'debit' => $displayAmt,
+        'credit' => 0,
+        'displayAmount' => 0,
+        'description' => $description
+    ];
+}
         }
     }
 
