@@ -439,57 +439,88 @@ function filterData() {
     const companyId = filterCompany.value;
     const projectId = filterProject.value;
 
-    filteredData = expenseData.filter(expense => {
-        // Search filter
-        if (searchTerm && !(
-            expense.voucher_no.toLowerCase().includes(searchTerm) ||
-            expense.description.toLowerCase().includes(searchTerm) ||
-            (expense.expense_accounts && expense.expense_accounts.toLowerCase().includes(searchTerm)) ||
-            (expense.cost_centers && expense.cost_centers.toLowerCase().includes(searchTerm))
-        )) {
-            return false;
-        }
+        filteredData = expenseData
+        .map(expense => {
+            // Clone the voucher so the original comma-lists (expenseData) stay untouched
+            const lineFiltered = { ...expense };
 
-        // Date range filter
-        const expenseDate = new Date(expense.date);
-        if (fromDate) {
-            const from = new Date(fromDate);
-            if (expenseDate < from) return false;
-        }
-        if (toDate) {
-            const to = new Date(toDate);
-            to.setHours(23, 59, 59, 999);
-            if (expenseDate > to) return false;
-        }
+            // Only trim the line-level lists down when an account/cost-center filter is active
+            if (expenseAccountId || costCenterId) {
+                const accIds   = expense.expense_account_ids ? expense.expense_account_ids.split(',').map(s => s.trim()) : [];
+                const ccIds    = expense.cost_center_ids ? expense.cost_center_ids.split(',').map(s => s.trim()) : [];
+                const accNames = expense.expense_accounts ? expense.expense_accounts.split(',') : [];
+                const ccNames  = expense.cost_centers ? expense.cost_centers.split(',') : [];
+                const amts     = expense.expense_amounts ? expense.expense_amounts.split(',') : [];
 
-        // Amount range filter
-        const amount = parseFloat(expense.total_amount);
-        if (amount < minAmount || amount > maxAmount) {
-            return false;
-        }
+                // Keep only the line indexes that match BOTH selected filters (when set)
+                const matchIdx = accIds.map((_, i) => i).filter(i => {
+                    const accOk = !expenseAccountId || accIds[i] === String(expenseAccountId);
+                    const ccOk  = !costCenterId || ccIds[i] === String(costCenterId);
+                    return accOk && ccOk;
+                });
 
-        // Company filter
-        if (companyId && expense.company_id != companyId) {
-            return false;
-        }
+                lineFiltered.expense_accounts    = matchIdx.map(i => accNames[i]).join(',');
+                lineFiltered.cost_centers        = matchIdx.map(i => ccNames[i]).join(',');
+                lineFiltered.expense_amounts     = matchIdx.map(i => amts[i]).join(',');
+                lineFiltered.expense_account_ids = matchIdx.map(i => accIds[i]).join(',');
+                lineFiltered.cost_center_ids     = matchIdx.map(i => ccIds[i]).join(',');
+                lineFiltered._matchedLines       = matchIdx.length;
+            }
 
-        // Project filter
-        if (projectId && expense.project_id != projectId) {
-            return false;
-        }
+            return lineFiltered;
+        })
+        .filter(expense => {
+            // Search filter
+            if (searchTerm && !(
+                expense.voucher_no.toLowerCase().includes(searchTerm) ||
+                expense.description.toLowerCase().includes(searchTerm) ||
+                (expense.expense_accounts && expense.expense_accounts.toLowerCase().includes(searchTerm)) ||
+                (expense.cost_centers && expense.cost_centers.toLowerCase().includes(searchTerm))
+            )) {
+                return false;
+            }
 
-        // Expense Account filter (client-side by name)
-        if (expenseAccountId && !(expense.expense_account_ids && expense.expense_account_ids.split(',').map(s => s.trim()).includes(String(expenseAccountId)))) {
-            return false;
-        }
+            // Date range filter
+            const expenseDate = new Date(expense.date);
+            if (fromDate) {
+                const from = new Date(fromDate);
+                if (expenseDate < from) return false;
+            }
+            if (toDate) {
+                const to = new Date(toDate);
+                to.setHours(23, 59, 59, 999);
+                if (expenseDate > to) return false;
+            }
 
-        // Cost Center filter (client-side by id)
-        if (costCenterId && !(expense.cost_center_ids && expense.cost_center_ids.split(',').map(s => s.trim()).includes(String(costCenterId)))) {
-            return false;
-        }
+            // Amount range filter
+            const amount = parseFloat(expense.total_amount);
+            if (amount < minAmount || amount > maxAmount) {
+                return false;
+            }
 
-        return true;
-    });
+            // Company filter
+            if (companyId && expense.company_id != companyId) {
+                return false;
+            }
+
+            // Project filter
+            if (projectId && expense.project_id != projectId) {
+                return false;
+            }
+
+            // Expense Account filter — after line-trimming above, an empty
+            // expense_account_ids means no line matched, so drop the voucher
+            if (expenseAccountId && !expense.expense_account_ids) {
+                return false;
+            }
+
+            // Cost Center filter — same idea
+            if (costCenterId && !expense.cost_center_ids) {
+                return false;
+            }
+
+            return true;
+        });
 
     currentPage = 1;
     updateStats();
