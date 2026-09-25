@@ -809,7 +809,6 @@ function validateForm() {
 function submitPayroll() {
     const rows = tableBody.querySelectorAll('tr');
     const items = [];
-    let anyCalculated = false;
 
     rows.forEach(row => {
         const employeeId = row.querySelector('.employee-id').value;
@@ -833,7 +832,6 @@ function submitPayroll() {
         // If this row was auto-filled from approved leave/overtime, carry the
         // breakdown along so it's stored with the payroll entry for later review.
         if (row.dataset.dailyRate !== undefined) {
-            anyCalculated = true;
             item.present_days = Number(row.dataset.presentDays || 0);
             item.absent_days = Number(row.dataset.absentDays || 0);
             item.paid_leave_days = Number(row.dataset.paidLeaveDays || 0);
@@ -859,13 +857,11 @@ function submitPayroll() {
         items: items
     };
 
-    // Payroll built from approved leave/overtime starts as a draft so HR can
-    // review before it's locked in — existing manual-entry payrolls keep
-    // defaulting to 'finalized' server-side (unchanged behavior) when this
-    // is omitted.
-    if (anyCalculated && !editPayrollId) {
-        payload.status = 'draft';
-    }
+    // No draft/review step — every submit (manual or auto-calculated from
+    // leave/overtime) finalizes immediately and posts to accounting_ledger
+    // right away. `status` is intentionally left unset here; the server
+    // (payroll-add.php / payroll-edit.php) defaults to 'finalized' when it's
+    // omitted, so there's nothing to override.
 
     if (editPayrollId) {
         payload.payroll_id = editPayrollId;

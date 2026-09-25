@@ -1291,18 +1291,18 @@ $purchasesNet = (float) $purchasesTotals['net'];
                             <option value="">Select Page...</option>
 
                             <!-- Lists -->
-                            <option value="sale-invoice" data-label="Sale Invoice List">Sale Invoice List</option>
-                            <option value="med-sale-invoice" data-label="Med Sale Invoice List">Med Sale Invoice List</option>
-                            <option value="sale-tax-invoice" data-label="Sale Tax Invoice List">Sale Tax Invoice List</option>
-                            <option value="purchase-invoice" data-label="Purchase Invoice List">Purchase Invoice List</option>
-                            <option value="receive-voucher" data-label="Receive Voucher List">Receive Voucher List</option>
-                            <option value="payment-voucher" data-label="Payment Voucher List">Payment Voucher List</option>
-                            <option value="expense-voucher" data-label="Expense Voucher List">Expense Voucher List</option>
+                            <option value="sale-invoice" data-label="Sale Invoice List">Sale Invoice </option>
+                            <option value="med-sale-invoice" data-label="Med Sale Invoice List">Med Sale Invoice </option>
+                            <option value="sale-tax-invoice" data-label="Sale Tax Invoice List">Sale Tax Invoice </option>
+                            <option value="purchase-invoice" data-label="Purchase Invoice List">Purchase Invoice </option>
+                            <option value="receive-voucher" data-label="Receive Voucher List">Receive Voucher </option>
+                            <option value="payment-voucher" data-label="Payment Voucher List">Payment Voucher </option>
+                            <option value="expense-voucher" data-label="Expense Voucher List">Expense Voucher </option>
                             <option value="customer-ledger" data-label="Customer Ledger">Customer Ledger</option>
                             <option value="supplier-ledger" data-label="Supplier Ledger">Supplier Ledger</option>
                             <option value="pos-invoice" data-label="POS Invoice">POS Invoice</option>
                             <option value="traders-sale-invoice" data-label="Traders Sale Invoice">Traders Sale Invoice</option>
-                            <option value="new-product" data-label="Product List">Product List</option>
+                            <option value="new-product" data-label="Product List">Product </option>
                             <option value="new-customer" data-label="New Customer List">New Customer List</option>
                             <option value="new-supplier" data-label="New Supplier List">New Supplier List</option>
 

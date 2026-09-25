@@ -78,31 +78,59 @@ try {
         $empTransactions = $transStmt->fetchAll(PDO::FETCH_ASSOC);
         
         foreach ($empTransactions as $trans) {
-            // Debit: Advance (employee owes company)
-            // Credit: Advance Return, Salary Adjustment (employee pays back)
-            // Salary and other payments shown in debit for record only (don't affect balance)
-            $debit = 0;
-            $credit = 0;
-            $displayAmount = 0;
-            
+            $date = date('Y-m-d', strtotime($trans['date']));
+
+            // Debit: Advance (employee owes company) — single line, real balance movement.
+            // Credit: Advance Return, Salary Adjustment (employee pays back) — single line.
+            // Salary / Commission / Bonus / Allowance / Daily Wages are accrued AND paid
+            // in the same payroll transaction (payment method is chosen right there), so
+            // per the reference ledger example we post BOTH legs instead of a single
+            // balance-blind "display only" row:
+            //   "<Type> Payable" (Cr — liability incurred)
+            //   "<Type> Paid"    (Dr — liability settled)
+            // Net effect on the running balance is zero (matches old display-only
+            // behavior) but the two legs are now visible/traceable, like Advance/
+            // Advance Return already are.
             if (in_array($trans['type'], ['Advance'])) {
-                $debit = $trans['amount'];
+                $transactions[] = [
+                    'employeeId' => $trans['employee_id'],
+                    'date' => $date,
+                    'voucherNo' => $trans['voucher_no'],
+                    'particulars' => $trans['description'] ?: $trans['type'],
+                    'debit' => (float)$trans['amount'],
+                    'credit' => 0,
+                    'displayAmount' => 0
+                ];
             } elseif (in_array($trans['type'], ['Advance Return', 'Salary Adjustment'])) {
-                $credit = $trans['amount'];
+                $transactions[] = [
+                    'employeeId' => $trans['employee_id'],
+                    'date' => $date,
+                    'voucherNo' => $trans['voucher_no'],
+                    'particulars' => $trans['description'] ?: $trans['type'],
+                    'debit' => 0,
+                    'credit' => (float)$trans['amount'],
+                    'displayAmount' => 0
+                ];
             } else {
-                // Salary, Commission, Bonus, Allowance, Daily Wages - show in debit column for display
-                $displayAmount = $trans['amount'];
+                $transactions[] = [
+                    'employeeId' => $trans['employee_id'],
+                    'date' => $date,
+                    'voucherNo' => $trans['voucher_no'],
+                    'particulars' => $trans['type'] . ' Payable',
+                    'debit' => 0,
+                    'credit' => (float)$trans['amount'],
+                    'displayAmount' => 0
+                ];
+                $transactions[] = [
+                    'employeeId' => $trans['employee_id'],
+                    'date' => $date,
+                    'voucherNo' => $trans['voucher_no'],
+                    'particulars' => $trans['description'] ? ($trans['description'] . ' - Paid') : ($trans['type'] . ' Paid'),
+                    'debit' => (float)$trans['amount'],
+                    'credit' => 0,
+                    'displayAmount' => 0
+                ];
             }
-            
-            $transactions[] = [
-                'employeeId' => $trans['employee_id'],
-                'date' => date('Y-m-d', strtotime($trans['date'])),
-                'voucherNo' => $trans['voucher_no'],
-                'particulars' => $trans['description'] ?: $trans['type'],
-                'debit' => (float)$debit,
-                'credit' => (float)$credit,
-                'displayAmount' => (float)$displayAmount
-            ];
         }
     }
 
@@ -115,6 +143,10 @@ try {
         $hardOpeningBalance = $balanceStmt->fetchColumn() ?: 0;
         
         // Calculate soft opening balance (transactions before start_date)
+        // NOTE: Salary/Commission/Bonus/Allowance/Daily Wages are intentionally
+        // excluded here, same as before — they net to zero (Payable + Paid
+        // cancel out), so they never carried into the opening balance and
+        // still don't.
         $softOpeningBalance = $hardOpeningBalance;
         if ($start_date) {
             $beforeDateSql = "SELECT pei.type, pei.amount

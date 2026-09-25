@@ -232,8 +232,8 @@ function renderTopCostCentersChart(data) {
     costCentersChart.render();
 }
 
-// Render table - each voucher's line items (account / cost center / amount) get
-// their own row via rowspan on the voucher-level columns.
+// Render table - each voucher's line items get their own fully separate row
+// (voucher-level info like Voucher #, Date, Description, etc. repeats on every row)
 function renderTable() {
     tableBody.innerHTML = '';
 
@@ -254,7 +254,7 @@ function renderTable() {
         return;
     }
 
-    // Pagination - by voucher; each voucher may render as multiple line-item rows
+    // Pagination - by voucher; each voucher may render as multiple fully separate rows
     const startIndex = (currentPage - 1) * itemsPerPage;
     const endIndex = startIndex + itemsPerPage;
     const pageData = filteredData.slice(startIndex, endIndex);
@@ -299,37 +299,25 @@ function renderTable() {
         const lineCount = accounts.length || 1;
 
         for (let i = 0; i < lineCount; i++) {
-            const row = document.createElement('tr');
-
             const accName = (accounts[i] || '-').trim();
             const ccName = (costCenters[i] || '-').trim() || '-';
-            // Fall back to voucher total only if a per-line amount isn't available
             const lineAmount = amounts[i] !== undefined
                 ? parseFloat(amounts[i])
                 : parseFloat(expense.total_amount);
             const formattedAmount = CURRENCY_SYMBOL + lineAmount.toFixed(2);
 
-            if (i === 0) {
-                // First line: include voucher-level columns, spanning all its lines
-                row.innerHTML = `
-                    <td rowspan="${lineCount}"><strong>${expense.voucher_no}</strong></td>
-                    <td rowspan="${lineCount}">${formattedDate}</td>
-                    <td rowspan="${lineCount}">${expense.description}</td>
-                    <td rowspan="${lineCount}">${expense.project_name || '-'}</td>
-                    <td>${accName}</td>
-                    <td>${ccName}</td>
-                    <td class="amount">${formattedAmount}</td>
-                    <td rowspan="${lineCount}">${cashFlowBadge}</td>
-                    <td rowspan="${lineCount}">${actionButtons}</td>
-                `;
-            } else {
-                // Subsequent lines: only the per-line columns
-                row.innerHTML = `
-                    <td>${accName}</td>
-                    <td>${ccName}</td>
-                    <td class="amount">${formattedAmount}</td>
-                `;
-            }
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td><strong>${expense.voucher_no}</strong></td>
+                <td>${formattedDate}</td>
+                <td>${expense.description}</td>
+                <td>${expense.project_name || '-'}</td>
+                <td>${accName}</td>
+                <td>${ccName}</td>
+                <td class="amount">${formattedAmount}</td>
+                <td>${cashFlowBadge}</td>
+                <td>${actionButtons}</td>
+            `;
 
             tableBody.appendChild(row);
         }
@@ -347,7 +335,6 @@ function renderTable() {
 
     updatePaginationButtons(totalPages);
 }
-
 // Update pagination number buttons
 function updatePaginationButtons(totalPages) {
     const paginationControls = document.querySelector('.pagination-controls');
@@ -584,12 +571,11 @@ async function toggleCashFlow(id, currentVal, btn) {
         });
         const data = await response.json();
         if (data.success) {
-            // Update in-memory data
             const record = expenseData.find(e => e.id == id);
             if (record) record.is_cash_flow = newVal;
             const fRecord = filteredData.find(e => e.id == id);
             if (fRecord) fRecord.is_cash_flow = newVal;
-            // Full re-render since a voucher's rows can now span multiple <tr> elements
+            // Voucher's rows can span multiple <tr>, so re-render the whole table
             renderTable();
         } else {
             alert('Error: ' + data.error);
@@ -598,7 +584,6 @@ async function toggleCashFlow(id, currentVal, btn) {
         console.error('Error toggling cash flow:', error);
     }
 }
-
 // Edit voucher
 function editVoucher(id) {
     window.location.href = `expense-add.php?id=${id}`;
