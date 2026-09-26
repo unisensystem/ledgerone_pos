@@ -258,6 +258,18 @@ if ($product_id) {
         // Holds exactly what's rendered on screen, so Export to Excel matches the preview
         let currentEntries = [];
         let currentCurrency = '$';
+        const ROUND_OFF_ENABLED = new URLSearchParams(window.location.search).get('round_off') === '1';
+
+        function formatAmount(value) {
+            const amount = Number(value) || 0;
+            return ROUND_OFF_ENABLED
+                ? Math.round(amount).toLocaleString()
+                : amount.toLocaleString(undefined, { maximumFractionDigits: 20 });
+        }
+
+        function formatQuantity(value, unit) {
+            return `${formatAmount(value)} ${unit || 'L'}`;
+        }
 
         async function loadPrintData() {
             try {
@@ -332,20 +344,20 @@ if ($product_id) {
                     <td>${entry.item_company_name || '-'}</td>
                     <td>${entry.branch_name}</td>
                     <td>${entry.transaction_type}</td>
-                    <td>${entry.qty_in > 0 ? parseFloat(entry.qty_in).toFixed(2) + ' ' + (entry.unit_symbol || 'L') : '-'}</td>
-                    <td>${entry.qty_out > 0 ? parseFloat(entry.qty_out).toFixed(2) + ' ' + (entry.unit_symbol || 'L') : '-'}</td>
-                    <td>${parseFloat(entry.balance).toFixed(2)} ${entry.unit_symbol || 'L'}</td>
-                    <td>${currency}${parseFloat(entry.unit_cost).toFixed(2)}</td>
-                    <td>${currency}${parseFloat(entry.value).toFixed(2)}</td>
+                    <td>${entry.qty_in > 0 ? formatQuantity(entry.qty_in, entry.unit_symbol) : '-'}</td>
+                    <td>${entry.qty_out > 0 ? formatQuantity(entry.qty_out, entry.unit_symbol) : '-'}</td>
+                    <td>${formatQuantity(entry.balance, entry.unit_symbol)}</td>
+                    <td>${currency}${formatAmount(entry.unit_cost)}</td>
+                    <td>${currency}${formatAmount(entry.value)}</td>
                 </tr>
             `).join('') + `
                 <tr class="totals-row">
                     <td colspan="5">Total (${entries.length} transactions)</td>
-                    <td>${totalQtyIn.toFixed(2)} ${unit}</td>
-                    <td>${totalQtyOut.toFixed(2)} ${unit}</td>
+                    <td>${formatQuantity(totalQtyIn, unit)}</td>
+                    <td>${formatQuantity(totalQtyOut, unit)}</td>
                     <td>-</td>
                     <td>-</td>
-                    <td>${currency}${totalValue.toFixed(2)}</td>
+                    <td>${currency}${formatAmount(totalValue)}</td>
                 </tr>
             `;
         }
@@ -368,11 +380,11 @@ if ($product_id) {
                 'Item Company': entry.item_company_name || '-',
                 'Branch': entry.branch_name,
                 'Transaction': entry.transaction_type,
-                'Qty In': entry.qty_in > 0 ? `${parseFloat(entry.qty_in).toFixed(2)} ${entry.unit_symbol || 'L'}` : '-',
-                'Qty Out': entry.qty_out > 0 ? `${parseFloat(entry.qty_out).toFixed(2)} ${entry.unit_symbol || 'L'}` : '-',
-                'Balance': `${parseFloat(entry.balance).toFixed(2)} ${entry.unit_symbol || 'L'}`,
-                'Unit Cost': parseFloat(entry.unit_cost).toFixed(2),
-                'Value': parseFloat(entry.value).toFixed(2)
+                'Qty In': entry.qty_in > 0 ? formatQuantity(entry.qty_in, entry.unit_symbol) : '-',
+                'Qty Out': entry.qty_out > 0 ? formatQuantity(entry.qty_out, entry.unit_symbol) : '-',
+                'Balance': formatQuantity(entry.balance, entry.unit_symbol),
+                'Unit Cost': formatAmount(entry.unit_cost),
+                'Value': formatAmount(entry.value)
             }));
 
             const worksheet = XLSX.utils.json_to_sheet(rows);

@@ -10,6 +10,8 @@ const itemsPerPage = 20;  // Increased from 10 to show more rows per page (fixes
 let totalItems = 0;
 let allPositions = [];
 let currentCurrency = '$';
+let currentDashboardStats = null;
+let currentDashboardCurrency = '$';
 // Customer-wise Ledger pagination variables
 let customerCurrentPage = 1;
 let customerTotalItems = 0;
@@ -41,6 +43,46 @@ let detailedCurrentPage = 1;
 let detailedTotalItems = 0;
 let allDetailedEntries = [];
 let detailedCurrency = '$';
+
+const ROUND_OFF_SWITCH_IDS = {
+    position: 'round-off-position',
+    'item-ledger': 'round-off-item-ledger',
+    'branch-ledger': 'round-off-branch-ledger',
+    'detailed-ledger': 'round-off-detailed-ledger',
+    'customer-ledger': 'round-off-customer-ledger',
+    'item-movement': 'round-off-item-movement'
+};
+
+function isRoundOffEnabled(tabId) {
+    return document.getElementById(ROUND_OFF_SWITCH_IDS[tabId])?.checked || false;
+}
+
+function formatStockAmount(value, tabId) {
+    const amount = Number(value) || 0;
+    return isRoundOffEnabled(tabId)
+        ? Math.round(amount).toLocaleString()
+        : amount.toLocaleString(undefined, { maximumFractionDigits: 20 });
+}
+
+function formatStockQuantity(value, unit, tabId) {
+    return `${formatStockAmount(value, tabId)} ${unit || 'L'}`;
+}
+
+function formatStockMoney(value, currency, tabId) {
+    return `${currency || ''}${formatStockAmount(value, tabId)}`;
+}
+
+function rerenderStockTab(tabId) {
+    if (tabId === 'position') {
+        updatePositionTable(currentCurrency);
+        if (currentDashboardStats) updateDashboardStats(currentDashboardStats, currentDashboardCurrency);
+    }
+    if (tabId === 'item-ledger') renderLedgerTable(itemCurrency);
+    if (tabId === 'branch-ledger') renderBranchLedgerTable(branchCurrency);
+    if (tabId === 'detailed-ledger') renderDetailedLedgerTable(detailedCurrency);
+    if (tabId === 'customer-ledger') renderCustomerLedgerTable(customerCurrency);
+    if (tabId === 'item-movement') renderMovementTable(movementCurrency);
+}
 
 // Column visibility state
 let columnVisibility = {
@@ -188,7 +230,7 @@ function printList() {
     const valuationMethod = document.getElementById('valuation-method').value;
     const positionProjectId = document.getElementById('position-project')?.value;
 
-    let url = `print.php?type=${activeTab}&`;
+    let url = `print.php?type=${activeTab}&round_off=${isRoundOffEnabled(activeTab) ? '1' : '0'}&`;
     if (activeTab === 'position') {
         if (branch) url += `branch_id=${branch}&`;
         if (product) url += `product_id=${product}&`;
@@ -390,12 +432,12 @@ function exportToExcel() {
                 const row = { 'Product': pos.product_name };
                 if (columnVisibility.branch) row['Branch'] = pos.branch_display;
                 if (columnVisibility.inventoryType) row['Inventory Type'] = pos.inventory_type || '-';
-                if (columnVisibility.openingBalance) row['Opening Balance'] = `${parseFloat(pos.opening_balance || 0).toFixed(2)} ${unit}`;
-                if (columnVisibility.qtyIn) row['Total Qty In'] = `${parseFloat(pos.total_qty_in || 0).toFixed(2)} ${unit}`;
-                if (columnVisibility.qtyOut) row['Total Qty Out'] = `${parseFloat(pos.total_qty_out || 0).toFixed(2)} ${unit}`;
-                if (columnVisibility.currentStock) row['Current Stock'] = `${parseFloat(pos.current_stock).toFixed(2)} ${unit}`;
-                if (columnVisibility.unitCost) row['Unit Cost'] = parseFloat(pos.unit_cost).toFixed(2);
-                if (columnVisibility.stockValue) row['Stock Value'] = parseFloat(pos.stock_value).toFixed(2);
+                if (columnVisibility.openingBalance) row['Opening Balance'] = formatStockQuantity(pos.opening_balance, unit, 'position');
+                if (columnVisibility.qtyIn) row['Total Qty In'] = formatStockQuantity(pos.total_qty_in, unit, 'position');
+                if (columnVisibility.qtyOut) row['Total Qty Out'] = formatStockQuantity(pos.total_qty_out, unit, 'position');
+                if (columnVisibility.currentStock) row['Current Stock'] = formatStockQuantity(pos.current_stock, unit, 'position');
+                if (columnVisibility.unitCost) row['Unit Cost'] = formatStockAmount(pos.unit_cost, 'position');
+                if (columnVisibility.stockValue) row['Stock Value'] = formatStockAmount(pos.stock_value, 'position');
                 if (columnVisibility.status) row['Status'] = pos.status.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase());
                 return row;
             });
@@ -413,11 +455,11 @@ function exportToExcel() {
                 'Transaction': entry.transaction_type,
                 'Batch No': entry.batch_no || '-',
                 'Expiry Date': entry.batch_expiry_date || '-',
-                'Qty In': entry.qty_in > 0 ? `${parseFloat(entry.qty_in).toFixed(2)} ${entry.unit_symbol || 'L'}` : '-',
-                'Qty Out': entry.qty_out > 0 ? `${parseFloat(entry.qty_out).toFixed(2)} ${entry.unit_symbol || 'L'}` : '-',
-                'Balance': `${parseFloat(entry.balance).toFixed(2)} ${entry.unit_symbol || 'L'}`,
-                'Unit Cost': parseFloat(entry.unit_cost).toFixed(2),
-                'Value': parseFloat(entry.value).toFixed(2)
+                'Qty In': entry.qty_in > 0 ? formatStockQuantity(entry.qty_in, entry.unit_symbol, 'item-ledger') : '-',
+                'Qty Out': entry.qty_out > 0 ? formatStockQuantity(entry.qty_out, entry.unit_symbol, 'item-ledger') : '-',
+                'Balance': formatStockQuantity(entry.balance, entry.unit_symbol, 'item-ledger'),
+                'Unit Cost': formatStockAmount(entry.unit_cost, 'item-ledger'),
+                'Value': formatStockAmount(entry.value, 'item-ledger')
             }));
             break;
         }
@@ -428,10 +470,10 @@ function exportToExcel() {
                 'Product': entry.product_name,
                 'Item Company': entry.item_company_name || '-',
                 'Transaction': entry.transaction_type,
-                'Qty In': entry.qty_in > 0 ? `${parseFloat(entry.qty_in).toFixed(2)} ${entry.unit_symbol || 'L'}` : '-',
-                'Qty Out': entry.qty_out > 0 ? `${parseFloat(entry.qty_out).toFixed(2)} ${entry.unit_symbol || 'L'}` : '-',
-                'Unit Cost': parseFloat(entry.unit_cost).toFixed(2),
-                'Value': ((parseFloat(entry.qty_in || 0) - parseFloat(entry.qty_out || 0)) * parseFloat(entry.unit_cost)).toFixed(2)
+                'Qty In': entry.qty_in > 0 ? formatStockQuantity(entry.qty_in, entry.unit_symbol, 'branch-ledger') : '-',
+                'Qty Out': entry.qty_out > 0 ? formatStockQuantity(entry.qty_out, entry.unit_symbol, 'branch-ledger') : '-',
+                'Unit Cost': formatStockAmount(entry.unit_cost, 'branch-ledger'),
+                'Value': formatStockAmount((parseFloat(entry.qty_in || 0) - parseFloat(entry.qty_out || 0)) * parseFloat(entry.unit_cost), 'branch-ledger')
             }));
             break;
             
@@ -447,11 +489,11 @@ function exportToExcel() {
                 'Transaction': entry.transaction_type,
                  'Batch No': entry.batch_no || '-',
                 'Expiry Date': entry.batch_expiry_date || '-',
-                'Qty In': entry.qty_in > 0 ? `${parseFloat(entry.qty_in).toFixed(2)} ${entry.unit_symbol || 'L'}` : '-',
-                'Qty Out': entry.qty_out > 0 ? `${parseFloat(entry.qty_out).toFixed(2)} ${entry.unit_symbol || 'L'}` : '-',
-                'Balance': `${parseFloat(entry.balance).toFixed(2)} ${entry.unit_symbol || 'L'}`,
-                'Unit Cost': parseFloat(entry.unit_cost).toFixed(2),
-                'Value': parseFloat(entry.value).toFixed(2)
+                'Qty In': entry.qty_in > 0 ? formatStockQuantity(entry.qty_in, entry.unit_symbol, 'detailed-ledger') : '-',
+                'Qty Out': entry.qty_out > 0 ? formatStockQuantity(entry.qty_out, entry.unit_symbol, 'detailed-ledger') : '-',
+                'Balance': formatStockQuantity(entry.balance, entry.unit_symbol, 'detailed-ledger'),
+                'Unit Cost': formatStockAmount(entry.unit_cost, 'detailed-ledger'),
+                'Value': formatStockAmount(entry.value, 'detailed-ledger')
             }));
             break;
         }
@@ -519,6 +561,7 @@ function openCustomerLedgerPreview() {
     if (expiryFilter) url += `expiry_date=${expiryFilter}&`;
     if (projectId) url += `project_id=${projectId}&`;
     if (itemCompanyId) url += `item_company_id=${itemCompanyId}&`;
+    url += `round_off=${isRoundOffEnabled('customer-ledger') ? '1' : '0'}&`;
 
     window.open(url, '_blank');
 }
@@ -564,6 +607,7 @@ function openItemMovementPreview() {
     if (sortBy) url += `sort_by=${sortBy}&sort_order=${sortOrder}&`;
     // hideNoMovement is the module-level toggle state already tracked for the on-screen table
     if (hideNoMovement) url += `hide_no_movement=1&`;
+    url += `round_off=${isRoundOffEnabled('item-movement') ? '1' : '0'}&`;
 
     window.open(url, '_blank');
 }
@@ -730,7 +774,7 @@ function updatePositionTable(currency = '$') {
     }, {});
     
     const unitTotalsText = Object.entries(unitTotals)
-        .map(([unit, total]) => `${total.toFixed(2)} ${unit}`)
+        .map(([unit, total]) => formatStockQuantity(total, unit, 'position'))
         .join(', ');
     
     tbody.innerHTML = pageData.map((pos, idx) => {
@@ -744,12 +788,12 @@ function updatePositionTable(currency = '$') {
             <td>${productDisplay}</td>
             <td class="col-branch">${escLedger(pos.branch_display)}</td>
             <td class="col-inventory-type">${escLedger(pos.inventory_type || '-')}</td>
-            <td class="col-opening-balance">${parseFloat(pos.opening_balance || 0).toFixed(2)} ${escLedger(pos.unit_symbol || 'L')}</td>
-            <td class="col-qty-in">${parseFloat(pos.total_qty_in || 0).toFixed(2)} ${escLedger(pos.unit_symbol || 'L')}</td>
-            <td class="col-qty-out">${parseFloat(pos.total_qty_out || 0).toFixed(2)} ${escLedger(pos.unit_symbol || 'L')}</td>
-            <td class="col-current-stock">${parseFloat(pos.current_stock).toFixed(2)} ${escLedger(pos.unit_symbol || 'L')}</td>
-            <td class="col-unit-cost">${currency}${parseFloat(pos.unit_cost).toFixed(2)}</td>
-            <td class="col-stock-value">${currency}${parseFloat(pos.stock_value).toFixed(2)}</td>
+            <td class="col-opening-balance">${formatStockQuantity(pos.opening_balance, escLedger(pos.unit_symbol || 'L'), 'position')}</td>
+            <td class="col-qty-in">${formatStockQuantity(pos.total_qty_in, escLedger(pos.unit_symbol || 'L'), 'position')}</td>
+            <td class="col-qty-out">${formatStockQuantity(pos.total_qty_out, escLedger(pos.unit_symbol || 'L'), 'position')}</td>
+            <td class="col-current-stock">${formatStockQuantity(pos.current_stock, escLedger(pos.unit_symbol || 'L'), 'position')}</td>
+            <td class="col-unit-cost">${formatStockMoney(pos.unit_cost, currency, 'position')}</td>
+            <td class="col-stock-value">${formatStockMoney(pos.stock_value, currency, 'position')}</td>
             <td class="col-status"><span class="status-badge status-${pos.status}">${pos.status.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase())}</span></td>
         </tr>
     `;
@@ -761,7 +805,7 @@ function updatePositionTable(currency = '$') {
             <td class="col-qty-out">-</td>
             <td class="col-current-stock">${unitTotalsText}</td>
             <td class="col-unit-cost">-</td>
-            <td class="col-stock-value">${currency}${totalValue.toFixed(2)}</td>
+            <td class="col-stock-value">${formatStockMoney(totalValue, currency, 'position')}</td>
             <td class="col-status"></td>
         </tr>
     `;
@@ -850,20 +894,20 @@ tbody.innerHTML = pageData.map(entry => `
         <td><span class="transaction-badge transaction-${entry.transaction_type.toLowerCase().replace(' ', '-')}">${escLedger(entry.transaction_type)}</span></td>
         <td>${escLedger(entry.batch_no || '-')}</td>
         <td>${escLedger(entry.batch_expiry_date || '-')}</td>
-        <td>${entry.qty_in > 0 ? parseFloat(entry.qty_in).toFixed(2) + ' ' + escLedger(entry.unit_symbol || 'L') : '-'}</td>
-        <td>${entry.qty_out > 0 ? parseFloat(entry.qty_out).toFixed(2) + ' ' + escLedger(entry.unit_symbol || 'L') : '-'}</td>
-        <td>${parseFloat(entry.balance).toFixed(2)} ${escLedger(entry.unit_symbol || 'L')}</td>
-        <td>${currency}${parseFloat(entry.unit_cost).toFixed(2)}</td>
-        <td>${currency}${parseFloat(entry.value).toFixed(2)}</td>
+        <td>${entry.qty_in > 0 ? formatStockQuantity(entry.qty_in, escLedger(entry.unit_symbol || 'L'), 'item-ledger') : '-'}</td>
+        <td>${entry.qty_out > 0 ? formatStockQuantity(entry.qty_out, escLedger(entry.unit_symbol || 'L'), 'item-ledger') : '-'}</td>
+        <td>${formatStockQuantity(entry.balance, escLedger(entry.unit_symbol || 'L'), 'item-ledger')}</td>
+        <td>${formatStockMoney(entry.unit_cost, currency, 'item-ledger')}</td>
+        <td>${formatStockMoney(entry.value, currency, 'item-ledger')}</td>
     </tr>
 `).join('') + `
     <tr style="font-weight: bold; background-color: var(--table-header);">
         <td colspan="9">Total (${allLedgerEntries.length} transactions)</td>
-        <td>${totalQtyIn.toFixed(2)} ${escLedger(allLedgerEntries[0]?.unit_symbol || 'L')}</td>
-        <td>${totalQtyOut.toFixed(2)} ${escLedger(allLedgerEntries[0]?.unit_symbol || 'L')}</td>
-        <td>${finalBalance.toFixed(2)} ${escLedger(allLedgerEntries[0]?.unit_symbol || 'L')}</td>
+        <td>${formatStockQuantity(totalQtyIn, escLedger(allLedgerEntries[0]?.unit_symbol || 'L'), 'item-ledger')}</td>
+        <td>${formatStockQuantity(totalQtyOut, escLedger(allLedgerEntries[0]?.unit_symbol || 'L'), 'item-ledger')}</td>
+        <td>${formatStockQuantity(finalBalance, escLedger(allLedgerEntries[0]?.unit_symbol || 'L'), 'item-ledger')}</td>
         <td>-</td>
-        <td>${currency}${finalValue.toFixed(2)}</td>
+        <td>${formatStockMoney(finalValue, currency, 'item-ledger')}</td>
     </tr>
 `;
 }
@@ -1061,20 +1105,20 @@ function renderDetailedLedgerTable(currency = '$') {
         <td><span class="transaction-badge transaction-${entry.transaction_type.toLowerCase().replace(' ', '-')}">${escLedger(entry.transaction_type)}</span></td>
         <td>${escLedger(entry.batch_no || '-')}</td>
         <td>${escLedger(entry.batch_expiry_date || '-')}</td>
-        <td>${entry.qty_in > 0 ? parseFloat(entry.qty_in).toFixed(2) + ' ' + escLedger(entry.unit_symbol || 'L') : '-'}</td>
-        <td>${entry.qty_out > 0 ? parseFloat(entry.qty_out).toFixed(2) + ' ' + escLedger(entry.unit_symbol || 'L') : '-'}</td>
-        <td>${parseFloat(entry.balance).toFixed(2)} ${escLedger(entry.unit_symbol || 'L')}</td>
-        <td>${currency}${parseFloat(entry.unit_cost).toFixed(2)}</td>
-        <td>${currency}${parseFloat(entry.value).toFixed(2)}</td>
+        <td>${entry.qty_in > 0 ? formatStockQuantity(entry.qty_in, escLedger(entry.unit_symbol || 'L'), 'detailed-ledger') : '-'}</td>
+        <td>${entry.qty_out > 0 ? formatStockQuantity(entry.qty_out, escLedger(entry.unit_symbol || 'L'), 'detailed-ledger') : '-'}</td>
+        <td>${formatStockQuantity(entry.balance, escLedger(entry.unit_symbol || 'L'), 'detailed-ledger')}</td>
+        <td>${formatStockMoney(entry.unit_cost, currency, 'detailed-ledger')}</td>
+        <td>${formatStockMoney(entry.value, currency, 'detailed-ledger')}</td>
     </tr>
 `).join('') + `
     <tr style="font-weight: bold; background-color: var(--table-header);">
         <td colspan="7">Total (${allDetailedEntries.length} transactions)</td>
-        <td>${totalQtyIn.toFixed(2)} ${escLedger(allDetailedEntries[0]?.unit_symbol || 'L')}</td>
-        <td>${totalQtyOut.toFixed(2)} ${escLedger(allDetailedEntries[0]?.unit_symbol || 'L')}</td>
-        <td>${totalBalance.toFixed(2)} ${escLedger(allDetailedEntries[0]?.unit_symbol || 'L')}</td>
+        <td>${formatStockQuantity(totalQtyIn, escLedger(allDetailedEntries[0]?.unit_symbol || 'L'), 'detailed-ledger')}</td>
+        <td>${formatStockQuantity(totalQtyOut, escLedger(allDetailedEntries[0]?.unit_symbol || 'L'), 'detailed-ledger')}</td>
+        <td>${formatStockQuantity(totalBalance, escLedger(allDetailedEntries[0]?.unit_symbol || 'L'), 'detailed-ledger')}</td>
         <td>-</td>
-        <td>${currency}${totalValue.toFixed(2)}</td>
+        <td>${formatStockMoney(totalValue, currency, 'detailed-ledger')}</td>
     </tr>
 `;
 }
@@ -1121,20 +1165,20 @@ function renderBranchLedgerTable(currency = '$') {
             <td>${escLedger(entry.product_name)}</td>
             <td>${escLedger(entry.item_company_name || '-')}</td>
             <td><span class="transaction-badge transaction-${entry.transaction_type.toLowerCase().replace(' ', '-')}">${escLedger(entry.transaction_type)}</span></td>
-            <td>${entry.qty_in > 0 ? parseFloat(entry.qty_in).toFixed(2) + ' ' + escLedger(entry.unit_symbol || 'L') : '-'}</td>
-            <td>${entry.qty_out > 0 ? parseFloat(entry.qty_out).toFixed(2) + ' ' + escLedger(entry.unit_symbol || 'L') : '-'}</td>
+            <td>${entry.qty_in > 0 ? formatStockQuantity(entry.qty_in, escLedger(entry.unit_symbol || 'L'), 'branch-ledger') : '-'}</td>
+            <td>${entry.qty_out > 0 ? formatStockQuantity(entry.qty_out, escLedger(entry.unit_symbol || 'L'), 'branch-ledger') : '-'}</td>
             <td>-</td>
-            <td>${currency}${parseFloat(entry.unit_cost).toFixed(2)}</td>
-            <td>${currency}${((parseFloat(entry.qty_in || 0) - parseFloat(entry.qty_out || 0)) * parseFloat(entry.unit_cost)).toFixed(2)}</td>
+            <td>${formatStockMoney(entry.unit_cost, currency, 'branch-ledger')}</td>
+            <td>${formatStockMoney((parseFloat(entry.qty_in || 0) - parseFloat(entry.qty_out || 0)) * parseFloat(entry.unit_cost), currency, 'branch-ledger')}</td>
         </tr>
     `).join('') + `
         <tr style="font-weight: bold; background-color: var(--table-header);">
             <td colspan="4">Total (${allBranchEntries.length} transactions)</td>
-            <td>${totalQtyIn.toFixed(2)} ${escLedger(allBranchEntries[0]?.unit_symbol || 'L')}</td>
-            <td>${totalQtyOut.toFixed(2)} ${escLedger(allBranchEntries[0]?.unit_symbol || 'L')}</td>
-            <td>${totalBalance.toFixed(2)} ${allBranchEntries[0]?.unit_symbol || 'L'}</td>
+            <td>${formatStockQuantity(totalQtyIn, escLedger(allBranchEntries[0]?.unit_symbol || 'L'), 'branch-ledger')}</td>
+            <td>${formatStockQuantity(totalQtyOut, escLedger(allBranchEntries[0]?.unit_symbol || 'L'), 'branch-ledger')}</td>
+            <td>${formatStockQuantity(totalBalance, escLedger(allBranchEntries[0]?.unit_symbol || 'L'), 'branch-ledger')}</td>
             <td>-</td>
-            <td>${currency}${totalValue.toFixed(2)}</td>
+            <td>${formatStockMoney(totalValue, currency, 'branch-ledger')}</td>
         </tr>
     `;
 }
@@ -1193,20 +1237,20 @@ tbody.innerHTML = pageData.map(entry => `
         <td><span class="transaction-badge transaction-${entry.transaction_type.toLowerCase().replace(' ', '-')}">${escLedger(entry.transaction_type)}</span></td>
         <td>${escLedger(entry.batch_no || '-')}</td>
         <td>${escLedger(entry.batch_expiry_date || '-')}</td>
-        <td>${entry.qty_in > 0 ? parseFloat(entry.qty_in).toFixed(2) + ' ' + escLedger(entry.unit_symbol || 'L') : '-'}</td>
-        <td>${entry.qty_out > 0 ? parseFloat(entry.qty_out).toFixed(2) + ' ' + escLedger(entry.unit_symbol || 'L') : '-'}</td>
-        <td>${parseFloat(entry.balance).toFixed(2)} ${escLedger(entry.unit_symbol || 'L')}</td>
-        <td>${currency}${parseFloat(entry.unit_cost).toFixed(2)}</td>
-        <td>${currency}${parseFloat(entry.value).toFixed(2)}</td>
+        <td>${entry.qty_in > 0 ? formatStockQuantity(entry.qty_in, escLedger(entry.unit_symbol || 'L'), 'customer-ledger') : '-'}</td>
+        <td>${entry.qty_out > 0 ? formatStockQuantity(entry.qty_out, escLedger(entry.unit_symbol || 'L'), 'customer-ledger') : '-'}</td>
+        <td>${formatStockQuantity(entry.balance, escLedger(entry.unit_symbol || 'L'), 'customer-ledger')}</td>
+        <td>${formatStockMoney(entry.unit_cost, currency, 'customer-ledger')}</td>
+        <td>${formatStockMoney(entry.value, currency, 'customer-ledger')}</td>
     </tr>
 `).join('') + `
     <tr style="font-weight: bold; background-color: var(--table-header);">
         <td colspan="9">Total (${allCustomerEntries.length} transactions)</td>
-        <td>${totalQtyIn.toFixed(2)} ${escLedger(allCustomerEntries[0]?.unit_symbol || 'L')}</td>
-        <td>${totalQtyOut.toFixed(2)} ${escLedger(allCustomerEntries[0]?.unit_symbol || 'L')}</td>
+        <td>${formatStockQuantity(totalQtyIn, escLedger(allCustomerEntries[0]?.unit_symbol || 'L'), 'customer-ledger')}</td>
+        <td>${formatStockQuantity(totalQtyOut, escLedger(allCustomerEntries[0]?.unit_symbol || 'L'), 'customer-ledger')}</td>
         <td>-</td>
         <td>-</td>
-        <td>${currency}${totalValue.toFixed(2)}</td>
+        <td>${formatStockMoney(totalValue, currency, 'customer-ledger')}</td>
     </tr>
 `;
 }
@@ -1320,22 +1364,22 @@ function renderMovementTable(currency = '$') {
         <tr>
             <td>${escLedger(entry.product_name)}</td>
             <td>${escLedger(entry.item_company_name || '-')}</td>
-            <td>${parseFloat(entry.opening || 0).toFixed(2)}</td>
-            <td>${parseFloat(entry.purchase || 0).toFixed(2)}</td>
-            <td>${parseFloat(entry.sale || 0).toFixed(2)}</td>
-            <td>${parseFloat(entry.credit_note || 0).toFixed(2)}</td>
-            <td>${parseFloat(entry.debit_note || 0).toFixed(2)}</td>
-            <td>${parseFloat(entry.closing || 0).toFixed(2)}</td>
+            <td>${formatStockAmount(entry.opening, 'item-movement')}</td>
+            <td>${formatStockAmount(entry.purchase, 'item-movement')}</td>
+            <td>${formatStockAmount(entry.sale, 'item-movement')}</td>
+            <td>${formatStockAmount(entry.credit_note, 'item-movement')}</td>
+            <td>${formatStockAmount(entry.debit_note, 'item-movement')}</td>
+            <td>${formatStockAmount(entry.closing, 'item-movement')}</td>
         </tr>
     `).join('') + `
         <tr style="font-weight: bold; background-color: var(--table-header);">
             <td>Total (${allMovementEntries.length} products)</td>
-            <td>${totalOpening.toFixed(2)}</td>
-            <td>${totalPurchase.toFixed(2)}</td>
-            <td>${totalSale.toFixed(2)}</td>
-            <td>${totalCreditNote.toFixed(2)}</td>
-            <td>${totalDebitNote.toFixed(2)}</td>
-            <td>${totalClosing.toFixed(2)}</td>
+            <td>${formatStockAmount(totalOpening, 'item-movement')}</td>
+            <td>${formatStockAmount(totalPurchase, 'item-movement')}</td>
+            <td>${formatStockAmount(totalSale, 'item-movement')}</td>
+            <td>${formatStockAmount(totalCreditNote, 'item-movement')}</td>
+            <td>${formatStockAmount(totalDebitNote, 'item-movement')}</td>
+            <td>${formatStockAmount(totalClosing, 'item-movement')}</td>
         </tr>
     `;
 }
@@ -1491,7 +1535,9 @@ async function loadDashboardStats() {
 }
 
 function updateDashboardStats(stats, currency = '$') {
-    document.querySelector('.stat-card:nth-child(1) .stat-value').textContent = `${currency}${parseFloat(stats.total_value || 0).toFixed(2)}`;
+    currentDashboardStats = stats;
+    currentDashboardCurrency = currency;
+    document.querySelector('.stat-card:nth-child(1) .stat-value').textContent = formatStockMoney(stats.total_value, currency, 'position');
     document.querySelector('.stat-card:nth-child(2) .stat-value').textContent = `${stats.in_stock || 0} Products`;
     document.querySelector('.stat-card:nth-child(3) .stat-value').textContent = `${stats.low_stock || 0} Products`;
     document.querySelector('.stat-card:nth-child(4) .stat-value').textContent = `${stats.out_of_stock || 0} Products`;
@@ -1634,6 +1680,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Keep From/To Date synced across every tab until the user changes them
     initDateFilterSync();
+
+    Object.entries(ROUND_OFF_SWITCH_IDS).forEach(([tabId, switchId]) => {
+        document.getElementById(switchId).addEventListener('change', () => rerenderStockTab(tabId));
+    });
     
     // Column visibility toggles
     const toggles = [

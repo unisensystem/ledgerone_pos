@@ -145,6 +145,11 @@ $currency_symbol = $currency['symbol'];
                                 </label>
                             </div>
                         </div>
+                        <label class="round-off-control">
+                            <span>Round Off</span>
+                            <input type="checkbox" id="round-off-position" aria-label="Round off Stock Position values">
+                            <span class="round-off-slider"></span>
+                        </label>
                         <div class="dropdown">
                             <button class="btn btn-primary dropdown-toggle" type="button" data-toggle="dropdown">
                                 <i class="fas fa-file-export"></i> Export
@@ -299,6 +304,11 @@ $currency_symbol = $currency['symbol'];
                 <div class="card-header">
                     <h2 class="card-title">Item-wise Stock Ledger</h2>
                     <div class="action-buttons">
+                        <label class="round-off-control">
+                            <span>Round Off</span>
+                            <input type="checkbox" id="round-off-item-ledger" aria-label="Round off Item-wise Ledger values">
+                            <span class="round-off-slider"></span>
+                        </label>
                         <div class="dropdown">
                             <button class="btn btn-primary dropdown-toggle" type="button" data-toggle="dropdown">
                                 <i class="fas fa-file-export"></i> Export
@@ -408,6 +418,11 @@ $currency_symbol = $currency['symbol'];
                 <div class="card-header">
                     <h2 class="card-title">Branch-wise Stock Ledger</h2>
                     <div class="action-buttons">
+                        <label class="round-off-control">
+                            <span>Round Off</span>
+                            <input type="checkbox" id="round-off-branch-ledger" aria-label="Round off Branch-wise Ledger values">
+                            <span class="round-off-slider"></span>
+                        </label>
                         <div class="dropdown">
                             <button class="btn btn-primary dropdown-toggle" type="button" data-toggle="dropdown">
                                 <i class="fas fa-file-export"></i> Export
@@ -491,6 +506,11 @@ $currency_symbol = $currency['symbol'];
                 <div class="card-header">
                     <h2 class="card-title">Customer-wise Stock Ledger</h2>
                     <div class="action-buttons">
+                        <label class="round-off-control">
+                            <span>Round Off</span>
+                            <input type="checkbox" id="round-off-customer-ledger" aria-label="Round off Customer-wise Ledger values">
+                            <span class="round-off-slider"></span>
+                        </label>
                         <div class="dropdown">
                             <button class="btn btn-primary dropdown-toggle" type="button" data-toggle="dropdown">
                                 <i class="fas fa-file-export"></i> Export
@@ -596,6 +616,11 @@ $currency_symbol = $currency['symbol'];
         <button class="btn btn-secondary" id="hideNoMovementBtn" style="margin-right: 8px;">
             <i class="fas fa-eye-slash"></i> Hide No Movement
         </button>
+        <label class="round-off-control">
+            <span>Round Off</span>
+            <input type="checkbox" id="round-off-item-movement" aria-label="Round off Item Stock Movement values">
+            <span class="round-off-slider"></span>
+        </label>
         <div class="dropdown">
             <button class="btn btn-primary dropdown-toggle" type="button" data-toggle="dropdown">
                 <i class="fas fa-file-export"></i> Export
@@ -718,6 +743,11 @@ $currency_symbol = $currency['symbol'];
                 <div class="card-header">
                     <h2 class="card-title">Detailed Stock Ledger</h2>
                     <div class="action-buttons">
+                        <label class="round-off-control">
+                            <span>Round Off</span>
+                            <input type="checkbox" id="round-off-detailed-ledger" aria-label="Round off Detailed Ledger values">
+                            <span class="round-off-slider"></span>
+                        </label>
                         <div class="dropdown">
                             <button class="btn btn-primary dropdown-toggle" type="button" data-toggle="dropdown">
                                 <i class="fas fa-file-export"></i> Export

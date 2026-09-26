@@ -32,6 +32,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const companyFilter = document.getElementById('company-filter');
     const currencyFilter = document.getElementById('currency-filter');
     const symbolOverride = document.getElementById('symbol-override');
+    const roundOffToggle = document.getElementById('round-off-toggle');
 
     let currentPage = 1;
     let totalPages = 1;
@@ -43,6 +44,22 @@ let detailedOpeningBalance = 0;  // add this
     let expandedInvoices = new Set();
     let allSuppliers = [];
     let currentCurrencySymbol = window.currencySymbol;
+
+    function formatAmount(value) {
+        const amount = Number(value) || 0;
+        return roundOffToggle.checked
+            ? Math.round(amount).toLocaleString()
+            : amount.toLocaleString(undefined, { maximumFractionDigits: 20 });
+    }
+
+    function formatMoney(value) {
+        return currentCurrencySymbol + formatAmount(value);
+    }
+
+    function formatBalance(value) {
+        const amount = Number(value) || 0;
+        return formatMoney(Math.abs(amount)) + (amount >= 0 ? ' Dr' : ' Cr');
+    }
 
     // Set default dates
     const today = new Date();
@@ -306,7 +323,20 @@ let detailedOpeningBalance = 0;  // add this
     symbolOverride.addEventListener('change', function() {
         currentCurrencySymbol = this.value;
         if (allData.length > 0) renderPage();
+        if (allDetailedGrouped) renderDetailedLedger(allDetailedGrouped, allDetailedSubAccounts, detailedOpeningBalance);
     });
+
+   roundOffToggle.addEventListener('change', function() {
+    console.log('ROUND OFF CHANGED. checked =', roundOffToggle.checked,
+        '| summaryActive =', summaryLedgerBtn.classList.contains('active'),
+        '| allData.length =', allData.length,
+        '| detailedActive =', detailedLedgerBtn.classList.contains('active'),
+        '| allDetailedGrouped =', !!allDetailedGrouped);
+    if (summaryLedgerBtn.classList.contains('active') && allData.length > 0) renderPage();
+    if (detailedLedgerBtn.classList.contains('active') && allDetailedGrouped) {
+        renderDetailedLedger(allDetailedGrouped, allDetailedSubAccounts, detailedOpeningBalance);
+    }
+});
 
     // Load suppliers
     async function loadSuppliers() {
@@ -432,10 +462,10 @@ let detailedOpeningBalance = 0;  // add this
             tbody.innerHTML += `
                 <tr>
                     <td>${row.supplier_name}</td>
-                    <td class="${opening >= 0 ? 'balance-positive' : 'balance-negative'}">${currentCurrencySymbol}${Math.abs(opening).toFixed(2)} ${opening >= 0 ? 'Dr' : 'Cr'}</td>
-                    <td>${currentCurrencySymbol}${debit.toFixed(2)}</td>
-                    <td>${currentCurrencySymbol}${credit.toFixed(2)}</td>
-                    <td class="${closing >= 0 ? 'balance-positive' : 'balance-negative'}">${currentCurrencySymbol}${Math.abs(closing).toFixed(2)} ${closing >= 0 ? 'Dr' : 'Cr'}</td>
+                    <td class="${opening >= 0 ? 'balance-positive' : 'balance-negative'}">${formatBalance(opening)}</td>
+                    <td>${formatMoney(debit)}</td>
+                    <td>${formatMoney(credit)}</td>
+                    <td class="${closing >= 0 ? 'balance-positive' : 'balance-negative'}">${formatBalance(closing)}</td>
                 </tr>
             `;
         });
@@ -452,10 +482,10 @@ let detailedOpeningBalance = 0;  // add this
         tbody.innerHTML += `
             <tr class="totals-row">
                 <td><strong>Totals</strong></td>
-                <td><strong class="${grandTotalOpening >= 0 ? 'balance-positive' : 'balance-negative'}">${currentCurrencySymbol}${Math.abs(grandTotalOpening).toFixed(2)} ${grandTotalOpening >= 0 ? 'Dr' : 'Cr'}</strong></td>
-                <td><strong>${currentCurrencySymbol}${grandTotalDebit.toFixed(2)}</strong></td>
-                <td><strong>${currentCurrencySymbol}${grandTotalCredit.toFixed(2)}</strong></td>
-                <td><strong class="${grandTotalClosing >= 0 ? 'balance-positive' : 'balance-negative'}">${currentCurrencySymbol}${Math.abs(grandTotalClosing).toFixed(2)} ${grandTotalClosing >= 0 ? 'Dr' : 'Cr'}</strong></td>
+                <td><strong class="${grandTotalOpening >= 0 ? 'balance-positive' : 'balance-negative'}">${formatBalance(grandTotalOpening)}</strong></td>
+                <td><strong>${formatMoney(grandTotalDebit)}</strong></td>
+                <td><strong>${formatMoney(grandTotalCredit)}</strong></td>
+                <td><strong class="${grandTotalClosing >= 0 ? 'balance-positive' : 'balance-negative'}">${formatBalance(grandTotalClosing)}</strong></td>
             </tr>
         `;
     }
@@ -484,7 +514,7 @@ let detailedOpeningBalance = 0;  // add this
                 <td>-</td>
                 <td></td>
                 <td></td>
-                <td class="${openingBalance >= 0 ? 'balance-positive' : 'balance-negative'}">${currentCurrencySymbol}${Math.abs(openingBalance).toFixed(2)} ${openingBalance >= 0 ? 'Dr' : 'Cr'}</td>
+                <td class="${openingBalance >= 0 ? 'balance-positive' : 'balance-negative'}">${formatBalance(openingBalance)}</td>
             </tr>
         `;
 
@@ -520,9 +550,9 @@ let detailedOpeningBalance = 0;  // add this
                         ${row.type === 'adjustment' && row.adj_note ? `<br><small style="color:var(--text-muted);font-size:11px;font-style:italic;">${row.adj_note}</small>` : ''}
                     </td>
                     <td>${row.reference}</td>
-                    <td>${debit > 0 ? currentCurrencySymbol + debit.toFixed(2) : ''}</td>
-                    <td>${credit > 0 ? currentCurrencySymbol + credit.toFixed(2) : ''}</td>
-                    <td class="${balance >= 0 ? 'balance-positive' : 'balance-negative'}">${currentCurrencySymbol}${Math.abs(balance).toFixed(2)} ${balance >= 0 ? 'Dr' : 'Cr'}</td>
+                    <td>${debit > 0 ? formatMoney(debit) : ''}</td>
+                    <td>${credit > 0 ? formatMoney(credit) : ''}</td>
+                    <td class="${balance >= 0 ? 'balance-positive' : 'balance-negative'}">${formatBalance(balance)}</td>
                 </tr>
             `;
         }
@@ -545,7 +575,7 @@ let detailedOpeningBalance = 0;  // add this
                         <td>${fromDate.value || '-'}</td>
                         <td><em>${openingLabel}</em></td>
                         <td>-</td><td></td><td></td>
-                        <td class="${saOpening >= 0 ? 'balance-positive' : 'balance-negative'}">${currentCurrencySymbol}${Math.abs(saOpening).toFixed(2)} ${saOpening >= 0 ? 'Dr' : 'Cr'}</td>
+                        <td class="${saOpening >= 0 ? 'balance-positive' : 'balance-negative'}">${formatBalance(saOpening)}</td>
                     </tr>`;
             }
             saTxns.forEach(renderRow);
@@ -564,9 +594,9 @@ let detailedOpeningBalance = 0;  // add this
             <tr class="totals-row">
                 <td><strong>Totals</strong></td>
                 <td></td><td></td>
-                <td><strong>${currentCurrencySymbol}${totalDebit.toFixed(2)}</strong></td>
-                <td><strong>${currentCurrencySymbol}${totalCredit.toFixed(2)}</strong></td>
-                <td><strong class="${finalBalance >= 0 ? 'balance-positive' : 'balance-negative'}">${currentCurrencySymbol}${Math.abs(finalBalance).toFixed(2)} ${finalBalance >= 0 ? 'Dr' : 'Cr'}</strong></td>
+                <td><strong>${formatMoney(totalDebit)}</strong></td>
+                <td><strong>${formatMoney(totalCredit)}</strong></td>
+                <td><strong class="${finalBalance >= 0 ? 'balance-positive' : 'balance-negative'}">${formatBalance(finalBalance)}</strong></td>
             </tr>
         `;
     }
@@ -633,7 +663,7 @@ function exportLedgerToExcel() {
             'Reference': '-',
             'Debit': '',
             'Credit': '',
-            'Balance': Math.abs(detailedOpeningBalance).toFixed(2),
+            'Balance': formatAmount(Math.abs(detailedOpeningBalance)),
             'Dr/Cr': detailedOpeningBalance >= 0 ? 'Dr' : 'Cr'
         });
 
@@ -649,7 +679,7 @@ function exportLedgerToExcel() {
                     'Reference': row.reference || '',
                     'Debit': debit || '',
                     'Credit': credit || '',
-                    'Balance': Math.abs(balance).toFixed(2),
+                    'Balance': formatAmount(Math.abs(balance)),
                     'Dr/Cr': balance >= 0 ? 'Dr' : 'Cr'
                 });
             });
@@ -687,11 +717,11 @@ function exportLedgerToExcel() {
             const closing = parseFloat(row.closing_balance) || 0;
             return {
                 'Supplier Name': row.supplier_name,
-                'Opening Balance': Math.abs(opening).toFixed(2),
+                'Opening Balance': formatAmount(Math.abs(opening)),
                 'Opening Dr/Cr': opening >= 0 ? 'Dr' : 'Cr',
-                'Debit': (parseFloat(row.total_debit) || 0).toFixed(2),
-                'Credit': (parseFloat(row.total_credit) || 0).toFixed(2),
-                'Closing Balance': Math.abs(closing).toFixed(2),
+                'Debit': formatAmount(row.total_debit),
+                'Credit': formatAmount(row.total_credit),
+                'Closing Balance': formatAmount(Math.abs(closing)),
                 'Closing Dr/Cr': closing >= 0 ? 'Dr' : 'Cr'
             };
         });
@@ -733,6 +763,7 @@ function exportLedgerToExcel() {
         if (expandedInvoices.size > 0) {
             params.append('expanded', Array.from(expandedInvoices).join(','));
         }
+        params.append('round_off', roundOffToggle.checked ? '1' : '0');
         
         window.open(`print.php?${params}`, '_blank');
     });
@@ -751,6 +782,7 @@ function exportLedgerToExcel() {
         if (companyFilter.value) params.append('company_id', companyFilter.value);
         if (currencyFilter.value) params.append('currency_id', currencyFilter.value);
         if (expandedInvoices.size > 0) params.append('expanded', Array.from(expandedInvoices).join(','));
+        params.append('round_off', roundOffToggle.checked ? '1' : '0');
         window.open(`print.php?${params}`, '_blank');
     });
 
@@ -844,7 +876,7 @@ function exportLedgerToExcel() {
                             // product row above them — indent further and mark distinctly so
                             // they don't read as separate main products.
                             const isVariant = !!item.parent_row_id;
-                            const price = parseFloat(item.purchase_price || 0).toFixed(3);
+                            const price = formatAmount(item.purchase_price || 0);
                             const label = isVariant
                                 ? `<span style="padding-left: 20px; color: #6b7280; font-style: italic;">↳ ${item.product_name} <span style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; margin-left: 4px;">(variant)</span> — ${item.quantity} ${item.uom_name} @ ₨${price}</span>`
                                 : `<span style="font-weight: 700; color: #111827;">→ ${item.product_name}</span> — ${item.quantity} ${item.uom_name} @ ₨${price}`;

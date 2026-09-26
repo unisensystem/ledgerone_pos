@@ -165,6 +165,10 @@ $all_symbols = $stmt2->fetchAll();
                         <option value="desc">Greater to Less</option>
                     </select>
                 </div>
+                <label class="form-group" style="display:flex; align-items:center; gap:8px; cursor:pointer;">
+                    <input type="checkbox" id="round-off-toggle">
+                    <span class="form-label" style="margin:0;">Round Off</span>
+                </label>
             </div>
             <div class="actions">
                 <button class="btn btn-primary" id="load-ledger-btn">

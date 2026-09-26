@@ -661,21 +661,53 @@ function deleteVoucher() {
     closeDeleteModalFunc();
 }
 
-// Export to Excel
+// Export to Excel - mirrors the table's own line-item split so every visible
+// row (Voucher #, Date, Description, Project, Expense Account, Cost Center, Amount, Cash Flow) is exported
 function exportToExcel() {
-    const data = filteredData.map(expense => ({
-        'Voucher #': expense.voucher_no,
-        'Date': new Date(expense.date).toLocaleDateString('en-US'),
-        'Description': expense.description,
-        'Total Items': expense.total_items,
-        'Total Amount': parseFloat(expense.total_amount).toFixed(2)
-    }));
+    // Escape a value for CSV: wrap in quotes if it contains a comma, quote, or newline
+    const escapeCSV = (value) => {
+        const str = String(value ?? '');
+        if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+            return '"' + str.replace(/"/g, '""') + '"';
+        }
+        return str;
+    };
 
-    const worksheet = data.map(row => Object.values(row));
-    const headers = Object.keys(data[0] || {});
-    worksheet.unshift(headers);
+    const headers = ['Voucher #', 'Date', 'Description', 'Project', 'Expense Account', 'Cost Center', 'Amount', 'Cash Flow'];
+    const rows = [];
 
-    let csv = worksheet.map(row => row.join(',')).join('\n');
+    filteredData.forEach(expense => {
+        const formattedDate = new Date(expense.date).toLocaleDateString('en-US');
+        const cashFlowLabel = parseInt(expense.is_cash_flow) === 1 ? 'Yes' : 'No';
+
+        // Split the comma-lists into individual line items, same as renderTable()
+        const accounts = expense.expense_accounts ? expense.expense_accounts.split(',') : ['-'];
+        const costCenters = expense.cost_centers ? expense.cost_centers.split(',') : [];
+        const amounts = expense.expense_amounts ? expense.expense_amounts.split(',') : [];
+        const lineCount = accounts.length || 1;
+
+        for (let i = 0; i < lineCount; i++) {
+            const accName = (accounts[i] || '-').trim();
+            const ccName = (costCenters[i] || '-').trim() || '-';
+            const lineAmount = amounts[i] !== undefined
+                ? parseFloat(amounts[i])
+                : parseFloat(expense.total_amount);
+
+            rows.push([
+                expense.voucher_no,
+                formattedDate,
+                expense.description,
+                expense.project_name || '-',
+                accName,
+                ccName,
+                lineAmount.toFixed(2),
+                cashFlowLabel
+            ]);
+        }
+    });
+
+    const worksheet = [headers, ...rows];
+    let csv = worksheet.map(row => row.map(escapeCSV).join(',')).join('\n');
     const blob = new Blob([csv], { type: 'text/csv' });
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');

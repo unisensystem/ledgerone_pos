@@ -96,6 +96,47 @@ body {
   transition: all 0.2s ease;
 }
 
+#round-off-toggle {
+  appearance: none;
+  display: block;
+  position: relative;
+  width: 42px;
+  height: 24px;
+  margin: 8px 0 0;
+  border: 1px solid var(--border-default);
+  border-radius: 999px;
+  background: var(--border-default);
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+#round-off-toggle::before {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  transition: transform 0.2s ease;
+}
+
+#round-off-toggle:checked {
+  border-color: var(--primary);
+  background: var(--primary);
+}
+
+#round-off-toggle:checked::before {
+  transform: translateX(18px);
+}
+
+#round-off-toggle:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
 .form-control:focus {
   outline: none;
   border-color: var(--primary);

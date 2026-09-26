@@ -49,6 +49,17 @@ $to_date    = $_GET['to_date'] ?? null;
 $sort_by    = $_GET['sort_by'] ?? '';
 $sort_order = $_GET['sort_order'] ?? 'asc';
 $hide_no_movement = isset($_GET['hide_no_movement']) && $_GET['hide_no_movement'] === '1';
+$round_off = ($_GET['round_off'] ?? '0') === '1';
+
+function formatMovementAmount($value, $roundOff)
+{
+    $amount = (float)$value;
+    if ($roundOff) {
+        return number_format(floor($amount + 0.5), 0);
+    }
+
+    return rtrim(rtrim(number_format($amount, 14, '.', ','), '0'), '.') ?: '0';
+}
 
 $allowed_sort_fields = ['opening', 'purchase', 'sale', 'credit_note', 'debit_note', 'closing'];
 if (!in_array($sort_by, $allowed_sort_fields, true)) {
@@ -641,22 +652,22 @@ $totalClosing    = array_sum(array_column($movement, 'closing'));
         <tr>
             <td><?= htmlspecialchars($row['product_name']) ?></td>
             <td><?= htmlspecialchars($row['item_company_name'] ?? '-') ?></td>
-            <td><?= number_format((float)$row['opening'], 2) ?></td>
-            <td><?= number_format((float)$row['purchase'], 2) ?></td>
-            <td><?= number_format((float)$row['sale'], 2) ?></td>
-            <td><?= number_format((float)$row['credit_note'], 2) ?></td>
-            <td><?= number_format((float)$row['debit_note'], 2) ?></td>
-            <td><?= number_format((float)$row['closing'], 2) ?></td>
+            <td><?= formatMovementAmount($row['opening'], $round_off) ?></td>
+            <td><?= formatMovementAmount($row['purchase'], $round_off) ?></td>
+            <td><?= formatMovementAmount($row['sale'], $round_off) ?></td>
+            <td><?= formatMovementAmount($row['credit_note'], $round_off) ?></td>
+            <td><?= formatMovementAmount($row['debit_note'], $round_off) ?></td>
+            <td><?= formatMovementAmount($row['closing'], $round_off) ?></td>
         </tr>
     <?php endforeach; ?>
         <tr class="total-row">
             <td>Total (<?= count($movement) ?> products)</td>
-            <td><?= number_format($totalOpening, 2) ?></td>
-            <td><?= number_format($totalPurchase, 2) ?></td>
-            <td><?= number_format($totalSale, 2) ?></td>
-            <td><?= number_format($totalCreditNote, 2) ?></td>
-            <td><?= number_format($totalDebitNote, 2) ?></td>
-            <td><?= number_format($totalClosing, 2) ?></td>
+            <td><?= formatMovementAmount($totalOpening, $round_off) ?></td>
+            <td><?= formatMovementAmount($totalPurchase, $round_off) ?></td>
+            <td><?= formatMovementAmount($totalSale, $round_off) ?></td>
+            <td><?= formatMovementAmount($totalCreditNote, $round_off) ?></td>
+            <td><?= formatMovementAmount($totalDebitNote, $round_off) ?></td>
+            <td><?= formatMovementAmount($totalClosing, $round_off) ?></td>
         </tr>
     </tbody>
 </table>

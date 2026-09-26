@@ -2,6 +2,26 @@ let reportData = {};
 let currentReportType = 'item';
 let currentDateRange = 'last30';
 let currentSearchTerm = '';
+let CURRENCY_SYMBOL = '$';
+
+// ---- Round Off helpers ----
+function isRoundOffEnabled() {
+    return document.getElementById('round-off-toggle')?.checked || false;
+}
+
+function formatMoney(value) {
+    const amount = parseFloat(value) || 0;
+    return CURRENCY_SYMBOL + (isRoundOffEnabled()
+        ? Math.round(amount).toLocaleString()
+        : amount.toLocaleString(undefined, { maximumFractionDigits: 20 }));
+}
+
+function formatQty(value) {
+    const amount = parseFloat(value) || 0;
+    return isRoundOffEnabled()
+        ? Math.round(amount).toLocaleString()
+        : amount.toLocaleString(undefined, { maximumFractionDigits: 20 });
+}
 
 // Column headers for each report type
 const tableHeaders = {
@@ -137,6 +157,13 @@ document.addEventListener('DOMContentLoaded', function () {
     document.addEventListener('click', function() {
         document.getElementById('exportMenu').classList.remove('show');
     });
+
+    // Round Off toggle - re-render current table and cards with new formatting
+    document.getElementById('round-off-toggle')?.addEventListener('change', () => {
+        if (reportData[currentReportType]) {
+            loadReportData(currentReportType);
+        }
+    });
 });
 
 // Load Companies
@@ -214,8 +241,9 @@ async function fetchReportData(reportType, dateRange) {
         const result = await response.json();
         
         if (result.success) {
+            CURRENCY_SYMBOL = result.currency || CURRENCY_SYMBOL;
             reportData[reportType] = result.data;
-            updateReportCards(result.summary, result.currency);
+            updateReportCards(result.summary, CURRENCY_SYMBOL);
             loadReportData(reportType);
         } else {
             console.error('Error fetching report data:', result.message);
@@ -231,34 +259,34 @@ async function fetchReportData(reportType, dateRange) {
 function updateReportCards(summary, currency) {
     // Item-wise card
     if (summary.item) {
-        document.querySelector('#itemReportCard .stat-item:nth-child(1) .stat-value').textContent = summary.item.items_purchased || 0;
-        document.querySelector('#itemReportCard .stat-item:nth-child(2) .stat-value').textContent = parseFloat(summary.item.total_quantity || 0).toFixed(0) + ' units';
-        document.querySelector('#itemReportCard .stat-item:nth-child(3) .stat-value').textContent = currency + parseFloat(summary.item.avg_unit_price || 0).toFixed(2);
-        document.querySelector('#itemReportCard .stat-item:nth-child(4) .stat-value').textContent = currency + parseFloat(summary.item.total_value || 0).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+        document.querySelector('#itemReportCard .stat-item:nth-child(1) .stat-value').textContent = formatQty(summary.item.items_purchased || 0);
+        document.querySelector('#itemReportCard .stat-item:nth-child(2) .stat-value').textContent = formatQty(summary.item.total_quantity || 0) + ' units';
+        document.querySelector('#itemReportCard .stat-item:nth-child(3) .stat-value').textContent = formatMoney(summary.item.avg_unit_price || 0);
+        document.querySelector('#itemReportCard .stat-item:nth-child(4) .stat-value').textContent = formatMoney(summary.item.total_value || 0);
     }
     
     // Invoice-wise card
     if (summary.invoice) {
-        document.querySelector('#invoiceReportCard .stat-item:nth-child(1) .stat-value').textContent = summary.invoice.total_invoices || 0;
-        document.querySelector('#invoiceReportCard .stat-item:nth-child(2) .stat-value').textContent = currency + parseFloat(summary.invoice.avg_invoice_value || 0).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
-        document.querySelector('#invoiceReportCard .stat-item:nth-child(3) .stat-value').textContent = summary.invoice.pending_invoices || 0;
-        document.querySelector('#invoiceReportCard .stat-item:nth-child(4) .stat-value').textContent = currency + parseFloat(summary.invoice.total_invoice_value || 0).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+        document.querySelector('#invoiceReportCard .stat-item:nth-child(1) .stat-value').textContent = formatQty(summary.invoice.total_invoices || 0);
+        document.querySelector('#invoiceReportCard .stat-item:nth-child(2) .stat-value').textContent = formatMoney(summary.invoice.avg_invoice_value || 0);
+        document.querySelector('#invoiceReportCard .stat-item:nth-child(3) .stat-value').textContent = formatQty(summary.invoice.pending_invoices || 0);
+        document.querySelector('#invoiceReportCard .stat-item:nth-child(4) .stat-value').textContent = formatMoney(summary.invoice.total_invoice_value || 0);
     }
     
     // Category-wise card
     if (summary.category) {
-        document.querySelector('#categoryReportCard .stat-item:nth-child(1) .stat-value').textContent = summary.category.categories || 0;
+        document.querySelector('#categoryReportCard .stat-item:nth-child(1) .stat-value').textContent = formatQty(summary.category.categories || 0);
         document.querySelector('#categoryReportCard .stat-item:nth-child(2) .stat-value').textContent = summary.category.top_category || 'N/A';
         document.querySelector('#categoryReportCard .stat-item:nth-child(3) .stat-value').textContent = parseFloat(summary.category.category_percent || 0).toFixed(0) + '%';
-        document.querySelector('#categoryReportCard .stat-item:nth-child(4) .stat-value').textContent = currency + parseFloat(summary.category.category_spend || 0).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+        document.querySelector('#categoryReportCard .stat-item:nth-child(4) .stat-value').textContent = formatMoney(summary.category.category_spend || 0);
     }
     
     // Supplier-wise card
     if (summary.supplier) {
-        document.querySelector('#supplierReportCard .stat-item:nth-child(1) .stat-value').textContent = summary.supplier.active_suppliers || 0;
-        document.querySelector('#supplierReportCard .stat-item:nth-child(2) .stat-value').textContent = parseFloat(summary.item.total_quantity || 0).toFixed(0) + ' units';
-        document.querySelector('#supplierReportCard .stat-item:nth-child(3) .stat-value').textContent = currency + parseFloat(summary.item.avg_unit_price || 0).toFixed(2);
-        document.querySelector('#supplierReportCard .stat-item:nth-child(4) .stat-value').textContent = currency + parseFloat(summary.supplier.supplier_spend || 0).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+        document.querySelector('#supplierReportCard .stat-item:nth-child(1) .stat-value').textContent = formatQty(summary.supplier.active_suppliers || 0);
+        document.querySelector('#supplierReportCard .stat-item:nth-child(2) .stat-value').textContent = formatQty(summary.item.total_quantity || 0) + ' units';
+        document.querySelector('#supplierReportCard .stat-item:nth-child(3) .stat-value').textContent = formatMoney(summary.item.avg_unit_price || 0);
+        document.querySelector('#supplierReportCard .stat-item:nth-child(4) .stat-value').textContent = formatMoney(summary.supplier.supplier_spend || 0);
     }
 }
 
@@ -345,7 +373,7 @@ function renderTableRows(data, reportType, tableBody) {
        if (reportType === 'item') {
     const expiryHtml = renderExpiryCell(item.expiryDate);
 
-    cells = [item.id, item.name, item.category, item.batchNo || '-', expiryHtml, item.quantity, item.unitPrice, item.total, item.supplier];
+    cells = [item.id, item.name, item.category, item.batchNo || '-', expiryHtml, formatQty(item.quantityRaw), formatMoney(item.unitPriceRaw), formatMoney(item.totalRaw), item.supplier];
 
     cells.forEach((cellContent, idx) => {
         const cell = document.createElement('td');
@@ -368,7 +396,7 @@ function renderTableRows(data, reportType, tableBody) {
 }
          else if (reportType === 'invoice') {
             const expiryHtml = renderExpiryCell(item.expiryDate);
-            cells = [item.id, item.name, item.category, item.batchNo || '-', expiryHtml, item.quantity, item.dueDate, item.total, item.supplier];
+            cells = [item.id, item.name, item.category, item.batchNo || '-', expiryHtml, item.quantity, item.dueDate, formatMoney(item.totalRaw), item.supplier];
             
             cells.forEach((cellContent, idx) => {
                 const cell = document.createElement('td');
@@ -392,7 +420,7 @@ function renderTableRows(data, reportType, tableBody) {
             return;
         } else if (reportType === 'category') {
             const expiryHtml = renderExpiryCell(item.expiryDate);
-            cells = [item.id, item.name, item.category, item.batchNo || '-', expiryHtml, item.quantity, item.unitPrice, item.total, item.supplier];
+            cells = [item.id, item.name, item.category, item.batchNo || '-', expiryHtml, formatQty(item.quantityRaw), formatMoney(item.unitPriceRaw), formatMoney(item.totalRaw), item.supplier];
             
             cells.forEach((cellContent, idx) => {
                 const cell = document.createElement('td');
@@ -414,7 +442,7 @@ function renderTableRows(data, reportType, tableBody) {
             return;
         } else if (reportType === 'supplier') {
             const expiryHtml = renderExpiryCell(item.expiryDate);
-            cells = [item.id, item.name, item.batchNo || '-', expiryHtml, item.quantity, item.unitPrice, item.total, item.contact];
+            cells = [item.id, item.name, item.batchNo || '-', expiryHtml, formatQty(item.quantityRaw), formatMoney(item.unitPriceRaw), formatMoney(item.totalRaw), item.contact];
             
             cells.forEach((cellContent, idx) => {
                 const cell = document.createElement('td');
@@ -482,9 +510,9 @@ function toggleInvoicesBreakdown(row, invoices, button) {
                                 <td style="padding: 8px;">${inv.date}</td>
                                 <td style="padding: 8px;">${inv.batchNo || '-'}</td>
                                 <td style="padding: 8px;">${renderExpiryCell(inv.expiryDate)}</td>
-                                <td style="padding: 8px;">${inv.quantity}</td>
-                                <td style="padding: 8px;">${inv.price}</td>
-                                <td style="padding: 8px;">${inv.total}</td>
+                                <td style="padding: 8px;">${formatQty(inv.quantityRaw)}</td>
+                                <td style="padding: 8px;">${formatMoney(inv.priceRaw)}</td>
+                                <td style="padding: 8px;">${formatMoney(inv.totalRaw)}</td>
                                 <td style="padding: 8px;">${inv.supplier}</td>
                             </tr>
                         `).join('')}
@@ -531,9 +559,9 @@ function toggleItemsBreakdown(row, items, button) {
                                 <td style="padding: 8px;">${item.product}</td>
                                 <td style="padding: 8px;">${item.batchNo || '-'}</td>
                                 <td style="padding: 8px;">${renderExpiryCell(item.expiryDate)}</td>
-                                <td style="padding: 8px;">${item.quantity}</td>
-                                <td style="padding: 8px;">${item.price}</td>
-                                <td style="padding: 8px;">${item.total}</td>
+                                <td style="padding: 8px;">${formatQty(item.quantityRaw)}</td>
+                                <td style="padding: 8px;">${formatMoney(item.priceRaw)}</td>
+                                <td style="padding: 8px;">${formatMoney(item.totalRaw)}</td>
                             </tr>
                         `).join('')}
                     </tbody>
@@ -567,7 +595,7 @@ function toggleSupplierInvoicesBreakdown(row, invoices, button) {
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px solid #e1e6ee;">
                             <strong>Invoice: ${inv.billNo}</strong>
                             <span>Date: ${inv.date}</span>
-                            <strong>Total: ${inv.total}</strong>
+                            <strong>Total: ${formatMoney(inv.totalRaw)}</strong>
                             <button class="btn-ghost btn-sm expand-items-btn" data-idx="${idx}" style="padding: 4px 8px;"><i class="fas fa-chevron-down"></i></button>
                         </div>
                         <div class="items-container" data-idx="${idx}" style="display: none;">
@@ -588,9 +616,9 @@ function toggleSupplierInvoicesBreakdown(row, invoices, button) {
                                             <td style="padding: 8px;">${item.product}</td>
                                             <td style="padding: 8px;">${item.batchNo || '-'}</td>
                                             <td style="padding: 8px;">${renderExpiryCell(item.expiryDate)}</td>
-                                            <td style="padding: 8px;">${item.quantity}</td>
-                                            <td style="padding: 8px;">${item.price}</td>
-                                            <td style="padding: 8px;">${item.total}</td>
+                                            <td style="padding: 8px;">${formatQty(item.quantityRaw)}</td>
+                                            <td style="padding: 8px;">${formatMoney(item.priceRaw)}</td>
+                                            <td style="padding: 8px;">${formatMoney(item.totalRaw)}</td>
                                         </tr>
                                     `).join('')}
                                 </tbody>
@@ -644,8 +672,8 @@ function toggleCategoryBreakdown(row, subcategories, button) {
                             <strong>Subcategory: ${subcat.name}</strong>
                             <span>Batch No: ${subcat.batchNo || '-'}</span>
                             <span>Expiry: ${renderExpiryCell(subcat.expiryDate)}</span>
-                            <span>Quantity: ${subcat.quantity}</span>
-                            <strong>Total: ${subcat.total}</strong>
+                            <span>Quantity: ${formatQty(subcat.quantityRaw)}</span>
+                            <strong>Total: ${formatMoney(subcat.totalRaw)}</strong>
                             <button class="btn-ghost btn-sm expand-subcat-btn" data-sc-idx="${scIdx}" style="padding: 4px 8px;"><i class="fas fa-chevron-down"></i></button>
                         </div>
                         <div class="subcat-invoices-container" data-sc-idx="${scIdx}" style="display: none;">
@@ -654,7 +682,7 @@ function toggleCategoryBreakdown(row, subcategories, button) {
                                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
                                         <strong>Invoice: ${inv.billNo}</strong>
                                         <span>Date: ${inv.date}</span>
-                                        <strong>Total: ${inv.total}</strong>
+                                        <strong>Total: ${formatMoney(inv.totalRaw)}</strong>
                                         <button class="btn-ghost btn-sm expand-inv-items-btn" data-sc-idx="${scIdx}" data-inv-idx="${invIdx}" style="padding: 4px 8px;"><i class="fas fa-chevron-down"></i></button>
                                     </div>
                                     <div class="inv-items-container" data-sc-idx="${scIdx}" data-inv-idx="${invIdx}" style="display: none;">
@@ -675,9 +703,9 @@ function toggleCategoryBreakdown(row, subcategories, button) {
                                                         <td style="padding: 6px;">${item.product}</td>
                                                         <td style="padding: 6px;">${item.batchNo || '-'}</td>
                                                         <td style="padding: 6px;">${renderExpiryCell(item.expiryDate)}</td>
-                                                        <td style="padding: 6px;">${item.quantity}</td>
-                                                        <td style="padding: 6px;">${item.price}</td>
-                                                        <td style="padding: 6px;">${item.total}</td>
+                                                        <td style="padding: 6px;">${formatQty(item.quantityRaw)}</td>
+                                                        <td style="padding: 6px;">${formatMoney(item.priceRaw)}</td>
+                                                        <td style="padding: 6px;">${formatMoney(item.totalRaw)}</td>
                                                     </tr>
                                                 `).join('')}
                                             </tbody>
@@ -844,6 +872,8 @@ function handleExport(type) {
         if (currentSearchTerm) {
             printUrl += `&search=${encodeURIComponent(currentSearchTerm)}`;
         }
+        // carry current round-off preference through to print
+        printUrl += `&round_off=${isRoundOffEnabled() ? '1' : '0'}`;
         window.open(printUrl, '_blank');
     } else if (type === 'excel') {
         alert(`Exporting ${reportName} to Excel format`);

@@ -81,6 +81,10 @@ $all_symbols = $stmt2->fetchAll();
                     </select>
                 </div>
                 <div class="form-group">
+                    <label class="form-label" for="round-off-toggle">Round Off</label>
+                    <input type="checkbox" id="round-off-toggle" aria-label="Round off supplier ledger amounts">
+                </div>
+                <div class="form-group">
                     <label class="form-label" for="supplier-code">Supplier Code</label>
                     <input type="text" class="form-control" id="supplier-search" placeholder="Search suppliers..." autocomplete="off">
                     <select class="form-control" id="supplier-code" style="display: none;">

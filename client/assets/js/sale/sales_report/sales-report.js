@@ -1,5 +1,24 @@
 let reportData = null;
 
+// ---- Round Off helpers ----
+function isRoundOffEnabled() {
+    return document.getElementById('round-off-toggle')?.checked || false;
+}
+
+function formatMoney(value) {
+    const amount = parseFloat(value) || 0;
+    return CURRENCY_SYMBOL + (isRoundOffEnabled()
+        ? Math.round(amount).toLocaleString()
+        : amount.toLocaleString(undefined, { maximumFractionDigits: 20 }));
+}
+
+function formatQty(value) {
+    const amount = parseFloat(value) || 0;
+    return isRoundOffEnabled()
+        ? Math.round(amount).toLocaleString()
+        : amount.toLocaleString(undefined, { maximumFractionDigits: 20 });
+}
+
 document.getElementById('current-date').textContent = new Date().toLocaleDateString('en-US', {
     year: 'numeric',
     month: 'long',
@@ -20,10 +39,10 @@ async function fetchReportData() {
         let url = `../../../../server/api/sale/sales_report/sales-report.php?date_from=${dateFrom}&date_to=${dateTo}&report_type=${reportType}`;
         if (company) url += `&company_id=${company}`;
         if (project) url += `&project_id=${project}`;
-        
+
         const response = await fetch(url);
         const result = await response.json();
-        
+
         if (result.success) {
             reportData = result.data;
             updateDashboard();
@@ -37,7 +56,7 @@ async function fetchReportData() {
 
 function updateDashboard() {
     if (!reportData) return;
-    
+
     updateSummaryCards();
     populateOfficerTable();
     populateProductTable();
@@ -81,7 +100,7 @@ async function loadProjects() {
     try {
         const response = await fetch('../../../../server/api/master_setup/project_setup/get-projects-dropdown.php');
         const data = await response.json();
-        
+
         if (data.success) {
             const select = document.getElementById('project');
             data.projects.forEach(project => {
@@ -101,7 +120,7 @@ async function loadCompanies() {
     try {
         const response = await fetch('../../../../server/api/sale/sales_report/get-companies.php');
         const data = await response.json();
-        
+
         if (data.success) {
             const select = document.getElementById('company');
             data.companies.forEach(company => {
@@ -133,14 +152,14 @@ function populateBranchTable() {
         row.innerHTML = `
             <td><i class="fas fa-chevron-right" style="margin-right: 8px; transition: transform 0.3s;"></i>${item.branch_id_display}</td>
             <td>${item.branch_name}</td>
-            <td>${CURRENCY_SYMBOL}${parseFloat(item.total_sales || 0).toLocaleString()}</td>
-            <td>${parseFloat(item.transactions || 0).toLocaleString()}</td>
-            <td>${CURRENCY_SYMBOL}${parseFloat(item.avg_sale || 0).toLocaleString()}</td>
+            <td>${formatMoney(item.total_sales)}</td>
+            <td>${formatQty(item.transactions)}</td>
+            <td>${formatMoney(item.avg_sale)}</td>
             <td>${formatBatchCell(item.batch_no)}</td>
             <td>${formatExpiryCell(item.nearest_expiry)}</td>
             <td>${formatItemCompanyCell(item.item_company_name)}</td>
         `;
-        
+
         const detailRow = document.createElement('tr');
         detailRow.style.display = 'none';
         detailRow.innerHTML = `
@@ -151,9 +170,9 @@ function populateBranchTable() {
                 </div>
             </td>
         `;
-        
+
         row.addEventListener('click', () => toggleBreakdown(row, detailRow, 'branch', item.branch_id, index));
-        
+
         tableBody.appendChild(row);
         tableBody.appendChild(detailRow);
     });
@@ -179,7 +198,7 @@ function populateCategoryTable() {
         row.setAttribute('data-search', item.category.toLowerCase());
         row.innerHTML = `
             <td>${item.category}</td>
-            <td>${CURRENCY_SYMBOL}${parseFloat(item.total || 0).toLocaleString()}</td>
+            <td>${formatMoney(item.total)}</td>
             <td>${percentage}%</td>
             <td>${formatBatchCell(item.batch_no)}</td>
             <td>${formatExpiryCell(item.nearest_expiry)}</td>
@@ -205,12 +224,12 @@ function filterReportType() {
     const itemCompanyTable = tables[7];
     const vendorTable = tables[8];
     const customerTable = tables[9];
-    
+
     if (!officerTable || !supplierManTable || !productTable || !branchTable || !categoryTable || !territoryTable || !invoiceTable || !itemCompanyTable || !vendorTable || !customerTable) return;
 
     tables.forEach(table => table.style.display = 'none');
     charts.forEach(chart => chart.style.display = 'none');
-    
+
     if (reportType === 'all') {
         officerTable.style.display = 'block';
         supplierManTable.style.display = 'block';
@@ -264,16 +283,16 @@ function filterReportType() {
 
 function updateSummaryCards() {
     const cards = document.querySelectorAll('.card-value');
-    
+
     const totalSales = (reportData.officer_sales || []).reduce((sum, item) => sum + parseFloat(item.total_sales || 0), 0);
     const totalCustomers = (reportData.customer_sales || []).length;
     const totalTransactions = (reportData.branch_sales || []).reduce((sum, item) => sum + parseFloat(item.transactions || 0), 0);
     const avgSale = totalTransactions > 0 ? totalSales / totalTransactions : 0;
-    
-    if (cards[0]) cards[0].textContent = CURRENCY_SYMBOL + totalSales.toLocaleString();
-    if (cards[1]) cards[1].textContent = totalCustomers.toLocaleString();
-    if (cards[2]) cards[2].textContent = totalTransactions.toLocaleString();
-    if (cards[3]) cards[3].textContent = CURRENCY_SYMBOL + avgSale.toLocaleString(undefined, {maximumFractionDigits: 2});
+
+    if (cards[0]) cards[0].textContent = formatMoney(totalSales);
+    if (cards[1]) cards[1].textContent = formatQty(totalCustomers);
+    if (cards[2]) cards[2].textContent = formatQty(totalTransactions);
+    if (cards[3]) cards[3].textContent = formatMoney(avgSale);
 }
 
 function populateOfficerTable() {
@@ -293,14 +312,14 @@ function populateOfficerTable() {
         row.innerHTML = `
             <td><i class="fas fa-chevron-right" style="margin-right: 8px; transition: transform 0.3s;"></i>${item.employee_id}</td>
             <td>${item.officer_name}</td>
-            <td>${parseFloat(item.total_invoices || 0).toLocaleString()}</td>
-            <td>${CURRENCY_SYMBOL}${parseFloat(item.total_sales || 0).toLocaleString()}</td>
+            <td>${formatQty(item.total_invoices)}</td>
+            <td>${formatMoney(item.total_sales)}</td>
             <td>${formatBatchCell(item.batch_no)}</td>
             <td>${formatExpiryCell(item.nearest_expiry)}</td>
             <td>${formatItemCompanyCell(item.item_company_name)}</td>
             <td><span class="badge ${item.status === 'Active' ? 'badge-success' : 'badge-warning'}">${item.status}</span></td>
         `;
-        
+
         const detailRow = document.createElement('tr');
         detailRow.style.display = 'none';
         detailRow.innerHTML = `
@@ -311,9 +330,9 @@ function populateOfficerTable() {
                 </div>
             </td>
         `;
-        
+
         row.addEventListener('click', () => toggleBreakdown(row, detailRow, 'officer', item.sale_officer_id, index));
-        
+
         tableBody.appendChild(row);
         tableBody.appendChild(detailRow);
     });
@@ -362,8 +381,8 @@ function populateProductTable() {
             <td data-col="batch_no">${batchNo}</td>
             <td data-col="expiry_date">${expiryHtml}</td>
             <td data-col="item_company">${itemCompany}</td>
-            <td data-col="quantity_sold">${parseFloat(item.quantity_sold || 0).toLocaleString()}</td>
-            <td data-col="revenue">${CURRENCY_SYMBOL}${parseFloat(item.revenue || 0).toLocaleString()}</td>
+            <td data-col="quantity_sold">${formatQty(item.quantity_sold)}</td>
+            <td data-col="revenue">${formatMoney(item.revenue)}</td>
             <td data-col="growth">${growthHtml}</td>
         `;
 
@@ -408,13 +427,13 @@ function populateTerritoryTable() {
             <td>${item.city}</td>
             <td>${item.zone}</td>
             <td>${item.area}</td>
-            <td>${parseFloat(item.total_invoices || 0).toLocaleString()}</td>
-            <td>${CURRENCY_SYMBOL}${parseFloat(item.total_sales || 0).toLocaleString()}</td>
+            <td>${formatQty(item.total_invoices)}</td>
+            <td>${formatMoney(item.total_sales)}</td>
             <td>${formatBatchCell(item.batch_no)}</td>
             <td>${formatExpiryCell(item.nearest_expiry)}</td>
             <td>${formatItemCompanyCell(item.item_company_name)}</td>
         `;
-        
+
         const detailRow = document.createElement('tr');
         detailRow.style.display = 'none';
         detailRow.innerHTML = `
@@ -425,9 +444,9 @@ function populateTerritoryTable() {
                 </div>
             </td>
         `;
-        
+
         row.addEventListener('click', () => toggleTerritoryDetails(row, detailRow, item, index));
-        
+
         tableBody.appendChild(row);
         tableBody.appendChild(detailRow);
     });
@@ -454,14 +473,14 @@ function populateInvoiceTable() {
             <td>${item.sale_date}</td>
             <td>${item.customer_name}</td>
             <td>${item.officer_name}</td>
-            <td>${CURRENCY_SYMBOL}${parseFloat(item.total_bill || 0).toLocaleString()}</td>
-            <td>${CURRENCY_SYMBOL}${parseFloat(item.total_discount_amount || 0).toLocaleString()}</td>
-            <td>${CURRENCY_SYMBOL}${parseFloat(item.net_amount || 0).toLocaleString()}</td>
+            <td>${formatMoney(item.total_bill)}</td>
+            <td>${formatMoney(item.total_discount_amount)}</td>
+            <td>${formatMoney(item.net_amount)}</td>
             <td>${formatBatchCell(item.batch_no)}</td>
             <td>${formatExpiryCell(item.nearest_expiry)}</td>
             <td>${formatItemCompanyCell(item.item_company_name)}</td>
         `;
-        
+
         const detailRow = document.createElement('tr');
         detailRow.style.display = 'none';
         detailRow.innerHTML = `
@@ -472,9 +491,9 @@ function populateInvoiceTable() {
                 </div>
             </td>
         `;
-        
+
         row.addEventListener('click', () => toggleDetails(row, detailRow, 'invoice_items', item.id, item.id));
-        
+
         tableBody.appendChild(row);
         tableBody.appendChild(detailRow);
     });
@@ -499,14 +518,14 @@ function populateVendorTable() {
         row.innerHTML = `
             <td><i class="fas fa-chevron-right" style="margin-right: 8px; transition: transform 0.3s;"></i>${item.vendor_id_display}</td>
             <td>${item.vendor_name}</td>
-            <td>${parseFloat(item.total_invoices || 0).toLocaleString()}</td>
-            <td>${parseFloat(item.total_quantity || 0).toLocaleString()}</td>
-            <td>${CURRENCY_SYMBOL}${parseFloat(item.total_sales || 0).toLocaleString()}</td>
+            <td>${formatQty(item.total_invoices)}</td>
+            <td>${formatQty(item.total_quantity)}</td>
+            <td>${formatMoney(item.total_sales)}</td>
             <td>${formatBatchCell(item.batch_no)}</td>
             <td>${formatExpiryCell(item.nearest_expiry)}</td>
             <td>${formatItemCompanyCell(item.item_company_name)}</td>
         `;
-        
+
         const detailRow = document.createElement('tr');
         detailRow.style.display = 'none';
         detailRow.innerHTML = `
@@ -517,9 +536,9 @@ function populateVendorTable() {
                 </div>
             </td>
         `;
-        
+
         row.addEventListener('click', () => toggleDetails(row, detailRow, 'vendor_products', item.vendor_id, item.vendor_id));
-        
+
         tableBody.appendChild(row);
         tableBody.appendChild(detailRow);
     });
@@ -542,9 +561,9 @@ function populateItemCompanyTable() {
         row.setAttribute('data-search', (item.item_company_name || '').toLowerCase());
         row.innerHTML = `
             <td>${item.item_company_name || 'Unknown'}</td>
-            <td>${parseFloat(item.total_invoices || 0).toLocaleString()}</td>
-            <td>${parseFloat(item.total_quantity || 0).toLocaleString()}</td>
-            <td>${CURRENCY_SYMBOL}${parseFloat(item.total_sales || 0).toLocaleString()}</td>
+            <td>${formatQty(item.total_invoices)}</td>
+            <td>${formatQty(item.total_quantity)}</td>
+            <td>${formatMoney(item.total_sales)}</td>
             <td>${formatBatchCell(item.batch_no)}</td>
             <td>${formatExpiryCell(item.nearest_expiry)}</td>
         `;
@@ -571,13 +590,13 @@ function populateCustomerTable() {
         row.innerHTML = `
             <td><i class="fas fa-chevron-right" style="margin-right: 8px; transition: transform 0.3s;"></i>${item.customer_id_display}</td>
             <td>${item.customer_name}</td>
-            <td>${parseFloat(item.total_invoices || 0).toLocaleString()}</td>
-            <td>${CURRENCY_SYMBOL}${parseFloat(item.total_sales || 0).toLocaleString()}</td>
+            <td>${formatQty(item.total_invoices)}</td>
+            <td>${formatMoney(item.total_sales)}</td>
             <td>${formatBatchCell(item.batch_no)}</td>
             <td>${formatExpiryCell(item.nearest_expiry)}</td>
             <td>${formatItemCompanyCell(item.item_company_name)}</td>
         `;
-        
+
         const detailRow = document.createElement('tr');
         detailRow.style.display = 'none';
         detailRow.innerHTML = `
@@ -588,9 +607,9 @@ function populateCustomerTable() {
                 </div>
             </td>
         `;
-        
+
         row.addEventListener('click', () => toggleDetails(row, detailRow, 'customer_invoices', item.customer_id, item.customer_id));
-        
+
         tableBody.appendChild(row);
         tableBody.appendChild(detailRow);
     });
@@ -609,7 +628,7 @@ function populateSupplierManTable() {
 
     reportData.supplier_man_sales.forEach((item, index) => {
         if (!item.supplier_man_id) return;
-        
+
         const row = document.createElement('tr');
         row.style.cursor = 'pointer';
         row.className = 'supplier-man-row';
@@ -617,14 +636,14 @@ function populateSupplierManTable() {
         row.innerHTML = `
             <td><i class="fas fa-chevron-right" style="margin-right: 8px; transition: transform 0.3s;"></i>${item.employee_id}</td>
             <td>${item.supplier_man_name}</td>
-            <td>${parseFloat(item.total_invoices || 0).toLocaleString()}</td>
-            <td>${CURRENCY_SYMBOL}${parseFloat(item.total_sales || 0).toLocaleString()}</td>
+            <td>${formatQty(item.total_invoices)}</td>
+            <td>${formatMoney(item.total_sales)}</td>
             <td>${formatBatchCell(item.batch_no)}</td>
             <td>${formatExpiryCell(item.nearest_expiry)}</td>
             <td>${formatItemCompanyCell(item.item_company_name)}</td>
             <td><span class="badge ${item.status === 'Active' ? 'badge-success' : 'badge-warning'}">${item.status}</span></td>
         `;
-        
+
         const detailRow = document.createElement('tr');
         detailRow.style.display = 'none';
         detailRow.innerHTML = `
@@ -635,9 +654,9 @@ function populateSupplierManTable() {
                 </div>
             </td>
         `;
-        
+
         row.addEventListener('click', () => toggleBreakdown(row, detailRow, 'supplier_man', item.supplier_man_id, index));
-        
+
         tableBody.appendChild(row);
         tableBody.appendChild(detailRow);
     });
@@ -942,61 +961,61 @@ function printReport() {
 
 async function toggleBreakdown(row, detailRow, type, id, index) {
     const icon = row.querySelector('i.fa-chevron-right');
-    
+
     if (detailRow.style.display === 'none') {
         icon.style.transform = 'rotate(90deg)';
         detailRow.style.display = 'table-row';
-        
+
         const dateFrom = document.getElementById('date-from').value;
         const dateTo = document.getElementById('date-to').value;
-        
+
         try {
             const response = await fetch(`../../../../server/api/sale/sales_report/breakdown.php?type=${type}&id=${id}&date_from=${dateFrom}&date_to=${dateTo}`);
             const result = await response.json();
-            
+
             if (result.success) {
                 const container = document.getElementById(`${type}-breakdown-${index}`);
-                
+
                 if (!container) {
                     console.error(`Container not found: ${type}-breakdown-${index}`);
                     return;
                 }
-                
+
                 const data = result.data;
-                
-                const headers = type === 'branch' ? '<tr><th>Date</th><th>Quantity</th><th>Unit</th><th>Revenue</th><th>Batch No</th><th>Expiry Date</th><th>Item Company</th></tr>' : 
-                               type === 'officer' ? '<tr><th>Date</th><th>Invoices</th><th>Revenue</th><th>Batch No</th><th>Expiry Date</th><th>Item Company</th></tr>' : 
-                               type === 'supplier_man' ? '<tr><th>Date</th><th>Invoices</th><th>Revenue</th><th>Batch No</th><th>Expiry Date</th><th>Item Company</th></tr>' : 
+
+                const headers = type === 'branch' ? '<tr><th>Date</th><th>Quantity</th><th>Unit</th><th>Revenue</th><th>Batch No</th><th>Expiry Date</th><th>Item Company</th></tr>' :
+                               type === 'officer' ? '<tr><th>Date</th><th>Invoices</th><th>Revenue</th><th>Batch No</th><th>Expiry Date</th><th>Item Company</th></tr>' :
+                               type === 'supplier_man' ? '<tr><th>Date</th><th>Invoices</th><th>Revenue</th><th>Batch No</th><th>Expiry Date</th><th>Item Company</th></tr>' :
                                '<tr><th>Date</th><th>Quantity</th><th>Revenue</th></tr>';
-                
+
                 let html = `
                     <div style="margin-bottom: 12px; display: flex; gap: 8px; align-items: center;">
-                        <input type="date" id="search-${type}-${index}" 
+                        <input type="date" id="search-${type}-${index}"
                             style="padding: 6px 10px; border: 1px solid #ddd; border-radius: 4px; font-size: 13px;" />
-                        <button onclick="document.getElementById('search-${type}-${index}').value=''; document.getElementById('search-${type}-${index}').dispatchEvent(new Event('input'));" 
+                        <button onclick="document.getElementById('search-${type}-${index}').value=''; document.getElementById('search-${type}-${index}').dispatchEvent(new Event('input'));"
                             style="padding: 6px 12px; border: 1px solid #ddd; border-radius: 4px; background: white; cursor: pointer; font-size: 13px;">Clear</button>
                         <span style="font-size: 12px; color: #666;">Showing ${data.length} records</span>
                     </div>
                     <div style="max-height: 300px; overflow-y: auto;">
                         <table style="width: 100%; font-size: 13px;" id="table-${type}-${index}">
                             ${headers}`;
-                
+
                 data.forEach(item => {
                     const batchCell = formatBatchCell(item.batch_no);
                     const expiryCell = formatExpiryCell(item.nearest_expiry);
                     const itemCompanyCell = formatItemCompanyCell(item.item_company_name);
                     if (type === 'branch') {
-                        html += `<tr class="breakdown-row"><td>${item.date}</td><td>${parseFloat(item.volume || 0).toLocaleString()}</td><td>${item.unit || '-'}</td><td>${CURRENCY_SYMBOL}${parseFloat(item.revenue || 0).toLocaleString()}</td><td>${batchCell}</td><td>${expiryCell}</td><td>${itemCompanyCell}</td></tr>`;
+                        html += `<tr class="breakdown-row"><td>${item.date}</td><td>${formatQty(item.volume)}</td><td>${item.unit || '-'}</td><td>${formatMoney(item.revenue)}</td><td>${batchCell}</td><td>${expiryCell}</td><td>${itemCompanyCell}</td></tr>`;
                     } else if (type === 'officer' || type === 'supplier_man') {
-                        html += `<tr class="breakdown-row"><td>${item.date}</td><td>${parseFloat(item.invoices || 0).toLocaleString()}</td><td>${CURRENCY_SYMBOL}${parseFloat(item.revenue || 0).toLocaleString()}</td><td>${batchCell}</td><td>${expiryCell}</td><td>${itemCompanyCell}</td></tr>`;
+                        html += `<tr class="breakdown-row"><td>${item.date}</td><td>${formatQty(item.invoices)}</td><td>${formatMoney(item.revenue)}</td><td>${batchCell}</td><td>${expiryCell}</td><td>${itemCompanyCell}</td></tr>`;
                     } else {
-                        html += `<tr class="breakdown-row"><td>${item.date}</td><td>${parseFloat(item.volume || 0).toLocaleString()}</td><td>${CURRENCY_SYMBOL}${parseFloat(item.revenue || 0).toLocaleString()}</td></tr>`;
+                        html += `<tr class="breakdown-row"><td>${item.date}</td><td>${formatQty(item.volume)}</td><td>${formatMoney(item.revenue)}</td></tr>`;
                     }
                 });
-                
+
                 html += '</table></div>';
                 container.innerHTML = html;
-                
+
                 document.getElementById(`search-${type}-${index}`).addEventListener('input', function(e) {
                     const searchValue = e.target.value;
                     const rows = document.querySelectorAll(`#table-${type}-${index} .breakdown-row`);
@@ -1026,24 +1045,24 @@ async function toggleBreakdown(row, detailRow, type, id, index) {
 
 async function toggleDetails(row, detailRow, type, id, index) {
     const icon = row.querySelector('i.fa-chevron-right');
-    
+
     if (detailRow.style.display === 'none') {
         icon.style.transform = 'rotate(90deg)';
         detailRow.style.display = 'table-row';
-        
+
         const dateFrom = document.getElementById('date-from').value;
         const dateTo = document.getElementById('date-to').value;
-        
+
         try {
             const response = await fetch(`../../../../server/api/sale/sales_report/details.php?type=${type}&id=${id}&date_from=${dateFrom}&date_to=${dateTo}`);
             const result = await response.json();
-            
+
             if (result.success) {
                 const container = document.getElementById(`${type.split('_')[0]}-details-${index}`);
                 const data = result.data;
-                
+
                 let html = '<div style="max-height: 300px; overflow-y: auto;"><table style="width: 100%; font-size: 13px;">';
-                
+
                 if (type === 'product_invoices') {
                     html += '<tr><th>Invoice #</th><th>Date</th><th>Customer</th><th>Quantity</th><th>Price</th><th>Batch No</th><th>Expiry Date</th><th>Item Company</th><th>Amount</th></tr>';
                     data.forEach(item => {
@@ -1051,7 +1070,7 @@ async function toggleDetails(row, detailRow, type, id, index) {
                         const expiryCell = item.expiry_date
                             ? (expiringSoon ? `<span style="color:#d64545; font-weight:600;">${item.expiry_date}</span>` : item.expiry_date)
                             : '-';
-                        html += `<tr><td>${item.bill_no}</td><td>${item.sale_date}</td><td>${item.customer_name}</td><td>${parseFloat(item.quantity || 0).toLocaleString()}</td><td>${CURRENCY_SYMBOL}${parseFloat(item.sale_price || 0).toLocaleString()}</td><td>${item.batch_no || '-'}</td><td>${expiryCell}</td><td>${item.item_company_name || '-'}</td><td>${CURRENCY_SYMBOL}${parseFloat(item.net_amount || 0).toLocaleString()}</td></tr>`;
+                        html += `<tr><td>${item.bill_no}</td><td>${item.sale_date}</td><td>${item.customer_name}</td><td>${formatQty(item.quantity)}</td><td>${formatMoney(item.sale_price)}</td><td>${item.batch_no || '-'}</td><td>${expiryCell}</td><td>${item.item_company_name || '-'}</td><td>${formatMoney(item.net_amount)}</td></tr>`;
                     });
                 } else if (type === 'vendor_products') {
                     html += '<tr><th>Product</th><th>Batch No</th><th>Expiry Date</th><th>Item Company</th><th>Quantity</th><th>Total Sales</th></tr>';
@@ -1060,12 +1079,12 @@ async function toggleDetails(row, detailRow, type, id, index) {
                         const expiryCell = item.nearest_expiry
                             ? (expiringSoon ? `<span style="color:#d64545; font-weight:600;">${item.nearest_expiry}</span>` : item.nearest_expiry)
                             : '-';
-                        html += `<tr><td>${item.product_name}</td><td>${item.batch_no || '-'}</td><td>${expiryCell}</td><td>${item.item_company_name || '-'}</td><td>${parseFloat(item.total_quantity || 0).toLocaleString()}</td><td>${CURRENCY_SYMBOL}${parseFloat(item.total_sales || 0).toLocaleString()}</td></tr>`;
+                        html += `<tr><td>${item.product_name}</td><td>${item.batch_no || '-'}</td><td>${expiryCell}</td><td>${item.item_company_name || '-'}</td><td>${formatQty(item.total_quantity)}</td><td>${formatMoney(item.total_sales)}</td></tr>`;
                     });
                 } else if (type === 'customer_invoices') {
                     html += '<tr><th>Invoice #</th><th>Date</th><th>Total Bill</th><th>Discount</th><th>Net Amount</th><th>Batch No</th><th>Expiry Date</th><th>Item Company</th></tr>';
                     data.forEach(item => {
-                        html += `<tr><td>${item.bill_no}</td><td>${item.sale_date}</td><td>${CURRENCY_SYMBOL}${parseFloat(item.total_bill || 0).toLocaleString()}</td><td>${CURRENCY_SYMBOL}${parseFloat(item.total_discount_amount || 0).toLocaleString()}</td><td>${CURRENCY_SYMBOL}${parseFloat(item.net_amount || 0).toLocaleString()}</td><td>${formatBatchCell(item.batch_no)}</td><td>${formatExpiryCell(item.nearest_expiry)}</td><td>${item.item_company_name || '-'}</td></tr>`;
+                        html += `<tr><td>${item.bill_no}</td><td>${item.sale_date}</td><td>${formatMoney(item.total_bill)}</td><td>${formatMoney(item.total_discount_amount)}</td><td>${formatMoney(item.net_amount)}</td><td>${formatBatchCell(item.batch_no)}</td><td>${formatExpiryCell(item.nearest_expiry)}</td><td>${item.item_company_name || '-'}</td></tr>`;
                     });
                 } else if (type === 'invoice_items') {
                     html += '<tr><th>Product</th><th>Batch No</th><th>Expiry Date</th><th>Item Company</th><th>Quantity</th><th>Price</th><th>Discount</th><th>Net Amount</th></tr>';
@@ -1074,10 +1093,10 @@ async function toggleDetails(row, detailRow, type, id, index) {
                         const expiryCell = item.expiry_date
                             ? (expiringSoon ? `<span style="color:#d64545; font-weight:600;">${item.expiry_date}</span>` : item.expiry_date)
                             : '-';
-                        html += `<tr><td>${item.product_name}</td><td>${item.batch_no || '-'}</td><td>${expiryCell}</td><td>${item.item_company_name || '-'}</td><td>${parseFloat(item.quantity || 0).toLocaleString()}</td><td>${CURRENCY_SYMBOL}${parseFloat(item.sale_price || 0).toLocaleString()}</td><td>${CURRENCY_SYMBOL}${parseFloat(item.discount_amount || 0).toLocaleString()}</td><td>${CURRENCY_SYMBOL}${parseFloat(item.net_amount || 0).toLocaleString()}</td></tr>`;
+                        html += `<tr><td>${item.product_name}</td><td>${item.batch_no || '-'}</td><td>${expiryCell}</td><td>${item.item_company_name || '-'}</td><td>${formatQty(item.quantity)}</td><td>${formatMoney(item.sale_price)}</td><td>${formatMoney(item.discount_amount)}</td><td>${formatMoney(item.net_amount)}</td></tr>`;
                     });
                 }
-                
+
                 html += '</table></div>';
                 container.innerHTML = data.length > 0 ? html : 'No data available';
             } else {
@@ -1094,26 +1113,26 @@ async function toggleDetails(row, detailRow, type, id, index) {
 
 async function toggleTerritoryDetails(row, detailRow, item, index) {
     const icon = row.querySelector('i.fa-chevron-right');
-    
+
     if (detailRow.style.display === 'none') {
         icon.style.transform = 'rotate(90deg)';
         detailRow.style.display = 'table-row';
-        
+
         const dateFrom = document.getElementById('date-from').value;
         const dateTo = document.getElementById('date-to').value;
-        
+
         try {
             const response = await fetch(`../../../../server/api/sale/sales_report/details.php?type=territory_invoices&date_from=${dateFrom}&date_to=${dateTo}&country=${encodeURIComponent(item.country)}&region=${encodeURIComponent(item.region)}&city=${encodeURIComponent(item.city)}&zone=${encodeURIComponent(item.zone)}&area=${encodeURIComponent(item.area)}`);
             const result = await response.json();
-            
+
             if (result.success) {
                 const container = document.getElementById(`territory-details-${index}`);
                 const data = result.data;
-                
+
                 let html = '<div style="max-height: 300px; overflow-y: auto;"><table style="width: 100%; font-size: 13px;">';
                 html += '<tr><th>Invoice #</th><th>Date</th><th>Customer</th><th>Net Amount</th><th>Batch No</th><th>Expiry Date</th><th>Item Company</th></tr>';
                 data.forEach(d => {
-                    html += `<tr><td>${d.bill_no}</td><td>${d.sale_date}</td><td>${d.customer_name}</td><td>${CURRENCY_SYMBOL}${parseFloat(d.net_amount || 0).toLocaleString()}</td><td>${formatBatchCell(d.batch_no)}</td><td>${formatExpiryCell(d.nearest_expiry)}</td><td>${d.item_company_name || '-'}</td></tr>`;
+                    html += `<tr><td>${d.bill_no}</td><td>${d.sale_date}</td><td>${d.customer_name}</td><td>${formatMoney(d.net_amount)}</td><td>${formatBatchCell(d.batch_no)}</td><td>${formatExpiryCell(d.nearest_expiry)}</td><td>${d.item_company_name || '-'}</td></tr>`;
                 });
                 html += '</table></div>';
                 container.innerHTML = data.length > 0 ? html : 'No data available';
@@ -1138,16 +1157,20 @@ document.addEventListener('DOMContentLoaded', function () {
     document.getElementById('date-to').valueAsDate = today;
 
     fetchReportData();
+
+    document.getElementById('round-off-toggle')?.addEventListener('change', () => {
+        if (reportData) updateDashboard();
+    });
 });
 
 function setupSearch(inputId, rowSelector, dataAttributes) {
     const input = document.getElementById(inputId);
     if (!input) return;
-    
+
     input.addEventListener('input', function() {
         const searchTerm = this.value.toLowerCase();
         const rows = document.querySelectorAll(rowSelector);
-        
+
         rows.forEach(row => {
             const matches = dataAttributes.some(attr => {
                 const value = row.getAttribute(attr);
@@ -1201,47 +1224,47 @@ function setupColumnToggle(prefix) {
 function setupPagination(tableBodyId, rowsPerPage = 50) {
     const tableBody = document.getElementById(tableBodyId);
     if (!tableBody) return;
-    
+
     const tableCard = tableBody.closest('.table-card');
     let paginationDiv = tableCard.querySelector('.pagination');
-    
+
     if (!paginationDiv) {
         paginationDiv = document.createElement('div');
         paginationDiv.className = 'pagination';
         tableCard.appendChild(paginationDiv);
     }
-    
-    const allRows = Array.from(tableBody.querySelectorAll('tr')).filter(row => 
+
+    const allRows = Array.from(tableBody.querySelectorAll('tr')).filter(row =>
         !row.querySelector('td[colspan]') && row.style.display !== 'none'
     );
-    
+
     const totalRows = allRows.length;
     const totalPages = Math.ceil(totalRows / rowsPerPage);
     let currentPage = 1;
-    
+
     function showPage(page) {
         currentPage = page;
         const start = (page - 1) * rowsPerPage;
         const end = start + rowsPerPage;
-        
+
         Array.from(tableBody.querySelectorAll('tr')).forEach(row => {
             if (row.querySelector('td[colspan]')) return;
             row.style.display = 'none';
         });
-        
+
         allRows.forEach((row, index) => {
             if (index >= start && index < end) {
                 row.style.display = '';
             }
         });
-        
+
         updatePaginationControls();
     }
-    
+
     function updatePaginationControls() {
         const start = (currentPage - 1) * rowsPerPage + 1;
         const end = Math.min(currentPage * rowsPerPage, totalRows);
-        
+
         paginationDiv.innerHTML = `
             <div class="pagination-info">Showing ${start}-${end} of ${totalRows} records</div>
             <div class="pagination-controls">
@@ -1253,7 +1276,7 @@ function setupPagination(tableBodyId, rowsPerPage = 50) {
             </div>
         `;
     }
-    
+
     if (!window.paginationHandlers) window.paginationHandlers = {};
     window.paginationHandlers[tableBodyId] = {
         first: () => showPage(1),
@@ -1261,7 +1284,7 @@ function setupPagination(tableBodyId, rowsPerPage = 50) {
         next: () => showPage(Math.min(totalPages, currentPage + 1)),
         last: () => showPage(totalPages)
     };
-    
+
     if (totalPages > 1) {
         showPage(1);
     } else {

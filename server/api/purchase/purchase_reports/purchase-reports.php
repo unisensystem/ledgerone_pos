@@ -231,8 +231,11 @@ try {
                         'billNo' => $invoice['bill_no'],
                         'date' => date('Y-m-d', strtotime($invoice['purchase_date'])),
                         'quantity' => number_format($invoice['quantity'], 2),
+                        'quantityRaw' => (float)$invoice['quantity'],
                         'price' => $currency_symbol . number_format($invoice['purchase_price'], 2),
+                        'priceRaw' => (float)$invoice['purchase_price'],
                         'total' => $currency_symbol . number_format($invoice['net_amount'], 2),
+                        'totalRaw' => (float)$invoice['net_amount'],
                         'batchNo' => formatBatchNo($invoice['batch_no']),
                         'expiryDate' => formatExpiryDate($invoice['batch_expiry_date']),
                         'supplier' => $invoice['supplier_name']
@@ -246,8 +249,11 @@ try {
     'batchNo' => $row['batch_no'] ?: '-',
     'expiryDate' => $row['nearest_expiry'] ? date('Y-m-d', strtotime($row['nearest_expiry'])) : '-',
     'quantity' => number_format($row['quantity'], 2),
+    'quantityRaw' => (float)$row['quantity'],
     'unitPrice' => $currency_symbol . number_format($row['unit_price'], 2),
+    'unitPriceRaw' => (float)$row['unit_price'],
     'total' => $currency_symbol . number_format($row['total'], 2),
+    'totalRaw' => (float)$row['total'],
     'supplier' => $row['supplier'],
     'invoices' => $invoicesBreakdown
 ];
@@ -303,8 +309,11 @@ try {
                     $itemsBreakdown[] = [
                         'product' => $item['product_name'],
                         'quantity' => number_format($item['quantity'], 2),
+                        'quantityRaw' => (float)$item['quantity'],
                         'price' => $currency_symbol . number_format($item['purchase_price'], 2),
+                        'priceRaw' => (float)$item['purchase_price'],
                         'total' => $currency_symbol . number_format($item['net_amount'], 2),
+                        'totalRaw' => (float)$item['net_amount'],
                         'batchNo' => formatBatchNo($item['batch_no']),
                         'expiryDate' => formatExpiryDate($item['batch_expiry_date'])
                     ];
@@ -317,8 +326,10 @@ try {
                     'batchNo' => $row['batch_no'] ?: '-',
                     'expiryDate' => $row['nearest_expiry'] ? date('Y-m-d', strtotime($row['nearest_expiry'])) : '-',
                     'quantity' => $row['items'] . ' items',
+                    'itemsCount' => (int)$row['items'],
                     'dueDate' => date('Y-m-d', strtotime($row['due_date'])),
                     'total' => $currency_symbol . number_format($row['total'], 2),
+                    'totalRaw' => (float)$row['total'],
                     'supplier' => $row['supplier'],
                     'items' => $itemsBreakdown
                 ];
@@ -417,8 +428,11 @@ try {
                             $itemsBreakdown[] = [
                                 'product' => $item['product_name'],
                                 'quantity' => number_format($item['quantity'], 2),
+                                'quantityRaw' => (float)$item['quantity'],
                                 'price' => $currency_symbol . number_format($item['purchase_price'], 2),
+                                'priceRaw' => (float)$item['purchase_price'],
                                 'total' => $currency_symbol . number_format($item['net_amount'], 2),
+                                'totalRaw' => (float)$item['net_amount'],
                                 'batchNo' => formatBatchNo($item['batch_no']),
                                 'expiryDate' => formatExpiryDate($item['batch_expiry_date'])
                             ];
@@ -429,6 +443,7 @@ try {
                                 'billNo' => $invoice['bill_no'],
                                 'date' => date('Y-m-d', strtotime($invoice['purchase_date'])),
                                 'total' => $currency_symbol . number_format($invoice['net_amount'], 2),
+                                'totalRaw' => (float)$invoice['net_amount'],
                                 'items' => $itemsBreakdown
                             ];
                         }
@@ -438,8 +453,11 @@ try {
                         $subcategoriesBreakdown[] = [
                             'name' => $subcat['subcategory_name'],
                             'quantity' => number_format($subcat['quantity'], 0),
+                            'quantityRaw' => (float)$subcat['quantity'],
                             'unitPrice' => $currency_symbol . number_format($subcat['unit_price'], 2),
+                            'unitPriceRaw' => (float)$subcat['unit_price'],
                             'total' => $currency_symbol . number_format($subcat['total'], 2),
+                            'totalRaw' => (float)$subcat['total'],
                             'batchNo' => formatBatchNo($subcat['batch_no']),
                             'expiryDate' => formatExpiryDate($subcat['nearest_expiry']),
                             'invoices' => $invoicesBreakdown
@@ -452,8 +470,11 @@ try {
                     'name' => $row['name'],
                     'category' => $row['category'],
                     'quantity' => number_format($row['quantity'], 0),
+                    'quantityRaw' => (float)$row['quantity'],
                     'unitPrice' => $currency_symbol . number_format($row['unit_price'], 2),
+                    'unitPriceRaw' => (float)$row['unit_price'],
                     'total' => $currency_symbol . number_format($row['total'], 2),
+                    'totalRaw' => (float)$row['total'],
                     'supplier' => $row['supplier'],
                     'batchNo' => $row['batch_no'] ?: '-',
                     'expiryDate' => $row['nearest_expiry'] ? date('Y-m-d', strtotime($row['nearest_expiry'])) : '-',
@@ -526,8 +547,11 @@ try {
                         $itemsBreakdown[] = [
                             'product' => $item['product_name'],
                             'quantity' => number_format($item['quantity'], 2),
+                            'quantityRaw' => (float)$item['quantity'],
                             'price' => $currency_symbol . number_format($item['purchase_price'], 2),
+                            'priceRaw' => (float)$item['purchase_price'],
                             'total' => $currency_symbol . number_format($item['net_amount'], 2),
+                            'totalRaw' => (float)$item['net_amount'],
                             'batchNo' => formatBatchNo($item['batch_no']),
                             'expiryDate' => formatExpiryDate($item['batch_expiry_date'])
                         ];
@@ -537,6 +561,7 @@ try {
                         'billNo' => $invoice['bill_no'],
                         'date' => date('Y-m-d', strtotime($invoice['purchase_date'])),
                         'total' => $currency_symbol . number_format($invoice['net_amount'], 2),
+                        'totalRaw' => (float)$invoice['net_amount'],
                         'items' => $itemsBreakdown
                     ];
                 }
@@ -546,8 +571,11 @@ try {
                     'name' => $row['name'],
                     'category' => $row['category'],
                     'quantity' => number_format($row['quantity'], 0),
+                    'quantityRaw' => (float)$row['quantity'],
                     'unitPrice' => $currency_symbol . number_format($row['unit_price'], 2),
+                    'unitPriceRaw' => (float)$row['unit_price'],
                     'total' => $currency_symbol . number_format($row['total'], 2),
+                    'totalRaw' => (float)$row['total'],
                     'supplier' => $row['supplier'],
                     'contact' => $row['contact'],
                     'batchNo' => $row['batch_no'] ?: '-',

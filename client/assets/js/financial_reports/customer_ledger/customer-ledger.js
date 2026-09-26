@@ -33,6 +33,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const currencyFilter = document.getElementById('currency-filter');
     const symbolOverride = document.getElementById('symbol-override');
     const sortOrder = document.getElementById('sort-order');
+    const roundOffToggle = document.getElementById('round-off-toggle');
 
     // City / Zone / Area / Salesman filters (Summary Ledger only) — city -> zone -> area
     // cascade, and an independent Salesman (employee) filter. All optional; narrow which
@@ -61,6 +62,22 @@ document.addEventListener('DOMContentLoaded', function () {
     let allRowsExpanded = false; // drives the Expand All / Collapse All button's label + behavior
     let allCustomers = [];
     let currentCurrencySymbol = window.currencySymbol;
+
+    function formatAmount(value) {
+        const amount = Number(value) || 0;
+        return roundOffToggle.checked
+            ? Math.round(amount).toLocaleString()
+            : amount.toLocaleString(undefined, { maximumFractionDigits: 20 });
+    }
+
+    function formatMoney(value) {
+        return currentCurrencySymbol + formatAmount(value);
+    }
+
+    function formatBalance(value) {
+        const amount = Number(value) || 0;
+        return formatMoney(Math.abs(amount)) + (amount >= 0 ? ' Dr' : ' Cr');
+    }
 
     // Set default dates
     const today = new Date();
@@ -144,6 +161,11 @@ document.addEventListener('DOMContentLoaded', function () {
         } else {
             if (rawSummaryData.length > 0) applySummarySort();
         }
+    });
+
+    roundOffToggle.addEventListener('change', function() {
+        if (rawSummaryData.length > 0) applySummarySort();
+        if (rawDetailedData.length > 0) applyDetailedSort();
     });
 
     // Re-sort when the Sort By field changes (Summary Ledger only)
@@ -644,10 +666,10 @@ document.addEventListener('DOMContentLoaded', function () {
             tbody.innerHTML += `
                 <tr>
                     <td>${row.customer_name}</td>
-                    <td class="${opening >= 0 ? 'balance-positive' : 'balance-negative'}">${currentCurrencySymbol}${Math.abs(opening).toFixed(2)} ${opening >= 0 ? 'Dr' : 'Cr'}</td>
-                    <td>${currentCurrencySymbol}${debit.toFixed(2)}</td>
-                    <td>${currentCurrencySymbol}${credit.toFixed(2)}</td>
-                    <td class="${closing >= 0 ? 'balance-positive' : 'balance-negative'}">${currentCurrencySymbol}${Math.abs(closing).toFixed(2)} ${closing >= 0 ? 'Dr' : 'Cr'}</td>
+                    <td class="${opening >= 0 ? 'balance-positive' : 'balance-negative'}">${formatBalance(opening)}</td>
+                    <td>${formatMoney(debit)}</td>
+                    <td>${formatMoney(credit)}</td>
+                    <td class="${closing >= 0 ? 'balance-positive' : 'balance-negative'}">${formatBalance(closing)}</td>
                 </tr>
             `;
         });
@@ -664,10 +686,10 @@ document.addEventListener('DOMContentLoaded', function () {
         tbody.innerHTML += `
             <tr class="totals-row">
                 <td><strong>Totals</strong></td>
-                <td><strong class="${grandTotalOpening >= 0 ? 'balance-positive' : 'balance-negative'}">${currentCurrencySymbol}${Math.abs(grandTotalOpening).toFixed(2)} ${grandTotalOpening >= 0 ? 'Dr' : 'Cr'}</strong></td>
-                <td><strong>${currentCurrencySymbol}${grandTotalDebit.toFixed(2)}</strong></td>
-                <td><strong>${currentCurrencySymbol}${grandTotalCredit.toFixed(2)}</strong></td>
-                <td><strong class="${grandTotalClosing >= 0 ? 'balance-positive' : 'balance-negative'}">${currentCurrencySymbol}${Math.abs(grandTotalClosing).toFixed(2)} ${grandTotalClosing >= 0 ? 'Dr' : 'Cr'}</strong></td>
+                <td><strong class="${grandTotalOpening >= 0 ? 'balance-positive' : 'balance-negative'}">${formatBalance(grandTotalOpening)}</strong></td>
+                <td><strong>${formatMoney(grandTotalDebit)}</strong></td>
+                <td><strong>${formatMoney(grandTotalCredit)}</strong></td>
+                <td><strong class="${grandTotalClosing >= 0 ? 'balance-positive' : 'balance-negative'}">${formatBalance(grandTotalClosing)}</strong></td>
             </tr>
         `;
     }
@@ -738,9 +760,9 @@ document.addEventListener('DOMContentLoaded', function () {
                         <td>${row.date}</td>
                         <td>${row.description}</td>
                         <td>${row.reference}</td>
-                        <td>${debit > 0 ? currentCurrencySymbol + debit.toFixed(2) : ''}</td>
+                        <td>${debit > 0 ? formatMoney(debit) : ''}</td>
                         <td></td>
-                        <td class="${balance >= 0 ? 'balance-positive' : 'balance-negative'}">${currentCurrencySymbol}${Math.abs(balance).toFixed(2)} ${balance >= 0 ? 'Dr' : 'Cr'}</td>
+                        <td class="${balance >= 0 ? 'balance-positive' : 'balance-negative'}">${formatBalance(balance)}</td>
                     </tr>
                 `;
             } else if (row.type === 'sub_account_header') {
@@ -761,9 +783,9 @@ document.addEventListener('DOMContentLoaded', function () {
                         <td colspan="3" style="text-align: right; padding: 12px 16px;">
                             <strong>${row.sub_account_name} Total:</strong>
                         </td>
-                        <td><strong>${currentCurrencySymbol}${parseFloat(row.total_debit).toFixed(2)}</strong></td>
-                        <td><strong>${currentCurrencySymbol}${parseFloat(row.total_credit).toFixed(2)}</strong></td>
-                        <td class="${balance >= 0 ? 'balance-positive' : 'balance-negative'}"><strong>${currentCurrencySymbol}${Math.abs(balance).toFixed(2)} ${balance >= 0 ? 'Dr' : 'Cr'}</strong></td>
+                        <td><strong>${formatMoney(row.total_debit)}</strong></td>
+                        <td><strong>${formatMoney(row.total_credit)}</strong></td>
+                        <td class="${balance >= 0 ? 'balance-positive' : 'balance-negative'}"><strong>${formatBalance(balance)}</strong></td>
                     </tr>
                 `;
             } else {
@@ -778,8 +800,8 @@ document.addEventListener('DOMContentLoaded', function () {
                     totalCredit += credit;
                 }
                 
-                const creditDisplay = credit > 0 ? currentCurrencySymbol + credit.toFixed(2) : 
-                                      (pdcDisplay > 0 ? `(${currentCurrencySymbol}${pdcDisplay.toFixed(2)})` : '');
+                const creditDisplay = credit > 0 ? formatMoney(credit) : 
+                                      (pdcDisplay > 0 ? `(${formatMoney(pdcDisplay)})` : '');
                 
                 tbody.innerHTML += `
                     <tr class="ledger-row" data-row-id="${rowIndex}">
@@ -791,9 +813,9 @@ document.addEventListener('DOMContentLoaded', function () {
                             ${row.type === 'adjustment' && row.adj_note ? `<br><small style="color:var(--text-muted);font-size:11px;font-style:italic;">${row.adj_note}</small>` : ''}
                         </td>
                         <td>${row.reference}</td>
-                        <td>${debit > 0 ? currentCurrencySymbol + debit.toFixed(2) : ''}</td>
+                        <td>${debit > 0 ? formatMoney(debit) : ''}</td>
                         <td>${creditDisplay}</td>
-                        <td class="${balance >= 0 ? 'balance-positive' : 'balance-negative'}">${currentCurrencySymbol}${Math.abs(balance).toFixed(2)} ${balance >= 0 ? 'Dr' : 'Cr'}</td>
+                        <td class="${balance >= 0 ? 'balance-positive' : 'balance-negative'}">${formatBalance(balance)}</td>
                     </tr>
                 `;
                 
@@ -844,9 +866,9 @@ document.addEventListener('DOMContentLoaded', function () {
                 <td><strong>Totals</strong></td>
                 <td></td>
                 <td></td>
-                <td><strong>${currentCurrencySymbol}${totalDebit.toFixed(2)}</strong></td>
-                <td><strong>${currentCurrencySymbol}${totalCredit.toFixed(2)}</strong></td>
-                <td><strong class="${lastRunningBalance >= 0 ? 'balance-positive' : 'balance-negative'}">${currentCurrencySymbol}${Math.abs(lastRunningBalance).toFixed(2)} ${lastRunningBalance >= 0 ? 'Dr' : 'Cr'}</strong></td>
+                <td><strong>${formatMoney(totalDebit)}</strong></td>
+                <td><strong>${formatMoney(totalCredit)}</strong></td>
+                <td><strong class="${lastRunningBalance >= 0 ? 'balance-positive' : 'balance-negative'}">${formatBalance(lastRunningBalance)}</strong></td>
             </tr>
         `;
         
@@ -946,7 +968,8 @@ document.addEventListener('DOMContentLoaded', function () {
         const params = new URLSearchParams({
             ledger_type: isDetailed ? 'detailed' : 'summary',
             date_from: fromDate.value,
-            date_to: toDate.value
+            date_to: toDate.value,
+            round_off: roundOffToggle.checked ? '1' : '0'
         });
         
         if (customerCode.value) {
@@ -1082,7 +1105,8 @@ function exportLedgerToExcel() {
             ledger_type: isDetailed ? 'detailed' : 'summary',
             date_from: fromDate.value,
             date_to: toDate.value,
-            pdf: '1'
+            pdf: '1',
+            round_off: roundOffToggle.checked ? '1' : '0'
         });
         if (customerCode.value) {
             const encryptedCode = encryptCustomerCode(customerCode.value);

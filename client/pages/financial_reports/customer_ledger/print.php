@@ -32,6 +32,7 @@ $sub_account_id = $_GET['sub_account_id'] ?? null;
 $expanded_rows = $_GET['expanded_rows'] ?? '';
 $company_id = $_GET['company_id'] ?? null;
 $sort_order = ($_GET['sort_order'] ?? 'asc') === 'desc' ? 'desc' : 'asc';
+$round_off = ($_GET['round_off'] ?? '0') === '1';
 
 // Get company info based on selected company_id
 if ($company_id) {
@@ -160,6 +161,16 @@ $company_timezone = $company['timezone'] ?? 'UTC';
         }
 
         const currencySymbol = '<?php echo $currency_symbol; ?>';
+        const roundOff = <?php echo $round_off ? 'true' : 'false'; ?>;
+        function formatAmount(value) {
+            const amount = Number(value) || 0;
+            return roundOff ? Math.round(amount).toLocaleString() : amount.toLocaleString(undefined, { maximumFractionDigits: 20 });
+        }
+        function formatMoney(value) { return currencySymbol + formatAmount(value); }
+        function formatBalance(value) {
+            const amount = Number(value) || 0;
+            return formatMoney(Math.abs(amount)) + (amount >= 0 ? ' Dr' : ' Cr');
+        }
         const sortOrder = '<?php echo $sort_order; ?>';
         const expandedRows = '<?php echo $expanded_rows; ?>'.split(',').filter(r => r);
         const params = new URLSearchParams();
@@ -205,7 +216,7 @@ $company_timezone = $company['timezone'] ?? 'UTC';
             
             if (num === 0) return 'Zero';
             
-            const parts = num.toFixed(2).split('.');
+            const parts = (roundOff ? Math.round(num) : num).toFixed(roundOff ? 0 : 2).split('.');
             const wholePart = parseInt(parts[0]);
             const decimalPart = parseInt(parts[1]);
             
@@ -299,10 +310,10 @@ $company_timezone = $company['timezone'] ?? 'UTC';
                 html += `
                     <tr>
                         <td>${row.customer_name}</td>
-                        <td class="${opening >= 0 ? 'balance-positive' : 'balance-negative'}">${currencySymbol}${Math.abs(opening).toFixed(2)} ${opening >= 0 ? 'Dr' : 'Cr'}</td>
-                        <td>${currencySymbol}${debit.toFixed(2)}</td>
-                        <td>${currencySymbol}${credit.toFixed(2)}</td>
-                        <td class="${closing >= 0 ? 'balance-positive' : 'balance-negative'}">${currencySymbol}${Math.abs(closing).toFixed(2)} ${closing >= 0 ? 'Dr' : 'Cr'}</td>
+                        <td class="${opening >= 0 ? 'balance-positive' : 'balance-negative'}">${formatBalance(opening)}</td>
+                        <td>${formatMoney(debit)}</td>
+                        <td>${formatMoney(credit)}</td>
+                        <td class="${closing >= 0 ? 'balance-positive' : 'balance-negative'}">${formatBalance(closing)}</td>
                     </tr>
                 `;
             });
@@ -310,10 +321,10 @@ $company_timezone = $company['timezone'] ?? 'UTC';
             html += `
                     <tr class="totals-row">
                         <td><strong>Totals</strong></td>
-                        <td><strong>${currencySymbol}${Math.abs(totalOpening).toFixed(2)} ${totalOpening >= 0 ? 'Dr' : 'Cr'}</strong></td>
-                        <td><strong>${currencySymbol}${totalDebit.toFixed(2)}</strong></td>
-                        <td><strong>${currencySymbol}${totalCredit.toFixed(2)}</strong></td>
-                        <td><strong>${currencySymbol}${Math.abs(totalClosing).toFixed(2)} ${totalClosing >= 0 ? 'Dr' : 'Cr'}</strong></td>
+                        <td><strong>${formatBalance(totalOpening)}</strong></td>
+                        <td><strong>${formatMoney(totalDebit)}</strong></td>
+                        <td><strong>${formatMoney(totalCredit)}</strong></td>
+                        <td><strong>${formatBalance(totalClosing)}</strong></td>
                     </tr>
                 </tbody>
             </table>
@@ -387,7 +398,7 @@ $company_timezone = $company['timezone'] ?? 'UTC';
                             <td>${row.reference}</td>
                             <td></td>
                             <td></td>
-                            <td class="${balance >= 0 ? 'balance-positive' : 'balance-negative'}">${currencySymbol}${Math.abs(balance).toFixed(2)} ${balance >= 0 ? 'Dr' : 'Cr'}</td>
+                            <td class="${balance >= 0 ? 'balance-positive' : 'balance-negative'}">${formatBalance(balance)}</td>
                         </tr>
                     `;
                 } else if (row.type === 'sub_account_header') {
@@ -405,9 +416,9 @@ $company_timezone = $company['timezone'] ?? 'UTC';
                             <td colspan="3" style="text-align: right; padding: 12px 16px;">
                                 <strong>${row.sub_account_name} Total:</strong>
                             </td>
-                            <td><strong>${currencySymbol}${parseFloat(row.total_debit).toFixed(2)}</strong></td>
-                            <td><strong>${currencySymbol}${parseFloat(row.total_credit).toFixed(2)}</strong></td>
-                            <td class="${balance >= 0 ? 'balance-positive' : 'balance-negative'}"><strong>${currencySymbol}${Math.abs(balance).toFixed(2)} ${balance >= 0 ? 'Dr' : 'Cr'}</strong></td>
+                            <td><strong>${formatMoney(row.total_debit)}</strong></td>
+                            <td><strong>${formatMoney(row.total_credit)}</strong></td>
+                            <td class="${balance >= 0 ? 'balance-positive' : 'balance-negative'}"><strong>${formatBalance(balance)}</strong></td>
                         </tr>
                     `;
                 } else {
@@ -421,17 +432,17 @@ $company_timezone = $company['timezone'] ?? 'UTC';
                         totalCredit += credit;
                     }
                     
-                    const creditDisplay = credit > 0 ? currencySymbol + credit.toFixed(2) : 
-                                          (pdcDisplay > 0 ? `(${currencySymbol}${pdcDisplay.toFixed(2)})` : '');
+                    const creditDisplay = credit > 0 ? formatMoney(credit) : 
+                                          (pdcDisplay > 0 ? `(${formatMoney(pdcDisplay)})` : '');
                     
                     html += `
                         <tr>
                             <td>${row.date}</td>
                             <td>${row.description}</td>
                             <td>${row.reference}</td>
-                            <td>${debit > 0 ? currencySymbol + debit.toFixed(2) : ''}</td>
+                            <td>${debit > 0 ? formatMoney(debit) : ''}</td>
                             <td>${creditDisplay}</td>
-                            <td class="${balance >= 0 ? 'balance-positive' : 'balance-negative'}">${currencySymbol}${Math.abs(balance).toFixed(2)} ${balance >= 0 ? 'Dr' : 'Cr'}</td>
+                            <td class="${balance >= 0 ? 'balance-positive' : 'balance-negative'}">${formatBalance(balance)}</td>
                         </tr>
                     `;
                     
@@ -453,8 +464,8 @@ $company_timezone = $company['timezone'] ?? 'UTC';
                                                 <tr>
                                                     <td>${item.product_name}</td>
                                                     <td>${parseFloat(item.quantity).toFixed(2)} ${item.uom_name || ''}</td>
-                                                    <td>${currencySymbol}${parseFloat(item.sale_price).toFixed(2)}</td>
-                                                    <td>${currencySymbol}${parseFloat(item.net_amount).toFixed(2)}</td>
+                                                    <td>${formatMoney(item.sale_price)}</td>
+                                                    <td>${formatMoney(item.net_amount)}</td>
                                                 </tr>
                                             `).join('')}
                                         </tbody>
@@ -474,9 +485,9 @@ $company_timezone = $company['timezone'] ?? 'UTC';
                         <td><strong>Totals</strong></td>
                         <td></td>
                         <td></td>
-                        <td><strong>${currencySymbol}${totalDebit.toFixed(2)}</strong></td>
-                        <td><strong>${currencySymbol}${totalCredit.toFixed(2)}</strong></td>
-                        <td><strong>${currencySymbol}${Math.abs(finalBalance).toFixed(2)} ${finalBalance >= 0 ? 'Dr' : 'Cr'}</strong></td>
+                        <td><strong>${formatMoney(totalDebit)}</strong></td>
+                        <td><strong>${formatMoney(totalCredit)}</strong></td>
+                        <td><strong>${formatBalance(finalBalance)}</strong></td>
                     </tr>
                 </tbody>
             </table>

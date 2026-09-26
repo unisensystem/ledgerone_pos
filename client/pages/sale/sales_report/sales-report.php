@@ -37,6 +37,30 @@ $currency_symbol = $currency['symbol'];
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link rel="stylesheet" href="../../../assets/css/sale/sales_report/sales-report.css">
 </head>
+<style>
+    #round-off-toggle {
+  appearance: none;
+  width: 42px;
+  height: 24px;
+  border: 1px solid var(--border-default, #e1e6ee);
+  border-radius: 999px;
+  background: var(--border-default, #e1e6ee);
+  cursor: pointer;
+  position: relative;
+  transition: background 0.2s ease;
+}
+#round-off-toggle::before {
+  content: '';
+  position: absolute;
+  top: 2px; left: 2px;
+  width: 18px; height: 18px;
+  border-radius: 50%;
+  background: #fff;
+  transition: transform 0.2s ease;
+}
+#round-off-toggle:checked { background: #1F7BFF; }
+#round-off-toggle:checked::before { transform: translateX(18px); }
+</style>
 
 <body>
     <div class="container">
@@ -96,6 +120,12 @@ $currency_symbol = $currency['symbol'];
                     <i class="fas fa-filter"></i> Apply Filter
                 </button>
             </div>
+            <div class="filter-group">
+    <label for="round-off-toggle" style="display:flex; align-items:center; gap:8px;">
+        Round Off
+    </label>
+    <input type="checkbox" id="round-off-toggle" aria-label="Round off sales report amounts">
+</div>
         </div>
 
         <!-- Summary Cards -->

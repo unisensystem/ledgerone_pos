@@ -340,6 +340,18 @@ $config = $report_config[$report_type];
         // exports exactly what's shown on screen (same filters, same columns).
         let currentRows = [];
         let currentCurrency = '$';
+        const ROUND_OFF_ENABLED = new URLSearchParams(window.location.search).get('round_off') === '1';
+
+        function formatAmount(value) {
+            const amount = Number(value) || 0;
+            return ROUND_OFF_ENABLED
+                ? Math.round(amount).toLocaleString()
+                : amount.toLocaleString(undefined, { maximumFractionDigits: 20 });
+        }
+
+        function formatMoney(value) {
+            return `${currentCurrency}${formatAmount(value)}`;
+        }
 
         function numberToWords(num) {
             const ones = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine'];
@@ -347,6 +359,7 @@ $config = $report_config[$report_type];
             const tens = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
             const thousands = ['', 'Thousand', 'Million', 'Billion'];
 
+            if (ROUND_OFF_ENABLED) num = Math.round(num);
             if (num === 0) return 'Zero';
 
             function convertHundreds(n) {
@@ -510,7 +523,7 @@ $config = $report_config[$report_type];
         }
 
         function fmtQty(val, unit) {
-            return `${parseFloat(val || 0).toFixed(2)} ${unit || 'L'}`;
+            return `${formatAmount(val)} ${unit || 'L'}`;
         }
 
         function statusLabel(status) {
@@ -529,8 +542,8 @@ $config = $report_config[$report_type];
                     <td>${fmtQty(pos.total_qty_in, pos.unit_symbol)}</td>
                     <td>${fmtQty(pos.total_qty_out, pos.unit_symbol)}</td>
                     <td>${fmtQty(pos.current_stock, pos.unit_symbol)}</td>
-                    <td>${currentCurrency}${parseFloat(pos.unit_cost).toFixed(2)}</td>
-                    <td>${currentCurrency}${parseFloat(pos.stock_value).toFixed(2)}</td>
+                    <td>${formatMoney(pos.unit_cost)}</td>
+                    <td>${formatMoney(pos.stock_value)}</td>
                     <td>${statusLabel(pos.status)}</td>
                 </tr>`;
             }).join('');
@@ -551,8 +564,8 @@ $config = $report_config[$report_type];
             <td>${entry.qty_in > 0 ? fmtQty(entry.qty_in, entry.unit_symbol) : '-'}</td>
             <td>${entry.qty_out > 0 ? fmtQty(entry.qty_out, entry.unit_symbol) : '-'}</td>
             <td>${fmtQty(entry.balance, entry.unit_symbol)}</td>
-            <td>${currentCurrency}${parseFloat(entry.unit_cost).toFixed(2)}</td>
-            <td>${currentCurrency}${parseFloat(entry.value).toFixed(2)}</td>
+            <td>${formatMoney(entry.unit_cost)}</td>
+            <td>${formatMoney(entry.value)}</td>
         </tr>`).join('');
 }
 
@@ -566,8 +579,8 @@ $config = $report_config[$report_type];
                     <td>${entry.qty_in > 0 ? fmtQty(entry.qty_in, entry.unit_symbol) : '-'}</td>
                     <td>${entry.qty_out > 0 ? fmtQty(entry.qty_out, entry.unit_symbol) : '-'}</td>
                     <td>-</td>
-                    <td>${currentCurrency}${parseFloat(entry.unit_cost).toFixed(2)}</td>
-                    <td>${currentCurrency}${((parseFloat(entry.qty_in || 0) - parseFloat(entry.qty_out || 0)) * parseFloat(entry.unit_cost)).toFixed(2)}</td>
+                    <td>${formatMoney(entry.unit_cost)}</td>
+                    <td>${formatMoney((parseFloat(entry.qty_in || 0) - parseFloat(entry.qty_out || 0)) * parseFloat(entry.unit_cost))}</td>
                 </tr>`).join('');
         }
 
@@ -584,8 +597,8 @@ $config = $report_config[$report_type];
                     <td>${entry.qty_in > 0 ? fmtQty(entry.qty_in, entry.unit_symbol) : '-'}</td>
                     <td>${entry.qty_out > 0 ? fmtQty(entry.qty_out, entry.unit_symbol) : '-'}</td>
                     <td>${fmtQty(entry.balance, entry.unit_symbol)}</td>
-                    <td>${currentCurrency}${parseFloat(entry.unit_cost).toFixed(2)}</td>
-                    <td>${currentCurrency}${parseFloat(entry.value).toFixed(2)}</td>
+                    <td>${formatMoney(entry.unit_cost)}</td>
+                    <td>${formatMoney(entry.value)}</td>
                 </tr>`).join('');
         }
 
@@ -608,7 +621,7 @@ $config = $report_config[$report_type];
                     }
                     return totals;
                 }, {});
-                const unitTotalsText = Object.entries(unitTotals).map(([u, t]) => `${t.toFixed(2)} ${u}`).join(', ');
+                const unitTotalsText = Object.entries(unitTotals).map(([u, t]) => fmtQty(t, u)).join(', ');
 
                 totalsHtml = `
                     <tr class="totals-row">
@@ -616,7 +629,7 @@ $config = $report_config[$report_type];
                         <td>-</td><td>-</td><td>-</td>
                         <td>${unitTotalsText}</td>
                         <td>-</td>
-                        <td>${currency}${totalValue.toFixed(2)}</td>
+                        <td>${formatMoney(totalValue)}</td>
                         <td></td>
                     </tr>`;
 
@@ -633,11 +646,11 @@ $config = $report_config[$report_type];
     totalsHtml = `
         <tr class="totals-row">
             <td colspan="9">Total (${rows.length} transactions)</td>
-            <td>${totalQtyIn.toFixed(2)} ${unit}</td>
-            <td>${totalQtyOut.toFixed(2)} ${unit}</td>
-            <td>${finalBalance.toFixed(2)} ${unit}</td>
+            <td>${fmtQty(totalQtyIn, unit)}</td>
+            <td>${fmtQty(totalQtyOut, unit)}</td>
+            <td>${fmtQty(finalBalance, unit)}</td>
             <td>-</td>
-            <td>${currency}${finalValue.toFixed(2)}</td>
+            <td>${formatMoney(finalValue)}</td>
         </tr>`;
 } else if (REPORT_TYPE === 'branch-ledger') {
                 bodyHtml = renderBranchLedgerRows(rows);
@@ -648,11 +661,11 @@ $config = $report_config[$report_type];
                 totalsHtml = `
                     <tr class="totals-row">
                         <td colspan="4">Total (${rows.length} transactions)</td>
-                        <td>${totalQtyIn.toFixed(2)} ${unit}</td>
-                        <td>${totalQtyOut.toFixed(2)} ${unit}</td>
-                        <td>${(totalQtyIn - totalQtyOut).toFixed(2)} ${unit}</td>
+                        <td>${fmtQty(totalQtyIn, unit)}</td>
+                        <td>${fmtQty(totalQtyOut, unit)}</td>
+                        <td>${fmtQty(totalQtyIn - totalQtyOut, unit)}</td>
                         <td>-</td>
-                        <td>${currency}${totalValue.toFixed(2)}</td>
+                        <td>${formatMoney(totalValue)}</td>
                     </tr>`;
             } else if (REPORT_TYPE === 'detailed-ledger') {
                 bodyHtml = renderDetailedLedgerRows(rows);
@@ -668,11 +681,11 @@ $config = $report_config[$report_type];
                 totalsHtml = `
                     <tr class="totals-row">
                         <td colspan="7">Total (${rows.length} transactions)</td>
-                        <td>${totalQtyIn.toFixed(2)} ${unit}</td>
-                        <td>${totalQtyOut.toFixed(2)} ${unit}</td>
-                        <td>${totalBalance.toFixed(2)} ${unit}</td>
+                        <td>${fmtQty(totalQtyIn, unit)}</td>
+                        <td>${fmtQty(totalQtyOut, unit)}</td>
+                        <td>${fmtQty(totalBalance, unit)}</td>
                         <td>-</td>
-                        <td>${currency}${totalValue.toFixed(2)}</td>
+                        <td>${formatMoney(totalValue)}</td>
                     </tr>`;
             }
 
@@ -699,8 +712,8 @@ $config = $report_config[$report_type];
                     'Total Qty In': fmtQty(pos.total_qty_in, pos.unit_symbol),
                     'Total Qty Out': fmtQty(pos.total_qty_out, pos.unit_symbol),
                     'Current Stock': fmtQty(pos.current_stock, pos.unit_symbol),
-                    'Unit Cost': parseFloat(pos.unit_cost).toFixed(2),
-                    'Stock Value': parseFloat(pos.stock_value).toFixed(2),
+                    'Unit Cost': formatAmount(pos.unit_cost),
+                    'Stock Value': formatAmount(pos.stock_value),
                     'Status': statusLabel(pos.status)
                 }));
             } else if (REPORT_TYPE === 'item-ledger') {
@@ -712,8 +725,8 @@ $config = $report_config[$report_type];
                     'Qty In': e.qty_in > 0 ? fmtQty(e.qty_in, e.unit_symbol) : '-',
                     'Qty Out': e.qty_out > 0 ? fmtQty(e.qty_out, e.unit_symbol) : '-',
                     'Balance': fmtQty(e.balance, e.unit_symbol),
-                    'Unit Cost': parseFloat(e.unit_cost).toFixed(2),
-                    'Value': parseFloat(e.value).toFixed(2)
+                    'Unit Cost': formatAmount(e.unit_cost),
+                    'Value': formatAmount(e.value)
                 }));
             } else if (REPORT_TYPE === 'branch-ledger') {
                 rows = currentRows.map(e => ({
@@ -722,8 +735,8 @@ $config = $report_config[$report_type];
                     'Transaction': e.transaction_type,
                     'Qty In': e.qty_in > 0 ? fmtQty(e.qty_in, e.unit_symbol) : '-',
                     'Qty Out': e.qty_out > 0 ? fmtQty(e.qty_out, e.unit_symbol) : '-',
-                    'Unit Cost': parseFloat(e.unit_cost).toFixed(2),
-                    'Value': ((parseFloat(e.qty_in || 0) - parseFloat(e.qty_out || 0)) * parseFloat(e.unit_cost)).toFixed(2)
+                    'Unit Cost': formatAmount(e.unit_cost),
+                    'Value': formatAmount((parseFloat(e.qty_in || 0) - parseFloat(e.qty_out || 0)) * parseFloat(e.unit_cost))
                 }));
             } else if (REPORT_TYPE === 'detailed-ledger') {
                 rows = currentRows.map(e => ({
@@ -736,8 +749,8 @@ $config = $report_config[$report_type];
                     'Qty In': e.qty_in > 0 ? fmtQty(e.qty_in, e.unit_symbol) : '-',
                     'Qty Out': e.qty_out > 0 ? fmtQty(e.qty_out, e.unit_symbol) : '-',
                     'Balance': fmtQty(e.balance, e.unit_symbol),
-                    'Unit Cost': parseFloat(e.unit_cost).toFixed(2),
-                    'Value': parseFloat(e.value).toFixed(2)
+                    'Unit Cost': formatAmount(e.unit_cost),
+                    'Value': formatAmount(e.value)
                 }));
             }
 

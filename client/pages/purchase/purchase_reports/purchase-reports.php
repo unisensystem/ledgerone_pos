@@ -45,6 +45,10 @@ $currency_symbol = $currency['symbol'];
                 <h1>Purchase Reports</h1>
                 <p>Analyze and track purchasing activities across different dimensions</p>
             </div>
+            <div class="round-off-toggle-wrapper" style="display:flex; align-items:center; gap:8px; margin-right:16px;">
+                <label for="round-off-toggle" style="font-size:13px; color:#4b5563; cursor:pointer; user-select:none;">Round Off</label>
+                <input type="checkbox" id="round-off-toggle" style="width:16px; height:16px; cursor:pointer;">
+            </div>
             <div class="export-dropdown">
                 <button class="btn btn-primary" id="exportBtn">
                     <i class="fas fa-download"></i> Export All Reports <i class="fas fa-chevron-down"></i>
@@ -97,6 +101,10 @@ $currency_symbol = $currency['symbol'];
                     <option value="">All Suppliers</option>
                 </select>
             </div>
+
+
+
+            
             <div class="report-type">
                 <label class="filter-label">Report Type</label>
                 <select class="filter-select" id="reportType">
