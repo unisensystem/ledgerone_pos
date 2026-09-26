@@ -55,7 +55,12 @@ try {
         // Only finalized payroll is actually committed money — a draft hasn't
         // posted to accounting_ledger yet (see payroll-add.php/payroll-finalize.php)
         // and must not show up here as if it had been paid.
-       $transSql = "SELECT pei.created_at as date, pe.payroll_code as voucher_no,
+       // Use the payroll's own payroll_date (what the user actually set/backdated
+        // this payroll to), not pei.created_at (when the row happened to be
+        // inserted into the DB) — otherwise a payroll dated e.g. Sep 24 but
+        // entered/finalized on Sep 26 shows up under Sep 26 in the ledger,
+        // mismatching payroll-list.php and the date range filter below.
+       $transSql = "SELECT pe.payroll_date as date, pe.payroll_code as voucher_no,
                     pei.type, pei.description, pei.amount, pei.employee_id,
                     pei.gross_amount, pei.deduction_amount, pei.ot_amount,
                     pei.absent_days, pei.unpaid_leave_days
@@ -63,17 +68,17 @@ try {
              JOIN payroll_entries pe ON pei.payroll_id = pe.id
              WHERE pei.tenant_id = ? AND pei.employee_id = ? AND pe.status = 'finalized'";
         $transParams = [$tenant_id, $emp['employee_id']];
-        
+
         if ($start_date) {
-            $transSql .= " AND DATE(pei.created_at) >= ?";
+            $transSql .= " AND pe.payroll_date >= ?";
             $transParams[] = $start_date;
         }
         if ($end_date) {
-            $transSql .= " AND DATE(pei.created_at) <= ?";
+            $transSql .= " AND pe.payroll_date <= ?";
             $transParams[] = $end_date;
         }
-        
-        $transSql .= " ORDER BY pei.created_at ASC";
+
+        $transSql .= " ORDER BY pe.payroll_date ASC, pei.id ASC";
         
         $transStmt = $pdo->prepare($transSql);
         $transStmt->execute($transParams);
@@ -181,7 +186,7 @@ try {
             $beforeDateSql = "SELECT pei.type, pei.amount
                              FROM payroll_entries_items pei
                              JOIN payroll_entries pe ON pei.payroll_id = pe.id
-                             WHERE pei.tenant_id = ? AND pei.employee_id = ? AND pe.status = 'finalized' AND DATE(pei.created_at) < ?";
+                             WHERE pei.tenant_id = ? AND pei.employee_id = ? AND pe.status = 'finalized' AND pe.payroll_date < ?";
             $beforeStmt = $pdo->prepare($beforeDateSql);
             $beforeStmt->execute([$tenant_id, $emp['employee_id'], $start_date]);
             $beforeTransactions = $beforeStmt->fetchAll(PDO::FETCH_ASSOC);

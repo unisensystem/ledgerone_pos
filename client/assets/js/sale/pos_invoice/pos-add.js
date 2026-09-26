@@ -33,14 +33,71 @@
         'hideContainerStandard','hideRemarksStandard','hideCustomerPhoneStandard'
     ]);
 
+    // ---- Server sync: Invoice Settings persisted per user in the DB ----
+    // These settings used to live ONLY in this browser's localStorage, so a
+    // user had to re-set them every time they opened this page on a
+    // different browser/computer. Now they're also saved server-side
+    // (server/api/sale/pos_invoice/invoice-settings.php), keyed by user +
+    // page type (pos/med), and pulled down on every load.
+    const SETTINGS_API = '../../../../server/api/sale/pos_invoice/invoice-settings.php';
+    const pageType = prefix === 'med_' ? 'med' : 'pos';
+
+    // Seed localStorage from the server BEFORE the rest of this script (and
+    // the many localStorage.getItem calls throughout pos-add.js) run, so
+    // DB-saved values are what actually gets read on this page load.
+    // Synchronous XHR is deliberate: this IIFE runs at parse time, before
+    // DOMContentLoaded, and everything downstream assumes localStorage is
+    // already populated — an async fetch here would race with it.
+    try {
+        const xhr = new XMLHttpRequest();
+        xhr.open('GET', `${SETTINGS_API}?page=${pageType}`, false);
+        xhr.send(null);
+        if (xhr.status === 200) {
+            const result = JSON.parse(xhr.responseText);
+            if (result.success && result.settings) {
+                Object.keys(result.settings).forEach(key => {
+                    if (sharedKeys.has(key)) {
+                        originalSetItem(prefix + key, result.settings[key]);
+                    }
+                });
+            }
+        }
+    } catch (e) {
+        console.error('Could not load saved Invoice Settings from server, using local values:', e);
+    }
+
+    // Pushes the full current set of shared-setting values to the server,
+    // debounced so the Save Settings button's many rapid-fire setItem calls
+    // become one request instead of dozens.
+    let settingsSyncTimer = null;
+    function syncSettingsToServer() {
+        clearTimeout(settingsSyncTimer);
+        settingsSyncTimer = setTimeout(() => {
+            const settings = {};
+            sharedKeys.forEach(key => {
+                const value = originalGetItem(prefix + key);
+                if (value !== null) settings[key] = value;
+            });
+            fetch(SETTINGS_API, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ page: pageType, settings })
+            }).catch(e => console.error('Could not save Invoice Settings to server:', e));
+        }, 600);
+    }
+
     localStorage.getItem = function(key) {
         return originalGetItem(sharedKeys.has(key) ? prefix + key : key);
     };
     localStorage.setItem = function(key, value) {
-        return originalSetItem(sharedKeys.has(key) ? prefix + key : key, value);
+        const result = originalSetItem(sharedKeys.has(key) ? prefix + key : key, value);
+        if (sharedKeys.has(key)) syncSettingsToServer();
+        return result;
     };
     localStorage.removeItem = function(key) {
-        return originalRemoveItem(sharedKeys.has(key) ? prefix + key : key);
+        const result = originalRemoveItem(sharedKeys.has(key) ? prefix + key : key);
+        if (sharedKeys.has(key)) syncSettingsToServer();
+        return result;
     };
 })();
 

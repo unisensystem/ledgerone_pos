@@ -337,9 +337,14 @@ function getRecoverySheetRows($pdo, $tenant_id, array $filters) {
         ORDER BY customer_name
     ";
 
-    // wrap in outer query to filter out zero balances (both positive
-    // receivable rows and negative/credit rows are kept)
-    $query = "SELECT * FROM ($query) AS recovery_data WHERE current_balance <> 0";
+    // Wrap in outer query to filter out zero balances (both positive
+    // receivable rows and negative/credit rows are kept). Uses the same
+    // 0.01 epsilon as Customer View's computeNetBalance()/ZERO_BALANCE_EPSILON
+    // in recovery-sheet.js, instead of an exact <> 0 — a bill whose balance
+    // rounds to 0.00 after cent-level arithmetic residue (e.g. 0.003) is
+    // still "zero" to the user even though it isn't exactly 0, and used to
+    // slip through Bill View showing a confusing "0.00" row.
+    $query = "SELECT * FROM ($query) AS recovery_data WHERE ABS(current_balance) > 0.01";
 
     // UNION Part 1: opening_balance_invoices
     $params = [$tenant_id];

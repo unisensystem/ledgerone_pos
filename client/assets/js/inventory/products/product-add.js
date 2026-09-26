@@ -508,8 +508,15 @@ window.addEventListener('load', function () {
 });
 
 function loadFieldPreferences() {
+    // BUG FIX: [data-field] also matches the Customize Fields modal's own
+    // .field-toggle checkboxes (they carry data-field="X" too, for reading
+    // their own dataset.field when saving). Without :not(.field-toggle),
+    // unchecking a field and saving applied display:none to BOTH the actual
+    // form field AND that field's own toggle checkbox in the modal — so the
+    // checkbox itself vanished and could never be clicked again to turn the
+    // field back on.
     const prefs = JSON.parse(localStorage.getItem('fieldPreferences') || '{}');
-    document.querySelectorAll('[data-field]').forEach(el => {
+    document.querySelectorAll('[data-field]:not(.field-toggle)').forEach(el => {
         const field = el.dataset.field;
         el.style.display = prefs[field] === false ? 'none' : '';
     });

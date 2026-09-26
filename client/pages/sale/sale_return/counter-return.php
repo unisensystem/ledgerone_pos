@@ -55,15 +55,16 @@ $user_employee_id = $user['employee_id'] ?? null;
         .return-no { font-size: 14px; color: var(--primary); font-weight: 700; }
         .form-group { display: flex; flex-direction: column; margin-bottom: 8px; }
         .form-label { font-size: 11px; color: var(--subtext); font-weight: 500; margin-bottom: 2px; }
-        input, select { height: 32px; padding: 0 8px; border: 1px solid var(--border-default); border-radius: 4px; background: white; font-size: 13px; width: 100%; }
-        input:focus, select:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 2px rgba(31,123,255,0.1); }
+        input, select { height: 32px; padding: 0 8px; border: 1.5px solid var(--border-strong); border-radius: 4px; background: #F4F8FF; font-size: 13px; width: 100%; color: var(--heading); font-weight: 700; }
+        input:focus, select:focus { outline: none; border-color: var(--primary); background: white; box-shadow: 0 0 0 2px rgba(31,123,255,0.15); }
         .items-container { background: white; border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); flex: 1; display: flex; flex-direction: column; overflow: hidden; }
         .items-header { padding: 8px 12px; background: var(--surface-1); border-bottom: 1px solid var(--border-default); display: grid; grid-template-columns: 30px 120px 60px 60px 70px 70px 70px 70px 70px 60px 80px 40px; gap: 4px; align-items: center; }
         .items-body { overflow-y: auto; max-height: calc(100vh - 400px); flex: 1; min-height: 200px; }
         .item-row { padding: 6px 12px; border-bottom: 1px solid var(--border-default); display: grid; grid-template-columns: 30px 120px 60px 60px 70px 70px 70px 70px 70px 60px 80px 40px; gap: 4px; align-items: center; transition: background 0.2s; }
         .item-row:hover { background: #F0F6FF; }
-        .item-row input, .item-row select { height: 28px; padding: 0 4px; border: 1px solid var(--border-default); border-radius: 3px; font-size: 12px; }
-        .item-row .readonly { background: var(--surface-2); border: none; padding: 4px; text-align: right; font-weight: 500; }
+        .item-row input, .item-row select { height: 28px; padding: 0 4px; border: 1.5px solid var(--border-strong); border-radius: 3px; background: #F4F8FF; font-size: 12px; color: var(--heading); font-weight: 700; }
+        .item-row input:focus, .item-row select:focus { background: white; border-color: var(--primary); }
+        .item-row .readonly { background: var(--surface-2); border: none; padding: 4px; text-align: right; font-weight: 700; color: var(--heading); }
         .col-header { font-weight: 600; color: var(--heading); font-size: 11px; white-space: nowrap; }
         .quick-entry { background: white; padding: 8px 12px; border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); display: grid; grid-template-columns: 1fr 80px 80px 40px; gap: 8px; align-items: end; }
         .summary-panel { background: white; padding: 12px; border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
