@@ -1,3 +1,86 @@
+// ---- Server sync: Invoice Settings persisted per user in the DB ----
+// The "Invoice Settings" modal's ~30 toggles/labels used to live ONLY in
+// this browser's localStorage, so a user had to re-set them every time they
+// opened this page on a different browser/computer — same complaint already
+// fixed for pos_invoice/med_pos_invoice (see their pos-add.js). Same fix
+// here: override localStorage.getItem/setItem for exactly this page's known
+// settings keys (reusing the shared user_invoice_settings table with
+// page_type = 'purchase' — see server/api/purchase/purchase_invoice/
+// invoice-settings.php), so every scattered localStorage call throughout
+// this file (the settings modal's load/save block, and the many inline
+// reads elsewhere) transparently goes through the DB without having to
+// touch each call site individually.
+(function() {
+    const originalGetItem = localStorage.getItem.bind(localStorage);
+    const originalSetItem = localStorage.setItem.bind(localStorage);
+
+    const settingsKeys = new Set([
+        'enablePcs', 'enableCtn', 'enableDz',
+        'enableInlineCashDiscount', 'enableInlineCashDiscountAmount',
+        'enableTradeOffer', 'enableTradeOfferAmount',
+        'enableFOC', 'enableTaxation',
+        'enableSize', 'enableBatchNo', 'enableBatchExpiry', 'enableExtraDiscount',
+        'showTableScrollbar',
+        'enableInvoiceCashDiscount', 'enableInvoiceCashDiscountAmount',
+        'enableShippingFees',
+        'showSupplierInvoiceNo', 'showSupplierInvoiceDate', 'showAssociatedCompany',
+        'showPurchaseOrder', 'showBiltyNo', 'showTransportName', 'showPreviousBalance',
+        'showSubAccount', 'showContainer', 'showProject', 'showRemarks',
+        'productDisplayFormat', 'supplierDisplayFormat', 'customerDisplayFormat'
+    ]);
+
+    const SETTINGS_API = '../../../../server/api/purchase/purchase_invoice/invoice-settings.php';
+
+    // Seed localStorage from the server BEFORE the rest of this script runs
+    // (DOMContentLoaded and everything in it) so DB-saved values are what
+    // actually gets read on this page load. Synchronous XHR is deliberate —
+    // this IIFE runs at parse time, before DOMContentLoaded, and everything
+    // downstream assumes localStorage is already populated.
+    try {
+        const xhr = new XMLHttpRequest();
+        xhr.open('GET', SETTINGS_API, false);
+        xhr.send(null);
+        if (xhr.status === 200) {
+            const result = JSON.parse(xhr.responseText);
+            if (result.success && result.settings) {
+                Object.keys(result.settings).forEach(key => {
+                    if (settingsKeys.has(key)) {
+                        originalSetItem(key, result.settings[key]);
+                    }
+                });
+            }
+        }
+    } catch (e) {
+        console.error('Could not load saved Invoice Settings from server, using local values:', e);
+    }
+
+    // Pushes the full current set of settings values to the server,
+    // debounced so the Save Settings button's many rapid-fire setItem calls
+    // become one request instead of dozens.
+    let settingsSyncTimer = null;
+    function syncSettingsToServer() {
+        clearTimeout(settingsSyncTimer);
+        settingsSyncTimer = setTimeout(() => {
+            const settings = {};
+            settingsKeys.forEach(key => {
+                const value = originalGetItem(key);
+                if (value !== null) settings[key] = value;
+            });
+            fetch(SETTINGS_API, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ settings })
+            }).catch(e => console.error('Could not save Invoice Settings to server:', e));
+        }, 600);
+    }
+
+    localStorage.setItem = function(key, value) {
+        const result = originalSetItem(key, value);
+        if (settingsKeys.has(key)) syncSettingsToServer();
+        return result;
+    };
+})();
+
 // Global variables for products and UOM data
 let productsData = [];
 let uomData = [];

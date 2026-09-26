@@ -273,8 +273,26 @@ function positionFloatingDropdown(input, dropdown) {
     const maxLeft = window.innerWidth - width - 12;
     if (left > maxLeft) left = Math.max(12, maxLeft);
     dropdown.style.left = left + 'px';
-    dropdown.style.top = (rect.bottom + 4) + 'px';
     dropdown.style.width = width + 'px';
+
+    // Flip the dropdown ABOVE the input when there isn't enough room below
+    // it in the viewport (matches .dropdown-list's 240px max-height in CSS).
+    // Without this, a row near the bottom of a long Bulk Mode table (e.g.
+    // after adding several rows) opened its dropdown below the visible
+    // viewport — it existed in the DOM but was scrolled out of view, so it
+    // looked like the options had simply stopped showing.
+    const maxDropdownHeight = 240;
+    const spaceBelow = window.innerHeight - rect.bottom - 4;
+    const spaceAbove = rect.top - 4;
+    if (spaceBelow < maxDropdownHeight && spaceAbove > spaceBelow) {
+        dropdown.style.top = '';
+        dropdown.style.bottom = (window.innerHeight - rect.top + 4) + 'px';
+        dropdown.style.maxHeight = Math.min(maxDropdownHeight, spaceAbove) + 'px';
+    } else {
+        dropdown.style.bottom = '';
+        dropdown.style.top = (rect.bottom + 4) + 'px';
+        dropdown.style.maxHeight = Math.min(maxDropdownHeight, spaceBelow) + 'px';
+    }
 }
 
 function showFloatingDropdown(input, dropdown) {

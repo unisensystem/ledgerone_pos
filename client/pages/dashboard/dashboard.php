@@ -25,10 +25,12 @@ $role_id = $stmt->fetchColumn();
 // Check Dashboard permission
 $hasPermission = hasPermission($pdo, $role_id, 'Dashboard', 'dashboard', $tenant_id);
 
-// Get date filters
-$dateFrom = $_GET['date_from'] ?? null;
-$dateTo = $_GET['date_to'] ?? null;
-$hasDateFilter = $dateFrom && $dateTo;
+// Get date filters — default to the current month (not just today), so a
+// fresh page load shows "this month's" figures instead of a single day, and
+// the date inputs' displayed values match what's actually being shown.
+$dateFrom = $_GET['date_from'] ?? date('Y-m-01');
+$dateTo = $_GET['date_to'] ?? date('Y-m-t');
+$hasDateFilter = true;
 
 // Get tenant's base currency symbol (falls back to Rs if none is set)
 $stmt = $pdo->prepare("
@@ -1163,8 +1165,8 @@ $purchasesNet = (float) $purchasesTotals['net'];
                     <p>Welcome back! Here's your business overview.</p>
                 </div>
                 <div class="dashboard-actions">
-                    <input type="date" id="dateFrom" value="<?= $dateFrom ?? date('Y-m-d') ?>" class="btn btn-secondary">
-                    <input type="date" id="dateTo" value="<?= $dateTo ?? date('Y-m-d') ?>" class="btn btn-secondary">
+                    <input type="date" id="dateFrom" value="<?= $dateFrom ?>" class="btn btn-secondary">
+                    <input type="date" id="dateTo" value="<?= $dateTo ?>" class="btn btn-secondary">
                     <button class="btn btn-primary" onclick="filterDashboard()">Filter</button>
                     <button class="btn btn-secondary" onclick="clearFilters()">Clear</button>
                 </div>
@@ -1938,27 +1940,39 @@ $purchasesNet = (float) $purchasesTotals['net'];
 
             // Sales Trend Chart
             <?php
+            // Now that the default range is a full month instead of always
+            // "last 7 days" (hasDateFilter is always true — see top of file),
+            // the old day-by-day loop below would run ~30 separate queries
+            // per page load instead of 7. One grouped query + zero-filling
+            // the missing days gives identical results for a fraction of
+            // the DB round trips, for a range of any length.
             $chartData = [];
             $chartLabels = [];
-            if ($hasDateFilter) {
-                $startDate = new DateTime($dateFrom);
-                $endDate = new DateTime($dateTo);
-                while ($startDate <= $endDate) {
-                    $date = $startDate->format('Y-m-d');
-                    $chartLabels[] = $startDate->format('M j');
-                    $stmt = $pdo->prepare("SELECT COALESCE(SUM(sii.quantity), 0) FROM sale_invoice si JOIN sale_invoice_items sii ON si.id = sii.sale_invoice_id WHERE si.tenant_id = ? AND DATE(si.sale_date) = ? AND sii.parent_row_id IS NULL");
-                    $stmt->execute([$tenant_id, $date]);
-                    $chartData[] = (float) $stmt->fetchColumn();
-                    $startDate->add(new DateInterval('P1D'));
+            $dateMap = [];
+            $cursor = new DateTime($dateFrom);
+            $endDate = new DateTime($dateTo);
+            while ($cursor <= $endDate) {
+                $dateMap[$cursor->format('Y-m-d')] = ['label' => $cursor->format('M j'), 'qty' => 0.0];
+                $cursor->add(new DateInterval('P1D'));
+            }
+
+            $stmt = $pdo->prepare("
+                SELECT DATE(si.sale_date) as sale_day, COALESCE(SUM(sii.quantity), 0) as qty
+                FROM sale_invoice si
+                JOIN sale_invoice_items sii ON si.id = sii.sale_invoice_id
+                WHERE si.tenant_id = ? AND DATE(si.sale_date) BETWEEN ? AND ? AND sii.parent_row_id IS NULL
+                GROUP BY DATE(si.sale_date)
+            ");
+            $stmt->execute([$tenant_id, $dateFrom, $dateTo]);
+            foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+                if (isset($dateMap[$row['sale_day']])) {
+                    $dateMap[$row['sale_day']]['qty'] = (float) $row['qty'];
                 }
-            } else {
-                for ($i = 6; $i >= 0; $i--) {
-                    $date = date('Y-m-d', strtotime("-$i days"));
-                    $chartLabels[] = date('M j', strtotime("-$i days"));
-                    $stmt = $pdo->prepare("SELECT COALESCE(SUM(sii.quantity), 0) FROM sale_invoice si JOIN sale_invoice_items sii ON si.id = sii.sale_invoice_id WHERE si.tenant_id = ? AND DATE(si.sale_date) = ? AND sii.parent_row_id IS NULL");
-                    $stmt->execute([$tenant_id, $date]);
-                    $chartData[] = (float) $stmt->fetchColumn();
-                }
+            }
+
+            foreach ($dateMap as $day) {
+                $chartLabels[] = $day['label'];
+                $chartData[] = $day['qty'];
             }
             ?>
             new ApexCharts(document.querySelector('#fuelSalesChart'), {

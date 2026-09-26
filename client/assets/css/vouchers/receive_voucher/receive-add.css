@@ -248,6 +248,12 @@ textarea {
   font-size: 13px;
 }
 
+/* Customer names run long ("code - full name") and were getting clipped at
+   the generic 120px min-width above. */
+.bulk-table input.bulk-customer {
+  min-width: 340px;
+}
+
 .bulk-table input[type="date"] {
   min-width: 140px;
 }
@@ -312,6 +318,12 @@ textarea {
   background-position: right 12px center;
   background-size: 16px;
   padding-right: 40px;
+}
+
+/* Customer names ("code - full name") were getting clipped in the closed
+   input at whatever width the 3-column form grid happened to give it. */
+#customerCode {
+  min-width: 280px;
 }
 
 .dropdown-list {
