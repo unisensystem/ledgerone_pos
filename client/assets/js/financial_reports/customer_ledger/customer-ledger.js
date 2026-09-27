@@ -63,12 +63,12 @@ document.addEventListener('DOMContentLoaded', function () {
     let allCustomers = [];
     let currentCurrencySymbol = window.currencySymbol;
 
-    function formatAmount(value) {
-        const amount = Number(value) || 0;
-        return roundOffToggle.checked
-            ? Math.round(amount).toLocaleString()
-            : amount.toLocaleString(undefined, { maximumFractionDigits: 20 });
-    }
+   function formatAmount(value) {
+    const amount = Number(value) || 0;
+    return roundOffToggle.checked
+        ? Math.round(amount).toLocaleString()
+        : amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
 
     function formatMoney(value) {
         return currentCurrencySymbol + formatAmount(value);
@@ -265,25 +265,49 @@ document.addEventListener('DOMContentLoaded', function () {
     let selectedIndex = -1;
     
     customerSearch.addEventListener('input', function() {
-        const searchTerm = this.value.toLowerCase().trim();
-        selectedIndex = -1;
-        
-        const filtered = searchTerm.length === 0 || searchTerm === ' '
-            ? allCustomers
-            : allCustomers.filter(customer => 
-                customer.customer_name.toLowerCase().includes(searchTerm) ||
-                customer.customer_code.toLowerCase().includes(searchTerm)
-            );
-        
-        if (filtered.length > 0) {
-            customerDropdown.innerHTML = filtered.map(customer => 
-                `<div class="customer-option" data-id="${customer.id}">${customer.customer_code} - ${customer.customer_name}</div>`
-            ).join('');
-            customerDropdown.style.display = 'block';
-        } else {
-            customerDropdown.style.display = 'none';
-        }
-    });
+    const searchTerm = this.value.toLowerCase().trim();
+    selectedIndex = -1;
+    
+    const filtered = searchTerm.length === 0 || searchTerm === ' '
+        ? allCustomers
+        : allCustomers.filter(customer => 
+            customer.customer_name.toLowerCase().includes(searchTerm) ||
+            customer.customer_code.toLowerCase().includes(searchTerm)
+        );
+    
+    if (filtered.length > 0) {
+        customerDropdown.innerHTML = filtered.map(customer => 
+            `<div class="customer-option" data-id="${customer.id}">${customer.customer_code} - ${customer.customer_name}</div>`
+        ).join('');
+        customerDropdown.style.display = 'block';
+    } else {
+        customerDropdown.style.display = 'none';
+    }
+});
+
+// Click/focus pe bhi dropdown khulay, chahay kuch type na kiya ho — sab customers show hon
+function openCustomerDropdown() {
+    if (allCustomers.length === 0) return;
+    selectedIndex = -1;
+
+    const searchTerm = customerSearch.value.toLowerCase().trim();
+    const filtered = searchTerm.length === 0 || searchTerm === ' '
+        ? allCustomers
+        : allCustomers.filter(customer =>
+            customer.customer_name.toLowerCase().includes(searchTerm) ||
+            customer.customer_code.toLowerCase().includes(searchTerm)
+        );
+
+    if (filtered.length > 0) {
+        customerDropdown.innerHTML = filtered.map(customer =>
+            `<div class="customer-option" data-id="${customer.id}">${customer.customer_code} - ${customer.customer_name}</div>`
+        ).join('');
+        customerDropdown.style.display = 'block';
+    }
+}
+
+customerSearch.addEventListener('focus', openCustomerDropdown);
+customerSearch.addEventListener('click', openCustomerDropdown);
 
     // Arrow key navigation
     customerSearch.addEventListener('keydown', function(e) {
