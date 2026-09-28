@@ -23,6 +23,46 @@ $initialSearch = $_GET['search'] ?? '';
     <title>LedgerOne ERP - Sale Returns</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="../../../assets/css/sale/sale_return/return-list.css">
+    <style>
+        /* Searchable customer dropdown */
+        .searchable-select { position: relative; width: 100%; }
+        .searchable-select-input { width: 100%; box-sizing: border-box; }
+        .searchable-select-list {
+            display: none;
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            z-index: 1000;
+            max-height: 240px;
+            overflow-y: auto;
+            background: var(--card-bg, #fff);
+            color: var(--text-color, #333);
+            border: 1px solid rgba(127, 127, 127, 0.35);
+            border-radius: 6px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            margin-top: 2px;
+        }
+        .searchable-select-item,
+        .searchable-select-empty { padding: 8px 12px; font-size: 14px; }
+        .searchable-select-item { cursor: pointer; }
+        .searchable-select-item:hover { background: rgba(127, 127, 127, 0.15); }
+        .searchable-select-item.selected { font-weight: 600; background: rgba(67, 97, 238, 0.12); }
+        .searchable-select-empty { opacity: 0.6; }
+
+        /* Summary boxes */
+        .summary-boxes { display: flex; gap: 15px; margin: 15px 0; flex-wrap: wrap; }
+        .summary-box {
+            flex: 1;
+            min-width: 200px;
+            padding: 14px 18px;
+            border: 1px solid rgba(127, 127, 127, 0.25);
+            border-radius: 8px;
+            background: rgba(127, 127, 127, 0.08);
+        }
+        .summary-box-label { font-size: 13px; opacity: 0.75; margin-bottom: 4px; }
+        .summary-box-value { font-size: 22px; font-weight: 700; }
+    </style>
 </head>
 <body class="light-theme">
     <div class="container">
@@ -72,6 +112,17 @@ $initialSearch = $_GET['search'] ?? '';
                 <button class="btn btn-primary" id="newInvoiceBtn">
                     <i class="fas fa-plus"></i> New Return
                 </button>
+            </div>
+
+            <div class="summary-boxes">
+                <div class="summary-box">
+                    <div class="summary-box-label">Total Invoices Loaded</div>
+                    <div class="summary-box-value" id="summaryInvoiceCount">0</div>
+                </div>
+                <div class="summary-box">
+                    <div class="summary-box-label">Total Amount</div>
+                    <div class="summary-box-value" id="summaryTotalAmount">0.00</div>
+                </div>
             </div>
             
             <div class="table-container">

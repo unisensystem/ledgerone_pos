@@ -1,17 +1,19 @@
 <?php
 /**
- * Customer Statement - Print View (UPDATED)
+ * Customer Statement - Print View (UPDATED v3)
  * Supports:
  * - All Customers (when customer_id is empty)
  * - Single Customer
- * - City / Zone / Area / Salesman filters - ab SAB MULTI-SELECT
+ * - City / Zone / Area / Salesman filters - SAB MULTI-SELECT
  *   (comma-separated ids), jaise main page se aate hain
  * - Date range
  *
- * NEW: Top par selected City/Zone/Area/Salesman ke naam dikhte hain
- * NEW: Bottom totals row ab sab columns ka total dikhata hai
- *      (Opening, Sale Invoice, Receive Voucher, Sale Return, Closing)
- *      - pehle sirf "Final Closing Balance" dikhta tha
+ * Top par selected City/Zone/Area/Salesman ke naam dikhte hain
+ * Bottom totals row sab columns ka total dikhata hai
+ *
+ * NEW: Transfer Voucher column (signed: TO = +, FROM = -) + uska total
+ * NEW: hide_cols param - main page mein jo columns hide hain wo print mein
+ *      bhi hide, aur unki calculation closing balance se bhi nikal di jati hai
  */
 
 if (session_status() == PHP_SESSION_NONE) {
@@ -31,6 +33,7 @@ $city_id       = $_GET['city_id']       ?? '';
 $city_zone_id  = $_GET['city_zone_id']  ?? '';
 $area_id       = $_GET['area_id']       ?? '';
 $salesman_id   = $_GET['salesman_id']   ?? '';
+$hide_cols     = $_GET['hide_cols']     ?? '';
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -160,16 +163,11 @@ $salesman_id   = $_GET['salesman_id']   ?? '';
     </div>
 </div>
 
-<!-- NEW: Applied filters (City / Zone / Area / Salesman) - sirf jo select huay hon wo dikhte hain -->
+<!-- Applied filters (City / Zone / Area / Salesman) - sirf jo select huay hon wo dikhte hain -->
 <div class="meta-row" id="p-filters-row" style="display:none;"></div>
 
-<div class="summary-line" id="p-summary" style="display:none;">
-    <span>Opening Balance<strong id="p-opening">0.00</strong></span>
-    <span>Total Sale Invoice<strong id="p-si">0.00</strong></span>
-    <span>Total Receive Voucher<strong id="p-rv">0.00</strong></span>
-    <span>Total Sale Return<strong id="p-sr">0.00</strong></span>
-    <span>Closing Balance<strong id="p-closing">0.00</strong></span>
-</div>
+<!-- Summary line JS se banti hai (sirf visible columns) -->
+<div class="summary-line" id="p-summary" style="display:none;"></div>
 
 <div id="p-table-wrapper">
     <div class="empty-note">Loading statement…</div>
@@ -187,6 +185,29 @@ const cityId      = <?php echo json_encode($city_id); ?>;
 const cityZoneId  = <?php echo json_encode($city_zone_id); ?>;
 const areaId      = <?php echo json_encode($area_id); ?>;
 const salesmanId  = <?php echo json_encode($salesman_id); ?>;
+const hideColsRaw = <?php echo json_encode($hide_cols); ?>;
+
+/* Main page ke same columns (same order) */
+const COLUMNS = [
+    { key:'date',             label:'Date' },
+    { key:'customer_name',    label:'Customer' },
+    { key:'opening_balance',  label:'Opening Balance' },
+    { key:'sale_invoice',     label:'Sale Invoice' },
+    { key:'receive_voucher',  label:'Receive Voucher' },
+    { key:'sale_return',      label:'Sale Return' },
+    { key:'transfer_voucher', label:'Transfer Voucher' },
+    { key:'closing_balance',  label:'Closing Balance' }
+];
+
+/* Hidden columns (main page se hide_cols aata hai) - sirf valid keys */
+const hiddenCols = new Set(
+    String(hideColsRaw || '')
+        .split(',')
+        .map(k => k.trim())
+        .filter(k => COLUMNS.some(c => c.key === k))
+);
+
+let currency = '$';
 
 function esc(v){
     return String(v ?? '').replace(/[&<>"']/g, c => ({
@@ -198,7 +219,93 @@ function fmt(n){
     return parseFloat(n || 0).toFixed(2);
 }
 
+/* Signed amount: +$100.00 / -$100.00 / - (zero) */
+function fmtSigned(n){
+    const number = parseFloat(n) || 0;
+    if(number > 0) return '+' + currency + fmt(number);
+    if(number < 0) return '-' + currency + fmt(Math.abs(number));
+    return '-';
+}
+
 document.getElementById('p-printed').textContent = new Date().toLocaleString();
+
+
+/* -----------------------------------------------------------
+ | Build view - hidden columns ko calculation se nikal deta hai
+ | (main page ke same logic)
+ |
+ |   closing = opening + sale_invoice - receive_voucher
+ |             - sale_return + transfer_voucher
+ |
+ | Har customer ka running balance alag; opening column hidden
+ | ho to opening 0 se start hota hai.
+ * ----------------------------------------------------------- */
+function buildView(data, hidden){
+    const num = v => parseFloat(v) || 0;
+    const use = k => !hidden.has(k);
+
+    const running = {};
+
+    const rows = (data.rows || []).map(r => {
+        const key = String(r.customer_id ?? r.customer_name ?? '');
+
+        const opening = (key in running)
+            ? running[key]
+            : (use('opening_balance') ? num(r.opening_balance) : 0);
+
+        const closing = opening
+            + (use('sale_invoice')     ? num(r.sale_invoice)     : 0)
+            - (use('receive_voucher')  ? num(r.receive_voucher)  : 0)
+            - (use('sale_return')      ? num(r.sale_return)      : 0)
+            + (use('transfer_voucher') ? num(r.transfer_voucher) : 0);
+
+        running[key] = closing;
+
+        return Object.assign({}, r, {
+            opening_balance: opening,
+            closing_balance: closing
+        });
+    });
+
+    const totalOpening = use('opening_balance') ? num(data.opening_balance) : 0;
+
+    const totalClosing = totalOpening
+        + (use('sale_invoice')     ? num(data.total_sale_invoice)     : 0)
+        - (use('receive_voucher')  ? num(data.total_receive_voucher)  : 0)
+        - (use('sale_return')      ? num(data.total_sale_return)      : 0)
+        + (use('transfer_voucher') ? num(data.total_transfer_voucher) : 0);
+
+    return Object.assign({}, data, {
+        rows: rows,
+        opening_balance: totalOpening,
+        closing_balance: totalClosing
+    });
+}
+
+
+/* -----------------------------------------------------------
+ | Row cell renderer (per column key)
+ * ----------------------------------------------------------- */
+function cellHtml(key, r){
+    switch(key){
+        case 'date':
+            return `<td>${esc(r.date)}</td>`;
+        case 'customer_name':
+            return `<td class="customer-cell">${esc(r.customer_name || '-')}</td>`;
+        case 'opening_balance':
+            return `<td>${currency}${fmt(r.opening_balance)}</td>`;
+        case 'sale_invoice':
+        case 'receive_voucher':
+        case 'sale_return':
+            return `<td>${parseFloat(r[key]) > 0 ? currency + fmt(r[key]) : '-'}</td>`;
+        case 'transfer_voucher':
+            return `<td>${fmtSigned(r.transfer_voucher)}</td>`;
+        case 'closing_balance':
+            return `<td><strong>${currency}${fmt(r.closing_balance)}</strong></td>`;
+    }
+    return '<td></td>';
+}
+
 
 async function loadStatement(){
 
@@ -216,15 +323,18 @@ async function loadStatement(){
 
     try {
         const res  = await fetch(url);
-        const data = await res.json();
+        const raw  = await res.json();
 
-        if (!data.success) {
+        if (!raw.success) {
             document.getElementById('p-table-wrapper').innerHTML =
-                `<div class="empty-note">${esc(data.message || 'Failed to load statement')}</div>`;
+                `<div class="empty-note">${esc(raw.message || 'Failed to load statement')}</div>`;
             return;
         }
 
-        const currency = data.currency || '$';
+        currency = raw.currency || '$';
+
+        // Hidden columns ke baghair recalculated data
+        const data = buildView(raw, hiddenCols);
 
         // Customer name (All Customers when no specific customer)
         document.getElementById('p-customer').textContent =
@@ -238,18 +348,31 @@ async function loadStatement(){
 
         const rows = data.rows || [];
 
-        // NEW: totals ab API se directly (rows se manually jama karne ki
-        // zaroorat nahi - main page ki tarah)
+        // Totals API se directly
         const totalSI = data.total_sale_invoice || 0;
         const totalRV = data.total_receive_voucher || 0;
         const totalSR = data.total_sale_return || 0;
+        const totalTV = data.total_transfer_voucher || 0;
 
-        document.getElementById('p-summary').style.display = 'flex';
-        document.getElementById('p-opening').textContent  = `${currency}${fmt(data.opening_balance)}`;
-        document.getElementById('p-si').textContent       = `${currency}${fmt(totalSI)}`;
-        document.getElementById('p-rv').textContent       = `${currency}${fmt(totalRV)}`;
-        document.getElementById('p-sr').textContent       = `${currency}${fmt(totalSR)}`;
-        document.getElementById('p-closing').textContent  = `${currency}${fmt(data.closing_balance)}`;
+        // Summary line - sirf visible columns
+        const summaryItems = [
+            { key:'opening_balance',  label:'Opening Balance',      value:`${currency}${fmt(data.opening_balance)}` },
+            { key:'sale_invoice',     label:'Total Sale Invoice',   value:`${currency}${fmt(totalSI)}` },
+            { key:'receive_voucher',  label:'Total Receive Voucher',value:`${currency}${fmt(totalRV)}` },
+            { key:'sale_return',      label:'Total Sale Return',    value:`${currency}${fmt(totalSR)}` },
+            { key:'transfer_voucher', label:'Net Transfer Voucher', value: totalTV === 0 ? `${currency}0.00` : fmtSigned(totalTV) },
+            { key:'closing_balance',  label:'Closing Balance',      value:`${currency}${fmt(data.closing_balance)}` }
+        ].filter(i => !hiddenCols.has(i.key));
+
+        const summaryEl = document.getElementById('p-summary');
+        if (summaryItems.length) {
+            summaryEl.style.display = 'flex';
+            summaryEl.innerHTML = summaryItems
+                .map(i => `<span>${esc(i.label)}<strong>${esc(i.value)}</strong></span>`)
+                .join('');
+        } else {
+            summaryEl.style.display = 'none';
+        }
 
         const wrapper = document.getElementById('p-table-wrapper');
 
@@ -261,72 +384,56 @@ async function loadStatement(){
             return;
         }
 
-        // Show Customer column only when multiple customers are returned
-        const showCustomerColumn = !customerId;
+        // Visible columns: hidden nahi + (Customer column sirf tab jab
+        // specific customer select na ho)
+        const visibleCols = COLUMNS.filter(c => {
+            if (hiddenCols.has(c.key)) return false;
+            if (c.key === 'customer_name' && customerId) return false;
+            return true;
+        });
 
-        const headerRow = showCustomerColumn
-            ? `<tr>
-                    <th>Date</th>
-                    <th>Customer</th>
-                    <th>Opening Balance</th>
-                    <th>Sale Invoice</th>
-                    <th>Receive Voucher</th>
-                    <th>Sale Return</th>
-                    <th>Closing Balance</th>
-               </tr>`
-            : `<tr>
-                    <th>Date</th>
-                    <th>Opening Balance</th>
-                    <th>Sale Invoice</th>
-                    <th>Receive Voucher</th>
-                    <th>Sale Return</th>
-                    <th>Closing Balance</th>
-               </tr>`;
+        if (visibleCols.length === 0) {
+            wrapper.innerHTML = `
+                <div class="empty-note">
+                    All columns are hidden. Please show at least one column.
+                </div>`;
+            return;
+        }
 
-        const bodyRows = rows.map(r => {
-            if (showCustomerColumn) {
-                return `
-                    <tr>
-                        <td>${esc(r.date)}</td>
-                        <td class="customer-cell">${esc(r.customer_name || '-')}</td>
-                        <td>${currency}${fmt(r.opening_balance)}</td>
-                        <td>${parseFloat(r.sale_invoice) > 0 ? currency + fmt(r.sale_invoice) : '-'}</td>
-                        <td>${parseFloat(r.receive_voucher) > 0 ? currency + fmt(r.receive_voucher) : '-'}</td>
-                        <td>${parseFloat(r.sale_return) > 0 ? currency + fmt(r.sale_return) : '-'}</td>
-                        <td><strong>${currency}${fmt(r.closing_balance)}</strong></td>
-                    </tr>`;
-            } else {
-                return `
-                    <tr>
-                        <td>${esc(r.date)}</td>
-                        <td>${currency}${fmt(r.opening_balance)}</td>
-                        <td>${parseFloat(r.sale_invoice) > 0 ? currency + fmt(r.sale_invoice) : '-'}</td>
-                        <td>${parseFloat(r.receive_voucher) > 0 ? currency + fmt(r.receive_voucher) : '-'}</td>
-                        <td>${parseFloat(r.sale_return) > 0 ? currency + fmt(r.sale_return) : '-'}</td>
-                        <td><strong>${currency}${fmt(r.closing_balance)}</strong></td>
-                    </tr>`;
+        const headerRow = `<tr>${visibleCols.map(c => `<th>${esc(c.label)}</th>`).join('')}</tr>`;
+
+        const bodyRows = rows.map(r =>
+            `<tr>${visibleCols.map(c => cellHtml(c.key, r)).join('')}</tr>`
+        ).join('');
+
+        // Totals row - "TOTALS" label pehle visible text column mein (Date, warna Customer)
+        const labelKey = visibleCols.some(c => c.key === 'date')
+            ? 'date'
+            : (visibleCols.some(c => c.key === 'customer_name') ? 'customer_name' : null);
+
+        const totalCell = key => {
+            switch (key) {
+                case 'date':
+                case 'customer_name':
+                    return `<td>${key === labelKey ? 'TOTALS' : ''}</td>`;
+                case 'opening_balance':
+                    return `<td>${currency}${fmt(data.opening_balance)}</td>`;
+                case 'sale_invoice':
+                    return `<td>${currency}${fmt(totalSI)}</td>`;
+                case 'receive_voucher':
+                    return `<td>${currency}${fmt(totalRV)}</td>`;
+                case 'sale_return':
+                    return `<td>${currency}${fmt(totalSR)}</td>`;
+                case 'transfer_voucher':
+                    return `<td>${fmtSigned(totalTV)}</td>`;
+                case 'closing_balance':
+                    return `<td>${currency}${fmt(data.closing_balance)}</td>`;
             }
-        }).join('');
+            return '<td></td>';
+        };
 
-        // NEW: Full totals row - Opening / Sale Invoice / Receive Voucher /
-        // Sale Return / Closing - sab columns ka total (sirf closing nahi)
-        const totalsRow = showCustomerColumn
-            ? `<tr class="total-row">
-                    <td colspan="2">TOTALS</td>
-                    <td>${currency}${fmt(data.opening_balance)}</td>
-                    <td>${currency}${fmt(totalSI)}</td>
-                    <td>${currency}${fmt(totalRV)}</td>
-                    <td>${currency}${fmt(totalSR)}</td>
-                    <td>${currency}${fmt(data.closing_balance)}</td>
-               </tr>`
-            : `<tr class="total-row">
-                    <td>TOTALS</td>
-                    <td>${currency}${fmt(data.opening_balance)}</td>
-                    <td>${currency}${fmt(totalSI)}</td>
-                    <td>${currency}${fmt(totalRV)}</td>
-                    <td>${currency}${fmt(totalSR)}</td>
-                    <td>${currency}${fmt(data.closing_balance)}</td>
-               </tr>`;
+        const totalsRow =
+            `<tr class="total-row">${visibleCols.map(c => totalCell(c.key)).join('')}</tr>`;
 
         wrapper.innerHTML = `
             <table class="table">
@@ -349,7 +456,7 @@ async function loadStatement(){
 
 
 /* -----------------------------------------------------------
- | NEW: Applied filter names (City / Zone / Area / Salesman)
+ | Applied filter names (City / Zone / Area / Salesman)
  | ids ko naam mein resolve karne ke liye respective list
  | endpoints call karta hai, phir sirf selected filters top
  | par dikhata hai.

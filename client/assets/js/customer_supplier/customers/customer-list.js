@@ -21,11 +21,12 @@ document.addEventListener('DOMContentLoaded', function () {
     let userPermissions = [];
 
     // Check permissions first
-       checkPermissions().then(() => {
+    checkPermissions().then(() => {
         bulkDeleteEnabled = userPermissions.includes('Delete');
         if (bulkDeleteEnabled) {
             injectBulkDeleteUI();
         }
+        injectOpeningBalanceCard();
         initColumnToggle();
         loadCompanyFilter();
         loadCustomers();
@@ -48,7 +49,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     selectedCustomerIds.clear();
                     customers = data.customers;
                     renderCustomers(customers);
-                    updateStats(data.stats);
+                    updateStats(data.stats, data.pagination);
                     updatePagination(data.pagination);
                     updateBulkBar();
                 } else {
@@ -77,7 +78,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 ? `<td><input type="checkbox" class="customer-row-checkbox" value="${customer.id}" ${selectedCustomerIds.has(String(customer.id)) ? 'checked' : ''}></td>`
                 : '';
 
-                 const balance = parseFloat(customer.current_balance || 0);
+            const balance = parseFloat(customer.current_balance || 0);
             const openingDebit = parseFloat(customer.opening_debit_amount || 0);
             const openingCredit = parseFloat(customer.opening_credit_amount || 0);
             const hasOpeningHistory = openingDebit > 0 || openingCredit > 0;
@@ -85,7 +86,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
             const row = document.createElement('tr');
             row.dataset.id = customer.id;
-                     row.innerHTML = `
+            row.innerHTML = `
                         ${checkboxCell}
                         <td data-col="sr">${startSr + index}</td>
                         <td data-col="code"><span class="customer-code">${customer.customer_code}</span></td>
@@ -134,17 +135,77 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-    function updateStats(stats) {
-        document.querySelector('.stat-card:nth-child(1) .stat-value').textContent = stats.total_customers;
+    // Adds a 4th stat card ("Opening Balance") right after the Blacklisted card.
+    // Done dynamically (cloning the Blacklisted card) so no HTML template edit is required.
+    function injectOpeningBalanceCard() {
+        if (document.getElementById('openingBalanceCard')) return;
+
+        const blacklistedCard = document.querySelector('.stat-card:nth-child(3)');
+        if (!blacklistedCard) return;
+
+        const card = blacklistedCard.cloneNode(true);
+        card.id = 'openingBalanceCard';
+
+        // Value element
+        const valueEl = card.querySelector('.stat-value');
+        if (valueEl) {
+            valueEl.id = 'openingBalanceValue';
+            valueEl.textContent = '-';
+        }
+
+        // Label element: the leaf element (other than the value) that says "Blacklisted"
+        const leafEls = Array.from(card.querySelectorAll('*')).filter(el => el.children.length === 0 && el !== valueEl);
+        const labelEl = leafEls.find(el => /blacklist/i.test(el.textContent));
+        if (labelEl) {
+            labelEl.textContent = 'Opening Balance';
+        }
+
+        // Icon (if the card has one)
+        const iconEl = card.querySelector('i');
+        if (iconEl) {
+            iconEl.className = 'fas fa-wallet';
+        }
+
+        blacklistedCard.insertAdjacentElement('afterend', card);
+
+        // If the cards sit in a CSS grid fixed to 3 columns, let it fit 4 cards
+        const parent = blacklistedCard.parentElement;
+        if (parent && window.getComputedStyle(parent).display === 'grid') {
+            parent.style.gridTemplateColumns = 'repeat(auto-fit, minmax(200px, 1fr))';
+        }
+    }
+
+    function updateStats(stats, pagination) {
+        // Total Customers box:
+        //  - when a search / status / company filter is active -> number of matching customers
+        //  - otherwise -> overall total
+        const filtersActive =
+            searchInput.value.trim() !== '' ||
+            statusFilter.value !== '' ||
+            companyFilter.value !== '';
+
+        const totalToShow = (filtersActive && pagination)
+            ? pagination.total
+            : stats.total_customers;
+
+        document.querySelector('.stat-card:nth-child(1) .stat-value').textContent = totalToShow;
         document.querySelector('.stat-card:nth-child(2) .stat-value').textContent = stats.active_customers;
         document.querySelector('.stat-card:nth-child(3) .stat-value').textContent = stats.blacklisted_customers;
+
+        // Opening Balance box (net: opening debit - opening credit)
+        const openingEl = document.getElementById('openingBalanceValue');
+        if (openingEl) {
+            const opening = parseFloat(stats.total_opening_balance || 0);
+            openingEl.textContent = `${opening < 0 ? '-' : ''}${currencySymbol}${Math.abs(opening).toFixed(2)}`;
+            openingEl.title = `Opening Debit: ${currencySymbol}${parseFloat(stats.total_opening_debit || 0).toFixed(2)} | Opening Credit: ${currencySymbol}${parseFloat(stats.total_opening_credit || 0).toFixed(2)}`;
+        }
     }
     
     function updatePagination(pagination) {
         currentPage = pagination.page;
         totalPages = pagination.pages;
         const tableInfo = document.getElementById('tableInfo');
-        const start = ((pagination.page - 1) * pagination.limit) + 1;
+        const start = pagination.total === 0 ? 0 : ((pagination.page - 1) * pagination.limit) + 1;
         const end = Math.min(pagination.page * pagination.limit, pagination.total);
         tableInfo.textContent = `Showing ${start}-${end} of ${pagination.total} customers`;
         
@@ -1553,7 +1614,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
 
 
-        // Columns to exclude from the hide/unhide list (always visible)
+    // Columns to exclude from the hide/unhide list (always visible)
     const NON_TOGGLEABLE_COLS = ['sr', 'actions'];
     const COLUMN_STORAGE_KEY = 'customerListHiddenColumns';
 

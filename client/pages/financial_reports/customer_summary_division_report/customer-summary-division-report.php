@@ -1,14 +1,16 @@
 <?php
 /**
- * Customer Statement Report - Page (FIXED v2)
+ * Customer Statement Report - Page (FIXED v4)
  *
  * Default behavior:
  * - Customer blank = ALL customers
  * - Customer selected = selected customer only
  * - Data automatically loads when page opens
- * - Filters: City, Zone, Area, Salesman - ab sab MULTI-SELECT hain
- *   (checkbox dropdown), e.g. Ali + Usman dono select ho sakte hain
- * - FIX: Date ab display ho raha hai sabhi rows mein
+ * - Filters: City, Zone, Area, Salesman - MULTI-SELECT (checkbox dropdown)
+ * - Transfer Voucher column (signed: TO = +, FROM = -)
+ * - NEW: Hidden columns ki calculation bhi band - closing balance sirf
+ *        visible columns se recalculate hota hai (client-side)
+ * - NEW: Print ko hidden columns pass hote hain (hide_cols)
  */
 
 require_once '../../../../includes/dashboard.php';
@@ -233,6 +235,21 @@ if (!$user_id) {
         font-size:13px;
     }
 
+    .ms-actions{
+        padding:6px 12px 8px;
+        border-bottom:1px solid var(--border);
+        margin-bottom:4px;
+    }
+
+    .ms-actions button{
+        background:none;
+        border:none;
+        color:var(--primary);
+        font-size:12.5px;
+        cursor:pointer;
+        padding:0;
+    }
+
     .summary-cards{
         display:grid;
         grid-template-columns:repeat(auto-fit,minmax(180px,1fr));
@@ -426,7 +443,7 @@ if (!$user_id) {
                 </div>
             </div>
 
-            <!-- SALESMAN (multi-select, NEW) -->
+            <!-- SALESMAN (multi-select) -->
             <div class="form-group">
                 <label>Salesman</label>
                 <div class="multiselect" id="salesman-multiselect">
@@ -445,6 +462,15 @@ if (!$user_id) {
             <div class="form-group">
                 <label for="to-date">To Date</label>
                 <input type="date" class="form-control" id="to-date">
+            </div>
+
+            <!-- COLUMNS (show / hide) -->
+            <div class="form-group">
+                <label>Columns</label>
+                <div class="multiselect" id="columns-multiselect">
+                    <button type="button" class="multiselect-toggle" id="columns-toggle">Columns</button>
+                    <div class="multiselect-panel" id="columns-panel"></div>
+                </div>
             </div>
 
             <!-- GENERATE -->
@@ -484,27 +510,32 @@ if (!$user_id) {
         <!-- SUMMARY -->
         <div class="summary-cards" id="summary-cards" style="display:none;">
 
-            <div class="stat opening">
+            <div class="stat opening" data-col="opening_balance">
                 <div class="label">Opening Balance</div>
                 <div class="value" id="stat-opening">0.00</div>
             </div>
 
-            <div class="stat">
+            <div class="stat" data-col="sale_invoice">
                 <div class="label">Total Sale Invoice</div>
                 <div class="value" id="stat-si">0.00</div>
             </div>
 
-            <div class="stat">
+            <div class="stat" data-col="receive_voucher">
                 <div class="label">Total Receive Voucher</div>
                 <div class="value" id="stat-rv">0.00</div>
             </div>
 
-            <div class="stat">
+            <div class="stat" data-col="sale_return">
                 <div class="label">Total Sale Return</div>
                 <div class="value" id="stat-sr">0.00</div>
             </div>
 
-            <div class="stat closing">
+            <div class="stat" data-col="transfer_voucher">
+                <div class="label">Net Transfer Voucher</div>
+                <div class="value" id="stat-tv">0.00</div>
+            </div>
+
+            <div class="stat closing" data-col="closing_balance">
                 <div class="label">Closing Balance</div>
                 <div class="value" id="stat-closing">0.00</div>
             </div>
@@ -542,11 +573,100 @@ let currentRows = [];
 let currentCustomerName = 'All Customers';
 let currentCustomerId = null;
 
+/* API ka raw response + hidden columns ke hisaab se recalculated view */
+let currentData = null;
+
 /* Multi-select state - Sets of string ids (City / Zone / Area / Salesman) */
 const selectedCityIds     = new Set();
 const selectedZoneIds     = new Set();
 const selectedAreaIds     = new Set();
 const selectedSalesmanIds = new Set();
+
+
+/* -----------------------------------------------------------
+ | Column show / hide (preference browser mein save hoti hai)
+ * ----------------------------------------------------------- */
+const COLUMNS = [
+    { key:'date',             label:'Date' },
+    { key:'customer_name',    label:'Customer' },
+    { key:'opening_balance',  label:'Opening Balance' },
+    { key:'sale_invoice',     label:'Sale Invoice' },
+    { key:'receive_voucher',  label:'Receive Voucher' },
+    { key:'sale_return',      label:'Sale Return' },
+    { key:'transfer_voucher', label:'Transfer Voucher' },
+    { key:'closing_balance',  label:'Closing Balance' }
+];
+const COL_STORAGE_KEY = 'csdr_hidden_columns';
+const hiddenCols = new Set();
+
+try{
+    JSON.parse(localStorage.getItem(COL_STORAGE_KEY) || '[]').forEach(k => {
+        if(COLUMNS.some(c => c.key === k)) hiddenCols.add(k);
+    });
+}catch(e){}
+
+function saveHiddenCols(){
+    try{
+        localStorage.setItem(COL_STORAGE_KEY, JSON.stringify([...hiddenCols]));
+    }catch(e){}
+}
+
+function applyColumnVisibility(){
+    let st = document.getElementById('col-visibility-style');
+    if(!st){
+        st = document.createElement('style');
+        st.id = 'col-visibility-style';
+        document.head.appendChild(st);
+    }
+    st.textContent = [...hiddenCols]
+        .map(k => `[data-col="${k}"]{display:none !important;}`)
+        .join('\n');
+
+    document.getElementById('columns-toggle').textContent =
+        hiddenCols.size ? `Columns (${hiddenCols.size} hidden)` : 'Columns';
+
+    // Hidden column ki calculation bhi hat jaye - closing dobara calculate
+    if(currentData){
+        renderAll();
+    }
+}
+
+function buildColumnPanel(){
+    const panel = document.getElementById('columns-panel');
+
+    panel.innerHTML =
+        `<div class="ms-actions"><button type="button" id="cols-show-all">Show all columns</button></div>` +
+        COLUMNS.map(c => `
+            <label class="ms-option">
+                <input type="checkbox" value="${c.key}" ${hiddenCols.has(c.key) ? '' : 'checked'}>
+                <span>${esc(c.label)}</span>
+            </label>
+        `).join('');
+
+    // Panel ke andar click karne se panel band na ho
+    panel.addEventListener('click', e => e.stopPropagation());
+
+    panel.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+        cb.addEventListener('change', function(){
+            if(this.checked){
+                hiddenCols.delete(this.value);
+            }else{
+                hiddenCols.add(this.value);
+            }
+            saveHiddenCols();
+            applyColumnVisibility();
+        });
+    });
+
+    document.getElementById('cols-show-all').addEventListener('click', function(){
+        hiddenCols.clear();
+        panel.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = true);
+        saveHiddenCols();
+        applyColumnVisibility();
+    });
+
+    applyColumnVisibility();
+}
 
 
 /* -----------------------------------------------------------
@@ -575,6 +695,81 @@ function fmt(n){
         return '0.00';
     }
     return number.toFixed(2);
+}
+
+
+/* -----------------------------------------------------------
+ | Format signed amount with currency: +$100.00 / -$100.00
+ * ----------------------------------------------------------- */
+function fmtSigned(n){
+    const number = parseFloat(n) || 0;
+    if(number > 0) return '+' + currentCurrency + fmt(number);
+    if(number < 0) return '-' + currentCurrency + fmt(Math.abs(number));
+    return '-';
+}
+
+
+/* -----------------------------------------------------------
+ | Build view - hidden columns ko calculation se nikal deta hai
+ |
+ | Formula (sirf visible columns):
+ |   closing = opening + sale_invoice - receive_voucher
+ |             - sale_return + transfer_voucher
+ |
+ | Har customer ka running balance alag chalta hai (rows date
+ | wise aati hain, next row ka opening = us customer ka pichla
+ | closing). Opening column hidden ho to opening 0 se start hota hai.
+ * ----------------------------------------------------------- */
+function buildView(data, hidden){
+    const num = v => parseFloat(v) || 0;
+    const use = k => !hidden.has(k);
+
+    const running = {};
+
+    const rows = (data.rows || []).map(r => {
+        const key = String(r.customer_id ?? r.customer_name ?? '');
+
+        const opening = (key in running)
+            ? running[key]
+            : (use('opening_balance') ? num(r.opening_balance) : 0);
+
+        const closing = opening
+            + (use('sale_invoice')     ? num(r.sale_invoice)     : 0)
+            - (use('receive_voucher')  ? num(r.receive_voucher)  : 0)
+            - (use('sale_return')      ? num(r.sale_return)      : 0)
+            + (use('transfer_voucher') ? num(r.transfer_voucher) : 0);
+
+        running[key] = closing;
+
+        return Object.assign({}, r, {
+            opening_balance: opening,
+            closing_balance: closing
+        });
+    });
+
+    const totalOpening = use('opening_balance') ? num(data.opening_balance) : 0;
+
+    const totalClosing = totalOpening
+        + (use('sale_invoice')     ? num(data.total_sale_invoice)     : 0)
+        - (use('receive_voucher')  ? num(data.total_receive_voucher)  : 0)
+        - (use('sale_return')      ? num(data.total_sale_return)      : 0)
+        + (use('transfer_voucher') ? num(data.total_transfer_voucher) : 0);
+
+    return Object.assign({}, data, {
+        rows: rows,
+        opening_balance: totalOpening,
+        closing_balance: totalClosing
+    });
+}
+
+function renderAll(){
+    if(!currentData) return;
+
+    const view = buildView(currentData, hiddenCols);
+    currentRows = view.rows;
+
+    renderSummary(view);
+    renderTable(view);
 }
 
 
@@ -747,7 +942,7 @@ async function loadAreas(){
 
 
 /* -----------------------------------------------------------
- | Load Salesmen (multi-select, NEW)
+ | Load Salesmen (multi-select)
  * ----------------------------------------------------------- */
 async function loadSalesmen(){
     try{
@@ -885,11 +1080,11 @@ async function generateStatement(){
         }
 
         currentCurrency     = data.currency || '$';
-        currentRows         = data.rows || [];
         currentCustomerName = data.customer_name || 'All Customers';
+        currentData         = data;
 
-        renderSummary(data);
-        renderTable(data);
+        // Summary + table hidden columns ke hisaab se recalculated view se render hote hain
+        renderAll();
 
     }catch(e){
         console.error('Error generating statement:', e);
@@ -914,10 +1109,11 @@ function renderSummary(data){
     document.getElementById('stat-closing').textContent =
         `${currentCurrency}${fmt(data.closing_balance)}`;
 
-    // FIX: Ab API se totals directly le rahe hain
+    // Totals API se directly aa rahe hain
     const totalSI = data.total_sale_invoice || 0;
     const totalRV = data.total_receive_voucher || 0;
     const totalSR = data.total_sale_return || 0;
+    const totalTV = data.total_transfer_voucher || 0;
 
     document.getElementById('stat-si').textContent =
         `${currentCurrency}${fmt(totalSI)}`;
@@ -927,11 +1123,15 @@ function renderSummary(data){
 
     document.getElementById('stat-sr').textContent =
         `${currentCurrency}${fmt(totalSR)}`;
+
+    // Signed net: + / - dikhata hai, zero pe 0.00
+    document.getElementById('stat-tv').textContent =
+        totalTV === 0 ? `${currentCurrency}0.00` : fmtSigned(totalTV);
 }
 
 
 /* -----------------------------------------------------------
- | Render Table (FIXED - Date ab display ho raha hai!)
+ | Render Table
  * ----------------------------------------------------------- */
 function renderTable(data){
 
@@ -946,68 +1146,75 @@ function renderTable(data){
         return;
     }
 
-    const bodyRows = rows.map(r => `
+    const bodyRows = rows.map(r => {
+        const tv = parseFloat(r.transfer_voucher || 0);
+        const tvClass = tv > 0 ? 'amt-in' : (tv < 0 ? 'amt-out' : '');
+
+        return `
         <tr>
-            <td>${esc(r.date)}</td>
-            <td class="customer-cell">
+            <td data-col="date">${esc(r.date)}</td>
+            <td data-col="customer_name" class="customer-cell">
                 <span class="customer-badge">
                     ${esc(r.customer_name || '-')}
                 </span>
             </td>
-            <td>${currentCurrency}${fmt(r.opening_balance)}</td>
-            <td class="amt-in" title="${esc(r.invoice_nos || '')}">
+            <td data-col="opening_balance">${currentCurrency}${fmt(r.opening_balance)}</td>
+            <td data-col="sale_invoice" class="amt-in" title="${esc(r.invoice_nos || '')}">
                 ${
                     parseFloat(r.sale_invoice || 0) > 0
                     ? currentCurrency + fmt(r.sale_invoice)
                     : '-'
                 }
             </td>
-            <td class="amt-out" title="${esc(r.voucher_nos || '')}">
+            <td data-col="receive_voucher" class="amt-out" title="${esc(r.voucher_nos || '')}">
                 ${
                     parseFloat(r.receive_voucher || 0) > 0
                     ? currentCurrency + fmt(r.receive_voucher)
                     : '-'
                 }
             </td>
-            <td class="amt-out" title="${esc(r.return_nos || '')}">
+            <td data-col="sale_return" class="amt-out" title="${esc(r.return_nos || '')}">
                 ${
                     parseFloat(r.sale_return || 0) > 0
                     ? currentCurrency + fmt(r.sale_return)
                     : '-'
                 }
             </td>
-            <td>
+            <td data-col="transfer_voucher" class="${tvClass}" title="${esc(r.transfer_nos || '')}">
+                ${fmtSigned(tv)}
+            </td>
+            <td data-col="closing_balance">
                 <strong>
                     ${currentCurrency}${fmt(r.closing_balance)}
                 </strong>
             </td>
         </tr>
-    `).join('');
+    `;
+    }).join('');
 
-    // Totals row
+    const headCells = COLUMNS
+        .map(c => `<th data-col="${c.key}">${esc(c.label)}</th>`)
+        .join('');
+
+    // Totals row (colspan nahi, taake column hide hone par layout na toote)
+    // TV total (signed) Transfer Voucher column ke neeche dikhta hai
     wrapper.innerHTML = `
         <div class="table-scroll">
             <table class="table">
                 <thead>
-                    <tr>
-                        <th>Date</th>
-                        <th>Customer</th>
-                        <th>Opening Balance</th>
-                        <th>Sale Invoice</th>
-                        <th>Receive Voucher</th>
-                        <th>Sale Return</th>
-                        <th>Closing Balance</th>
-                    </tr>
+                    <tr>${headCells}</tr>
                 </thead>
                 <tbody>
                     ${bodyRows}
                     <tr class="total-row">
-                        <td colspan="2"><strong>TOTALS</strong></td>
-                        <td><strong>${currentCurrency}${fmt(data.opening_balance)}</strong></td>
-                        <td><strong>${currentCurrency}${fmt(data.total_sale_invoice)}</strong></td>
-                        <td><strong>${currentCurrency}${fmt(data.total_receive_voucher)}</strong></td>
-                        <td><strong>${currentCurrency}${fmt(data.total_sale_return)}</strong></td>
-                        <td><strong>${currentCurrency}${fmt(data.closing_balance)}</strong></td>
+                        <td data-col="date"><strong>TOTALS</strong></td>
+                        <td data-col="customer_name"></td>
+                        <td data-col="opening_balance"><strong>${currentCurrency}${fmt(data.opening_balance)}</strong></td>
+                        <td data-col="sale_invoice"><strong>${currentCurrency}${fmt(data.total_sale_invoice)}</strong></td>
+                        <td data-col="receive_voucher"><strong>${currentCurrency}${fmt(data.total_receive_voucher)}</strong></td>
+                        <td data-col="sale_return"><strong>${currentCurrency}${fmt(data.total_sale_return)}</strong></td>
+                        <td data-col="transfer_voucher"><strong>${fmtSigned(data.total_transfer_voucher)}</strong></td>
+                        <td data-col="closing_balance"><strong>${currentCurrency}${fmt(data.closing_balance)}</strong></td>
                     </tr>
                 </tbody>
             </table>
@@ -1018,6 +1225,7 @@ function renderTable(data){
 
 /* -----------------------------------------------------------
  | Print
+ | Hidden columns hide_cols param se print page ko pass hote hain
  * ----------------------------------------------------------- */
 function openPrintView(){
 
@@ -1040,6 +1248,7 @@ function openPrintView(){
     if(zoneIdsParam)     params.push(`city_zone_id=${encodeURIComponent(zoneIdsParam)}`);
     if(areaIdsParam)     params.push(`area_id=${encodeURIComponent(areaIdsParam)}`);
     if(salesmanIdsParam) params.push(`salesman_id=${encodeURIComponent(salesmanIdsParam)}`);
+    if(hiddenCols.size)  params.push(`hide_cols=${encodeURIComponent([...hiddenCols].join(','))}`);
 
     if(params.length){
         url += '?' + params.join('&');
@@ -1058,10 +1267,26 @@ function exportCSV(){
         return;
     }
 
-    let csv = 'Date,Customer,Opening Balance,Sale Invoice,Receive Voucher,Sale Return,Closing Balance\n';
+    // Sirf visible columns export hote hain
+    const cols = COLUMNS.filter(c => !hiddenCols.has(c.key));
 
+    if(cols.length === 0){
+        alert('All columns are hidden. Please show at least one column.');
+        return;
+    }
+
+    const textCols = ['date', 'customer_name'];
+
+    let csv = cols.map(c => c.label).join(',') + '\n';
+
+    // currentRows = recalculated rows (hidden columns ke baghair)
     currentRows.forEach(row => {
-        csv += `"${row.date}","${row.customer_name}",${row.opening_balance},${row.sale_invoice},${row.receive_voucher},${row.sale_return},${row.closing_balance}\n`;
+        csv += cols.map(c => {
+            const v = row[c.key] ?? (textCols.includes(c.key) ? '' : 0);
+            return textCols.includes(c.key)
+                ? `"${String(v).replace(/"/g, '""')}"`
+                : v;
+        }).join(',') + '\n';
     });
 
     const blob = new Blob([csv], { type: 'text/csv' });
@@ -1125,6 +1350,7 @@ document.getElementById('clearBtn').addEventListener('click', async function(){
  | Initial Load
  * ----------------------------------------------------------- */
 (async function init(){
+    buildColumnPanel();
     await loadCities();
     await loadZones();
     await loadAreas();

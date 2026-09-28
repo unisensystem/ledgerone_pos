@@ -1,28 +1,26 @@
 <?php
 /**
- * Customer Statement Report - API (FIXED v4)
+ * Customer Statement Report - API (FIXED v5)
  * ---------------------------------------------------------------
  *
- * FIX 1: Customers with opening balance but NO transactions 
+ * FIX 1: Customers with opening balance but NO transactions
  *        ab appear karengi WITH FROM_DATE
  * FIX 2: Proper totals calculation opening balance + sale invoice
  * FIX 3: Empty date field ab bhara hua hai from_date ke sath
  * FIX 4: total_closing_balance ab har customer ke closing balance
  *        ko SUM kar raha hai (pehle sirf last customer ka closing
  *        balance overwrite ho raha tha)
- * FIX 5 (NEW): City / Zone / Area / Salesman filters ab MULTI-SELECT
- *        support karte hain. Query string mein ye params ab
- *        COMMA-SEPARATED ids lete hain, e.g. city_id=3,7,10
- *        Backward compatible hai - single id bhi bilkul pehle
- *        jaisa kaam karega (e.g. city_id=3).
- * FIX 6 (NEW): action=salesmen add ki gayi hai - dropdown ke liye
- *        employees list return karti hai. Salesman filter
- *        customers.associated_sales_officer_id column pe lagta hai.
- *        NOTE: employees table mein role/designation column pata
- *        nahi, isliye abhi tenant ke sab employees list mein aate
- *        hain. Agar sirf "Sales Officer" designation wale employees
- *        chahiye to WHERE clause mein designation filter add karna
- *        hoga.
+ * FIX 5: City / Zone / Area / Salesman filters MULTI-SELECT support
+ *        karte hain (comma-separated ids, e.g. city_id=3,7,10).
+ *        Single id bhi pehle jaisa kaam karta hai.
+ * FIX 6: action=salesmen - dropdown ke liye employees list.
+ *        Salesman filter customers.associated_sales_officer_id pe lagta hai.
+ * FIX 7 (NEW): TRANSFER VOUCHER column add hua.
+ *        - Customer jab FROM party ho  => balance MINUS (credit)
+ *        - Customer jab TO party ho    => balance PLUS  (debit)
+ *        Ye transfer-add.php ke ledger entries ke mutabiq hai
+ *        (customer = Trade Debtors, debit-normal).
+ *        Opening balance mein from_date se pehle ke transfers bhi shamil hain.
  *
  * LOGIC:
  * Opening Balance
@@ -30,12 +28,14 @@
  *     + Sale Invoices before From Date
  *     - Receive Vouchers before From Date
  *     - Sale Returns before From Date
+ *     +/- Transfer Vouchers before From Date   (TO = +, FROM = -)
  *
  * Closing Balance
  *     = Opening
  *     + Sale Invoice
  *     - Receive Voucher
  *     - Sale Return
+ *     +/- Transfer Voucher (net)
  */
 
 require_once '../../../../includes/connection.php';
@@ -162,9 +162,8 @@ try {
             break;
 
         case 'zones':
-            // FIX 5: ab multiple city ids accept karta hai (comma-separated).
-            // Agar city_id bilkul na diya jaye to TENANT KE SAB zones return
-            // hote hain (multi-select "All Cities" state ke liye zaroori).
+            // Multiple city ids accept karta hai (comma-separated).
+            // city_id na diya jaye to TENANT KE SAB zones return hote hain.
             $city_ids = parseIdList($_GET['city_id'] ?? null);
 
             $sql    = "
@@ -193,9 +192,8 @@ try {
             break;
 
         case 'areas':
-            // FIX 5: ab multiple zone ids accept karta hai (comma-separated).
-            // Agar city_zone_id bilkul na diya jaye to TENANT KE SAB areas
-            // return hote hain.
+            // Multiple zone ids accept karta hai (comma-separated).
+            // city_zone_id na diya jaye to TENANT KE SAB areas return hote hain.
             $city_zone_ids = parseIdList($_GET['city_zone_id'] ?? null);
 
             $sql    = "
@@ -224,7 +222,7 @@ try {
             break;
 
         case 'salesmen':
-            // FIX 6 (NEW): Salesman dropdown ke liye employees list.
+            // Salesman dropdown ke liye employees list.
             // NOTE: designation/role column pata nahi hai, isliye abhi
             // tenant ke sab employees dikh rahe hain.
             $sql = "
@@ -255,10 +253,7 @@ try {
             $from_date = !empty($_GET['from_date']) ? $_GET['from_date'] : null;
             $to_date   = !empty($_GET['to_date'])   ? $_GET['to_date']   : null;
 
-            // FIX 5: City / Zone / Area / Salesman - ab sab MULTI-SELECT hain.
-            // Query string mein comma-separated ids aati hain, e.g.
-            // city_id=3,7,10. Single id (e.g. city_id=3) bhi bilkul pehle
-            // jaisa kaam karta hai - backward compatible.
+            // City / Zone / Area / Salesman - MULTI-SELECT (comma-separated ids)
             $city_ids      = parseIdList($_GET['city_id']      ?? null);
             $city_zone_ids = parseIdList($_GET['city_zone_id'] ?? null);
             $area_ids      = parseIdList($_GET['area_id']      ?? null);
@@ -325,6 +320,7 @@ try {
                     'total_sale_invoice' => 0,
                     'total_receive_voucher' => 0,
                     'total_sale_return' => 0,
+                    'total_transfer_voucher' => 0,
                     'rows'            => []
                 ]);
                 exit;
@@ -336,6 +332,7 @@ try {
             $total_sale_invoice = 0;
             $total_receive_voucher = 0;
             $total_sale_return = 0;
+            $total_transfer_voucher = 0; // signed net (TO = +, FROM = -)
 
             foreach ($customers as $customer) {
 
@@ -381,6 +378,23 @@ try {
                     ");
                     $sr_stmt->execute([$tenant_id, $cid, $from_date]);
                     $bbf -= (float)$sr_stmt->fetchColumn();
+
+                    // Transfer vouchers before from_date: TO = +, FROM = -
+                    $tv_stmt = $pdo->prepare("
+                        SELECT COALESCE(SUM(
+                            CASE
+                                WHEN to_customer_id = ?   THEN amount
+                                WHEN from_customer_id = ? THEN -amount
+                                ELSE 0
+                            END
+                        ), 0)
+                        FROM transfer_voucher
+                        WHERE tenant_id = ?
+                          AND (to_customer_id = ? OR from_customer_id = ?)
+                          AND voucher_date < ?
+                    ");
+                    $tv_stmt->execute([$cid, $cid, $tenant_id, $cid, $cid, $from_date]);
+                    $bbf += (float)$tv_stmt->fetchColumn();
                 }
 
                 $total_opening_balance += $bbf;
@@ -390,12 +404,14 @@ try {
                 $makeDay = function ($date) use (&$days) {
                     if (!isset($days[$date])) {
                         $days[$date] = [
-                            'sale_invoice'    => 0,
-                            'receive_voucher' => 0,
-                            'sale_return'     => 0,
-                            'si_bills'        => [],
-                            'rv_bills'        => [],
-                            'sr_bills'        => []
+                            'sale_invoice'     => 0,
+                            'receive_voucher'  => 0,
+                            'sale_return'      => 0,
+                            'transfer_voucher' => 0,
+                            'si_bills'         => [],
+                            'rv_bills'         => [],
+                            'sr_bills'         => [],
+                            'tv_bills'         => []
                         ];
                     }
                 };
@@ -504,6 +520,48 @@ try {
                     }
                 }
 
+                // TRANSFER VOUCHERS
+                // Customer TO party  => + (debit, balance barhta hai)
+                // Customer FROM party => - (credit, balance kam hota hai)
+                $tv_sql = "
+                    SELECT voucher_date, voucher_number, amount,
+                           from_customer_id, to_customer_id
+                    FROM transfer_voucher
+                    WHERE tenant_id = ?
+                      AND (from_customer_id = ? OR to_customer_id = ?)
+                ";
+                $tv_params = [$tenant_id, $cid, $cid];
+
+                if ($from_date) {
+                    $tv_sql .= " AND voucher_date >= ?";
+                    $tv_params[] = $from_date;
+                }
+                if ($to_date) {
+                    $tv_sql .= " AND voucher_date <= ?";
+                    $tv_params[] = $to_date;
+                }
+
+                $tv_sql .= " ORDER BY voucher_date";
+
+                $tv_stmt = $pdo->prepare($tv_sql);
+                $tv_stmt->execute($tv_params);
+
+                foreach ($tv_stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+                    $d = $row['voucher_date'];
+                    // Skip if date is null/empty
+                    if (!$d) continue;
+                    $makeDay($d);
+
+                    $signed = ((int)$row['to_customer_id'] === $cid)
+                        ? (float)$row['amount']
+                        : -(float)$row['amount'];
+
+                    $days[$d]['transfer_voucher'] += $signed;
+                    if (isset($row['voucher_number']) && $row['voucher_number'] !== '') {
+                        $days[$d]['tv_bills'][] = $row['voucher_number'];
+                    }
+                }
+
                 ksort($days);
 
                 $running = $bbf;
@@ -515,7 +573,8 @@ try {
                     $closing = $opening
                         + $d['sale_invoice']
                         - $d['receive_voucher']
-                        - $d['sale_return'];
+                        - $d['sale_return']
+                        + $d['transfer_voucher'];
 
                     $running = $closing;
                     $customer_has_transactions = true;
@@ -528,45 +587,46 @@ try {
                         'sale_invoice'     => round($d['sale_invoice'], 2),
                         'receive_voucher'  => round($d['receive_voucher'], 2),
                         'sale_return'      => round($d['sale_return'], 2),
+                        'transfer_voucher' => round($d['transfer_voucher'], 2),
                         'closing_balance'  => round($closing, 2),
                         'invoice_nos'      => implode(', ', array_unique(array_filter($d['si_bills']))),
                         'voucher_nos'      => implode(', ', array_unique(array_filter($d['rv_bills']))),
-                        'return_nos'       => implode(', ', array_unique(array_filter($d['sr_bills'])))
+                        'return_nos'       => implode(', ', array_unique(array_filter($d['sr_bills']))),
+                        'transfer_nos'     => implode(', ', array_unique(array_filter($d['tv_bills'])))
                     ];
 
                     // Add to totals
-                    $total_sale_invoice += (float)$d['sale_invoice'];
-                    $total_receive_voucher += (float)$d['receive_voucher'];
-                    $total_sale_return += (float)$d['sale_return'];
+                    $total_sale_invoice     += (float)$d['sale_invoice'];
+                    $total_receive_voucher  += (float)$d['receive_voucher'];
+                    $total_sale_return      += (float)$d['sale_return'];
+                    $total_transfer_voucher += (float)$d['transfer_voucher'];
                 }
 
-                // FIX 3: Date ab bhara hua hai!
                 // Agar customer ke paas opening balance hai but koi transaction nahi
-                // to ab from_date show hoga (ya aaj ki date agar from_date nahi hai)
+                // to from_date show hoga (ya aaj ki date agar from_date nahi hai)
                 if (!$customer_has_transactions && $bbf != 0) {
                     $display_date = $from_date ?? date('Y-m-d');
-                    
+
                     $all_rows[] = [
-                        'date'             => $display_date,  // <-- FIX: Ab bhara hua hai!
+                        'date'             => $display_date,
                         'customer_id'      => $cid,
                         'customer_name'    => $customer_name,
                         'opening_balance'  => round($bbf, 2),
                         'sale_invoice'     => 0,
                         'receive_voucher'  => 0,
                         'sale_return'      => 0,
+                        'transfer_voucher' => 0,
                         'closing_balance'  => round($bbf, 2),
                         'invoice_nos'      => '',
                         'voucher_nos'      => '',
-                        'return_nos'       => ''
+                        'return_nos'       => '',
+                        'transfer_nos'     => ''
                     ];
 
-                    // FIX 4: Transaction-less customer ka closing balance
-                    // (= opening balance) bhi total mein shamil karna hai.
                     $running = $bbf;
                 }
 
-                // FIX 4: SUM (+=) - har customer ka closing balance total
-                // mein add hota hai, overwrite nahi hota.
+                // SUM (+=) - har customer ka closing balance total mein add hota hai
                 $total_closing_balance += $running;
             }
 
@@ -585,7 +645,6 @@ try {
                 $response_customer_name = 'All Customers';
             }
 
-            // FIX 2: Proper totals ab return ho rahe hain
             echo json_encode([
                 'success'                => true,
                 'currency'               => $currency_symbol,
@@ -599,6 +658,7 @@ try {
                 'total_sale_invoice'     => round($total_sale_invoice, 2),
                 'total_receive_voucher'  => round($total_receive_voucher, 2),
                 'total_sale_return'      => round($total_sale_return, 2),
+                'total_transfer_voucher' => round($total_transfer_voucher, 2),
                 'rows'                   => $all_rows
             ]);
             break;

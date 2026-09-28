@@ -347,6 +347,7 @@ $config = $report_config[$report_type];
             return ROUND_OFF_ENABLED
                 ? Math.round(amount).toLocaleString()
 : amount.toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 });
+
         }
 
         function formatMoney(value) {

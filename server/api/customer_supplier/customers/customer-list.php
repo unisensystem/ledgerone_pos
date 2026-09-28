@@ -64,7 +64,7 @@ try {
         LEFT JOIN areas ar ON c.area_id = ar.id AND ar.tenant_id = c.tenant_id
         LEFT JOIN employees e ON c.associated_sales_officer_id = e.id AND e.tenant_id = c.tenant_id";
 
-    // Get total count
+    // Get total count (respects search / status / company filters)
     $countSql = "SELECT COUNT(*) as total FROM customers c $joins $whereClause";
     $stmt = $pdo->prepare($countSql);
     $stmt->execute($params);
@@ -156,12 +156,12 @@ try {
                  )
                 WHERE jv.tenant_id = c.tenant_id
                   AND jv.status = 'posted'
-                                   AND jv.adj_mode = 'cross'
+                  AND jv.adj_mode = 'cross'
                   AND jv.party_type2 = 'customer'
                   AND jv.party_id2 = c.id
             ), 0)
 
-            -- ===== NEW: Transfer voucher, customer is FROM (-) =====
+            -- Transfer voucher, customer is FROM (-)
             - COALESCE((
                 SELECT SUM(tv.amount)
                 FROM transfer_voucher tv
@@ -170,7 +170,7 @@ try {
                   AND tv.from_customer_id = c.id
             ), 0)
 
-            -- ===== NEW: Transfer voucher, customer is TO =====
+            -- Transfer voucher, customer is TO
             -- From customer => (+), From supplier => (-)
             + COALESCE((
                 SELECT SUM(CASE WHEN tv.from_type = 'customer' THEN tv.amount ELSE -tv.amount END)
@@ -190,12 +190,16 @@ try {
     $stmt->execute($params);
     $customers = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-    // Get stats
+    // Get stats (overall, for this tenant)
+    // total_opening_balance = total opening debit - total opening credit
     $statsSql = "SELECT
         COUNT(*) as total_customers,
         COUNT(CASE WHEN is_blacklisted = FALSE THEN 1 END) as active_customers,
         COUNT(CASE WHEN is_blacklisted = TRUE THEN 1 END) as blacklisted_customers,
-        SUM(CASE WHEN current_balance > 0 THEN current_balance ELSE 0 END) as total_receivables
+        SUM(CASE WHEN current_balance > 0 THEN current_balance ELSE 0 END) as total_receivables,
+        COALESCE(SUM(opening_debit_amount), 0) as total_opening_debit,
+        COALESCE(SUM(opening_credit_amount), 0) as total_opening_credit,
+        COALESCE(SUM(opening_debit_amount), 0) - COALESCE(SUM(opening_credit_amount), 0) as total_opening_balance
         FROM customers WHERE tenant_id = ?";
 
     $stmt = $pdo->prepare($statsSql);
@@ -209,7 +213,7 @@ try {
             'page' => $page,
             'limit' => $limit,
             'total' => (int)$total,
-            'pages' => ceil($total / $limit)
+            'pages' => (int)ceil($total / $limit)
         ],
         'stats' => $stats
     ]);

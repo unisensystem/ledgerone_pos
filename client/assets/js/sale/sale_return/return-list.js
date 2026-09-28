@@ -21,11 +21,121 @@ document.addEventListener('DOMContentLoaded', function () {
         });
 });
 
+// Turns a native <select> into a searchable dropdown.
+// The original <select> stays in the DOM (hidden), so existing code that reads
+// select.value or listens to the 'change' event keeps working.
+function initSearchableSelect(selectEl) {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'searchable-select';
+
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'searchable-select-input';
+    input.autocomplete = 'off';
+    input.placeholder = 'Search...';
+
+    const list = document.createElement('div');
+    list.className = 'searchable-select-list';
+
+    selectEl.parentNode.insertBefore(wrapper, selectEl);
+    wrapper.appendChild(input);
+    wrapper.appendChild(list);
+    wrapper.appendChild(selectEl);
+    selectEl.style.display = 'none';
+
+    function getSelectedLabel() {
+        const opt = selectEl.options[selectEl.selectedIndex];
+        return opt && opt.value !== '' ? opt.textContent : '';
+    }
+
+    function renderList(filterText = '') {
+        list.innerHTML = '';
+        const term = filterText.trim().toLowerCase();
+        let count = 0;
+
+        Array.from(selectEl.options).forEach(opt => {
+            if (term && !opt.textContent.toLowerCase().includes(term)) return;
+            const item = document.createElement('div');
+            item.className = 'searchable-select-item';
+            if (opt.value === selectEl.value) item.classList.add('selected');
+            item.textContent = opt.textContent;
+            item.dataset.value = opt.value;
+            // mousedown fires before input blur, so the selection is not lost
+            item.addEventListener('mousedown', function (e) {
+                e.preventDefault();
+                selectValue(opt.value);
+            });
+            list.appendChild(item);
+            count++;
+        });
+
+        if (count === 0) {
+            const empty = document.createElement('div');
+            empty.className = 'searchable-select-empty';
+            empty.textContent = 'No results found';
+            list.appendChild(empty);
+        }
+    }
+
+    function openList() {
+        renderList(input.value === getSelectedLabel() ? '' : input.value);
+        list.style.display = 'block';
+    }
+
+    function closeList() {
+        list.style.display = 'none';
+        input.value = getSelectedLabel();
+    }
+
+    function selectValue(value) {
+        const changed = selectEl.value !== value;
+        selectEl.value = value;
+        closeList();
+        input.blur();
+        if (changed) {
+            selectEl.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+    }
+
+    input.addEventListener('focus', function () {
+        input.select();
+        openList();
+    });
+
+    input.addEventListener('input', function () {
+        renderList(input.value);
+        list.style.display = 'block';
+    });
+
+    input.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') {
+            closeList();
+            input.blur();
+        } else if (e.key === 'Enter') {
+            e.preventDefault();
+            const first = list.querySelector('.searchable-select-item');
+            if (first) selectValue(first.dataset.value);
+        }
+    });
+
+    input.addEventListener('blur', closeList);
+
+    // Call this after the <select> options are rebuilt
+    function refresh() {
+        input.placeholder = selectEl.options.length ? selectEl.options[0].textContent : 'Search...';
+        input.value = getSelectedLabel();
+    }
+
+    refresh();
+    return { refresh };
+}
+
 function initializeListPage(permissions) {
     let invoices = [];
     let currentPage = 1;
     let totalPages = 1;
     const invoicesTable = document.getElementById('invoicesTable').getElementsByTagName('tbody')[0];
+    const customerSearch = initSearchableSelect(document.getElementById('customerFilter'));
 
     // Load companies
     async function loadCompanies() {
@@ -63,6 +173,7 @@ function initializeListPage(permissions) {
                     option.textContent = c.customer_name;
                     customerFilter.appendChild(option);
                 });
+                customerSearch.refresh();
             }
         } catch (error) {
             console.error('Error loading customers:', error);
@@ -102,8 +213,27 @@ function initializeListPage(permissions) {
         }
     }
 
+    // Update summary boxes (count + total amount of the rows currently shown)
+    function updateSummary(data) {
+        const countEl = document.getElementById('summaryInvoiceCount');
+        const amountEl = document.getElementById('summaryTotalAmount');
+        if (!countEl || !amountEl) return;
+
+        const total = data.reduce((sum, invoice) => sum + (parseFloat(invoice.totalAmount) || 0), 0);
+        const symbols = new Set(data.map(invoice => invoice.currencySymbol).filter(Boolean));
+        // Show the symbol only when all rows share the same currency
+        const symbol = symbols.size === 1 ? [...symbols][0] + ' ' : '';
+
+        countEl.textContent = data.length;
+        amountEl.textContent = symbol + total.toLocaleString('en-US', {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2
+        });
+    }
+
     function populateTable(data) {
         invoicesTable.innerHTML = '';
+        updateSummary(data);
 
         data.forEach(invoice => {
             const row = invoicesTable.insertRow();
