@@ -267,7 +267,11 @@ $currency_symbol = $currency['symbol'] ?? '$';
 
     <script>
         const currencySymbol = '<?php echo $currency_symbol; ?>';
-        
+
+        function escHtml(v) {
+            return String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+        }
+
         document.addEventListener('DOMContentLoaded', function() {
             loadCustomersForPrint();
         });
@@ -311,15 +315,15 @@ $currency_symbol = $currency['symbol'] ?? '$';
             let hasFilters = false;
 
             if (search) {
-                filterText += `Search: "${search}" | `;
+                filterText += `Search: "${escHtml(search)}" | `;
                 hasFilters = true;
             }
             if (status) {
-                filterText += `Status: ${status.charAt(0).toUpperCase() + status.slice(1)} | `;
+                filterText += `Status: ${escHtml(status.charAt(0).toUpperCase() + status.slice(1))} | `;
                 hasFilters = true;
             }
             if (company) {
-                filterText += `Company: ${company} | `;
+                filterText += `Company: ${escHtml(company)} | `;
                 hasFilters = true;
             }
 
@@ -344,15 +348,15 @@ $currency_symbol = $currency['symbol'] ?? '$';
             customers.forEach(customer => {
                 const row = document.createElement('tr');
                 row.innerHTML = `
-                    <td><span class="customer-code">${customer.customer_code}</span></td>
-                    <td>${customer.customer_name}</td>
-                    <td>${customer.customer_group_name || '-'}</td>
-                    <td>${customer.customer_category_name || '-'}</td>
-                    <td>${customer.city_name || '-'}</td>
-                    <td>${customer.zone_name || '-'}</td>
-                    <td>${customer.area_name || '-'}</td>
-                    <td>${customer.primary_phone || '-'}</td>
-                    <td>${customer.address || '-'}</td>
+                    <td><span class="customer-code">${escHtml(customer.customer_code)}</span></td>
+                    <td>${escHtml(customer.customer_name)}</td>
+                    <td>${escHtml(customer.customer_group_name || '-')}</td>
+                    <td>${escHtml(customer.customer_category_name || '-')}</td>
+                    <td>${escHtml(customer.city_name || '-')}</td>
+                    <td>${escHtml(customer.zone_name || '-')}</td>
+                    <td>${escHtml(customer.area_name || '-')}</td>
+                    <td>${escHtml(customer.primary_phone || '-')}</td>
+                    <td>${escHtml(customer.address || '-')}</td>
                 `;
                 tbody.appendChild(row);
             });
