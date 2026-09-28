@@ -59,9 +59,9 @@ try {
             rv.cheque_date,
             rv.cheque_no,
             rv.attachment,
-            cu.customer_name,
-            cu.customer_code,
-            cu.address as customer_address,
+            COALESCE(cu.customer_name, su.supplier_name) as customer_name,
+            COALESCE(cu.customer_code, su.supplier_code) as customer_code,
+            COALESCE(cu.address, su.address) as customer_address,
             a.name as payment_method,
             c.name as currency_name,
             c.symbol as currency_symbol,
@@ -82,6 +82,7 @@ try {
             p.project_name
         FROM receive_voucher rv
         LEFT JOIN customers cu ON rv.customer_id = cu.id
+        LEFT JOIN suppliers su ON rv.supplier_id = su.id
         LEFT JOIN accounts a ON rv.payment_method_id = a.id
         LEFT JOIN ledgerone_public.currencies c ON rv.currency_id = c.id
         LEFT JOIN bank_accounts ba ON rv.bank_account_id = ba.id

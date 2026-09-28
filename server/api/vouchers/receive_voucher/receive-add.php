@@ -37,7 +37,8 @@ error_log('LOCK CHECK: ' . print_r($lockCheck, true) . ' | voucher_date: ' . $vo
 if (!$lockCheck['allowed']) {
     echo json_encode(['success' => false, 'error' => $lockCheck['message']]);
     exit();
-}  $customer_code = $_POST['customer_code'] ?? '';
+}  $receive_type = $_POST['receive_type'] ?? 'customer';
+    $customer_code = $_POST['customer_code'] ?? '';
     $previous_balance = (!empty($_POST['previous_balance']) && $_POST['previous_balance'] !== 'null') ? floatval($_POST['previous_balance']) : 0;
     $sub_account_id = (!empty($_POST['sub_account_id']) && $_POST['sub_account_id'] !== 'null') ? intval($_POST['sub_account_id']) : null;
     $bill_no = (!empty($_POST['bill_no']) && $_POST['bill_no'] !== 'null') ? $_POST['bill_no'] : null;
@@ -58,21 +59,35 @@ if (!$lockCheck['allowed']) {
     $recovery_officer_id = (!empty($_POST['recovery_officer']) && $_POST['recovery_officer'] !== 'null') ? $_POST['recovery_officer'] : null;
     $against_pdc_id = (!empty($_POST['against_pdc_id']) && $_POST['against_pdc_id'] !== 'null') ? intval($_POST['against_pdc_id']) : null;
 
-    // Look up the customer by customer_code within the tenant.
-    // The customer's own company_id is the source of truth and is used for the voucher.
-    $stmt = $pdo->prepare("
-        SELECT id, company_id FROM customers
-        WHERE tenant_id = ? AND customer_code = ?
-    ");
-    $stmt->execute([$tenant_id, $customer_code]);
-    $customer = $stmt->fetch(PDO::FETCH_ASSOC);
+    // Look up the customer/supplier by code within the tenant.
+    // The entity's own company_id is the source of truth and is used for the voucher.
+    if ($receive_type === 'supplier') {
+        $stmt = $pdo->prepare("
+            SELECT id, company_id FROM suppliers
+            WHERE tenant_id = ? AND supplier_code = ?
+        ");
+        $stmt->execute([$tenant_id, $customer_code]);
+        $customer = $stmt->fetch(PDO::FETCH_ASSOC);
 
-    if (!$customer) {
-        echo json_encode(['success' => false, 'error' => 'Customer not found']);
-        exit();
+        if (!$customer) {
+            echo json_encode(['success' => false, 'error' => 'Supplier not found']);
+            exit();
+        }
+    } else {
+        $stmt = $pdo->prepare("
+            SELECT id, company_id FROM customers
+            WHERE tenant_id = ? AND customer_code = ?
+        ");
+        $stmt->execute([$tenant_id, $customer_code]);
+        $customer = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if (!$customer) {
+            echo json_encode(['success' => false, 'error' => 'Customer not found']);
+            exit();
+        }
     }
 
-    // Company is derived from the customer, not from the form's Company dropdown
+    // Company is derived from the entity, not from the form's Company dropdown
     $company_id = $customer['company_id'];
 
     // Generate sequential voucher number
@@ -161,31 +176,50 @@ if (!$lockCheck['allowed']) {
         $attachment = $finalFileName;
     }
 
-      $stmt = $pdo->prepare("
-        INSERT INTO receive_voucher (
-            tenant_id, company_id, voucher_number, voucher_date, customer_id, sub_account_id, bill_no, dsr_no, project_id, container_id,
-            amount, adjust_amount, previous_balance, currency_id, payment_method_id, bank_account_id, cheque_date, cheque_no, description, attachment,
-            recovery_officer_id, against_pdc_id, created_by, updated_by
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    ");
-    
+    if ($receive_type === 'supplier') {
+        $stmt = $pdo->prepare("
+            INSERT INTO receive_voucher (
+                tenant_id, company_id, voucher_number, voucher_date, supplier_id, sub_account_id, bill_no, dsr_no, project_id, container_id,
+                amount, adjust_amount, previous_balance, currency_id, payment_method_id, bank_account_id, cheque_date, cheque_no, description, attachment,
+                recovery_officer_id, against_pdc_id, created_by, updated_by
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ");
+    } else {
+        $stmt = $pdo->prepare("
+            INSERT INTO receive_voucher (
+                tenant_id, company_id, voucher_number, voucher_date, customer_id, sub_account_id, bill_no, dsr_no, project_id, container_id,
+                amount, adjust_amount, previous_balance, currency_id, payment_method_id, bank_account_id, cheque_date, cheque_no, description, attachment,
+                recovery_officer_id, against_pdc_id, created_by, updated_by
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ");
+    }
+
     $stmt->execute([
         $tenant_id, $company_id, $voucher_number, $voucher_date, $customer['id'], $sub_account_id, $bill_no, $dsr_no, $project_id, $container_id,
         $amount, $adjust_amount, $previous_balance, $currency_id, $payment_method_id, $bank_account_id, $cheque_date, $cheque_no, $description, $attachment,
         $recovery_officer_id, $against_pdc_id, $user_id, $user_id
     ]);
-    
+
     $voucher_id = $pdo->lastInsertId();
-    
+
     // Insert post-dated cheque if payment method is 6
     if ($payment_method_id == 6) {
-        $stmt = $pdo->prepare("
-            INSERT INTO post_dated_cheques (
-                tenant_id, company_id, cheque_no, bank_account_id, transaction_type, customer_id,
-                amount, cheque_date, reference_id, reference_table
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ");
-        
+        if ($receive_type === 'supplier') {
+            $stmt = $pdo->prepare("
+                INSERT INTO post_dated_cheques (
+                    tenant_id, company_id, cheque_no, bank_account_id, transaction_type, supplier_id,
+                    amount, cheque_date, reference_id, reference_table
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ");
+        } else {
+            $stmt = $pdo->prepare("
+                INSERT INTO post_dated_cheques (
+                    tenant_id, company_id, cheque_no, bank_account_id, transaction_type, customer_id,
+                    amount, cheque_date, reference_id, reference_table
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ");
+        }
+
         $stmt->execute([
             $tenant_id, $company_id, $cheque_no, $bank_account_id, 'Received', $customer['id'],
             $amount, $cheque_date, $voucher_id, 'receive_voucher'
@@ -226,9 +260,11 @@ if ($adjust_amount > 0) {
         $voucher_date, $description, $adjust_amount, 0.00
     ]);
 }
-    // Customer ka Trade Debtors (id 2) ab amount + adjust dono se kam hoga
+    // Customer's Trade Debtors (id 2) is credited (reduces what they owe), or
+    // for a supplier receipt, Trade Creditors (id 14) is credited (increases what we owe them)
+    $credit_account_id = $receive_type === 'supplier' ? 14 : 2;
     $stmt->execute([
-        $tenant_id, 'Receive Voucher', 'receive_voucher', $voucher_id, 2,
+        $tenant_id, 'Receive Voucher', 'receive_voucher', $voucher_id, $credit_account_id,
         $voucher_date, $description, 0.00, $amount + $adjust_amount
     ]);
 
@@ -237,7 +273,7 @@ if ($adjust_amount > 0) {
         "Created receive voucher \"$voucher_number\" (amount " . number_format($amount, 2) . ")",
         null,
         [
-            'voucher_number' => $voucher_number, 'voucher_date' => $voucher_date, 'customer_id' => $customer['id'],
+            'voucher_number' => $voucher_number, 'voucher_date' => $voucher_date, 'receive_type' => $receive_type, 'customer_id' => $customer['id'],
             'company_id' => $company_id, 'bill_no' => $bill_no, 'amount' => $amount, 'adjust_amount' => $adjust_amount,
             'currency_id' => $currency_id, 'payment_method_id' => $payment_method_id, 'bank_account_id' => $bank_account_id,
             'cheque_no' => $cheque_no, 'description' => $description

@@ -34,6 +34,7 @@ if (!$voucher_id) {
 // Chart-of-accounts IDs used by Receive Voucher on this tenant's live server
 if (!defined('ADJUSTMENT_ACCOUNT_ID'))     define('ADJUSTMENT_ACCOUNT_ID', 406);
 if (!defined('TRADE_DEBTORS_ACCOUNT_ID'))  define('TRADE_DEBTORS_ACCOUNT_ID', 2);
+if (!defined('TRADE_CREDITORS_ACCOUNT_ID')) define('TRADE_CREDITORS_ACCOUNT_ID', 14);
 if (!defined('CASH_ACCOUNT_ID'))           define('CASH_ACCOUNT_ID', 1);
 if (!defined('PDC_RECEIVABLE_ACCOUNT_ID')) define('PDC_RECEIVABLE_ACCOUNT_ID', 78);
 
@@ -59,8 +60,9 @@ $sub_account_id = !empty($input['sub_account_id']) ? intval($input['sub_account_
 $recovery_officer_id = !empty($input['recovery_officer_id']) ? $input['recovery_officer_id'] : null;
 $against_pdc_id = !empty($input['against_pdc_id']) ? intval($input['against_pdc_id']) : null;
 
-    // Need customer_id for the PDC rebuild below, plus full old row for the Activity Log diff
-    $stmt = $pdo->prepare("SELECT voucher_number, customer_id, company_id, voucher_date, bill_no, dsr_no, amount, adjust_amount, currency_id, payment_method_id, bank_account_id, cheque_no, description FROM receive_voucher WHERE id = ? AND tenant_id = ?");
+    // Need customer_id/supplier_id for the PDC rebuild below, plus full old row for the Activity Log diff.
+    // The party itself (and its type) cannot be changed on edit — it's read from the existing row.
+    $stmt = $pdo->prepare("SELECT voucher_number, customer_id, supplier_id, company_id, voucher_date, bill_no, dsr_no, amount, adjust_amount, currency_id, payment_method_id, bank_account_id, cheque_no, description FROM receive_voucher WHERE id = ? AND tenant_id = ?");
     $stmt->execute([$voucher_id, $tenant_id]);
     $existingVoucher = $stmt->fetch(PDO::FETCH_ASSOC);
 
@@ -69,7 +71,10 @@ $against_pdc_id = !empty($input['against_pdc_id']) ? intval($input['against_pdc_
         exit();
     }
 
+    $is_supplier = !empty($existingVoucher['supplier_id']);
     $customer_id = $existingVoucher['customer_id'];
+    $supplier_id = $existingVoucher['supplier_id'];
+    $party_id = $is_supplier ? $supplier_id : $customer_id;
     $company_id  = $input['company_id'] ?? $existingVoucher['company_id'];
 
 $stmt = $pdo->prepare("
@@ -157,8 +162,9 @@ $stmt->execute([
         ]);
     }
 
+    $credit_account_id = $is_supplier ? TRADE_CREDITORS_ACCOUNT_ID : TRADE_DEBTORS_ACCOUNT_ID;
     $ledgerStmt->execute([
-        $tenant_id, 'Receive Voucher', 'receive_voucher', $voucher_id, TRADE_DEBTORS_ACCOUNT_ID,
+        $tenant_id, 'Receive Voucher', 'receive_voucher', $voucher_id, $credit_account_id,
         $voucher_date, $description, 0.00, $amount + $adjust_amount
     ]);
 
@@ -171,14 +177,23 @@ $stmt->execute([
     $stmt->execute([$tenant_id, $voucher_id]);
 
     if ($payment_method_id == 6) {
-        $stmt = $pdo->prepare("
-            INSERT INTO post_dated_cheques (
-                tenant_id, company_id, cheque_no, bank_account_id, transaction_type, customer_id,
-                amount, cheque_date, reference_id, reference_table
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ");
+        if ($is_supplier) {
+            $stmt = $pdo->prepare("
+                INSERT INTO post_dated_cheques (
+                    tenant_id, company_id, cheque_no, bank_account_id, transaction_type, supplier_id,
+                    amount, cheque_date, reference_id, reference_table
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ");
+        } else {
+            $stmt = $pdo->prepare("
+                INSERT INTO post_dated_cheques (
+                    tenant_id, company_id, cheque_no, bank_account_id, transaction_type, customer_id,
+                    amount, cheque_date, reference_id, reference_table
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ");
+        }
         $stmt->execute([
-            $tenant_id, $company_id, $cheque_no, $bank_account_id, 'Received', $customer_id,
+            $tenant_id, $company_id, $cheque_no, $bank_account_id, 'Received', $party_id,
             $amount, $cheque_date, $voucher_id, 'receive_voucher'
         ]);
     }

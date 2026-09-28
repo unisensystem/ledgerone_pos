@@ -43,7 +43,17 @@ $initialSearch = $_GET['search'] ?? '';
     <div class="container">
         <div class="header">
             <h1 class="page-title">Receive Vouchers</h1>
-            <div class="header-actions">
+            <div class="header-actions" style="display:flex; align-items:center; gap:16px;">
+                <div class="mode-toggle">
+                    <label class="toggle-label">
+                        <input type="radio" name="listReceiveType" value="customer" checked>
+                        <span>Receive from Customer</span>
+                    </label>
+                    <label class="toggle-label">
+                        <input type="radio" name="listReceiveType" value="supplier">
+                        <span>Receive from Supplier</span>
+                    </label>
+                </div>
                 <button class="btn btn-primary" id="newVoucherBtn">
                     <i class="fas fa-plus"></i>
                     New Voucher
@@ -79,7 +89,7 @@ $initialSearch = $_GET['search'] ?? '';
                     </select>
                 </div>
                 <div class="filter-group">
-                    <label for="customerFilter">Customer</label>
+                    <label for="customerFilter" id="customerFilterLabel">Customer</label>
                     <div class="searchable-dropdown">
                         <input type="text" class="search-input" placeholder="Search customer..." id="customerFilterSearch" autocomplete="off">
                         <div class="dropdown-options" id="customerFilterOptions">
@@ -88,7 +98,7 @@ $initialSearch = $_GET['search'] ?? '';
                         <input type="hidden" id="customerFilter">
                     </div>
                 </div>
-                <div class="filter-group">
+                <div class="filter-group" id="areaFilterGroup">
                     <label for="areaFilter">Area</label>
                     <div class="searchable-dropdown">
                         <input type="text" class="search-input" placeholder="Search area..." id="areaFilterSearch" autocomplete="off">
@@ -98,7 +108,7 @@ $initialSearch = $_GET['search'] ?? '';
                         <input type="hidden" id="areaFilter">
                     </div>
                 </div>
-                <div class="filter-group">
+                <div class="filter-group" id="cityFilterGroup">
                     <label for="cityFilter">City</label>
                     <div class="searchable-dropdown">
                         <input type="text" class="search-input" placeholder="Search city..." id="cityFilterSearch" autocomplete="off">
@@ -108,7 +118,7 @@ $initialSearch = $_GET['search'] ?? '';
                         <input type="hidden" id="cityFilter">
                     </div>
                 </div>
-                <div class="filter-group">
+                <div class="filter-group" id="recoveryOfficerFilterGroup">
                     <label for="recoveryOfficerFilter">Recovery Officer</label>
                     <div class="searchable-dropdown">
                         <input type="text" class="search-input" placeholder="Search officer..." id="recoveryOfficerFilterSearch" autocomplete="off">
@@ -196,14 +206,14 @@ $initialSearch = $_GET['search'] ?? '';
                     <tr>
                         <th>Voucher #</th>
                         <th>Date</th>
-                        <th>Customer</th>
-                        <th>Area</th>
-                        <th>City</th>
+                        <th id="listCustomerHeader">Customer</th>
+                        <th id="listAreaHeader">Area</th>
+                        <th id="listCityHeader">City</th>
                         <th>Bill No</th>
                         <th>Project</th>
                         <th>Amount</th>
                         <th>Payment Method</th>
-                        <th>Recovery Officer</th>
+                        <th id="listRecoveryOfficerHeader">Recovery Officer</th>
                         <th>Status</th>
                         <th>Actions</th>
                     </tr>
@@ -249,7 +259,7 @@ $initialSearch = $_GET['search'] ?? '';
                             </select>
                         </div>
                         <div class="form-group">
-                            <label for="editCustomer">Customer</label>
+                            <label for="editCustomer" id="editCustomerLabel">Customer</label>
                             <input type="text" id="editCustomer" readonly>
                         </div>
                         <div class="form-group">

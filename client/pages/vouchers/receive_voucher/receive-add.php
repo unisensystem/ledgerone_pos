@@ -30,6 +30,16 @@ if (!$user_id) {
         <div class="header">
             <h1 class="page-title">Receive Voucher</h1>
             <div style="display: flex; align-items: center; gap: 16px;">
+                <div class="mode-toggle">
+                    <label class="toggle-label">
+                        <input type="radio" name="receiveType" value="customer" checked>
+                        <span>Receive from Customer</span>
+                    </label>
+                    <label class="toggle-label">
+                        <input type="radio" name="receiveType" value="supplier">
+                        <span>Receive from Supplier</span>
+                    </label>
+                </div>
                 <button type="button" id="customizeFieldsBtn" class="btn btn-secondary" style="height: 40px; padding: 0 16px;">
                     <i class="fas fa-sliders-h"></i>
                     Customize Fields
@@ -64,7 +74,7 @@ if (!$user_id) {
                                 <!-- Options will be populated by JS -->
                             </select>
                         </div>
-                        <div class="form-group">
+                        <div class="form-group" id="recoveryOfficerGroup">
                             <label for="recoveryOfficer">Recovery Officer</label>
                             <div class="searchable-dropdown">
                                 <input type="text" id="recoveryOfficer" placeholder="Search employee..." autocomplete="off">
@@ -74,7 +84,7 @@ if (!$user_id) {
                             </div>
                         </div>
                         <div class="form-group">
-                            <label for="customerCode" class="required">Customer Code</label>
+                            <label for="customerCode" class="required" id="customerLabel">Customer Code</label>
                             <div class="searchable-dropdown">
                                 <input type="text" id="customerCode" placeholder="Search customer..." autocomplete="off" required>
                                 <div class="dropdown-list" id="customerDropdown">
@@ -106,7 +116,7 @@ if (!$user_id) {
                                 </div>
                             </div>
                         </div>
-                        <div class="form-group">
+                        <div class="form-group" id="dsrNoGroup">
                             <label for="dsrNo">DSR#</label>
                             <input type="text" id="dsrNo" placeholder="DSR-B-24-26-20251231-20260112" pattern="DSR-[A-Z]-\d{2}-\d{2}-\d{8}-\d{8}" title="Format: DSR-B-24-26-20251231-20260112">
                         </div>
@@ -223,25 +233,25 @@ if (!$user_id) {
                         <label for="bulkJournalDate">Bulk Journal Date</label>
                         <input type="date" id="bulkJournalDate" title="Applies this date to all rows below">
                     </div>
-                    <div class="form-group" style="margin: 0; min-width: 160px;">
+                    <div class="form-group" style="margin: 0; min-width: 160px;" id="bulkCityGroup">
                         <label for="bulkCity">City</label>
                         <select id="bulkCity">
                             <option value="">Select City</option>
                         </select>
                     </div>
-                    <div class="form-group" style="margin: 0; min-width: 160px;">
+                    <div class="form-group" style="margin: 0; min-width: 160px;" id="bulkZoneGroup">
                         <label for="bulkZone">Zone</label>
                         <select id="bulkZone">
                             <option value="">Select Zone</option>
                         </select>
                     </div>
-                    <div class="form-group" style="margin: 0; min-width: 160px;">
+                    <div class="form-group" style="margin: 0; min-width: 160px;" id="bulkAreaGroup">
                         <label for="bulkArea">Area</label>
                         <select id="bulkArea">
                             <option value="">Select Area</option>
                         </select>
                     </div>
-                    <div class="form-group" style="margin: 0; min-width: 250px;">
+                    <div class="form-group" style="margin: 0; min-width: 250px;" id="bulkRecoveryOfficerGroup">
                         <label for="bulkRecoveryOfficer">Recovery Officer</label>
                         <div class="searchable-dropdown">
                             <input type="text" id="bulkRecoveryOfficer" placeholder="Search employee..." autocomplete="off">
@@ -261,11 +271,11 @@ if (!$user_id) {
                     <thead>
                         <tr>
                             <th>Date</th>
-                            <th>Customer</th>
+                            <th id="bulkCustomerHeader">Customer</th>
                             <th>Previous Balance</th>
                             <th>Sub Account</th>
                             <th>Bill No</th>
-                            <th>DSR#</th>
+                            <th id="bulkDsrHeader">DSR#</th>
                             <th>Project</th>
                             <th>Container</th>
                             <th>Currency</th>

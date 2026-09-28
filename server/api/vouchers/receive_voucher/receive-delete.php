@@ -33,7 +33,7 @@ if (!$voucher_id) {
 
 try {
     // Get payment method (to determine which table to delete from) and full row for the Activity Log
-    $stmt = $pdo->prepare("SELECT voucher_number, payment_method_id, voucher_date, customer_id, amount FROM receive_voucher WHERE id = ? AND tenant_id = ?");
+    $stmt = $pdo->prepare("SELECT voucher_number, payment_method_id, voucher_date, customer_id, supplier_id, amount FROM receive_voucher WHERE id = ? AND tenant_id = ?");
     $stmt->execute([$voucher_id, $tenant_id]);
     $voucher = $stmt->fetch(PDO::FETCH_ASSOC);
 

@@ -31,6 +31,7 @@ try {
             rv.voucher_number,
             rv.voucher_date,
             rv.customer_id,
+            rv.supplier_id,
             rv.company_id,
             rv.sub_account_id,
             rv.bill_no,
@@ -44,11 +45,13 @@ try {
             rv.cheque_no,
             rv.description,
             rv.recovery_officer_id,
-            cu.customer_name,
-            cu.customer_code,
+            COALESCE(cu.customer_name, su.supplier_name) as customer_name,
+            COALESCE(cu.customer_code, su.supplier_code) as customer_code,
+            CASE WHEN rv.supplier_id IS NOT NULL THEN 'supplier' ELSE 'customer' END as receive_type,
             c.symbol as currency_symbol
         FROM receive_voucher rv
         LEFT JOIN customers cu ON rv.customer_id = cu.id
+        LEFT JOIN suppliers su ON rv.supplier_id = su.id
         LEFT JOIN ledgerone_public.currencies c ON rv.currency_id = c.id
         WHERE rv.id = ? AND rv.tenant_id = ?
     ");

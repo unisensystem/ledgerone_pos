@@ -1,3 +1,6 @@
+// Receive from Customer (default) vs Receive from Supplier
+let currentListReceiveType = 'customer';
+
 // Vouchers data and pagination
 let vouchers = [];
 let currentPage = 1;
@@ -129,7 +132,7 @@ function fetchVouchers(page = 1) {
     const cityFilter = document.getElementById('cityFilter').value;
     const voucherNumberFilter = document.getElementById('voucherNumberFilter').value;
 
-    let url = `../../../../server/api/vouchers/receive_voucher/receive-list.php?page=${page}&limit=${itemsPerPage}`;
+    let url = `../../../../server/api/vouchers/receive_voucher/receive-list.php?page=${page}&limit=${itemsPerPage}&receive_type=${currentListReceiveType}`;
 
     if (dateFrom) url += `&date_from=${dateFrom}`;
     if (dateTo) url += `&date_to=${dateTo}`;
@@ -185,30 +188,86 @@ function fetchVouchers(page = 1) {
 // Initial fetch
 fetchVouchers(1);
 
-// Fetch customers for filter dropdown
-fetch('../../../../server/api/vouchers/receive_voucher/get-suppliers.php')
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            const customerFilterOptions = document.getElementById('customerFilterOptions');
-            customerFilterOptions.innerHTML = '<div class="dropdown-option" data-value="" data-name="">All Customers</div>';
-            data.data.forEach(customer => {
-                const option = document.createElement('div');
-                option.className = 'dropdown-option';
-                option.setAttribute('data-value', customer.id);
-                option.setAttribute('data-name', customer.customer_name);
-                option.textContent = `${customer.customer_code} - ${customer.customer_name}`;
-                customerFilterOptions.appendChild(option);
-            });
-            initSearchableDropdown('customerFilterSearch', 'customerFilterOptions', 'customerFilter');
-        }
-    });
+// ===== Receive from Customer / Receive from Supplier toggle =====
+function applyListReceiveTypeUI() {
+    const isSupplier = currentListReceiveType === 'supplier';
 
-// Initialize searchable dropdown
+    document.getElementById('customerFilterLabel').textContent = isSupplier ? 'Supplier' : 'Customer';
+    document.getElementById('listCustomerHeader').textContent = isSupplier ? 'Supplier' : 'Customer';
+    document.getElementById('editCustomerLabel').textContent = isSupplier ? 'Supplier' : 'Customer';
+
+    // Area/City/Recovery Officer are customer-recovery-specific concepts — not applicable to suppliers
+    ['areaFilterGroup', 'cityFilterGroup', 'recoveryOfficerFilterGroup'].forEach(id => {
+        document.getElementById(id).style.display = isSupplier ? 'none' : '';
+    });
+    document.getElementById('listAreaHeader').style.display = isSupplier ? 'none' : '';
+    document.getElementById('listCityHeader').style.display = isSupplier ? 'none' : '';
+    document.getElementById('listRecoveryOfficerHeader').style.display = isSupplier ? 'none' : '';
+    document.getElementById('printSummaryBtn').style.display = isSupplier ? 'none' : '';
+
+    // Clear the party filter and re-load it against the right table
+    document.getElementById('customerFilter').value = '';
+    document.getElementById('customerFilterSearch').value = '';
+    document.getElementById('areaFilter').value = '';
+    document.getElementById('areaFilterSearch').value = '';
+    document.getElementById('cityFilter').value = '';
+    document.getElementById('cityFilterSearch').value = '';
+    document.getElementById('recoveryOfficerFilter').value = '';
+    document.getElementById('recoveryOfficerFilterSearch').value = '';
+    loadPartyFilterOptions();
+
+    fetchVouchers(1);
+}
+
+document.querySelectorAll('input[name="listReceiveType"]').forEach(radio => {
+    radio.addEventListener('change', function () {
+        if (!this.checked) return;
+        currentListReceiveType = this.value;
+        applyListReceiveTypeUI();
+    });
+});
+
+// Fetch customers/suppliers for the party filter dropdown, depending on currentListReceiveType
+function loadPartyFilterOptions() {
+    const isSupplier = currentListReceiveType === 'supplier';
+    const url = isSupplier
+        ? '../../../../server/api/vouchers/receive_voucher/get-real-suppliers.php'
+        : '../../../../server/api/vouchers/receive_voucher/get-suppliers.php';
+    const allLabel = isSupplier ? 'All Suppliers' : 'All Customers';
+
+    fetch(url)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                const customerFilterOptions = document.getElementById('customerFilterOptions');
+                customerFilterOptions.innerHTML = `<div class="dropdown-option" data-value="" data-name="${allLabel}">${allLabel}</div>`;
+                data.data.forEach(party => {
+                    const code = isSupplier ? party.supplier_code : party.customer_code;
+                    const name = isSupplier ? party.supplier_name : party.customer_name;
+                    const option = document.createElement('div');
+                    option.className = 'dropdown-option';
+                    option.setAttribute('data-value', party.id);
+                    option.setAttribute('data-name', name);
+                    option.textContent = `${code} - ${name}`;
+                    customerFilterOptions.appendChild(option);
+                });
+                initSearchableDropdown('customerFilterSearch', 'customerFilterOptions', 'customerFilter');
+                document.getElementById('customerFilterSearch').placeholder = isSupplier ? 'Search supplier...' : 'Search customer...';
+            }
+        });
+}
+loadPartyFilterOptions();
+
+// Initialize searchable dropdown. Idempotent — safe to call again after refreshing an
+// options list (e.g. the party filter, whose list is reloaded on every mode toggle);
+// re-attaching listeners on every call would otherwise stack duplicates.
 function initSearchableDropdown(searchInputId, optionsContainerId, hiddenInputId) {
     const searchInput = document.getElementById(searchInputId);
     const optionsContainer = document.getElementById(optionsContainerId);
     const hiddenInput = document.getElementById(hiddenInputId);
+
+    if (searchInput.dataset.searchableInit === '1') return;
+    searchInput.dataset.searchableInit = '1';
 
     searchInput.addEventListener('click', function(e) {
         e.stopPropagation();
@@ -224,7 +283,7 @@ function initSearchableDropdown(searchInputId, optionsContainerId, hiddenInputId
         if (e.target.classList.contains('dropdown-option')) {
             const value = e.target.getAttribute('data-value');
             const name = e.target.getAttribute('data-name');
-            searchInput.value = name || 'All Customers';
+            searchInput.value = name || searchInput.placeholder;
             hiddenInput.value = value;
             optionsContainer.style.display = 'none';
         }
@@ -304,17 +363,18 @@ function renderVouchers(vouchersToRender) {
                 break;
         }
 
+        const isSupplierRow = currentListReceiveType === 'supplier';
         row.innerHTML = `
                     <td>${voucher.voucherNumber}</td>
                     <td>${formattedDate}</td>
                     <td>${voucher.customer}</td>
-                    <td>${voucher.area || 'N/A'}</td>
-                    <td>${voucher.city || 'N/A'}</td>
+                    ${isSupplierRow ? '' : `<td>${voucher.area || 'N/A'}</td>`}
+                    ${isSupplierRow ? '' : `<td>${voucher.city || 'N/A'}</td>`}
                     <td>${voucher.billNo}</td>
                     <td>${voucher.projectCode ? `${voucher.projectCode} - ${voucher.projectName}` : 'N/A'}</td>
                     <td class="amount">${formattedAmount}</td>
                     <td>${voucher.paymentMethod}</td>
-                    <td>${voucher.recoveryOfficer || 'N/A'}</td>
+                    ${isSupplierRow ? '' : `<td>${voucher.recoveryOfficer || 'N/A'}</td>`}
                     <td><span class="status ${statusClass}">${statusText}</span></td>
                     <td>
                         <div class="actions">
@@ -484,6 +544,9 @@ function loadEditVoucher(id) {
         const voucher = voucherRes.data;
 
         // ---- Core (required) fields — populate these FIRST, unconditionally ----
+        const isSupplierVoucher = voucher.receive_type === 'supplier';
+        document.getElementById('editCustomerLabel').textContent = isSupplierVoucher ? 'Supplier' : 'Customer';
+
         document.getElementById('editVoucherNumber').value = voucher.voucher_number;
         document.getElementById('editVoucherDate').value = voucher.voucher_date;
         document.getElementById('editCustomer').value = `${voucher.customer_code} - ${voucher.customer_name}`;
@@ -588,8 +651,12 @@ function loadEditVoucher(id) {
         const subAccountSelect = document.getElementById('editSubAccount');
         if (subAccountSelect) {
             subAccountSelect.innerHTML = '<option value="">Select Sub Account</option>';
-            if (voucher.customer_id) {
-                fetch(`../../../../server/api/vouchers/receive_voucher/get-sub-accounts.php?customer_id=${voucher.customer_id}`)
+            const subAccountPartyId = isSupplierVoucher ? voucher.supplier_id : voucher.customer_id;
+            if (subAccountPartyId) {
+                const subAccountUrl = isSupplierVoucher
+                    ? `../../../../server/api/vouchers/receive_voucher/get-supplier-sub-accounts.php?supplier_id=${subAccountPartyId}`
+                    : `../../../../server/api/vouchers/receive_voucher/get-sub-accounts.php?customer_id=${subAccountPartyId}`;
+                fetch(subAccountUrl)
                     .then(r => r.json())
                     .then(data => {
                         if (data.success) {
@@ -611,8 +678,12 @@ function loadEditVoucher(id) {
         const pdcSelect = document.getElementById('editAgainstPdc');
         if (pdcSelect) {
             pdcSelect.innerHTML = '<option value="">— No PDC —</option>';
-            if (voucher.customer_id) {
-                fetch(`../../../../server/api/vouchers/receive_voucher/get-pending-pdcs.php?customer_id=${voucher.customer_id}`)
+            const pdcPartyId = isSupplierVoucher ? voucher.supplier_id : voucher.customer_id;
+            if (pdcPartyId) {
+                const pdcUrl = isSupplierVoucher
+                    ? `../../../../server/api/vouchers/receive_voucher/get-supplier-pending-pdcs.php?supplier_id=${pdcPartyId}`
+                    : `../../../../server/api/vouchers/receive_voucher/get-pending-pdcs.php?customer_id=${pdcPartyId}`;
+                fetch(pdcUrl)
                     .then(r => r.json())
                     .then(data => {
                         if (data.success) {

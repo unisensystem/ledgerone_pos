@@ -1,3 +1,6 @@
+// Receive from Customer (default) vs Receive from Supplier
+let currentReceiveType = 'customer';
+
 // ===== CUSTOMIZE FIELDS =====
 const CUSTOMIZE_KEY = 'receiveVoucherCustomizeFields';
 
@@ -103,7 +106,12 @@ function applyBulkColumnVisibilityToRow(row) {
     allCustomizeFields.forEach(f => {
         if (f.bulkCol === null) return;
         const td = row.querySelectorAll('td')[f.bulkCol];
-        if (td) td.style.display = v[f.id] ? '' : 'none';
+        if (!td) return;
+        if (f.id === 'dsrNo' && currentReceiveType === 'supplier') {
+            td.style.display = 'none';
+        } else {
+            td.style.display = v[f.id] ? '' : 'none';
+        }
     });
 }
 
@@ -359,6 +367,38 @@ function fetchCustomers(recoveryOfficerId, locationFilters) {
         });
 }
 
+// Fetch real suppliers (used when currentReceiveType === 'supplier') — no recovery-officer/location
+// filters, since those are customer-recovery-specific concepts that don't apply to suppliers.
+function fetchSuppliers() {
+    return fetch('../../../../server/api/vouchers/receive_voucher/get-real-suppliers.php')
+        .then(response => response.json())
+        .then(data => {
+            if (!data.success) return [];
+            return data.data.map(supplier => ({
+                code: supplier.supplier_code,
+                name: supplier.supplier_name,
+                id: supplier.id
+            }));
+        })
+        .catch(error => {
+            console.error('Error fetching suppliers:', error);
+            return [];
+        });
+}
+
+// Party fetcher that branches on the current Receive from Customer/Supplier mode
+function fetchParties(recoveryOfficerId, locationFilters) {
+    return currentReceiveType === 'supplier'
+        ? fetchSuppliers()
+        : fetchCustomers(recoveryOfficerId, locationFilters);
+}
+
+function getBalanceUrl(code) {
+    return currentReceiveType === 'supplier'
+        ? `../../../../server/api/vouchers/receive_voucher/get-supplier-balance.php?supplier_code=${code}`
+        : `../../../../server/api/vouchers/receive_voucher/get-customer-balance.php?customer_code=${code}`;
+}
+
 // Fetch employees (recovery officers) from API, optionally filtered by location
 // (city_id / city_zone_id / area_id). An officer only has a location indirectly,
 // through the customers assigned to them — filtering is done server-side via a join.
@@ -453,10 +493,64 @@ function refreshBulkLocationFilter() {
 }
 
 // Initial (unfiltered) load for both single-mode and bulk-mode customer lists
-fetchCustomers(null, null).then(list => {
+fetchParties(null, null).then(list => {
     customers.push(...list);
     bulkCustomers.push(...list);
     setupSearchableDropdown('customerCode', 'customerDropdown', customers, 'name', 'code');
+});
+
+// ===== Receive from Customer / Receive from Supplier toggle =====
+function applyReceiveTypeUI() {
+    const isSupplier = currentReceiveType === 'supplier';
+
+    document.getElementById('customerLabel').textContent = isSupplier ? 'Supplier Code' : 'Customer Code';
+    document.getElementById('customerCode').placeholder = isSupplier ? 'Search supplier...' : 'Search customer...';
+    document.getElementById('bulkCustomerHeader').textContent = isSupplier ? 'Supplier' : 'Customer';
+
+    // Recovery Officer / DSR# are customer-recovery-specific concepts — force-hide them in supplier
+    // mode (overriding the Customize Fields preference); restore that preference in customer mode.
+    if (isSupplier) {
+        document.getElementById('recoveryOfficerGroup').style.display = 'none';
+        document.getElementById('dsrNoGroup').style.display = 'none';
+        setBulkColumnVisible(5, false); // DSR# bulk column
+    } else {
+        applyCustomizeVisibility();
+    }
+
+    ['bulkCityGroup', 'bulkZoneGroup', 'bulkAreaGroup', 'bulkRecoveryOfficerGroup'].forEach(id => {
+        document.getElementById(id).style.display = isSupplier ? 'none' : '';
+    });
+
+    // Clear the currently selected party and everything derived from it
+    const custEl = document.getElementById('customerCode');
+    custEl.value = '';
+    delete custEl.dataset.selectedId;
+    delete custEl.dataset.selectedName;
+    currentCustomerId = null;
+    document.getElementById('previousBalance').value = '';
+    document.getElementById('remainingBalance').value = '';
+    document.getElementById('subAccount').innerHTML = '<option value="">Select Sub Account</option>';
+    document.getElementById('billNo').value = '';
+    bills = [];
+    document.getElementById('againstPdc').innerHTML = '<option value="">Select Pending PDC...</option>';
+    document.getElementById('pdcRemainingInfo').style.display = 'none';
+    pendingPdcs = [];
+
+    // Re-fetch the party list for both single and bulk dropdowns
+    customers.length = 0;
+    bulkCustomers.length = 0;
+    fetchParties(null, null).then(list => {
+        customers.push(...list);
+        bulkCustomers.push(...list);
+    });
+}
+
+document.querySelectorAll('input[name="receiveType"]').forEach(radio => {
+    radio.addEventListener('change', function () {
+        if (!this.checked) return;
+        currentReceiveType = this.value;
+        applyReceiveTypeUI();
+    });
 });
 
 // Fetch companies from API
@@ -523,7 +617,7 @@ fetch('../../../../server/api/vouchers/receive_voucher/get-containers.php')
     })
     .catch(error => console.error('Error fetching containers:', error));
 
-// Fetch pending PDCs for selected customer
+// Fetch pending PDCs for selected customer/supplier
 function fetchPendingPdcsForCustomer(customerId) {
     const select = document.getElementById('againstPdc');
     select.innerHTML = '<option value="">Select Pending PDC...</option>';
@@ -531,7 +625,10 @@ function fetchPendingPdcsForCustomer(customerId) {
     pendingPdcs = [];
     if (!customerId) return;
 
-    fetch(`../../../../server/api/vouchers/receive_voucher/get-pending-pdcs.php?customer_id=${customerId}`)
+    const pdcUrl = currentReceiveType === 'supplier'
+        ? `../../../../server/api/vouchers/receive_voucher/get-supplier-pending-pdcs.php?supplier_id=${customerId}`
+        : `../../../../server/api/vouchers/receive_voucher/get-pending-pdcs.php?customer_id=${customerId}`;
+    fetch(pdcUrl)
         .then(r => r.json())
         .then(data => {
             if (data.success && data.data.length > 0) {
@@ -568,9 +665,12 @@ document.getElementById('againstPdc').addEventListener('change', function() {
     }
 });
 
-// Fetch bills for selected customer
+// Fetch bills for selected customer/supplier
 function fetchBillsForCustomer(customerCode) {
-    fetch(`../../../../server/api/vouchers/receive_voucher/get-bills.php?customer_code=${customerCode}`)
+    const billsUrl = currentReceiveType === 'supplier'
+        ? `../../../../server/api/vouchers/receive_voucher/get-supplier-bills.php?supplier_code=${customerCode}`
+        : `../../../../server/api/vouchers/receive_voucher/get-bills.php?customer_code=${customerCode}`;
+    fetch(billsUrl)
         .then(response => response.json())
         .then(data => {
             if (data.success) {
@@ -616,14 +716,17 @@ function renderBillDropdown(searchTerm) {
     showFloatingDropdown(billInput, dropdown);
 }
 
-// Fetch sub-accounts for selected customer
+// Fetch sub-accounts for selected customer/supplier
 function fetchSubAccountsForCustomer(customerId) {
     const subAccountSelect = document.getElementById('subAccount');
     subAccountSelect.innerHTML = '<option value="">Select Sub Account</option>';
-    
+
     if (!customerId) return;
-    
-    fetch(`../../../../server/api/vouchers/receive_voucher/get-sub-accounts.php?customer_id=${customerId}`)
+
+    const subAccountUrl = currentReceiveType === 'supplier'
+        ? `../../../../server/api/vouchers/receive_voucher/get-supplier-sub-accounts.php?supplier_id=${customerId}`
+        : `../../../../server/api/vouchers/receive_voucher/get-sub-accounts.php?customer_id=${customerId}`;
+    fetch(subAccountUrl)
         .then(response => response.json())
         .then(data => {
             if (data.success && data.data.length > 0) {
@@ -931,7 +1034,7 @@ function setupSearchableDropdown(inputId, dropdownId, data, displayKey, valueKey
                         fetchPendingPdcsForCustomer(this.dataset.id);
 
                         // Fetch balance from API
-                        fetch(`../../../../server/api/vouchers/receive_voucher/get-customer-balance.php?customer_code=${this.dataset.value}`)
+                        fetch(getBalanceUrl(this.dataset.value))
                             .then(r => r.json())
                             .then(data => {
                                 if (data.success) {
@@ -993,7 +1096,7 @@ function setupSearchableDropdown(inputId, dropdownId, data, displayKey, valueKey
                     fetchPendingPdcsForCustomer(selectedItem.dataset.id);
 
                     // Fetch balance from API
-                    fetch(`../../../../server/api/vouchers/receive_voucher/get-customer-balance.php?customer_code=${selectedItem.dataset.value}`)
+                    fetch(getBalanceUrl(selectedItem.dataset.value))
                         .then(r => r.json())
                         .then(data => {
                             if (data.success) {
@@ -1186,7 +1289,7 @@ function addBulkRow() {
 
     row.innerHTML = `
         <td><input type="date" class="bulk-date" value="${rowDate}" required></td>
-        <td><input type="text" class="bulk-customer" placeholder="Customer code" required autocomplete="off"></td>
+        <td><input type="text" class="bulk-customer" placeholder="${currentReceiveType === 'supplier' ? 'Supplier code' : 'Customer code'}" required autocomplete="off"></td>
         <td><input type="text" class="bulk-prev-balance" readonly></td>
         <td><select class="bulk-sub-account"><option value="">Select</option></select></td>
         <td><input type="text" class="bulk-bill" placeholder="Bill no" autocomplete="off"></td>
@@ -1338,7 +1441,10 @@ function setupBulkCustomerDropdown(row) {
                     // Populate Against PDC dropdown for this row
                     const pdcSelect = row.querySelector('.bulk-against-pdc');
                     pdcSelect.innerHTML = '<option value="">— No PDC —</option>';
-                    fetch(`../../../../server/api/vouchers/receive_voucher/get-pending-pdcs.php?customer_id=${customer.id}`)
+                    const bulkPdcUrl = currentReceiveType === 'supplier'
+                        ? `../../../../server/api/vouchers/receive_voucher/get-supplier-pending-pdcs.php?supplier_id=${customer.id}`
+                        : `../../../../server/api/vouchers/receive_voucher/get-pending-pdcs.php?customer_id=${customer.id}`;
+                    fetch(bulkPdcUrl)
                         .then(r => r.json())
                         .then(data => {
                             if (data.success && data.data.length > 0) {
@@ -1353,7 +1459,7 @@ function setupBulkCustomerDropdown(row) {
                         });
 
                     // Fetch balance from API
-                    fetch(`../../../../server/api/vouchers/receive_voucher/get-customer-balance.php?customer_code=${customer.code}`)
+                    fetch(getBalanceUrl(customer.code))
                         .then(r => r.json())
                         .then(data => {
                             if (data.success) {
@@ -1519,6 +1625,7 @@ document.getElementById('postBulkBtn').addEventListener('click', async function(
     for (const row of rows) {
         const formData = new FormData();
         formData.append('voucher_date', row.querySelector('.bulk-date').value);
+        formData.append('receive_type', currentReceiveType);
         // Always send the real customer code (dataset), never the formatted display text,
         // so "Name Only" / "Code Only" display preferences don't break the backend lookup.
         const bulkCustEl = row.querySelector('.bulk-customer');
@@ -1620,6 +1727,7 @@ form.addEventListener('submit', function (e) {
     // Prepare form data
     const formData = new FormData();
     formData.append('voucher_date', document.getElementById('voucherDate').value);
+    formData.append('receive_type', currentReceiveType);
     // Always send the real customer code (dataset), never the formatted display text,
     // so "Name Only" / "Code Only" display preferences don't break the backend lookup.
     const custEl = document.getElementById('customerCode');

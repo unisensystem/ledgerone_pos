@@ -157,7 +157,21 @@ try {
                     }
                     $prev_returns += $amount;
                 }
-                
+
+                // Money received FROM this supplier (e.g. an advance/refund) increases the payable, same direction as an invoice
+                $stmt = $pdo->prepare("SELECT amount, adjust_amount, currency_id FROM receive_voucher WHERE tenant_id = ? AND supplier_id = ? AND voucher_date < ?" . ($company_id ? " AND company_id = ?" : ""));
+                $params_prev = [$tenant_id, $supplier['id'], $from_date];
+                if ($company_id) $params_prev[] = $company_id;
+                $stmt->execute($params_prev);
+                $prev_receipts = 0;
+                foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $rcv) {
+                    $amount = floatval($rcv['amount']) + floatval($rcv['adjust_amount']);
+                    if ($rcv['currency_id'] && $rcv['currency_id'] != $target_currency_id) {
+                        $amount = $converter->convert($amount, $rcv['currency_id'], $target_currency_id);
+                    }
+                    $prev_receipts += $amount;
+                }
+
                 // Supplier = Credit-normal: tv_out (FROM) = credit (payable+), tv_in (TO) = debit (payable-)
                 $stmt = $pdo->prepare("SELECT COALESCE(SUM(amount), 0) as total, currency_id FROM transfer_voucher WHERE tenant_id = ? AND from_type = 'supplier' AND from_supplier_id = ? AND voucher_date < ?" . ($company_id ? " AND company_id = ?" : "") . " GROUP BY currency_id");
                 $params_prev = [$tenant_id, $supplier['id'], $from_date];
@@ -191,29 +205,35 @@ try {
                     if ($ev['type'] === 'DR') $prev_ev_dr += floatval($ev['total_amount']);
                     else $prev_ev_cr += floatval($ev['total_amount']);
                 }
-                $opening_balance = $base_opening - $prev_invoices + $prev_payments + $prev_pdcs + $prev_returns - $prev_tv_from + $prev_tv_to + $prev_ev_dr - $prev_ev_cr;
+                $opening_balance = $base_opening - $prev_invoices + $prev_payments + $prev_pdcs + $prev_returns - $prev_receipts - $prev_tv_from + $prev_tv_to + $prev_ev_dr - $prev_ev_cr;
             }
             $invoice_sql = "SELECT pi.net_amount, pi.currency_id FROM purchase_invoice pi WHERE pi.tenant_id = ? AND pi.supplier_id = ?" . ($company_id ? " AND pi.company_id = ?" : "");
             $payment_sql = "SELECT pv.amount, pv.currency_id FROM payment_voucher pv WHERE pv.tenant_id = ? AND pv.supplier_id = ? AND pv.id NOT IN (SELECT reference_id FROM post_dated_cheques WHERE tenant_id = ? AND reference_table = 'payment_voucher')" . ($company_id ? " AND pv.company_id = ?" : "");
             $return_sql = "SELECT pr.net_amount, pr.currency_id FROM purchase_return pr WHERE pr.tenant_id = ? AND pr.supplier_id = ?" . ($company_id ? " AND pr.company_id = ?" : "");
-            
+            $receipt_sql = "SELECT rv.amount, rv.adjust_amount, rv.currency_id FROM receive_voucher rv WHERE rv.tenant_id = ? AND rv.supplier_id = ?" . ($company_id ? " AND rv.company_id = ?" : "");
+
             $invoice_params = [$tenant_id, $supplier['id']];
             if ($company_id) $invoice_params[] = $company_id;
             $payment_params = [$tenant_id, $supplier['id'], $tenant_id];
             if ($company_id) $payment_params[] = $company_id;
             $return_params = [$tenant_id, $supplier['id']];
             if ($company_id) $return_params[] = $company_id;
-            
+            $receipt_params = [$tenant_id, $supplier['id']];
+            if ($company_id) $receipt_params[] = $company_id;
+
             if ($from_date && $to_date) {
                 $invoice_sql .= " AND purchase_date BETWEEN ? AND ?";
                 $payment_sql .= " AND voucher_date BETWEEN ? AND ?";
                 $return_sql .= " AND purchase_date BETWEEN ? AND ?";
+                $receipt_sql .= " AND voucher_date BETWEEN ? AND ?";
                 $invoice_params[] = $from_date;
                 $invoice_params[] = $to_date;
                 $payment_params[] = $from_date;
                 $payment_params[] = $to_date;
                 $return_params[] = $from_date;
                 $return_params[] = $to_date;
+                $receipt_params[] = $from_date;
+                $receipt_params[] = $to_date;
             }
             
             // Get invoices and convert currency
@@ -228,7 +248,18 @@ try {
                 }
                 $total_credit += $amount;
             }
-            
+
+            // Money received FROM this supplier — increases the payable, same direction as an invoice
+            $stmt = $pdo->prepare($receipt_sql);
+            $stmt->execute($receipt_params);
+            foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $rcv) {
+                $amount = floatval($rcv['amount']) + floatval($rcv['adjust_amount']);
+                if ($rcv['currency_id'] && $rcv['currency_id'] != $target_currency_id) {
+                    $amount = $converter->convert($amount, $rcv['currency_id'], $target_currency_id);
+                }
+                $total_credit += $amount;
+            }
+
             // Get payments and convert currency
             $stmt = $pdo->prepare($payment_sql);
             $stmt->execute($payment_params);
@@ -451,7 +482,21 @@ try {
                 }
                 $prev_returns += $amount;
             }
-            
+
+            // Money received FROM this supplier before from_date — increases the payable, same direction as an invoice
+            $stmt = $pdo->prepare("SELECT amount, adjust_amount, currency_id FROM receive_voucher WHERE tenant_id = ? AND supplier_id = ? AND voucher_date < ?" . ($company_id ? " AND company_id = ?" : ""));
+            $params_prev = [$tenant_id, $supplier_id, $from_date];
+            if ($company_id) $params_prev[] = $company_id;
+            $stmt->execute($params_prev);
+            $prev_receipts = 0;
+            foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $rcv) {
+                $amount = floatval($rcv['amount']) + floatval($rcv['adjust_amount']);
+                if ($rcv['currency_id'] && $rcv['currency_id'] != $target_currency_id) {
+                    $amount = $converter->convert($amount, $rcv['currency_id'], $target_currency_id);
+                }
+                $prev_receipts += $amount;
+            }
+
             // Supplier = Credit-normal: tv_out (FROM) = credit (payable+), tv_in (TO) = debit (payable-)
             $stmt = $pdo->prepare("SELECT COALESCE(SUM(amount), 0) as total, currency_id FROM transfer_voucher WHERE tenant_id = ? AND from_type = 'supplier' AND from_supplier_id = ? AND voucher_date < ?" . ($company_id ? " AND company_id = ?" : "") . " GROUP BY currency_id");
             $params_prev = [$tenant_id, $supplier_id, $from_date];
@@ -486,9 +531,9 @@ try {
                 else $prev_ev_cr += floatval($ev['total_amount']);
             }
 
-            $opening_balance = $base_opening - $prev_invoices + $prev_payments + $prev_pdcs + $prev_returns - $prev_tv_from + $prev_tv_to + $prev_ev_dr - $prev_ev_cr;
+            $opening_balance = $base_opening - $prev_invoices + $prev_payments + $prev_pdcs + $prev_returns - $prev_receipts - $prev_tv_from + $prev_tv_to + $prev_ev_dr - $prev_ev_cr;
         }
-        $sql = "SELECT pi.purchase_date as date, CONCAT('Purchase Invoice - ', pi.bill_no) as description, 
+        $sql = "SELECT pi.purchase_date as date, CONCAT('Purchase Invoice - ', pi.bill_no) as description,
                 pi.bill_no as reference, 0 as debit, pi.net_amount as credit, pi.sub_account_id, pi.id as invoice_id, pi.currency_id
                 FROM purchase_invoice pi
                 WHERE pi.tenant_id = ? AND pi.supplier_id = ?" . ($company_id ? " AND pi.company_id = ?" : "");
@@ -509,7 +554,30 @@ try {
         $stmt = $pdo->prepare($sql);
         $stmt->execute($params);
         $invoices = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        
+
+        // Get money received FROM this supplier (advance/refund) — posts as a credit, same as an invoice
+        $sql = "SELECT rv.voucher_date as date, CONCAT('Receive Voucher - ', rv.voucher_number) as description,
+                rv.voucher_number as reference, 0 as debit, (rv.amount + rv.adjust_amount) as credit, rv.sub_account_id, rv.currency_id
+                FROM receive_voucher rv
+                WHERE rv.tenant_id = ? AND rv.supplier_id = ?" . ($company_id ? " AND rv.company_id = ?" : "");
+        $params = [$tenant_id, $supplier_id];
+        if ($company_id) $params[] = $company_id;
+        if ($from_date && $to_date) {
+            $sql .= " AND rv.voucher_date BETWEEN ? AND ?";
+            $params[] = $from_date;
+            $params[] = $to_date;
+        } elseif ($from_date) {
+            $sql .= " AND rv.voucher_date >= ?";
+            $params[] = $from_date;
+        } elseif ($to_date) {
+            $sql .= " AND rv.voucher_date <= ?";
+            $params[] = $to_date;
+        }
+        $sql .= " ORDER BY rv.voucher_date";
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute($params);
+        $receipts = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
         // Get payment vouchers (exclude those linked to PDCs) with currency
         $sql = "SELECT pv.voucher_date as date,
                 CONCAT('Payment - ', pv.voucher_number,
@@ -690,7 +758,7 @@ try {
         $adjustments = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
         // Combine and sort transactions
-        $transactions = array_merge($invoices, $payments, $pdcs, $returns, $tv_out, $tv_in, $expense_vouchers, $adjustments);
+        $transactions = array_merge($invoices, $receipts, $payments, $pdcs, $returns, $tv_out, $tv_in, $expense_vouchers, $adjustments);
         
         // Convert currencies for all transactions
         foreach ($transactions as &$transaction) {
@@ -767,8 +835,21 @@ try {
                         }
                         $prev_returns += $amount;
                     }
-                    
-                    $opening_balance = $opening_balance - $prev_invoices + $prev_payments + $prev_returns;
+
+                    $stmt = $pdo->prepare("SELECT amount, adjust_amount, currency_id FROM receive_voucher WHERE tenant_id = ? AND supplier_id = ? AND sub_account_id = ? AND voucher_date < ?" . ($company_id ? " AND company_id = ?" : ""));
+                    $params_sub = [$tenant_id, $supplier_id, $sub_account_id, $from_date];
+                    if ($company_id) $params_sub[] = $company_id;
+                    $stmt->execute($params_sub);
+                    $prev_receipts = 0;
+                    foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $rcv) {
+                        $amount = floatval($rcv['amount']) + floatval($rcv['adjust_amount']);
+                        if ($rcv['currency_id'] && $rcv['currency_id'] != $target_currency_id) {
+                            $amount = $converter->convert($amount, $rcv['currency_id'], $target_currency_id);
+                        }
+                        $prev_receipts += $amount;
+                    }
+
+                    $opening_balance = $opening_balance - $prev_invoices + $prev_payments + $prev_returns - $prev_receipts;
                 }
             }
         }
