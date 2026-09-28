@@ -363,6 +363,26 @@ function initializeListPage(permissions) {
     statusFilter.addEventListener('change', applyFilters);
     searchInput.addEventListener('input', applyFilters);
 
+    // ✅ REFRESH BUTTON - Clear all filters and reload data
+    document.getElementById('refreshBtn').addEventListener('click', function() {
+        // Clear all filter values
+        dateFrom.value = '';
+        dateTo.value = '';
+        companyFilter.value = '';
+        customerFilter.value = '';
+        statusFilter.value = '';
+        searchInput.value = '';
+        
+        // Refresh customer dropdown
+        customerSearch.refresh();
+        
+        // Reload data from page 1
+        currentPage = 1;
+        loadCompanies();
+        loadCustomers();
+        loadInvoices(1);
+    });
+
     // Update pagination
     function updatePagination(pagination) {
         const { page, limit, total, pages } = pagination;

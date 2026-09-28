@@ -107,8 +107,11 @@ $initialSearch = $_GET['search'] ?? '';
             <div class="actions">
                 <div class="search-box">
                     <i class="fas fa-search"></i>
-<input type="text" id="searchInput" placeholder="Search by invoice number, customer..." value="<?= htmlspecialchars($initialSearch) ?>">
+                    <input type="text" id="searchInput" placeholder="Search by invoice number, customer..." value="<?= htmlspecialchars($initialSearch) ?>">
                 </div>
+                <button class="btn btn-secondary" id="refreshBtn" title="Refresh and clear filters" style="margin-left: 632px;">
+                    <i class="fas fa-redo"></i> Refresh
+                </button>
                 <button class="btn btn-primary" id="newInvoiceBtn">
                     <i class="fas fa-plus"></i> New Return
                 </button>
