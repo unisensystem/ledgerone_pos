@@ -2285,7 +2285,12 @@ try {
             $fromDate = $_GET['from_date'] ?? null;
             $toDate = $_GET['to_date'] ?? null;
 
-            $sql = "SELECT 
+            // Same conversion-factor rule used everywhere else in this file (see line ~65):
+            // a universal unit with its own base_unit_id uses its own conversion_factor,
+            // otherwise a per-product override in product_uom_conversions, otherwise 1.
+            $detailedConversionFactor = "COALESCE(CASE WHEN u.base_unit_id IS NOT NULL AND u.unit_scope = 'universal' THEN u.conversion_factor WHEN puc.conversion_factor IS NOT NULL THEN puc.conversion_factor ELSE 1 END, 1)";
+
+            $sql = "SELECT
                         sl.id,
                         sl.transaction_date,
                         p.name as product_name,
@@ -2297,12 +2302,17 @@ try {
                         sl.qty_in,
                         sl.qty_out,
                         sl.unit_cost,
-                        COALESCE(u.uom_name, 'L') as unit_symbol
+                        COALESCE(u.uom_name, 'L') as unit_symbol,
+                        sl.qty_in * {$detailedConversionFactor} as qty_in_base,
+                        sl.qty_out * {$detailedConversionFactor} as qty_out_base,
+                        COALESCE(base_u.uom_name, u.uom_name, 'L') as base_unit_symbol
                     FROM stock_ledger sl
                     JOIN products p ON sl.product_id = p.id
                     JOIN branches b ON sl.branch_id = b.id
                     LEFT JOIN item_companies ic ON p.item_company_id = ic.id AND ic.tenant_id = p.tenant_id
                     LEFT JOIN uom u ON sl.unit_id = u.id
+                    LEFT JOIN uom base_u ON u.base_unit_id = base_u.id
+                    LEFT JOIN product_uom_conversions puc ON p.id = puc.product_id AND sl.unit_id = puc.uom_id
                     LEFT JOIN purchase_invoice pi ON sl.reference_table = 'purchase_invoice' AND sl.reference_id = pi.id
                     LEFT JOIN sale_invoice si ON sl.reference_table = 'sale_invoice' AND sl.reference_id = si.id
                     WHERE sl.tenant_id = ? AND p.product_type = 'physical'";

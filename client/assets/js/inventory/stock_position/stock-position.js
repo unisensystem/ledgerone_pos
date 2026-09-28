@@ -1078,13 +1078,9 @@ function renderDetailedLedgerTable(currency = '$') {
     const endIndex = startIndex + itemsPerPage;
     const pageData = processedLedger.slice(startIndex, endIndex);
     
-    // Calculate totals - simple sum of all displayed transactions
-    const totalQtyIn = processedLedger.reduce((sum, entry) => sum + parseFloat(entry.qty_in || 0), 0);
-    const totalQtyOut = processedLedger.reduce((sum, entry) => sum + parseFloat(entry.qty_out || 0), 0);
-    
     // Calculate total balance - sum of all final balances per product-branch
     const totalBalance = Object.values(balances).reduce((sum, balance) => sum + balance, 0);
-    
+
     // Calculate total value - sum of final values per product-branch
     const finalValues = {};
     Object.keys(balances).forEach(key => {
@@ -1095,7 +1091,32 @@ function renderDetailedLedgerTable(currency = '$') {
         }
     });
     const totalValue = Object.values(finalValues).reduce((sum, value) => sum + value, 0);
-    
+
+    // Totals in BASE units (e.g. Piece), not mixed transaction units — a transaction
+    // recorded in Dozen and one recorded in Piece can't be summed as raw numbers.
+    // Grouped by base unit so mixing products with different base units (e.g. Piece
+    // vs Kg) still shows a correct breakdown instead of one meaningless combined sum.
+    const baseUnitTotals = {};
+    processedLedger.forEach(entry => {
+        const unit = entry.base_unit_symbol || entry.unit_symbol || 'L';
+        if (!baseUnitTotals[unit]) baseUnitTotals[unit] = { in: 0, out: 0 };
+        baseUnitTotals[unit].in += parseFloat(entry.qty_in_base ?? entry.qty_in ?? 0);
+        baseUnitTotals[unit].out += parseFloat(entry.qty_out_base ?? entry.qty_out ?? 0);
+    });
+    const baseUnitRows = Object.keys(baseUnitTotals).map(unit => {
+        const t = baseUnitTotals[unit];
+        const net = t.in - t.out;
+        return `
+        <tr class="base-unit-total-row" style="font-weight: 600; background: linear-gradient(to right, rgba(46,125,50,0.08), rgba(46,125,50,0.03)); border-top: 2px solid rgba(46,125,50,0.35);">
+            <td colspan="7" style="text-align:right;"><i class="fas fa-calculator" style="margin-right:6px; opacity:0.6;"></i>Total in Base Unit — ${escLedger(unit)}</td>
+            <td>${formatStockQuantity(t.in, escLedger(unit), 'detailed-ledger')}</td>
+            <td>${formatStockQuantity(t.out, escLedger(unit), 'detailed-ledger')}</td>
+            <td>${formatStockQuantity(net, escLedger(unit), 'detailed-ledger')}</td>
+            <td>-</td>
+            <td>-</td>
+        </tr>`;
+    }).join('');
+
    tbody.innerHTML = pageData.map(entry => `
     <tr>
         <td>${entry.transaction_date}</td>
@@ -1114,13 +1135,12 @@ function renderDetailedLedgerTable(currency = '$') {
 `).join('') + `
     <tr style="font-weight: bold; background-color: var(--table-header);">
         <td colspan="7">Total (${allDetailedEntries.length} transactions)</td>
-        <td>${formatStockQuantity(totalQtyIn, escLedger(allDetailedEntries[0]?.unit_symbol || 'L'), 'detailed-ledger')}</td>
-        <td>${formatStockQuantity(totalQtyOut, escLedger(allDetailedEntries[0]?.unit_symbol || 'L'), 'detailed-ledger')}</td>
-        <td>${formatStockQuantity(totalBalance, escLedger(allDetailedEntries[0]?.unit_symbol || 'L'), 'detailed-ledger')}</td>
+        <td colspan="2" style="text-align:center; color: var(--subtext, #666); font-weight: normal;">see base-unit totals below — transactions may use mixed units</td>
+        <td>-</td>
         <td>-</td>
         <td>${formatStockMoney(totalValue, currency, 'detailed-ledger')}</td>
     </tr>
-`;
+` + baseUnitRows;
 }
 
 function updateDetailedPaginationControls() {

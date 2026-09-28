@@ -319,9 +319,6 @@ $stmt->execute([
 
             // Skip stock ledger for Draft status
             if ($status === 'Posted') {
-                // Convert quantity to pieces based on UOM
-                $qtyInPieces = convertToPieces($item['quantity'], $item['uomId'], $pdo, $item['productId']);
-
                 // Get product cost price
                 $costPrice = getCostPrice($pdo, $tenant_id, $item['productId'], $input['branchId']);
 
@@ -334,7 +331,10 @@ $stmt->execute([
                 $productStmt->execute([$item['productId']]);
                 $inventoryAccountId = $productStmt->fetchColumn() ?: 33;
 
-                // Insert stock ledger for quantity sold
+                // Insert stock ledger for quantity sold (use actual quantity, not converted —
+                // stock-position.php converts qty_out to base units itself using unit_id at
+                // read time; pre-converting here while still storing the original unit_id
+                // double-converts. Matches pos-add.php's insert exactly.)
                 $stock_stmt = $pdo->prepare("
                         INSERT INTO stock_ledger (
                             tenant_id, account_id, branch_id, product_id, reference_table, reference_id,
@@ -347,7 +347,7 @@ $stmt->execute([
                     $input['branchId'],
                     $item['productId'],
                     $invoice_id,
-                    $qtyInPieces,
+                    $item['quantity'],
                     $costPrice,
                     $item['uomId'],
                     $input['saleDate']
@@ -355,7 +355,18 @@ $stmt->execute([
 
                 // Insert stock ledger for FOC quantity if exists
                 if (isset($item['focQty']) && $item['focQty'] > 0) {
-                    $focQtyInPieces = convertToPieces($item['focQty'], $item['uomId'], $pdo, $item['productId']);
+                    // Use base unit ID for FOC quantity (mirrors pos-add.php)
+                    $focUnitId = $item['focUnitId'] ?? null;
+                    if (!$focUnitId || $focUnitId === '') {
+                        $unitStmt = $pdo->prepare("SELECT is_base_unit, base_unit_id FROM uom WHERE id = ?");
+                        $unitStmt->execute([$item['uomId']]);
+                        $unitData = $unitStmt->fetch();
+                        if ($unitData) {
+                            $focUnitId = $unitData['is_base_unit'] == 1 ? $item['uomId'] : ($unitData['base_unit_id'] ?? $item['uomId']);
+                        } else {
+                            $focUnitId = $item['uomId'];
+                        }
+                    }
 
                     $foc_stmt = $pdo->prepare("
                         INSERT INTO stock_ledger (
@@ -369,9 +380,9 @@ $stmt->execute([
                         $input['branchId'],
                         $item['productId'],
                         $invoice_id,
-                        $focQtyInPieces,
+                        $item['focQty'],
                         0,
-                        $item['uomId'],
+                        $focUnitId,
                         $input['saleDate']
                     ]);
                 }
