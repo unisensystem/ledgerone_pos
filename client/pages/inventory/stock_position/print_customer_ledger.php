@@ -264,7 +264,7 @@ if ($product_id) {
             const amount = Number(value) || 0;
             return ROUND_OFF_ENABLED
                 ? Math.round(amount).toLocaleString()
-                : amount.toLocaleString(undefined, { maximumFractionDigits: 20 });
+: amount.toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 });
         }
 
         function formatQuantity(value, unit) {

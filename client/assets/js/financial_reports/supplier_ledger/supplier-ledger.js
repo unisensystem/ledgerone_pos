@@ -46,11 +46,11 @@ let detailedOpeningBalance = 0;  // add this
     let currentCurrencySymbol = window.currencySymbol;
 
     function formatAmount(value) {
-        const amount = Number(value) || 0;
-        return roundOffToggle.checked
-            ? Math.round(amount).toLocaleString()
-            : amount.toLocaleString(undefined, { maximumFractionDigits: 20 });
-    }
+    const amount = Number(value) || 0;
+    return roundOffToggle.checked
+        ? Math.round(amount).toLocaleString()
+        : amount.toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 });
+}
 
     function formatMoney(value) {
         return currentCurrencySymbol + formatAmount(value);

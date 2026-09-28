@@ -61,7 +61,7 @@ function formatStockAmount(value, tabId) {
     const amount = Number(value) || 0;
     return isRoundOffEnabled(tabId)
         ? Math.round(amount).toLocaleString()
-        : amount.toLocaleString(undefined, { maximumFractionDigits: 20 });
+        : amount.toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 });
 }
 
 function formatStockQuantity(value, unit, tabId) {

@@ -129,6 +129,22 @@ $search = $_GET['search'] ?? '';
             return fields.some(f => String(f || '').toLowerCase().includes(searchTerm));
         }
 
+
+        const ROUND_OFF_ENABLED = new URLSearchParams(window.location.search).get('round_off') === '1';
+
+function fmtMoney(value) {
+    const amount = parseFloat(value) || 0;
+    return CURRENCY_SYMBOL + (ROUND_OFF_ENABLED
+        ? Math.round(amount).toLocaleString()
+        : amount.toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 }));
+}
+
+function fmtQty(value) {
+    const amount = parseFloat(value) || 0;
+    return ROUND_OFF_ENABLED
+        ? Math.round(amount).toLocaleString()
+        : amount.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 3 });
+}
         // HTML entity escape
         function esc(v) {
             return String(v ?? '').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
@@ -215,6 +231,8 @@ $search = $_GET['search'] ?? '';
             try {
                 let url = `${API_BASE}/sales-report.php?date_from=${dateFrom}&date_to=${dateTo}&report_type=${reportType}`;
                 if (companyId) url += `&company_id=${companyId}`;
+
+                printUrl += `&round_off=${isRoundOffEnabled() ? '1' : '0'}`;
                 
                 const response = await fetch(url);
                 const result = await response.json();
@@ -237,10 +255,10 @@ $search = $_GET['search'] ?? '';
             const totalTransactions = (data.branch_sales || []).reduce((sum, item) => sum + parseFloat(item.transactions || 0), 0);
             const avgSale = totalTransactions > 0 ? totalSales / totalTransactions : 0;
             
-            document.getElementById('total-sales').textContent = CURRENCY_SYMBOL + totalSales.toLocaleString();
-            document.getElementById('total-customers').textContent = totalCustomers.toLocaleString();
-            document.getElementById('total-transactions').textContent = totalTransactions.toLocaleString();
-            document.getElementById('avg-sale').textContent = CURRENCY_SYMBOL + avgSale.toLocaleString(undefined, {maximumFractionDigits: 2});
+        document.getElementById('total-sales').textContent = fmtMoney(totalSales);
+document.getElementById('total-customers').textContent = fmtQty(totalCustomers);
+document.getElementById('total-transactions').textContent = fmtQty(totalTransactions);
+document.getElementById('avg-sale').textContent = fmtMoney(avgSale);
             
             const container = document.getElementById('report-tables');
             const sectionHtmlParts = [];

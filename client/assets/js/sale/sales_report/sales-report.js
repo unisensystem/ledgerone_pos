@@ -9,14 +9,14 @@ function formatMoney(value) {
     const amount = parseFloat(value) || 0;
     return CURRENCY_SYMBOL + (isRoundOffEnabled()
         ? Math.round(amount).toLocaleString()
-        : amount.toLocaleString(undefined, { maximumFractionDigits: 20 }));
+        : amount.toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 }));
 }
 
 function formatQty(value) {
     const amount = parseFloat(value) || 0;
     return isRoundOffEnabled()
         ? Math.round(amount).toLocaleString()
-        : amount.toLocaleString(undefined, { maximumFractionDigits: 20 });
+        : amount.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 3 });
 }
 
 document.getElementById('current-date').textContent = new Date().toLocaleDateString('en-US', {

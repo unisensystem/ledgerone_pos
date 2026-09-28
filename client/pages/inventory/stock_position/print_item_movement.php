@@ -58,7 +58,7 @@ function formatMovementAmount($value, $roundOff)
         return number_format(floor($amount + 0.5), 0);
     }
 
-    return rtrim(rtrim(number_format($amount, 14, '.', ','), '0'), '.') ?: '0';
+return number_format($amount, 3, '.', ',');
 }
 
 $allowed_sort_fields = ['opening', 'purchase', 'sale', 'credit_note', 'debit_note', 'closing'];
