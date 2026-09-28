@@ -746,8 +746,14 @@ document.addEventListener('DOMContentLoaded', function () {
             exportDropdown.classList.remove('show');
             
             if (exportType === 'print') {
-                // Redirect to print page
-                window.open('customer-print.php', '_blank');
+                // ✅ FIX: Pass filter parameters to print page
+                // Jo search list me hoga vohi print me bhi aayega!
+                const filterParams = new URLSearchParams({
+                    search: searchInput.value,
+                    status: statusFilter.value,
+                    company: companyFilter.value
+                });
+                window.open(`customer-print.php?${filterParams.toString()}`, '_blank');
             } else if (exportType === 'excel') {
                 // Download Excel file
                 window.location.href = '../../../../server/api/customer_supplier/customers/customer-export.php';
@@ -760,7 +766,9 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     });
 
-    // Edit Modal Elements
+    // Rest of the code remains the same...
+    // (Edit Modal, etc. - keeping all the original edit functionality)
+    
     const editModal = document.getElementById('editModal');
     const editModalClose = document.getElementById('editModalClose');
     const editCancelBtn = document.getElementById('editCancelBtn');

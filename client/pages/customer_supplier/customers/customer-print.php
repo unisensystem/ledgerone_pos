@@ -79,6 +79,15 @@ $currency_symbol = $currency['symbol'] ?? '$';
             font-size: 11px;
         }
 
+        .filter-info {
+            font-size: 11px;
+            margin-bottom: 15px;
+            padding: 10px;
+            background: #f9f9f9;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+
         .customers-table {
             width: 100%;
             border-collapse: collapse;
@@ -214,6 +223,9 @@ $currency_symbol = $currency['symbol'] ?? '$';
         </div>
     </div>
 
+    <!-- Filter info display -->
+    <div class="filter-info" id="filterInfo"></div>
+
     <div class="summary-stats" id="summaryStats">
         <div class="stat-item">
             <div class="stat-value" id="totalCustomers">-</div>
@@ -261,7 +273,24 @@ $currency_symbol = $currency['symbol'] ?? '$';
         });
 
         function loadCustomersForPrint() {
-            fetch('../../../../server/api/customer_supplier/customers/customer-list.php?limit=1000')
+            // ✅ FIX: Get filters from URL query parameters
+            const urlParams = new URLSearchParams(window.location.search);
+            const search = urlParams.get('search') || '';
+            const status = urlParams.get('status') || '';
+            const company = urlParams.get('company') || '';
+
+            // Build API query with filters
+            const params = new URLSearchParams({
+                search: search,
+                status: status,
+                company: company,
+                limit: 9999 // Get all filtered results
+            });
+
+            // Display what filters are applied
+            displayFilterInfo(search, status, company);
+
+            fetch(`../../../../server/api/customer_supplier/customers/customer-list.php?${params}`)
                 .then(response => response.json())
                 .then(data => {
                     if (data.success) {
@@ -276,9 +305,41 @@ $currency_symbol = $currency['symbol'] ?? '$';
                 });
         }
 
+        function displayFilterInfo(search, status, company) {
+            const filterInfo = document.getElementById('filterInfo');
+            let filterText = '<strong>Filters Applied:</strong> ';
+            let hasFilters = false;
+
+            if (search) {
+                filterText += `Search: "${search}" | `;
+                hasFilters = true;
+            }
+            if (status) {
+                filterText += `Status: ${status.charAt(0).toUpperCase() + status.slice(1)} | `;
+                hasFilters = true;
+            }
+            if (company) {
+                filterText += `Company: ${company} | `;
+                hasFilters = true;
+            }
+
+            if (hasFilters) {
+                filterText = filterText.slice(0, -3); // Remove last " | "
+            } else {
+                filterText += 'None (All Customers)';
+            }
+
+            filterInfo.innerHTML = filterText;
+        }
+
         function renderCustomersForPrint(customers) {
             const tbody = document.getElementById('customersTableBody');
             tbody.innerHTML = '';
+
+            if (customers.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="9" style="text-align: center; padding: 20px;">No customers found</td></tr>';
+                return;
+            }
 
             customers.forEach(customer => {
                 const row = document.createElement('tr');
