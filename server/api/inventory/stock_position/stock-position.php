@@ -86,13 +86,22 @@ try {
                             COALESCE(u.base_unit_id, u.id) as unit_id,
                             p.min_stock_level,
                             p.max_stock_level,
-                            COALESCE(SUM(CASE WHEN ? IS NULL OR sl.transaction_date < ? THEN
-                                (sl.qty_in * {$conversionFactor}) - (sl.qty_out * {$conversionFactor})
-                            ELSE 0 END), 0) as opening_balance,
-                            COALESCE(SUM(CASE WHEN (? IS NULL OR sl.transaction_date >= ?) AND (? IS NULL OR sl.transaction_date <= ?) THEN
+                            -- Opening = everything strictly before from_date, plus 'Opening Stock' rows
+                            -- dated exactly on from_date. With no from_date given, there's no date
+                            -- split to rely on, so opening must only ever be the recorded 'Opening
+                            -- Stock' entries — otherwise it silently sums the entire history, making
+                            -- Opening Balance equal Current Stock (same fix as item-movement below).
+                            COALESCE(SUM(CASE
+                                WHEN ? IS NOT NULL AND (sl.transaction_date < ? OR (sl.transaction_date = ? AND sl.transaction_type = 'Opening Stock')) THEN (sl.qty_in * {$conversionFactor}) - (sl.qty_out * {$conversionFactor})
+                                WHEN ? IS NULL AND sl.transaction_type = 'Opening Stock' THEN (sl.qty_in * {$conversionFactor}) - (sl.qty_out * {$conversionFactor})
+                                ELSE 0
+                            END), 0) as opening_balance,
+                            -- Opening Stock is handled entirely above, never as period movement,
+                            -- otherwise it gets double-counted into Total Qty In as well.
+                            COALESCE(SUM(CASE WHEN sl.transaction_type <> 'Opening Stock' AND (? IS NULL OR sl.transaction_date >= ?) AND (? IS NULL OR sl.transaction_date <= ?) THEN
                                 sl.qty_in * {$conversionFactor}
                             ELSE 0 END), 0) as total_qty_in,
-                            COALESCE(SUM(CASE WHEN (? IS NULL OR sl.transaction_date >= ?) AND (? IS NULL OR sl.transaction_date <= ?) THEN
+                            COALESCE(SUM(CASE WHEN sl.transaction_type <> 'Opening Stock' AND (? IS NULL OR sl.transaction_date >= ?) AND (? IS NULL OR sl.transaction_date <= ?) THEN
                                 sl.qty_out * {$conversionFactor}
                             ELSE 0 END), 0) as total_qty_out,
                             COALESCE(SUM((sl.qty_in * {$conversionFactor}) - (sl.qty_out * {$conversionFactor})), 0) as current_stock,
@@ -110,7 +119,7 @@ try {
                         LEFT JOIN sale_invoice si ON sl.reference_table = 'sale_invoice' AND sl.reference_id = si.id
                         WHERE sl.tenant_id = ? AND p.product_type = 'physical' AND sl.account_id IS NOT NULL";
 
-                $params = [$from_date, $from_date, $from_date, $from_date, $to_date, $to_date, $from_date, $from_date, $to_date, $to_date, $tenant_id];
+                $params = [$from_date, $from_date, $from_date, $from_date, $from_date, $from_date, $to_date, $to_date, $from_date, $from_date, $to_date, $to_date, $tenant_id];
 
                 if ($branch_id) {
                     $sql .= " AND sl.branch_id = ?";
@@ -234,8 +243,10 @@ try {
                                 COALESCE(SUM(sl.qty_in * {$conversionFactor}), 0) as unit_base_in_total,
                                 COALESCE(SUM(sl.qty_out * {$conversionFactor}), 0) as unit_base_out_total,
                                 COALESCE(AVG({$conversionFactor}), 1) as unit_cf,
-                                COALESCE(SUM(CASE WHEN (? IS NULL OR sl.transaction_date >= ?) AND (? IS NULL OR sl.transaction_date <= ?) THEN sl.qty_in ELSE 0 END), 0) as total_qty_in,
-                                COALESCE(SUM(CASE WHEN (? IS NULL OR sl.transaction_date >= ?) AND (? IS NULL OR sl.transaction_date <= ?) THEN sl.qty_out ELSE 0 END), 0) as total_qty_out,
+                                -- Opening Stock is handled entirely via total_base_opening below, never
+                                -- as period movement, otherwise it gets double-counted into these totals.
+                                COALESCE(SUM(CASE WHEN sl.transaction_type <> 'Opening Stock' AND (? IS NULL OR sl.transaction_date >= ?) AND (? IS NULL OR sl.transaction_date <= ?) THEN sl.qty_in ELSE 0 END), 0) as total_qty_in,
+                                COALESCE(SUM(CASE WHEN sl.transaction_type <> 'Opening Stock' AND (? IS NULL OR sl.transaction_date >= ?) AND (? IS NULL OR sl.transaction_date <= ?) THEN sl.qty_out ELSE 0 END), 0) as total_qty_out,
                                 {$unitCostCalc} as unit_cost
                             FROM stock_ledger sl
                             JOIN products p ON sl.product_id = p.id AND sl.tenant_id = p.tenant_id
@@ -256,9 +267,14 @@ try {
                                 COALESCE(SUM(sl2.qty_in * {$conversionFactor2}), 0) as total_base_in,
                                 COALESCE(SUM(sl2.qty_out * {$conversionFactor2}), 0) as total_base_out,
                                 COALESCE(SUM((sl2.qty_in - sl2.qty_out) * {$conversionFactor2}), 0) as total_base_closing,
-                                COALESCE(SUM(CASE WHEN ? IS NULL OR sl2.transaction_date < ? THEN
-                                    (sl2.qty_in - sl2.qty_out) * {$conversionFactor2}
-                                ELSE 0 END), 0) as total_base_opening
+                                -- Same opening-balance fix as the base-units branch above: with no
+                                -- from_date, opening must only be the recorded 'Opening Stock' rows,
+                                -- not the entire history (which would make opening equal current).
+                                COALESCE(SUM(CASE
+                                    WHEN ? IS NOT NULL AND (sl2.transaction_date < ? OR (sl2.transaction_date = ? AND sl2.transaction_type = 'Opening Stock')) THEN (sl2.qty_in - sl2.qty_out) * {$conversionFactor2}
+                                    WHEN ? IS NULL AND sl2.transaction_type = 'Opening Stock' THEN (sl2.qty_in - sl2.qty_out) * {$conversionFactor2}
+                                    ELSE 0
+                                END), 0) as total_base_opening
                             FROM stock_ledger sl2
                             JOIN products p2 ON sl2.product_id = p2.id AND sl2.tenant_id = p2.tenant_id
                             LEFT JOIN uom u2 ON sl2.unit_id = u2.id
@@ -284,6 +300,8 @@ try {
                 ];
                 $params = array_merge($params, $filterParamsSub, [
                     // agg: opening balance date filter
+                    $from_date,
+                    $from_date,
                     $from_date,
                     $from_date,
                     // agg: WHERE tenant_id

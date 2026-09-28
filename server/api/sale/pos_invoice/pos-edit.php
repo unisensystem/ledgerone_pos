@@ -337,9 +337,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
                 // otherwise this column silently falls back to the table's DEFAULT 33
                 // (Trading Inventory), splitting stock reports for products reclassified
                 // to a different inventory account, e.g. Finished Goods).
-                $productStmt = $pdo->prepare("SELECT inventory_account_id FROM products WHERE id = ?");
-                $productStmt->execute([$item['productId']]);
-                $inventoryAccountId = $productStmt->fetchColumn() ?: 33;
+                $productId = intval($item['productId']);
+                $productStmt = $pdo->prepare("SELECT inventory_account_id FROM products WHERE id = ? AND tenant_id = ?");
+                $productStmt->execute([$productId, $tenant_id]);
+                $inventoryAccountId = intval($productStmt->fetchColumn() ?: 33);
 
                 // Insert stock ledger for quantity sold (use actual quantity, not converted —
                 // stock-position.php's reports convert qty_out to base units themselves using
@@ -355,12 +356,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
                 $stock_stmt->execute([
                     $tenant_id,
                     $inventoryAccountId,
-                    $input['branchId'],
-                    $item['productId'],
+                    intval($input['branchId']),
+                    $productId,
                     $invoice_id,
-                    $item['quantity'],
+                    floatval($item['quantity']),
                     $costPrice,
-                    $item['uomId'],
+                    intval($item['uomId']),
                     !empty($item['batchNo']) ? $item['batchNo'] : null,
                     !empty($item['batchExpiryDate']) ? $item['batchExpiryDate'] : null,
                     $input['saleDate']
@@ -372,7 +373,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
                     $focUnitId = $item['focUnitId'] ?? null;
                     if (!$focUnitId || $focUnitId === '') {
                         $unitStmt = $pdo->prepare("SELECT is_base_unit, base_unit_id FROM uom WHERE id = ?");
-                        $unitStmt->execute([$item['uomId']]);
+                        $unitStmt->execute([intval($item['uomId'])]);
                         $unitData = $unitStmt->fetch();
                         if ($unitData) {
                             $focUnitId = $unitData['is_base_unit'] == 1 ? $item['uomId'] : ($unitData['base_unit_id'] ?? $item['uomId']);
@@ -380,6 +381,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
                             $focUnitId = $item['uomId'];
                         }
                     }
+                    $focUnitId = intval($focUnitId);
 
                     $foc_stmt = $pdo->prepare("
                         INSERT INTO stock_ledger (
@@ -390,10 +392,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
                     $foc_stmt->execute([
                         $tenant_id,
                         $inventoryAccountId,
-                        $input['branchId'],
-                        $item['productId'],
+                        intval($input['branchId']),
+                        $productId,
                         $invoice_id,
-                        $item['focQty'],
+                        floatval($item['focQty']),
                         0,
                         $focUnitId,
                         !empty($item['batchNo']) ? $item['batchNo'] : null,
