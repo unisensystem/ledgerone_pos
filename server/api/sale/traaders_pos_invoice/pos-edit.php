@@ -342,19 +342,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
             if ($status === 'Posted') {
                 // Convert quantity to pieces based on UOM
                 $qtyInPieces = convertToPieces($item['quantity'], $item['uomId'], $pdo, $item['productId']);
-                
+
                 // Get product cost price
                 $costPrice = getCostPrice($pdo, $tenant_id, $item['productId'], $input['branchId']);
-                
+
+                // Get product's inventory account (must be re-fetched, not assumed —
+                // an edit's stock_ledger rows must land on the product's CURRENT account,
+                // otherwise this column silently falls back to the table's DEFAULT 33
+                // (Trading Inventory), splitting stock reports for products reclassified
+                // to a different inventory account, e.g. Finished Goods).
+                $productStmt = $pdo->prepare("SELECT inventory_account_id FROM products WHERE id = ?");
+                $productStmt->execute([$item['productId']]);
+                $inventoryAccountId = $productStmt->fetchColumn() ?: 33;
+
                 // Insert stock ledger for quantity sold
                 $stock_stmt = $pdo->prepare("
                         INSERT INTO stock_ledger (
-                            tenant_id, branch_id, product_id, reference_table, reference_id,
+                            tenant_id, account_id, branch_id, product_id, reference_table, reference_id,
                             qty_out, unit_cost, unit_id, batch_no, expiry_date, transaction_type, transaction_date
-                        ) VALUES (?, ?, ?, 'sale_invoice', ?, ?, ?, ?, ?, ?, 'Sale Invoice', ?)
+                        ) VALUES (?, ?, ?, ?, 'sale_invoice', ?, ?, ?, ?, ?, ?, 'Sale Invoice', ?)
                     ");
                 $stock_stmt->execute([
                     $tenant_id,
+                    $inventoryAccountId,
                     $input['branchId'],
                     $item['productId'],
                     $invoice_id,
@@ -365,19 +375,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
                     !empty($item['batchExpiryDate']) ? $item['batchExpiryDate'] : null,
                     $input['saleDate']
                 ]);
-                
+
                 // Insert stock ledger for FOC quantity if exists
                 if (isset($item['focQty']) && $item['focQty'] > 0) {
                     $focQtyInPieces = convertToPieces($item['focQty'], $item['uomId'], $pdo, $item['productId']);
-                    
+
                     $foc_stmt = $pdo->prepare("
                         INSERT INTO stock_ledger (
-                            tenant_id, branch_id, product_id, reference_table, reference_id,
+                            tenant_id, account_id, branch_id, product_id, reference_table, reference_id,
                             qty_out, unit_cost, unit_id, batch_no, expiry_date, transaction_type, transaction_date
-                        ) VALUES (?, ?, ?, 'sale_invoice', ?, ?, ?, ?, ?, ?, 'Sale Invoice - FOC', ?)
+                        ) VALUES (?, ?, ?, ?, 'sale_invoice', ?, ?, ?, ?, ?, ?, 'Sale Invoice - FOC', ?)
                     ");
                     $foc_stmt->execute([
                         $tenant_id,
+                        $inventoryAccountId,
                         $input['branchId'],
                         $item['productId'],
                         $invoice_id,

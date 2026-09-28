@@ -95,7 +95,7 @@ try {
 
     // Get sale order items with product stock_affects flag
     $itemsStmt = $pdo->prepare("
-        SELECT soi.*, p.stock_affects, p.invoice_affects, p.purchase_price 
+        SELECT soi.*, p.stock_affects, p.invoice_affects, p.purchase_price, p.inventory_account_id
         FROM sale_order_items soi
         LEFT JOIN products p ON soi.product_id = p.id
         WHERE soi.sale_invoice_id = ? AND soi.tenant_id = ?
@@ -181,7 +181,7 @@ try {
                 $avgCost,
                 $order['sale_date'],
                 $item['uom_id'],
-                33
+                $item['inventory_account_id'] ?: 33
             ]);
         }
 
