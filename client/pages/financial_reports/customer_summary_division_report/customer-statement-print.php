@@ -1,6 +1,6 @@
 <?php
 /**
- * Customer Statement - Print View (UPDATED v3)
+ * Customer Statement - Print View (UPDATED v4)
  * Supports:
  * - All Customers (when customer_id is empty)
  * - Single Customer
@@ -11,9 +11,11 @@
  * Top par selected City/Zone/Area/Salesman ke naam dikhte hain
  * Bottom totals row sab columns ka total dikhata hai
  *
- * NEW: Transfer Voucher column (signed: TO = +, FROM = -) + uska total
- * NEW: hide_cols param - main page mein jo columns hide hain wo print mein
+ * Transfer Voucher column (signed: TO = +, FROM = -) + uska total
+ * hide_cols param - main page mein jo columns hide hain wo print mein
  *      bhi hide, aur unki calculation closing balance se bhi nikal di jati hai
+ * NEW: Adjustment column (signed net: RV adjust_amount = -,
+ *      Balance Adjustment JV Debit = +, Credit = -) + uska total
  */
 
 if (session_status() == PHP_SESSION_NONE) {
@@ -196,6 +198,7 @@ const COLUMNS = [
     { key:'receive_voucher',  label:'Receive Voucher' },
     { key:'sale_return',      label:'Sale Return' },
     { key:'transfer_voucher', label:'Transfer Voucher' },
+    { key:'adjustment',       label:'Adjustment' },
     { key:'closing_balance',  label:'Closing Balance' }
 ];
 
@@ -235,7 +238,7 @@ document.getElementById('p-printed').textContent = new Date().toLocaleString();
  | (main page ke same logic)
  |
  |   closing = opening + sale_invoice - receive_voucher
- |             - sale_return + transfer_voucher
+ |             - sale_return + transfer_voucher + adjustment
  |
  | Har customer ka running balance alag; opening column hidden
  | ho to opening 0 se start hota hai.
@@ -257,7 +260,8 @@ function buildView(data, hidden){
             + (use('sale_invoice')     ? num(r.sale_invoice)     : 0)
             - (use('receive_voucher')  ? num(r.receive_voucher)  : 0)
             - (use('sale_return')      ? num(r.sale_return)      : 0)
-            + (use('transfer_voucher') ? num(r.transfer_voucher) : 0);
+            + (use('transfer_voucher') ? num(r.transfer_voucher) : 0)
+            + (use('adjustment')       ? num(r.adjustment)       : 0);
 
         running[key] = closing;
 
@@ -273,7 +277,8 @@ function buildView(data, hidden){
         + (use('sale_invoice')     ? num(data.total_sale_invoice)     : 0)
         - (use('receive_voucher')  ? num(data.total_receive_voucher)  : 0)
         - (use('sale_return')      ? num(data.total_sale_return)      : 0)
-        + (use('transfer_voucher') ? num(data.total_transfer_voucher) : 0);
+        + (use('transfer_voucher') ? num(data.total_transfer_voucher) : 0)
+        + (use('adjustment')       ? num(data.total_adjustment)       : 0);
 
     return Object.assign({}, data, {
         rows: rows,
@@ -300,6 +305,8 @@ function cellHtml(key, r){
             return `<td>${parseFloat(r[key]) > 0 ? currency + fmt(r[key]) : '-'}</td>`;
         case 'transfer_voucher':
             return `<td>${fmtSigned(r.transfer_voucher)}</td>`;
+        case 'adjustment':
+            return `<td>${fmtSigned(r.adjustment)}</td>`;
         case 'closing_balance':
             return `<td><strong>${currency}${fmt(r.closing_balance)}</strong></td>`;
     }
@@ -349,10 +356,11 @@ async function loadStatement(){
         const rows = data.rows || [];
 
         // Totals API se directly
-        const totalSI = data.total_sale_invoice || 0;
-        const totalRV = data.total_receive_voucher || 0;
-        const totalSR = data.total_sale_return || 0;
-        const totalTV = data.total_transfer_voucher || 0;
+        const totalSI  = data.total_sale_invoice || 0;
+        const totalRV  = data.total_receive_voucher || 0;
+        const totalSR  = data.total_sale_return || 0;
+        const totalTV  = data.total_transfer_voucher || 0;
+        const totalADJ = data.total_adjustment || 0;
 
         // Summary line - sirf visible columns
         const summaryItems = [
@@ -361,6 +369,7 @@ async function loadStatement(){
             { key:'receive_voucher',  label:'Total Receive Voucher',value:`${currency}${fmt(totalRV)}` },
             { key:'sale_return',      label:'Total Sale Return',    value:`${currency}${fmt(totalSR)}` },
             { key:'transfer_voucher', label:'Net Transfer Voucher', value: totalTV === 0 ? `${currency}0.00` : fmtSigned(totalTV) },
+            { key:'adjustment',       label:'Net Adjustment',       value: totalADJ === 0 ? `${currency}0.00` : fmtSigned(totalADJ) },
             { key:'closing_balance',  label:'Closing Balance',      value:`${currency}${fmt(data.closing_balance)}` }
         ].filter(i => !hiddenCols.has(i.key));
 
@@ -426,6 +435,8 @@ async function loadStatement(){
                     return `<td>${currency}${fmt(totalSR)}</td>`;
                 case 'transfer_voucher':
                     return `<td>${fmtSigned(totalTV)}</td>`;
+                case 'adjustment':
+                    return `<td>${fmtSigned(totalADJ)}</td>`;
                 case 'closing_balance':
                     return `<td>${currency}${fmt(data.closing_balance)}</td>`;
             }

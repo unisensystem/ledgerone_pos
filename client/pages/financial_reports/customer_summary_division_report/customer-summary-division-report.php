@@ -1,6 +1,6 @@
 <?php
 /**
- * Customer Statement Report - Page (FIXED v4)
+ * Customer Statement Report - Page (FIXED v5)
  *
  * Default behavior:
  * - Customer blank = ALL customers
@@ -8,9 +8,11 @@
  * - Data automatically loads when page opens
  * - Filters: City, Zone, Area, Salesman - MULTI-SELECT (checkbox dropdown)
  * - Transfer Voucher column (signed: TO = +, FROM = -)
- * - NEW: Hidden columns ki calculation bhi band - closing balance sirf
- *        visible columns se recalculate hota hai (client-side)
- * - NEW: Print ko hidden columns pass hote hain (hide_cols)
+ * - Hidden columns ki calculation bhi band - closing balance sirf
+ *   visible columns se recalculate hota hai (client-side)
+ * - Print ko hidden columns pass hote hain (hide_cols)
+ * - NEW: Adjustment column (signed net: RV adjust_amount = -,
+ *        Balance Adjustment JV Debit = +, Credit = -)
  */
 
 require_once '../../../../includes/dashboard.php';
@@ -535,6 +537,11 @@ if (!$user_id) {
                 <div class="value" id="stat-tv">0.00</div>
             </div>
 
+            <div class="stat" data-col="adjustment">
+                <div class="label">Net Adjustment</div>
+                <div class="value" id="stat-adj">0.00</div>
+            </div>
+
             <div class="stat closing" data-col="closing_balance">
                 <div class="label">Closing Balance</div>
                 <div class="value" id="stat-closing">0.00</div>
@@ -594,6 +601,7 @@ const COLUMNS = [
     { key:'receive_voucher',  label:'Receive Voucher' },
     { key:'sale_return',      label:'Sale Return' },
     { key:'transfer_voucher', label:'Transfer Voucher' },
+    { key:'adjustment',       label:'Adjustment' },
     { key:'closing_balance',  label:'Closing Balance' }
 ];
 const COL_STORAGE_KEY = 'csdr_hidden_columns';
@@ -714,7 +722,7 @@ function fmtSigned(n){
  |
  | Formula (sirf visible columns):
  |   closing = opening + sale_invoice - receive_voucher
- |             - sale_return + transfer_voucher
+ |             - sale_return + transfer_voucher + adjustment
  |
  | Har customer ka running balance alag chalta hai (rows date
  | wise aati hain, next row ka opening = us customer ka pichla
@@ -737,7 +745,8 @@ function buildView(data, hidden){
             + (use('sale_invoice')     ? num(r.sale_invoice)     : 0)
             - (use('receive_voucher')  ? num(r.receive_voucher)  : 0)
             - (use('sale_return')      ? num(r.sale_return)      : 0)
-            + (use('transfer_voucher') ? num(r.transfer_voucher) : 0);
+            + (use('transfer_voucher') ? num(r.transfer_voucher) : 0)
+            + (use('adjustment')       ? num(r.adjustment)       : 0);
 
         running[key] = closing;
 
@@ -753,7 +762,8 @@ function buildView(data, hidden){
         + (use('sale_invoice')     ? num(data.total_sale_invoice)     : 0)
         - (use('receive_voucher')  ? num(data.total_receive_voucher)  : 0)
         - (use('sale_return')      ? num(data.total_sale_return)      : 0)
-        + (use('transfer_voucher') ? num(data.total_transfer_voucher) : 0);
+        + (use('transfer_voucher') ? num(data.total_transfer_voucher) : 0)
+        + (use('adjustment')       ? num(data.total_adjustment)       : 0);
 
     return Object.assign({}, data, {
         rows: rows,
@@ -1110,10 +1120,11 @@ function renderSummary(data){
         `${currentCurrency}${fmt(data.closing_balance)}`;
 
     // Totals API se directly aa rahe hain
-    const totalSI = data.total_sale_invoice || 0;
-    const totalRV = data.total_receive_voucher || 0;
-    const totalSR = data.total_sale_return || 0;
-    const totalTV = data.total_transfer_voucher || 0;
+    const totalSI  = data.total_sale_invoice || 0;
+    const totalRV  = data.total_receive_voucher || 0;
+    const totalSR  = data.total_sale_return || 0;
+    const totalTV  = data.total_transfer_voucher || 0;
+    const totalADJ = data.total_adjustment || 0;
 
     document.getElementById('stat-si').textContent =
         `${currentCurrency}${fmt(totalSI)}`;
@@ -1127,6 +1138,9 @@ function renderSummary(data){
     // Signed net: + / - dikhata hai, zero pe 0.00
     document.getElementById('stat-tv').textContent =
         totalTV === 0 ? `${currentCurrency}0.00` : fmtSigned(totalTV);
+
+    document.getElementById('stat-adj').textContent =
+        totalADJ === 0 ? `${currentCurrency}0.00` : fmtSigned(totalADJ);
 }
 
 
@@ -1149,6 +1163,9 @@ function renderTable(data){
     const bodyRows = rows.map(r => {
         const tv = parseFloat(r.transfer_voucher || 0);
         const tvClass = tv > 0 ? 'amt-in' : (tv < 0 ? 'amt-out' : '');
+
+        const adj = parseFloat(r.adjustment || 0);
+        const adjClass = adj > 0 ? 'amt-in' : (adj < 0 ? 'amt-out' : '');
 
         return `
         <tr>
@@ -1183,6 +1200,9 @@ function renderTable(data){
             <td data-col="transfer_voucher" class="${tvClass}" title="${esc(r.transfer_nos || '')}">
                 ${fmtSigned(tv)}
             </td>
+            <td data-col="adjustment" class="${adjClass}" title="${esc(r.adjustment_nos || '')}">
+                ${fmtSigned(adj)}
+            </td>
             <td data-col="closing_balance">
                 <strong>
                     ${currentCurrency}${fmt(r.closing_balance)}
@@ -1197,7 +1217,7 @@ function renderTable(data){
         .join('');
 
     // Totals row (colspan nahi, taake column hide hone par layout na toote)
-    // TV total (signed) Transfer Voucher column ke neeche dikhta hai
+    // TV / Adjustment totals (signed) apne column ke neeche dikhte hain
     wrapper.innerHTML = `
         <div class="table-scroll">
             <table class="table">
@@ -1214,6 +1234,7 @@ function renderTable(data){
                         <td data-col="receive_voucher"><strong>${currentCurrency}${fmt(data.total_receive_voucher)}</strong></td>
                         <td data-col="sale_return"><strong>${currentCurrency}${fmt(data.total_sale_return)}</strong></td>
                         <td data-col="transfer_voucher"><strong>${fmtSigned(data.total_transfer_voucher)}</strong></td>
+                        <td data-col="adjustment"><strong>${fmtSigned(data.total_adjustment)}</strong></td>
                         <td data-col="closing_balance"><strong>${currentCurrency}${fmt(data.closing_balance)}</strong></td>
                     </tr>
                 </tbody>

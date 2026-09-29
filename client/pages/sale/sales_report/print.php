@@ -228,26 +228,23 @@ function fmtQty(value) {
         }
 
         async function loadReportData() {
-            try {
-                let url = `${API_BASE}/sales-report.php?date_from=${dateFrom}&date_to=${dateTo}&report_type=${reportType}`;
-                if (companyId) url += `&company_id=${companyId}`;
+    try {
+        let url = `${API_BASE}/sales-report.php?date_from=${dateFrom}&date_to=${dateTo}&report_type=${reportType}`;
+        if (companyId) url += `&company_id=${companyId}`;
 
-                printUrl += `&round_off=${isRoundOffEnabled() ? '1' : '0'}`;
-                
-                const response = await fetch(url);
-                const result = await response.json();
-                
-                if (result.success) {
-                    await populateReport(result.data);
-                } else {
-                    document.getElementById('report-tables').innerHTML = '<div class="sub-table-empty">Failed to load report.</div>';
-                }
-            } catch (error) {
-                console.error('Error loading report:', error);
-                document.getElementById('report-tables').innerHTML = '<div class="sub-table-empty">Error loading report.</div>';
-            }
+        const response = await fetch(url);
+        const result = await response.json();
+
+        if (result.success) {
+            await populateReport(result.data);
+        } else {
+            document.getElementById('report-tables').innerHTML = '<div class="sub-table-empty">Failed to load report.</div>';
         }
-        
+    } catch (error) {
+        console.error('Error loading report:', error);
+        document.getElementById('report-tables').innerHTML = '<div class="sub-table-empty">Error loading report.</div>';
+    }
+}
         async function populateReport(data) {
             // Update Summary Cards
             const totalSales = (data.officer_sales || []).reduce((sum, item) => sum + parseFloat(item.total_sales || 0), 0);

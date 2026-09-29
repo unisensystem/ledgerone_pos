@@ -1,6 +1,6 @@
 <?php
 /**
- * Customer Statement Report - API (FIXED v5)
+ * Customer Statement Report - API (FIXED v6)
  * ---------------------------------------------------------------
  *
  * FIX 1: Customers with opening balance but NO transactions
@@ -8,19 +8,23 @@
  * FIX 2: Proper totals calculation opening balance + sale invoice
  * FIX 3: Empty date field ab bhara hua hai from_date ke sath
  * FIX 4: total_closing_balance ab har customer ke closing balance
- *        ko SUM kar raha hai (pehle sirf last customer ka closing
- *        balance overwrite ho raha tha)
+ *        ko SUM kar raha hai
  * FIX 5: City / Zone / Area / Salesman filters MULTI-SELECT support
- *        karte hain (comma-separated ids, e.g. city_id=3,7,10).
- *        Single id bhi pehle jaisa kaam karta hai.
+ *        (comma-separated ids, e.g. city_id=3,7,10).
  * FIX 6: action=salesmen - dropdown ke liye employees list.
- *        Salesman filter customers.associated_sales_officer_id pe lagta hai.
- * FIX 7 (NEW): TRANSFER VOUCHER column add hua.
- *        - Customer jab FROM party ho  => balance MINUS (credit)
- *        - Customer jab TO party ho    => balance PLUS  (debit)
- *        Ye transfer-add.php ke ledger entries ke mutabiq hai
- *        (customer = Trade Debtors, debit-normal).
- *        Opening balance mein from_date se pehle ke transfers bhi shamil hain.
+ * FIX 7: TRANSFER VOUCHER column (TO = +, FROM = -).
+ * FIX 8 (NEW): ADJUSTMENT column (signed net).
+ *        Sources:
+ *        a) Receive Voucher ki adjust_amount
+ *           receive-edit/add ledger: Trade Debtors CR = amount + adjust_amount
+ *           => customer ka balance adjust_amount se bhi kam hota hai  (-)
+ *        b) Balance Adjustment (journal_voucher, adj_mode single/cross)
+ *           adjustment-add.php lines insert karta hai:
+ *             1st line (lowest id) = Party 1, 2nd line = Party 2 (cross)
+ *           Debit  => customer balance barhta hai  (+)
+ *           Credit => customer balance kam hota hai (-)
+ *           (adj_type journal_voucher me save nahi hota, is liye direction
+ *            line ke debit/credit se nikalti hai)
  *
  * LOGIC:
  * Opening Balance
@@ -28,14 +32,12 @@
  *     + Sale Invoices before From Date
  *     - Receive Vouchers before From Date
  *     - Sale Returns before From Date
- *     +/- Transfer Vouchers before From Date   (TO = +, FROM = -)
+ *     +/- Transfer Vouchers before From Date
+ *     +/- Adjustments before From Date (RV adjust_amount = -, JV = +/-)
  *
  * Closing Balance
- *     = Opening
- *     + Sale Invoice
- *     - Receive Voucher
- *     - Sale Return
- *     +/- Transfer Voucher (net)
+ *     = Opening + Sale Invoice - Receive Voucher - Sale Return
+ *       +/- Transfer Voucher (net) +/- Adjustment (net)
  */
 
 require_once '../../../../includes/connection.php';
@@ -97,6 +99,78 @@ function buildInClause($column, array $ids) {
         'sql'    => " AND {$column} IN ({$placeholders})",
         'params' => $ids
     ];
+}
+
+/**
+ * Helper: customer ki Balance Adjustment (journal_voucher) entries, signed.
+ *   signed > 0  => Debit  => customer balance barhta hai
+ *   signed < 0  => Credit => customer balance kam hota hai
+ *
+ * Party 1 = journal_voucher_line ki pehli line (lowest id)
+ * Party 2 = journal_voucher_line ki doosri line (cross mode)
+ *
+ * Date filters (sab optional):
+ *   $from   => voucher_date >= from
+ *   $to     => voucher_date <= to
+ *   $before => voucher_date <  before   (opening balance ke liye)
+ */
+function fetchCustomerJvAdjustments(PDO $pdo, $tenant_id, $cid, $from = null, $to = null, $before = null) {
+    $sql = "
+        SELECT
+            jv.voucher_date,
+            jv.voucher_number,
+            CASE
+                WHEN jv.party_type = 'customer' AND jv.party_id = :cid_a THEN
+                    (SELECT l.debit - l.credit
+                       FROM journal_voucher_line l
+                      WHERE l.voucher_id = jv.id
+                        AND l.tenant_id  = jv.tenant_id
+                      ORDER BY l.id ASC
+                      LIMIT 1)
+                ELSE
+                    (SELECT l.debit - l.credit
+                       FROM journal_voucher_line l
+                      WHERE l.voucher_id = jv.id
+                        AND l.tenant_id  = jv.tenant_id
+                      ORDER BY l.id ASC
+                      LIMIT 1 OFFSET 1)
+            END AS signed_amount
+        FROM journal_voucher jv
+        WHERE jv.tenant_id = :tenant
+          AND jv.status = 'posted'
+          AND jv.adj_mode IN ('single', 'cross')
+          AND (
+                (jv.party_type = 'customer' AND jv.party_id = :cid_b)
+             OR (jv.adj_mode = 'cross' AND jv.party_type2 = 'customer' AND jv.party_id2 = :cid_c)
+          )
+    ";
+
+    $params = [
+        ':cid_a'  => $cid,
+        ':tenant' => $tenant_id,
+        ':cid_b'  => $cid,
+        ':cid_c'  => $cid
+    ];
+
+    if ($from) {
+        $sql .= " AND jv.voucher_date >= :from_d";
+        $params[':from_d'] = $from;
+    }
+    if ($to) {
+        $sql .= " AND jv.voucher_date <= :to_d";
+        $params[':to_d'] = $to;
+    }
+    if ($before) {
+        $sql .= " AND jv.voucher_date < :before_d";
+        $params[':before_d'] = $before;
+    }
+
+    $sql .= " ORDER BY jv.voucher_date";
+
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute($params);
+
+    return $stmt->fetchAll(PDO::FETCH_ASSOC);
 }
 
 try {
@@ -321,6 +395,7 @@ try {
                     'total_receive_voucher' => 0,
                     'total_sale_return' => 0,
                     'total_transfer_voucher' => 0,
+                    'total_adjustment' => 0,
                     'rows'            => []
                 ]);
                 exit;
@@ -333,6 +408,7 @@ try {
             $total_receive_voucher = 0;
             $total_sale_return = 0;
             $total_transfer_voucher = 0; // signed net (TO = +, FROM = -)
+            $total_adjustment = 0;       // signed net (RV adjust = -, JV Dr = +, JV Cr = -)
 
             foreach ($customers as $customer) {
 
@@ -358,15 +434,19 @@ try {
                     $si_stmt->execute([$tenant_id, $cid, $from_date]);
                     $bbf += (float)$si_stmt->fetchColumn();
 
+                    // Receive vouchers before from_date: amount aur adjust_amount alag
                     $rv_stmt = $pdo->prepare("
-                        SELECT COALESCE(SUM(amount), 0)
+                        SELECT COALESCE(SUM(amount), 0) AS amt,
+                               COALESCE(SUM(adjust_amount), 0) AS adj
                         FROM receive_voucher
                         WHERE tenant_id = ?
                           AND customer_id = ?
                           AND voucher_date < ?
                     ");
                     $rv_stmt->execute([$tenant_id, $cid, $from_date]);
-                    $bbf -= (float)$rv_stmt->fetchColumn();
+                    $rv_before = $rv_stmt->fetch(PDO::FETCH_ASSOC);
+                    $bbf -= (float)$rv_before['amt'];
+                    $bbf -= (float)$rv_before['adj'];   // RV adjustment (-)
 
                     $sr_stmt = $pdo->prepare("
                         SELECT COALESCE(SUM(net_amount), 0)
@@ -395,6 +475,11 @@ try {
                     ");
                     $tv_stmt->execute([$cid, $cid, $tenant_id, $cid, $cid, $from_date]);
                     $bbf += (float)$tv_stmt->fetchColumn();
+
+                    // Balance Adjustment (journal voucher) before from_date: Dr = +, Cr = -
+                    foreach (fetchCustomerJvAdjustments($pdo, $tenant_id, $cid, null, null, $from_date) as $jv) {
+                        $bbf += (float)$jv['signed_amount'];
+                    }
                 }
 
                 $total_opening_balance += $bbf;
@@ -408,10 +493,12 @@ try {
                             'receive_voucher'  => 0,
                             'sale_return'      => 0,
                             'transfer_voucher' => 0,
+                            'adjustment'       => 0,
                             'si_bills'         => [],
                             'rv_bills'         => [],
                             'sr_bills'         => [],
-                            'tv_bills'         => []
+                            'tv_bills'         => [],
+                            'adj_bills'        => []
                         ];
                     }
                 };
@@ -451,9 +538,10 @@ try {
                     }
                 }
 
-                // RECEIVE VOUCHERS
+                // RECEIVE VOUCHERS (amount => Receive Voucher column,
+                // adjust_amount => Adjustment column, negative)
                 $rv_sql = "
-                    SELECT voucher_date, voucher_number, amount
+                    SELECT voucher_date, voucher_number, amount, adjust_amount
                     FROM receive_voucher
                     WHERE tenant_id = ?
                       AND customer_id = ?
@@ -482,6 +570,15 @@ try {
                     $days[$d]['receive_voucher'] += (float)$row['amount'];
                     if (isset($row['voucher_number']) && $row['voucher_number'] !== '') {
                         $days[$d]['rv_bills'][] = $row['voucher_number'];
+                    }
+
+                    // RV adjustment => Adjustment column (balance kam hota hai)
+                    $rv_adj = (float)($row['adjust_amount'] ?? 0);
+                    if ($rv_adj != 0) {
+                        $days[$d]['adjustment'] -= $rv_adj;
+                        if (isset($row['voucher_number']) && $row['voucher_number'] !== '') {
+                            $days[$d]['adj_bills'][] = $row['voucher_number'];
+                        }
                     }
                 }
 
@@ -562,6 +659,20 @@ try {
                     }
                 }
 
+                // BALANCE ADJUSTMENTS (journal voucher, single + cross)
+                // Debit => + (balance barhta hai), Credit => - (balance kam hota hai)
+                foreach (fetchCustomerJvAdjustments($pdo, $tenant_id, $cid, $from_date, $to_date, null) as $row) {
+                    $d = $row['voucher_date'];
+                    // Skip if date is null/empty
+                    if (!$d) continue;
+                    $makeDay($d);
+
+                    $days[$d]['adjustment'] += (float)$row['signed_amount'];
+                    if (isset($row['voucher_number']) && $row['voucher_number'] !== '') {
+                        $days[$d]['adj_bills'][] = $row['voucher_number'];
+                    }
+                }
+
                 ksort($days);
 
                 $running = $bbf;
@@ -574,7 +685,8 @@ try {
                         + $d['sale_invoice']
                         - $d['receive_voucher']
                         - $d['sale_return']
-                        + $d['transfer_voucher'];
+                        + $d['transfer_voucher']
+                        + $d['adjustment'];
 
                     $running = $closing;
                     $customer_has_transactions = true;
@@ -588,11 +700,13 @@ try {
                         'receive_voucher'  => round($d['receive_voucher'], 2),
                         'sale_return'      => round($d['sale_return'], 2),
                         'transfer_voucher' => round($d['transfer_voucher'], 2),
+                        'adjustment'       => round($d['adjustment'], 2),
                         'closing_balance'  => round($closing, 2),
                         'invoice_nos'      => implode(', ', array_unique(array_filter($d['si_bills']))),
                         'voucher_nos'      => implode(', ', array_unique(array_filter($d['rv_bills']))),
                         'return_nos'       => implode(', ', array_unique(array_filter($d['sr_bills']))),
-                        'transfer_nos'     => implode(', ', array_unique(array_filter($d['tv_bills'])))
+                        'transfer_nos'     => implode(', ', array_unique(array_filter($d['tv_bills']))),
+                        'adjustment_nos'   => implode(', ', array_unique(array_filter($d['adj_bills'])))
                     ];
 
                     // Add to totals
@@ -600,6 +714,7 @@ try {
                     $total_receive_voucher  += (float)$d['receive_voucher'];
                     $total_sale_return      += (float)$d['sale_return'];
                     $total_transfer_voucher += (float)$d['transfer_voucher'];
+                    $total_adjustment       += (float)$d['adjustment'];
                 }
 
                 // Agar customer ke paas opening balance hai but koi transaction nahi
@@ -616,11 +731,13 @@ try {
                         'receive_voucher'  => 0,
                         'sale_return'      => 0,
                         'transfer_voucher' => 0,
+                        'adjustment'       => 0,
                         'closing_balance'  => round($bbf, 2),
                         'invoice_nos'      => '',
                         'voucher_nos'      => '',
                         'return_nos'       => '',
-                        'transfer_nos'     => ''
+                        'transfer_nos'     => '',
+                        'adjustment_nos'   => ''
                     ];
 
                     $running = $bbf;
@@ -659,6 +776,7 @@ try {
                 'total_receive_voucher'  => round($total_receive_voucher, 2),
                 'total_sale_return'      => round($total_sale_return, 2),
                 'total_transfer_voucher' => round($total_transfer_voucher, 2),
+                'total_adjustment'       => round($total_adjustment, 2),
                 'rows'                   => $all_rows
             ]);
             break;
