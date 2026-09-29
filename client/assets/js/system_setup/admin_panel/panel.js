@@ -422,12 +422,12 @@ function renderPermissionsTree(permissions) {
         'Financial Reports': ['General Ledger', 'Customer Ledger', 'Our Standing', 'Supplier Ledger', 'Both (Customer + Supplier) Ledger', 'Customer Aging', 'Supplier Aging', 'Recovery Sheet', 'Customer Summary Division Report (CSDR)', 'Sales Officer-wise Recovery', 'Trial Balance', 'Balance Sheet', 'Profit & Loss Statement', 'Cash Flow', 'Financial Summary', 'Pending DSR Sheet', 'Project Tracking', 'Container Tracking'],
         'HRM': ['New Employee', 'Record Attendance', 'Leave Management', 'New Payroll', 'Employees Ledger'],
         'Master Setup': ['Branch Setup', 'Territory Setup', 'Rate List Setup', 'Tax Rates Setup', 'Tax Regimes Setup', 'Project Setup'],
-        'System Setup': ['Company Profile', 'Admin Panel', 'Currency Setup', 'Software Info']
+'System Setup': ['Company Profile', 'Admin Panel', 'Currency Setup', 'Software Info', 'GL Debug']
     };
 
     const subPermissions = ['Add', 'Edit', 'Delete'];
     const noSubPermCategories = ['Dashboard', 'Financial Reports'];
-    const noSubPermForms = ['Sale Reports', 'Discount Report', 'Purchase Reports', 'Stock Position', 'Software Info', 'Company Profile', 'Employees Ledger', 'Post Dated Cheques (PDCs)', 'Daily Sale Report', 'Daily Sales Report (DSR) - Multiple Unit', 'Daily Product Sale', 'Daily Product Sale 2', 'Invoice Payment Report', 'Bill of Materials (BOM)', 'Production Wastage', 'Production Report', 'Tax Rates Setup', 'Tax Regimes Setup', 'Project Product Rates', 'Container Tracking'];
+    const noSubPermForms = ['Sale Reports', 'Discount Report', 'Purchase Reports', 'Stock Position', 'Software Info', 'Company Profile', 'Employees Ledger', 'Post Dated Cheques (PDCs)', 'Daily Sale Report', 'Daily Sales Report (DSR) - Multiple Unit', 'Daily Product Sale', 'Daily Product Sale 2', 'Invoice Payment Report', 'Bill of Materials (BOM)', 'Production Wastage', 'Production Report', 'Tax Rates Setup', 'Tax Regimes Setup', 'Project Product Rates', 'Container Tracking' , 'GL Debug'];
 
     // Create permission lookup map
     const permMap = {};
