@@ -96,21 +96,33 @@ $initialSearch = $_GET['search'] ?? '';
                 <div class="form-group">
                     <label for="statusFilter">Status</label>
                     <select id="statusFilter">
+                        <option value="Posted">Posted</option>
+                        <option value="Draft">Draft</option>
                         <option value="">All Status</option>
-                        <option value="paid">Paid</option>
-                        <option value="pending">Pending</option>
-                        <option value="overdue">Overdue</option>
                     </select>
                 </div>
             </div>
-            
-            <div class="actions">
+
+            <div class="actions" style="display: flex; flex-wrap: wrap; align-items: center; gap: 12px;">
                 <div class="search-box">
                     <i class="fas fa-search"></i>
                     <input type="text" id="searchInput" placeholder="Search by invoice number, customer..." value="<?= htmlspecialchars($initialSearch) ?>">
                 </div>
-                <button class="btn btn-secondary" id="refreshBtn" title="Refresh and clear filters" style="margin-left: 632px;">
-                    <i class="fas fa-redo"></i> Refresh
+                <div class="form-group" style="margin: 0;">
+                    <label for="pageSizeSelect" style="margin-right: 6px;">Show</label>
+                    <select id="pageSizeSelect">
+                        <option value="10">10</option>
+                        <option value="20">20</option>
+                        <option value="50">50</option>
+                        <option value="100">100</option>
+                    </select>
+                </div>
+                <div style="flex: 1;"></div>
+                <button class="btn btn-primary" id="applyFiltersBtn" title="Apply filters">
+                    <i class="fas fa-filter"></i> Apply Filters
+                </button>
+                <button class="btn btn-secondary" id="refreshBtn" title="Reset all filters">
+                    <i class="fas fa-redo"></i> Reset
                 </button>
                 <button class="btn btn-primary" id="newInvoiceBtn">
                     <i class="fas fa-plus"></i> New Return
@@ -119,7 +131,7 @@ $initialSearch = $_GET['search'] ?? '';
 
             <div class="summary-boxes">
                 <div class="summary-box">
-                    <div class="summary-box-label">Total Invoices Loaded</div>
+                    <div class="summary-box-label">Total Invoices (Filtered)</div>
                     <div class="summary-box-value" id="summaryInvoiceCount">0</div>
                 </div>
                 <div class="summary-box">

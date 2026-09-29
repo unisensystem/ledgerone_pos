@@ -134,6 +134,7 @@ function initializeListPage(permissions) {
     let invoices = [];
     let currentPage = 1;
     let totalPages = 1;
+    let pageSize = 10;
     const invoicesTable = document.getElementById('invoicesTable').getElementsByTagName('tbody')[0];
     const customerSearch = initSearchableSelect(document.getElementById('customerFilter'));
 
@@ -180,15 +181,29 @@ function initializeListPage(permissions) {
         }
     }
 
-    // Load invoices from API
+    // Load invoices from API — every filter is sent to the server, so results (and the
+    // search box) cover the whole matching dataset, not just whatever page happens to be
+    // loaded right now.
     async function loadInvoices(page = 1) {
         try {
             const companyId = document.getElementById('companyFilter').value;
-            const params = new URLSearchParams({ page, limit: 10 });
+            const customerId = document.getElementById('customerFilter').value;
+            const status = document.getElementById('statusFilter').value;
+            const dateFromVal = document.getElementById('dateFrom').value;
+            const dateToVal = document.getElementById('dateTo').value;
+            const search = document.getElementById('searchInput').value.trim();
+
+            const params = new URLSearchParams({ page, limit: pageSize });
             if (companyId) params.append('company_id', companyId);
+            if (customerId) params.append('customer_id', customerId);
+            if (status) params.append('status', status);
+            if (dateFromVal) params.append('date_from', dateFromVal);
+            if (dateToVal) params.append('date_to', dateToVal);
+            if (search) params.append('search', search);
+
             const response = await fetch(`../../../../server/api/sale/sale_return/return-list.php?${params}`);
             const data = await response.json();
-            
+
             if (data.success) {
                 invoices = data.invoices.map(invoice => ({
                     id: invoice.id,
@@ -197,6 +212,7 @@ function initializeListPage(permissions) {
                     customer: invoice.customer_name,
                     customer_id: invoice.customer_id,
                     company_id: invoice.company_id,
+                    status: invoice.status,
                     items: invoice.item_count,
                     totalAmount: parseFloat(invoice.net_amount),
                     currencySymbol: invoice.currency_symbol || ''
@@ -204,6 +220,7 @@ function initializeListPage(permissions) {
                 currentPage = data.pagination.page;
                 totalPages = data.pagination.pages;
                 populateTable(invoices);
+                updateSummary(data.summary);
                 updatePagination(data.pagination);
             } else {
                 console.error('Error loading invoices:', data.message);
@@ -213,19 +230,17 @@ function initializeListPage(permissions) {
         }
     }
 
-    // Update summary boxes (count + total amount of the rows currently shown)
-    function updateSummary(data) {
+    // Update summary boxes — reflects the WHOLE filtered result set (server-computed),
+    // not just the rows on the current page, so it stays correct across pagination.
+    function updateSummary(summary) {
         const countEl = document.getElementById('summaryInvoiceCount');
         const amountEl = document.getElementById('summaryTotalAmount');
-        if (!countEl || !amountEl) return;
+        if (!countEl || !amountEl || !summary) return;
 
-        const total = data.reduce((sum, invoice) => sum + (parseFloat(invoice.totalAmount) || 0), 0);
-        const symbols = new Set(data.map(invoice => invoice.currencySymbol).filter(Boolean));
-        // Show the symbol only when all rows share the same currency
-        const symbol = symbols.size === 1 ? [...symbols][0] + ' ' : '';
+        const symbol = summary.currency_symbol ? summary.currency_symbol + ' ' : '';
 
-        countEl.textContent = data.length;
-        amountEl.textContent = symbol + total.toLocaleString('en-US', {
+        countEl.textContent = summary.total_count;
+        amountEl.textContent = symbol + summary.total_amount.toLocaleString('en-US', {
             minimumFractionDigits: 2,
             maximumFractionDigits: 2
         });
@@ -233,7 +248,6 @@ function initializeListPage(permissions) {
 
     function populateTable(data) {
         invoicesTable.innerHTML = '';
-        updateSummary(data);
 
         data.forEach(invoice => {
             const row = invoicesTable.insertRow();
@@ -300,82 +314,76 @@ function initializeListPage(permissions) {
         });
     }
 
-    // Initial load
-    loadCompanies();
-    loadCustomers();
-    loadInvoices();
-
-    // Filter functionality
+    // Filter elements. All filtering happens server-side (see loadInvoices) so results,
+    // and the search box, always cover the full matching dataset — not just whatever
+    // page happens to be loaded in the browser right now.
     const dateFrom = document.getElementById('dateFrom');
     const dateTo = document.getElementById('dateTo');
     const companyFilter = document.getElementById('companyFilter');
     const customerFilter = document.getElementById('customerFilter');
     const statusFilter = document.getElementById('statusFilter');
     const searchInput = document.getElementById('searchInput');
+    const pageSizeSelect = document.getElementById('pageSizeSelect');
 
-    function applyFilters() {
-        let filteredInvoices = [...invoices];
+    // Initial load
+    loadCompanies();
+    loadCustomers();
+    loadInvoices(1);
 
-        // Date filter
-        if (dateFrom.value) {
-            filteredInvoices = filteredInvoices.filter(invoice =>
-                new Date(invoice.date) >= new Date(dateFrom.value)
-            );
-        }
+    // Date/Company/Customer/Status filters apply immediately on change (auto-filter) —
+    // Company additionally refreshes the customer dropdown to that company's customers.
+    dateFrom.addEventListener('change', () => loadInvoices(1));
+    dateTo.addEventListener('change', () => loadInvoices(1));
+    companyFilter.addEventListener('change', () => {
+        // Clear the customer filter synchronously first — otherwise a customer selected
+        // under the previous company could still be in the field when loadInvoices reads
+        // it a moment later (loadCustomers rebuilds the dropdown asynchronously), sending
+        // a company_id + customer_id combination that matches nothing.
+        customerFilter.value = '';
+        loadCustomers(companyFilter.value);
+        loadInvoices(1);
+    });
+    customerFilter.addEventListener('change', () => loadInvoices(1));
+    statusFilter.addEventListener('change', () => loadInvoices(1));
 
-        if (dateTo.value) {
-            filteredInvoices = filteredInvoices.filter(invoice =>
-                new Date(invoice.date) <= new Date(dateTo.value)
-            );
-        }
+    // Search auto-filters too, but debounced so it doesn't hit the server on every
+    // keystroke — it fires shortly after the user stops typing.
+    let searchDebounceTimer = null;
+    searchInput.addEventListener('input', () => {
+        clearTimeout(searchDebounceTimer);
+        searchDebounceTimer = setTimeout(() => loadInvoices(1), 400);
+    });
 
-        // Company filter
-        if (companyFilter.value) {
-            filteredInvoices = filteredInvoices.filter(invoice =>
-                invoice.company_id == companyFilter.value
-            );
-        }
+    // Explicit "Apply Filters" button — fires immediately, bypassing the search debounce
+    // (useful right after setting several filters at once, e.g. both dates).
+    document.getElementById('applyFiltersBtn').addEventListener('click', () => {
+        clearTimeout(searchDebounceTimer);
+        loadInvoices(1);
+    });
 
-        // Customer filter
-        if (customerFilter.value) {
-            filteredInvoices = filteredInvoices.filter(invoice =>
-                invoice.customer_id == customerFilter.value
-            );
-        }
+    // Page size selector
+    pageSizeSelect.addEventListener('change', () => {
+        pageSize = parseInt(pageSizeSelect.value, 10) || 10;
+        loadInvoices(1);
+    });
 
-        // Search filter
-        if (searchInput.value) {
-            const searchTerm = searchInput.value.toLowerCase();
-            filteredInvoices = filteredInvoices.filter(invoice =>
-                invoice.invoiceNo.toLowerCase().includes(searchTerm) ||
-                (invoice.customer && invoice.customer.toLowerCase().includes(searchTerm))
-            );
-        }
-
-        populateTable(filteredInvoices);
-    }
-
-    // Add event listeners for filters
-    dateFrom.addEventListener('change', applyFilters);
-    dateTo.addEventListener('change', applyFilters);
-    companyFilter.addEventListener('change', () => { loadCustomers(companyFilter.value); loadInvoices(1); });
-    customerFilter.addEventListener('change', applyFilters);
-    statusFilter.addEventListener('change', applyFilters);
-    searchInput.addEventListener('input', applyFilters);
-
-    // ✅ REFRESH BUTTON - Clear all filters and reload data
+    // ✅ RESET BUTTON - Clear all filters and reload data
     document.getElementById('refreshBtn').addEventListener('click', function() {
+        clearTimeout(searchDebounceTimer);
+
         // Clear all filter values
         dateFrom.value = '';
         dateTo.value = '';
         companyFilter.value = '';
         customerFilter.value = '';
-        statusFilter.value = '';
+        statusFilter.value = 'Posted';
         searchInput.value = '';
-        
+        pageSizeSelect.value = '10';
+        pageSize = 10;
+
         // Refresh customer dropdown
         customerSearch.refresh();
-        
+
         // Reload data from page 1
         currentPage = 1;
         loadCompanies();
@@ -395,11 +403,15 @@ function initializeListPage(permissions) {
         generatePaginationButtons(page, pages);
     }
     
-    // Generate dynamic pagination buttons
+    // Generate dynamic pagination buttons — a windowed range around the current page
+    // (up to 5 numbers), not one button per page, which used to render hundreds of
+    // buttons and break the layout on any dataset with many pages.
     function generatePaginationButtons(currentPage, totalPages) {
         const container = document.getElementById('paginationControls');
         container.innerHTML = '';
-        
+
+        if (totalPages <= 0) return;
+
         // Previous button
         const prevBtn = document.createElement('button');
         prevBtn.className = 'pagination-btn';
@@ -409,9 +421,8 @@ function initializeListPage(permissions) {
             if (currentPage > 1) loadInvoices(currentPage - 1);
         });
         container.appendChild(prevBtn);
-        
-        // Page number buttons
-        for (let i = 1; i <= totalPages; i++) {
+
+        function addPageButton(i) {
             const pageBtn = document.createElement('button');
             pageBtn.className = `pagination-btn ${i === currentPage ? 'active' : ''}`;
             pageBtn.textContent = i;
@@ -420,7 +431,33 @@ function initializeListPage(permissions) {
             });
             container.appendChild(pageBtn);
         }
-        
+
+        function addEllipsis() {
+            const span = document.createElement('span');
+            span.className = 'pagination-ellipsis';
+            span.textContent = '…';
+            span.style.padding = '0 6px';
+            container.appendChild(span);
+        }
+
+        const windowSize = 2; // pages shown on each side of the current page
+        const startPage = Math.max(1, currentPage - windowSize);
+        const endPage = Math.min(totalPages, currentPage + windowSize);
+
+        if (startPage > 1) {
+            addPageButton(1);
+            if (startPage > 2) addEllipsis();
+        }
+
+        for (let i = startPage; i <= endPage; i++) {
+            addPageButton(i);
+        }
+
+        if (endPage < totalPages) {
+            if (endPage < totalPages - 1) addEllipsis();
+            addPageButton(totalPages);
+        }
+
         // Next button
         const nextBtn = document.createElement('button');
         nextBtn.className = 'pagination-btn';
