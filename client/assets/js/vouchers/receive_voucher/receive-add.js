@@ -680,7 +680,15 @@ function fetchBillsForCustomer(customerCode) {
                     date: bill.sale_date,
                     currency: bill.currency_symbol || '$'
                 }));
-                renderBillDropdown('');
+                // fetchBillsForCustomer() is also called from Bulk Mode's per-row
+                // customer select (setupBulkCustomerDropdown). renderBillDropdown()
+                // targets the single-mode #billNo/#billDropdown pair - those are
+                // hidden but already "floated" to <body> once opened, so calling it
+                // unconditionally made a stray, wrongly-positioned (0,0) dropdown box
+                // pop up on screen while in Bulk Mode. Only refresh it in Single Mode.
+                if (!document.getElementById('bulkModeToggle').checked) {
+                    renderBillDropdown('');
+                }
             }
         })
         .catch(error => console.error('Error fetching bills:', error));
@@ -1519,6 +1527,14 @@ function setupBulkCustomerDropdown(row) {
         }
     });
 
+    // Also close on blur (e.g. Tab to the next field), not just on an outside click -
+    // otherwise moving between rows with Tab left every previous row's dropdown open,
+    // so several floating boxes could be visible/stacked on screen at once.
+    // Delayed so a click on a dropdown item still registers before this fires.
+    input.addEventListener('blur', function() {
+        setTimeout(() => hideFloatingDropdown(dropdown), 150);
+    });
+
     document.addEventListener('click', function(e) {
         if (!input.contains(e.target) && !dropdown.contains(e.target)) {
             hideFloatingDropdown(dropdown);
@@ -1531,9 +1547,12 @@ function setupBulkCustomerDropdown(row) {
     const billDropdown = document.createElement('div');
     billDropdown.className = 'dropdown-list';
 
+    let billHighlightedIndex = -1;
+
     billInput.addEventListener('input', function() {
         const searchTerm = this.value.toLowerCase();
         billDropdown.innerHTML = '';
+        billHighlightedIndex = -1;
 
         const filtered = bills.filter(b =>
             b.number.toLowerCase().includes(searchTerm)
@@ -1561,6 +1580,41 @@ function setupBulkCustomerDropdown(row) {
         if (bills.length > 0) {
             this.dispatchEvent(new Event('input'));
         }
+    });
+
+    // Same Down/Up/Enter/Escape keyboard navigation as the Customer dropdown above
+    // (was missing here entirely, so arrow keys did nothing on this field).
+    billInput.addEventListener('keydown', function(e) {
+        const items = billDropdown.querySelectorAll('.dropdown-item');
+
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            billHighlightedIndex = Math.min(billHighlightedIndex + 1, items.length - 1);
+            updateBillHighlight(items);
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            billHighlightedIndex = Math.max(billHighlightedIndex - 1, -1);
+            updateBillHighlight(items);
+        } else if (e.key === 'Enter' && billHighlightedIndex >= 0) {
+            e.preventDefault();
+            items[billHighlightedIndex].click();
+        } else if (e.key === 'Escape') {
+            hideFloatingDropdown(billDropdown);
+        }
+    });
+
+    function updateBillHighlight(items) {
+        items.forEach((item, index) => {
+            item.classList.toggle('highlighted', index === billHighlightedIndex);
+        });
+        if (billHighlightedIndex >= 0 && items[billHighlightedIndex]) {
+            items[billHighlightedIndex].scrollIntoView({ block: 'nearest' });
+        }
+    }
+
+    // Same reasoning as the Customer input's blur handler above.
+    billInput.addEventListener('blur', function() {
+        setTimeout(() => hideFloatingDropdown(billDropdown), 150);
     });
 
     document.addEventListener('click', function(e) {

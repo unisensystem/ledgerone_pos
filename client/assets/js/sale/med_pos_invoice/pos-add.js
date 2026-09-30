@@ -6739,10 +6739,14 @@ batchExpiry2Cell.appendChild(batchExpiry2Input);
     focInput.step = '0.001';
     focInput.value = '0';
     // Bonus draws from the same batch as the regular sale qty, so changing it
-    // must re-check available stock too (see validateStockForRow).
+    // must re-check available stock too (see validateStockForRow), and the
+    // footer's Total Bonus figure needs to pick up the new value immediately.
     focInput.addEventListener('input', function() {
         if (typeof validateStockForRow === 'function') {
             validateStockForRow(row);
+        }
+        if (typeof updateInvoiceSummaryDynamic === 'function') {
+            updateInvoiceSummaryDynamic();
         }
     });
     focCell.appendChild(focInput);

@@ -134,7 +134,7 @@ try {
                 LEFT JOIN delivery_chalan dc_hdr ON dc_hdr.sale_invoice_id = sii2.sale_invoice_id
                 GROUP BY sii2.sale_invoice_id
             ) dc_counts ON dc_counts.sale_invoice_id = si.id
-            WHERE si.tenant_id = ? AND si.status = 'Posted'";
+            WHERE si.tenant_id = ? AND si.status = 'Posted' AND si.invoice_source = 'trade'";
 
     $params = [$tenant_id];
 
@@ -162,7 +162,7 @@ try {
                  FROM sale_invoice si
                  LEFT JOIN customers c  ON si.customer_id = c.id
                  LEFT JOIN companies co ON si.company_id  = co.id
-                 WHERE si.tenant_id = ? AND si.status = 'Posted'";
+                 WHERE si.tenant_id = ? AND si.status = 'Posted' AND si.invoice_source = 'trade'";
     $countParams = [$tenant_id];
 
     if ($date_from) { $countSql .= " AND si.sale_date >= ?"; $countParams[] = $date_from; }
