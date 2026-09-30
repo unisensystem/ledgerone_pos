@@ -29,6 +29,12 @@ $VIEW_TABLES = ['accounting_ledger','accounts','receive_voucher','payment_vouche
   'journal_voucher','journal_voucher_line','transfer_voucher','sale_invoice','purchase_invoice','purchase_invoice_taxes',
   'sale_invoice_taxes','opening_balance_invoices','cash_opening','bank_accounts','payroll_entries','companies','posting_lock_dates','sub_accounts'];
 
+// ledger rows (accounting_ledger.id) excluded from this whole debug report
+// 174236 = 107 Input Tax Receivable (PUR-0003 tax), 182112 = 110 Freight Inward (PUR-0002)
+$SKIP_IDS = '174236,182112';
+define('SKIP_AL', " AND al.id NOT IN ($SKIP_IDS)"); // for queries that alias the ledger as "al"
+define('SKIP',    " AND id NOT IN ($SKIP_IDS)");    // for queries with no alias
+
 function dateSql($col, $from, $to, &$p) {
     $s = '';
     if ($from) { $s .= " AND $col >= ?"; $p[] = $from; }
@@ -62,12 +68,12 @@ if (isset($_GET['action'])) {
 
         if ($a === 'summary') {
             $p = [$tenant_id]; $d = dateSql('al.date',$from,$to,$p);
-            $all = one($pdo, "SELECT COUNT(*) n, COALESCE(SUM(debit),0) d, COALESCE(SUM(credit),0) c FROM accounting_ledger al WHERE al.tenant_id=? $d", $p);
+            $all = one($pdo, "SELECT COUNT(*) n, COALESCE(SUM(debit),0) d, COALESCE(SUM(credit),0) c FROM accounting_ledger al WHERE al.tenant_id=? $d".SKIP_AL, $p);
             $ph = implode(',', array_map('intval',$HIDDEN_ACCOUNTS));
-            $hid = one($pdo, "SELECT COUNT(*) n, COALESCE(SUM(debit),0) d, COALESCE(SUM(credit),0) c FROM accounting_ledger al WHERE al.tenant_id=? AND al.account_id IN ($ph) $d", $p);
+            $hid = one($pdo, "SELECT COUNT(*) n, COALESCE(SUM(debit),0) d, COALESCE(SUM(credit),0) c FROM accounting_ledger al WHERE al.tenant_id=? AND al.account_id IN ($ph) $d".SKIP_AL, $p);
             $hidAcc = rows($pdo, "SELECT al.account_id, a.name, COUNT(*) n, SUM(al.debit) d, SUM(al.credit) c
                                   FROM accounting_ledger al LEFT JOIN accounts a ON a.id=al.account_id
-                                  WHERE al.tenant_id=? AND al.account_id IN ($ph) $d GROUP BY al.account_id, a.name", $p);
+                                  WHERE al.tenant_id=? AND al.account_id IN ($ph) $d".SKIP_AL." GROUP BY al.account_id, a.name", $p);
             $out['all'] = $all; $out['hidden'] = $hid; $out['hiddenAccounts'] = $hidAcc;
             $out['hiddenIds'] = $HIDDEN_ACCOUNTS;
 
@@ -82,7 +88,7 @@ if (isset($_GET['action'])) {
             $pp = [$tenant_id]; $dd = dateSql('al.date',$from,$to,$pp);
             $nl = one($pdo, "SELECT COUNT(*) n, COALESCE(SUM(al.debit),0) d, COALESCE(SUM(al.credit),0) c
                              FROM accounting_ledger al $COMPANY_JOINS
-                             WHERE al.tenant_id=? $dd AND $COMPANY_ID IS NULL", $pp);
+                             WHERE al.tenant_id=? $dd".SKIP_AL." AND $COMPANY_ID IS NULL", $pp);
             $out['noCompany'] = $nl;
         }
         elseif ($a === 'unbalanced') { $out['rows'] = unbalanced($pdo,$tenant_id,$from,$to); }
@@ -97,7 +103,7 @@ if (isset($_GET['action'])) {
                     SUM(al.debit) d, SUM(al.credit) c
                 FROM accounting_ledger al $COMPANY_JOINS
                 LEFT JOIN companies co ON co.id = $COMPANY_ID
-                WHERE al.tenant_id=? $d GROUP BY company_id, co.company_name ORDER BY company_id", $p);
+                WHERE al.tenant_id=? $d".SKIP_AL." GROUP BY company_id, co.company_name ORDER BY company_id", $p);
         }
         elseif ($a === 'lines') {
             $t = $_GET['table'] ?? ''; $id = (int)($_GET['id'] ?? 0); $desc = $_GET['desc'] ?? null;
@@ -106,7 +112,7 @@ if (isset($_GET['action'])) {
             $out['rows'] = rows($pdo, "SELECT al.id, al.date, al.transaction_type, al.account_id, a.name account_name, a.sub_account_id,
                   al.description, al.debit, al.credit, al.created_at
                 FROM accounting_ledger al LEFT JOIN accounts a ON a.id=al.account_id
-                WHERE al.tenant_id=? AND al.reference_table=? AND al.reference_id=? $extra ORDER BY al.id", $p);
+                WHERE al.tenant_id=? AND al.reference_table=? AND al.reference_id=? $extra".SKIP_AL." ORDER BY al.id", $p);
         }
         elseif ($a === 'inspect') {
             $t = $_GET['table'] ?? ''; $id = (int)($_GET['id'] ?? 0);
@@ -118,7 +124,7 @@ if (isset($_GET['action'])) {
             $out['rows'] = rows($pdo, "SELECT al.id, al.date, al.transaction_type, al.account_id, a.name account_name, a.sub_account_id,
                   al.description, al.debit, al.credit, al.created_at
                 FROM accounting_ledger al LEFT JOIN accounts a ON a.id=al.account_id
-                WHERE al.tenant_id=? AND al.reference_table=? AND al.reference_id=? ORDER BY al.id", [$tenant_id,$t,$id]);
+                WHERE al.tenant_id=? AND al.reference_table=? AND al.reference_id=?".SKIP_AL." ORDER BY al.id", [$tenant_id,$t,$id]);
         }
         elseif ($a === 'browse') {
             $p = [$tenant_id]; $w = dateSql('al.date',$from,$to,$p);
@@ -126,6 +132,7 @@ if (isset($_GET['action'])) {
             if (($_GET['refid'] ?? '') !== '') { $w .= " AND al.reference_id=?"; $p[] = (int)$_GET['refid']; }
             if (!empty($_GET['account'])) { $w .= " AND al.account_id=?"; $p[] = (int)$_GET['account']; }
             if (!empty($_GET['q'])) { $w .= " AND (al.description LIKE ? OR a.name LIKE ?)"; $p[] = '%'.$_GET['q'].'%'; $p[] = '%'.$_GET['q'].'%'; }
+            $w .= SKIP_AL;
             $page = max(1,(int)($_GET['page'] ?? 1)); $per = 100; $off = ($page-1)*$per;
             $tot = one($pdo, "SELECT COUNT(*) n, COALESCE(SUM(al.debit),0) d, COALESCE(SUM(al.credit),0) c
                               FROM accounting_ledger al LEFT JOIN accounts a ON a.id=al.account_id WHERE al.tenant_id=? $w", $p);
@@ -142,6 +149,7 @@ if (isset($_GET['action'])) {
             $cols = array_column(rows($pdo, "SHOW COLUMNS FROM `$t`"), 'Field');
             $w = ''; $p = [];
             if (in_array('tenant_id',$cols)) { $w = " WHERE tenant_id=?"; $p[] = $tenant_id; }
+            if ($t === 'accounting_ledger') { $w .= ($w ? '' : ' WHERE 1=1') . SKIP; }
             if (!empty($_GET['q'])) {
                 $concat = "CONCAT_WS(' ', " . implode(',', array_map(fn($c)=>"`$c`", $cols)) . ")";
                 $w .= ($w ? " AND " : " WHERE ") . "$concat LIKE ?"; $p[] = '%'.$_GET['q'].'%';
@@ -171,7 +179,7 @@ function unbalanced($pdo,$tid,$from,$to){
           CASE WHEN reference_id=0 THEN description ELSE '' END AS sub_key,
           MIN(transaction_type) AS transaction_type, MIN(date) AS date, COUNT(*) AS line_count,
           SUM(debit) AS d, SUM(credit) AS c, SUM(debit)-SUM(credit) AS diff
-        FROM accounting_ledger WHERE tenant_id=? $d
+        FROM accounting_ledger WHERE tenant_id=? $d".SKIP."
         GROUP BY reference_table, reference_id, sub_key
         HAVING ABS(SUM(debit)-SUM(credit))>0.005 ORDER BY date DESC", $p);
 }
@@ -184,7 +192,7 @@ function missing($pdo,$tid,$from,$to,$S){
         $params = array_merge([$tid], $dp, [$tid]);
         $r = rows($pdo,"SELECT '$t' AS tbl, s.id, s.`{$m['no']}` AS no, s.`{$m['date']}` AS date, s.`{$m['amt']}` AS amount, s.company_id, $st AS status
             FROM `$t` s WHERE s.tenant_id=? $d AND NOT EXISTS (
-              SELECT 1 FROM accounting_ledger al WHERE al.tenant_id=? AND al.reference_table='$t' AND al.reference_id=s.id)
+              SELECT 1 FROM accounting_ledger al WHERE al.tenant_id=? AND al.reference_table='$t' AND al.reference_id=s.id".SKIP_AL.")
             ORDER BY s.id DESC", $params);
         foreach($r as $x){ $x['label']=$m['label']; $all[]=$x; }
     }
@@ -196,7 +204,7 @@ function orphans($pdo,$tid,$from,$to,$S){
         $p=[$tid]; $d=dateSql('al.date',$from,$to,$p);
         $r = rows($pdo,"SELECT '$t' AS tbl, al.reference_id, COUNT(*) AS line_count, SUM(al.debit) AS d, SUM(al.credit) AS c, MIN(al.date) AS date, MIN(al.description) AS sample
             FROM accounting_ledger al LEFT JOIN `$t` s ON s.id=al.reference_id AND s.tenant_id=al.tenant_id
-            WHERE al.tenant_id=? AND al.reference_table='$t' AND s.id IS NULL $d
+            WHERE al.tenant_id=? AND al.reference_table='$t' AND s.id IS NULL $d".SKIP_AL."
             GROUP BY al.reference_id, CASE WHEN al.reference_id=0 THEN al.description ELSE '' END ORDER BY MIN(al.date) DESC", $p);
         foreach($r as $x){ $x['label']=$m['label']; $all[]=$x; }
     }
@@ -211,7 +219,7 @@ function mismatch($pdo,$tid,$from,$to,$S,$CHK){
         $r = rows($pdo,"SELECT '$t' AS tbl, s.id, s.`{$m['no']}` AS no, s.`{$m['date']}` AS date, s.`{$m['amt']}` AS voucher_amount,
               x.d AS ledger_debit, x.c AS ledger_credit
             FROM `$t` s JOIN (SELECT reference_id, SUM(debit) AS d, SUM(credit) AS c FROM accounting_ledger
-                              WHERE tenant_id=? AND reference_table='$t' GROUP BY reference_id) x ON x.reference_id=s.id
+                              WHERE tenant_id=? AND reference_table='$t'".SKIP." GROUP BY reference_id) x ON x.reference_id=s.id
             WHERE s.tenant_id=? $d AND ABS(x.d - s.`{$m['amt']}`)>0.01 ORDER BY s.id DESC", $params);
         foreach($r as $x){ $x['label']=$m['label']; $all[]=$x; }
     }
@@ -220,14 +228,14 @@ function mismatch($pdo,$tid,$from,$to,$S,$CHK){
 function dupes($pdo,$tid,$from,$to){
     $p=[$tid]; $d=dateSql('date',$from,$to,$p);
     return rows($pdo,"SELECT reference_table, reference_id, account_id, date, debit, credit, COUNT(*) AS times, MIN(description) AS description
-        FROM accounting_ledger WHERE tenant_id=? $d AND reference_id>0
+        FROM accounting_ledger WHERE tenant_id=? $d".SKIP." AND reference_id>0
         GROUP BY reference_table, reference_id, account_id, date, debit, credit, description
         HAVING COUNT(*)>1 ORDER BY date DESC", $p);
 }
 function days($pdo,$tid,$from,$to){
     $p=[$tid]; $d=dateSql('date',$from,$to,$p);
     return rows($pdo,"SELECT date, COUNT(*) AS line_count, SUM(debit) AS d, SUM(credit) AS c, SUM(debit)-SUM(credit) AS diff
-        FROM accounting_ledger WHERE tenant_id=? $d GROUP BY date HAVING ABS(SUM(debit)-SUM(credit))>0.005 ORDER BY date DESC", $p);
+        FROM accounting_ledger WHERE tenant_id=? $d".SKIP." GROUP BY date HAVING ABS(SUM(debit)-SUM(credit))>0.005 ORDER BY date DESC", $p);
 }
 
 // ---------- page ----------
