@@ -97,10 +97,23 @@ async function fetchDropdownData() {
     }
 }
 
+// When an Expense Account / Cost Center filter is active, filterData() trims a
+// voucher's expense_amounts down to just the matching line(s) - sum those instead
+// of the whole voucher's total_amount, which would pull in unrelated expense lines
+// bundled in the same voucher. With no such filter active, expense_amounts still
+// holds every line, so this sums to the same value as total_amount either way.
+function getEffectiveAmount(expense) {
+    if (expense.expense_amounts) {
+        const amounts = expense.expense_amounts.split(',').map(a => parseFloat(a) || 0);
+        if (amounts.length) return amounts.reduce((a, b) => a + b, 0);
+    }
+    return parseFloat(expense.total_amount) || 0;
+}
+
 // Update stats cards
 function updateStats() {
     const totalVouchers = filteredData.length;
-    const totalAmount = filteredData.reduce((sum, v) => sum + parseFloat(v.total_amount), 0);
+    const totalAmount = filteredData.reduce((sum, v) => sum + getEffectiveAmount(v), 0);
 
     document.querySelector('.stat-card:nth-child(1) .stat-value').textContent = totalVouchers;
     document.getElementById('totalAmountStat').textContent = CURRENCY_SYMBOL + totalAmount.toFixed(2);
@@ -127,7 +140,7 @@ function renderExpenseTrendChart() {
     last30Days.forEach(date => expensesByDate[date] = 0);
     filteredData.forEach(expense => {
         if (expensesByDate.hasOwnProperty(expense.date)) {
-            expensesByDate[expense.date] += parseFloat(expense.total_amount);
+            expensesByDate[expense.date] += getEffectiveAmount(expense);
         }
     });
 
