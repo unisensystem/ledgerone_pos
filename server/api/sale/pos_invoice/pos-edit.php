@@ -242,6 +242,35 @@ if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
             $tenant_id
         ]);
 
+        // Signature: the column is touched ONLY when the user explicitly does something.
+        //  - removeSignature flag          -> clear it
+        //  - brand-new cropped data:image  -> save new file, store its filename
+        //  - existing filename of THIS tenant -> re-use it
+        // In every other case (the normal edit where the front end sends null) the
+        // saved signature is left exactly as it is, so editing an old invoice can
+        // never wipe its signature.
+        if (!empty($input['removeSignature'])) {
+            $pdo->prepare("UPDATE sale_invoice SET signature = NULL WHERE id = ? AND tenant_id = ?")
+                ->execute([$invoice_id, $tenant_id]);
+        } elseif (!empty($input['signature']) && is_string($input['signature'])) {
+            if (strpos($input['signature'], 'data:image') === 0) {
+                $signatureFileName = saveInvoiceSignature($input['signature'], $tenant_id, $invoice_id);
+                if ($signatureFileName) {
+                    $pdo->prepare("UPDATE sale_invoice SET signature = ? WHERE id = ? AND tenant_id = ?")
+                        ->execute([$signatureFileName, $invoice_id, $tenant_id]);
+                }
+            } else {
+                // Filename re-use: verify it belongs to this tenant's own signatures
+                // (blocks path traversal / cross-tenant access), same check as pos-add.php.
+                $chk = $pdo->prepare("SELECT 1 FROM sale_invoice WHERE tenant_id = ? AND signature = ? LIMIT 1");
+                $chk->execute([$tenant_id, $input['signature']]);
+                if ($chk->fetchColumn()) {
+                    $pdo->prepare("UPDATE sale_invoice SET signature = ? WHERE id = ? AND tenant_id = ?")
+                        ->execute([$input['signature'], $invoice_id, $tenant_id]);
+                }
+            }
+        }
+
         // Delete existing items and related records
         $pdo->prepare("DELETE FROM sale_invoice_taxes WHERE sale_invoice_id = ? AND tenant_id = ?")->execute([$invoice_id, $tenant_id]);
         $pdo->prepare("DELETE FROM sale_invoice_items WHERE sale_invoice_id = ? AND tenant_id = ?")->execute([$invoice_id, $tenant_id]);
@@ -739,4 +768,32 @@ function convertToPieces($quantity, $uomId, $pdo, $productId)
     
     // Other units - return as is
     return $qty;
+}
+
+// Decode a base64 data-URL PNG (from the client-side signature crop) and save it
+// to disk, returning the stored filename to be saved in sale_invoice.signature.
+// Same folder + naming as pos-add.php's saveInvoiceSignature() (both files live in
+// server/api/sale/pos_invoice/, so the relative path is identical).
+function saveInvoiceSignature($dataUrl, $tenant_id, $invoice_id)
+{
+    if (!preg_match('/^data:image\/(png|jpeg|jpg);base64,/', $dataUrl)) {
+        return null;
+    }
+    $base64Data = substr($dataUrl, strpos($dataUrl, ',') + 1);
+    $decoded = base64_decode($base64Data);
+    if ($decoded === false) {
+        return null;
+    }
+
+    $uploadDir = __DIR__ . '/../../../../client/assets/uploads/signatures/';
+    if (!is_dir($uploadDir)) {
+        mkdir($uploadDir, 0755, true);
+    }
+
+    $fileName = 'sig_' . $tenant_id . '_' . $invoice_id . '_' . time() . '.png';
+    if (file_put_contents($uploadDir . $fileName, $decoded) === false) {
+        return null;
+    }
+
+    return $fileName;
 }

@@ -3,6 +3,7 @@
 // invoice can auto-load it as the default — the user only needs to upload a
 // signature once; every invoice after that reuses it until they upload a
 // different one (which then becomes the new "latest" for future invoices).
+// Signatures whose image file is missing from disk are skipped.
 require_once '../../../../includes/connection.php';
 
 header('Content-Type: application/json');
@@ -24,15 +25,24 @@ try {
         SELECT signature
         FROM sale_invoice
         WHERE tenant_id = ? AND signature IS NOT NULL AND signature <> ''
-        ORDER BY id DESC
-        LIMIT 1
+        GROUP BY signature
+        ORDER BY MAX(id) DESC
+        LIMIT 30
     ");
     $stmt->execute([$tenant_id]);
-    $signature = $stmt->fetchColumn();
+
+    $uploadDir = __DIR__ . '/../../../../client/assets/uploads/signatures/';
+    $signature = null;
+    foreach ($stmt->fetchAll(PDO::FETCH_COLUMN) as $candidate) {
+        if (is_file($uploadDir . basename($candidate))) {
+            $signature = $candidate;
+            break;
+        }
+    }
 
     echo json_encode([
         'success' => true,
-        'signature' => $signature ?: null
+        'signature' => $signature
     ]);
 } catch (Exception $e) {
     http_response_code(500);

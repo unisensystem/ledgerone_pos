@@ -1,6 +1,6 @@
 <?php
 /**
- * Customer Statement - Print View (UPDATED v4)
+ * Customer Statement - Print View (UPDATED v6)
  * Supports:
  * - All Customers (when customer_id is empty)
  * - Single Customer
@@ -13,9 +13,12 @@
  *
  * Transfer Voucher column (signed: TO = +, FROM = -) + uska total
  * hide_cols param - main page mein jo columns hide hain wo print mein
- *      bhi hide, aur unki calculation closing balance se bhi nikal di jati hai
- * NEW: Adjustment column (signed net: RV adjust_amount = -,
+ *      bhi hide hote hain. Yeh sirf DISPLAY hai: Closing Balance par koi
+ *      asar nahi, hamesha poora (API ka) total dikhta hai.
+ * Adjustment column (signed net: RV adjust_amount = -,
  *      Balance Adjustment JV Debit = +, Credit = -) + uska total
+ * Signature column (LAST) - blank, sirf print par dastkhat ke liye.
+ *      Koi data/total nahi, API se koi talluq nahi.
  */
 
 if (session_status() == PHP_SESSION_NONE) {
@@ -128,6 +131,13 @@ $hide_cols     = $_GET['hide_cols']     ?? '';
     table.table td:first-child,
     table.table th:first-child{text-align:left;}
     table.table td.customer-cell{text-align:left;}
+    /* Blank signature column - dastkhat ke liye jagah */
+    table.table th.signature-cell,
+    table.table td.signature-cell{
+        width:110px;
+        min-width:110px;
+        height:32px;
+    }
     .total-row td{font-weight:700;background:var(--header-bg);}
     .empty-note{padding:24px;text-align:center;color:var(--subtext);}
 
@@ -168,7 +178,7 @@ $hide_cols     = $_GET['hide_cols']     ?? '';
 <!-- Applied filters (City / Zone / Area / Salesman) - sirf jo select huay hon wo dikhte hain -->
 <div class="meta-row" id="p-filters-row" style="display:none;"></div>
 
-<!-- Summary line JS se banti hai (sirf visible columns) -->
+<!-- Summary line JS se banti hai (sirf visible columns dikhte hain) -->
 <div class="summary-line" id="p-summary" style="display:none;"></div>
 
 <div id="p-table-wrapper">
@@ -189,7 +199,7 @@ const areaId      = <?php echo json_encode($area_id); ?>;
 const salesmanId  = <?php echo json_encode($salesman_id); ?>;
 const hideColsRaw = <?php echo json_encode($hide_cols); ?>;
 
-/* Main page ke same columns (same order) */
+/* Main page ke same columns (same order) + last par blank Signature */
 const COLUMNS = [
     { key:'date',             label:'Date' },
     { key:'customer_name',    label:'Customer' },
@@ -199,10 +209,12 @@ const COLUMNS = [
     { key:'sale_return',      label:'Sale Return' },
     { key:'transfer_voucher', label:'Transfer Voucher' },
     { key:'adjustment',       label:'Adjustment' },
-    { key:'closing_balance',  label:'Closing Balance' }
+    { key:'closing_balance',  label:'Closing Balance' },
+    { key:'signature',        label:'Signature' }
 ];
 
-/* Hidden columns (main page se hide_cols aata hai) - sirf valid keys */
+/* Hidden columns (main page se hide_cols aata hai) - sirf valid keys.
+   Sirf display ke liye - calculation par koi asar nahi. */
 const hiddenCols = new Set(
     String(hideColsRaw || '')
         .split(',')
@@ -234,61 +246,6 @@ document.getElementById('p-printed').textContent = new Date().toLocaleString();
 
 
 /* -----------------------------------------------------------
- | Build view - hidden columns ko calculation se nikal deta hai
- | (main page ke same logic)
- |
- |   closing = opening + sale_invoice - receive_voucher
- |             - sale_return + transfer_voucher + adjustment
- |
- | Har customer ka running balance alag; opening column hidden
- | ho to opening 0 se start hota hai.
- * ----------------------------------------------------------- */
-function buildView(data, hidden){
-    const num = v => parseFloat(v) || 0;
-    const use = k => !hidden.has(k);
-
-    const running = {};
-
-    const rows = (data.rows || []).map(r => {
-        const key = String(r.customer_id ?? r.customer_name ?? '');
-
-        const opening = (key in running)
-            ? running[key]
-            : (use('opening_balance') ? num(r.opening_balance) : 0);
-
-        const closing = opening
-            + (use('sale_invoice')     ? num(r.sale_invoice)     : 0)
-            - (use('receive_voucher')  ? num(r.receive_voucher)  : 0)
-            - (use('sale_return')      ? num(r.sale_return)      : 0)
-            + (use('transfer_voucher') ? num(r.transfer_voucher) : 0)
-            + (use('adjustment')       ? num(r.adjustment)       : 0);
-
-        running[key] = closing;
-
-        return Object.assign({}, r, {
-            opening_balance: opening,
-            closing_balance: closing
-        });
-    });
-
-    const totalOpening = use('opening_balance') ? num(data.opening_balance) : 0;
-
-    const totalClosing = totalOpening
-        + (use('sale_invoice')     ? num(data.total_sale_invoice)     : 0)
-        - (use('receive_voucher')  ? num(data.total_receive_voucher)  : 0)
-        - (use('sale_return')      ? num(data.total_sale_return)      : 0)
-        + (use('transfer_voucher') ? num(data.total_transfer_voucher) : 0)
-        + (use('adjustment')       ? num(data.total_adjustment)       : 0);
-
-    return Object.assign({}, data, {
-        rows: rows,
-        opening_balance: totalOpening,
-        closing_balance: totalClosing
-    });
-}
-
-
-/* -----------------------------------------------------------
  | Row cell renderer (per column key)
  * ----------------------------------------------------------- */
 function cellHtml(key, r){
@@ -309,6 +266,8 @@ function cellHtml(key, r){
             return `<td>${fmtSigned(r.adjustment)}</td>`;
         case 'closing_balance':
             return `<td><strong>${currency}${fmt(r.closing_balance)}</strong></td>`;
+        case 'signature':
+            return `<td class="signature-cell"></td>`;
     }
     return '<td></td>';
 }
@@ -330,18 +289,15 @@ async function loadStatement(){
 
     try {
         const res  = await fetch(url);
-        const raw  = await res.json();
+        const data = await res.json();
 
-        if (!raw.success) {
+        if (!data.success) {
             document.getElementById('p-table-wrapper').innerHTML =
-                `<div class="empty-note">${esc(raw.message || 'Failed to load statement')}</div>`;
+                `<div class="empty-note">${esc(data.message || 'Failed to load statement')}</div>`;
             return;
         }
 
-        currency = raw.currency || '$';
-
-        // Hidden columns ke baghair recalculated data
-        const data = buildView(raw, hiddenCols);
+        currency = data.currency || '$';
 
         // Customer name (All Customers when no specific customer)
         document.getElementById('p-customer').textContent =
@@ -362,7 +318,8 @@ async function loadStatement(){
         const totalTV  = data.total_transfer_voucher || 0;
         const totalADJ = data.total_adjustment || 0;
 
-        // Summary line - sirf visible columns
+        // Summary line - hidden columns ka card nahi dikhta, lekin
+        // Closing Balance hamesha poora total hota hai
         const summaryItems = [
             { key:'opening_balance',  label:'Opening Balance',      value:`${currency}${fmt(data.opening_balance)}` },
             { key:'sale_invoice',     label:'Total Sale Invoice',   value:`${currency}${fmt(totalSI)}` },
@@ -409,7 +366,9 @@ async function loadStatement(){
             return;
         }
 
-        const headerRow = `<tr>${visibleCols.map(c => `<th>${esc(c.label)}</th>`).join('')}</tr>`;
+        const headerRow = `<tr>${visibleCols.map(c =>
+            `<th${c.key === 'signature' ? ' class="signature-cell"' : ''}>${esc(c.label)}</th>`
+        ).join('')}</tr>`;
 
         const bodyRows = rows.map(r =>
             `<tr>${visibleCols.map(c => cellHtml(c.key, r)).join('')}</tr>`
@@ -439,6 +398,8 @@ async function loadStatement(){
                     return `<td>${fmtSigned(totalADJ)}</td>`;
                 case 'closing_balance':
                     return `<td>${currency}${fmt(data.closing_balance)}</td>`;
+                case 'signature':
+                    return `<td class="signature-cell"></td>`;
             }
             return '<td></td>';
         };

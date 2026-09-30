@@ -134,15 +134,23 @@ try {
     if ($status === 'Posted' || $status === 'Draft') {
         if (!empty($input['signature']) && is_string($input['signature'])) {
             if (strpos($input['signature'], 'data:image') === 0) {
+                // Case 1: brand-new signature -> write file, store its filename.
                 $signatureFileName = saveInvoiceSignature($input['signature'], $tenant_id, $invoice_id);
                 if ($signatureFileName) {
-                    $pdo->prepare("UPDATE sale_invoice SET signature = ? WHERE id = ?")
-                        ->execute([$signatureFileName, $invoice_id]);
+                    $pdo->prepare("UPDATE sale_invoice SET signature = ? WHERE id = ? AND tenant_id = ?")
+                        ->execute([$signatureFileName, $invoice_id, $tenant_id]);
                 }
             } else {
-                // Re-using an existing signature filename (tenant default) — just reference it.
-                $pdo->prepare("UPDATE sale_invoice SET signature = ? WHERE id = ?")
-                    ->execute([$input['signature'], $invoice_id]);
+                // Case 2: re-using an existing filename. The client-supplied string later
+                // gets rendered as an <img src>, so verify it really belongs to THIS
+                // tenant's own signatures before storing it (blocks path traversal and
+                // cross-tenant access via a guessed filename).
+                $chk = $pdo->prepare("SELECT 1 FROM sale_invoice WHERE tenant_id = ? AND signature = ? LIMIT 1");
+                $chk->execute([$tenant_id, $input['signature']]);
+                if ($chk->fetchColumn()) {
+                    $pdo->prepare("UPDATE sale_invoice SET signature = ? WHERE id = ? AND tenant_id = ?")
+                        ->execute([$input['signature'], $invoice_id, $tenant_id]);
+                }
             }
         }
     }

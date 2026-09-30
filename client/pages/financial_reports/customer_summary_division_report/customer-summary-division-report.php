@@ -1,6 +1,6 @@
 <?php
 /**
- * Customer Statement Report - Page (FIXED v5)
+ * Customer Statement Report - Page (FIXED v6)
  *
  * Default behavior:
  * - Customer blank = ALL customers
@@ -8,10 +8,10 @@
  * - Data automatically loads when page opens
  * - Filters: City, Zone, Area, Salesman - MULTI-SELECT (checkbox dropdown)
  * - Transfer Voucher column (signed: TO = +, FROM = -)
- * - Hidden columns ki calculation bhi band - closing balance sirf
- *   visible columns se recalculate hota hai (client-side)
- * - Print ko hidden columns pass hote hain (hide_cols)
- * - NEW: Adjustment column (signed net: RV adjust_amount = -,
+ * - Columns hide/unhide sirf DISPLAY badalta hai. Closing Balance par
+ *   koi asar nahi - hamesha poora (API ka) total dikhta hai.
+ * - Print ko hidden columns pass hote hain (hide_cols) - wahan bhi sirf display
+ * - Adjustment column (signed net: RV adjust_amount = -,
  *        Balance Adjustment JV Debit = +, Credit = -)
  */
 
@@ -580,7 +580,7 @@ let currentRows = [];
 let currentCustomerName = 'All Customers';
 let currentCustomerId = null;
 
-/* API ka raw response + hidden columns ke hisaab se recalculated view */
+/* API ka response (as-is - closing balance par column hide ka koi asar nahi) */
 let currentData = null;
 
 /* Multi-select state - Sets of string ids (City / Zone / Area / Salesman) */
@@ -592,6 +592,7 @@ const selectedSalesmanIds = new Set();
 
 /* -----------------------------------------------------------
  | Column show / hide (preference browser mein save hoti hai)
+ | Yeh sirf DISPLAY badalta hai, koi calculation nahi.
  * ----------------------------------------------------------- */
 const COLUMNS = [
     { key:'date',             label:'Date' },
@@ -632,11 +633,6 @@ function applyColumnVisibility(){
 
     document.getElementById('columns-toggle').textContent =
         hiddenCols.size ? `Columns (${hiddenCols.size} hidden)` : 'Columns';
-
-    // Hidden column ki calculation bhi hat jaye - closing dobara calculate
-    if(currentData){
-        renderAll();
-    }
 }
 
 function buildColumnPanel(){
@@ -718,68 +714,16 @@ function fmtSigned(n){
 
 
 /* -----------------------------------------------------------
- | Build view - hidden columns ko calculation se nikal deta hai
- |
- | Formula (sirf visible columns):
- |   closing = opening + sale_invoice - receive_voucher
- |             - sale_return + transfer_voucher + adjustment
- |
- | Har customer ka running balance alag chalta hai (rows date
- | wise aati hain, next row ka opening = us customer ka pichla
- | closing). Opening column hidden ho to opening 0 se start hota hai.
+ | Render - API data as-is (hidden columns se closing balance
+ | par koi asar nahi; hide sirf CSS se hota hai)
  * ----------------------------------------------------------- */
-function buildView(data, hidden){
-    const num = v => parseFloat(v) || 0;
-    const use = k => !hidden.has(k);
-
-    const running = {};
-
-    const rows = (data.rows || []).map(r => {
-        const key = String(r.customer_id ?? r.customer_name ?? '');
-
-        const opening = (key in running)
-            ? running[key]
-            : (use('opening_balance') ? num(r.opening_balance) : 0);
-
-        const closing = opening
-            + (use('sale_invoice')     ? num(r.sale_invoice)     : 0)
-            - (use('receive_voucher')  ? num(r.receive_voucher)  : 0)
-            - (use('sale_return')      ? num(r.sale_return)      : 0)
-            + (use('transfer_voucher') ? num(r.transfer_voucher) : 0)
-            + (use('adjustment')       ? num(r.adjustment)       : 0);
-
-        running[key] = closing;
-
-        return Object.assign({}, r, {
-            opening_balance: opening,
-            closing_balance: closing
-        });
-    });
-
-    const totalOpening = use('opening_balance') ? num(data.opening_balance) : 0;
-
-    const totalClosing = totalOpening
-        + (use('sale_invoice')     ? num(data.total_sale_invoice)     : 0)
-        - (use('receive_voucher')  ? num(data.total_receive_voucher)  : 0)
-        - (use('sale_return')      ? num(data.total_sale_return)      : 0)
-        + (use('transfer_voucher') ? num(data.total_transfer_voucher) : 0)
-        + (use('adjustment')       ? num(data.total_adjustment)       : 0);
-
-    return Object.assign({}, data, {
-        rows: rows,
-        opening_balance: totalOpening,
-        closing_balance: totalClosing
-    });
-}
-
 function renderAll(){
     if(!currentData) return;
 
-    const view = buildView(currentData, hiddenCols);
-    currentRows = view.rows;
+    currentRows = currentData.rows || [];
 
-    renderSummary(view);
-    renderTable(view);
+    renderSummary(currentData);
+    renderTable(currentData);
 }
 
 
@@ -1093,7 +1037,6 @@ async function generateStatement(){
         currentCustomerName = data.customer_name || 'All Customers';
         currentData         = data;
 
-        // Summary + table hidden columns ke hisaab se recalculated view se render hote hain
         renderAll();
 
     }catch(e){
@@ -1247,6 +1190,7 @@ function renderTable(data){
 /* -----------------------------------------------------------
  | Print
  | Hidden columns hide_cols param se print page ko pass hote hain
+ | (sirf display ke liye)
  * ----------------------------------------------------------- */
 function openPrintView(){
 
@@ -1300,7 +1244,6 @@ function exportCSV(){
 
     let csv = cols.map(c => c.label).join(',') + '\n';
 
-    // currentRows = recalculated rows (hidden columns ke baghair)
     currentRows.forEach(row => {
         csv += cols.map(c => {
             const v = row[c.key] ?? (textCols.includes(c.key) ? '' : 0);
