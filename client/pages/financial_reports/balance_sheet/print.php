@@ -35,6 +35,14 @@ try {
     $currency_symbol = '$';
     $company = ['company_name' => 'Company Name', 'address' => '', 'phone' => '', 'email' => ''];
 }
+
+// Same period the main report page had selected - the Print button passes these
+// through so the printed page matches what's actually on screen, not always "today".
+$end_date = $_GET['end_date'] ?? date('Y-m-d');
+$start_date = $_GET['start_date'] ?? null;
+$report_date_label = $start_date
+    ? date('F j, Y', strtotime($start_date)) . ' - ' . date('F j, Y', strtotime($end_date))
+    : date('F j, Y', strtotime($end_date));
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -206,14 +214,14 @@ try {
     </div>
 
     <div class="print-header">
-        <div class="company-name"><?php echo htmlspecialchars($company['name'] ?? 'Company Name'); ?></div>
+        <div class="company-name"><?php echo htmlspecialchars($company['company_name'] ?? 'Company Name'); ?></div>
         <div class="company-details">
             <?php if ($company['address']) echo htmlspecialchars($company['address']) . ' | '; ?>
             <?php if ($company['phone']) echo 'Tel: ' . htmlspecialchars($company['phone']) . ' | '; ?>
             <?php if ($company['email']) echo 'Email: ' . htmlspecialchars($company['email']); ?>
         </div>
         <div class="report-title">Balance Sheet</div>
-        <div class="report-date">As of <span id="report-date"><?php echo date('F j, Y'); ?></span></div>
+        <div class="report-date">As of <span id="report-date"><?php echo htmlspecialchars($report_date_label); ?></span></div>
     </div>
 
     <div class="balance-sheet-grid">
@@ -258,8 +266,13 @@ try {
             }).format(value);
         }
 
-        // Load balance sheet data
-        fetch('../../../../server/api/financial_reports/balance_sheet/balance-sheet.php')
+        // Load balance sheet data - same period the main report page had selected
+        const endDate = '<?php echo htmlspecialchars($end_date, ENT_QUOTES); ?>';
+        const startDate = <?php echo $start_date ? "'" . htmlspecialchars($start_date, ENT_QUOTES) . "'" : 'null'; ?>;
+        let apiUrl = `../../../../server/api/financial_reports/balance_sheet/balance-sheet.php?end_date=${endDate}`;
+        if (startDate) apiUrl += `&start_date=${startDate}`;
+
+        fetch(apiUrl)
             .then(response => response.json())
             .then(result => {
                 if (result.success) {
@@ -323,11 +336,12 @@ try {
                 `;
             }
 
-            // Render Equity
+            // Render Equity accounts (retained earnings etc.) as their raw recorded balances
+            let retainedEarnings = 0;
             if (data['3']) {
                 for (const [subId, subData] of Object.entries(data['3'])) {
                     subData.accounts.forEach(account => {
-                        totalEquity += parseFloat(account.balance);
+                        retainedEarnings += parseFloat(account.balance);
                         equitySection.innerHTML += `
                             <div class="account-row">
                                 <div>${account.name}</div>
@@ -336,14 +350,23 @@ try {
                         `;
                     });
                 }
-                
-                equitySection.innerHTML += `
-                    <div class="account-total">
-                        <div>TOTAL EQUITY</div>
-                        <div class="amount">${formatCurrency(totalEquity)}</div>
-                    </div>
-                `;
             }
+
+            // Total Equity = Assets - Liabilities (fundamental accounting equation),
+            // matching the live report's calculation - not just the raw sum of equity
+            // accounts, which can differ from this when the books are out of balance.
+            totalEquity = totalAssets - totalLiabilities;
+
+            equitySection.innerHTML += `
+                <div class="account-row" style="font-weight:600; border-top:1px solid #ddd; margin-top:6px; padding-top:8px;">
+                    <div>Total Retained Earnings</div>
+                    <div class="amount">${formatCurrency(retainedEarnings)}</div>
+                </div>
+                <div class="account-total">
+                    <div>TOTAL EQUITY</div>
+                    <div class="amount">${formatCurrency(totalEquity)}</div>
+                </div>
+            `;
 
             // Update totals
             document.getElementById('total-assets').textContent = formatCurrency(totalAssets);

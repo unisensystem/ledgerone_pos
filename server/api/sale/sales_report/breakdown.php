@@ -78,19 +78,25 @@ try {
     } elseif ($type === 'branch') {
         // sale_invoice_items is already joined here, so batch/expiry can be
         // aggregated directly per date - no extra params needed.
+        // Volume is base-unit-converted (same formula as sales-report.php) since a
+        // branch's daily sales span many products/units - a raw SUM(quantity) would
+        // silently add Cartons and Pieces together, which 'Units' as unit hid.
         $stmt = $pdo->prepare("
-            SELECT 
+            SELECT
                 si.sale_date as date,
-                SUM(sii.quantity) as volume,
-                'Units' as unit,
+                SUM(sii.quantity * COALESCE(CASE WHEN u.unit_scope = 'universal' THEN u.conversion_factor WHEN puc.conversion_factor IS NOT NULL THEN puc.conversion_factor ELSE 1 END, 1)) as volume,
+                COALESCE(GROUP_CONCAT(DISTINCT base_u.uom_name SEPARATOR '/'), 'Units') as unit,
                 SUM(si.net_amount) as revenue,
                 GROUP_CONCAT(DISTINCT NULLIF(sii.batch_no,'') SEPARATOR ', ') as batch_no,
                 MIN(CASE WHEN sii.batch_expiry_date >= CURDATE() THEN sii.batch_expiry_date END) as nearest_batch_expiry
             FROM sale_invoice si
             JOIN sale_invoice_items sii ON si.id = sii.sale_invoice_id AND sii.tenant_id = ?
             LEFT JOIN branches b ON si.branch_id = b.id
-            WHERE si.tenant_id = ? 
-                AND COALESCE(b.parent_branch_id, si.branch_id) = ? 
+            LEFT JOIN uom u ON sii.uom_id = u.id
+            LEFT JOIN product_uom_conversions puc ON puc.product_id = sii.product_id AND puc.uom_id = sii.uom_id
+            LEFT JOIN uom base_u ON COALESCE(u.base_unit_id, u.id) = base_u.id
+            WHERE si.tenant_id = ?
+                AND COALESCE(b.parent_branch_id, si.branch_id) = ?
                 AND si.sale_date BETWEEN ? AND ?
                 AND si.status = 'Posted'
             GROUP BY si.sale_date

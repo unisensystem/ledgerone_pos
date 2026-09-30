@@ -60,6 +60,34 @@ $currency_symbol = $currency['symbol'];
 }
 #round-off-toggle:checked { background: #1F7BFF; }
 #round-off-toggle:checked::before { transform: translateX(18px); }
+
+.table-toolbar { margin-bottom: 16px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+.columns-btn { white-space: nowrap; }
+
+.col-modal-overlay {
+    display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.45);
+    z-index: 1000; align-items: center; justify-content: center;
+}
+.col-modal-overlay.open { display: flex; }
+.col-modal {
+    background: var(--card-bg, #fff); color: var(--text-color, #222);
+    border-radius: 10px; width: 340px; max-width: 92vw; max-height: 80vh;
+    display: flex; flex-direction: column; box-shadow: 0 10px 40px rgba(0,0,0,0.25);
+}
+.col-modal-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 18px; border-bottom: 1px solid #e1e6ee;
+}
+.col-modal-header h3 { font-size: 16px; margin: 0; }
+.col-modal-close { background: none; border: none; font-size: 22px; line-height: 1; cursor: pointer; color: inherit; }
+.col-modal-body { padding: 10px 18px; overflow-y: auto; flex: 1; }
+.col-modal-body label {
+    display: flex; align-items: center; gap: 10px; padding: 7px 2px; font-size: 14px; cursor: pointer;
+}
+.col-modal-footer {
+    padding: 12px 18px; border-top: 1px solid #e1e6ee;
+    display: flex; justify-content: space-between; gap: 10px;
+}
 </style>
 
 <body>
@@ -269,21 +297,22 @@ $currency_symbol = $currency['symbol'];
         <!-- Sales Officer Wise Sales Table -->
         <div class="table-card">
             <div class="table-title">Sales Officer Wise Sales Details</div>
-            <div style="margin-bottom: 16px;">
+            <div class="table-toolbar">
                 <input type="text" id="search-officer" class="form-input" placeholder="Search by Employee ID or Officer Name..." style="max-width: 400px;">
+                <button type="button" class="btn btn-secondary columns-btn" id="officer-columns-btn"><i class="fas fa-columns"></i> Columns</button>
             </div>
             <div class="table-responsive">
                 <table>
                     <thead>
                         <tr>
-                            <th>Employee ID</th>
-                            <th>Officer Name</th>
-                            <th>Total Invoices</th>
-                            <th>Total Sales (<?php echo $currency_symbol; ?>)</th>
-                            <th>Batch No</th>
-                            <th>Expiry Date</th>
-                            <th>Item Company</th>
-                            <th>Status</th>
+                            <th data-col="employee_id">Employee ID</th>
+                            <th data-col="officer_name">Officer Name</th>
+                            <th data-col="total_invoices">Total Invoices</th>
+                            <th data-col="total_sales">Total Sales (<?php echo $currency_symbol; ?>)</th>
+                            <th data-col="batch_no">Batch No</th>
+                            <th data-col="expiry_date">Expiry Date</th>
+                            <th data-col="item_company">Item Company</th>
+                            <th data-col="status">Status</th>
                         </tr>
                     </thead>
                     <tbody id="officerTableBody">
@@ -296,21 +325,22 @@ $currency_symbol = $currency['symbol'];
         <!-- Supplier Man Wise Sales Table -->
         <div class="table-card">
             <div class="table-title">Supplier Man Wise Sales Details</div>
-            <div style="margin-bottom: 16px;">
+            <div class="table-toolbar">
                 <input type="text" id="search-supplier-man" class="form-input" placeholder="Search by Employee ID or Supplier Man Name..." style="max-width: 400px;">
+                <button type="button" class="btn btn-secondary columns-btn" id="supplier_man-columns-btn"><i class="fas fa-columns"></i> Columns</button>
             </div>
             <div class="table-responsive">
                 <table>
                     <thead>
                         <tr>
-                            <th>Employee ID</th>
-                            <th>Supplier Man Name</th>
-                            <th>Total Invoices</th>
-                            <th>Total Sales (<?php echo $currency_symbol; ?>)</th>
-                            <th>Batch No</th>
-                            <th>Expiry Date</th>
-                            <th>Item Company</th>
-                            <th>Status</th>
+                            <th data-col="employee_id">Employee ID</th>
+                            <th data-col="supplier_man_name">Supplier Man Name</th>
+                            <th data-col="total_invoices">Total Invoices</th>
+                            <th data-col="total_sales">Total Sales (<?php echo $currency_symbol; ?>)</th>
+                            <th data-col="batch_no">Batch No</th>
+                            <th data-col="expiry_date">Expiry Date</th>
+                            <th data-col="item_company">Item Company</th>
+                            <th data-col="status">Status</th>
                         </tr>
                     </thead>
                     <tbody id="supplierManTableBody">
@@ -323,12 +353,9 @@ $currency_symbol = $currency['symbol'];
         <!-- Product Wise Sales Table -->
         <div class="table-card">
             <div class="table-title">Product Wise Sales Details</div>
-            <div style="margin-bottom: 16px; display:flex; gap:12px; align-items:center; flex-wrap:wrap;">
+            <div class="table-toolbar">
                 <input type="text" id="search-product" class="form-input" placeholder="Search by Product ID, Name or Category..." style="max-width: 400px;">
-                <div style="position:relative;">
-                    <button type="button" class="btn btn-secondary" id="product-columns-btn"><i class="fas fa-columns"></i> Columns</button>
-                    <div id="product-columns-menu" style="display:none; position:absolute; top:110%; left:0; background:#fff; border:1px solid #e1e6ee; border-radius:8px; padding:10px; box-shadow:0 4px 14px rgba(0,0,0,0.1); z-index:20; min-width:190px;"></div>
-                </div>
+                <button type="button" class="btn btn-secondary columns-btn" id="product-columns-btn"><i class="fas fa-columns"></i> Columns</button>
             </div>
             <div class="table-responsive">
                 <table>
@@ -353,21 +380,22 @@ $currency_symbol = $currency['symbol'];
         <!-- Branch Wise Sales Table -->
         <div class="table-card">
             <div class="table-title">Branch Wise Sales Details</div>
-            <div style="margin-bottom: 16px;">
+            <div class="table-toolbar">
                 <input type="text" id="search-branch" class="form-input" placeholder="Search by Branch ID or Name..." style="max-width: 400px;">
+                <button type="button" class="btn btn-secondary columns-btn" id="branch-columns-btn"><i class="fas fa-columns"></i> Columns</button>
             </div>
             <div class="table-responsive">
                 <table>
                     <thead>
                         <tr>
-                            <th>Branch ID</th>
-                            <th>Branch Name</th>
-                            <th>Total Sales (<?php echo $currency_symbol; ?>)</th>
-                            <th>Transactions</th>
-                            <th>Avg Sale (<?php echo $currency_symbol; ?>)</th>
-                            <th>Batch No</th>
-                            <th>Expiry Date</th>
-                            <th>Item Company</th>
+                            <th data-col="branch_id">Branch ID</th>
+                            <th data-col="branch_name">Branch Name</th>
+                            <th data-col="total_sales">Total Sales (<?php echo $currency_symbol; ?>)</th>
+                            <th data-col="transactions">Transactions</th>
+                            <th data-col="avg_sale">Avg Sale (<?php echo $currency_symbol; ?>)</th>
+                            <th data-col="batch_no">Batch No</th>
+                            <th data-col="expiry_date">Expiry Date</th>
+                            <th data-col="item_company">Item Company</th>
                         </tr>
                     </thead>
                     <tbody id="branchTableBody">
@@ -380,19 +408,20 @@ $currency_symbol = $currency['symbol'];
         <!-- Category Wise Sales Table -->
         <div class="table-card">
             <div class="table-title">Category Wise Sales Details</div>
-            <div style="margin-bottom: 16px;">
+            <div class="table-toolbar">
                 <input type="text" id="search-category" class="form-input" placeholder="Search by Category..." style="max-width: 400px;">
+                <button type="button" class="btn btn-secondary columns-btn" id="category-columns-btn"><i class="fas fa-columns"></i> Columns</button>
             </div>
             <div class="table-responsive">
                 <table>
                     <thead>
                         <tr>
-                            <th>Category</th>
-                            <th>Total Revenue (<?php echo $currency_symbol; ?>)</th>
-                            <th>Percentage</th>
-                            <th>Batch No</th>
-                            <th>Expiry Date</th>
-                            <th>Item Company</th>
+                            <th data-col="category">Category</th>
+                            <th data-col="total_revenue">Total Revenue (<?php echo $currency_symbol; ?>)</th>
+                            <th data-col="percentage">Percentage</th>
+                            <th data-col="batch_no">Batch No</th>
+                            <th data-col="expiry_date">Expiry Date</th>
+                            <th data-col="item_company">Item Company</th>
                         </tr>
                     </thead>
                     <tbody id="categoryTableBody">
@@ -405,23 +434,24 @@ $currency_symbol = $currency['symbol'];
         <!-- Territory Wise Sales Table -->
         <div class="table-card">
             <div class="table-title">Territory Wise Sales Details</div>
-            <div style="margin-bottom: 16px;">
+            <div class="table-toolbar">
                 <input type="text" id="search-territory" class="form-input" placeholder="Search by Country, Region, City, Zone or Area..." style="max-width: 400px;">
+                <button type="button" class="btn btn-secondary columns-btn" id="territory-columns-btn"><i class="fas fa-columns"></i> Columns</button>
             </div>
             <div class="table-responsive">
                 <table>
                     <thead>
                         <tr>
-                            <th>Country</th>
-                            <th>Region</th>
-                            <th>City</th>
-                            <th>Zone</th>
-                            <th>Area</th>
-                            <th>Total Invoices</th>
-                            <th>Total Sales (<?php echo $currency_symbol; ?>)</th>
-                            <th>Batch No</th>
-                            <th>Expiry Date</th>
-                            <th>Item Company</th>
+                            <th data-col="country">Country</th>
+                            <th data-col="region">Region</th>
+                            <th data-col="city">City</th>
+                            <th data-col="zone">Zone</th>
+                            <th data-col="area">Area</th>
+                            <th data-col="total_invoices">Total Invoices</th>
+                            <th data-col="total_sales">Total Sales (<?php echo $currency_symbol; ?>)</th>
+                            <th data-col="batch_no">Batch No</th>
+                            <th data-col="expiry_date">Expiry Date</th>
+                            <th data-col="item_company">Item Company</th>
                         </tr>
                     </thead>
                     <tbody id="territoryTableBody">
@@ -434,23 +464,24 @@ $currency_symbol = $currency['symbol'];
         <!-- Invoice Wise Sales Table -->
         <div class="table-card">
             <div class="table-title">Invoice Wise Sales Details</div>
-            <div style="margin-bottom: 16px;">
+            <div class="table-toolbar">
                 <input type="text" id="search-invoice" class="form-input" placeholder="Search by Invoice #, Customer or Officer..." style="max-width: 400px;">
+                <button type="button" class="btn btn-secondary columns-btn" id="invoice-columns-btn"><i class="fas fa-columns"></i> Columns</button>
             </div>
             <div class="table-responsive">
                 <table>
                     <thead>
                         <tr>
-                            <th>Invoice #</th>
-                            <th>Date</th>
-                            <th>Customer</th>
-                            <th>Sales Officer</th>
-                            <th>Total Bill (<?php echo $currency_symbol; ?>)</th>
-                            <th>Discount (<?php echo $currency_symbol; ?>)</th>
-                            <th>Net Amount (<?php echo $currency_symbol; ?>)</th>
-                            <th>Batch No</th>
-                            <th>Expiry Date</th>
-                            <th>Item Company</th>
+                            <th data-col="bill_no">Invoice #</th>
+                            <th data-col="sale_date">Date</th>
+                            <th data-col="customer_name">Customer</th>
+                            <th data-col="officer_name">Sales Officer</th>
+                            <th data-col="total_bill">Total Bill (<?php echo $currency_symbol; ?>)</th>
+                            <th data-col="discount">Discount (<?php echo $currency_symbol; ?>)</th>
+                            <th data-col="net_amount">Net Amount (<?php echo $currency_symbol; ?>)</th>
+                            <th data-col="batch_no">Batch No</th>
+                            <th data-col="expiry_date">Expiry Date</th>
+                            <th data-col="item_company">Item Company</th>
                         </tr>
                     </thead>
                     <tbody id="invoiceTableBody">
@@ -463,19 +494,20 @@ $currency_symbol = $currency['symbol'];
         <!-- Item Company Wise Sales Table -->
         <div class="table-card">
             <div class="table-title">Item Company Wise Sales Details</div>
-            <div style="margin-bottom: 16px;">
+            <div class="table-toolbar">
                 <input type="text" id="search-item-company" class="form-input" placeholder="Search by Item Company Name..." style="max-width: 400px;">
+                <button type="button" class="btn btn-secondary columns-btn" id="item_company-columns-btn"><i class="fas fa-columns"></i> Columns</button>
             </div>
             <div class="table-responsive">
                 <table>
                     <thead>
                         <tr>
-                            <th>Item Company</th>
-                            <th>Total Invoices</th>
-                            <th>Total Quantity</th>
-                            <th>Total Sales (<?php echo $currency_symbol; ?>)</th>
-                            <th>Batch No</th>
-                            <th>Expiry Date</th>
+                            <th data-col="item_company">Item Company</th>
+                            <th data-col="total_invoices">Total Invoices</th>
+                            <th data-col="total_quantity">Total Quantity</th>
+                            <th data-col="total_sales">Total Sales (<?php echo $currency_symbol; ?>)</th>
+                            <th data-col="batch_no">Batch No</th>
+                            <th data-col="expiry_date">Expiry Date</th>
                         </tr>
                     </thead>
                     <tbody id="itemCompanyTableBody"></tbody>
@@ -486,21 +518,22 @@ $currency_symbol = $currency['symbol'];
         <!-- Vendor Wise Sales Table -->
         <div class="table-card">
             <div class="table-title">Vendor Wise Sales Details</div>
-            <div style="margin-bottom: 16px;">
+            <div class="table-toolbar">
                 <input type="text" id="search-vendor" class="form-input" placeholder="Search by Vendor ID or Name..." style="max-width: 400px;">
+                <button type="button" class="btn btn-secondary columns-btn" id="vendor-columns-btn"><i class="fas fa-columns"></i> Columns</button>
             </div>
             <div class="table-responsive">
                 <table>
                     <thead>
                         <tr>
-                            <th>Vendor ID</th>
-                            <th>Vendor Name</th>
-                            <th>Total Invoices</th>
-                            <th>Total Quantity</th>
-                            <th>Total Sales (<?php echo $currency_symbol; ?>)</th>
-                            <th>Batch No</th>
-                            <th>Expiry Date</th>
-                            <th>Item Company</th>
+                            <th data-col="vendor_id">Vendor ID</th>
+                            <th data-col="vendor_name">Vendor Name</th>
+                            <th data-col="total_invoices">Total Invoices</th>
+                            <th data-col="total_quantity">Total Quantity</th>
+                            <th data-col="total_sales">Total Sales (<?php echo $currency_symbol; ?>)</th>
+                            <th data-col="batch_no">Batch No</th>
+                            <th data-col="expiry_date">Expiry Date</th>
+                            <th data-col="item_company">Item Company</th>
                         </tr>
                     </thead>
                     <tbody id="vendorTableBody">
@@ -513,26 +546,42 @@ $currency_symbol = $currency['symbol'];
         <!-- Customer Wise Sales Table -->
         <div class="table-card">
             <div class="table-title">Customer Wise Sales Details</div>
-            <div style="margin-bottom: 16px;">
+            <div class="table-toolbar">
                 <input type="text" id="search-customer" class="form-input" placeholder="Search by Customer ID or Name..." style="max-width: 400px;">
+                <button type="button" class="btn btn-secondary columns-btn" id="customer-columns-btn"><i class="fas fa-columns"></i> Columns</button>
             </div>
             <div class="table-responsive">
                 <table>
                     <thead>
                         <tr>
-                            <th>Customer ID</th>
-                            <th>Customer Name</th>
-                            <th>Total Invoices</th>
-                            <th>Total Sales (<?php echo $currency_symbol; ?>)</th>
-                            <th>Batch No</th>
-                            <th>Expiry Date</th>
-                            <th>Item Company</th>
+                            <th data-col="customer_id">Customer ID</th>
+                            <th data-col="customer_name">Customer Name</th>
+                            <th data-col="total_invoices">Total Invoices</th>
+                            <th data-col="total_sales">Total Sales (<?php echo $currency_symbol; ?>)</th>
+                            <th data-col="batch_no">Batch No</th>
+                            <th data-col="expiry_date">Expiry Date</th>
+                            <th data-col="item_company">Item Company</th>
                         </tr>
                     </thead>
                     <tbody id="customerTableBody">
                         <!-- Data will be populated by JavaScript -->
                     </tbody>
                 </table>
+            </div>
+        </div>
+
+        <!-- Shared Show/Hide Columns Modal (reused by every report table) -->
+        <div id="columns-modal" class="col-modal-overlay">
+            <div class="col-modal">
+                <div class="col-modal-header">
+                    <h3 id="col-modal-title">Show / Hide Columns</h3>
+                    <button type="button" class="col-modal-close" id="col-modal-close">&times;</button>
+                </div>
+                <div class="col-modal-body" id="col-modal-body"></div>
+                <div class="col-modal-footer">
+                    <button type="button" class="btn btn-secondary" id="col-modal-reset">Reset to Default</button>
+                    <button type="button" class="btn btn-primary" id="col-modal-done">Done</button>
+                </div>
             </div>
         </div>
 

@@ -150,14 +150,14 @@ function populateBranchTable() {
         row.className = 'branch-row';
         row.setAttribute('data-search', `${item.branch_id_display} ${item.branch_name}`.toLowerCase());
         row.innerHTML = `
-            <td><i class="fas fa-chevron-right" style="margin-right: 8px; transition: transform 0.3s;"></i>${item.branch_id_display}</td>
-            <td>${item.branch_name}</td>
-            <td>${formatMoney(item.total_sales)}</td>
-            <td>${formatQty(item.transactions)}</td>
-            <td>${formatMoney(item.avg_sale)}</td>
-            <td>${formatBatchCell(item.batch_no)}</td>
-            <td>${formatExpiryCell(item.nearest_expiry)}</td>
-            <td>${formatItemCompanyCell(item.item_company_name)}</td>
+            <td data-col="branch_id"><i class="fas fa-chevron-right" style="margin-right: 8px; transition: transform 0.3s;"></i>${item.branch_id_display}</td>
+            <td data-col="branch_name">${item.branch_name}</td>
+            <td data-col="total_sales">${formatMoney(item.total_sales)}</td>
+            <td data-col="transactions">${formatQty(item.transactions)}</td>
+            <td data-col="avg_sale">${formatMoney(item.avg_sale)}</td>
+            <td data-col="batch_no">${formatBatchCell(item.batch_no)}</td>
+            <td data-col="expiry_date">${formatExpiryCell(item.nearest_expiry)}</td>
+            <td data-col="item_company">${formatItemCompanyCell(item.item_company_name)}</td>
         `;
 
         const detailRow = document.createElement('tr');
@@ -178,6 +178,7 @@ function populateBranchTable() {
     });
     setupSearch('search-branch', '.branch-row', ['data-search']);
     setupPagination('branchTableBody', 50);
+    setupColumnToggle('branch');
 }
 
 function populateCategoryTable() {
@@ -197,17 +198,18 @@ function populateCategoryTable() {
         row.className = 'category-row';
         row.setAttribute('data-search', item.category.toLowerCase());
         row.innerHTML = `
-            <td>${item.category}</td>
-            <td>${formatMoney(item.total)}</td>
-            <td>${percentage}%</td>
-            <td>${formatBatchCell(item.batch_no)}</td>
-            <td>${formatExpiryCell(item.nearest_expiry)}</td>
-            <td>${formatItemCompanyCell(item.item_company_name)}</td>
+            <td data-col="category">${item.category}</td>
+            <td data-col="total_revenue">${formatMoney(item.total)}</td>
+            <td data-col="percentage">${percentage}%</td>
+            <td data-col="batch_no">${formatBatchCell(item.batch_no)}</td>
+            <td data-col="expiry_date">${formatExpiryCell(item.nearest_expiry)}</td>
+            <td data-col="item_company">${formatItemCompanyCell(item.item_company_name)}</td>
         `;
         tableBody.appendChild(row);
     });
     setupSearch('search-category', '.category-row', ['data-search']);
     setupPagination('categoryTableBody', 50);
+    setupColumnToggle('category');
 }
 
 function filterReportType() {
@@ -310,14 +312,14 @@ function populateOfficerTable() {
         row.className = 'officer-row';
         row.setAttribute('data-search', `${item.employee_id} ${item.officer_name}`.toLowerCase());
         row.innerHTML = `
-            <td><i class="fas fa-chevron-right" style="margin-right: 8px; transition: transform 0.3s;"></i>${item.employee_id}</td>
-            <td>${item.officer_name}</td>
-            <td>${formatQty(item.total_invoices)}</td>
-            <td>${formatMoney(item.total_sales)}</td>
-            <td>${formatBatchCell(item.batch_no)}</td>
-            <td>${formatExpiryCell(item.nearest_expiry)}</td>
-            <td>${formatItemCompanyCell(item.item_company_name)}</td>
-            <td><span class="badge ${item.status === 'Active' ? 'badge-success' : 'badge-warning'}">${item.status}</span></td>
+            <td data-col="employee_id"><i class="fas fa-chevron-right" style="margin-right: 8px; transition: transform 0.3s;"></i>${item.employee_id}</td>
+            <td data-col="officer_name">${item.officer_name}</td>
+            <td data-col="total_invoices">${formatQty(item.total_invoices)}</td>
+            <td data-col="total_sales">${formatMoney(item.total_sales)}</td>
+            <td data-col="batch_no">${formatBatchCell(item.batch_no)}</td>
+            <td data-col="expiry_date">${formatExpiryCell(item.nearest_expiry)}</td>
+            <td data-col="item_company">${formatItemCompanyCell(item.item_company_name)}</td>
+            <td data-col="status"><span class="badge ${item.status === 'Active' ? 'badge-success' : 'badge-warning'}">${item.status}</span></td>
         `;
 
         const detailRow = document.createElement('tr');
@@ -338,6 +340,7 @@ function populateOfficerTable() {
     });
     setupSearch('search-officer', '.officer-row', ['data-search']);
     setupPagination('officerTableBody', 50);
+    setupColumnToggle('officer');
 }
 
 function populateProductTable() {
@@ -381,7 +384,7 @@ function populateProductTable() {
             <td data-col="batch_no">${batchNo}</td>
             <td data-col="expiry_date">${expiryHtml}</td>
             <td data-col="item_company">${itemCompany}</td>
-            <td data-col="quantity_sold">${formatQty(item.quantity_sold)}</td>
+            <td data-col="quantity_sold">${formatQty(item.quantity_sold)}${item.unit_symbol ? ' ' + item.unit_symbol : ''}</td>
             <td data-col="revenue">${formatMoney(item.revenue)}</td>
             <td data-col="growth">${growthHtml}</td>
         `;
@@ -422,16 +425,16 @@ function populateTerritoryTable() {
         row.className = 'territory-row';
         row.setAttribute('data-search', `${item.country} ${item.region} ${item.city} ${item.zone} ${item.area}`.toLowerCase());
         row.innerHTML = `
-            <td><i class="fas fa-chevron-right" style="margin-right: 8px; transition: transform 0.3s;"></i>${item.country}</td>
-            <td>${item.region}</td>
-            <td>${item.city}</td>
-            <td>${item.zone}</td>
-            <td>${item.area}</td>
-            <td>${formatQty(item.total_invoices)}</td>
-            <td>${formatMoney(item.total_sales)}</td>
-            <td>${formatBatchCell(item.batch_no)}</td>
-            <td>${formatExpiryCell(item.nearest_expiry)}</td>
-            <td>${formatItemCompanyCell(item.item_company_name)}</td>
+            <td data-col="country"><i class="fas fa-chevron-right" style="margin-right: 8px; transition: transform 0.3s;"></i>${item.country}</td>
+            <td data-col="region">${item.region}</td>
+            <td data-col="city">${item.city}</td>
+            <td data-col="zone">${item.zone}</td>
+            <td data-col="area">${item.area}</td>
+            <td data-col="total_invoices">${formatQty(item.total_invoices)}</td>
+            <td data-col="total_sales">${formatMoney(item.total_sales)}</td>
+            <td data-col="batch_no">${formatBatchCell(item.batch_no)}</td>
+            <td data-col="expiry_date">${formatExpiryCell(item.nearest_expiry)}</td>
+            <td data-col="item_company">${formatItemCompanyCell(item.item_company_name)}</td>
         `;
 
         const detailRow = document.createElement('tr');
@@ -452,6 +455,7 @@ function populateTerritoryTable() {
     });
     setupSearch('search-territory', '.territory-row', ['data-search']);
     setupPagination('territoryTableBody', 50);
+    setupColumnToggle('territory');
 }
 
 function populateInvoiceTable() {
@@ -469,16 +473,16 @@ function populateInvoiceTable() {
         row.className = 'invoice-row';
         row.setAttribute('data-search', `${item.bill_no} ${item.customer_name} ${item.officer_name}`.toLowerCase());
         row.innerHTML = `
-            <td><i class="fas fa-chevron-right" style="margin-right: 8px; transition: transform 0.3s;"></i>${item.bill_no}</td>
-            <td>${item.sale_date}</td>
-            <td>${item.customer_name}</td>
-            <td>${item.officer_name}</td>
-            <td>${formatMoney(item.total_bill)}</td>
-            <td>${formatMoney(item.total_discount_amount)}</td>
-            <td>${formatMoney(item.net_amount)}</td>
-            <td>${formatBatchCell(item.batch_no)}</td>
-            <td>${formatExpiryCell(item.nearest_expiry)}</td>
-            <td>${formatItemCompanyCell(item.item_company_name)}</td>
+            <td data-col="bill_no"><i class="fas fa-chevron-right" style="margin-right: 8px; transition: transform 0.3s;"></i>${item.bill_no}</td>
+            <td data-col="sale_date">${item.sale_date}</td>
+            <td data-col="customer_name">${item.customer_name}</td>
+            <td data-col="officer_name">${item.officer_name}</td>
+            <td data-col="total_bill">${formatMoney(item.total_bill)}</td>
+            <td data-col="discount">${formatMoney(item.total_discount_amount)}</td>
+            <td data-col="net_amount">${formatMoney(item.net_amount)}</td>
+            <td data-col="batch_no">${formatBatchCell(item.batch_no)}</td>
+            <td data-col="expiry_date">${formatExpiryCell(item.nearest_expiry)}</td>
+            <td data-col="item_company">${formatItemCompanyCell(item.item_company_name)}</td>
         `;
 
         const detailRow = document.createElement('tr');
@@ -499,6 +503,7 @@ function populateInvoiceTable() {
     });
     setupSearch('search-invoice', '.invoice-row', ['data-search']);
     setupPagination('invoiceTableBody', 50);
+    setupColumnToggle('invoice');
 }
 
 function populateVendorTable() {
@@ -516,14 +521,14 @@ function populateVendorTable() {
         row.className = 'vendor-row';
         row.setAttribute('data-search', `${item.vendor_id_display} ${item.vendor_name}`.toLowerCase());
         row.innerHTML = `
-            <td><i class="fas fa-chevron-right" style="margin-right: 8px; transition: transform 0.3s;"></i>${item.vendor_id_display}</td>
-            <td>${item.vendor_name}</td>
-            <td>${formatQty(item.total_invoices)}</td>
-            <td>${formatQty(item.total_quantity)}</td>
-            <td>${formatMoney(item.total_sales)}</td>
-            <td>${formatBatchCell(item.batch_no)}</td>
-            <td>${formatExpiryCell(item.nearest_expiry)}</td>
-            <td>${formatItemCompanyCell(item.item_company_name)}</td>
+            <td data-col="vendor_id"><i class="fas fa-chevron-right" style="margin-right: 8px; transition: transform 0.3s;"></i>${item.vendor_id_display}</td>
+            <td data-col="vendor_name">${item.vendor_name}</td>
+            <td data-col="total_invoices">${formatQty(item.total_invoices)}</td>
+            <td data-col="total_quantity">${formatQty(item.total_quantity)}${item.unit_symbol ? ' ' + item.unit_symbol : ''}</td>
+            <td data-col="total_sales">${formatMoney(item.total_sales)}</td>
+            <td data-col="batch_no">${formatBatchCell(item.batch_no)}</td>
+            <td data-col="expiry_date">${formatExpiryCell(item.nearest_expiry)}</td>
+            <td data-col="item_company">${formatItemCompanyCell(item.item_company_name)}</td>
         `;
 
         const detailRow = document.createElement('tr');
@@ -544,6 +549,7 @@ function populateVendorTable() {
     });
     setupSearch('search-vendor', '.vendor-row', ['data-search']);
     setupPagination('vendorTableBody', 50);
+    setupColumnToggle('vendor');
 }
 
 function populateItemCompanyTable() {
@@ -560,17 +566,18 @@ function populateItemCompanyTable() {
         row.className = 'item-company-row';
         row.setAttribute('data-search', (item.item_company_name || '').toLowerCase());
         row.innerHTML = `
-            <td>${item.item_company_name || 'Unknown'}</td>
-            <td>${formatQty(item.total_invoices)}</td>
-            <td>${formatQty(item.total_quantity)}</td>
-            <td>${formatMoney(item.total_sales)}</td>
-            <td>${formatBatchCell(item.batch_no)}</td>
-            <td>${formatExpiryCell(item.nearest_expiry)}</td>
+            <td data-col="item_company">${item.item_company_name || 'Unknown'}</td>
+            <td data-col="total_invoices">${formatQty(item.total_invoices)}</td>
+            <td data-col="total_quantity">${formatQty(item.total_quantity)}${item.unit_symbol ? ' ' + item.unit_symbol : ''}</td>
+            <td data-col="total_sales">${formatMoney(item.total_sales)}</td>
+            <td data-col="batch_no">${formatBatchCell(item.batch_no)}</td>
+            <td data-col="expiry_date">${formatExpiryCell(item.nearest_expiry)}</td>
         `;
         tableBody.appendChild(row);
     });
     setupSearch('search-item-company', '.item-company-row', ['data-search']);
     setupPagination('itemCompanyTableBody', 50);
+    setupColumnToggle('item_company');
 }
 
 function populateCustomerTable() {
@@ -588,13 +595,13 @@ function populateCustomerTable() {
         row.className = 'customer-row';
         row.setAttribute('data-search', `${item.customer_id_display} ${item.customer_name}`.toLowerCase());
         row.innerHTML = `
-            <td><i class="fas fa-chevron-right" style="margin-right: 8px; transition: transform 0.3s;"></i>${item.customer_id_display}</td>
-            <td>${item.customer_name}</td>
-            <td>${formatQty(item.total_invoices)}</td>
-            <td>${formatMoney(item.total_sales)}</td>
-            <td>${formatBatchCell(item.batch_no)}</td>
-            <td>${formatExpiryCell(item.nearest_expiry)}</td>
-            <td>${formatItemCompanyCell(item.item_company_name)}</td>
+            <td data-col="customer_id"><i class="fas fa-chevron-right" style="margin-right: 8px; transition: transform 0.3s;"></i>${item.customer_id_display}</td>
+            <td data-col="customer_name">${item.customer_name}</td>
+            <td data-col="total_invoices">${formatQty(item.total_invoices)}</td>
+            <td data-col="total_sales">${formatMoney(item.total_sales)}</td>
+            <td data-col="batch_no">${formatBatchCell(item.batch_no)}</td>
+            <td data-col="expiry_date">${formatExpiryCell(item.nearest_expiry)}</td>
+            <td data-col="item_company">${formatItemCompanyCell(item.item_company_name)}</td>
         `;
 
         const detailRow = document.createElement('tr');
@@ -615,6 +622,7 @@ function populateCustomerTable() {
     });
     setupSearch('search-customer', '.customer-row', ['data-search']);
     setupPagination('customerTableBody', 50);
+    setupColumnToggle('customer');
 }
 
 function populateSupplierManTable() {
@@ -634,14 +642,14 @@ function populateSupplierManTable() {
         row.className = 'supplier-man-row';
         row.setAttribute('data-search', `${item.employee_id} ${item.supplier_man_name}`.toLowerCase());
         row.innerHTML = `
-            <td><i class="fas fa-chevron-right" style="margin-right: 8px; transition: transform 0.3s;"></i>${item.employee_id}</td>
-            <td>${item.supplier_man_name}</td>
-            <td>${formatQty(item.total_invoices)}</td>
-            <td>${formatMoney(item.total_sales)}</td>
-            <td>${formatBatchCell(item.batch_no)}</td>
-            <td>${formatExpiryCell(item.nearest_expiry)}</td>
-            <td>${formatItemCompanyCell(item.item_company_name)}</td>
-            <td><span class="badge ${item.status === 'Active' ? 'badge-success' : 'badge-warning'}">${item.status}</span></td>
+            <td data-col="employee_id"><i class="fas fa-chevron-right" style="margin-right: 8px; transition: transform 0.3s;"></i>${item.employee_id}</td>
+            <td data-col="supplier_man_name">${item.supplier_man_name}</td>
+            <td data-col="total_invoices">${formatQty(item.total_invoices)}</td>
+            <td data-col="total_sales">${formatMoney(item.total_sales)}</td>
+            <td data-col="batch_no">${formatBatchCell(item.batch_no)}</td>
+            <td data-col="expiry_date">${formatExpiryCell(item.nearest_expiry)}</td>
+            <td data-col="item_company">${formatItemCompanyCell(item.item_company_name)}</td>
+            <td data-col="status"><span class="badge ${item.status === 'Active' ? 'badge-success' : 'badge-warning'}">${item.status}</span></td>
         `;
 
         const detailRow = document.createElement('tr');
@@ -662,6 +670,7 @@ function populateSupplierManTable() {
     });
     setupSearch('search-supplier-man', '.supplier-man-row', ['data-search']);
     setupPagination('supplierManTableBody', 50);
+    setupColumnToggle('supplier_man');
 }
 
 // Chart initialization (unchanged - kept same for brevity)
@@ -983,9 +992,9 @@ async function toggleBreakdown(row, detailRow, type, id, index) {
 
                 const data = result.data;
 
-                const headers = type === 'branch' ? '<tr><th>Date</th><th>Quantity</th><th>Unit</th><th>Revenue</th><th>Batch No</th><th>Expiry Date</th><th>Item Company</th></tr>' :
-                               type === 'officer' ? '<tr><th>Date</th><th>Invoices</th><th>Revenue</th><th>Batch No</th><th>Expiry Date</th><th>Item Company</th></tr>' :
-                               type === 'supplier_man' ? '<tr><th>Date</th><th>Invoices</th><th>Revenue</th><th>Batch No</th><th>Expiry Date</th><th>Item Company</th></tr>' :
+                const headers = type === 'branch' ? '<tr><th data-col="bd_date">Date</th><th>Quantity</th><th>Unit</th><th data-col="bd_revenue">Revenue</th><th data-col="batch_no">Batch No</th><th data-col="expiry_date">Expiry Date</th><th data-col="item_company">Item Company</th></tr>' :
+                               type === 'officer' ? '<tr><th data-col="bd_date">Date</th><th data-col="bd_invoices">Invoices</th><th data-col="bd_revenue">Revenue</th><th data-col="batch_no">Batch No</th><th data-col="expiry_date">Expiry Date</th><th data-col="item_company">Item Company</th></tr>' :
+                               type === 'supplier_man' ? '<tr><th data-col="bd_date">Date</th><th data-col="bd_invoices">Invoices</th><th data-col="bd_revenue">Revenue</th><th data-col="batch_no">Batch No</th><th data-col="expiry_date">Expiry Date</th><th data-col="item_company">Item Company</th></tr>' :
                                '<tr><th>Date</th><th>Quantity</th><th>Revenue</th></tr>';
 
                 let html = `
@@ -998,23 +1007,25 @@ async function toggleBreakdown(row, detailRow, type, id, index) {
                     </div>
                     <div style="max-height: 300px; overflow-y: auto;">
                         <table style="width: 100%; font-size: 13px;" id="table-${type}-${index}">
-                            ${headers}`;
+                            <thead>${headers}</thead>
+                            <tbody>`;
 
                 data.forEach(item => {
                     const batchCell = formatBatchCell(item.batch_no);
                     const expiryCell = formatExpiryCell(item.nearest_expiry);
                     const itemCompanyCell = formatItemCompanyCell(item.item_company_name);
                     if (type === 'branch') {
-                        html += `<tr class="breakdown-row"><td>${item.date}</td><td>${formatQty(item.volume)}</td><td>${item.unit || '-'}</td><td>${formatMoney(item.revenue)}</td><td>${batchCell}</td><td>${expiryCell}</td><td>${itemCompanyCell}</td></tr>`;
+                        html += `<tr class="breakdown-row"><td data-col="bd_date">${item.date}</td><td data-col="quantity_sold">${formatQty(item.volume)}</td><td data-col="quantity_sold">${item.unit || '-'}</td><td data-col="bd_revenue">${formatMoney(item.revenue)}</td><td data-col="batch_no">${batchCell}</td><td data-col="expiry_date">${expiryCell}</td><td data-col="item_company">${itemCompanyCell}</td></tr>`;
                     } else if (type === 'officer' || type === 'supplier_man') {
-                        html += `<tr class="breakdown-row"><td>${item.date}</td><td>${formatQty(item.invoices)}</td><td>${formatMoney(item.revenue)}</td><td>${batchCell}</td><td>${expiryCell}</td><td>${itemCompanyCell}</td></tr>`;
+                        html += `<tr class="breakdown-row"><td data-col="bd_date">${item.date}</td><td data-col="bd_invoices">${formatQty(item.invoices)}</td><td data-col="bd_revenue">${formatMoney(item.revenue)}</td><td data-col="batch_no">${batchCell}</td><td data-col="expiry_date">${expiryCell}</td><td data-col="item_company">${itemCompanyCell}</td></tr>`;
                     } else {
                         html += `<tr class="breakdown-row"><td>${item.date}</td><td>${formatQty(item.volume)}</td><td>${formatMoney(item.revenue)}</td></tr>`;
                     }
                 });
 
-                html += '</table></div>';
+                html += '</tbody></table></div>';
                 container.innerHTML = html;
+                applyColumnVisibility(DETAIL_TYPE_TO_PREFIX[type] || type);
 
                 document.getElementById(`search-${type}-${index}`).addEventListener('input', function(e) {
                     const searchValue = e.target.value;
@@ -1064,41 +1075,42 @@ async function toggleDetails(row, detailRow, type, id, index) {
                 let html = '<div style="max-height: 300px; overflow-y: auto;"><table style="width: 100%; font-size: 13px;">';
 
                 if (type === 'product_invoices') {
-                    html += '<tr><th>Invoice #</th><th>Date</th><th>Customer</th><th>Quantity</th><th>Price</th><th>Batch No</th><th>Expiry Date</th><th>Item Company</th><th>Amount</th></tr>';
+                    html += '<thead><tr><th data-col="pi_bill_no">Invoice #</th><th data-col="pi_date">Date</th><th data-col="pi_customer">Customer</th><th>Quantity</th><th data-col="pi_price">Price</th><th data-col="batch_no">Batch No</th><th data-col="expiry_date">Expiry Date</th><th data-col="item_company">Item Company</th><th data-col="pi_amount">Amount</th></tr></thead><tbody>';
                     data.forEach(item => {
                         const expiringSoon = item.expiry_date && (new Date(item.expiry_date) - new Date()) / (1000*60*60*24) <= 30;
                         const expiryCell = item.expiry_date
                             ? (expiringSoon ? `<span style="color:#d64545; font-weight:600;">${item.expiry_date}</span>` : item.expiry_date)
                             : '-';
-                        html += `<tr><td>${item.bill_no}</td><td>${item.sale_date}</td><td>${item.customer_name}</td><td>${formatQty(item.quantity)}</td><td>${formatMoney(item.sale_price)}</td><td>${item.batch_no || '-'}</td><td>${expiryCell}</td><td>${item.item_company_name || '-'}</td><td>${formatMoney(item.net_amount)}</td></tr>`;
+                        html += `<tr><td data-col="pi_bill_no">${item.bill_no}</td><td data-col="pi_date">${item.sale_date}</td><td data-col="pi_customer">${item.customer_name}</td><td data-col="quantity_sold">${formatQty(item.quantity)}${item.unit_symbol ? ' ' + item.unit_symbol : ''}</td><td data-col="pi_price">${formatMoney(item.sale_price)}</td><td data-col="batch_no">${item.batch_no || '-'}</td><td data-col="expiry_date">${expiryCell}</td><td data-col="item_company">${item.item_company_name || '-'}</td><td data-col="pi_amount">${formatMoney(item.net_amount)}</td></tr>`;
                     });
                 } else if (type === 'vendor_products') {
-                    html += '<tr><th>Product</th><th>Batch No</th><th>Expiry Date</th><th>Item Company</th><th>Quantity</th><th>Total Sales</th></tr>';
+                    html += '<thead><tr><th data-col="vp_product">Product</th><th data-col="batch_no">Batch No</th><th data-col="expiry_date">Expiry Date</th><th data-col="item_company">Item Company</th><th>Quantity</th><th data-col="vp_total_sales">Total Sales</th></tr></thead><tbody>';
                     data.forEach(item => {
                         const expiringSoon = item.nearest_expiry && (new Date(item.nearest_expiry) - new Date()) / (1000*60*60*24) <= 30;
                         const expiryCell = item.nearest_expiry
                             ? (expiringSoon ? `<span style="color:#d64545; font-weight:600;">${item.nearest_expiry}</span>` : item.nearest_expiry)
                             : '-';
-                        html += `<tr><td>${item.product_name}</td><td>${item.batch_no || '-'}</td><td>${expiryCell}</td><td>${item.item_company_name || '-'}</td><td>${formatQty(item.total_quantity)}</td><td>${formatMoney(item.total_sales)}</td></tr>`;
+                        html += `<tr><td data-col="vp_product">${item.product_name}</td><td data-col="batch_no">${item.batch_no || '-'}</td><td data-col="expiry_date">${expiryCell}</td><td data-col="item_company">${item.item_company_name || '-'}</td><td data-col="total_quantity">${formatQty(item.total_quantity)}${item.unit_symbol ? ' ' + item.unit_symbol : ''}</td><td data-col="vp_total_sales">${formatMoney(item.total_sales)}</td></tr>`;
                     });
                 } else if (type === 'customer_invoices') {
-                    html += '<tr><th>Invoice #</th><th>Date</th><th>Total Bill</th><th>Discount</th><th>Net Amount</th><th>Batch No</th><th>Expiry Date</th><th>Item Company</th></tr>';
+                    html += '<thead><tr><th data-col="ci_bill_no">Invoice #</th><th data-col="ci_date">Date</th><th data-col="ci_total_bill">Total Bill</th><th data-col="ci_discount">Discount</th><th data-col="ci_net_amount">Net Amount</th><th data-col="batch_no">Batch No</th><th data-col="expiry_date">Expiry Date</th><th data-col="item_company">Item Company</th></tr></thead><tbody>';
                     data.forEach(item => {
-                        html += `<tr><td>${item.bill_no}</td><td>${item.sale_date}</td><td>${formatMoney(item.total_bill)}</td><td>${formatMoney(item.total_discount_amount)}</td><td>${formatMoney(item.net_amount)}</td><td>${formatBatchCell(item.batch_no)}</td><td>${formatExpiryCell(item.nearest_expiry)}</td><td>${item.item_company_name || '-'}</td></tr>`;
+                        html += `<tr><td data-col="ci_bill_no">${item.bill_no}</td><td data-col="ci_date">${item.sale_date}</td><td data-col="ci_total_bill">${formatMoney(item.total_bill)}</td><td data-col="ci_discount">${formatMoney(item.total_discount_amount)}</td><td data-col="ci_net_amount">${formatMoney(item.net_amount)}</td><td data-col="batch_no">${formatBatchCell(item.batch_no)}</td><td data-col="expiry_date">${formatExpiryCell(item.nearest_expiry)}</td><td data-col="item_company">${item.item_company_name || '-'}</td></tr>`;
                     });
                 } else if (type === 'invoice_items') {
-                    html += '<tr><th>Product</th><th>Batch No</th><th>Expiry Date</th><th>Item Company</th><th>Quantity</th><th>Price</th><th>Discount</th><th>Net Amount</th></tr>';
+                    html += '<thead><tr><th data-col="ii_product">Product</th><th data-col="batch_no">Batch No</th><th data-col="expiry_date">Expiry Date</th><th data-col="item_company">Item Company</th><th>Quantity</th><th data-col="ii_price">Price</th><th data-col="ii_discount">Discount</th><th data-col="ii_net_amount">Net Amount</th></tr></thead><tbody>';
                     data.forEach(item => {
                         const expiringSoon = item.expiry_date && (new Date(item.expiry_date) - new Date()) / (1000*60*60*24) <= 30;
                         const expiryCell = item.expiry_date
                             ? (expiringSoon ? `<span style="color:#d64545; font-weight:600;">${item.expiry_date}</span>` : item.expiry_date)
                             : '-';
-                        html += `<tr><td>${item.product_name}</td><td>${item.batch_no || '-'}</td><td>${expiryCell}</td><td>${item.item_company_name || '-'}</td><td>${formatQty(item.quantity)}</td><td>${formatMoney(item.sale_price)}</td><td>${formatMoney(item.discount_amount)}</td><td>${formatMoney(item.net_amount)}</td></tr>`;
+                        html += `<tr><td data-col="ii_product">${item.product_name}</td><td data-col="batch_no">${item.batch_no || '-'}</td><td data-col="expiry_date">${expiryCell}</td><td data-col="item_company">${item.item_company_name || '-'}</td><td data-col="quantity_sold">${formatQty(item.quantity)}${item.unit_symbol ? ' ' + item.unit_symbol : ''}</td><td data-col="ii_price">${formatMoney(item.sale_price)}</td><td data-col="ii_discount">${formatMoney(item.discount_amount)}</td><td data-col="ii_net_amount">${formatMoney(item.net_amount)}</td></tr>`;
                     });
                 }
 
-                html += '</table></div>';
+                html += '</tbody></table></div>';
                 container.innerHTML = data.length > 0 ? html : 'No data available';
+                applyColumnVisibility(DETAIL_TYPE_TO_PREFIX[type] || type);
             } else {
                 document.getElementById(`${type.split('_')[0]}-details-${index}`).innerHTML = 'Error loading details';
             }
@@ -1130,12 +1142,13 @@ async function toggleTerritoryDetails(row, detailRow, item, index) {
                 const data = result.data;
 
                 let html = '<div style="max-height: 300px; overflow-y: auto;"><table style="width: 100%; font-size: 13px;">';
-                html += '<tr><th>Invoice #</th><th>Date</th><th>Customer</th><th>Net Amount</th><th>Batch No</th><th>Expiry Date</th><th>Item Company</th></tr>';
+                html += '<thead><tr><th data-col="ti_bill_no">Invoice #</th><th data-col="ti_date">Date</th><th data-col="ti_customer">Customer</th><th data-col="ti_net_amount">Net Amount</th><th data-col="batch_no">Batch No</th><th data-col="expiry_date">Expiry Date</th><th data-col="item_company">Item Company</th></tr></thead><tbody>';
                 data.forEach(d => {
-                    html += `<tr><td>${d.bill_no}</td><td>${d.sale_date}</td><td>${d.customer_name}</td><td>${formatMoney(d.net_amount)}</td><td>${formatBatchCell(d.batch_no)}</td><td>${formatExpiryCell(d.nearest_expiry)}</td><td>${d.item_company_name || '-'}</td></tr>`;
+                    html += `<tr><td data-col="ti_bill_no">${d.bill_no}</td><td data-col="ti_date">${d.sale_date}</td><td data-col="ti_customer">${d.customer_name}</td><td data-col="ti_net_amount">${formatMoney(d.net_amount)}</td><td data-col="batch_no">${formatBatchCell(d.batch_no)}</td><td data-col="expiry_date">${formatExpiryCell(d.nearest_expiry)}</td><td data-col="item_company">${d.item_company_name || '-'}</td></tr>`;
                 });
-                html += '</table></div>';
+                html += '</tbody></table></div>';
                 container.innerHTML = data.length > 0 ? html : 'No data available';
+                applyColumnVisibility('territory');
             } else {
                 document.getElementById(`territory-details-${index}`).innerHTML = 'Error loading details';
             }
@@ -1185,41 +1198,194 @@ function setupSearch(inputId, rowSelector, dataAttributes) {
     });
 }
 
-function setupColumnToggle(prefix) {
+// ---- Show/Hide Columns (shared modal, persisted per-table in localStorage) ----
+const COLUMN_STORAGE_PREFIX = 'salesReport.columns.';
+const COLUMN_TABLE_TITLES = {
+    officer: 'Sales Officer Wise', supplier_man: 'Supplier Man Wise', product: 'Product Wise',
+    branch: 'Branch Wise', category: 'Category Wise', territory: 'Territory Wise',
+    invoice: 'Invoice Wise', item_company: 'Item Company Wise', vendor: 'Vendor Wise', customer: 'Customer Wise'
+};
+// Columns that only exist inside a table's expandable sub-table (breakdown/detail row),
+// with no equivalent in the main table - so they can't be discovered by scanning the
+// main table's <thead> the way main-table columns are. Listed statically here so they
+// show up in the Columns modal (and stay toggleable) even before that row is ever expanded.
+const SUB_TABLE_COLUMNS = {
+    officer: { title: 'Daily Breakdown', cols: [
+        {key:'bd_date', label:'Date'}, {key:'bd_invoices', label:'Invoices'}, {key:'bd_revenue', label:'Revenue'}
+    ]},
+    supplier_man: { title: 'Daily Breakdown', cols: [
+        {key:'bd_date', label:'Date'}, {key:'bd_invoices', label:'Invoices'}, {key:'bd_revenue', label:'Revenue'}
+    ]},
+    branch: { title: 'Daily Breakdown', cols: [
+        {key:'bd_date', label:'Date'}, {key:'bd_revenue', label:'Revenue'}
+    ]},
+    product: { title: 'Invoices Including This Product', cols: [
+        {key:'pi_bill_no', label:'Invoice #'}, {key:'pi_date', label:'Date'}, {key:'pi_customer', label:'Customer'},
+        {key:'pi_price', label:'Price'}, {key:'pi_amount', label:'Amount'}
+    ]},
+    vendor: { title: 'Products Sold', cols: [
+        {key:'vp_product', label:'Product'}, {key:'vp_total_sales', label:'Total Sales'}
+    ]},
+    customer: { title: 'Customer Invoices', cols: [
+        {key:'ci_bill_no', label:'Invoice #'}, {key:'ci_date', label:'Date'}, {key:'ci_total_bill', label:'Total Bill'},
+        {key:'ci_discount', label:'Discount'}, {key:'ci_net_amount', label:'Net Amount'}
+    ]},
+    invoice: { title: 'Invoice Items', cols: [
+        {key:'ii_product', label:'Product'}, {key:'ii_price', label:'Price'},
+        {key:'ii_discount', label:'Discount'}, {key:'ii_net_amount', label:'Net Amount'}
+    ]},
+    territory: { title: 'Territory Invoices', cols: [
+        {key:'ti_bill_no', label:'Invoice #'}, {key:'ti_date', label:'Date'}, {key:'ti_customer', label:'Customer'},
+        {key:'ti_net_amount', label:'Net Amount'}
+    ]}
+};
+let activeColumnsPrefix = null;
+
+function getSavedColumnState(prefix) {
+    try {
+        const raw = localStorage.getItem(COLUMN_STORAGE_PREFIX + prefix);
+        return raw ? JSON.parse(raw) : {};
+    } catch (e) {
+        return {};
+    }
+}
+
+function saveColumnState(prefix, state) {
+    try {
+        localStorage.setItem(COLUMN_STORAGE_PREFIX + prefix, JSON.stringify(state));
+    } catch (e) {
+        console.error('Could not save column preferences:', e);
+    }
+}
+
+// Re-applies the saved hide/show state to a table's current header+body cells.
+// Must be re-run every time a table's rows are rebuilt (innerHTML wipes prior state).
+function applyColumnVisibility(prefix) {
     const btn = document.getElementById(`${prefix}-columns-btn`);
-    const menu = document.getElementById(`${prefix}-columns-menu`);
-    if (!btn || !menu || menu.dataset.built) return;
-
-    const table = btn.closest('.table-card').querySelector('table');
-    const headers = table.querySelectorAll('thead th[data-col]');
-
-    let html = '';
-    headers.forEach(th => {
+    const table = btn?.closest('.table-card')?.querySelector('table');
+    if (!table) return;
+    const state = getSavedColumnState(prefix);
+    table.querySelectorAll('thead th[data-col]').forEach(th => {
         const col = th.getAttribute('data-col');
-        html += `
-            <label style="display:flex; align-items:center; gap:8px; padding:4px 2px; font-size:13px; cursor:pointer;">
-                <input type="checkbox" checked data-toggle-col="${col}"> ${th.textContent}
-            </label>`;
-    });
-    menu.innerHTML = html;
-    menu.dataset.built = '1';
-
-    menu.querySelectorAll('input[type="checkbox"]').forEach(cb => {
-        cb.addEventListener('change', () => {
-            const col = cb.getAttribute('data-toggle-col');
-            const cells = table.querySelectorAll(`[data-col="${col}"]`);
-            cells.forEach(c => c.style.display = cb.checked ? '' : 'none');
+        const visible = LOCKED_VISIBLE_COLS.has(col) ? true : (state[col] !== false); // default: visible
+        th.style.display = visible ? '' : 'none';
+        // querySelectorAll on the main table also reaches nested sub-tables inside
+        // expandable breakdown/detail rows, so Batch No/Expiry Date/Item Company
+        // toggles apply there too, in sync with the main columns.
+        table.querySelectorAll(`td[data-col="${col}"]`).forEach(td => {
+            td.style.display = visible ? '' : 'none';
         });
     });
-
-    btn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
-    });
-    document.addEventListener('click', (e) => {
-        if (!menu.contains(e.target) && e.target !== btn) menu.style.display = 'none';
-    });
 }
+
+// Quantity is never toggleable - the whole point of showing it is that the unit
+// (Ctn/Pc/Kg) must always be readable, so it's excluded from hide/show entirely.
+const LOCKED_VISIBLE_COLS = new Set(['quantity_sold', 'total_quantity']);
+
+// Which expandable sub-table (breakdown/detail row) belongs to which main table's
+// Columns modal, so toggling Batch No / Expiry Date / Item Company up top also
+// hides/shows that same column inside the drilldown rows underneath.
+const DETAIL_TYPE_TO_PREFIX = {
+    officer: 'officer', supplier_man: 'supplier_man', branch: 'branch',
+    product_invoices: 'product', vendor_products: 'vendor',
+    customer_invoices: 'customer', invoice_items: 'invoice', territory_invoices: 'territory'
+};
+
+function setupColumnToggle(prefix) {
+    const btn = document.getElementById(`${prefix}-columns-btn`);
+    if (!btn) return;
+    if (!btn.dataset.bound) {
+        btn.dataset.bound = '1';
+        btn.addEventListener('click', () => openColumnsModal(prefix));
+    }
+    applyColumnVisibility(prefix);
+}
+
+function openColumnsModal(prefix) {
+    const table = document.getElementById(`${prefix}-columns-btn`)?.closest('.table-card')?.querySelector('table');
+    if (!table) return;
+    activeColumnsPrefix = prefix;
+
+    document.getElementById('col-modal-title').textContent = `Show / Hide Columns — ${COLUMN_TABLE_TITLES[prefix] || ''}`;
+
+    const state = getSavedColumnState(prefix);
+    const body = document.getElementById('col-modal-body');
+    body.innerHTML = '';
+    table.querySelectorAll('thead th[data-col]').forEach(th => {
+        const col = th.getAttribute('data-col');
+        const locked = LOCKED_VISIBLE_COLS.has(col);
+        const visible = locked ? true : (state[col] !== false);
+        const label = document.createElement('label');
+        if (locked) label.style.opacity = '0.65';
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.checked = visible;
+        checkbox.disabled = locked;
+        checkbox.setAttribute('data-toggle-col', col);
+        const span = document.createElement('span');
+        span.textContent = th.textContent.trim() + (locked ? ' (always shown)' : '');
+        label.appendChild(checkbox);
+        label.appendChild(span);
+        body.appendChild(label);
+
+        if (!locked) {
+            checkbox.addEventListener('change', () => {
+                const s = getSavedColumnState(activeColumnsPrefix);
+                s[col] = checkbox.checked;
+                saveColumnState(activeColumnsPrefix, s);
+                applyColumnVisibility(activeColumnsPrefix);
+            });
+        }
+    });
+
+    const subConfig = SUB_TABLE_COLUMNS[prefix];
+    if (subConfig) {
+        const divider = document.createElement('div');
+        divider.textContent = subConfig.title;
+        divider.style.cssText = 'margin:10px 0 2px; padding-top:8px; border-top:1px solid #e1e6ee; font-size:12px; font-weight:600; opacity:0.7; text-transform:uppercase;';
+        body.appendChild(divider);
+
+        subConfig.cols.forEach(({key: col, label}) => {
+            const visible = state[col] !== false;
+            const label_ = document.createElement('label');
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.checked = visible;
+            checkbox.setAttribute('data-toggle-col', col);
+            const span = document.createElement('span');
+            span.textContent = label;
+            label_.appendChild(checkbox);
+            label_.appendChild(span);
+            body.appendChild(label_);
+
+            checkbox.addEventListener('change', () => {
+                const s = getSavedColumnState(activeColumnsPrefix);
+                s[col] = checkbox.checked;
+                saveColumnState(activeColumnsPrefix, s);
+                applyColumnVisibility(activeColumnsPrefix);
+            });
+        });
+    }
+
+    document.getElementById('columns-modal').classList.add('open');
+}
+
+function closeColumnsModal() {
+    document.getElementById('columns-modal').classList.remove('open');
+    activeColumnsPrefix = null;
+}
+
+document.getElementById('col-modal-close')?.addEventListener('click', closeColumnsModal);
+document.getElementById('col-modal-done')?.addEventListener('click', closeColumnsModal);
+document.getElementById('columns-modal')?.addEventListener('click', (e) => {
+    if (e.target.id === 'columns-modal') closeColumnsModal();
+});
+document.getElementById('col-modal-reset')?.addEventListener('click', () => {
+    if (!activeColumnsPrefix) return;
+    localStorage.removeItem(COLUMN_STORAGE_PREFIX + activeColumnsPrefix);
+    applyColumnVisibility(activeColumnsPrefix);
+    openColumnsModal(activeColumnsPrefix);
+});
 
 function setupPagination(tableBodyId, rowsPerPage = 50) {
     const tableBody = document.getElementById(tableBodyId);

@@ -10,6 +10,16 @@ $date_to = $_GET['date_to'] ?? date('Y-m-d');
 $report_type = $_GET['report_type'] ?? 'all';
 $company_id = $_GET['company_id'] ?? null;
 
+// A sale line item's own uom_id may be a "per_product" scoped unit (e.g. Carton) whose
+// real conversion factor lives in product_uom_conversions, or a "universal" unit (e.g.
+// Dozen) whose factor lives on the uom row itself. Base-converting every quantity this
+// way (matching the Stock Position report's established formula) lets mixed-unit sales
+// of the same product be summed meaningfully instead of adding raw Carton+Piece counts.
+const UOM_BASE_FACTOR_SQL = "COALESCE(CASE WHEN u.unit_scope = 'universal' THEN u.conversion_factor WHEN puc.conversion_factor IS NOT NULL THEN puc.conversion_factor ELSE 1 END, 1)";
+const UOM_BASE_FACTOR_JOINS = "LEFT JOIN uom u ON sii.uom_id = u.id
+            LEFT JOIN product_uom_conversions puc ON puc.product_id = sii.product_id AND puc.uom_id = sii.uom_id
+            LEFT JOIN uom base_u ON COALESCE(u.base_unit_id, u.id) = base_u.id";
+
 try {
     // Summary Cards
     $stmt = $pdo->prepare("
@@ -74,6 +84,7 @@ try {
             current.nearest_expiry,
             current.item_company_name,
             current.quantity_sold,
+            current.unit_symbol,
             current.revenue,
             CASE 
                 WHEN previous.revenue > 0 THEN ROUND(((current.revenue - previous.revenue) / previous.revenue) * 100, 1)
@@ -83,15 +94,17 @@ try {
             current.parent_row_id
         FROM (
             SELECT sii.product_id, sii.parent_row_id,
-                   SUM(sii.quantity) as quantity_sold, 
+                   SUM(sii.quantity * " . UOM_BASE_FACTOR_SQL . ") as quantity_sold,
                    SUM(sii.net_amount) as revenue,
                    GROUP_CONCAT(DISTINCT NULLIF(sii.batch_no,'') SEPARATOR ', ') as batch_no,
                    MIN(CASE WHEN sii.expiry_date >= CURDATE() THEN sii.expiry_date END) as nearest_expiry,
-                   GROUP_CONCAT(DISTINCT COALESCE(ic.company_name, 'Unknown') SEPARATOR ', ') as item_company_name
+                   GROUP_CONCAT(DISTINCT COALESCE(ic.company_name, 'Unknown') SEPARATOR ', ') as item_company_name,
+                   MIN(base_u.uom_name) as unit_symbol
             FROM sale_invoice_items sii
             JOIN sale_invoice si ON sii.sale_invoice_id = si.id AND si.tenant_id = ?
             LEFT JOIN products p ON sii.product_id = p.id
             LEFT JOIN item_companies ic ON p.item_company_id = ic.id
+            " . UOM_BASE_FACTOR_JOINS . "
             WHERE sii.tenant_id = ? AND si.sale_date BETWEEN ? AND ? AND si.status = 'Posted'" . ($company_id ? " AND si.company_id = ?" : "") . "
             GROUP BY sii.product_id, sii.parent_row_id
         ) current
@@ -266,14 +279,16 @@ try {
             ic.id as item_company_id,
             COALESCE(ic.company_name, 'Unknown') as item_company_name,
             COUNT(DISTINCT si.id) as total_invoices,
-            SUM(sii.quantity) as total_quantity,
+            SUM(sii.quantity * " . UOM_BASE_FACTOR_SQL . ") as total_quantity,
             SUM(sii.net_amount) as total_sales,
             GROUP_CONCAT(DISTINCT NULLIF(sii.batch_no,'') SEPARATOR ', ') as batch_no,
-            MIN(CASE WHEN sii.expiry_date >= CURDATE() THEN sii.expiry_date END) as nearest_expiry
+            MIN(CASE WHEN sii.expiry_date >= CURDATE() THEN sii.expiry_date END) as nearest_expiry,
+            GROUP_CONCAT(DISTINCT base_u.uom_name SEPARATOR '/') as unit_symbol
         FROM sale_invoice_items sii
         JOIN sale_invoice si ON sii.sale_invoice_id = si.id AND si.tenant_id = ?
         JOIN products p ON sii.product_id = p.id AND p.tenant_id = ?
         LEFT JOIN item_companies ic ON p.item_company_id = ic.id
+        " . UOM_BASE_FACTOR_JOINS . "
         WHERE sii.tenant_id = ? AND si.sale_date BETWEEN ? AND ? AND si.status = 'Posted'" . ($company_id ? " AND si.company_id = ?" : "") . "
         GROUP BY p.item_company_id, ic.company_name
         ORDER BY total_sales DESC
@@ -290,16 +305,18 @@ try {
             CONCAT('VEN-', LPAD(p.vendor_id, 3, '0')) as vendor_id_display,
             COALESCE(s.supplier_name, 'Unknown') as vendor_name,
             COUNT(DISTINCT si.id) as total_invoices,
-            SUM(sii.quantity) as total_quantity,
+            SUM(sii.quantity * " . UOM_BASE_FACTOR_SQL . ") as total_quantity,
             SUM(sii.net_amount) as total_sales,
             GROUP_CONCAT(DISTINCT NULLIF(sii.batch_no,'') SEPARATOR ', ') as batch_no,
             MIN(CASE WHEN sii.expiry_date >= CURDATE() THEN sii.expiry_date END) as nearest_expiry,
-            GROUP_CONCAT(DISTINCT COALESCE(ic.company_name, 'Unknown') SEPARATOR ', ') as item_company_name
+            GROUP_CONCAT(DISTINCT COALESCE(ic.company_name, 'Unknown') SEPARATOR ', ') as item_company_name,
+            GROUP_CONCAT(DISTINCT base_u.uom_name SEPARATOR '/') as unit_symbol
         FROM sale_invoice_items sii
         JOIN sale_invoice si ON sii.sale_invoice_id = si.id AND si.tenant_id = ?
         JOIN products p ON sii.product_id = p.id AND p.tenant_id = ?
         LEFT JOIN suppliers s ON p.vendor_id = s.id AND s.tenant_id = ?
         LEFT JOIN item_companies ic ON p.item_company_id = ic.id
+        " . UOM_BASE_FACTOR_JOINS . "
         WHERE sii.tenant_id = ? AND si.sale_date BETWEEN ? AND ? AND si.status = 'Posted'" . ($company_id ? " AND si.company_id = ?" : "") . "
         GROUP BY p.vendor_id, s.supplier_name
         ORDER BY total_sales DESC

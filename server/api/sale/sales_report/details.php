@@ -10,16 +10,27 @@ $id = $_GET['id'] ?? 0;
 $date_from = $_GET['date_from'] ?? date('Y-m-01');
 $date_to = $_GET['date_to'] ?? date('Y-m-d');
 
+// Same base-unit conversion formula used in sales-report.php and the Stock Position
+// report, so aggregated quantities across mixed units (Carton + Piece, say) add up to
+// a meaningful number instead of a meaningless raw sum of different units.
+const UOM_BASE_FACTOR_SQL = "COALESCE(CASE WHEN u.unit_scope = 'universal' THEN u.conversion_factor WHEN puc.conversion_factor IS NOT NULL THEN puc.conversion_factor ELSE 1 END, 1)";
+const UOM_BASE_FACTOR_JOINS = "LEFT JOIN uom u ON sii.uom_id = u.id
+            LEFT JOIN product_uom_conversions puc ON puc.product_id = sii.product_id AND puc.uom_id = sii.uom_id
+            LEFT JOIN uom base_u ON COALESCE(u.base_unit_id, u.id) = base_u.id";
+
 try {
     if ($type === 'product_invoices') {
         // Get invoices for a specific product
         // Includes item_company_name from the product's item company relationship
+        // and the actual unit that particular sale was made in (not base-converted -
+        // this is a single real transaction, so show it the way it was sold).
         $stmt = $pdo->prepare("
-            SELECT 
+            SELECT
                 si.bill_no,
                 si.sale_date,
                 COALESCE(c.customer_name, 'Walk-in') as customer_name,
                 sii.quantity,
+                COALESCE(u.uom_name, '') as unit_symbol,
                 sii.sale_price,
                 sii.batch_no,
                 sii.expiry_date as expiry_date,
@@ -30,18 +41,20 @@ try {
             LEFT JOIN customers c ON si.customer_id = c.id AND c.tenant_id = ?
             LEFT JOIN products p ON sii.product_id = p.id AND p.tenant_id = ?
             LEFT JOIN item_companies ic ON p.item_company_id = ic.id
+            LEFT JOIN uom u ON sii.uom_id = u.id
             WHERE sii.tenant_id = ? AND sii.product_id = ? AND si.sale_date BETWEEN ? AND ? AND si.status = 'Posted'
             ORDER BY si.sale_date DESC
         ");
         $stmt->execute([$tenant_id, $tenant_id, $tenant_id, $tenant_id, $id, $date_from, $date_to]);
-    } 
+    }
     elseif ($type === 'vendor_products') {
         // Get products sold for a specific vendor
         // Includes item_company_name aggregated from sale_invoice_items
         $stmt = $pdo->prepare("
-            SELECT 
+            SELECT
                 p.name as product_name,
-                SUM(sii.quantity) as total_quantity,
+                SUM(sii.quantity * " . UOM_BASE_FACTOR_SQL . ") as total_quantity,
+                MIN(base_u.uom_name) as unit_symbol,
                 SUM(sii.net_amount) as total_sales,
                 GROUP_CONCAT(DISTINCT NULLIF(sii.batch_no,'') SEPARATOR ', ') as batch_no,
                 MIN(CASE WHEN sii.expiry_date >= CURDATE() THEN sii.expiry_date END) as nearest_expiry,
@@ -50,12 +63,13 @@ try {
             JOIN sale_invoice si ON sii.sale_invoice_id = si.id AND si.tenant_id = ?
             JOIN products p ON sii.product_id = p.id AND p.tenant_id = ?
             LEFT JOIN item_companies ic ON p.item_company_id = ic.id
+            " . UOM_BASE_FACTOR_JOINS . "
             WHERE sii.tenant_id = ? AND p.vendor_id = ? AND si.sale_date BETWEEN ? AND ? AND si.status = 'Posted'
             GROUP BY p.id, p.name, ic.company_name
             ORDER BY total_sales DESC
         ");
         $stmt->execute([$tenant_id, $tenant_id, $tenant_id, $id, $date_from, $date_to]);
-    } 
+    }
     elseif ($type === 'customer_invoices') {
         // Get invoices for a specific customer
         // Uses invoice-batch subquery to aggregate item_company_name
@@ -90,9 +104,10 @@ try {
         // Get items for a specific invoice
         // Includes item_company_name directly from product relationship
         $stmt = $pdo->prepare("
-            SELECT 
+            SELECT
                 p.name as product_name,
                 sii.quantity,
+                COALESCE(u.uom_name, '') as unit_symbol,
                 sii.sale_price,
                 sii.batch_no,
                 sii.expiry_date as expiry_date,
@@ -102,6 +117,7 @@ try {
             FROM sale_invoice_items sii
             JOIN products p ON sii.product_id = p.id AND p.tenant_id = ?
             LEFT JOIN item_companies ic ON p.item_company_id = ic.id
+            LEFT JOIN uom u ON sii.uom_id = u.id
             WHERE sii.tenant_id = ? AND sii.sale_invoice_id = ?
             ORDER BY sii.id
         ");

@@ -171,6 +171,27 @@ function fmtQty(value) {
             return itemCompanyValue && itemCompanyValue.length ? esc(itemCompanyValue) : '-';
         }
 
+        // ---- Column visibility (same localStorage the main report page's "Columns"
+        // modal writes to - same origin, so this print tab reads the same choices) ----
+        const COLUMN_STORAGE_PREFIX = 'salesReport.columns.';
+        function getColumnVisibility(prefix, cols) {
+            let state = {};
+            try {
+                const raw = localStorage.getItem(COLUMN_STORAGE_PREFIX + prefix);
+                state = raw ? JSON.parse(raw) : {};
+            } catch (e) {}
+            // "locked" columns (e.g. Quantity, which always needs its unit visible)
+            // have no toggle in the Columns modal and are never hidden.
+            return cols.map(c => c.locked ? true : (state[c.key] !== false));
+        }
+        function filterHeader(cols, vis) {
+            return cols.filter((_, i) => vis[i]).map(c => `<th>${c.label}</th>`).join('');
+        }
+        // cells: array of already-built inner HTML strings, same order/length as cols
+        function filterRow(cells, vis) {
+            return cells.filter((_, i) => vis[i]).map(c => `<td>${c}</td>`).join('');
+        }
+
         // Fetch breakdown data (daily breakdown for officer, branch, etc.)
         async function fetchBreakdown(type, id) {
             try {
@@ -262,204 +283,198 @@ document.getElementById('avg-sale').textContent = fmtMoney(avgSale);
 
             // ========== OFFICER SALES ==========
             if (reportType === 'all' || reportType === 'officer') {
+                const officerCols = [
+                    {key:'employee_id', label:'Employee ID'}, {key:'officer_name', label:'Officer Name'},
+                    {key:'total_invoices', label:'Total Invoices'}, {key:'total_sales', label:'Total Sales'},
+                    {key:'batch_no', label:'Batch No'}, {key:'expiry_date', label:'Expiry Date'},
+                    {key:'item_company', label:'Item Company'}, {key:'status', label:'Status'}
+                ];
+                const officerVis = getColumnVisibility('officer', officerCols);
+                const officerColspan = officerVis.filter(Boolean).length;
+                const officerSubCols = [
+                    {key:'bd_date', label:'Date'}, {key:'bd_invoices', label:'Invoices'}, {key:'bd_revenue', label:'Revenue'},
+                    {key:'batch_no', label:'Batch No'}, {key:'expiry_date', label:'Expiry Date'}, {key:'item_company', label:'Item Company'}
+                ];
+                const officerSubVis = getColumnVisibility('officer', officerSubCols);
                 const rows = await buildExpandableSection(
                     data.officer_sales || [],
-                    8,
+                    officerColspan,
                     item => [item.employee_id, item.officer_name],
-                    item => `<tr>
-                        <td>${esc(item.employee_id)}</td>
-                        <td>${esc(item.officer_name)}</td>
-                        <td>${parseFloat(item.total_invoices || 0).toLocaleString()}</td>
-                        <td>${CURRENCY_SYMBOL}${parseFloat(item.total_sales || 0).toLocaleString()}</td>
-                        <td>${formatBatchCell(item.batch_no)}</td>
-                        <td>${formatExpiryCell(item.nearest_expiry)}</td>
-                        <td>${formatItemCompanyCell(item.item_company_name)}</td>
-                        <td>${esc(item.status)}</td>
-                    </tr>`,
+                    item => `<tr>${filterRow([
+                        esc(item.employee_id), esc(item.officer_name),
+                        parseFloat(item.total_invoices || 0).toLocaleString(), CURRENCY_SYMBOL + parseFloat(item.total_sales || 0).toLocaleString(),
+                        formatBatchCell(item.batch_no), formatExpiryCell(item.nearest_expiry),
+                        formatItemCompanyCell(item.item_company_name), esc(item.status)
+                    ], officerVis)}</tr>`,
                     'Daily Breakdown',
-                    ['Date', 'Invoices', 'Revenue', 'Batch No', 'Expiry Date', 'Item Company'],
+                    officerSubCols.filter((_, i) => officerSubVis[i]).map(c => c.label),
                     item => fetchBreakdown('officer', item.sale_officer_id),
-                    d => `<tr>
-                        <td>${esc(d.date)}</td>
-                        <td>${parseFloat(d.invoices || 0).toLocaleString()}</td>
-                        <td>${CURRENCY_SYMBOL}${parseFloat(d.revenue || 0).toLocaleString()}</td>
-                        <td>${formatBatchCell(d.batch_no)}</td>
-                        <td>${formatExpiryCell(d.nearest_expiry)}</td>
-                        <td>${formatItemCompanyCell(d.item_company_name)}</td>
-                    </tr>`
+                    d => `<tr>${filterRow([
+                        esc(d.date), parseFloat(d.invoices || 0).toLocaleString(), CURRENCY_SYMBOL + parseFloat(d.revenue || 0).toLocaleString(),
+                        formatBatchCell(d.batch_no), formatExpiryCell(d.nearest_expiry), formatItemCompanyCell(d.item_company_name)
+                    ], officerSubVis)}</tr>`
                 );
                 sectionHtmlParts.push(`<table>
                     <caption>Sales Officer Wise Sales</caption>
-                    <thead><tr>
-                        <th>Employee ID</th>
-                        <th>Officer Name</th>
-                        <th>Total Invoices</th>
-                        <th>Total Sales</th>
-                        <th>Batch No</th>
-                        <th>Expiry Date</th>
-                        <th>Item Company</th>
-                        <th>Status</th>
-                    </tr></thead>
+                    <thead><tr>${filterHeader(officerCols, officerVis)}</tr></thead>
                     <tbody>${rows}</tbody>
                 </table>`);
             }
             
             // ========== SUPPLIER MAN SALES ==========
             if (reportType === 'all' || reportType === 'supplier_man') {
+                const supManCols = [
+                    {key:'employee_id', label:'Employee ID'}, {key:'supplier_man_name', label:'Supplier Man Name'},
+                    {key:'total_invoices', label:'Total Invoices'}, {key:'total_sales', label:'Total Sales'},
+                    {key:'batch_no', label:'Batch No'}, {key:'expiry_date', label:'Expiry Date'},
+                    {key:'item_company', label:'Item Company'}, {key:'status', label:'Status'}
+                ];
+                const supManVis = getColumnVisibility('supplier_man', supManCols);
+                const supManColspan = supManVis.filter(Boolean).length;
+                const supManSubCols = [
+                    {key:'bd_date', label:'Date'}, {key:'bd_invoices', label:'Invoices'}, {key:'bd_revenue', label:'Revenue'},
+                    {key:'batch_no', label:'Batch No'}, {key:'expiry_date', label:'Expiry Date'}, {key:'item_company', label:'Item Company'}
+                ];
+                const supManSubVis = getColumnVisibility('supplier_man', supManSubCols);
                 const rows = await buildExpandableSection(
                     data.supplier_man_sales || [],
-                    8,
+                    supManColspan,
                     item => [item.employee_id, item.supplier_man_name],
-                    item => `<tr>
-                        <td>${esc(item.employee_id)}</td>
-                        <td>${esc(item.supplier_man_name)}</td>
-                        <td>${parseFloat(item.total_invoices || 0).toLocaleString()}</td>
-                        <td>${CURRENCY_SYMBOL}${parseFloat(item.total_sales || 0).toLocaleString()}</td>
-                        <td>${formatBatchCell(item.batch_no)}</td>
-                        <td>${formatExpiryCell(item.nearest_expiry)}</td>
-                        <td>${formatItemCompanyCell(item.item_company_name)}</td>
-                        <td>${esc(item.status)}</td>
-                    </tr>`,
+                    item => `<tr>${filterRow([
+                        esc(item.employee_id), esc(item.supplier_man_name),
+                        parseFloat(item.total_invoices || 0).toLocaleString(), CURRENCY_SYMBOL + parseFloat(item.total_sales || 0).toLocaleString(),
+                        formatBatchCell(item.batch_no), formatExpiryCell(item.nearest_expiry),
+                        formatItemCompanyCell(item.item_company_name), esc(item.status)
+                    ], supManVis)}</tr>`,
                     'Daily Breakdown',
-                    ['Date', 'Invoices', 'Revenue', 'Batch No', 'Expiry Date', 'Item Company'],
+                    supManSubCols.filter((_, i) => supManSubVis[i]).map(c => c.label),
                     item => fetchBreakdown('supplier_man', item.supplier_man_id),
-                    d => `<tr>
-                        <td>${esc(d.date)}</td>
-                        <td>${parseFloat(d.invoices || 0).toLocaleString()}</td>
-                        <td>${CURRENCY_SYMBOL}${parseFloat(d.revenue || 0).toLocaleString()}</td>
-                        <td>${formatBatchCell(d.batch_no)}</td>
-                        <td>${formatExpiryCell(d.nearest_expiry)}</td>
-                        <td>${formatItemCompanyCell(d.item_company_name)}</td>
-                    </tr>`
+                    d => `<tr>${filterRow([
+                        esc(d.date), parseFloat(d.invoices || 0).toLocaleString(), CURRENCY_SYMBOL + parseFloat(d.revenue || 0).toLocaleString(),
+                        formatBatchCell(d.batch_no), formatExpiryCell(d.nearest_expiry), formatItemCompanyCell(d.item_company_name)
+                    ], supManSubVis)}</tr>`
                 );
                 sectionHtmlParts.push(`<table>
                     <caption>Supplier Man Wise Sales</caption>
-                    <thead><tr>
-                        <th>Employee ID</th>
-                        <th>Supplier Man Name</th>
-                        <th>Total Invoices</th>
-                        <th>Total Sales</th>
-                        <th>Batch No</th>
-                        <th>Expiry Date</th>
-                        <th>Item Company</th>
-                        <th>Status</th>
-                    </tr></thead>
+                    <thead><tr>${filterHeader(supManCols, supManVis)}</tr></thead>
                     <tbody>${rows}</tbody>
                 </table>`);
             }
             
             // ========== PRODUCT SALES ==========
             if (reportType === 'all' || reportType === 'product') {
+                const productCols = [
+                    {key:'product_id', label:'Product ID'}, {key:'product_name', label:'Product Name'},
+                    {key:'category', label:'Category'}, {key:'batch_no', label:'Batch No'},
+                    {key:'expiry_date', label:'Expiry Date'}, {key:'item_company', label:'Item Company'},
+                    {key:'quantity_sold', label:'Quantity Sold'}, {key:'revenue', label:'Revenue'}, {key:'growth', label:'Growth'}
+                ];
+                const productVis = getColumnVisibility('product', productCols);
+                const productColspan = productVis.filter(Boolean).length;
+                const productSubCols = [
+                    {key:'pi_bill_no', label:'Invoice #'}, {key:'pi_date', label:'Date'}, {key:'pi_customer', label:'Customer'},
+                    {label:'Quantity', locked:true}, {key:'pi_price', label:'Price'},
+                    {key:'batch_no', label:'Batch No'}, {key:'expiry_date', label:'Expiry Date'}, {key:'item_company', label:'Item Company'},
+                    {key:'pi_amount', label:'Amount'}
+                ];
+                const productSubVis = getColumnVisibility('product', productSubCols);
                 const rows = await buildExpandableSection(
                     data.product_sales || [],
-                    9,
+                    productColspan,
                     item => [item.product_id_display, item.product_name, item.category],
                     item => {
                         const isChild = item.parent_row_id || item.parent_product_id;
                         const indent = isChild ? 'padding-left: 20px;' : '';
                         const prefix = isChild ? '→ ' : '';
-                        return `<tr>
-                            <td>${esc(item.product_id_display)}</td>
-                            <td style="${indent}">${prefix}${esc(item.product_name)}</td>
-                            <td>${esc(item.category)}</td>
-                            <td>${formatBatchCell(item.batch_no)}</td>
-                            <td>${formatExpiryCell(item.nearest_expiry)}</td>
-                            <td>${formatItemCompanyCell(item.item_company_name)}</td>
-                            <td>${parseFloat(item.quantity_sold || 0).toLocaleString()}</td>
-                            <td>${CURRENCY_SYMBOL}${parseFloat(item.revenue || 0).toLocaleString()}</td>
-                        </tr>`;
+                        const growth = item.growth !== null && item.growth !== undefined ? `${item.growth >= 0 ? '+' : ''}${item.growth}%` : '-';
+                        return `<tr>${filterRow([
+                            esc(item.product_id_display),
+                            `<span style="${indent}">${prefix}${esc(item.product_name)}</span>`,
+                            esc(item.category), formatBatchCell(item.batch_no), formatExpiryCell(item.nearest_expiry),
+                            formatItemCompanyCell(item.item_company_name),
+                            parseFloat(item.quantity_sold || 0).toLocaleString() + (item.unit_symbol ? ' ' + esc(item.unit_symbol) : ''),
+                            CURRENCY_SYMBOL + parseFloat(item.revenue || 0).toLocaleString(),
+                            growth
+                        ], productVis)}</tr>`;
                     },
                     'Invoices Including This Product',
-                    ['Invoice #', 'Date', 'Customer', 'Quantity', 'Price', 'Batch No', 'Expiry Date', 'Item Company', 'Amount'],
+                    productSubCols.filter((_, i) => productSubVis[i]).map(c => c.label),
                     item => fetchDetails('product_invoices', item.product_id),
-                    d => `<tr>
-                        <td>${esc(d.bill_no)}</td>
-                        <td>${esc(d.sale_date)}</td>
-                        <td>${esc(d.customer_name)}</td>
-                        <td>${parseFloat(d.quantity || 0).toLocaleString()}</td>
-                        <td>${CURRENCY_SYMBOL}${parseFloat(d.sale_price || 0).toLocaleString()}</td>
-                        <td>${formatBatchCell(d.batch_no)}</td>
-                        <td>${formatExpiryCell(d.expiry_date)}</td>
-                        <td>${formatItemCompanyCell(d.item_company_name)}</td>
-                        <td>${CURRENCY_SYMBOL}${parseFloat(d.net_amount || 0).toLocaleString()}</td>
-                    </tr>`
+                    d => `<tr>${filterRow([
+                        esc(d.bill_no), esc(d.sale_date), esc(d.customer_name),
+                        parseFloat(d.quantity || 0).toLocaleString() + (d.unit_symbol ? ' ' + esc(d.unit_symbol) : ''),
+                        CURRENCY_SYMBOL + parseFloat(d.sale_price || 0).toLocaleString(),
+                        formatBatchCell(d.batch_no), formatExpiryCell(d.expiry_date), formatItemCompanyCell(d.item_company_name),
+                        CURRENCY_SYMBOL + parseFloat(d.net_amount || 0).toLocaleString()
+                    ], productSubVis)}</tr>`
                 );
                 sectionHtmlParts.push(`<table>
                     <caption>Product Wise Sales</caption>
-                    <thead><tr>
-                        <th>Product ID</th>
-                        <th>Product Name</th>
-                        <th>Category</th>
-                        <th>Batch No</th>
-                        <th>Expiry Date</th>
-                        <th>Item Company</th>
-                        <th>Quantity Sold</th>
-                        <th>Revenue</th>
-                    </tr></thead>
+                    <thead><tr>${filterHeader(productCols, productVis)}</tr></thead>
                     <tbody>${rows}</tbody>
                 </table>`);
             }
             
             // ========== BRANCH SALES ==========
             if (reportType === 'all' || reportType === 'branch') {
+                const branchCols = [
+                    {key:'branch_id', label:'Branch ID'}, {key:'branch_name', label:'Branch Name'},
+                    {key:'total_sales', label:'Total Sales'}, {key:'transactions', label:'Transactions'},
+                    {key:'avg_sale', label:'Avg Sale'}, {key:'batch_no', label:'Batch No'},
+                    {key:'expiry_date', label:'Expiry Date'}, {key:'item_company', label:'Item Company'}
+                ];
+                const branchVis = getColumnVisibility('branch', branchCols);
+                const branchColspan = branchVis.filter(Boolean).length;
+                const branchSubCols = [
+                    {key:'bd_date', label:'Date'}, {label:'Quantity', locked:true}, {label:'Unit', locked:true}, {key:'bd_revenue', label:'Revenue'},
+                    {key:'batch_no', label:'Batch No'}, {key:'expiry_date', label:'Expiry Date'}, {key:'item_company', label:'Item Company'}
+                ];
+                const branchSubVis = getColumnVisibility('branch', branchSubCols);
                 const rows = await buildExpandableSection(
                     data.branch_sales || [],
-                    8,
+                    branchColspan,
                     item => [item.branch_id_display, item.branch_name],
-                    item => `<tr>
-                        <td>${esc(item.branch_id_display)}</td>
-                        <td>${esc(item.branch_name)}</td>
-                        <td>${CURRENCY_SYMBOL}${parseFloat(item.total_sales || 0).toLocaleString()}</td>
-                        <td>${parseFloat(item.transactions || 0).toLocaleString()}</td>
-                        <td>${CURRENCY_SYMBOL}${parseFloat(item.avg_sale || 0).toLocaleString()}</td>
-                        <td>${formatBatchCell(item.batch_no)}</td>
-                        <td>${formatExpiryCell(item.nearest_expiry)}</td>
-                        <td>${formatItemCompanyCell(item.item_company_name)}</td>
-                    </tr>`,
+                    item => `<tr>${filterRow([
+                        esc(item.branch_id_display), esc(item.branch_name),
+                        CURRENCY_SYMBOL + parseFloat(item.total_sales || 0).toLocaleString(),
+                        parseFloat(item.transactions || 0).toLocaleString(),
+                        CURRENCY_SYMBOL + parseFloat(item.avg_sale || 0).toLocaleString(),
+                        formatBatchCell(item.batch_no), formatExpiryCell(item.nearest_expiry),
+                        formatItemCompanyCell(item.item_company_name)
+                    ], branchVis)}</tr>`,
                     'Daily Breakdown',
-                    ['Date', 'Quantity', 'Unit', 'Revenue', 'Batch No', 'Expiry Date', 'Item Company'],
+                    branchSubCols.filter((_, i) => branchSubVis[i]).map(c => c.label),
                     item => fetchBreakdown('branch', item.branch_id),
-                    d => `<tr>
-                        <td>${esc(d.date)}</td>
-                        <td>${parseFloat(d.volume || 0).toLocaleString()}</td>
-                        <td>${esc(d.unit || '-')}</td>
-                        <td>${CURRENCY_SYMBOL}${parseFloat(d.revenue || 0).toLocaleString()}</td>
-                        <td>${formatBatchCell(d.batch_no)}</td>
-                        <td>${formatExpiryCell(d.nearest_expiry)}</td>
-                        <td>${formatItemCompanyCell(d.item_company_name)}</td>
-                    </tr>`
+                    d => `<tr>${filterRow([
+                        esc(d.date), parseFloat(d.volume || 0).toLocaleString(), esc(d.unit || '-'),
+                        CURRENCY_SYMBOL + parseFloat(d.revenue || 0).toLocaleString(),
+                        formatBatchCell(d.batch_no), formatExpiryCell(d.nearest_expiry), formatItemCompanyCell(d.item_company_name)
+                    ], branchSubVis)}</tr>`
                 );
                 sectionHtmlParts.push(`<table>
                     <caption>Branch Wise Sales</caption>
-                    <thead><tr>
-                        <th>Branch ID</th>
-                        <th>Branch Name</th>
-                        <th>Total Sales</th>
-                        <th>Transactions</th>
-                        <th>Avg Sale</th>
-                        <th>Batch No</th>
-                        <th>Expiry Date</th>
-                        <th>Item Company</th>
-                    </tr></thead>
+                    <thead><tr>${filterHeader(branchCols, branchVis)}</tr></thead>
                     <tbody>${rows}</tbody>
                 </table>`);
             }
             
             // ========== CATEGORY SALES ==========
             if (reportType === 'all' || reportType === 'category') {
+                const categoryCols = [
+                    {key:'category', label:'Category'}, {key:'total_revenue', label:'Total Revenue'},
+                    {key:'percentage', label:'Percentage'}, {key:'batch_no', label:'Batch No'},
+                    {key:'expiry_date', label:'Expiry Date'}, {key:'item_company', label:'Item Company'}
+                ];
+                const categoryVis = getColumnVisibility('category', categoryCols);
                 const total = (data.categories || []).reduce((sum, item) => sum + parseFloat(item.total || 0), 0);
-                let html = '<table><caption>Category Wise Sales</caption><thead><tr><th>Category</th><th>Total Revenue</th><th>Percentage</th><th>Batch No</th><th>Expiry Date</th><th>Item Company</th></tr></thead><tbody>';
+                let html = `<table><caption>Category Wise Sales</caption><thead><tr>${filterHeader(categoryCols, categoryVis)}</tr></thead><tbody>`;
                 (data.categories || []).forEach(item => {
                     if (!matchesSearch([item.category])) return;
                     const percentage = total > 0 ? ((parseFloat(item.total || 0) / total) * 100).toFixed(1) : 0;
-                    html += `<tr>
-                        <td>${esc(item.category)}</td>
-                        <td>${CURRENCY_SYMBOL}${parseFloat(item.total || 0).toLocaleString()}</td>
-                        <td>${percentage}%</td>
-                        <td>${formatBatchCell(item.batch_no)}</td>
-                        <td>${formatExpiryCell(item.nearest_expiry)}</td>
-                        <td>${formatItemCompanyCell(item.item_company_name)}</td>
-                    </tr>`;
+                    html += `<tr>${filterRow([
+                        esc(item.category), CURRENCY_SYMBOL + parseFloat(item.total || 0).toLocaleString(), percentage + '%',
+                        formatBatchCell(item.batch_no), formatExpiryCell(item.nearest_expiry), formatItemCompanyCell(item.item_company_name)
+                    ], categoryVis)}</tr>`;
                 });
                 html += '</tbody></table>';
                 sectionHtmlParts.push(html);
@@ -467,204 +482,190 @@ document.getElementById('avg-sale').textContent = fmtMoney(avgSale);
             
             // ========== TERRITORY SALES ==========
             if (reportType === 'all' || reportType === 'territory') {
+                const territoryCols = [
+                    {key:'country', label:'Country'}, {key:'region', label:'Region'}, {key:'city', label:'City'},
+                    {key:'zone', label:'Zone'}, {key:'area', label:'Area'}, {key:'total_invoices', label:'Total Invoices'},
+                    {key:'total_sales', label:'Total Sales'}, {key:'batch_no', label:'Batch No'},
+                    {key:'expiry_date', label:'Expiry Date'}, {key:'item_company', label:'Item Company'}
+                ];
+                const territoryVis = getColumnVisibility('territory', territoryCols);
+                const territoryColspan = territoryVis.filter(Boolean).length;
+                const territorySubCols = [
+                    {key:'ti_bill_no', label:'Invoice #'}, {key:'ti_date', label:'Date'}, {key:'ti_customer', label:'Customer'}, {key:'ti_net_amount', label:'Net Amount'},
+                    {key:'batch_no', label:'Batch No'}, {key:'expiry_date', label:'Expiry Date'}, {key:'item_company', label:'Item Company'}
+                ];
+                const territorySubVis = getColumnVisibility('territory', territorySubCols);
                 const rows = await buildExpandableSection(
                     data.territory_sales || [],
-                    10,
+                    territoryColspan,
                     item => [item.country, item.region, item.city, item.zone, item.area],
-                    item => `<tr>
-                        <td>${esc(item.country)}</td>
-                        <td>${esc(item.region)}</td>
-                        <td>${esc(item.city)}</td>
-                        <td>${esc(item.zone)}</td>
-                        <td>${esc(item.area)}</td>
-                        <td>${parseFloat(item.total_invoices || 0).toLocaleString()}</td>
-                        <td>${CURRENCY_SYMBOL}${parseFloat(item.total_sales || 0).toLocaleString()}</td>
-                        <td>${formatBatchCell(item.batch_no)}</td>
-                        <td>${formatExpiryCell(item.nearest_expiry)}</td>
-                        <td>${formatItemCompanyCell(item.item_company_name)}</td>
-                    </tr>`,
+                    item => `<tr>${filterRow([
+                        esc(item.country), esc(item.region), esc(item.city), esc(item.zone), esc(item.area),
+                        parseFloat(item.total_invoices || 0).toLocaleString(), CURRENCY_SYMBOL + parseFloat(item.total_sales || 0).toLocaleString(),
+                        formatBatchCell(item.batch_no), formatExpiryCell(item.nearest_expiry), formatItemCompanyCell(item.item_company_name)
+                    ], territoryVis)}</tr>`,
                     'Territory Invoices',
-                    ['Invoice #', 'Date', 'Customer', 'Net Amount', 'Batch No', 'Expiry Date', 'Item Company'],
+                    territorySubCols.filter((_, i) => territorySubVis[i]).map(c => c.label),
                     item => fetchDetails('territory_invoices', 0, `&country=${encodeURIComponent(item.country)}&region=${encodeURIComponent(item.region)}&city=${encodeURIComponent(item.city)}&zone=${encodeURIComponent(item.zone)}&area=${encodeURIComponent(item.area)}`),
-                    d => `<tr>
-                        <td>${esc(d.bill_no)}</td>
-                        <td>${esc(d.sale_date)}</td>
-                        <td>${esc(d.customer_name)}</td>
-                        <td>${CURRENCY_SYMBOL}${parseFloat(d.net_amount || 0).toLocaleString()}</td>
-                        <td>${formatBatchCell(d.batch_no)}</td>
-                        <td>${formatExpiryCell(d.nearest_expiry)}</td>
-                        <td>${formatItemCompanyCell(d.item_company_name)}</td>
-                    </tr>`
+                    d => `<tr>${filterRow([
+                        esc(d.bill_no), esc(d.sale_date), esc(d.customer_name),
+                        CURRENCY_SYMBOL + parseFloat(d.net_amount || 0).toLocaleString(),
+                        formatBatchCell(d.batch_no), formatExpiryCell(d.nearest_expiry), formatItemCompanyCell(d.item_company_name)
+                    ], territorySubVis)}</tr>`
                 );
                 sectionHtmlParts.push(`<table>
                     <caption>Territory Wise Sales</caption>
-                    <thead><tr>
-                        <th>Country</th>
-                        <th>Region</th>
-                        <th>City</th>
-                        <th>Zone</th>
-                        <th>Area</th>
-                        <th>Total Invoices</th>
-                        <th>Total Sales</th>
-                        <th>Batch No</th>
-                        <th>Expiry Date</th>
-                        <th>Item Company</th>
-                    </tr></thead>
+                    <thead><tr>${filterHeader(territoryCols, territoryVis)}</tr></thead>
                     <tbody>${rows}</tbody>
                 </table>`);
             }
             
             // ========== INVOICE SALES ==========
             if (reportType === 'all' || reportType === 'invoice') {
+                const invoiceCols = [
+                    {key:'bill_no', label:'Invoice #'}, {key:'sale_date', label:'Date'}, {key:'customer_name', label:'Customer'},
+                    {key:'officer_name', label:'Sales Officer'}, {key:'total_bill', label:'Total Bill'}, {key:'discount', label:'Discount'},
+                    {key:'net_amount', label:'Net Amount'}, {key:'batch_no', label:'Batch No'},
+                    {key:'expiry_date', label:'Expiry Date'}, {key:'item_company', label:'Item Company'}
+                ];
+                const invoiceVis = getColumnVisibility('invoice', invoiceCols);
+                const invoiceColspan = invoiceVis.filter(Boolean).length;
+                const invoiceSubCols = [
+                    {key:'ii_product', label:'Product'}, {key:'batch_no', label:'Batch No'}, {key:'expiry_date', label:'Expiry Date'}, {key:'item_company', label:'Item Company'},
+                    {label:'Quantity', locked:true}, {key:'ii_price', label:'Price'}, {key:'ii_discount', label:'Discount'}, {key:'ii_net_amount', label:'Net Amount'}
+                ];
+                const invoiceSubVis = getColumnVisibility('invoice', invoiceSubCols);
                 const rows = await buildExpandableSection(
                     data.invoice_sales || [],
-                    10,
+                    invoiceColspan,
                     item => [item.bill_no, item.customer_name, item.officer_name],
-                    item => `<tr>
-                        <td>${esc(item.bill_no)}</td>
-                        <td>${esc(item.sale_date)}</td>
-                        <td>${esc(item.customer_name)}</td>
-                        <td>${esc(item.officer_name)}</td>
-                        <td>${CURRENCY_SYMBOL}${parseFloat(item.total_bill || 0).toLocaleString()}</td>
-                        <td>${CURRENCY_SYMBOL}${parseFloat(item.total_discount_amount || 0).toLocaleString()}</td>
-                        <td>${CURRENCY_SYMBOL}${parseFloat(item.net_amount || 0).toLocaleString()}</td>
-                        <td>${formatBatchCell(item.batch_no)}</td>
-                        <td>${formatExpiryCell(item.nearest_expiry)}</td>
-                        <td>${formatItemCompanyCell(item.item_company_name)}</td>
-                    </tr>`,
+                    item => `<tr>${filterRow([
+                        esc(item.bill_no), esc(item.sale_date), esc(item.customer_name), esc(item.officer_name),
+                        CURRENCY_SYMBOL + parseFloat(item.total_bill || 0).toLocaleString(),
+                        CURRENCY_SYMBOL + parseFloat(item.total_discount_amount || 0).toLocaleString(),
+                        CURRENCY_SYMBOL + parseFloat(item.net_amount || 0).toLocaleString(),
+                        formatBatchCell(item.batch_no), formatExpiryCell(item.nearest_expiry), formatItemCompanyCell(item.item_company_name)
+                    ], invoiceVis)}</tr>`,
                     'Invoice Items',
-                    ['Product', 'Batch No', 'Expiry Date', 'Item Company', 'Quantity', 'Price', 'Discount', 'Net Amount'],
+                    invoiceSubCols.filter((_, i) => invoiceSubVis[i]).map(c => c.label),
                     item => fetchDetails('invoice_items', item.id),
-                    d => `<tr>
-                        <td>${esc(d.product_name)}</td>
-                        <td>${formatBatchCell(d.batch_no)}</td>
-                        <td>${formatExpiryCell(d.expiry_date)}</td>
-                        <td>${formatItemCompanyCell(d.item_company_name)}</td>
-                        <td>${parseFloat(d.quantity || 0).toLocaleString()}</td>
-                        <td>${CURRENCY_SYMBOL}${parseFloat(d.sale_price || 0).toLocaleString()}</td>
-                        <td>${CURRENCY_SYMBOL}${parseFloat(d.discount_amount || 0).toLocaleString()}</td>
-                        <td>${CURRENCY_SYMBOL}${parseFloat(d.net_amount || 0).toLocaleString()}</td>
-                    </tr>`
+                    d => `<tr>${filterRow([
+                        esc(d.product_name), formatBatchCell(d.batch_no), formatExpiryCell(d.expiry_date), formatItemCompanyCell(d.item_company_name),
+                        parseFloat(d.quantity || 0).toLocaleString() + (d.unit_symbol ? ' ' + esc(d.unit_symbol) : ''),
+                        CURRENCY_SYMBOL + parseFloat(d.sale_price || 0).toLocaleString(),
+                        CURRENCY_SYMBOL + parseFloat(d.discount_amount || 0).toLocaleString(),
+                        CURRENCY_SYMBOL + parseFloat(d.net_amount || 0).toLocaleString()
+                    ], invoiceSubVis)}</tr>`
                 );
                 sectionHtmlParts.push(`<table>
                     <caption>Invoice Wise Sales</caption>
-                    <thead><tr>
-                        <th>Invoice #</th>
-                        <th>Date</th>
-                        <th>Customer</th>
-                        <th>Sales Officer</th>
-                        <th>Total Bill</th>
-                        <th>Discount</th>
-                        <th>Net Amount</th>
-                        <th>Batch No</th>
-                        <th>Expiry Date</th>
-                        <th>Item Company</th>
-                    </tr></thead>
+                    <thead><tr>${filterHeader(invoiceCols, invoiceVis)}</tr></thead>
                     <tbody>${rows}</tbody>
                 </table>`);
             }
             
             // ========== VENDOR SALES ==========
             if (reportType === 'all' || reportType === 'vendor') {
+                const vendorCols = [
+                    {key:'vendor_id', label:'Vendor ID'}, {key:'vendor_name', label:'Vendor Name'},
+                    {key:'total_invoices', label:'Total Invoices'}, {key:'total_quantity', label:'Total Quantity'},
+                    {key:'total_sales', label:'Total Sales'}, {key:'batch_no', label:'Batch No'},
+                    {key:'expiry_date', label:'Expiry Date'}, {key:'item_company', label:'Item Company'}
+                ];
+                const vendorVis = getColumnVisibility('vendor', vendorCols);
+                const vendorColspan = vendorVis.filter(Boolean).length;
+                const vendorSubCols = [
+                    {key:'vp_product', label:'Product'}, {key:'batch_no', label:'Batch No'}, {key:'expiry_date', label:'Expiry Date'}, {key:'item_company', label:'Item Company'},
+                    {label:'Quantity', locked:true}, {key:'vp_total_sales', label:'Total Sales'}
+                ];
+                const vendorSubVis = getColumnVisibility('vendor', vendorSubCols);
                 const rows = await buildExpandableSection(
                     data.vendor_sales || [],
-                    8,
+                    vendorColspan,
                     item => [item.vendor_id_display, item.vendor_name],
-                    item => `<tr>
-                        <td>${esc(item.vendor_id_display)}</td>
-                        <td>${esc(item.vendor_name)}</td>
-                        <td>${parseFloat(item.total_invoices || 0).toLocaleString()}</td>
-                        <td>${parseFloat(item.total_quantity || 0).toLocaleString()}</td>
-                        <td>${CURRENCY_SYMBOL}${parseFloat(item.total_sales || 0).toLocaleString()}</td>
-                        <td>${formatBatchCell(item.batch_no)}</td>
-                        <td>${formatExpiryCell(item.nearest_expiry)}</td>
-                        <td>${formatItemCompanyCell(item.item_company_name)}</td>
-                    </tr>`,
+                    item => `<tr>${filterRow([
+                        esc(item.vendor_id_display), esc(item.vendor_name),
+                        parseFloat(item.total_invoices || 0).toLocaleString(),
+                        parseFloat(item.total_quantity || 0).toLocaleString() + (item.unit_symbol ? ' ' + esc(item.unit_symbol) : ''),
+                        CURRENCY_SYMBOL + parseFloat(item.total_sales || 0).toLocaleString(),
+                        formatBatchCell(item.batch_no), formatExpiryCell(item.nearest_expiry), formatItemCompanyCell(item.item_company_name)
+                    ], vendorVis)}</tr>`,
                     'Products Sold',
-                    ['Product', 'Batch No', 'Expiry Date', 'Item Company', 'Quantity', 'Total Sales'],
+                    vendorSubCols.filter((_, i) => vendorSubVis[i]).map(c => c.label),
                     item => fetchDetails('vendor_products', item.vendor_id),
-                    d => `<tr>
-                        <td>${esc(d.product_name)}</td>
-                        <td>${formatBatchCell(d.batch_no)}</td>
-                        <td>${formatExpiryCell(d.nearest_expiry)}</td>
-                        <td>${formatItemCompanyCell(d.item_company_name)}</td>
-                        <td>${parseFloat(d.total_quantity || 0).toLocaleString()}</td>
-                        <td>${CURRENCY_SYMBOL}${parseFloat(d.total_sales || 0).toLocaleString()}</td>
-                    </tr>`
+                    d => `<tr>${filterRow([
+                        esc(d.product_name), formatBatchCell(d.batch_no), formatExpiryCell(d.nearest_expiry), formatItemCompanyCell(d.item_company_name),
+                        parseFloat(d.total_quantity || 0).toLocaleString() + (d.unit_symbol ? ' ' + esc(d.unit_symbol) : ''),
+                        CURRENCY_SYMBOL + parseFloat(d.total_sales || 0).toLocaleString()
+                    ], vendorSubVis)}</tr>`
                 );
                 sectionHtmlParts.push(`<table>
                     <caption>Vendor Wise Sales</caption>
-                    <thead><tr>
-                        <th>Vendor ID</th>
-                        <th>Vendor Name</th>
-                        <th>Total Invoices</th>
-                        <th>Total Quantity</th>
-                        <th>Total Sales</th>
-                        <th>Batch No</th>
-                        <th>Expiry Date</th>
-                        <th>Item Company</th>
-                    </tr></thead>
+                    <thead><tr>${filterHeader(vendorCols, vendorVis)}</tr></thead>
                     <tbody>${rows}</tbody>
                 </table>`);
             }
             
             // ========== CUSTOMER SALES ==========
             if (reportType === 'all' || reportType === 'customer') {
+                const customerCols = [
+                    {key:'customer_id', label:'Customer ID'}, {key:'customer_name', label:'Customer Name'},
+                    {key:'total_invoices', label:'Total Invoices'}, {key:'total_sales', label:'Total Sales'},
+                    {key:'batch_no', label:'Batch No'}, {key:'expiry_date', label:'Expiry Date'}, {key:'item_company', label:'Item Company'}
+                ];
+                const customerVis = getColumnVisibility('customer', customerCols);
+                const customerColspan = customerVis.filter(Boolean).length;
+                const customerSubCols = [
+                    {key:'ci_bill_no', label:'Invoice #'}, {key:'ci_date', label:'Date'}, {key:'ci_total_bill', label:'Total Bill'},
+                    {key:'ci_discount', label:'Discount'}, {key:'ci_net_amount', label:'Net Amount'},
+                    {key:'batch_no', label:'Batch No'}, {key:'expiry_date', label:'Expiry Date'}, {key:'item_company', label:'Item Company'}
+                ];
+                const customerSubVis = getColumnVisibility('customer', customerSubCols);
                 const rows = await buildExpandableSection(
                     data.customer_sales || [],
-                    7,
+                    customerColspan,
                     item => [item.customer_id_display, item.customer_name],
-                    item => `<tr>
-                        <td>${esc(item.customer_id_display)}</td>
-                        <td>${esc(item.customer_name)}</td>
-                        <td>${parseFloat(item.total_invoices || 0).toLocaleString()}</td>
-                        <td>${CURRENCY_SYMBOL}${parseFloat(item.total_sales || 0).toLocaleString()}</td>
-                        <td>${formatBatchCell(item.batch_no)}</td>
-                        <td>${formatExpiryCell(item.nearest_expiry)}</td>
-                        <td>${formatItemCompanyCell(item.item_company_name)}</td>
-                    </tr>`,
+                    item => `<tr>${filterRow([
+                        esc(item.customer_id_display), esc(item.customer_name),
+                        parseFloat(item.total_invoices || 0).toLocaleString(), CURRENCY_SYMBOL + parseFloat(item.total_sales || 0).toLocaleString(),
+                        formatBatchCell(item.batch_no), formatExpiryCell(item.nearest_expiry), formatItemCompanyCell(item.item_company_name)
+                    ], customerVis)}</tr>`,
                     'Customer Invoices',
-                    ['Invoice #', 'Date', 'Total Bill', 'Discount', 'Net Amount', 'Batch No', 'Expiry Date', 'Item Company'],
+                    customerSubCols.filter((_, i) => customerSubVis[i]).map(c => c.label),
                     item => fetchDetails('customer_invoices', item.customer_id),
-                    d => `<tr>
-                        <td>${esc(d.bill_no)}</td>
-                        <td>${esc(d.sale_date)}</td>
-                        <td>${CURRENCY_SYMBOL}${parseFloat(d.total_bill || 0).toLocaleString()}</td>
-                        <td>${CURRENCY_SYMBOL}${parseFloat(d.total_discount_amount || 0).toLocaleString()}</td>
-                        <td>${CURRENCY_SYMBOL}${parseFloat(d.net_amount || 0).toLocaleString()}</td>
-                        <td>${formatBatchCell(d.batch_no)}</td>
-                        <td>${formatExpiryCell(d.nearest_expiry)}</td>
-                        <td>${formatItemCompanyCell(d.item_company_name)}</td>
-                    </tr>`
+                    d => `<tr>${filterRow([
+                        esc(d.bill_no), esc(d.sale_date),
+                        CURRENCY_SYMBOL + parseFloat(d.total_bill || 0).toLocaleString(),
+                        CURRENCY_SYMBOL + parseFloat(d.total_discount_amount || 0).toLocaleString(),
+                        CURRENCY_SYMBOL + parseFloat(d.net_amount || 0).toLocaleString(),
+                        formatBatchCell(d.batch_no), formatExpiryCell(d.nearest_expiry), formatItemCompanyCell(d.item_company_name)
+                    ], customerSubVis)}</tr>`
                 );
                 sectionHtmlParts.push(`<table>
                     <caption>Customer Wise Sales</caption>
-                    <thead><tr>
-                        <th>Customer ID</th>
-                        <th>Customer Name</th>
-                        <th>Total Invoices</th>
-                        <th>Total Sales</th>
-                        <th>Batch No</th>
-                        <th>Expiry Date</th>
-                        <th>Item Company</th>
-                    </tr></thead>
+                    <thead><tr>${filterHeader(customerCols, customerVis)}</tr></thead>
                     <tbody>${rows}</tbody>
                 </table>`);
             }
 
             // ========== ITEM COMPANY SALES ==========
             if (reportType === 'all' || reportType === 'item_company') {
-                let html = '<table><caption>Item Company Wise Sales</caption><thead><tr><th>Item Company</th><th>Total Invoices</th><th>Total Quantity</th><th>Total Sales</th><th>Batch No</th><th>Expiry Date</th></tr></thead><tbody>';
+                const itemCompanyCols = [
+                    {key:'item_company', label:'Item Company'}, {key:'total_invoices', label:'Total Invoices'},
+                    {key:'total_quantity', label:'Total Quantity'}, {key:'total_sales', label:'Total Sales'},
+                    {key:'batch_no', label:'Batch No'}, {key:'expiry_date', label:'Expiry Date'}
+                ];
+                const itemCompanyVis = getColumnVisibility('item_company', itemCompanyCols);
+                let html = `<table><caption>Item Company Wise Sales</caption><thead><tr>${filterHeader(itemCompanyCols, itemCompanyVis)}</tr></thead><tbody>`;
                 (data.item_company_sales || []).forEach(item => {
                     if (!matchesSearch([item.item_company_name])) return;
-                    html += `<tr>
-                        <td>${formatItemCompanyCell(item.item_company_name)}</td>
-                        <td>${parseFloat(item.total_invoices || 0).toLocaleString()}</td>
-                        <td>${parseFloat(item.total_quantity || 0).toLocaleString()}</td>
-                        <td>${CURRENCY_SYMBOL}${parseFloat(item.total_sales || 0).toLocaleString()}</td>
-                        <td>${formatBatchCell(item.batch_no)}</td>
-                        <td>${formatExpiryCell(item.nearest_expiry)}</td>
-                    </tr>`;
+                    html += `<tr>${filterRow([
+                        formatItemCompanyCell(item.item_company_name),
+                        parseFloat(item.total_invoices || 0).toLocaleString(),
+                        parseFloat(item.total_quantity || 0).toLocaleString() + (item.unit_symbol ? ' ' + esc(item.unit_symbol) : ''),
+                        CURRENCY_SYMBOL + parseFloat(item.total_sales || 0).toLocaleString(),
+                        formatBatchCell(item.batch_no), formatExpiryCell(item.nearest_expiry)
+                    ], itemCompanyVis)}</tr>`;
                 });
                 html += '</tbody></table>';
                 sectionHtmlParts.push(html);

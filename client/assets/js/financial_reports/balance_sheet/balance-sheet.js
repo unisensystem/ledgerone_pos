@@ -410,7 +410,11 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // Function to print the report
     function printReport() {
-        window.open('print.php', '_blank');
+        const endDate = getEndDateFromPeriod();
+        const startDate = getStartDateFromPeriod();
+        let url = `print.php?end_date=${endDate}`;
+        if (startDate) url += `&start_date=${startDate}`;
+        window.open(url, '_blank');
     }
 
     // Function to export the report
