@@ -1329,7 +1329,7 @@ $purchasesNet = (float) $purchasesTotals['net'];
                 </div>
             </div>
 
-            <!-- Quick Actions Section -->
+                      <!-- Quick Actions Section -->
             <div class="quick-actions">
                 <h2 class="section-title">Quick Actions</h2>
                 <div class="actions-grid">
@@ -1368,10 +1368,31 @@ $purchasesNet = (float) $purchasesTotals['net'];
                         <span>Posting Lock</span>
                     </a>
 
-
+                    <!-- Database Operations -->
+                    <div style="grid-column:span 2; background:white; border:2px solid #e2e8f0; border-radius:0.75rem; padding:0.9rem 1rem; display:flex; flex-direction:column; justify-content:center; gap:0.75rem;">
+                        <div style="display:flex; align-items:center; gap:0.75rem;">
+                            <span style="width:38px; height:38px; border-radius:10px; background:rgba(31,123,255,0.1); color:var(--primary,#1f7bff); display:flex; align-items:center; justify-content:center; font-size:1.05rem; flex-shrink:0;">
+                                <i class="fas fa-database"></i>
+                            </span>
+                            <div>
+                                <div style="font-size:0.95rem; font-weight:600; color:#0f172a;">Database Operations</div>
+                                <div style="font-size:12px; color:#64748b;">Backup, restore, or reset this tenant's data</div>
+                            </div>
+                        </div>
+                        <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
+                            <a href="../system_setup/admin_panel/panel.php" style="flex:1; min-width:0; display:flex; align-items:center; justify-content:center; gap:0.4rem; padding:0.5rem 0.3rem; background:#dc2626; color:#fff; border-radius:0.5rem; font-size:12.5px; font-weight:600; text-decoration:none; white-space:nowrap;">
+                                <i class="fas fa-eraser"></i> Format
+                            </a>
+                            <a href="../system_setup/admin_panel/panel.php" style="flex:1; min-width:0; display:flex; align-items:center; justify-content:center; gap:0.4rem; padding:0.5rem 0.3rem; background:#1f7bff; color:#fff; border-radius:0.5rem; font-size:12.5px; font-weight:600; text-decoration:none; white-space:nowrap;">
+                                <i class="fas fa-download"></i> Backup
+                            </a>
+                            <a href="../system_setup/admin_panel/panel.php" style="flex:1; min-width:0; display:flex; align-items:center; justify-content:center; gap:0.4rem; padding:0.5rem 0.3rem; background:#e8890c; color:#fff; border-radius:0.5rem; font-size:12.5px; font-weight:600; text-decoration:none; white-space:nowrap;">
+                                <i class="fas fa-upload"></i> Restore
+                            </a>
+                        </div>
+                    </div>
                 </div>
             </div>
-
             <!-- ✅ SAHI: bahar hai grid ke -->
             <div id="leaveApprovalsCard" class="card" style="display:none; margin-bottom:1rem; border-left:4px solid #e8b23f;">
                 <h3 class="card-title" style="display:flex; align-items:center; gap:0.5rem;">

@@ -30,7 +30,8 @@
         'hideSalesOfficerStandard','hideSupplierManStandard','hideAreaCityStandard',
         'hideSubAccountStandard','hideSaleOrderStandard','hideCurrencyStandard',
         'hideTransportNameStandard','hideBiltyNoStandard','hideProjectStandard',
-        'hideContainerStandard','hideRemarksStandard'
+        'hideContainerStandard','hideRemarksStandard',
+        'enableAmountPaidPaymentMethod','enablePrintQRCode','enableRoundOffNetAmount',
     ]);
 
     // ---- Server sync: Invoice Settings persisted per user in the DB ----
@@ -314,7 +315,9 @@ const invoiceSettingCheckboxes = [
     'enableBatchNo',        // NEW
     'enableExpiryDate',     // NEW
     'enableTaxation',       // NEW — only exists on med_pos_invoice's settings modal
-    'enableExtraDiscountItem' // NEW — only exists on med_pos_invoice's settings modal
+    'enableExtraDiscountItem',
+'enableRoundOffNetAmount',
+
 ];
 
     invoiceSettingCheckboxes.forEach(checkboxId => {
@@ -3430,7 +3433,9 @@ data.items.forEach(item => {
             // GST calculation - skip if elements don't exist
             const shippingFeesEl = document.getElementById('shippingFees');
             const shippingFees = shippingFeesEl ? parseFloat(shippingFeesEl.value) || 0 : 0;
-            const netAmount = afterDiscount + shippingFees;
+const roundOffNet = localStorage.getItem('enableRoundOffNetAmount') === 'true';
+let netAmount = afterDiscount + shippingFees;
+if (roundOffNet) netAmount = Math.round(netAmount);
 
             console.log('Summary: totalNetAmountItems =', totalNetAmountItems, 'extraDiscount1 =', extraDiscount1Amount, 'extraDiscount2 =', extraDiscount2Amount, 'netAmount =', netAmount);
 
@@ -3441,7 +3446,7 @@ data.items.forEach(item => {
 
             // Update DOM element
             const netAmountEl = document.getElementById('netAmount');
-            if (netAmountEl) netAmountEl.textContent = netAmount.toFixed(3);
+if (netAmountEl) netAmountEl.textContent = roundOffNet ? netAmount.toFixed(0) : netAmount.toFixed(2);
 
             console.log('DOM netAmount element now contains:', netAmountEl?.textContent);
 
@@ -4859,6 +4864,8 @@ function loadInvoiceSettings() {
     document.getElementById('enableAmountPaidPaymentMethod').checked = localStorage.getItem('enableAmountPaidPaymentMethod') === 'true';
     document.getElementById('enableExtraDiscount1').checked = localStorage.getItem('enableExtraDiscount1') === 'true';
     document.getElementById('enableExtraDiscount2').checked = localStorage.getItem('enableExtraDiscount2') === 'true';
+    const enableRoundOffCheckbox = document.getElementById('enableRoundOffNetAmount');
+if (enableRoundOffCheckbox) enableRoundOffCheckbox.checked = localStorage.getItem('enableRoundOffNetAmount') === 'true';
     // Taxation / Extra Discount / Batch No / Expiry Date checkboxes only exist on
     // med_pos_invoice's settings modal — guard their absence on the regular POS
     // invoice page, which doesn't have these controls.
@@ -4911,6 +4918,8 @@ function saveInvoiceSettings() {
     localStorage.setItem('enableInvoiceCashDiscountAmount', document.getElementById('enableInvoiceCashDiscountAmount').checked);
     localStorage.setItem('enableExtraDiscount1', document.getElementById('enableExtraDiscount1').checked);
     localStorage.setItem('enableExtraDiscount2', document.getElementById('enableExtraDiscount2').checked);
+    const enableRoundOffCheckbox = document.getElementById('enableRoundOffNetAmount');
+if (enableRoundOffCheckbox) localStorage.setItem('enableRoundOffNetAmount', enableRoundOffCheckbox.checked);
     localStorage.setItem('enableShippingFees', document.getElementById('enableShippingFees').checked);
     localStorage.setItem('enablePrintQRCode', document.getElementById('enablePrintQRCode').checked);
     localStorage.setItem('enableAmountPaidPaymentMethod', document.getElementById('enableAmountPaidPaymentMethod').checked);
@@ -7415,3 +7424,4 @@ function hideSignaturePreview() {
 }
 
 document.addEventListener('DOMContentLoaded', initSignatureUpload);
+

@@ -399,7 +399,10 @@ function calculateRowAmounts(row, totalQty, price, source) {
         && row.dataset.isTaxInclusive !== '1'
         && (typeof isTaxationEnabled === 'function' ? isTaxationEnabled() : false);
     const net = includeTaxInNet ? (afterTradeOffer + taxAmt) : afterTradeOffer;
-    row.querySelector('.net-cell input').value = net.toFixed(3);
+    // Row Net Amount follows the Round Off Net Amount switch (Invoice Settings):
+    // ON  -> whole number, OFF -> sirf 2 decimals
+    const roundOffRowNet = localStorage.getItem('enableRoundOffNetAmount') === 'true';
+    row.querySelector('.net-cell input').value = roundOffRowNet ? Math.round(net).toFixed(0) : net.toFixed(2);
     
     // Update summary
     updateInvoiceSummaryDynamic();
@@ -499,10 +502,11 @@ function updateInvoiceSummaryDynamic() {
     if (totalTaxAmountEl) totalTaxAmountEl.textContent = totalTaxAmountItems.toFixed(3);
     if (itemTaxAmountSummaryEl) itemTaxAmountSummaryEl.textContent = totalTaxAmountItems.toFixed(3); // NEW
     if (totalFocQtyEl) totalFocQtyEl.textContent = totalFOCQty.toFixed(3);
-    if (totalNetAmountItemsEl) totalNetAmountItemsEl.textContent = totalNetAmountItems.toFixed(3);
+    const roundOffFooterNet = localStorage.getItem('enableRoundOffNetAmount') === 'true';
+    if (totalNetAmountItemsEl) totalNetAmountItemsEl.textContent = roundOffFooterNet ? totalNetAmountItems.toFixed(0) : totalNetAmountItems.toFixed(2);
     
     const totalBillEl = document.getElementById('totalBill');
-    if (totalBillEl) totalBillEl.textContent = totalBill.toFixed(3);
+    if (totalBillEl) totalBillEl.textContent = totalBill.toFixed(2);
     
     // Calculate invoice-level discount
     const discountPercentEl = document.getElementById('totalDiscountPercent');
@@ -512,13 +516,18 @@ function updateInvoiceSummaryDynamic() {
     
     const shippingFeesEl = document.getElementById('shippingFees');
     const shippingFees = parseFloat(shippingFeesEl?.value) || 0;
-    const netAmount = afterDiscount + shippingFees;
+
+    // Round Off Net Amount switch (Invoice Settings):
+    // ON  -> whole number, OFF -> sirf 2 decimals
+    const roundOffNet = localStorage.getItem('enableRoundOffNetAmount') === 'true';
+    let netAmount = afterDiscount + shippingFees;
+    if (roundOffNet) netAmount = Math.round(netAmount);
     
     const totalDiscountAmountEl = document.getElementById('totalDiscountAmount');
     const netAmountEl = document.getElementById('netAmount');
     
     if (totalDiscountAmountEl) totalDiscountAmountEl.value = discountAmount.toFixed(3);
-    if (netAmountEl) netAmountEl.textContent = netAmount.toFixed(3);
+    if (netAmountEl) netAmountEl.textContent = roundOffNet ? netAmount.toFixed(0) : netAmount.toFixed(2);
 
     // Expose totals for invoice-level tax base resolution
     window.currentTotalBill = totalBill;

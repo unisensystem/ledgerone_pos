@@ -181,9 +181,9 @@ $currency_symbol = $currency['symbol'];
             </div>
             
             <div class="form-group mb-0">
-                <label class="form-label">Search Description or Reference</label>
+                <label class="form-label">Search Everything (Date, Account #, Account Name, Description, Reference, Amount)</label>
                 <div class="d-flex gap-1">
-                    <input type="text" class="form-control" id="searchText" placeholder="Search transaction descriptions...">
+                    <input type="text" class="form-control" id="searchText" placeholder="Search anything: 1010, Cash, fuel, sale_invoice-12, 2026-09, 1500...">
                     <button class="btn btn-secondary" id="clearFilters">
                         <i class="fas fa-times"></i> Clear
                     </button>
@@ -363,14 +363,7 @@ $currency_symbol = $currency['symbol'];
                     <i class="fas fa-info-circle"></i> Double-click any entry for detailed view
                 </div>
                 
-                <div class="d-flex gap-1">
-                    <button class="btn btn-ghost">
-                        <i class="fas fa-chevron-left"></i> Previous
-                    </button>
-                    <button class="btn btn-ghost">
-                        Next <i class="fas fa-chevron-right"></i>
-                    </button>
-                </div>
+                <div class="d-flex gap-1" id="pagination"></div>
             </div>
         </div>
         

@@ -8,7 +8,10 @@ document.addEventListener('DOMContentLoaded', function () {
 
     let currentPage = 1;
     const itemsPerPage = 20;
-    
+    const pagesPerGroup = 10;
+    let allEntries = [];
+    let allSummary = null;
+
     function loadCompanies() {
         fetch('../../../../server/api/financial_reports/general_ledger/get-companies.php')
             .then(response => response.json())
@@ -22,7 +25,7 @@ document.addEventListener('DOMContentLoaded', function () {
                         option.textContent = company.company_name;
                         companySelect.appendChild(option);
                     });
-                    
+
                     loadReport();
                 }
             })
@@ -130,7 +133,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     const searchInput = document.getElementById('searchText');
     let searchTimeout;
-    
+
     searchInput.addEventListener('input', function () {
         clearTimeout(searchTimeout);
         searchTimeout = setTimeout(() => {
@@ -145,7 +148,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function loadReport() {
         const companyId = document.getElementById('company').value;
-        
+
         const params = new URLSearchParams({
             company_id: companyId,
             startDate: document.getElementById('startDate').value,
@@ -161,8 +164,10 @@ document.addEventListener('DOMContentLoaded', function () {
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
-                    updateSummary(data.summary);
-                    updateTable(data.entries, data.summary);
+                    allEntries = data.entries;
+                    allSummary = data.summary;
+                    updateSummary(allSummary);
+                    renderTable();
                 }
             })
             .catch(error => console.error('Error:', error));
@@ -176,7 +181,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
         const badge1 = document.querySelector('.col-3:nth-child(1) .badge');
         const badge2 = document.querySelector('.col-3:nth-child(2) .badge');
-        
+
         if (summary.isBalanced) {
             badge1.textContent = 'Balanced';
             badge1.className = 'badge badge-balanced';
@@ -190,15 +195,24 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
-    function updateTable(entries, summary) {
+    // Renders the current page from the already-loaded entries (no refetch on page change)
+    function renderTable() {
+        const entries = allEntries;
+        const summary = allSummary;
         const tbody = document.querySelector('tbody');
         tbody.innerHTML = '';
-        
+
         const totalEntries = entries.length;
-        const totalPages = Math.ceil(totalEntries / itemsPerPage);
+        const totalPages = Math.max(1, Math.ceil(totalEntries / itemsPerPage));
+        if (currentPage > totalPages) currentPage = totalPages;
+
         const startIndex = (currentPage - 1) * itemsPerPage;
         const endIndex = Math.min(startIndex + itemsPerPage, totalEntries);
         const paginatedEntries = entries.slice(startIndex, endIndex);
+
+        if (paginatedEntries.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="9" class="text-center">No entries found</td></tr>';
+        }
 
         paginatedEntries.forEach(entry => {
             const row = document.createElement('tr');
@@ -213,13 +227,13 @@ document.addEventListener('DOMContentLoaded', function () {
                 <td class="text-right">${entry.balance >= 0 ? 'Dr ' : 'Cr '}${formatCurrency(Math.abs(entry.balance))}</td>
                 <td><span class="badge badge-balanced">Valid</span></td>
             `;
-            
+
             row.addEventListener('dblclick', function () {
                 const amount = entry.debit > 0 ? entry.debit : entry.credit;
                 const type = entry.debit > 0 ? 'Debit' : 'Credit';
                 alert(`Transaction Details:\n\nAccount: ${entry.account_number} - ${entry.account_name}\nAmount: ${formatCurrency(amount)} (${type})\nDate: ${entry.date}\nDescription: ${entry.description}\nReference: ${entry.reference}`);
             });
-            
+
             tbody.appendChild(row);
         });
 
@@ -235,45 +249,54 @@ document.addEventListener('DOMContentLoaded', function () {
             </td>
         `;
 
-        document.querySelector('.card .d-flex.justify-between.align-center div:last-child').textContent = 
-            `Showing ${startIndex + 1}-${endIndex} of ${totalEntries} entries`;
-        
-        updatePaginationButtons(totalPages);
+        document.querySelector('.card .d-flex.justify-between.align-center div:last-child').textContent =
+            `Showing ${totalEntries ? startIndex + 1 : 0}-${endIndex} of ${totalEntries} entries`;
+
+        renderPagination(totalPages);
     }
-    
-    function updatePaginationButtons(totalPages) {
-        const prevBtn = document.querySelector('.btn-ghost:has(.fa-chevron-left)');
-        const nextBtn = document.querySelector('.btn-ghost:has(.fa-chevron-right)');
-        
-        prevBtn.disabled = currentPage === 1;
-        nextBtn.disabled = currentPage === totalPages || totalPages === 0;
-        
-        prevBtn.style.opacity = prevBtn.disabled ? '0.5' : '1';
-        nextBtn.style.opacity = nextBtn.disabled ? '0.5' : '1';
-        prevBtn.style.cursor = prevBtn.disabled ? 'not-allowed' : 'pointer';
-        nextBtn.style.cursor = nextBtn.disabled ? 'not-allowed' : 'pointer';
+
+    // Numbered pagination: 10 page numbers at a time, "<" and ">" to move one page
+    function renderPagination(totalPages) {
+        const container = document.getElementById('pagination');
+        container.innerHTML = '';
+        if (totalPages <= 1) return;
+
+        function addButton(html, page, isActive) {
+            const btn = document.createElement('button');
+            btn.className = isActive ? 'btn btn-secondary' : 'btn btn-ghost';
+            btn.innerHTML = html;
+            btn.addEventListener('click', function () {
+                if (page === currentPage) return;
+                currentPage = page;
+                renderTable();
+            });
+            container.appendChild(btn);
+        }
+
+        const groupStart = Math.floor((currentPage - 1) / pagesPerGroup) * pagesPerGroup + 1;
+        const groupEnd = Math.min(groupStart + pagesPerGroup - 1, totalPages);
+
+        if (currentPage > 1) {
+            addButton('<i class="fas fa-chevron-left"></i>', currentPage - 1, false);
+        }
+
+        for (let p = groupStart; p <= groupEnd; p++) {
+            addButton(String(p), p, p === currentPage);
+        }
+
+        if (currentPage < totalPages) {
+            addButton('<i class="fas fa-chevron-right"></i>', currentPage + 1, false);
+        }
     }
 
     document.querySelector('.btn-primary').addEventListener('click', () => {
         currentPage = 1;
         loadReport();
     });
-    
-    document.querySelector('.btn-ghost:has(.fa-chevron-left)').addEventListener('click', function() {
-        if (currentPage > 1) {
-            currentPage--;
-            loadReport();
-        }
-    });
-    
-    document.querySelector('.btn-ghost:has(.fa-chevron-right)').addEventListener('click', function() {
-        currentPage++;
-        loadReport();
-    });
-    
+
     document.getElementById('printBtn').addEventListener('click', function() {
         const companyId = document.getElementById('company').value;
-        
+
         const params = new URLSearchParams({
             company_id: companyId,
             startDate: document.getElementById('startDate').value,
@@ -286,6 +309,6 @@ document.addEventListener('DOMContentLoaded', function () {
         });
         window.open(`print.php?${params}`, '_blank');
     });
-    
+
     loadCompanies();
 });

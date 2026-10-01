@@ -25,7 +25,7 @@ $accountNumber = $_GET['accountNumber'] ?? '';
 $transactionType = $_GET['transactionType'] ?? '';
 $minAmount = $_GET['minAmount'] ?? null;
 $maxAmount = $_GET['maxAmount'] ?? null;
-$searchText = $_GET['searchText'] ?? '';
+$searchText = trim($_GET['searchText'] ?? '');
 $company_id = $_GET['company_id'] ?? null;
 
 try {
@@ -98,10 +98,26 @@ try {
         $params[] = $maxAmount;
     }
     
-    if ($searchText) {
-        $query .= " AND (al.description LIKE ? OR a.name LIKE ?)";
-        $params[] = "%$searchText%";
-        $params[] = "%$searchText%";
+    // Global search: date, account number, account name, description, reference, debit, credit
+    if ($searchText !== '') {
+        $query .= " AND (
+            al.description LIKE ?
+            OR a.name LIKE ?
+            OR a.sub_account_id LIKE ?
+            OR CONCAT(al.reference_table, '-', al.reference_id) LIKE ?
+            OR CAST(al.date AS CHAR) LIKE ?
+            OR CAST(al.debit AS CHAR) LIKE ?
+            OR CAST(al.credit AS CHAR) LIKE ?
+        )";
+        $like = "%$searchText%";
+        $amountLike = '%' . str_replace(',', '', $searchText) . '%'; // so "1,500" matches 1500.00
+        $params[] = $like;
+        $params[] = $like;
+        $params[] = $like;
+        $params[] = $like;
+        $params[] = $like;
+        $params[] = $amountLike;
+        $params[] = $amountLike;
     }
     
     $query .= " ORDER BY al.date, al.id";
