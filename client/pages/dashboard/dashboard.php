@@ -1368,27 +1368,22 @@ $purchasesNet = (float) $purchasesTotals['net'];
                         <span>Posting Lock</span>
                     </a>
 
-                    <!-- Database Operations -->
+                    <!-- Database Operations: Backup only here (instant, this tenant's data only).
+                         Format / Restore are destructive and stay Admin-Panel-only on purpose. -->
                     <div style="grid-column:span 2; background:white; border:2px solid #e2e8f0; border-radius:0.75rem; padding:0.9rem 1rem; display:flex; flex-direction:column; justify-content:center; gap:0.75rem;">
                         <div style="display:flex; align-items:center; gap:0.75rem;">
                             <span style="width:38px; height:38px; border-radius:10px; background:rgba(31,123,255,0.1); color:var(--primary,#1f7bff); display:flex; align-items:center; justify-content:center; font-size:1.05rem; flex-shrink:0;">
                                 <i class="fas fa-database"></i>
                             </span>
                             <div>
-                                <div style="font-size:0.95rem; font-weight:600; color:#0f172a;">Database Operations</div>
-                                <div style="font-size:12px; color:#64748b;">Backup, restore, or reset this tenant's data</div>
+                                <div style="font-size:0.95rem; font-weight:600; color:#0f172a;">Database Backup</div>
+                                <div style="font-size:12px; color:#64748b;">Download a backup of this tenant's data. Need Format or Restore? Use Admin Panel.</div>
                             </div>
                         </div>
                         <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
-                            <a href="../system_setup/admin_panel/panel.php" style="flex:1; min-width:0; display:flex; align-items:center; justify-content:center; gap:0.4rem; padding:0.5rem 0.3rem; background:#dc2626; color:#fff; border-radius:0.5rem; font-size:12.5px; font-weight:600; text-decoration:none; white-space:nowrap;">
-                                <i class="fas fa-eraser"></i> Format
-                            </a>
-                            <a href="../system_setup/admin_panel/panel.php" style="flex:1; min-width:0; display:flex; align-items:center; justify-content:center; gap:0.4rem; padding:0.5rem 0.3rem; background:#1f7bff; color:#fff; border-radius:0.5rem; font-size:12.5px; font-weight:600; text-decoration:none; white-space:nowrap;">
-                                <i class="fas fa-download"></i> Backup
-                            </a>
-                            <a href="../system_setup/admin_panel/panel.php" style="flex:1; min-width:0; display:flex; align-items:center; justify-content:center; gap:0.4rem; padding:0.5rem 0.3rem; background:#e8890c; color:#fff; border-radius:0.5rem; font-size:12.5px; font-weight:600; text-decoration:none; white-space:nowrap;">
-                                <i class="fas fa-upload"></i> Restore
-                            </a>
+                            <button type="button" id="dashboardBackupBtn" onclick="dashboardCreateBackup()" style="flex:1; min-width:0; display:flex; align-items:center; justify-content:center; gap:0.4rem; padding:0.5rem 0.3rem; background:#1f7bff; color:#fff; border:none; border-radius:0.5rem; font-size:12.5px; font-weight:600; cursor:pointer; white-space:nowrap;">
+                                <i class="fas fa-download"></i> <span>Backup Now</span>
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -3043,6 +3038,54 @@ $purchasesNet = (float) $purchasesTotals['net'];
                 const div = document.createElement('div');
                 div.textContent = str;
                 return div.innerHTML;
+            }
+
+            // Streams this tenant's backup (server/api/backup/generate_backup.php - the
+            // same endpoint Admin Panel's Backup button uses) straight to a browser
+            // download, with no modal/navigation needed.
+            async function dashboardCreateBackup() {
+                const btn = document.getElementById('dashboardBackupBtn');
+                const label = btn.querySelector('span');
+                const originalLabel = label.textContent;
+                btn.disabled = true;
+                btn.style.opacity = '0.7';
+                btn.style.cursor = 'wait';
+                label.textContent = 'Preparing...';
+
+                const now = new Date();
+                const pad = n => String(n).padStart(2, '0');
+                const name = `backup_${now.getFullYear()}_${pad(now.getMonth() + 1)}_${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
+
+                try {
+                    const response = await fetch(`../../../server/api/backup/generate_backup.php?name=${encodeURIComponent(name)}`);
+
+                    const contentType = response.headers.get('Content-Type') || '';
+                    if (!response.ok || contentType.includes('application/json')) {
+                        const err = await response.json().catch(() => null);
+                        throw new Error(err?.message || 'Backup failed');
+                    }
+
+                    const blob = await response.blob();
+                    const url = URL.createObjectURL(blob);
+                    const link = document.createElement('a');
+                    link.href = url;
+                    link.download = `${name}.sql`;
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    URL.revokeObjectURL(url);
+
+                    label.textContent = 'Downloaded!';
+                    setTimeout(() => { label.textContent = originalLabel; }, 2000);
+                } catch (error) {
+                    console.error('Backup error:', error);
+                    alert('Backup failed: ' + error.message);
+                    label.textContent = originalLabel;
+                } finally {
+                    btn.disabled = false;
+                    btn.style.opacity = '';
+                    btn.style.cursor = 'pointer';
+                }
             }
 
             function openTodoModal() {

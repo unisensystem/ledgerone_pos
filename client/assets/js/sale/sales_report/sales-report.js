@@ -953,6 +953,16 @@ const REPORT_TYPE_SEARCH_INPUT = {
     customer: 'search-customer'
 };
 
+// Tracks which rows' expandable sub-tables (Daily Breakdown / Invoices Including This
+// Product / etc.) are currently open on screen, keyed by report-table prefix. Print
+// reads this (via URL params below) so it only fetches and shows a sub-table for a row
+// the user actually expanded here - not every row unconditionally.
+const expandedRowKeys = {
+    officer: new Set(), supplier_man: new Set(), branch: new Set(),
+    product: new Set(), vendor: new Set(), customer: new Set(), invoice: new Set(),
+    territory: new Set()
+};
+
 function printReport() {
     const dateFrom = document.getElementById('date-from').value;
     const dateTo = document.getElementById('date-to').value;
@@ -965,6 +975,11 @@ function printReport() {
     const searchTerm = searchInputId ? (document.getElementById(searchInputId)?.value || '').trim() : '';
     if (searchTerm) printUrl += `&search=${encodeURIComponent(searchTerm)}`;
 
+    Object.keys(expandedRowKeys).forEach(prefix => {
+        const keys = [...expandedRowKeys[prefix]];
+        if (keys.length) printUrl += `&expanded_${prefix}=${encodeURIComponent(keys.join(','))}`;
+    });
+
     window.open(printUrl, '_blank');
 }
 
@@ -974,6 +989,7 @@ async function toggleBreakdown(row, detailRow, type, id, index) {
     if (detailRow.style.display === 'none') {
         icon.style.transform = 'rotate(90deg)';
         detailRow.style.display = 'table-row';
+        expandedRowKeys[type]?.add(String(id));
 
         const dateFrom = document.getElementById('date-from').value;
         const dateTo = document.getElementById('date-to').value;
@@ -1051,6 +1067,7 @@ async function toggleBreakdown(row, detailRow, type, id, index) {
     } else {
         icon.style.transform = 'rotate(0deg)';
         detailRow.style.display = 'none';
+        expandedRowKeys[type]?.delete(String(id));
     }
 }
 
@@ -1060,6 +1077,7 @@ async function toggleDetails(row, detailRow, type, id, index) {
     if (detailRow.style.display === 'none') {
         icon.style.transform = 'rotate(90deg)';
         detailRow.style.display = 'table-row';
+        expandedRowKeys[DETAIL_TYPE_TO_PREFIX[type] || type]?.add(String(id));
 
         const dateFrom = document.getElementById('date-from').value;
         const dateTo = document.getElementById('date-to').value;
@@ -1120,6 +1138,7 @@ async function toggleDetails(row, detailRow, type, id, index) {
     } else {
         icon.style.transform = 'rotate(0deg)';
         detailRow.style.display = 'none';
+        expandedRowKeys[DETAIL_TYPE_TO_PREFIX[type] || type]?.delete(String(id));
     }
 }
 
@@ -1129,6 +1148,7 @@ async function toggleTerritoryDetails(row, detailRow, item, index) {
     if (detailRow.style.display === 'none') {
         icon.style.transform = 'rotate(90deg)';
         detailRow.style.display = 'table-row';
+        expandedRowKeys.territory.add(`${item.country}::${item.region}::${item.city}::${item.zone}::${item.area}`);
 
         const dateFrom = document.getElementById('date-from').value;
         const dateTo = document.getElementById('date-to').value;
@@ -1158,6 +1178,7 @@ async function toggleTerritoryDetails(row, detailRow, item, index) {
     } else {
         icon.style.transform = 'rotate(0deg)';
         detailRow.style.display = 'none';
+        expandedRowKeys.territory.delete(`${item.country}::${item.region}::${item.city}::${item.zone}::${item.area}`);
     }
 }
 

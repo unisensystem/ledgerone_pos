@@ -132,6 +132,23 @@ $search = $_GET['search'] ?? '';
 
         const ROUND_OFF_ENABLED = new URLSearchParams(window.location.search).get('round_off') === '1';
 
+        // Which rows' expandable sub-tables (Daily Breakdown / Invoices Including This
+        // Product / etc.) were actually open on the live report page when Print was
+        // clicked - see expandedRowKeys in sales-report.js. A row not in this set prints
+        // as a single collapsed line, with no sub-table fetched or rendered for it at all.
+        function parseExpandedParam(name) {
+            const v = new URLSearchParams(window.location.search).get(name);
+            return v ? new Set(v.split(',')) : new Set();
+        }
+        const expandedOfficer = parseExpandedParam('expanded_officer');
+        const expandedSupplierMan = parseExpandedParam('expanded_supplier_man');
+        const expandedBranch = parseExpandedParam('expanded_branch');
+        const expandedProduct = parseExpandedParam('expanded_product');
+        const expandedVendor = parseExpandedParam('expanded_vendor');
+        const expandedCustomer = parseExpandedParam('expanded_customer');
+        const expandedInvoice = parseExpandedParam('expanded_invoice');
+        const expandedTerritory = parseExpandedParam('expanded_territory');
+
 function fmtMoney(value) {
     const amount = parseFloat(value) || 0;
     return CURRENCY_SYMBOL + (ROUND_OFF_ENABLED
@@ -232,13 +249,17 @@ function fmtQty(value) {
             </td></tr>`;
         }
 
-        // Build expandable section: main table rows + sub-table rows
-        async function buildExpandableSection(items, colspan, matchFn, mainRowFn, subTitle, subHeaders, fetchFn, detailRowFn) {
+        // Build expandable section: main table rows + sub-table rows. A sub-table is
+        // only fetched and rendered for an item isExpandedFn says was actually open on
+        // the live page - everything else prints as a single collapsed row, same as it
+        // looked on screen.
+        async function buildExpandableSection(items, colspan, matchFn, mainRowFn, subTitle, subHeaders, fetchFn, detailRowFn, isExpandedFn) {
             const visibleItems = items.filter(item => matchesSearch(matchFn(item)));
             if (!visibleItems.length) return '';
 
             const rendered = await Promise.all(visibleItems.map(async item => {
                 const mainRow = mainRowFn(item);
+                if (!isExpandedFn(item)) return mainRow;
                 const details = await fetchFn(item);
                 const bodyHtml = details.map(detailRowFn).join('');
                 const subRow = subTableRow(colspan, subTitle, subHeaders, bodyHtml);
@@ -312,7 +333,8 @@ document.getElementById('avg-sale').textContent = fmtMoney(avgSale);
                     d => `<tr>${filterRow([
                         esc(d.date), parseFloat(d.invoices || 0).toLocaleString(), CURRENCY_SYMBOL + parseFloat(d.revenue || 0).toLocaleString(),
                         formatBatchCell(d.batch_no), formatExpiryCell(d.nearest_expiry), formatItemCompanyCell(d.item_company_name)
-                    ], officerSubVis)}</tr>`
+                    ], officerSubVis)}</tr>`,
+                    item => expandedOfficer.has(String(item.sale_officer_id))
                 );
                 sectionHtmlParts.push(`<table>
                     <caption>Sales Officer Wise Sales</caption>
@@ -352,7 +374,8 @@ document.getElementById('avg-sale').textContent = fmtMoney(avgSale);
                     d => `<tr>${filterRow([
                         esc(d.date), parseFloat(d.invoices || 0).toLocaleString(), CURRENCY_SYMBOL + parseFloat(d.revenue || 0).toLocaleString(),
                         formatBatchCell(d.batch_no), formatExpiryCell(d.nearest_expiry), formatItemCompanyCell(d.item_company_name)
-                    ], supManSubVis)}</tr>`
+                    ], supManSubVis)}</tr>`,
+                    item => expandedSupplierMan.has(String(item.supplier_man_id))
                 );
                 sectionHtmlParts.push(`<table>
                     <caption>Supplier Man Wise Sales</caption>
@@ -406,7 +429,8 @@ document.getElementById('avg-sale').textContent = fmtMoney(avgSale);
                         CURRENCY_SYMBOL + parseFloat(d.sale_price || 0).toLocaleString(),
                         formatBatchCell(d.batch_no), formatExpiryCell(d.expiry_date), formatItemCompanyCell(d.item_company_name),
                         CURRENCY_SYMBOL + parseFloat(d.net_amount || 0).toLocaleString()
-                    ], productSubVis)}</tr>`
+                    ], productSubVis)}</tr>`,
+                    item => expandedProduct.has(String(item.product_id))
                 );
                 sectionHtmlParts.push(`<table>
                     <caption>Product Wise Sales</caption>
@@ -449,7 +473,8 @@ document.getElementById('avg-sale').textContent = fmtMoney(avgSale);
                         esc(d.date), parseFloat(d.volume || 0).toLocaleString(), esc(d.unit || '-'),
                         CURRENCY_SYMBOL + parseFloat(d.revenue || 0).toLocaleString(),
                         formatBatchCell(d.batch_no), formatExpiryCell(d.nearest_expiry), formatItemCompanyCell(d.item_company_name)
-                    ], branchSubVis)}</tr>`
+                    ], branchSubVis)}</tr>`,
+                    item => expandedBranch.has(String(item.branch_id))
                 );
                 sectionHtmlParts.push(`<table>
                     <caption>Branch Wise Sales</caption>
@@ -511,7 +536,8 @@ document.getElementById('avg-sale').textContent = fmtMoney(avgSale);
                         esc(d.bill_no), esc(d.sale_date), esc(d.customer_name),
                         CURRENCY_SYMBOL + parseFloat(d.net_amount || 0).toLocaleString(),
                         formatBatchCell(d.batch_no), formatExpiryCell(d.nearest_expiry), formatItemCompanyCell(d.item_company_name)
-                    ], territorySubVis)}</tr>`
+                    ], territorySubVis)}</tr>`,
+                    item => expandedTerritory.has(`${item.country}::${item.region}::${item.city}::${item.zone}::${item.area}`)
                 );
                 sectionHtmlParts.push(`<table>
                     <caption>Territory Wise Sales</caption>
@@ -555,7 +581,8 @@ document.getElementById('avg-sale').textContent = fmtMoney(avgSale);
                         CURRENCY_SYMBOL + parseFloat(d.sale_price || 0).toLocaleString(),
                         CURRENCY_SYMBOL + parseFloat(d.discount_amount || 0).toLocaleString(),
                         CURRENCY_SYMBOL + parseFloat(d.net_amount || 0).toLocaleString()
-                    ], invoiceSubVis)}</tr>`
+                    ], invoiceSubVis)}</tr>`,
+                    item => expandedInvoice.has(String(item.id))
                 );
                 sectionHtmlParts.push(`<table>
                     <caption>Invoice Wise Sales</caption>
@@ -597,7 +624,8 @@ document.getElementById('avg-sale').textContent = fmtMoney(avgSale);
                         esc(d.product_name), formatBatchCell(d.batch_no), formatExpiryCell(d.nearest_expiry), formatItemCompanyCell(d.item_company_name),
                         parseFloat(d.total_quantity || 0).toLocaleString() + (d.unit_symbol ? ' ' + esc(d.unit_symbol) : ''),
                         CURRENCY_SYMBOL + parseFloat(d.total_sales || 0).toLocaleString()
-                    ], vendorSubVis)}</tr>`
+                    ], vendorSubVis)}</tr>`,
+                    item => expandedVendor.has(String(item.vendor_id))
                 );
                 sectionHtmlParts.push(`<table>
                     <caption>Vendor Wise Sales</caption>
@@ -639,7 +667,8 @@ document.getElementById('avg-sale').textContent = fmtMoney(avgSale);
                         CURRENCY_SYMBOL + parseFloat(d.total_discount_amount || 0).toLocaleString(),
                         CURRENCY_SYMBOL + parseFloat(d.net_amount || 0).toLocaleString(),
                         formatBatchCell(d.batch_no), formatExpiryCell(d.nearest_expiry), formatItemCompanyCell(d.item_company_name)
-                    ], customerSubVis)}</tr>`
+                    ], customerSubVis)}</tr>`,
+                    item => expandedCustomer.has(String(item.customer_id))
                 );
                 sectionHtmlParts.push(`<table>
                     <caption>Customer Wise Sales</caption>
