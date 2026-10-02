@@ -72,6 +72,176 @@ let showOnlyManageable = false;
 let totalAccountsCount = 0;
 let newPartnerRowCounter = 0;
 
+// ===== Searchable Select =====
+// Turns an existing <select> into a searchable dropdown.
+// The original <select> stays in the DOM (hidden) and remains the source of truth,
+// so existing code that reads/sets select.value, or repopulates its options, keeps working.
+function makeSearchableSelect(selectEl) {
+    if (!selectEl || selectEl.dataset.searchable === '1') return;
+    selectEl.dataset.searchable = '1';
+
+    // Keep select.value in sync with the visible input when value is set from code
+    const valueDesc = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value');
+    Object.defineProperty(selectEl, 'value', {
+        get() { return valueDesc.get.call(this); },
+        set(v) { valueDesc.set.call(this, v); refresh(); },
+        configurable: true
+    });
+
+    const wrap = document.createElement('div');
+    wrap.className = 'ss-wrap';
+
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'form-input ss-input';
+    input.autocomplete = 'off';
+
+    const list = document.createElement('div');
+    list.className = 'ss-list';
+
+    selectEl.classList.add('ss-native');
+    selectEl.parentNode.insertBefore(wrap, selectEl);
+    wrap.appendChild(selectEl);
+    wrap.appendChild(input);
+    document.body.appendChild(list);
+
+    let activeIndex = -1;
+
+    function isOpen() {
+        return list.style.display === 'block';
+    }
+
+    function refresh() {
+        const opt = selectEl.options[selectEl.selectedIndex];
+        input.value = opt && opt.value ? opt.textContent : '';
+        input.placeholder = selectEl.options.length ? selectEl.options[0].textContent : '';
+        input.disabled = selectEl.disabled;
+    }
+
+    function position() {
+        const rect = input.getBoundingClientRect();
+        list.style.left = rect.left + 'px';
+        list.style.top = (rect.bottom + 2) + 'px';
+        list.style.width = rect.width + 'px';
+    }
+
+    function setActive(index) {
+        const items = list.querySelectorAll('.ss-item');
+        if (!items.length) return;
+        activeIndex = (index + items.length) % items.length;
+        items.forEach((el, i) => el.classList.toggle('ss-active', i === activeIndex));
+        items[activeIndex].scrollIntoView({ block: 'nearest' });
+    }
+
+    function renderList(term) {
+        const search = (term || '').trim().toLowerCase();
+        list.innerHTML = '';
+        activeIndex = -1;
+
+        Array.from(selectEl.options).forEach(opt => {
+            if (!opt.value) return; // skip placeholder option
+            if (search && !opt.textContent.toLowerCase().includes(search)) return;
+
+            const item = document.createElement('div');
+            item.className = 'ss-item' + (opt.value === selectEl.value ? ' ss-selected' : '');
+            item.dataset.value = opt.value;
+            item.textContent = opt.textContent;
+            list.appendChild(item);
+        });
+
+        if (!list.children.length) {
+            const empty = document.createElement('div');
+            empty.className = 'ss-empty';
+            empty.textContent = 'No results found';
+            list.appendChild(empty);
+        }
+    }
+
+    function open() {
+        if (input.disabled) return;
+        renderList('');
+        position();
+        list.style.display = 'block';
+        const selected = list.querySelector('.ss-selected');
+        if (selected) selected.scrollIntoView({ block: 'nearest' });
+    }
+
+    function close() {
+        list.style.display = 'none';
+        refresh();
+    }
+
+    function choose(value) {
+        selectEl.value = value;
+        selectEl.dispatchEvent(new Event('change', { bubbles: true }));
+        close();
+        input.blur();
+    }
+
+    input.addEventListener('focus', () => {
+        input.select();
+        open();
+    });
+
+    input.addEventListener('click', () => {
+        if (!isOpen()) open();
+    });
+
+    input.addEventListener('input', () => {
+        position();
+        renderList(input.value);
+        list.style.display = 'block';
+    });
+
+    input.addEventListener('keydown', (e) => {
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            if (!isOpen()) open();
+            setActive(activeIndex + 1);
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            if (!isOpen()) open();
+            setActive(activeIndex - 1);
+        } else if (e.key === 'Enter') {
+            e.preventDefault();
+            const items = list.querySelectorAll('.ss-item');
+            if (activeIndex >= 0 && items[activeIndex]) {
+                choose(items[activeIndex].dataset.value);
+            } else if (items.length === 1) {
+                choose(items[0].dataset.value);
+            }
+        } else if (e.key === 'Escape' || e.key === 'Tab') {
+            close();
+        }
+    });
+
+    input.addEventListener('blur', close);
+
+    // mousedown (not click) so the input does not lose focus before selection
+    list.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        const item = e.target.closest('.ss-item');
+        if (item) choose(item.dataset.value);
+    });
+
+    window.addEventListener('scroll', () => { if (isOpen()) position(); }, true);
+    window.addEventListener('resize', () => { if (isOpen()) position(); });
+
+    // Re-sync when options are repopulated or select is enabled/disabled from code
+    new MutationObserver(refresh).observe(selectEl, {
+        childList: true,
+        attributes: true,
+        attributeFilter: ['disabled']
+    });
+
+    // Re-sync when the parent form is reset
+    if (selectEl.form) {
+        selectEl.form.addEventListener('reset', () => setTimeout(refresh, 0));
+    }
+
+    refresh();
+}
+
 // Fetch CoA data from API
 async function fetchCoAData() {
     try {
@@ -584,6 +754,7 @@ function editAccount(account) {
     if (account.type === 'sub') {
         populateSubAccountParents();
         document.getElementById('editSubAccountId').value = account.id;
+        document.getElementById('editSubAccountIdDisplay').value = account.id;
         document.getElementById('editSubAccountName').value = account.name;
         
         // Set parent
@@ -597,7 +768,14 @@ function editAccount(account) {
     } else if (account.type === 'posting') {
         populateEditPostingAccountParents();
         document.getElementById('editPostingAccountId').value = account.id;
+        document.getElementById('editPostingAccountIdDisplay').value = account.id;
         document.getElementById('editPostingAccountName').value = account.name;
+        
+        // Pre-fill opening balance (same fields as create)
+        const hasBalance = account.balanceAmount > 0;
+        const balanceType = hasBalance ? account.balanceType : 'debit';
+        document.querySelector(`input[name="editBalanceType"][value="${balanceType}"]`).checked = true;
+        document.getElementById('editBalanceAmount').value = account.balanceAmount;
         
         // Find parent sub account
         let parentSubId = null;
@@ -689,8 +867,10 @@ async function updatePostingAccount() {
     const id = document.getElementById('editPostingAccountId').value;
     const parentId = editPostingAccountParentSelect.value;
     const accountName = document.getElementById('editPostingAccountName').value;
+    const balanceType = document.querySelector('input[name="editBalanceType"]:checked').value;
+    const balanceAmount = parseFloat(document.getElementById('editBalanceAmount').value);
 
-    if (!parentId || !accountName) {
+    if (!parentId || !accountName || isNaN(balanceAmount)) {
         alert('Please fill all fields correctly.');
         return;
     }
@@ -704,8 +884,8 @@ async function updatePostingAccount() {
                 id: id,
                 sub_account_id: parentId,
                 name: accountName,
-                debit: 0,
-                credit: 0
+                debit: balanceType === 'debit' ? balanceAmount : 0,
+                credit: balanceType === 'credit' ? balanceAmount : 0
             })
         });
         
@@ -875,6 +1055,9 @@ function addPartnerRow() {
     });
 
     newPartnerRowsContainer.appendChild(row);
+
+    // Make the account dropdown searchable
+    makeSearchableSelect(row.querySelector('.partner-account-select'));
 }
 
 // Fetch existing partner accounts from the API and render them
@@ -1173,6 +1356,12 @@ partnerAccountModal.addEventListener('click', (e) => {
         partnerAccountModal.classList.remove('active');
     }
 });
+
+// Make all parent dropdowns searchable
+makeSearchableSelect(subAccountParentSelect);
+makeSearchableSelect(postingAccountParentSelect);
+makeSearchableSelect(editSubAccountParentSelect);
+makeSearchableSelect(editPostingAccountParentSelect);
 
 // Initialize
 fetchCoAData().then(() => {

@@ -258,21 +258,43 @@ function handlePut($input) {
                     return;
                 }
 
-                $oldStmt = $pdo->prepare("SELECT sub_account_id, name, debit, credit FROM accounts WHERE id = ? AND tenant_id = ?");
-                $oldStmt->execute([$id, $tenant_id]);
-                $oldAccount = $oldStmt->fetch(PDO::FETCH_ASSOC);
+                $pdo->beginTransaction();
 
-                $stmt = $pdo->prepare("UPDATE accounts SET sub_account_id = ?, name = ?, debit = ?, credit = ? WHERE id = ? AND tenant_id = ?");
-                $stmt->execute([$sub_account_id, $name, $debit, $credit, $id, $tenant_id]);
+                try {
+                    $oldStmt = $pdo->prepare("SELECT sub_account_id, name, debit, credit FROM accounts WHERE id = ? AND tenant_id = ?");
+                    $oldStmt->execute([$id, $tenant_id]);
+                    $oldAccount = $oldStmt->fetch(PDO::FETCH_ASSOC);
 
-                if ($oldAccount) {
-                    $newAccount = ['sub_account_id' => $sub_account_id, 'name' => $name, 'debit' => $debit, 'credit' => $credit];
-                    $changeDescriptions = buildChangeDescription($oldAccount, $newAccount, ['sub_account_id' => 'Sub-Account', 'name' => 'Name', 'debit' => 'Debit', 'credit' => 'Credit']);
-                    $editDescription = !empty($changeDescriptions) ? "Updated account \"$name\": " . implode('; ', $changeDescriptions) : "Updated account \"$name\" - no tracked field changes";
-                    logActivity($pdo, $tenant_id, $user_id, 'update', 'Chart of Accounts', $id, $name, $editDescription, $oldAccount, $newAccount);
+                    $stmt = $pdo->prepare("UPDATE accounts SET sub_account_id = ?, name = ?, debit = ?, credit = ? WHERE id = ? AND tenant_id = ?");
+                    $stmt->execute([$sub_account_id, $name, $debit, $credit, $id, $tenant_id]);
+
+                    if ($oldAccount) {
+                        // Re-sync the opening balance ledger entries (same structure as create)
+                        $stmt = $pdo->prepare("DELETE FROM accounting_ledger WHERE tenant_id = ? AND transaction_type = 'Opening Balance' AND reference_table = 'accounts' AND reference_id = ?");
+                        $stmt->execute([$tenant_id, $id]);
+
+                        if ($debit > 0 || $credit > 0) {
+                            $stmt = $pdo->prepare("INSERT INTO accounting_ledger (tenant_id, transaction_type, reference_table, reference_id, account_id, date, description, debit, credit) VALUES (?, 'Opening Balance', 'accounts', ?, ?, CURDATE(), 'Opening Balance', ?, ?)");
+
+                            // Primary entry for the account
+                            $stmt->execute([$tenant_id, $id, $id, $debit, $credit]);
+
+                            // Contra entry against Opening Balance Equity (account_id = 90)
+                            $stmt->execute([$tenant_id, $id, 90, $credit, $debit]);
+                        }
+
+                        $newAccount = ['sub_account_id' => $sub_account_id, 'name' => $name, 'debit' => $debit, 'credit' => $credit];
+                        $changeDescriptions = buildChangeDescription($oldAccount, $newAccount, ['sub_account_id' => 'Sub-Account', 'name' => 'Name', 'debit' => 'Debit', 'credit' => 'Credit']);
+                        $editDescription = !empty($changeDescriptions) ? "Updated account \"$name\": " . implode('; ', $changeDescriptions) : "Updated account \"$name\" - no tracked field changes";
+                        logActivity($pdo, $tenant_id, $user_id, 'update', 'Chart of Accounts', $id, $name, $editDescription, $oldAccount, $newAccount);
+                    }
+
+                    $pdo->commit();
+                    echo json_encode(['success' => true, 'message' => 'Account updated successfully']);
+                } catch (Exception $e) {
+                    $pdo->rollBack();
+                    throw $e;
                 }
-
-                echo json_encode(['success' => true, 'message' => 'Account updated successfully']);
                 break;
                 
             default:

@@ -9,7 +9,57 @@ require_once '../../../includes/dashboard.php';
     <title>LedgerOne ERP - Chart of Accounts</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="../../assets/css/chart_of_accounts/coa.css">
+    <link rel="stylesheet" href="../../assets/css/chart_of_accounts/coa-searchable-select.css">
 </head>
+<style>
+    /* Searchable select (used by makeSearchableSelect in coa.js) */
+.ss-wrap {
+    position: relative;
+    width: 100%;
+}
+
+.ss-native {
+    display: none !important;
+}
+
+.ss-input {
+    width: 100%;
+    cursor: pointer;
+}
+
+.ss-list {
+    display: none;
+    position: fixed;
+    z-index: 100000;
+    max-height: 240px;
+    overflow-y: auto;
+    background: #fff;
+    border: 1px solid #e2e2e2;
+    border-radius: 6px;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.12);
+}
+
+.ss-item {
+    padding: 8px 12px;
+    font-size: 14px;
+    cursor: pointer;
+}
+
+.ss-item:hover,
+.ss-item.ss-active {
+    background: #f1f5f9;
+}
+
+.ss-item.ss-selected {
+    font-weight: 600;
+}
+
+.ss-empty {
+    padding: 8px 12px;
+    font-size: 13px;
+    color: #888;
+}
+</style>
 <body>
     <div class="container">
         <div class="header">
@@ -173,9 +223,16 @@ require_once '../../../includes/dashboard.php';
                         </select>
                     </div>
                     
-                    <div class="form-group">
-                        <label class="form-label" for="editSubAccountName">Account Name</label>
-                        <input type="text" class="form-input" id="editSubAccountName" required>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label" for="editSubAccountIdDisplay">Account ID</label>
+                            <input type="text" class="form-input" id="editSubAccountIdDisplay" readonly>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="form-label" for="editSubAccountName">Account Name</label>
+                            <input type="text" class="form-input" id="editSubAccountName" required>
+                        </div>
                     </div>
                 </form>
             </div>
@@ -206,9 +263,35 @@ require_once '../../../includes/dashboard.php';
                         </select>
                     </div>
                     
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label" for="editPostingAccountIdDisplay">Account ID</label>
+                            <input type="text" class="form-input" id="editPostingAccountIdDisplay" readonly>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="form-label" for="editPostingAccountName">Account Name</label>
+                            <input type="text" class="form-input" id="editPostingAccountName" required>
+                        </div>
+                    </div>
+                    
                     <div class="form-group">
-                        <label class="form-label" for="editPostingAccountName">Account Name</label>
-                        <input type="text" class="form-input" id="editPostingAccountName" required>
+                        <label class="form-label">Opening Balance Type</label>
+                        <div class="radio-group">
+                            <label class="radio-option">
+                                <input type="radio" name="editBalanceType" value="debit" checked>
+                                <span>Debit</span>
+                            </label>
+                            <label class="radio-option">
+                                <input type="radio" name="editBalanceType" value="credit">
+                                <span>Credit</span>
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label" for="editBalanceAmount">Opening Balance Amount</label>
+                        <input type="number" class="form-input" id="editBalanceAmount" placeholder="0.00" step="0.01" min="0" required>
                     </div>
                 </form>
             </div>
