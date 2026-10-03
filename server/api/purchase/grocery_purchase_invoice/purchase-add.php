@@ -1,0 +1,357 @@
+<?php
+require_once '../../../../includes/connection.php';
+require_once '../../../../includes/posting_lock.php';
+require_once '../../../../includes/activity-logger.php';
+
+require_once 'purchase-invoice-tax-helper.php';
+
+header('Content-Type: application/json');
+header('Access-Control-Allow-Origin: *');
+header('Access-Control-Allow-Methods: POST');
+header('Access-Control-Allow-Headers: Content-Type');
+
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    http_response_code(405);
+    echo json_encode(['success' => false, 'message' => 'Method not allowed']);
+    exit;
+}
+
+session_start();
+$user_id = $_SESSION['user_id'] ?? null;
+$tenant_id = $_SESSION['tenant_id'] ?? null;
+
+if (!$user_id || !$tenant_id) {
+    http_response_code(401);
+    echo json_encode(['success' => false, 'message' => 'Unauthorized - Please login again']);
+    exit;
+}
+
+// A grocery-style product (UOM Group, e.g. Bag/Kg/Gram) can have a single row
+// carry multiple unit entries (e.g. the cashier typed qty into both the Bag and
+// Kg columns in one line). The client sends ONE purchasePrice per-base-unit
+// (e.g. 140/Kg) for the whole row — this scales it to whichever specific unit
+// a given unitEntry actually uses (e.g. 140*50=7000 for a Bag entry), matching
+// how getRowUnitPrice()/the Sale side's basePricePerUnit * conversionFactor work.
+function getUnitCostFactor($pdo, $product_id, $unit_id)
+{
+    if (!$unit_id) return 1.0;
+
+    $stmt = $pdo->prepare("SELECT conversion_factor FROM product_uom_conversions WHERE product_id = ? AND uom_id = ?");
+    $stmt->execute([$product_id, $unit_id]);
+    $perProductFactor = $stmt->fetchColumn();
+    if ($perProductFactor !== false && $perProductFactor !== null && (float)$perProductFactor > 0) {
+        return (float)$perProductFactor;
+    }
+
+    $stmt = $pdo->prepare("SELECT is_base_unit, conversion_factor FROM uom WHERE id = ?");
+    $stmt->execute([$unit_id]);
+    $row = $stmt->fetch(PDO::FETCH_ASSOC);
+    if (!$row) return 1.0;
+    if ((int)$row['is_base_unit'] === 1) return 1.0;
+    $factor = (float)$row['conversion_factor'];
+    return $factor > 0 ? $factor : 1.0;
+}
+
+try {
+    $input = json_decode(file_get_contents('php://input'), true);
+    
+    if (!$input) {
+        throw new Exception('Invalid JSON data');
+    }
+    
+    // Validate required fields
+    $required = ['purchaseDate', 'supplierId', 'branchId', 'items'];
+    foreach ($required as $field) {
+        if (empty($input[$field])) {
+            throw new Exception("Field {$field} is required");
+        }
+    }
+    
+    if (empty($input['items']) || !is_array($input['items'])) {
+    throw new Exception('At least one item is required');
+}
+
+$lockCheck = checkPostingDateAllowed($pdo, $tenant_id, 'purchase_invoice', $input['purchaseDate']);
+if (!$lockCheck['allowed']) {
+    throw new Exception($lockCheck['message']);
+}
+
+$pdo->beginTransaction();
+    
+    
+    // Generate sequential bill number tenant-wide
+    $billStmt = $pdo->prepare("SELECT MAX(CAST(SUBSTRING(bill_no, 5) AS UNSIGNED)) FROM purchase_invoice WHERE tenant_id = ? AND bill_no LIKE 'PUR-%'");
+    $billStmt->execute([$tenant_id]);
+    $lastNumber = (int) $billStmt->fetchColumn();
+    $billNo = 'PUR-' . str_pad($lastNumber + 1, 4, '0', STR_PAD_LEFT);
+    
+    // Insert purchase invoice
+    $stmt = $pdo->prepare("
+        INSERT INTO purchase_invoice (
+            tenant_id, company_id, currency_id, bill_no, purchase_date, supplier_id, branch_id, container_id,
+            previous_balance, total_bill, total_discount_percent, 
+            total_discount_amount, total_tax_percent, total_tax_amount, 
+            shipping_fees, shipping_fees_type, net_amount, supplier_invoice_no, supplier_invoice_date, 
+            purchase_order_id, bilty_no, transport_name, remarks, sub_account_id, project_id, assoc_company_id, created_by, updated_by
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ");
+    
+    $stmt->execute([
+        $tenant_id,
+        $input['companyId'],
+        $input['currencyId'],
+        $billNo,
+        $input['purchaseDate'],
+        $input['supplierId'],
+        $input['branchId'],
+        $input['containerId'] ?? null,
+        extractBalanceAmount($input['previousBalance'] ?? '0.000'),
+        $input['totalBill'],
+        $input['totalDiscountPercent'] ?? 0.00,
+        $input['totalDiscountAmount'] ?? 0.00,
+        $input['totalTaxPercent'] ?? 0.00,
+        $input['totalTaxAmount'] ?? 0.00,
+        $input['shippingFees'] ?? 0.00,
+        $input['shippingFeesType'] ?? 'add',
+        $input['netAmount'],
+        $input['supplierInvoiceNo'],
+        $input['supplierInvoiceDate'],
+        $input['purchaseOrderId'] ?? null,
+        $input['biltyNo'],
+        $input['transportName'],
+        $input['remarks'] ?? null,
+        $input['subAccountId'] ?? null,
+        $input['projectId'] ?? null,
+        $input['assocCompanyId'] ?? null,
+        $user_id,
+        $user_id
+    ]);
+    
+    $invoice_id = $pdo->lastInsertId();
+    
+    // Insert invoice items
+    $item_stmt = $pdo->prepare("
+        INSERT INTO purchase_invoice_items (
+            tenant_id, purchase_invoice_id, product_id, uom_id,
+            quantity, purchase_price, gross_amount, discount_percent,
+            discount_amount, extra_discount_percent, trade_offer_percent, trade_offer_amount,
+            tax_percent, tax_amount, foc_quantity, net_amount, size,
+            batch_no, batch_expiry_date, parent_row_id,
+            created_by, updated_by
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ");
+
+    $itemRowCounter = 0;
+    $itemIdMap = [];
+
+    foreach ($input['items'] as $item) {
+        $itemRowCounter++;
+
+        // Map parent_row_id (1-based position of the parent row in $input['items'])
+        // to the actual DB id of that row's first inserted unit entry
+        $parentRowId = null;
+        if (isset($item['parentRowId']) && $item['parentRowId'] !== null) {
+            $parentRowId = $itemIdMap[$item['parentRowId']] ?? null;
+        }
+
+        // Each item can have multiple unit entries. $item['purchasePrice'] is
+        // per-base-unit (e.g. per-Kg) for the whole row — scale it to THIS
+        // entry's own unit (e.g. per-Bag) so quantity * price matches reality.
+        $isFirstEntry = true;
+        foreach ($item['unitEntries'] as $unitEntry) {
+            $entryUnitFactor = getUnitCostFactor($pdo, $item['productId'], $unitEntry['uomId']);
+            $entryPrice = $item['purchasePrice'] * $entryUnitFactor;
+            $item_stmt->execute([
+                $tenant_id,
+                $invoice_id,
+                $item['productId'],
+                $unitEntry['uomId'],
+                $unitEntry['quantity'],
+                $entryPrice,
+                $isFirstEntry ? $item['grossAmount'] : 0,
+                $item['discountPercent'] ?? 0.00,
+                $isFirstEntry ? $item['discountAmount'] : 0,
+                $item['extraDiscountPercent'] ?? 0.00,
+                $item['tradeOfferPercent'] ?? 0.00,
+                $isFirstEntry ? ($item['tradeOfferAmount'] ?? 0) : 0,
+                $item['taxPercent'] ?? 0.00,
+                $isFirstEntry ? $item['taxAmount'] : 0,
+                $item['focQty'] ?? 0,
+                $isFirstEntry ? $item['netAmount'] : 0,
+                $item['size'] ?? null,
+                $item['batchNo'] ?? null,
+                $item['batchExpiryDate'] ?? null,
+                $parentRowId,
+                $user_id,
+                $user_id
+            ]);
+
+            if ($isFirstEntry) {
+                $itemIdMap[$itemRowCounter] = $pdo->lastInsertId();
+            }
+
+            // Stock ledger entry for each unit
+            $stockAffects = $item['stockAffects'] ?? 1;
+            if ($stockAffects == 1) {
+                $product_stmt = $pdo->prepare("SELECT inventory_account_id FROM products WHERE id = ?");
+                $product_stmt->execute([$item['productId']]);
+                $account_id = $product_stmt->fetchColumn();
+                
+                              $stock_stmt = $pdo->prepare("
+                    INSERT INTO stock_ledger (
+                        tenant_id, account_id, branch_id, product_id, reference_table, reference_id,
+                        qty_in, unit_cost, unit_id, batch_no, expiry_date, transaction_type, transaction_date
+                    ) VALUES (?, ?, ?, ?, 'purchase_invoice', ?, ?, ?, ?, ?, ?, 'Purchase Invoice', ?)
+                ");
+                $stock_stmt->execute([
+                    $tenant_id,
+                    $account_id,
+                    $input['branchId'],
+                    $item['productId'],
+                    $invoice_id,
+                    $unitEntry['quantity'],
+                    $entryPrice,
+                    $unitEntry['uomId'],
+                    $item['batchNo'] ?? null,
+                    $item['batchExpiryDate'] ?? null,
+                    $input['purchaseDate']
+                ]);
+            }
+            
+            $isFirstEntry = false;
+        }
+
+        // Insert stock ledger for FOC quantity if exists — matches Sale
+        // Invoice's handling ("Sale Invoice - FOC"). Added once per item
+        // (not per unit entry) so a bonus quantity isn't multiplied across
+        // a multi-unit line. Without this, FOC units were saved on the item
+        // row but never entered stock_ledger, so they never showed up in
+        // Stock Position even though they were physically received.
+        if (($stockAffects ?? 1) == 1 && !empty($item['focQty']) && $item['focQty'] > 0) {
+            $focUnitId = $item['focUnitId'] ?? null;
+            if (!$focUnitId) {
+                $refUnitId = $item['unitEntries'][0]['uomId'] ?? null;
+                if ($refUnitId) {
+                    $unitStmt = $pdo->prepare("SELECT is_base_unit, base_unit_id FROM uom WHERE id = ?");
+                    $unitStmt->execute([$refUnitId]);
+                    $unitData = $unitStmt->fetch();
+                    if ($unitData) {
+                        $focUnitId = $unitData['is_base_unit'] == 1 ? $refUnitId : ($unitData['base_unit_id'] ?? $refUnitId);
+                    } else {
+                        $focUnitId = $refUnitId;
+                    }
+                }
+            }
+            if ($focUnitId && isset($account_id)) {
+                $foc_stmt = $pdo->prepare("
+                    INSERT INTO stock_ledger (
+                        tenant_id, account_id, branch_id, product_id, reference_table, reference_id,
+                        qty_in, unit_cost, unit_id, batch_no, expiry_date, transaction_type, transaction_date
+                    ) VALUES (?, ?, ?, ?, 'purchase_invoice', ?, ?, ?, ?, ?, ?, 'Purchase Invoice - FOC', ?)
+                ");
+                $foc_stmt->execute([
+                    $tenant_id,
+                    $account_id,
+                    $input['branchId'],
+                    $item['productId'],
+                    $invoice_id,
+                    $item['focQty'],
+                    0,
+                    $focUnitId,
+                    $item['batchNo'] ?? null,
+                    $item['batchExpiryDate'] ?? null,
+                    $input['purchaseDate']
+                ]);
+            }
+        }
+    }
+
+    // Accounting entries
+    $ledger_stmt = $pdo->prepare("
+        INSERT INTO accounting_ledger (
+            tenant_id, transaction_type, reference_table, reference_id,
+            account_id, date, description, debit, credit
+        ) VALUES (?, 'Purchase Invoice', 'purchase_invoice', ?, ?, ?, ?, ?, ?)
+    ");
+    
+    // 1. Debit - Purchases (Net Amount)
+    $ledger_stmt->execute([$tenant_id, $invoice_id, 19, $input['purchaseDate'], 'Purchase Invoice - ' . $billNo, $input['netAmount'], 0]);
+
+    // 2. Debit - Input Tax Receivable
+    if ($input['totalTaxAmount'] > 0) {
+        $ledger_stmt->execute([$tenant_id, $invoice_id, 107, $input['purchaseDate'], 'Purchase Invoice - ' . $billNo, $input['totalTaxAmount'], 0]);
+    }
+
+    // 3. Debit - Freight Inward
+    if ($input['shippingFees'] > 0) {
+        $ledger_stmt->execute([$tenant_id, $invoice_id, 110, $input['purchaseDate'], 'Purchase Invoice - ' . $billNo, $input['shippingFees'], 0]);
+    }
+
+    // 4. Credit - Trade Creditors (Net Amount) — Purchase Discounts Received no
+    // longer gets its own ledger line; it's folded into Net Amount on
+    // Purchases/Trade Creditors instead.
+    $ledger_stmt->execute([$tenant_id, $invoice_id, 14, $input['purchaseDate'], 'Purchase Invoice - ' . $billNo, 0, $input['netAmount']]);
+
+    // 6. Save invoice-level taxes
+    $invoiceTaxesInput = (isset($input['invoiceTaxes']) && is_array($input['invoiceTaxes'])) ? $input['invoiceTaxes'] : [];
+    savePurchaseInvoiceTaxes($pdo, $tenant_id, $invoice_id, $invoiceTaxesInput, $user_id);
+    // Debit each invoice-level tax to Input Tax Receivable (account 107)
+    foreach ($invoiceTaxesInput as $tax) {
+        $taxAmt = floatval($tax['taxAmount'] ?? 0);
+        if ($taxAmt > 0) {
+            $ledger_stmt->execute([$tenant_id, $invoice_id, 107, $input['purchaseDate'], 'Purchase Invoice Tax - ' . $billNo, $taxAmt, 0]);
+        }
+    }
+
+    logActivity(
+        $pdo, $tenant_id, $user_id, 'create', 'Purchase Invoice', $invoice_id, $billNo,
+        "Created purchase invoice \"$billNo\" (" . count($input['items']) . " item(s), net " . number_format($input['netAmount'], 2) . ")",
+        null,
+        [
+            'bill_no' => $billNo, 'purchase_date' => $input['purchaseDate'], 'supplier_id' => $input['supplierId'],
+            'branch_id' => $input['branchId'], 'company_id' => $input['companyId'], 'currency_id' => $input['currencyId'],
+            'container_id' => $input['containerId'] ?? null, 'total_bill' => $input['totalBill'],
+            'total_discount_percent' => $input['totalDiscountPercent'] ?? 0, 'total_discount_amount' => $input['totalDiscountAmount'] ?? 0,
+            'total_tax_amount' => $input['totalTaxAmount'] ?? 0, 'shipping_fees' => $input['shippingFees'] ?? 0,
+            'net_amount' => $input['netAmount'], 'supplier_invoice_no' => $input['supplierInvoiceNo'],
+            'purchase_order_id' => $input['purchaseOrderId'] ?? null, 'bilty_no' => $input['biltyNo'],
+            'transport_name' => $input['transportName'], 'remarks' => $input['remarks'] ?? null, 'items' => $input['items']
+        ]
+    );
+
+    $pdo->commit();
+
+    echo json_encode([
+        'success' => true,
+        'message' => 'Purchase invoice saved successfully',
+        'invoice_id' => $invoice_id
+    ]);
+    
+} catch (Exception $e) {
+    if ($pdo->inTransaction()) {
+        $pdo->rollBack();
+    }
+    
+    http_response_code(400);
+    echo json_encode([
+        'success' => false,
+        'message' => $e->getMessage()
+    ]);
+}
+
+// Function to extract numeric amount from balance string
+function extractBalanceAmount($balanceString) {
+    if (empty($balanceString)) return 0.00;
+    
+    // Dr = positive (we owe supplier), Cr = negative (supplier owes us)
+    $isCr = stripos($balanceString, 'Cr') !== false;
+    $amount = preg_replace('/^(Dr|Cr)\s*/i', '', trim($balanceString));
+    $amount = floatval($amount);
+    return $isCr ? -$amount : $amount;
+}
+
+
+
+// ALTER TABLE purchase_invoice_items 
+// ADD COLUMN batch_no VARCHAR(100) NULL AFTER size,
+// ADD COLUMN batch_expiry_date DATE NULL AFTER batch_no;

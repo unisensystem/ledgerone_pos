@@ -685,6 +685,11 @@ function handleFormSubmit(e) {
                 return;
             }
             formData.set('priceEntryUnitId', unit.id);
+            const rawPurchase = parseFloat(formData.get('purchasePrice'));
+            if (!isNaN(rawPurchase) && rawPurchase > 0) {
+                formData.set('purchasePriceEntryValue', rawPurchase.toFixed(3));
+                formData.set('purchasePrice', (rawPurchase / factor).toFixed(3));
+            }
             const rawTrade = parseFloat(formData.get('tradePrice'));
             if (!isNaN(rawTrade) && rawTrade > 0) {
                 formData.set('tradePriceEntryValue', rawTrade.toFixed(3));
@@ -2809,9 +2814,11 @@ function getUnitFactorValue(unit) {
 }
 
 function updatePriceFieldLabels(unitName) {
+    const purchaseLabel = document.getElementById('purchasePriceLabel');
     const tradeLabel = document.getElementById('tradePriceLabel');
     const mrpLabel = document.getElementById('mrpLabel');
     const suffix = unitName ? ` / ${escProdText(unitName)}` : ' / Selected Unit';
+    if (purchaseLabel) purchaseLabel.textContent = `Purchase Price${suffix}`;
     if (tradeLabel) tradeLabel.textContent = `Trade Price (TP)${suffix}`;
     if (mrpLabel) mrpLabel.textContent = `Maximum Retail Price (MRP)${suffix}`;
 
@@ -2866,7 +2873,7 @@ function handlePriceEntryUnitChange() {
     const oldFactor = oldUnit ? getUnitFactorValue(oldUnit) : 1;
 
     if (oldFactor) {
-        ['tradePrice', 'mrp'].forEach(fieldId => {
+        ['purchasePrice', 'tradePrice', 'mrp'].forEach(fieldId => {
             const input = document.getElementById(fieldId);
             const val = parseFloat(input.value);
             if (!isNaN(val) && val > 0) {
@@ -2906,6 +2913,9 @@ function applyStoredPriceEntry(product) {
     currentPriceEntryUnitId = String(unit.id);
     updatePriceFieldLabels(unit.uom_name);
 
+    if (product.purchase_price_entry_value !== null && product.purchase_price_entry_value !== undefined && product.purchase_price_entry_value !== '') {
+        document.getElementById('purchasePrice').value = product.purchase_price_entry_value;
+    }
     if (product.trade_price_entry_value !== null && product.trade_price_entry_value !== undefined && product.trade_price_entry_value !== '') {
         document.getElementById('tradePrice').value = product.trade_price_entry_value;
     }

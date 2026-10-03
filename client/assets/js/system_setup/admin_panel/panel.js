@@ -411,12 +411,12 @@ function renderPermissionsTree(permissions) {
     const permissionsStructure = {
         'Dashboard': [],
         'Customer / Supplier': ['New Customer', 'New Supplier', 'New Customer + Supplier (Both)', 'Leads'],
-        'Sale': ['Sale Order', 'Create Quotation', 'Sale Invoice', 'Med Sale Invoice', 'Sale Tax Invoice', 'Meter Invoice', 'POS Invoice', 'Primery Trade Invoice', 'Traders Sale Invoice', 'Issue Delivery Challan', 'Sale Reports', 'Discount Report', 'Daily Sale Report', 'Daily Sales Report (DSR) - Multiple Unit', 'Daily Product Sale', 'Daily Product Sale 2', 'Invoice Payment Report', 'Sale Return'],
-        'Purchase': ['Record Purchase Order', 'New Purchase', 'Purchase Tax Invoice', 'Purchase Reports', 'Purchase Return', 'Project Product Rates'],
+        'Sale': ['Sale Order', 'Create Quotation', 'Sale Invoice', 'Grocery Sale Invoice', 'Med Sale Invoice', 'Sale Tax Invoice', 'Meter Invoice', 'POS Invoice', 'Primery Trade Invoice', 'Traders Sale Invoice', 'Issue Delivery Challan', 'Sale Reports', 'Discount Report', 'Daily Sale Report', 'Daily Sales Report (DSR) - Multiple Unit', 'Daily Product Sale', 'Daily Product Sale 2', 'Invoice Payment Report', 'Sale Return'],
+        'Purchase': ['Record Purchase Order', 'New Purchase', 'Grocery Purchase Invoice', 'Purchase Tax Invoice', 'Purchase Reports', 'Purchase Return', 'Project Product Rates'],
         'Inventory': ['New Product', 'Stock Adjustment', 'Stock Transfer', 'Stock Position', 'Inward Gatepass', 'Outward Gatepass', 'Container Setup'],
         'Manufacturing': ['Bill of Materials (BOM)', 'Unit Measurement', 'Machine Setup', 'Production Order', 'WIP Management', 'Production Completion', 'Production Expenses', 'Production Wastage', 'Production Report'],
         'Vouchers': ['Receive Voucher', 'Payment Voucher', 'Transfer Voucher', 'Expense Voucher', 'Journal Entry', 'Cash Opening'],
-        'Banking': ['New Bank', 'Post Dated Cheques (PDCs)'],
+        'Banking': ['New Bank', 'Post Dated Cheques (PDCs)', 'Bank Statement'],
         'Rent Management': ['Issue Rent', 'Rent List'],
         'Chart of Accounts': [],
         'Financial Reports': ['General Ledger', 'Customer Ledger', 'Our Standing', 'Supplier Ledger', 'Both (Customer + Supplier) Ledger', 'Customer Aging', 'Supplier Aging', 'Recovery Sheet', 'Customer Summary Division Report (CSDR)', 'Sales Officer-wise Recovery', 'Trial Balance', 'Balance Sheet', 'Profit & Loss Statement', 'Cash Flow', 'Financial Summary', 'Pending DSR Sheet', 'Project Tracking', 'Container Tracking'],
@@ -427,7 +427,7 @@ function renderPermissionsTree(permissions) {
 
     const subPermissions = ['Add', 'Edit', 'Delete'];
     const noSubPermCategories = ['Dashboard', 'Financial Reports'];
-    const noSubPermForms = ['Sale Reports', 'Discount Report', 'Purchase Reports', 'Stock Position', 'Software Info', 'Company Profile', 'Employees Ledger', 'Post Dated Cheques (PDCs)', 'Daily Sale Report', 'Daily Sales Report (DSR) - Multiple Unit', 'Daily Product Sale', 'Daily Product Sale 2', 'Invoice Payment Report', 'Bill of Materials (BOM)', 'Production Wastage', 'Production Report', 'Tax Rates Setup', 'Tax Regimes Setup', 'Project Product Rates', 'Container Tracking' , 'GL Debug'];
+    const noSubPermForms = ['Sale Reports', 'Discount Report', 'Purchase Reports', 'Stock Position', 'Software Info', 'Company Profile', 'Employees Ledger', 'Post Dated Cheques (PDCs)', 'Bank Statement', 'Daily Sale Report', 'Daily Sales Report (DSR) - Multiple Unit', 'Daily Product Sale', 'Daily Product Sale 2', 'Invoice Payment Report', 'Bill of Materials (BOM)', 'Production Wastage', 'Production Report', 'Tax Rates Setup', 'Tax Regimes Setup', 'Project Product Rates', 'Container Tracking' , 'GL Debug'];
 
     // Create permission lookup map
     const permMap = {};

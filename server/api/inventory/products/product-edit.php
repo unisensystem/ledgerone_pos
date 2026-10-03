@@ -49,6 +49,7 @@ try {
     // Carton-price-entry feature (tenant-gated) — remembers which unit Trade Price/MRP
     // were originally typed in, and the exact value, so editing shows it back verbatim.
     $price_entry_unit_id = !empty($_POST['priceEntryUnitId']) ? $_POST['priceEntryUnitId'] : null;
+    $purchase_price_entry_value = !empty($_POST['purchasePriceEntryValue']) ? $_POST['purchasePriceEntryValue'] : null;
     $trade_price_entry_value = !empty($_POST['tradePriceEntryValue']) ? $_POST['tradePriceEntryValue'] : null;
     $mrp_entry_value = !empty($_POST['mrpEntryValue']) ? $_POST['mrpEntryValue'] : null;
     $default_discount = !empty($_POST['defaultDiscount']) ? $_POST['defaultDiscount'] : 0;
@@ -90,7 +91,7 @@ try {
        $stmt = $pdo->prepare("
         SELECT code, name, product_type, uom_type, company_id, item_company_id, default_unit_id, uom_group_id, product_conversion_factor,
                category_id, subcategory_id, inventory_account_id, vendor_id, parent_product_id, description, weight_value, weight_unit, qr_code, barcode,
-               purchase_price, trade_price, wholesale_price, mrp, price_entry_unit_id, trade_price_entry_value, mrp_entry_value,
+               purchase_price, trade_price, wholesale_price, mrp, price_entry_unit_id, purchase_price_entry_value, trade_price_entry_value, mrp_entry_value,
                default_discount, trade_offer_discount, default_foc, carton_conversion, tax_regime_id,
                min_stock_level, max_stock_level, manufacturing_date, expiry_date, photo, is_active, stock_affects, invoice_affects
         FROM products WHERE id = ? AND tenant_id = ?
@@ -121,7 +122,7 @@ try {
                      UPDATE products SET
                 company_id = ?, item_company_id = ?, name = ?, product_type = ?, uom_type = ?, default_unit_id = ?, uom_group_id = ?, product_conversion_factor = ?, category_id = ?, subcategory_id = ?,
                 inventory_account_id = ?, vendor_id = ?, parent_product_id = ?, description = ?, weight_value = ?, weight_unit = ?, qr_code = ?, barcode = ?, purchase_price = ?,
-                trade_price = ?, wholesale_price = ?, mrp = ?, price_entry_unit_id = ?, trade_price_entry_value = ?, mrp_entry_value = ?,
+                trade_price = ?, wholesale_price = ?, mrp = ?, price_entry_unit_id = ?, purchase_price_entry_value = ?, trade_price_entry_value = ?, mrp_entry_value = ?,
                 default_discount = ?, trade_offer_discount = ?, default_foc = ?,
                 carton_conversion = ?, tax_regime_id = ?, min_stock_level = ?, max_stock_level = ?,
                 manufacturing_date = ?, expiry_date = ?, photo = ?, is_active = ?, stock_affects = ?, invoice_affects = ?, updated_at = CURRENT_TIMESTAMP
@@ -131,7 +132,7 @@ try {
                $stmt->execute([
             $company, $item_company, $name, $product_type, $uom_type, $default_unit, $uom_group_id, $product_conversion_factor, $category, $subcategory,
             $inventory_account, $vendor_id, $parent_product_id, $description, $weight_value, $weight_unit, $qr_code, $barcode, $purchase_price,
-            $trade_price, $wholesale_price, $mrp, $price_entry_unit_id, $trade_price_entry_value, $mrp_entry_value,
+            $trade_price, $wholesale_price, $mrp, $price_entry_unit_id, $purchase_price_entry_value, $trade_price_entry_value, $mrp_entry_value,
             $default_discount, $trade_offer_discount, $default_foc,
             $carton_conversion, $tax_regime_id, $min_stock, $max_stock,
             $manufacturing_date, $expiry_date, $photo_filename, $is_active, $stock_affects, $invoice_affects, $product_id, $tenant_id
@@ -141,7 +142,7 @@ try {
             UPDATE products SET
                 company_id = ?, item_company_id = ?, name = ?, product_type = ?, uom_type = ?, default_unit_id = ?, uom_group_id = ?, product_conversion_factor = ?, category_id = ?, subcategory_id = ?,
                 inventory_account_id = ?, vendor_id = ?, parent_product_id = ?, description = ?, weight_value = ?, weight_unit = ?, qr_code = ?, barcode = ?, purchase_price = ?,
-                trade_price = ?, wholesale_price = ?, mrp = ?, price_entry_unit_id = ?, trade_price_entry_value = ?, mrp_entry_value = ?,
+                trade_price = ?, wholesale_price = ?, mrp = ?, price_entry_unit_id = ?, purchase_price_entry_value = ?, trade_price_entry_value = ?, mrp_entry_value = ?,
                 default_discount = ?, trade_offer_discount = ?, default_foc = ?,
                 carton_conversion = ?, tax_regime_id = ?, min_stock_level = ?, max_stock_level = ?,
                 manufacturing_date = ?, expiry_date = ?, is_active = ?, stock_affects = ?, invoice_affects = ?, updated_at = CURRENT_TIMESTAMP
@@ -151,7 +152,7 @@ try {
         $stmt->execute([
             $company, $item_company, $name, $product_type, $uom_type, $default_unit, $uom_group_id, $product_conversion_factor, $category, $subcategory,
             $inventory_account, $vendor_id, $parent_product_id, $description, $weight_value, $weight_unit, $qr_code, $barcode, $purchase_price,
-            $trade_price, $wholesale_price, $mrp, $price_entry_unit_id, $trade_price_entry_value, $mrp_entry_value,
+            $trade_price, $wholesale_price, $mrp, $price_entry_unit_id, $purchase_price_entry_value, $trade_price_entry_value, $mrp_entry_value,
             $default_discount, $trade_offer_discount, $default_foc,
             $carton_conversion, $tax_regime_id, $min_stock, $max_stock,
             $manufacturing_date, $expiry_date, $is_active, $stock_affects, $invoice_affects, $product_id, $tenant_id
@@ -183,6 +184,7 @@ try {
         'wholesale_price' => $wholesale_price,
         'mrp' => $mrp,
         'price_entry_unit_id' => $price_entry_unit_id,
+        'purchase_price_entry_value' => $purchase_price_entry_value,
         'trade_price_entry_value' => $trade_price_entry_value,
         'mrp_entry_value' => $mrp_entry_value,
         'default_discount' => $default_discount,
@@ -221,6 +223,7 @@ try {
         'wholesale_price' => 'Wholesale Price',
         'mrp' => 'MRP',
         'price_entry_unit_id' => 'Price Entry Unit',
+        'purchase_price_entry_value' => 'Purchase Price Entry Value',
         'trade_price_entry_value' => 'Trade Price Entry Value',
         'mrp_entry_value' => 'MRP Entry Value',
         'default_discount' => 'Default Discount',

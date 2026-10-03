@@ -308,7 +308,7 @@ if ($tenant_id) {
                 
                 <div class="form-row">
                     <div class="form-group optional-field" id="purchasePriceGroup" data-field="purchasePrice">
-                        <label>Purchase Price / Selected Unit</label>
+                        <label id="purchasePriceLabel">Purchase Price / Selected Unit</label>
                         <input type="number" id="purchasePrice" name="purchasePrice" step="0.001" min="0">
                     </div>
                     
