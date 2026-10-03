@@ -165,6 +165,40 @@ try {
         " . ($city_id      ? " AND c.city_id = ?"           : "") . "
         " . ($city_zone_id ? " AND c.city_zone_id = ?"      : "") . "
         " . ($area_id      ? " AND c.area_id = ?"           : "") . "
+
+        UNION ALL
+
+        -- Payment Voucher to Customer (an advance/charge paid out to the customer
+        -- debits Trade Debtors, increasing what the customer owes — same
+        -- treatment as customer-aging.php / recovery-sheet-query.php. Since
+        -- payment_voucher carries no salesman column of its own, it is
+        -- attributed to the customer's own associated_sales_officer_id.
+        SELECT
+            COALESCE(e.full_name, 'Unassigned') AS salesman_name,
+            e.id                                AS salesman_id,
+            c.customer_name,
+            c.address,
+            c.primary_phone,
+            pv.voucher_number                   AS bill_no,
+            pv.voucher_date                     AS invoice_date,
+            DATEDIFF(CURDATE(), pv.voucher_date) AS days_overdue,
+            pv.amount                           AS current_balance,
+            0                                    AS total_received,
+            0                                    AS total_returns,
+            0                                    AS unallocated_received,
+            0                                    AS unallocated_returns
+        FROM payment_voucher pv
+        JOIN customers c ON pv.customer_id = c.id
+        LEFT JOIN employees e ON c.associated_sales_officer_id = e.id
+        WHERE pv.tenant_id = ?
+          AND c.status = 'ACTIVE'
+        " . ($salesman_id  ? " AND c.associated_sales_officer_id = ?" : "") . "
+        " . ($company_id   ? " AND c.company_id = ?"        : "") . "
+        " . ($country_id   ? " AND c.country_id = ?"        : "") . "
+        " . ($region_id    ? " AND c.region_id = ?"         : "") . "
+        " . ($city_id      ? " AND c.city_id = ?"           : "") . "
+        " . ($city_zone_id ? " AND c.city_zone_id = ?"      : "") . "
+        " . ($area_id      ? " AND c.area_id = ?"           : "") . "
     ";
 
     $query = "SELECT * FROM ($inner) AS sr_data WHERE current_balance > 0 ORDER BY salesman_name, customer_name, invoice_date";
@@ -203,6 +237,16 @@ try {
     if ($salesman_id)  $params[] = $salesman_id;
     if ($date_from)    $params[] = $date_from;
     if ($date_to)      $params[] = $date_to;
+    if ($company_id)   $params[] = $company_id;
+    if ($country_id)   $params[] = $country_id;
+    if ($region_id)    $params[] = $region_id;
+    if ($city_id)      $params[] = $city_id;
+    if ($city_zone_id) $params[] = $city_zone_id;
+    if ($area_id)      $params[] = $area_id;
+
+    // UNION Part 3 params (payment_voucher)
+    $params[] = $tenant_id;                 // WHERE pv.tenant_id
+    if ($salesman_id)  $params[] = $salesman_id;
     if ($company_id)   $params[] = $company_id;
     if ($country_id)   $params[] = $country_id;
     if ($region_id)    $params[] = $region_id;

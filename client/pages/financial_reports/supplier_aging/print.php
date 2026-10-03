@@ -46,10 +46,31 @@ $stmt = $pdo->prepare("
     " . ($company_id ? " AND pi.company_id = ?" : "") . "
     GROUP BY pi.id
     HAVING (pi.net_amount - paid_amount) > 0 AND DATEDIFF(CURDATE(), pi.purchase_date) >= 15
-    
+
+    UNION ALL
+
+    SELECT
+        rv.id,
+        rv.voucher_number as bill_no,
+        rv.voucher_date as purchase_date,
+        (rv.amount + rv.adjust_amount) as net_amount,
+        s.supplier_code,
+        s.supplier_name,
+        s.address,
+        0 as paid_amount,
+        DATEDIFF(CURDATE(), rv.voucher_date) as days_overdue,
+        'Receive Voucher (Advance from Supplier)' as invoice_type
+    FROM receive_voucher rv
+    JOIN suppliers s ON rv.supplier_id = s.id
+    WHERE rv.tenant_id = ?
+    " . ($company_id ? " AND rv.company_id = ?" : "") . "
+    AND DATEDIFF(CURDATE(), rv.voucher_date) >= 15
+
     ORDER BY days_overdue DESC
 ");
 $params = [$tenant_id, $tenant_id];
+if ($company_id) $params[] = $company_id;
+$params[] = $tenant_id;
 if ($company_id) $params[] = $company_id;
 $stmt->execute($params);
 $invoices = $stmt->fetchAll(PDO::FETCH_ASSOC);

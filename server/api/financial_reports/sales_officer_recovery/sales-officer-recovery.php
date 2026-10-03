@@ -153,6 +153,16 @@ try {
         $params[] = $areaId;
     }
 
+    // 6. payment_voucher WHERE conditions
+    $params[] = $tenant_id;
+    if ($companyId) $params[] = $companyId;
+    if ($dateFrom) $params[] = $dateFrom;
+    if ($dateTo) $params[] = $dateTo;
+    if ($salesOfficerId) $params[] = $salesOfficerId;
+    if ($customerId) $params[] = $customerId;
+    if ($cityId) $params[] = $cityId;
+    if ($areaId) $params[] = $areaId;
+
     // Build query for sales invoices with recoveries
     $query = "(
         SELECT 
@@ -212,6 +222,39 @@ try {
             GROUP BY bill_no
         ) rv ON obi.invoice_number = rv.bill_no
         WHERE {$obiWhere}
+    )
+    UNION ALL
+    (
+        -- Payment Voucher to Customer (an advance/charge paid out to the customer
+        -- debits Trade Debtors, increasing what the customer owes — same
+        -- treatment as customer-aging.php / recovery-sheet-query.php. Since
+        -- payment_voucher carries no sales-officer column of its own, it is
+        -- attributed to the customer's own associated_sales_officer_id, the
+        -- same fallback the customer record itself carries elsewhere.
+        SELECT
+            e.id as officer_id,
+            e.full_name as officer_name,
+            pv.id as invoice_id,
+            pv.voucher_number as bill_no,
+            pv.voucher_date as invoice_date,
+            pv.customer_id,
+            c.customer_name,
+            NULL as distribution_id,
+            pv.amount as bill_amount,
+            0 as return_amount,
+            0 as total_recovery,
+            pv.amount as remaining_balance,
+            DATEDIFF(CURDATE(), pv.voucher_date) as overdue_days
+        FROM payment_voucher pv
+        INNER JOIN customers c ON pv.customer_id = c.id
+        INNER JOIN employees e ON c.associated_sales_officer_id = e.id
+        WHERE pv.tenant_id = ?" . ($companyId ? " AND pv.company_id = ?" : "") . "
+        " . ($dateFrom ? " AND pv.voucher_date >= ?" : "") . "
+        " . ($dateTo ? " AND pv.voucher_date <= ?" : "") . "
+        " . ($salesOfficerId ? " AND c.associated_sales_officer_id = ?" : "") . "
+        " . ($customerId ? " AND pv.customer_id = ?" : "") . "
+        " . ($cityId ? " AND c.city_id = ?" : "") . "
+        " . ($areaId ? " AND c.area_id = ?" : "") . "
     )
     ORDER BY officer_name, invoice_date DESC";
     

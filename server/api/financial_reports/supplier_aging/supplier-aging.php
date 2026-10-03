@@ -51,6 +51,21 @@ try {
 
     $companyCondition = $company_id ? ' AND pi.company_id = ?' : '';
 
+    // Receive Voucher (Receive from Supplier) — the supplier sending money to
+    // us (an advance, refund, or rebate) increases what we owe them, the same
+    // direction as a purchase invoice — see supplier-ledger.php's identical
+    // treatment. Folded in as its own positive-amount row, same pattern as
+    // customer-aging.php's handling of Payment Voucher (Advance to Customer).
+    $rvDateCondition = '';
+    if ($date_from && $date_to) {
+        $rvDateCondition = ' AND rv.voucher_date BETWEEN ? AND ?';
+    } elseif ($date_range === '30days') {
+        $rvDateCondition = ' AND rv.voucher_date >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)';
+    } elseif ($date_range === '90days') {
+        $rvDateCondition = ' AND rv.voucher_date >= DATE_SUB(CURDATE(), INTERVAL 90 DAY)';
+    }
+    $rvCompanyCondition = $company_id ? ' AND rv.company_id = ?' : '';
+
     $sql = "
         SELECT 
             pi.id,
@@ -71,11 +86,38 @@ try {
         {$companyCondition}
         GROUP BY pi.id
         HAVING (pi.net_amount - paid_amount) > 0
+
+        UNION ALL
+
+        SELECT
+            rv.id,
+            rv.voucher_number as bill_no,
+            rv.voucher_date as purchase_date,
+            (rv.amount + rv.adjust_amount) as net_amount,
+            s.supplier_code,
+            s.supplier_name,
+            s.address,
+            0 as paid_amount,
+            DATEDIFF(CURDATE(), rv.voucher_date) as days_overdue,
+            'Receive Voucher (Advance from Supplier)' as invoice_type
+        FROM receive_voucher rv
+        JOIN suppliers s ON rv.supplier_id = s.id
+        WHERE rv.tenant_id = ?
+        {$rvDateCondition}
+        {$rvCompanyCondition}
+
         ORDER BY days_overdue DESC
     ";
 
     $params = [$tenant_id, $tenant_id];
     $params = array_merge($params, $dateParams);
+    if ($company_id) $params[] = $company_id;
+
+    $params[] = $tenant_id;
+    if ($date_from && $date_to) {
+        $params[] = $date_from;
+        $params[] = $date_to;
+    }
     if ($company_id) $params[] = $company_id;
 
     $stmt = $pdo->prepare($sql);

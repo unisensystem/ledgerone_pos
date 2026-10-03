@@ -55,6 +55,7 @@ if ($date_from && $date_to) {
 }
 $siDateCond  = str_replace('{date_col}', 'si.sale_date',    $dateCondition);
 $obiDateCond = str_replace('{date_col}', 'obi.invoice_date', $dateCondition);
+$pvDateCond  = str_replace('{date_col}', 'pv.voucher_date', $dateCondition);
 
 // ── Shared territory filter ───────────────────────────────────────────────────
 $companyCondition  = $company_id  ? ' AND {company_col} = ?' : '';
@@ -77,6 +78,7 @@ if ($area_id)     $sharedFilterParams[] = $area_id;
 
 $siCompCond  = str_replace('{company_col}', 'si.company_id', $companyCondition);
 $obiCompCond = str_replace('{company_col}', 'c.company_id',  $companyCondition);
+$pvCompCond  = str_replace('{company_col}', 'c.company_id',  $companyCondition);
 
 // ── SQL ───────────────────────────────────────────────────────────────────────
 $sql = "
@@ -143,6 +145,38 @@ $sql = "
     GROUP BY obi.id
     HAVING (obi.debit - paid_amount) > 0
 
+    UNION ALL
+
+    -- Payment Voucher to Customer (an advance/charge paid out to the customer
+    -- debits Trade Debtors, increasing what the customer owes — same treatment
+    -- as the main customer-aging.php API and customer-ledger.php).
+    SELECT
+        pv.id,
+        pv.voucher_number AS bill_no,
+        pv.voucher_date AS invoice_date,
+        pv.amount AS net_amount,
+        c.id AS customer_id_val,
+        c.customer_code,
+        c.customer_name,
+        c.address,
+        0 AS paid_amount,
+        0 AS returned_amount,
+        DATEDIFF(CURDATE(), pv.voucher_date) AS days_overdue,
+        'Payment Voucher (Advance to Customer)' AS invoice_type,
+        COALESCE((
+            SELECT SUM(rv2.amount)
+            FROM receive_voucher rv2
+            WHERE rv2.customer_id = c.id
+            AND rv2.tenant_id = ?
+            AND (rv2.bill_no IS NULL OR rv2.bill_no = '' OR rv2.bill_no = 'null')
+        ), 0) AS unallocated_received
+    FROM payment_voucher pv
+    JOIN customers c ON pv.customer_id = c.id
+    WHERE pv.tenant_id = ?
+    {$pvDateCond}
+    {$pvCompCond}
+    {$sharedFilterSql}
+
     ORDER BY days_overdue DESC
 ";
 
@@ -154,6 +188,13 @@ $params = array_merge($params, $sharedFilterParams);
 
 // opening_balance branch: unallocated.tenant_id, rv.tenant_id, obi.tenant_id, [date], [company], [shared]
 $params[] = $tenant_id;
+$params[] = $tenant_id;
+$params[] = $tenant_id;
+$params = array_merge($params, $dateParams);
+if ($company_id) $params[] = $company_id;
+$params = array_merge($params, $sharedFilterParams);
+
+// payment_voucher branch: unallocated.tenant_id, pv.tenant_id, [date], [company], [shared]
 $params[] = $tenant_id;
 $params[] = $tenant_id;
 $params = array_merge($params, $dateParams);

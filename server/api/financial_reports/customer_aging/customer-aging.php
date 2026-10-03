@@ -272,6 +272,14 @@ $zoneCondition     = $zone_id     ? ' AND c.city_zone_id = ?' : '';
     $srDateCond = str_replace('{date_col}', 'sr.sale_date', $dateCondition);
     $rvCompCond = str_replace('{company_col}', 'c.company_id', $companyCondition);
     $srCompCond = str_replace('{company_col}', 'c.company_id', $companyCondition);
+    // Payment Voucher (Payment to Customer) rows — an advance/charge paid out
+    // to the customer debits Trade Debtors (see payment-add.php's
+    // debit_account_id = 2 for payment_type='customer'), so it INCREASES what
+    // the customer owes, same treatment as customer-ledger.php's
+    // $prev_payment_vouchers. Folded in as its own positive-amount row, same
+    // pattern as the unbilled Receive Voucher/Sale Return rows above.
+    $pvDateCond = str_replace('{date_col}', 'pv.voucher_date', $dateCondition);
+    $pvCompCond = str_replace('{company_col}', 'c.company_id', $companyCondition);
 
     $sql = "
         SELECT
@@ -405,6 +413,37 @@ $zoneCondition     = $zone_id     ? ' AND c.city_zone_id = ?' : '';
         {$srCompCond}
         {$sharedFilterSql}
 
+        UNION ALL
+
+        SELECT
+            pv.id,
+            pv.voucher_number as bill_no,
+            pv.voucher_date as invoice_date,
+            pv.amount as net_amount,
+            c.customer_code,
+            c.customer_name,
+            c.address,
+            0 as paid_amount,
+            0 as returned_amount,
+            DATEDIFF(CURDATE(), pv.voucher_date) as days_overdue,
+            'Payment Voucher (Advance to Customer)' as invoice_type,
+            COALESCE((
+                SELECT SUM(rv2.amount)
+                FROM receive_voucher rv2
+                WHERE rv2.customer_id = c.id
+                AND rv2.tenant_id = ?
+                AND (rv2.bill_no IS NULL OR rv2.bill_no = '' OR rv2.bill_no = 'null')
+            ), 0) as unallocated_received,
+{$returnSubquery},
+{$adjustmentSubquery},
+{$transferSubquery}
+        FROM payment_voucher pv
+        JOIN customers c ON pv.customer_id = c.id
+        WHERE pv.tenant_id = ?
+        {$pvDateCond}
+        {$pvCompCond}
+        {$sharedFilterSql}
+
         ORDER BY days_overdue DESC
     ";
 
@@ -444,6 +483,18 @@ $zoneCondition     = $zone_id     ? ' AND c.city_zone_id = ?' : '';
     // unbilled Sale Return branch params: same pattern
     // unallocated_received.tenant_id, unallocated_sale_return.tenant_id, unallocated_adjustment.tenant_id,
     // transfer_subquery.tenant_id, sr.tenant_id (WHERE), [dateParams], [company_id], [sharedFilterParams]
+    $params[] = $tenant_id;
+    $params[] = $tenant_id;
+    $params[] = $tenant_id;
+    $params[] = $tenant_id;
+    $params[] = $tenant_id;
+    $params = array_merge($params, $dateParams);
+    if ($company_id) $params[] = $company_id;
+    $params = array_merge($params, $sharedFilterParams);
+
+    // Payment Voucher (Payment to Customer) branch params: same pattern
+    // unallocated_received.tenant_id, unallocated_sale_return.tenant_id, unallocated_adjustment.tenant_id,
+    // transfer_subquery.tenant_id, pv.tenant_id (WHERE), [dateParams], [company_id], [sharedFilterParams]
     $params[] = $tenant_id;
     $params[] = $tenant_id;
     $params[] = $tenant_id;

@@ -334,6 +334,70 @@ function getRecoverySheetRows($pdo, $tenant_id, array $filters) {
         " . ($city_zone_id ? " AND c.city_zone_id = ?" : "") . "
         " . ($area_id ? " AND c.area_id = ?" : "") . "
 
+        UNION ALL
+
+        -- Payment Voucher to Customer (an advance/charge paid out to the customer
+        -- debits Trade Debtors — see payment-add.php's debit_account_id = 2 for
+        -- payment_type='customer' — so it INCREASES what the customer owes, same
+        -- treatment as customer-ledger.php's prev-payment-vouchers accumulator.
+        -- Sign is POSITIVE here, the opposite convention from receive_voucher
+        -- and sale_return above, which REDUCE the balance.
+       SELECT
+            c.customer_name,
+            c.address,
+            c.primary_phone,
+            pv.voucher_number as bill_no,
+            pv.voucher_date as invoice_date,
+            DATEDIFF(CURDATE(), pv.voucher_date) as days_overdue,
+            pv.amount as current_balance,
+            0 as total_sales,
+            COALESCE((
+                SELECT SUM(rv.amount)
+                FROM receive_voucher rv
+                WHERE rv.customer_id = c.id
+                AND rv.tenant_id = ?
+                " . ($date_from ? " AND rv.voucher_date >= ?" : "") . "
+                " . ($date_to ? " AND rv.voucher_date <= ?" : "") . "
+                " . ($recovery_officer_id ? " AND rv.recovery_officer_id = ?" : "") . "
+            ), 0) as total_received,
+            COALESCE((
+                SELECT SUM(sr.net_amount)
+                FROM sale_return sr
+                WHERE sr.customer_id = c.id
+                AND sr.tenant_id = ?
+                AND sr.status = 'Posted'
+                " . ($date_from ? " AND sr.sale_date >= ?" : "") . "
+                " . ($date_to ? " AND sr.sale_date <= ?" : "") . "
+            ), 0) as total_returns,
+            COALESCE((
+                SELECT SUM(rv2.amount)
+                FROM receive_voucher rv2
+                WHERE rv2.customer_id = c.id
+                AND rv2.tenant_id = ?
+                AND (rv2.bill_no IS NULL OR rv2.bill_no = '' OR rv2.bill_no = 'null')
+            ), 0) as unallocated_received,
+            COALESCE((
+                SELECT SUM(sr3.net_amount)
+                FROM sale_return sr3
+                WHERE sr3.customer_id = c.id
+                AND sr3.tenant_id = ?
+                AND sr3.status = 'Posted'
+                AND (sr3.sale_invoice_no IS NULL OR sr3.sale_invoice_no = 0)
+            ), 0) as unallocated_returns,
+            {$adjustmentSubquery},
+            {$transferSubquery}
+        FROM payment_voucher pv
+        JOIN customers c ON pv.customer_id = c.id
+        WHERE pv.tenant_id = ?
+        AND c.status = 'ACTIVE'
+        " . ($company_id ? " AND c.company_id = ?" : "") . "
+        " . ($customer_id ? " AND c.id = ?" : "") . "
+        " . ($country_id ? " AND c.country_id = ?" : "") . "
+        " . ($region_id ? " AND c.region_id = ?" : "") . "
+        " . ($city_id ? " AND c.city_id = ?" : "") . "
+        " . ($city_zone_id ? " AND c.city_zone_id = ?" : "") . "
+        " . ($area_id ? " AND c.area_id = ?" : "") . "
+
         ORDER BY customer_name
     ";
 
@@ -428,6 +492,27 @@ function getRecoverySheetRows($pdo, $tenant_id, array $filters) {
     $params[] = $tenant_id; // unallocated_adjustment
     $params[] = $tenant_id; // unallocated_transfer
     $params[] = $tenant_id; // WHERE sr.tenant_id
+    if ($company_id) $params[] = $company_id;
+    if ($customer_id) $params[] = $customer_id;
+    if ($country_id) $params[] = $country_id;
+    if ($region_id) $params[] = $region_id;
+    if ($city_id) $params[] = $city_id;
+    if ($city_zone_id) $params[] = $city_zone_id;
+    if ($area_id) $params[] = $area_id;
+
+    // UNION Part 5: Payment Voucher to Customer
+    $params[] = $tenant_id;
+    if ($date_from) $params[] = $date_from;
+    if ($date_to) $params[] = $date_to;
+    if ($recovery_officer_id) $params[] = $recovery_officer_id;
+    $params[] = $tenant_id;
+    if ($date_from) $params[] = $date_from;
+    if ($date_to) $params[] = $date_to;
+    $params[] = $tenant_id;
+    $params[] = $tenant_id;
+    $params[] = $tenant_id; // unallocated_adjustment
+    $params[] = $tenant_id; // unallocated_transfer
+    $params[] = $tenant_id; // WHERE pv.tenant_id
     if ($company_id) $params[] = $company_id;
     if ($customer_id) $params[] = $customer_id;
     if ($country_id) $params[] = $country_id;
