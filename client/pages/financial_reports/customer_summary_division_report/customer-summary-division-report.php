@@ -1,6 +1,6 @@
 <?php
 /**
- * Customer Statement Report - Page (FIXED v6)
+ * Customer Statement Report - Page (FIXED v7)
  *
  * Default behavior:
  * - Customer blank = ALL customers
@@ -13,6 +13,7 @@
  * - Print ko hidden columns pass hote hain (hide_cols) - wahan bhi sirf display
  * - Adjustment column (signed net: RV adjust_amount = -,
  *        Balance Adjustment JV Debit = +, Credit = -)
+ * - Payment Voucher column (Payment to Customer, Debit = +)
  */
 
 require_once '../../../../includes/dashboard.php';
@@ -532,6 +533,11 @@ if (!$user_id) {
                 <div class="value" id="stat-sr">0.00</div>
             </div>
 
+            <div class="stat" data-col="payment_voucher">
+                <div class="label">Total Payment Voucher</div>
+                <div class="value" id="stat-pv">0.00</div>
+            </div>
+
             <div class="stat" data-col="transfer_voucher">
                 <div class="label">Net Transfer Voucher</div>
                 <div class="value" id="stat-tv">0.00</div>
@@ -601,6 +607,7 @@ const COLUMNS = [
     { key:'sale_invoice',     label:'Sale Invoice' },
     { key:'receive_voucher',  label:'Receive Voucher' },
     { key:'sale_return',      label:'Sale Return' },
+    { key:'payment_voucher',  label:'Payment Voucher' },
     { key:'transfer_voucher', label:'Transfer Voucher' },
     { key:'adjustment',       label:'Adjustment' },
     { key:'closing_balance',  label:'Closing Balance' }
@@ -1066,6 +1073,7 @@ function renderSummary(data){
     const totalSI  = data.total_sale_invoice || 0;
     const totalRV  = data.total_receive_voucher || 0;
     const totalSR  = data.total_sale_return || 0;
+    const totalPV  = data.total_payment_voucher || 0;
     const totalTV  = data.total_transfer_voucher || 0;
     const totalADJ = data.total_adjustment || 0;
 
@@ -1077,6 +1085,9 @@ function renderSummary(data){
 
     document.getElementById('stat-sr').textContent =
         `${currentCurrency}${fmt(totalSR)}`;
+
+    document.getElementById('stat-pv').textContent =
+        `${currentCurrency}${fmt(totalPV)}`;
 
     // Signed net: + / - dikhata hai, zero pe 0.00
     document.getElementById('stat-tv').textContent =
@@ -1140,6 +1151,13 @@ function renderTable(data){
                     : '-'
                 }
             </td>
+            <td data-col="payment_voucher" class="amt-in" title="${esc(r.payment_nos || '')}">
+                ${
+                    parseFloat(r.payment_voucher || 0) > 0
+                    ? currentCurrency + fmt(r.payment_voucher)
+                    : '-'
+                }
+            </td>
             <td data-col="transfer_voucher" class="${tvClass}" title="${esc(r.transfer_nos || '')}">
                 ${fmtSigned(tv)}
             </td>
@@ -1176,6 +1194,7 @@ function renderTable(data){
                         <td data-col="sale_invoice"><strong>${currentCurrency}${fmt(data.total_sale_invoice)}</strong></td>
                         <td data-col="receive_voucher"><strong>${currentCurrency}${fmt(data.total_receive_voucher)}</strong></td>
                         <td data-col="sale_return"><strong>${currentCurrency}${fmt(data.total_sale_return)}</strong></td>
+                        <td data-col="payment_voucher"><strong>${currentCurrency}${fmt(data.total_payment_voucher)}</strong></td>
                         <td data-col="transfer_voucher"><strong>${fmtSigned(data.total_transfer_voucher)}</strong></td>
                         <td data-col="adjustment"><strong>${fmtSigned(data.total_adjustment)}</strong></td>
                         <td data-col="closing_balance"><strong>${currentCurrency}${fmt(data.closing_balance)}</strong></td>

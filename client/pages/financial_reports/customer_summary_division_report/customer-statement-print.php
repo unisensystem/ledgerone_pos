@@ -1,6 +1,6 @@
 <?php
 /**
- * Customer Statement - Print View (UPDATED v6)
+ * Customer Statement - Print View (UPDATED v7)
  * Supports:
  * - All Customers (when customer_id is empty)
  * - Single Customer
@@ -17,6 +17,7 @@
  *      asar nahi, hamesha poora (API ka) total dikhta hai.
  * Adjustment column (signed net: RV adjust_amount = -,
  *      Balance Adjustment JV Debit = +, Credit = -) + uska total
+ * Payment Voucher column (Payment to Customer, Debit = +) + uska total
  * Signature column (LAST) - blank, sirf print par dastkhat ke liye.
  *      Koi data/total nahi, API se koi talluq nahi.
  */
@@ -207,6 +208,7 @@ const COLUMNS = [
     { key:'sale_invoice',     label:'Sale Invoice' },
     { key:'receive_voucher',  label:'Receive Voucher' },
     { key:'sale_return',      label:'Sale Return' },
+    { key:'payment_voucher',  label:'Payment Voucher' },
     { key:'transfer_voucher', label:'Transfer Voucher' },
     { key:'adjustment',       label:'Adjustment' },
     { key:'closing_balance',  label:'Closing Balance' },
@@ -259,6 +261,7 @@ function cellHtml(key, r){
         case 'sale_invoice':
         case 'receive_voucher':
         case 'sale_return':
+        case 'payment_voucher':
             return `<td>${parseFloat(r[key]) > 0 ? currency + fmt(r[key]) : '-'}</td>`;
         case 'transfer_voucher':
             return `<td>${fmtSigned(r.transfer_voucher)}</td>`;
@@ -315,6 +318,7 @@ async function loadStatement(){
         const totalSI  = data.total_sale_invoice || 0;
         const totalRV  = data.total_receive_voucher || 0;
         const totalSR  = data.total_sale_return || 0;
+        const totalPV  = data.total_payment_voucher || 0;
         const totalTV  = data.total_transfer_voucher || 0;
         const totalADJ = data.total_adjustment || 0;
 
@@ -325,6 +329,7 @@ async function loadStatement(){
             { key:'sale_invoice',     label:'Total Sale Invoice',   value:`${currency}${fmt(totalSI)}` },
             { key:'receive_voucher',  label:'Total Receive Voucher',value:`${currency}${fmt(totalRV)}` },
             { key:'sale_return',      label:'Total Sale Return',    value:`${currency}${fmt(totalSR)}` },
+            { key:'payment_voucher',  label:'Total Payment Voucher',value:`${currency}${fmt(totalPV)}` },
             { key:'transfer_voucher', label:'Net Transfer Voucher', value: totalTV === 0 ? `${currency}0.00` : fmtSigned(totalTV) },
             { key:'adjustment',       label:'Net Adjustment',       value: totalADJ === 0 ? `${currency}0.00` : fmtSigned(totalADJ) },
             { key:'closing_balance',  label:'Closing Balance',      value:`${currency}${fmt(data.closing_balance)}` }
@@ -392,6 +397,8 @@ async function loadStatement(){
                     return `<td>${currency}${fmt(totalRV)}</td>`;
                 case 'sale_return':
                     return `<td>${currency}${fmt(totalSR)}</td>`;
+                case 'payment_voucher':
+                    return `<td>${currency}${fmt(totalPV)}</td>`;
                 case 'transfer_voucher':
                     return `<td>${fmtSigned(totalTV)}</td>`;
                 case 'adjustment':

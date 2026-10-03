@@ -1,6 +1,6 @@
 <?php
 /**
- * Customer Statement Report - API (FIXED v6)
+ * Customer Statement Report - API (FIXED v7)
  * ---------------------------------------------------------------
  *
  * FIX 1: Customers with opening balance but NO transactions
@@ -13,7 +13,7 @@
  *        (comma-separated ids, e.g. city_id=3,7,10).
  * FIX 6: action=salesmen - dropdown ke liye employees list.
  * FIX 7: TRANSFER VOUCHER column (TO = +, FROM = -).
- * FIX 8 (NEW): ADJUSTMENT column (signed net).
+ * FIX 8: ADJUSTMENT column (signed net).
  *        Sources:
  *        a) Receive Voucher ki adjust_amount
  *           receive-edit/add ledger: Trade Debtors CR = amount + adjust_amount
@@ -25,6 +25,11 @@
  *           Credit => customer balance kam hota hai (-)
  *           (adj_type journal_voucher me save nahi hota, is liye direction
  *            line ke debit/credit se nikalti hai)
+ * FIX 9 (NEW): PAYMENT VOUCHER column ("Payment to Customer").
+ *        payment_voucher table se wo rows jin me customer_id set ho aur
+ *        supplier_id NULL ho (Customer Ledger ke same filter).
+ *        Customer ko paisa wapas dene se customer ka receivable barhta hai
+ *        => DEBIT (+), Sale Invoice ki tarah.
  *
  * LOGIC:
  * Opening Balance
@@ -32,11 +37,13 @@
  *     + Sale Invoices before From Date
  *     - Receive Vouchers before From Date
  *     - Sale Returns before From Date
+ *     + Payment Vouchers (to customer) before From Date
  *     +/- Transfer Vouchers before From Date
  *     +/- Adjustments before From Date (RV adjust_amount = -, JV = +/-)
  *
  * Closing Balance
  *     = Opening + Sale Invoice - Receive Voucher - Sale Return
+ *       + Payment Voucher
  *       +/- Transfer Voucher (net) +/- Adjustment (net)
  */
 
@@ -394,6 +401,7 @@ try {
                     'total_sale_invoice' => 0,
                     'total_receive_voucher' => 0,
                     'total_sale_return' => 0,
+                    'total_payment_voucher' => 0,
                     'total_transfer_voucher' => 0,
                     'total_adjustment' => 0,
                     'rows'            => []
@@ -407,6 +415,7 @@ try {
             $total_sale_invoice = 0;
             $total_receive_voucher = 0;
             $total_sale_return = 0;
+            $total_payment_voucher = 0;  // Payment to Customer (Debit, +)
             $total_transfer_voucher = 0; // signed net (TO = +, FROM = -)
             $total_adjustment = 0;       // signed net (RV adjust = -, JV Dr = +, JV Cr = -)
 
@@ -459,6 +468,19 @@ try {
                     $sr_stmt->execute([$tenant_id, $cid, $from_date]);
                     $bbf -= (float)$sr_stmt->fetchColumn();
 
+                    // Payment vouchers (Payment to Customer) before from_date: Debit = +
+                    $pv_stmt = $pdo->prepare("
+                        SELECT COALESCE(SUM(amount), 0)
+                        FROM payment_voucher
+                        WHERE tenant_id = ?
+                          AND customer_id IS NOT NULL
+                          AND supplier_id IS NULL
+                          AND customer_id = ?
+                          AND voucher_date < ?
+                    ");
+                    $pv_stmt->execute([$tenant_id, $cid, $from_date]);
+                    $bbf += (float)$pv_stmt->fetchColumn();
+
                     // Transfer vouchers before from_date: TO = +, FROM = -
                     $tv_stmt = $pdo->prepare("
                         SELECT COALESCE(SUM(
@@ -492,11 +514,13 @@ try {
                             'sale_invoice'     => 0,
                             'receive_voucher'  => 0,
                             'sale_return'      => 0,
+                            'payment_voucher'  => 0,
                             'transfer_voucher' => 0,
                             'adjustment'       => 0,
                             'si_bills'         => [],
                             'rv_bills'         => [],
                             'sr_bills'         => [],
+                            'pv_bills'         => [],
                             'tv_bills'         => [],
                             'adj_bills'        => []
                         ];
@@ -617,6 +641,43 @@ try {
                     }
                 }
 
+                // PAYMENT VOUCHERS (Payment to Customer)
+                // Customer ko paisa wapas diya => customer balance barhta hai (Debit, +)
+                $pv_sql = "
+                    SELECT voucher_date, voucher_number, amount
+                    FROM payment_voucher
+                    WHERE tenant_id = ?
+                      AND customer_id IS NOT NULL
+                      AND supplier_id IS NULL
+                      AND customer_id = ?
+                ";
+                $pv_params = [$tenant_id, $cid];
+
+                if ($from_date) {
+                    $pv_sql .= " AND voucher_date >= ?";
+                    $pv_params[] = $from_date;
+                }
+                if ($to_date) {
+                    $pv_sql .= " AND voucher_date <= ?";
+                    $pv_params[] = $to_date;
+                }
+
+                $pv_sql .= " ORDER BY voucher_date";
+
+                $pv_stmt = $pdo->prepare($pv_sql);
+                $pv_stmt->execute($pv_params);
+
+                foreach ($pv_stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+                    $d = $row['voucher_date'];
+                    // Skip if date is null/empty
+                    if (!$d) continue;
+                    $makeDay($d);
+                    $days[$d]['payment_voucher'] += (float)$row['amount'];
+                    if (isset($row['voucher_number']) && $row['voucher_number'] !== '') {
+                        $days[$d]['pv_bills'][] = $row['voucher_number'];
+                    }
+                }
+
                 // TRANSFER VOUCHERS
                 // Customer TO party  => + (debit, balance barhta hai)
                 // Customer FROM party => - (credit, balance kam hota hai)
@@ -685,6 +746,7 @@ try {
                         + $d['sale_invoice']
                         - $d['receive_voucher']
                         - $d['sale_return']
+                        + $d['payment_voucher']
                         + $d['transfer_voucher']
                         + $d['adjustment'];
 
@@ -699,12 +761,14 @@ try {
                         'sale_invoice'     => round($d['sale_invoice'], 2),
                         'receive_voucher'  => round($d['receive_voucher'], 2),
                         'sale_return'      => round($d['sale_return'], 2),
+                        'payment_voucher'  => round($d['payment_voucher'], 2),
                         'transfer_voucher' => round($d['transfer_voucher'], 2),
                         'adjustment'       => round($d['adjustment'], 2),
                         'closing_balance'  => round($closing, 2),
                         'invoice_nos'      => implode(', ', array_unique(array_filter($d['si_bills']))),
                         'voucher_nos'      => implode(', ', array_unique(array_filter($d['rv_bills']))),
                         'return_nos'       => implode(', ', array_unique(array_filter($d['sr_bills']))),
+                        'payment_nos'      => implode(', ', array_unique(array_filter($d['pv_bills']))),
                         'transfer_nos'     => implode(', ', array_unique(array_filter($d['tv_bills']))),
                         'adjustment_nos'   => implode(', ', array_unique(array_filter($d['adj_bills'])))
                     ];
@@ -713,6 +777,7 @@ try {
                     $total_sale_invoice     += (float)$d['sale_invoice'];
                     $total_receive_voucher  += (float)$d['receive_voucher'];
                     $total_sale_return      += (float)$d['sale_return'];
+                    $total_payment_voucher  += (float)$d['payment_voucher'];
                     $total_transfer_voucher += (float)$d['transfer_voucher'];
                     $total_adjustment       += (float)$d['adjustment'];
                 }
@@ -730,12 +795,14 @@ try {
                         'sale_invoice'     => 0,
                         'receive_voucher'  => 0,
                         'sale_return'      => 0,
+                        'payment_voucher'  => 0,
                         'transfer_voucher' => 0,
                         'adjustment'       => 0,
                         'closing_balance'  => round($bbf, 2),
                         'invoice_nos'      => '',
                         'voucher_nos'      => '',
                         'return_nos'       => '',
+                        'payment_nos'      => '',
                         'transfer_nos'     => '',
                         'adjustment_nos'   => ''
                     ];
@@ -775,6 +842,7 @@ try {
                 'total_sale_invoice'     => round($total_sale_invoice, 2),
                 'total_receive_voucher'  => round($total_receive_voucher, 2),
                 'total_sale_return'      => round($total_sale_return, 2),
+                'total_payment_voucher'  => round($total_payment_voucher, 2),
                 'total_transfer_voucher' => round($total_transfer_voucher, 2),
                 'total_adjustment'       => round($total_adjustment, 2),
                 'rows'                   => $all_rows
