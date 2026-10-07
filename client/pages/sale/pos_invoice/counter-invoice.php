@@ -959,6 +959,12 @@ $user_employee_id = $user['employee_id'] ?? null;
                     </div>
                 </div>
                 <div class="header-item">
+                    <div class="header-label">COUNTER</div>
+                    <select id="counterSelect" style="width: 100%; height: 32px; padding: 0 8px; border: 1px solid var(--border-default); border-radius: 4px; background: white; font-size: 13px; font-weight: 600; color: var(--body);">
+                        <option value="">-- Select Counter --</option>
+                    </select>
+                </div>
+                <div class="header-item">
                     <div class="header-label">OPERATOR</div>
                     <div class="header-value"><?php echo htmlspecialchars($user_full_name); ?></div>
                 </div>

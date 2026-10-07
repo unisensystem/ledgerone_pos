@@ -74,13 +74,14 @@ $pdo->beginTransaction();
     // Insert sale invoice
     $stmt = $pdo->prepare("
         INSERT INTO sale_invoice (
-            tenant_id, currency_id, bill_no, sale_date, customer_id, sub_account_id, company_id, branch_id,
+            tenant_id, currency_id, bill_no, sale_date, customer_id, sub_account_id, company_id, branch_id, counter_id,
             previous_balance, sale_officer_id, supplier_man_id, brand_id, sale_order_id, bilty_no, transport_name, customer_phone,
             total_bill, total_discount_percent, total_discount_amount,
             extra_discount_1_percent, extra_discount_1_amount, extra_discount_2_percent, extra_discount_2_amount,
             shipping_fees, net_amount, withholding_tax_percent, withholding_tax_amount, amount_paid_auto_fill,
-            amount_returned, invoice_type, due_date, remarks, status, created_by, updated_by, project_id, container_id
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            amount_returned, invoice_type, due_date, remarks, status, created_by, updated_by, project_id, container_id,
+            payment_method, amount_paid
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ");
 
     $stmt->execute([
@@ -92,6 +93,7 @@ $pdo->beginTransaction();
         $input['subAccountId'] ?? null,
         $input['companyId'] ?? null,
         $input['branchId'],
+        (!empty($input['counterId']) && intval($input['counterId']) > 0) ? intval($input['counterId']) : null,
         extractBalanceAmount($input['previousBalance'] ?? '0.00'),
         $input['salesOfficerId'] ?? null,
         $input['supplierManId'] ?? null,
@@ -120,7 +122,9 @@ $pdo->beginTransaction();
         $user_id,
         $user_id,
         (!empty($input['projectId']) && $input['projectId'] !== null && intval($input['projectId']) > 0) ? intval($input['projectId']) : null,
-        (!empty($input['containerId']) && $input['containerId'] !== null && intval($input['containerId']) > 0) ? intval($input['containerId']) : null
+        (!empty($input['containerId']) && $input['containerId'] !== null && intval($input['containerId']) > 0) ? intval($input['containerId']) : null,
+        $input['paymentMethod'] ?? null,
+        floatval($input['amountPaid'] ?? 0)
     ]);
 
     $invoice_id = $pdo->lastInsertId();
@@ -420,8 +424,9 @@ if ($status === 'Posted' || $status === 'Draft') {
             $rvStmt = $pdo->prepare("
                 INSERT INTO receive_voucher (
                     tenant_id, company_id, currency_id, voucher_number, voucher_date, customer_id,
-                    bill_no, amount, previous_balance, payment_method_id, bank_account_id, project_id, created_by, updated_by
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    bill_no, amount, previous_balance, payment_method_id, bank_account_id, project_id,
+                    counter_id, created_by, updated_by
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ");
             $rvStmt->execute([
                 $tenant_id,
@@ -436,6 +441,7 @@ if ($status === 'Posted' || $status === 'Draft') {
                 $splitMethodId,
                 $splitBankAccountId,
                 (!empty($input['projectId']) && intval($input['projectId']) > 0) ? intval($input['projectId']) : null,
+                (!empty($input['counterId']) && intval($input['counterId']) > 0) ? intval($input['counterId']) : null,
                 $user_id,
                 $user_id
             ]);

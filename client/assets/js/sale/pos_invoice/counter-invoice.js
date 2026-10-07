@@ -77,6 +77,13 @@ document.addEventListener('DOMContentLoaded', async function() {
     await loadCompanies();
     
     loadShortcuts();
+
+    document.getElementById('counterSelect')?.addEventListener('change', function() {
+        if (this.value && currentInvoice.branch) {
+            localStorage.setItem(`lastCounter_${currentInvoice.branch}`, this.value);
+        }
+    });
+
     updateDateTime();
     setInterval(updateDateTime, 1000);
     await loadNextInvoiceNo();
@@ -121,14 +128,15 @@ document.addEventListener('DOMContentLoaded', async function() {
                     localStorage.setItem('lastSelectedBranch', this.dataset.value);
                     branchOptions.style.display = 'none';
                     loadStockData();
+                    loadCounters(parseInt(this.dataset.value));
                 });
-                
+
                 branchOptions.appendChild(option);
             });
             branchOptions.style.display = 'block';
         }
     });
-    
+
     document.getElementById('branchSearch').addEventListener('focus', function() {
         if (branchesData.length > 0) {
             const branchOptions = document.getElementById('branchOptions');
@@ -136,13 +144,13 @@ document.addEventListener('DOMContentLoaded', async function() {
             branchesData.forEach(branch => {
                 const option = document.createElement('div');
                 option.style.cssText = 'padding: 8px 12px; cursor: pointer; border-bottom: 1px solid var(--border-default);';
-                const branchText = branch.parent_branch_name 
+                const branchText = branch.parent_branch_name
                     ? `${branch.branch_code} - ${branch.branch_name} (${branch.branch_type}) - Parent: ${branch.parent_branch_name}`
                     : `${branch.branch_code} - ${branch.branch_name} (${branch.branch_type})`;
                 option.textContent = branchText;
                 option.dataset.value = branch.id;
                 option.dataset.text = branchText;
-                
+
                 option.addEventListener('click', function() {
                     document.getElementById('branchSearch').value = this.dataset.text;
                     document.getElementById('branch').value = this.dataset.value;
@@ -150,6 +158,7 @@ document.addEventListener('DOMContentLoaded', async function() {
                     localStorage.setItem('lastSelectedBranch', this.dataset.value);
                     branchOptions.style.display = 'none';
                     loadStockData();
+                    loadCounters(parseInt(this.dataset.value));
                 });
                 
                 branchOptions.appendChild(option);
@@ -1057,30 +1066,59 @@ async function loadBranches() {
                 localStorage.setItem('lastSelectedBranch', this.dataset.value);
                 branchOptions.style.display = 'none';
                 loadStockData();
+                loadCounters(parseInt(this.dataset.value));
             });
-            
+
             branchOptions.appendChild(option);
         });
-        
+
         // Load from localStorage or set first branch
         const savedBranchId = localStorage.getItem('lastSelectedBranch');
         if (savedBranchId && data.branches.find(b => b.id == savedBranchId)) {
             const savedBranch = data.branches.find(b => b.id == savedBranchId);
-            const branchText = savedBranch.parent_branch_name 
+            const branchText = savedBranch.parent_branch_name
                 ? `${savedBranch.branch_code} - ${savedBranch.branch_name} (${savedBranch.branch_type}) - Parent: ${savedBranch.parent_branch_name}`
                 : `${savedBranch.branch_code} - ${savedBranch.branch_name} (${savedBranch.branch_type})`;
             document.getElementById('branchSearch').value = branchText;
             document.getElementById('branch').value = savedBranchId;
             currentInvoice.branch = parseInt(savedBranchId);
+            loadCounters(parseInt(savedBranchId));
         } else if (data.branches.length > 0) {
             const firstBranch = data.branches[0];
-            const branchText = firstBranch.parent_branch_name 
+            const branchText = firstBranch.parent_branch_name
                 ? `${firstBranch.branch_code} - ${firstBranch.branch_name} (${firstBranch.branch_type}) - Parent: ${firstBranch.parent_branch_name}`
                 : `${firstBranch.branch_code} - ${firstBranch.branch_name} (${firstBranch.branch_type})`;
             document.getElementById('branchSearch').value = branchText;
             document.getElementById('branch').value = firstBranch.id;
             currentInvoice.branch = firstBranch.id;
+            loadCounters(firstBranch.id);
         }
+    }
+}
+
+async function loadCounters(branchId) {
+    const sel = document.getElementById('counterSelect');
+    if (!sel) return;
+    sel.innerHTML = '<option value="">-- Select Counter --</option>';
+    if (!branchId) return;
+    try {
+        const res = await fetch(`../../../../server/api/sale/pos_invoice/get-counters.php?branch_id=${branchId}`);
+        const data = await res.json();
+        if (data.success && data.counters.length > 0) {
+            data.counters.forEach(c => {
+                const opt = document.createElement('option');
+                opt.value = c.id;
+                opt.textContent = c.counter_name;
+                sel.appendChild(opt);
+            });
+            // Restore last selected counter for this branch
+            const saved = localStorage.getItem(`lastCounter_${branchId}`);
+            if (saved && data.counters.find(c => c.id == saved)) {
+                sel.value = saved;
+            }
+        }
+    } catch (e) {
+        // Non-fatal — counters optional
     }
 }
 
@@ -1894,6 +1932,7 @@ async function saveInvoice(status = 'Posted') {
         branchId: currentInvoice.branch,
         currencyId: currentInvoice.currency,
         projectId: currentInvoice.project || null,
+        counterId: document.getElementById('counterSelect')?.value || null,
         salesOfficerId: userEmployeeId,
         previousBalance: currentInvoice.previousBalance || 'Dr 0.00',
         paymentMethod: document.getElementById('paymentMethod').value || 'cash',
