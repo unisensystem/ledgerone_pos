@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+
 import '../../core/outbox_service.dart';
+import '../../core/reference_cache.dart';
 import '../../core/sync_service.dart';
 import 'sale_return_api.dart';
 import 'sale_return_screen.dart';
@@ -47,11 +49,14 @@ class _SaleReturnListScreenState extends State<SaleReturnListScreen> {
       _error = null;
     });
     try {
-      final result = await SaleReturnApi.getReturns(
-        page: page,
-        search: _searchController.text.trim().isEmpty ? null : _searchController.text.trim(),
-        status: _status,
-      );
+      final search = _searchController.text.trim().isEmpty
+          ? null
+          : _searchController.text.trim();
+      final fetchReturns = () =>
+          SaleReturnApi.getReturns(page: page, search: search, status: _status);
+      final result = (page == 1 && search == null)
+          ? await ReferenceCache.cached('sr_list_page1_$_status', fetchReturns)
+          : await fetchReturns();
       setState(() {
         _returns = result['invoices'] as List<dynamic>? ?? [];
         _page = result['pagination']?['page'] ?? 1;
@@ -68,7 +73,9 @@ class _SaleReturnListScreenState extends State<SaleReturnListScreen> {
 
   Future<void> _editReturn(int returnId) async {
     await Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => SaleReturnScreen(editReturnId: returnId)),
+      MaterialPageRoute(
+        builder: (_) => SaleReturnScreen(editReturnId: returnId),
+      ),
     );
     _load(page: _page);
   }
@@ -80,9 +87,15 @@ class _SaleReturnListScreenState extends State<SaleReturnListScreen> {
         title: const Text('Delete Return'),
         content: Text('Delete return $billNo? This cannot be undone.'),
         actions: [
-          TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFE34F4F), foregroundColor: Colors.white),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFE34F4F),
+              foregroundColor: Colors.white,
+            ),
             onPressed: () => Navigator.of(context).pop(true),
             child: const Text('Delete'),
           ),
@@ -95,36 +108,47 @@ class _SaleReturnListScreenState extends State<SaleReturnListScreen> {
       final result = await SaleReturnApi.deleteReturn(returnId);
       if (!mounted) return;
       if (result['success'] == true) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Return $billNo deleted')));
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Return $billNo deleted')));
         _load(page: _page);
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(result['message']?.toString() ?? 'Could not delete return')),
+          SnackBar(
+            content: Text(
+              result['message']?.toString() ?? 'Could not delete return',
+            ),
+          ),
         );
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Network error: $e')));
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Network error: $e')));
       }
     }
   }
 
   Future<void> _manualSync() async {
     setState(() => _manualSyncing = true);
-    final pendingBefore = (await OutboxService.instance.getAll()).where((e) => e.endpoint.contains('sale_return')).length;
+    final pendingBefore = (await OutboxService.instance.getAll())
+        .where((e) => e.endpoint.contains('sale_return'))
+        .length;
     await SyncService.instance.syncNow();
     if (!mounted) return;
-    final pendingAfter = (await OutboxService.instance.getAll()).where((e) => e.endpoint.contains('sale_return')).length;
+    final pendingAfter = (await OutboxService.instance.getAll())
+        .where((e) => e.endpoint.contains('sale_return'))
+        .length;
     setState(() => _manualSyncing = false);
     final message = pendingBefore == 0
         ? 'Nothing to sync'
         : pendingAfter == 0
-            ? 'All returns synced'
-            : pendingAfter < pendingBefore
-                ? '${pendingBefore - pendingAfter} synced, $pendingAfter still waiting (no connection?)'
-                : 'Still no connection — $pendingAfter return(s) waiting';
+        ? 'All returns synced'
+        : pendingAfter < pendingBefore
+        ? '${pendingBefore - pendingAfter} synced, $pendingAfter still waiting (no connection?)'
+        : 'Still no connection — $pendingAfter return(s) waiting';
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(message)));
     }
     _load(page: _page);
   }
@@ -144,7 +168,10 @@ class _SaleReturnListScreenState extends State<SaleReturnListScreen> {
                 ? const SizedBox(
                     width: 20,
                     height: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    ),
                   )
                 : const Icon(Icons.sync),
             onPressed: _manualSyncing ? null : _manualSync,
@@ -157,9 +184,9 @@ class _SaleReturnListScreenState extends State<SaleReturnListScreen> {
         icon: const Icon(Icons.add),
         label: const Text('New Return'),
         onPressed: () async {
-          await Navigator.of(context).push(
-            MaterialPageRoute(builder: (_) => const SaleReturnScreen()),
-          );
+          await Navigator.of(
+            context,
+          ).push(MaterialPageRoute(builder: (_) => const SaleReturnScreen()));
           _load();
         },
       ),
@@ -202,77 +229,109 @@ class _SaleReturnListScreenState extends State<SaleReturnListScreen> {
             child: _loading
                 ? const Center(child: CircularProgressIndicator())
                 : _error != null
-                    ? Center(
-                        child: Padding(
-                          padding: const EdgeInsets.all(24),
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(_error!, textAlign: TextAlign.center),
-                              const SizedBox(height: 12),
-                              ElevatedButton(onPressed: () => _load(), child: const Text('Retry')),
-                            ],
+                ? Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(_error!, textAlign: TextAlign.center),
+                          const SizedBox(height: 12),
+                          ElevatedButton(
+                            onPressed: () => _load(),
+                            child: const Text('Retry'),
                           ),
-                        ),
-                      )
-                    : _returns.isEmpty
-                        ? const Center(child: Text('No sale returns found.', style: TextStyle(color: Color(0xFF6B7280))))
-                        : RefreshIndicator(
-                            onRefresh: () => _load(page: _page),
-                            child: ListView.builder(
-                              padding: const EdgeInsets.fromLTRB(16, 0, 16, 90),
-                              itemCount: _returns.length + 1,
-                              itemBuilder: (context, index) {
-                                if (index == _returns.length) {
-                                  return _pager();
-                                }
-                                final ret = _returns[index];
-                                final returnId = ret['id'] as int;
-                                final billNo = ret['bill_no']?.toString() ?? '';
-                                final netAmount = double.tryParse(ret['net_amount']?.toString() ?? '') ?? 0;
-                                final saleDate = ret['sale_date'] != null
-                                    ? DateFormat('dd MMM yyyy').format(DateTime.parse(ret['sale_date']))
-                                    : '';
-                                return Card(
-                                  margin: const EdgeInsets.only(bottom: 8),
-                                  child: Padding(
-                                    padding: const EdgeInsets.fromLTRB(16, 12, 8, 4),
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Text(billNo, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15)),
-                                        const SizedBox(height: 2),
-                                        Text(
-                                          '${ret['customer_name'] ?? 'Unknown customer'} · $saleDate · ${ret['item_count'] ?? 0} item(s)',
-                                          style: const TextStyle(fontSize: 12, color: Color(0xFF6B7280)),
-                                        ),
-                                        Row(
-                                          children: [
-                                            Expanded(
-                                              child: Text(
-                                                '${ret['currency_symbol'] ?? ''} ${netAmount.toStringAsFixed(2)}',
-                                                style: const TextStyle(fontWeight: FontWeight.w600),
-                                              ),
-                                            ),
-                                            IconButton(
-                                              icon: const Icon(Icons.edit_outlined, size: 19),
-                                              tooltip: 'Edit Return',
-                                              onPressed: () => _editReturn(returnId),
-                                            ),
-                                            IconButton(
-                                              icon: const Icon(Icons.delete_outline, size: 19, color: Color(0xFFE34F4F)),
-                                              tooltip: 'Delete Return',
-                                              onPressed: () => _deleteReturn(returnId, billNo),
-                                            ),
-                                          ],
-                                        ),
-                                      ],
-                                    ),
+                        ],
+                      ),
+                    ),
+                  )
+                : _returns.isEmpty
+                ? const Center(
+                    child: Text(
+                      'No sale returns found.',
+                      style: TextStyle(color: Color(0xFF6B7280)),
+                    ),
+                  )
+                : RefreshIndicator(
+                    onRefresh: () => _load(page: _page),
+                    child: ListView.builder(
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 90),
+                      itemCount: _returns.length + 1,
+                      itemBuilder: (context, index) {
+                        if (index == _returns.length) {
+                          return _pager();
+                        }
+                        final ret = _returns[index];
+                        final returnId = ret['id'] as int;
+                        final billNo = ret['bill_no']?.toString() ?? '';
+                        final netAmount =
+                            double.tryParse(
+                              ret['net_amount']?.toString() ?? '',
+                            ) ??
+                            0;
+                        final saleDate = ret['sale_date'] != null
+                            ? DateFormat('dd MMM yyyy')
+                                  .format(DateTime.parse(ret['sale_date']))
+                            : '';
+                        return Card(
+                          margin: const EdgeInsets.only(bottom: 8),
+                          child: Padding(
+                            padding: const EdgeInsets.fromLTRB(16, 12, 8, 4),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  billNo,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 15,
                                   ),
-                                );
-                              },
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  '${ret['customer_name'] ?? 'Unknown customer'} · $saleDate · ${ret['item_count'] ?? 0} item(s)',
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    color: Color(0xFF6B7280),
+                                  ),
+                                ),
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: Text(
+                                        '${ret['currency_symbol'] ?? ''} ${netAmount.toStringAsFixed(2)}',
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ),
+                                    IconButton(
+                                      icon: const Icon(
+                                        Icons.edit_outlined,
+                                        size: 19,
+                                      ),
+                                      tooltip: 'Edit Return',
+                                      onPressed: () => _editReturn(returnId),
+                                    ),
+                                    IconButton(
+                                      icon: const Icon(
+                                        Icons.delete_outline,
+                                        size: 19,
+                                        color: Color(0xFFE34F4F),
+                                      ),
+                                      tooltip: 'Delete Return',
+                                      onPressed: () =>
+                                          _deleteReturn(returnId, billNo),
+                                    ),
+                                  ],
+                                ),
+                              ],
                             ),
                           ),
+                        );
+                      },
+                    ),
+                  ),
           ),
         ],
       ),
@@ -292,7 +351,9 @@ class _SaleReturnListScreenState extends State<SaleReturnListScreen> {
           ),
           Text('Page $_page of $_totalPages'),
           TextButton(
-            onPressed: _page < _totalPages ? () => _load(page: _page + 1) : null,
+            onPressed: _page < _totalPages
+                ? () => _load(page: _page + 1)
+                : null,
             child: const Text('Next'),
           ),
         ],
@@ -354,18 +415,29 @@ class _PendingSyncBannerState extends State<_PendingSyncBanner> {
         children: [
           Row(
             children: [
-              const Icon(Icons.sync_problem, size: 18, color: Color(0xFFB8860B)),
+              const Icon(
+                Icons.sync_problem,
+                size: 18,
+                color: Color(0xFFB8860B),
+              ),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
                   '${_entries.length} return(s) waiting to sync',
-                  style: const TextStyle(fontWeight: FontWeight.w600, color: Color(0xFFB8860B)),
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFFB8860B),
+                  ),
                 ),
               ),
               TextButton(
                 onPressed: _syncing ? null : _syncNow,
                 child: _syncing
-                    ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
                     : const Text('Sync Now'),
               ),
             ],
@@ -377,8 +449,8 @@ class _PendingSyncBannerState extends State<_PendingSyncBanner> {
                 e.status == 'failed'
                     ? '${e.label} — failed${e.lastError != null ? ': ${e.lastError}' : ''}'
                     : e.status == 'syncing'
-                        ? '${e.label} — syncing…'
-                        : '${e.label} — pending',
+                    ? '${e.label} — syncing…'
+                    : '${e.label} — pending',
                 style: const TextStyle(fontSize: 12, color: Color(0xFF6B7280)),
                 overflow: TextOverflow.ellipsis,
               ),

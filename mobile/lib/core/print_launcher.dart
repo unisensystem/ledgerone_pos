@@ -1,4 +1,5 @@
 import 'package:url_launcher/url_launcher.dart';
+
 import 'api_client.dart';
 import 'api_config.dart';
 
@@ -14,7 +15,10 @@ import 'api_config.dart';
 /// navigation, so the token would otherwise sit in server logs, browser
 /// history, and any Referer header the print page's subresources send.
 class PrintLauncher {
-  static Future<bool> open({required int orderId, required bool thermal}) async {
+  static Future<bool> open({
+    required int orderId,
+    required bool thermal,
+  }) async {
     String nonce;
     try {
       final res = await ApiClient.dio.post(

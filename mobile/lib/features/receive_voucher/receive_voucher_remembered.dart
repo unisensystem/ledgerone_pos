@@ -7,9 +7,13 @@ class ReceiveVoucherRemembered {
   static const _companyKey = 'receive_voucher_remembered_company_id';
   static const _currencyKey = 'receive_voucher_remembered_currency_id';
 
-  static Future<int?> getCompanyId() async => (await SharedPreferences.getInstance()).getInt(_companyKey);
-  static Future<int?> getCurrencyId() async => (await SharedPreferences.getInstance()).getInt(_currencyKey);
+  static Future<int?> getCompanyId() async =>
+      (await SharedPreferences.getInstance()).getInt(_companyKey);
+  static Future<int?> getCurrencyId() async =>
+      (await SharedPreferences.getInstance()).getInt(_currencyKey);
 
-  static Future<void> setCompanyId(int id) async => (await SharedPreferences.getInstance()).setInt(_companyKey, id);
-  static Future<void> setCurrencyId(int id) async => (await SharedPreferences.getInstance()).setInt(_currencyKey, id);
+  static Future<void> setCompanyId(int id) async =>
+      (await SharedPreferences.getInstance()).setInt(_companyKey, id);
+  static Future<void> setCurrencyId(int id) async =>
+      (await SharedPreferences.getInstance()).setInt(_currencyKey, id);
 }

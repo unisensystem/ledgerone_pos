@@ -4,37 +4,52 @@ import '../../core/api_client.dart';
 /// backend the web app's Sale Order screen uses. No parallel mobile API.
 class SaleOrderApi {
   static Future<List<dynamic>> getCompanies() async {
-    final res = await ApiClient.dio.get('/server/api/sale/sale_order/get-companies.php');
+    final res = await ApiClient.dio.get(
+      '/server/api/sale/sale_order/get-companies.php',
+    );
     final data = res.data as Map;
-    if (data['success'] != true) throw Exception(data['message'] ?? 'Failed to load companies');
+    if (data['success'] != true)
+      throw Exception(data['message'] ?? 'Failed to load companies');
     return List<dynamic>.from(data['companies'] as List? ?? []);
   }
 
   static Future<List<dynamic>> getBranches() async {
-    final res = await ApiClient.dio.get('/server/api/sale/sale_order/get-branches.php');
+    final res = await ApiClient.dio.get(
+      '/server/api/sale/sale_order/get-branches.php',
+    );
     final data = res.data as Map;
-    if (data['success'] != true) throw Exception(data['message'] ?? 'Failed to load branches');
+    if (data['success'] != true)
+      throw Exception(data['message'] ?? 'Failed to load branches');
     return List<dynamic>.from(data['branches'] as List? ?? []);
   }
 
   static Future<List<dynamic>> getCustomers() async {
-    final res = await ApiClient.dio.get('/server/api/sale/sale_order/get-customers.php');
+    final res = await ApiClient.dio.get(
+      '/server/api/sale/sale_order/get-customers.php',
+    );
     final data = res.data as Map;
-    if (data['success'] != true) throw Exception(data['message'] ?? 'Failed to load customers');
+    if (data['success'] != true)
+      throw Exception(data['message'] ?? 'Failed to load customers');
     return List<dynamic>.from(data['customers'] as List? ?? []);
   }
 
   static Future<List<dynamic>> getProducts() async {
-    final res = await ApiClient.dio.get('/server/api/sale/sale_order/get-products.php');
+    final res = await ApiClient.dio.get(
+      '/server/api/sale/sale_order/get-products.php',
+    );
     final data = res.data as Map;
-    if (data['success'] != true) throw Exception(data['message'] ?? 'Failed to load products');
+    if (data['success'] != true)
+      throw Exception(data['message'] ?? 'Failed to load products');
     return List<dynamic>.from(data['products'] as List? ?? []);
   }
 
   static Future<List<dynamic>> getCurrencies() async {
-    final res = await ApiClient.dio.get('/server/api/sale/sale_order/get-currencies.php');
+    final res = await ApiClient.dio.get(
+      '/server/api/sale/sale_order/get-currencies.php',
+    );
     final data = res.data as Map;
-    if (data['success'] != true) throw Exception(data['message'] ?? 'Failed to load currencies');
+    if (data['success'] != true)
+      throw Exception(data['message'] ?? 'Failed to load currencies');
     return List<dynamic>.from(data['currencies'] as List? ?? []);
   }
 
@@ -61,7 +76,8 @@ class SaleOrderApi {
       },
     );
     final data = res.data as Map;
-    if (data['success'] != true) throw Exception(data['message'] ?? 'Failed to load orders');
+    if (data['success'] != true)
+      throw Exception(data['message'] ?? 'Failed to load orders');
     return Map<String, dynamic>.from(data);
   }
 
@@ -72,13 +88,18 @@ class SaleOrderApi {
       queryParameters: {'id': orderId},
     );
     final data = res.data as Map;
-    if (data['success'] != true) throw Exception(data['message'] ?? 'Failed to load order');
+    if (data['success'] != true)
+      throw Exception(data['message'] ?? 'Failed to load order');
     return Map<String, dynamic>.from(data);
   }
 
-  static const String editOrderEndpoint = '/server/api/sale/sale_order/order-edit.php';
+  static const String editOrderEndpoint =
+      '/server/api/sale/sale_order/order-edit.php';
 
-  static Future<Map<String, dynamic>> updateOrder(int orderId, Map<String, dynamic> payload) async {
+  static Future<Map<String, dynamic>> updateOrder(
+    int orderId,
+    Map<String, dynamic> payload,
+  ) async {
     final res = await ApiClient.dio.put(
       editOrderEndpoint,
       data: {...payload, 'invoice_id': orderId},
@@ -134,20 +155,26 @@ class SaleOrderApi {
   /// key here rather than reproduce that bug, since there's nothing to lose
   /// by having it actually work on mobile.
   static Future<List<dynamic>> getProjects() async {
-    final res = await ApiClient.dio.get('/server/api/master_setup/project_setup/get-projects-dropdown.php');
+    final res = await ApiClient.dio.get(
+      '/server/api/master_setup/project_setup/get-projects-dropdown.php',
+    );
     final data = res.data as Map;
     if (data['success'] != true) return [];
     return List<dynamic>.from(data['projects'] as List? ?? []);
   }
 
   static Future<List<dynamic>> getEmployees() async {
-    final res = await ApiClient.dio.get('/server/api/sale/sale_order/get-employees.php');
+    final res = await ApiClient.dio.get(
+      '/server/api/sale/sale_order/get-employees.php',
+    );
     final data = res.data as Map;
-    if (data['success'] != true) throw Exception(data['message'] ?? 'Failed to load employees');
+    if (data['success'] != true)
+      throw Exception(data['message'] ?? 'Failed to load employees');
     return List<dynamic>.from(data['employees'] as List? ?? []);
   }
 
-  static const String createOrderEndpoint = '/server/api/sale/sale_order/order-add.php';
+  static const String createOrderEndpoint =
+      '/server/api/sale/sale_order/order-add.php';
 
   /// Builds the exact payload order-add.php expects. Kept separate from the
   /// actual POST so the same map can either be sent immediately or — if
@@ -211,7 +238,9 @@ class SaleOrderApi {
     };
   }
 
-  static Future<Map<String, dynamic>> createOrder(Map<String, dynamic> payload) async {
+  static Future<Map<String, dynamic>> createOrder(
+    Map<String, dynamic> payload,
+  ) async {
     final res = await ApiClient.dio.post(createOrderEndpoint, data: payload);
     return Map<String, dynamic>.from(res.data as Map);
   }

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+
 import '../../core/outbox_service.dart';
+import '../../core/reference_cache.dart';
 import '../../core/sync_service.dart';
 import 'receive_voucher_api.dart';
 import 'receive_voucher_screen.dart';
@@ -12,7 +14,8 @@ class ReceiveVoucherListScreen extends StatefulWidget {
   const ReceiveVoucherListScreen({super.key});
 
   @override
-  State<ReceiveVoucherListScreen> createState() => _ReceiveVoucherListScreenState();
+  State<ReceiveVoucherListScreen> createState() =>
+      _ReceiveVoucherListScreenState();
 }
 
 class _ReceiveVoucherListScreenState extends State<ReceiveVoucherListScreen> {
@@ -48,10 +51,16 @@ class _ReceiveVoucherListScreenState extends State<ReceiveVoucherListScreen> {
       _error = null;
     });
     try {
-      final result = await ReceiveVoucherApi.getVouchers(
-        page: page,
-        search: _searchController.text.trim().isEmpty ? null : _searchController.text.trim(),
-      );
+      final search = _searchController.text.trim().isEmpty
+          ? null
+          : _searchController.text.trim();
+      final fetchVouchers = () =>
+          ReceiveVoucherApi.getVouchers(page: page, search: search);
+      // Only the unfiltered first page is worth caching for offline viewing
+      // — search results are inherently a live server query.
+      final result = (page == 1 && search == null)
+          ? await ReferenceCache.cached('rv_list_page1', fetchVouchers)
+          : await fetchVouchers();
       setState(() {
         _vouchers = result['data'] as List<dynamic>? ?? [];
         _page = result['pagination']?['current_page'] ?? 1;
@@ -68,7 +77,9 @@ class _ReceiveVoucherListScreenState extends State<ReceiveVoucherListScreen> {
 
   Future<void> _editVoucher(int voucherId) async {
     await Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => ReceiveVoucherScreen(editVoucherId: voucherId)),
+      MaterialPageRoute(
+        builder: (_) => ReceiveVoucherScreen(editVoucherId: voucherId),
+      ),
     );
     _load(page: _page);
   }
@@ -80,9 +91,15 @@ class _ReceiveVoucherListScreenState extends State<ReceiveVoucherListScreen> {
         title: const Text('Delete Voucher'),
         content: Text('Delete voucher $voucherNumber? This cannot be undone.'),
         actions: [
-          TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFE34F4F), foregroundColor: Colors.white),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFE34F4F),
+              foregroundColor: Colors.white,
+            ),
             onPressed: () => Navigator.of(context).pop(true),
             child: const Text('Delete'),
           ),
@@ -95,36 +112,50 @@ class _ReceiveVoucherListScreenState extends State<ReceiveVoucherListScreen> {
       final result = await ReceiveVoucherApi.deleteVoucher(voucherId);
       if (!mounted) return;
       if (result['success'] == true) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Voucher $voucherNumber deleted')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Voucher $voucherNumber deleted')),
+        );
         _load(page: _page);
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(result['message']?.toString() ?? result['error']?.toString() ?? 'Could not delete voucher')),
+          SnackBar(
+            content: Text(
+              result['message']?.toString() ??
+                  result['error']?.toString() ??
+                  'Could not delete voucher',
+            ),
+          ),
         );
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Network error: $e')));
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Network error: $e')));
       }
     }
   }
 
   Future<void> _manualSync() async {
     setState(() => _manualSyncing = true);
-    final pendingBefore = (await OutboxService.instance.getAll()).where((e) => e.endpoint.contains('receive_voucher')).length;
+    final pendingBefore = (await OutboxService.instance.getAll())
+        .where((e) => e.endpoint.contains('receive_voucher'))
+        .length;
     await SyncService.instance.syncNow();
     if (!mounted) return;
-    final pendingAfter = (await OutboxService.instance.getAll()).where((e) => e.endpoint.contains('receive_voucher')).length;
+    final pendingAfter = (await OutboxService.instance.getAll())
+        .where((e) => e.endpoint.contains('receive_voucher'))
+        .length;
     setState(() => _manualSyncing = false);
     final message = pendingBefore == 0
         ? 'Nothing to sync'
         : pendingAfter == 0
-            ? 'All vouchers synced'
-            : pendingAfter < pendingBefore
-                ? '${pendingBefore - pendingAfter} synced, $pendingAfter still waiting (no connection?)'
-                : 'Still no connection — $pendingAfter voucher(s) waiting';
+        ? 'All vouchers synced'
+        : pendingAfter < pendingBefore
+        ? '${pendingBefore - pendingAfter} synced, $pendingAfter still waiting (no connection?)'
+        : 'Still no connection — $pendingAfter voucher(s) waiting';
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(message)));
     }
     _load(page: _page);
   }
@@ -144,7 +175,10 @@ class _ReceiveVoucherListScreenState extends State<ReceiveVoucherListScreen> {
                 ? const SizedBox(
                     width: 20,
                     height: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    ),
                   )
                 : const Icon(Icons.sync),
             onPressed: _manualSyncing ? null : _manualSync,
@@ -188,77 +222,113 @@ class _ReceiveVoucherListScreenState extends State<ReceiveVoucherListScreen> {
             child: _loading
                 ? const Center(child: CircularProgressIndicator())
                 : _error != null
-                    ? Center(
-                        child: Padding(
-                          padding: const EdgeInsets.all(24),
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(_error!, textAlign: TextAlign.center),
-                              const SizedBox(height: 12),
-                              ElevatedButton(onPressed: () => _load(), child: const Text('Retry')),
-                            ],
+                ? Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(_error!, textAlign: TextAlign.center),
+                          const SizedBox(height: 12),
+                          ElevatedButton(
+                            onPressed: () => _load(),
+                            child: const Text('Retry'),
                           ),
-                        ),
-                      )
-                    : _vouchers.isEmpty
-                        ? const Center(child: Text('No receive vouchers found.', style: TextStyle(color: Color(0xFF6B7280))))
-                        : RefreshIndicator(
-                            onRefresh: () => _load(page: _page),
-                            child: ListView.builder(
-                              padding: const EdgeInsets.fromLTRB(16, 0, 16, 90),
-                              itemCount: _vouchers.length + 1,
-                              itemBuilder: (context, index) {
-                                if (index == _vouchers.length) {
-                                  return _pager();
-                                }
-                                final voucher = _vouchers[index];
-                                final voucherId = voucher['id'] as int;
-                                final voucherNumber = voucher['voucher_number']?.toString() ?? '';
-                                final amount = double.tryParse(voucher['amount']?.toString() ?? '') ?? 0;
-                                final voucherDate = voucher['voucher_date'] != null
-                                    ? DateFormat('dd MMM yyyy').format(DateTime.parse(voucher['voucher_date']))
-                                    : '';
-                                return Card(
-                                  margin: const EdgeInsets.only(bottom: 8),
-                                  child: Padding(
-                                    padding: const EdgeInsets.fromLTRB(16, 12, 8, 4),
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Text(voucherNumber, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15)),
-                                        const SizedBox(height: 2),
-                                        Text(
-                                          '${voucher['customer_name'] ?? 'Unknown customer'} · $voucherDate · ${voucher['payment_method'] ?? ''}',
-                                          style: const TextStyle(fontSize: 12, color: Color(0xFF6B7280)),
-                                        ),
-                                        Row(
-                                          children: [
-                                            Expanded(
-                                              child: Text(
-                                                '${voucher['currency_symbol'] ?? ''} ${amount.toStringAsFixed(2)}',
-                                                style: const TextStyle(fontWeight: FontWeight.w600),
-                                              ),
-                                            ),
-                                            IconButton(
-                                              icon: const Icon(Icons.edit_outlined, size: 19),
-                                              tooltip: 'Edit Voucher',
-                                              onPressed: () => _editVoucher(voucherId),
-                                            ),
-                                            IconButton(
-                                              icon: const Icon(Icons.delete_outline, size: 19, color: Color(0xFFE34F4F)),
-                                              tooltip: 'Delete Voucher',
-                                              onPressed: () => _deleteVoucher(voucherId, voucherNumber),
-                                            ),
-                                          ],
-                                        ),
-                                      ],
-                                    ),
+                        ],
+                      ),
+                    ),
+                  )
+                : _vouchers.isEmpty
+                ? const Center(
+                    child: Text(
+                      'No receive vouchers found.',
+                      style: TextStyle(color: Color(0xFF6B7280)),
+                    ),
+                  )
+                : RefreshIndicator(
+                    onRefresh: () => _load(page: _page),
+                    child: ListView.builder(
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 90),
+                      itemCount: _vouchers.length + 1,
+                      itemBuilder: (context, index) {
+                        if (index == _vouchers.length) {
+                          return _pager();
+                        }
+                        final voucher = _vouchers[index];
+                        final voucherId = voucher['id'] as int;
+                        final voucherNumber =
+                            voucher['voucher_number']?.toString() ?? '';
+                        final amount =
+                            double.tryParse(
+                              voucher['amount']?.toString() ?? '',
+                            ) ??
+                            0;
+                        final voucherDate = voucher['voucher_date'] != null
+                            ? DateFormat(
+                                'dd MMM yyyy',
+                              ).format(DateTime.parse(voucher['voucher_date']))
+                            : '';
+                        return Card(
+                          margin: const EdgeInsets.only(bottom: 8),
+                          child: Padding(
+                            padding: const EdgeInsets.fromLTRB(16, 12, 8, 4),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  voucherNumber,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 15,
                                   ),
-                                );
-                              },
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  '${voucher['customer_name'] ?? 'Unknown customer'} · $voucherDate · ${voucher['payment_method'] ?? ''}',
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    color: Color(0xFF6B7280),
+                                  ),
+                                ),
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: Text(
+                                        '${voucher['currency_symbol'] ?? ''} ${amount.toStringAsFixed(2)}',
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ),
+                                    IconButton(
+                                      icon: const Icon(
+                                        Icons.edit_outlined,
+                                        size: 19,
+                                      ),
+                                      tooltip: 'Edit Voucher',
+                                      onPressed: () => _editVoucher(voucherId),
+                                    ),
+                                    IconButton(
+                                      icon: const Icon(
+                                        Icons.delete_outline,
+                                        size: 19,
+                                        color: Color(0xFFE34F4F),
+                                      ),
+                                      tooltip: 'Delete Voucher',
+                                      onPressed: () => _deleteVoucher(
+                                        voucherId,
+                                        voucherNumber,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
                             ),
                           ),
+                        );
+                      },
+                    ),
+                  ),
           ),
         ],
       ),
@@ -278,7 +348,9 @@ class _ReceiveVoucherListScreenState extends State<ReceiveVoucherListScreen> {
           ),
           Text('Page $_page of $_totalPages'),
           TextButton(
-            onPressed: _page < _totalPages ? () => _load(page: _page + 1) : null,
+            onPressed: _page < _totalPages
+                ? () => _load(page: _page + 1)
+                : null,
             child: const Text('Next'),
           ),
         ],
@@ -336,18 +408,29 @@ class _PendingSyncBannerState extends State<_PendingSyncBanner> {
         children: [
           Row(
             children: [
-              const Icon(Icons.sync_problem, size: 18, color: Color(0xFFB8860B)),
+              const Icon(
+                Icons.sync_problem,
+                size: 18,
+                color: Color(0xFFB8860B),
+              ),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
                   '${_entries.length} voucher(s) waiting to sync',
-                  style: const TextStyle(fontWeight: FontWeight.w600, color: Color(0xFFB8860B)),
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFFB8860B),
+                  ),
                 ),
               ),
               TextButton(
                 onPressed: _syncing ? null : _syncNow,
                 child: _syncing
-                    ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
                     : const Text('Sync Now'),
               ),
             ],
@@ -359,8 +442,8 @@ class _PendingSyncBannerState extends State<_PendingSyncBanner> {
                 e.status == 'failed'
                     ? '${e.label} — failed${e.lastError != null ? ': ${e.lastError}' : ''}'
                     : e.status == 'syncing'
-                        ? '${e.label} — syncing…'
-                        : '${e.label} — pending',
+                    ? '${e.label} — syncing…'
+                    : '${e.label} — pending',
                 style: const TextStyle(fontSize: 12, color: Color(0xFF6B7280)),
                 overflow: TextOverflow.ellipsis,
               ),

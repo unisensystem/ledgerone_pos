@@ -145,26 +145,87 @@ class _FieldSettingsDialogState extends State<_FieldSettingsDialog> {
                 ),
               ),
             ),
-            _toggle('Company (remembers last pick)', _settings.showCompanyField,
-                (v) => setState(() => _settings = _settings.copyWith(showCompanyField: v))),
-            _toggle('Currency (remembers last pick)', _settings.showCurrencyField,
-                (v) => setState(() => _settings = _settings.copyWith(showCurrencyField: v))),
+            _toggle(
+              'Company (remembers last pick)',
+              _settings.showCompanyField,
+              (v) => setState(
+                () => _settings = _settings.copyWith(showCompanyField: v),
+              ),
+            ),
+            _toggle(
+              'Currency (remembers last pick)',
+              _settings.showCurrencyField,
+              (v) => setState(
+                () => _settings = _settings.copyWith(showCurrencyField: v),
+              ),
+            ),
             const Divider(),
-            _toggle('Recovery Officer', _settings.showRecoveryOfficer,
-                (v) => setState(() => _settings = _settings.copyWith(showRecoveryOfficer: v))),
-            _toggle('Sub Account', _settings.showSubAccount, (v) => setState(() => _settings = _settings.copyWith(showSubAccount: v))),
-            _toggle('Bill No', _settings.showBillNo, (v) => setState(() => _settings = _settings.copyWith(showBillNo: v))),
-            _toggle('DSR#', _settings.showDsrNo, (v) => setState(() => _settings = _settings.copyWith(showDsrNo: v))),
-            _toggle('Project', _settings.showProject, (v) => setState(() => _settings = _settings.copyWith(showProject: v))),
-            _toggle('Adjust Amount', _settings.showAdjustAmount, (v) => setState(() => _settings = _settings.copyWith(showAdjustAmount: v))),
-            _toggle('Against PDC', _settings.showAgainstPdc, (v) => setState(() => _settings = _settings.copyWith(showAgainstPdc: v))),
-            _toggle('Description', _settings.showDescription, (v) => setState(() => _settings = _settings.copyWith(showDescription: v))),
+            _toggle(
+              'Recovery Officer',
+              _settings.showRecoveryOfficer,
+              (v) => setState(
+                () => _settings = _settings.copyWith(showRecoveryOfficer: v),
+              ),
+            ),
+            _toggle(
+              'Sub Account',
+              _settings.showSubAccount,
+              (v) => setState(
+                () => _settings = _settings.copyWith(showSubAccount: v),
+              ),
+            ),
+            _toggle(
+              'Bill No',
+              _settings.showBillNo,
+              (v) =>
+                  setState(() => _settings = _settings.copyWith(showBillNo: v)),
+            ),
+            _toggle(
+              'DSR#',
+              _settings.showDsrNo,
+              (v) =>
+                  setState(() => _settings = _settings.copyWith(showDsrNo: v)),
+            ),
+            _toggle(
+              'Project',
+              _settings.showProject,
+              (v) => setState(
+                () => _settings = _settings.copyWith(showProject: v),
+              ),
+            ),
+            _toggle(
+              'Adjust Amount',
+              _settings.showAdjustAmount,
+              (v) => setState(
+                () => _settings = _settings.copyWith(showAdjustAmount: v),
+              ),
+            ),
+            _toggle(
+              'Against PDC',
+              _settings.showAgainstPdc,
+              (v) => setState(
+                () => _settings = _settings.copyWith(showAgainstPdc: v),
+              ),
+            ),
+            _toggle(
+              'Description',
+              _settings.showDescription,
+              (v) => setState(
+                () => _settings = _settings.copyWith(showDescription: v),
+              ),
+            ),
           ],
         ),
       ),
       actions: [
-        TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Cancel')),
-        ElevatedButton(onPressed: () => Navigator.of(context).pop(_settings), child: const Text('Save')),
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        ElevatedButton(
+          onPressed: () => Navigator.of(context).pop(_settings),
+          child: const Text('Save'),
+        ),
       ],
     );
   }

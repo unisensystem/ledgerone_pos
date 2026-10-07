@@ -10,49 +10,69 @@ import '../../core/api_client.dart';
 /// client follows `counter-return.js`'s contract, not `return-add.js`'s.
 class SaleReturnApi {
   static Future<List<dynamic>> getCompanies() async {
-    final res = await ApiClient.dio.get('/server/api/sale/sale_return/get-companies.php');
+    final res = await ApiClient.dio.get(
+      '/server/api/sale/sale_return/get-companies.php',
+    );
     final data = res.data as Map;
-    if (data['success'] != true) throw Exception(data['message'] ?? 'Failed to load companies');
+    if (data['success'] != true)
+      throw Exception(data['message'] ?? 'Failed to load companies');
     return List<dynamic>.from(data['companies'] as List? ?? []);
   }
 
   static Future<List<dynamic>> getBranches() async {
-    final res = await ApiClient.dio.get('/server/api/sale/sale_return/get-branches.php');
+    final res = await ApiClient.dio.get(
+      '/server/api/sale/sale_return/get-branches.php',
+    );
     final data = res.data as Map;
-    if (data['success'] != true) throw Exception(data['message'] ?? 'Failed to load branches');
+    if (data['success'] != true)
+      throw Exception(data['message'] ?? 'Failed to load branches');
     return List<dynamic>.from(data['branches'] as List? ?? []);
   }
 
   static Future<List<dynamic>> getCustomers() async {
-    final res = await ApiClient.dio.get('/server/api/sale/sale_return/get-customers.php');
+    final res = await ApiClient.dio.get(
+      '/server/api/sale/sale_return/get-customers.php',
+    );
     final data = res.data as Map;
-    if (data['success'] != true) throw Exception(data['message'] ?? 'Failed to load customers');
+    if (data['success'] != true)
+      throw Exception(data['message'] ?? 'Failed to load customers');
     return List<dynamic>.from(data['customers'] as List? ?? []);
   }
 
   static Future<List<dynamic>> getProducts() async {
-    final res = await ApiClient.dio.get('/server/api/sale/sale_return/get-products.php');
+    final res = await ApiClient.dio.get(
+      '/server/api/sale/sale_return/get-products.php',
+    );
     final data = res.data as Map;
-    if (data['success'] != true) throw Exception(data['message'] ?? 'Failed to load products');
+    if (data['success'] != true)
+      throw Exception(data['message'] ?? 'Failed to load products');
     return List<dynamic>.from(data['products'] as List? ?? []);
   }
 
   static Future<List<dynamic>> getCurrencies() async {
-    final res = await ApiClient.dio.get('/server/api/sale/sale_return/get-currencies.php');
+    final res = await ApiClient.dio.get(
+      '/server/api/sale/sale_return/get-currencies.php',
+    );
     final data = res.data as Map;
-    if (data['success'] != true) throw Exception(data['message'] ?? 'Failed to load currencies');
+    if (data['success'] != true)
+      throw Exception(data['message'] ?? 'Failed to load currencies');
     return List<dynamic>.from(data['currencies'] as List? ?? []);
   }
 
   static Future<List<dynamic>> getEmployees() async {
-    final res = await ApiClient.dio.get('/server/api/sale/sale_return/get-employees.php');
+    final res = await ApiClient.dio.get(
+      '/server/api/sale/sale_return/get-employees.php',
+    );
     final data = res.data as Map;
-    if (data['success'] != true) throw Exception(data['message'] ?? 'Failed to load employees');
+    if (data['success'] != true)
+      throw Exception(data['message'] ?? 'Failed to load employees');
     return List<dynamic>.from(data['employees'] as List? ?? []);
   }
 
   static Future<List<dynamic>> getBankAccounts() async {
-    final res = await ApiClient.dio.get('/server/api/sale/sale_return/get-bank-accounts.php');
+    final res = await ApiClient.dio.get(
+      '/server/api/sale/sale_return/get-bank-accounts.php',
+    );
     final data = res.data as Map;
     if (data['success'] != true) return [];
     return List<dynamic>.from(data['accounts'] as List? ?? []);
@@ -101,7 +121,8 @@ class SaleReturnApi {
       },
     );
     final data = res.data as Map;
-    if (data['success'] != true) throw Exception(data['message'] ?? 'Failed to load returns');
+    if (data['success'] != true)
+      throw Exception(data['message'] ?? 'Failed to load returns');
     return Map<String, dynamic>.from(data);
   }
 
@@ -109,13 +130,16 @@ class SaleReturnApi {
   /// matches web's loadSaleInvoiceData() in return-add.js, which calls this
   /// same cross-module pos_invoice endpoint (it's not duplicated under
   /// sale_return because it's the live, authoritative invoice record).
-  static Future<Map<String, dynamic>> getSaleInvoiceDetail(int invoiceId) async {
+  static Future<Map<String, dynamic>> getSaleInvoiceDetail(
+    int invoiceId,
+  ) async {
     final res = await ApiClient.dio.get(
       '/server/api/sale/pos_invoice/pos-edit.php',
       queryParameters: {'id': invoiceId},
     );
     final data = res.data as Map;
-    if (data['success'] != true) throw Exception(data['message'] ?? 'Failed to load invoice');
+    if (data['success'] != true)
+      throw Exception(data['message'] ?? 'Failed to load invoice');
     return Map<String, dynamic>.from(data);
   }
 
@@ -125,13 +149,18 @@ class SaleReturnApi {
       queryParameters: {'id': returnId},
     );
     final data = res.data as Map;
-    if (data['success'] != true) throw Exception(data['message'] ?? 'Failed to load return');
+    if (data['success'] != true)
+      throw Exception(data['message'] ?? 'Failed to load return');
     return Map<String, dynamic>.from(data);
   }
 
-  static const String editReturnEndpoint = '/server/api/sale/sale_return/return-edit.php';
+  static const String editReturnEndpoint =
+      '/server/api/sale/sale_return/return-edit.php';
 
-  static Future<Map<String, dynamic>> updateReturn(int returnId, Map<String, dynamic> payload) async {
+  static Future<Map<String, dynamic>> updateReturn(
+    int returnId,
+    Map<String, dynamic> payload,
+  ) async {
     final res = await ApiClient.dio.put(
       editReturnEndpoint,
       data: {...payload, 'invoice_id': returnId},
@@ -147,7 +176,8 @@ class SaleReturnApi {
     return Map<String, dynamic>.from(res.data as Map);
   }
 
-  static const String createReturnEndpoint = '/server/api/sale/sale_return/return-add.php';
+  static const String createReturnEndpoint =
+      '/server/api/sale/sale_return/return-add.php';
 
   /// Builds the exact payload return-add.php/return-edit.php expect, per the
   /// contract proven correct by counter-return.js — NOT the broken flat
@@ -208,7 +238,9 @@ class SaleReturnApi {
     };
   }
 
-  static Future<Map<String, dynamic>> createReturn(Map<String, dynamic> payload) async {
+  static Future<Map<String, dynamic>> createReturn(
+    Map<String, dynamic> payload,
+  ) async {
     final res = await ApiClient.dio.post(createReturnEndpoint, data: payload);
     return Map<String, dynamic>.from(res.data as Map);
   }

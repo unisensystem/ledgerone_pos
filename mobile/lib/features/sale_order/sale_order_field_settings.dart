@@ -195,39 +195,123 @@ class _FieldSettingsDialogState extends State<_FieldSettingsDialog> {
             _toggle(
               'Company (remembers last pick)',
               _settings.showCompanyField,
-              (v) => setState(() => _settings = _settings.copyWith(showCompanyField: v)),
+              (v) => setState(
+                () => _settings = _settings.copyWith(showCompanyField: v),
+              ),
             ),
             _toggle(
               'Branch (remembers last pick)',
               _settings.showBranchField,
-              (v) => setState(() => _settings = _settings.copyWith(showBranchField: v)),
+              (v) => setState(
+                () => _settings = _settings.copyWith(showBranchField: v),
+              ),
             ),
             _toggle(
               'Currency (remembers last pick)',
               _settings.showCurrencyField,
-              (v) => setState(() => _settings = _settings.copyWith(showCurrencyField: v)),
+              (v) => setState(
+                () => _settings = _settings.copyWith(showCurrencyField: v),
+              ),
             ),
             const Divider(),
-            _toggle('Sales Officer', _settings.showSalesOfficer, (v) => setState(() => _settings = _settings.copyWith(showSalesOfficer: v))),
-            _toggle('Supplier Man', _settings.showSupplierMan, (v) => setState(() => _settings = _settings.copyWith(showSupplierMan: v))),
-            _toggle('Project', _settings.showProject, (v) => setState(() => _settings = _settings.copyWith(showProject: v))),
-            _toggle('Bilty No', _settings.showBiltyNo, (v) => setState(() => _settings = _settings.copyWith(showBiltyNo: v))),
-            _toggle('Transport Name', _settings.showTransportName, (v) => setState(() => _settings = _settings.copyWith(showTransportName: v))),
-            _toggle('Remarks', _settings.showRemarks, (v) => setState(() => _settings = _settings.copyWith(showRemarks: v))),
-            _toggle('Customer Info (Balance/Address)', _settings.showCustomerInfo,
-                (v) => setState(() => _settings = _settings.copyWith(showCustomerInfo: v))),
-            _toggle('Discount', _settings.showDiscount, (v) => setState(() => _settings = _settings.copyWith(showDiscount: v))),
-            _toggle('GST / Tax', _settings.showGst, (v) => setState(() => _settings = _settings.copyWith(showGst: v))),
-            _toggle('Scheme', _settings.showScheme, (v) => setState(() => _settings = _settings.copyWith(showScheme: v))),
-            _toggle('Trade Offer', _settings.showTradeOffer, (v) => setState(() => _settings = _settings.copyWith(showTradeOffer: v))),
-            _toggle('FOC Quantity', _settings.showFoc, (v) => setState(() => _settings = _settings.copyWith(showFoc: v))),
-            _toggle('Shipping Fees', _settings.showShipping, (v) => setState(() => _settings = _settings.copyWith(showShipping: v))),
+            _toggle(
+              'Sales Officer',
+              _settings.showSalesOfficer,
+              (v) => setState(
+                () => _settings = _settings.copyWith(showSalesOfficer: v),
+              ),
+            ),
+            _toggle(
+              'Supplier Man',
+              _settings.showSupplierMan,
+              (v) => setState(
+                () => _settings = _settings.copyWith(showSupplierMan: v),
+              ),
+            ),
+            _toggle(
+              'Project',
+              _settings.showProject,
+              (v) => setState(
+                () => _settings = _settings.copyWith(showProject: v),
+              ),
+            ),
+            _toggle(
+              'Bilty No',
+              _settings.showBiltyNo,
+              (v) => setState(
+                () => _settings = _settings.copyWith(showBiltyNo: v),
+              ),
+            ),
+            _toggle(
+              'Transport Name',
+              _settings.showTransportName,
+              (v) => setState(
+                () => _settings = _settings.copyWith(showTransportName: v),
+              ),
+            ),
+            _toggle(
+              'Remarks',
+              _settings.showRemarks,
+              (v) => setState(
+                () => _settings = _settings.copyWith(showRemarks: v),
+              ),
+            ),
+            _toggle(
+              'Customer Info (Balance/Address)',
+              _settings.showCustomerInfo,
+              (v) => setState(
+                () => _settings = _settings.copyWith(showCustomerInfo: v),
+              ),
+            ),
+            _toggle(
+              'Discount',
+              _settings.showDiscount,
+              (v) => setState(
+                () => _settings = _settings.copyWith(showDiscount: v),
+              ),
+            ),
+            _toggle(
+              'GST / Tax',
+              _settings.showGst,
+              (v) => setState(() => _settings = _settings.copyWith(showGst: v)),
+            ),
+            _toggle(
+              'Scheme',
+              _settings.showScheme,
+              (v) =>
+                  setState(() => _settings = _settings.copyWith(showScheme: v)),
+            ),
+            _toggle(
+              'Trade Offer',
+              _settings.showTradeOffer,
+              (v) => setState(
+                () => _settings = _settings.copyWith(showTradeOffer: v),
+              ),
+            ),
+            _toggle(
+              'FOC Quantity',
+              _settings.showFoc,
+              (v) => setState(() => _settings = _settings.copyWith(showFoc: v)),
+            ),
+            _toggle(
+              'Shipping Fees',
+              _settings.showShipping,
+              (v) => setState(
+                () => _settings = _settings.copyWith(showShipping: v),
+              ),
+            ),
           ],
         ),
       ),
       actions: [
-        TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Cancel')),
-        ElevatedButton(onPressed: () => Navigator.of(context).pop(_settings), child: const Text('Save')),
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        ElevatedButton(
+          onPressed: () => Navigator.of(context).pop(_settings),
+          child: const Text('Save'),
+        ),
       ],
     );
   }

@@ -1,8 +1,10 @@
 import 'dart:async';
 import 'dart:convert';
+
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
+
 import 'api_client.dart';
 import 'outbox_service.dart';
 
@@ -59,7 +61,10 @@ class SyncService {
       var succeeded = 0;
       var failed = 0;
       for (final entry in pending) {
-        await OutboxService.instance.updateStatus(entry.clientUuid, status: 'syncing');
+        await OutboxService.instance.updateStatus(
+          entry.clientUuid,
+          status: 'syncing',
+        );
         try {
           dynamic body = entry.payload;
           if (entry.isFormData) {
@@ -67,13 +72,20 @@ class SyncService {
               ..remove(kOutboxAttachmentBase64Key)
               ..remove(kOutboxAttachmentFileNameKey);
             final formData = FormData.fromMap(fields);
-            final base64Bytes = entry.payload[kOutboxAttachmentBase64Key] as String?;
-            final fileName = entry.payload[kOutboxAttachmentFileNameKey] as String?;
+            final base64Bytes =
+                entry.payload[kOutboxAttachmentBase64Key] as String?;
+            final fileName =
+                entry.payload[kOutboxAttachmentFileNameKey] as String?;
             if (base64Bytes != null && fileName != null) {
-              formData.files.add(MapEntry(
-                'attachment',
-                MultipartFile.fromBytes(base64Decode(base64Bytes), filename: fileName),
-              ));
+              formData.files.add(
+                MapEntry(
+                  'attachment',
+                  MultipartFile.fromBytes(
+                    base64Decode(base64Bytes),
+                    filename: fileName,
+                  ),
+                ),
+              );
             }
             body = formData;
           }
@@ -90,12 +102,19 @@ class SyncService {
               status: 'failed',
               // Most endpoints use 'message'; a few older ones (Receive
               // Voucher among them) use 'error' instead.
-              lastError: data['message']?.toString() ?? data['error']?.toString() ?? 'Server rejected the record',
+              lastError:
+                  data['message']?.toString() ??
+                  data['error']?.toString() ??
+                  'Server rejected the record',
             );
             failed++;
           }
         } catch (e) {
-          await OutboxService.instance.updateStatus(entry.clientUuid, status: 'pending', lastError: e.toString());
+          await OutboxService.instance.updateStatus(
+            entry.clientUuid,
+            status: 'pending',
+            lastError: e.toString(),
+          );
           // Network still down (or flaky) — stop this pass, the connectivity
           // listener or next manual Sync Now will pick up where we left off.
           break;

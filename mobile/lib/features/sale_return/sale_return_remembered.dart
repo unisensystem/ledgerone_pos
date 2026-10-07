@@ -8,11 +8,17 @@ class SaleReturnRemembered {
   static const _branchKey = 'sale_return_remembered_branch_id';
   static const _currencyKey = 'sale_return_remembered_currency_id';
 
-  static Future<int?> getCompanyId() async => (await SharedPreferences.getInstance()).getInt(_companyKey);
-  static Future<int?> getBranchId() async => (await SharedPreferences.getInstance()).getInt(_branchKey);
-  static Future<int?> getCurrencyId() async => (await SharedPreferences.getInstance()).getInt(_currencyKey);
+  static Future<int?> getCompanyId() async =>
+      (await SharedPreferences.getInstance()).getInt(_companyKey);
+  static Future<int?> getBranchId() async =>
+      (await SharedPreferences.getInstance()).getInt(_branchKey);
+  static Future<int?> getCurrencyId() async =>
+      (await SharedPreferences.getInstance()).getInt(_currencyKey);
 
-  static Future<void> setCompanyId(int id) async => (await SharedPreferences.getInstance()).setInt(_companyKey, id);
-  static Future<void> setBranchId(int id) async => (await SharedPreferences.getInstance()).setInt(_branchKey, id);
-  static Future<void> setCurrencyId(int id) async => (await SharedPreferences.getInstance()).setInt(_currencyKey, id);
+  static Future<void> setCompanyId(int id) async =>
+      (await SharedPreferences.getInstance()).setInt(_companyKey, id);
+  static Future<void> setBranchId(int id) async =>
+      (await SharedPreferences.getInstance()).setInt(_branchKey, id);
+  static Future<void> setCurrencyId(int id) async =>
+      (await SharedPreferences.getInstance()).setInt(_currencyKey, id);
 }

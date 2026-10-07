@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+
 import '../../core/api_client.dart';
 
 /// Calls the existing server/api/vouchers/receive_voucher/*.php endpoints —
@@ -14,16 +15,24 @@ import '../../core/api_client.dart';
 /// that must each be matched exactly.
 class ReceiveVoucherApi {
   static Future<List<dynamic>> getCompanies() async {
-    final res = await ApiClient.dio.get('/server/api/vouchers/receive_voucher/get-companies.php');
+    final res = await ApiClient.dio.get(
+      '/server/api/vouchers/receive_voucher/get-companies.php',
+    );
     final data = res.data as Map;
-    if (data['success'] != true) throw Exception(data['message'] ?? data['error'] ?? 'Failed to load companies');
+    if (data['success'] != true)
+      throw Exception(
+        data['message'] ?? data['error'] ?? 'Failed to load companies',
+      );
     return List<dynamic>.from(data['data'] as List? ?? []);
   }
 
   static Future<List<dynamic>> getCurrencies() async {
-    final res = await ApiClient.dio.get('/server/api/vouchers/receive_voucher/get-currencies.php');
+    final res = await ApiClient.dio.get(
+      '/server/api/vouchers/receive_voucher/get-currencies.php',
+    );
     final data = res.data as Map;
-    if (data['success'] != true) throw Exception(data['error'] ?? 'Failed to load currencies');
+    if (data['success'] != true)
+      throw Exception(data['error'] ?? 'Failed to load currencies');
     return List<dynamic>.from(data['data'] as List? ?? []);
   }
 
@@ -31,9 +40,12 @@ class ReceiveVoucherApi {
   /// the CUSTOMER list (customer_code/customer_name/id). Not renamed here;
   /// matching the real, live backend file exactly.
   static Future<List<dynamic>> getCustomers() async {
-    final res = await ApiClient.dio.get('/server/api/vouchers/receive_voucher/get-suppliers.php');
+    final res = await ApiClient.dio.get(
+      '/server/api/vouchers/receive_voucher/get-suppliers.php',
+    );
     final data = res.data as Map;
-    if (data['success'] != true) throw Exception(data['error'] ?? 'Failed to load customers');
+    if (data['success'] != true)
+      throw Exception(data['error'] ?? 'Failed to load customers');
     return List<dynamic>.from(data['data'] as List? ?? []);
   }
 
@@ -81,30 +93,40 @@ class ReceiveVoucherApi {
   }
 
   static Future<List<dynamic>> getPaymentMethods() async {
-    final res = await ApiClient.dio.get('/server/api/vouchers/receive_voucher/get-payment-methods.php');
+    final res = await ApiClient.dio.get(
+      '/server/api/vouchers/receive_voucher/get-payment-methods.php',
+    );
     final data = res.data as Map;
-    if (data['success'] != true) throw Exception(data['error'] ?? 'Failed to load payment methods');
+    if (data['success'] != true)
+      throw Exception(data['error'] ?? 'Failed to load payment methods');
     return List<dynamic>.from(data['data'] as List? ?? []);
   }
 
   static Future<List<dynamic>> getBankAccounts() async {
-    final res = await ApiClient.dio.get('/server/api/vouchers/receive_voucher/get-bank-accounts.php');
+    final res = await ApiClient.dio.get(
+      '/server/api/vouchers/receive_voucher/get-bank-accounts.php',
+    );
     final data = res.data as Map;
     if (data['success'] != true) return [];
     return List<dynamic>.from(data['data'] as List? ?? []);
   }
 
   static Future<List<dynamic>> getEmployees() async {
-    final res = await ApiClient.dio.get('/server/api/vouchers/receive_voucher/get-employees.php');
+    final res = await ApiClient.dio.get(
+      '/server/api/vouchers/receive_voucher/get-employees.php',
+    );
     final data = res.data as Map;
-    if (data['success'] != true) throw Exception(data['error'] ?? 'Failed to load employees');
+    if (data['success'] != true)
+      throw Exception(data['error'] ?? 'Failed to load employees');
     return List<dynamic>.from(data['data'] as List? ?? []);
   }
 
   /// Same cross-module endpoint Sale Order's mobile Project dropdown
   /// already uses (already mobile_auth-shimmed).
   static Future<List<dynamic>> getProjects() async {
-    final res = await ApiClient.dio.get('/server/api/master_setup/project_setup/get-projects-dropdown.php');
+    final res = await ApiClient.dio.get(
+      '/server/api/master_setup/project_setup/get-projects-dropdown.php',
+    );
     final data = res.data as Map;
     if (data['success'] != true) return [];
     return List<dynamic>.from(data['projects'] as List? ?? []);
@@ -112,7 +134,11 @@ class ReceiveVoucherApi {
 
   /// Vouchers this booker created (always only_mine for a mobile token —
   /// enforced server-side, see receive-list.php).
-  static Future<Map<String, dynamic>> getVouchers({int page = 1, int limit = 20, String? search}) async {
+  static Future<Map<String, dynamic>> getVouchers({
+    int page = 1,
+    int limit = 20,
+    String? search,
+  }) async {
     final res = await ApiClient.dio.get(
       '/server/api/vouchers/receive_voucher/receive-list.php',
       queryParameters: {
@@ -123,7 +149,8 @@ class ReceiveVoucherApi {
       },
     );
     final data = res.data as Map;
-    if (data['success'] != true) throw Exception(data['error'] ?? 'Failed to load vouchers');
+    if (data['success'] != true)
+      throw Exception(data['error'] ?? 'Failed to load vouchers');
     return Map<String, dynamic>.from(data);
   }
 
@@ -133,12 +160,15 @@ class ReceiveVoucherApi {
       queryParameters: {'id': voucherId},
     );
     final data = res.data as Map;
-    if (data['success'] != true) throw Exception(data['error'] ?? 'Failed to load voucher');
+    if (data['success'] != true)
+      throw Exception(data['error'] ?? 'Failed to load voucher');
     return Map<String, dynamic>.from(data['data'] as Map);
   }
 
-  static const String createVoucherEndpoint = '/server/api/vouchers/receive_voucher/receive-add.php';
-  static const String editVoucherEndpoint = '/server/api/vouchers/receive_voucher/receive-edit.php';
+  static const String createVoucherEndpoint =
+      '/server/api/vouchers/receive_voucher/receive-add.php';
+  static const String editVoucherEndpoint =
+      '/server/api/vouchers/receive_voucher/receive-edit.php';
 
   /// receive-add.php reads $_POST — every value must be a String for
   /// FormData, not a number/null, hence the .toString() / '' handling here
@@ -195,10 +225,15 @@ class ReceiveVoucherApi {
     // Dio's default JSON body, or every field arrives empty server-side.
     final formData = FormData.fromMap(payload);
     if (attachmentBytes != null && attachmentFileName != null) {
-      formData.files.add(MapEntry(
-        'attachment',
-        MultipartFile.fromBytes(attachmentBytes, filename: attachmentFileName),
-      ));
+      formData.files.add(
+        MapEntry(
+          'attachment',
+          MultipartFile.fromBytes(
+            attachmentBytes,
+            filename: attachmentFileName,
+          ),
+        ),
+      );
     }
     final res = await ApiClient.dio.post(createVoucherEndpoint, data: formData);
     return Map<String, dynamic>.from(res.data as Map);
@@ -245,7 +280,10 @@ class ReceiveVoucherApi {
     };
   }
 
-  static Future<Map<String, dynamic>> updateVoucher(int voucherId, Map<String, dynamic> payload) async {
+  static Future<Map<String, dynamic>> updateVoucher(
+    int voucherId,
+    Map<String, dynamic> payload,
+  ) async {
     final res = await ApiClient.dio.put(
       editVoucherEndpoint,
       queryParameters: {'id': voucherId},

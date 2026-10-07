@@ -190,38 +190,134 @@ class _FieldSettingsDialogState extends State<_FieldSettingsDialog> {
                 ),
               ),
             ),
-            _toggle('Company (remembers last pick)', _settings.showCompanyField,
-                (v) => setState(() => _settings = _settings.copyWith(showCompanyField: v))),
-            _toggle('Branch (remembers last pick)', _settings.showBranchField,
-                (v) => setState(() => _settings = _settings.copyWith(showBranchField: v))),
-            _toggle('Currency (remembers last pick)', _settings.showCurrencyField,
-                (v) => setState(() => _settings = _settings.copyWith(showCurrencyField: v))),
+            _toggle(
+              'Company (remembers last pick)',
+              _settings.showCompanyField,
+              (v) => setState(
+                () => _settings = _settings.copyWith(showCompanyField: v),
+              ),
+            ),
+            _toggle(
+              'Branch (remembers last pick)',
+              _settings.showBranchField,
+              (v) => setState(
+                () => _settings = _settings.copyWith(showBranchField: v),
+              ),
+            ),
+            _toggle(
+              'Currency (remembers last pick)',
+              _settings.showCurrencyField,
+              (v) => setState(
+                () => _settings = _settings.copyWith(showCurrencyField: v),
+              ),
+            ),
             const Divider(),
-            _toggle('Original Sale Invoice (optional link)', _settings.showOriginalInvoice,
-                (v) => setState(() => _settings = _settings.copyWith(showOriginalInvoice: v))),
-            _toggle('Sales Officer', _settings.showSalesOfficer, (v) => setState(() => _settings = _settings.copyWith(showSalesOfficer: v))),
-            _toggle('Supplier Man', _settings.showSupplierMan, (v) => setState(() => _settings = _settings.copyWith(showSupplierMan: v))),
-            _toggle('Sub Account', _settings.showSubAccount, (v) => setState(() => _settings = _settings.copyWith(showSubAccount: v))),
-            _toggle('Remarks', _settings.showRemarks, (v) => setState(() => _settings = _settings.copyWith(showRemarks: v))),
-            _toggle('Customer Info (Balance/Address)', _settings.showCustomerInfo,
-                (v) => setState(() => _settings = _settings.copyWith(showCustomerInfo: v))),
-            _toggle('Discount', _settings.showDiscount, (v) => setState(() => _settings = _settings.copyWith(showDiscount: v))),
-            _toggle('Tax', _settings.showTax, (v) => setState(() => _settings = _settings.copyWith(showTax: v))),
-            _toggle('Trade Offer', _settings.showTradeOffer, (v) => setState(() => _settings = _settings.copyWith(showTradeOffer: v))),
-            _toggle('FOC Quantity', _settings.showFoc, (v) => setState(() => _settings = _settings.copyWith(showFoc: v))),
-            _toggle('Batch No / Expiry Date', _settings.showBatchExpiry,
-                (v) => setState(() => _settings = _settings.copyWith(showBatchExpiry: v))),
-            _toggle('Stock Status (Sellable/Damaged)', _settings.showStockStatus,
-                (v) => setState(() => _settings = _settings.copyWith(showStockStatus: v))),
-            _toggle('Shipping Fees', _settings.showShipping, (v) => setState(() => _settings = _settings.copyWith(showShipping: v))),
-            _toggle('Payment Details (Method/Bank/Refund)', _settings.showPaymentDetails,
-                (v) => setState(() => _settings = _settings.copyWith(showPaymentDetails: v))),
+            _toggle(
+              'Original Sale Invoice (optional link)',
+              _settings.showOriginalInvoice,
+              (v) => setState(
+                () => _settings = _settings.copyWith(showOriginalInvoice: v),
+              ),
+            ),
+            _toggle(
+              'Sales Officer',
+              _settings.showSalesOfficer,
+              (v) => setState(
+                () => _settings = _settings.copyWith(showSalesOfficer: v),
+              ),
+            ),
+            _toggle(
+              'Supplier Man',
+              _settings.showSupplierMan,
+              (v) => setState(
+                () => _settings = _settings.copyWith(showSupplierMan: v),
+              ),
+            ),
+            _toggle(
+              'Sub Account',
+              _settings.showSubAccount,
+              (v) => setState(
+                () => _settings = _settings.copyWith(showSubAccount: v),
+              ),
+            ),
+            _toggle(
+              'Remarks',
+              _settings.showRemarks,
+              (v) => setState(
+                () => _settings = _settings.copyWith(showRemarks: v),
+              ),
+            ),
+            _toggle(
+              'Customer Info (Balance/Address)',
+              _settings.showCustomerInfo,
+              (v) => setState(
+                () => _settings = _settings.copyWith(showCustomerInfo: v),
+              ),
+            ),
+            _toggle(
+              'Discount',
+              _settings.showDiscount,
+              (v) => setState(
+                () => _settings = _settings.copyWith(showDiscount: v),
+              ),
+            ),
+            _toggle(
+              'Tax',
+              _settings.showTax,
+              (v) => setState(() => _settings = _settings.copyWith(showTax: v)),
+            ),
+            _toggle(
+              'Trade Offer',
+              _settings.showTradeOffer,
+              (v) => setState(
+                () => _settings = _settings.copyWith(showTradeOffer: v),
+              ),
+            ),
+            _toggle(
+              'FOC Quantity',
+              _settings.showFoc,
+              (v) => setState(() => _settings = _settings.copyWith(showFoc: v)),
+            ),
+            _toggle(
+              'Batch No / Expiry Date',
+              _settings.showBatchExpiry,
+              (v) => setState(
+                () => _settings = _settings.copyWith(showBatchExpiry: v),
+              ),
+            ),
+            _toggle(
+              'Stock Status (Sellable/Damaged)',
+              _settings.showStockStatus,
+              (v) => setState(
+                () => _settings = _settings.copyWith(showStockStatus: v),
+              ),
+            ),
+            _toggle(
+              'Shipping Fees',
+              _settings.showShipping,
+              (v) => setState(
+                () => _settings = _settings.copyWith(showShipping: v),
+              ),
+            ),
+            _toggle(
+              'Payment Details (Method/Bank/Refund)',
+              _settings.showPaymentDetails,
+              (v) => setState(
+                () => _settings = _settings.copyWith(showPaymentDetails: v),
+              ),
+            ),
           ],
         ),
       ),
       actions: [
-        TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Cancel')),
-        ElevatedButton(onPressed: () => Navigator.of(context).pop(_settings), child: const Text('Save')),
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        ElevatedButton(
+          onPressed: () => Navigator.of(context).pop(_settings),
+          child: const Text('Save'),
+        ),
       ],
     );
   }

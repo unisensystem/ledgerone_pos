@@ -9,10 +9,12 @@ class SecureStorage {
   static const _tokenKey = 'ledgerone_mobile_token';
   static const _deviceIdKey = 'ledgerone_device_uuid';
 
-  static Future<void> saveToken(String token) => _storage.write(key: _tokenKey, value: token);
+  static Future<void> saveToken(String token) =>
+      _storage.write(key: _tokenKey, value: token);
   static Future<String?> getToken() => _storage.read(key: _tokenKey);
   static Future<void> clearToken() => _storage.delete(key: _tokenKey);
 
   static Future<String?> getDeviceId() => _storage.read(key: _deviceIdKey);
-  static Future<void> saveDeviceId(String id) => _storage.write(key: _deviceIdKey, value: id);
+  static Future<void> saveDeviceId(String id) =>
+      _storage.write(key: _deviceIdKey, value: id);
 }

@@ -1,4 +1,5 @@
 import 'package:uuid/uuid.dart';
+
 import 'secure_storage.dart';
 
 /// A UUID generated once per install and reused forever after (persisted in

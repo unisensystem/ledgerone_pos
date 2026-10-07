@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+
 import '../../core/outbox_service.dart';
 import '../../core/print_launcher.dart';
+import '../../core/reference_cache.dart';
 import '../../core/sync_service.dart';
 import 'sale_order_api.dart';
 import 'sale_order_screen.dart';
@@ -56,11 +58,20 @@ class _SaleOrderListScreenState extends State<SaleOrderListScreen> {
       _error = null;
     });
     try {
-      final result = await SaleOrderApi.getOrders(
+      final search = _searchController.text.trim().isEmpty
+          ? null
+          : _searchController.text.trim();
+      final fetchOrders = () => SaleOrderApi.getOrders(
         page: page,
-        search: _searchController.text.trim().isEmpty ? null : _searchController.text.trim(),
+        search: search,
         orderStatus: _orderStatus,
       );
+      final result = (page == 1 && search == null)
+          ? await ReferenceCache.cached(
+              'so_list_page1_$_orderStatus',
+              fetchOrders,
+            )
+          : await fetchOrders();
       setState(() {
         _orders = result['invoices'] as List<dynamic>? ?? [];
         _page = result['pagination']?['page'] ?? 1;
@@ -89,9 +100,15 @@ class _SaleOrderListScreenState extends State<SaleOrderListScreen> {
         title: const Text('Delete Order'),
         content: Text('Delete order $billNo? This cannot be undone.'),
         actions: [
-          TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFE34F4F), foregroundColor: Colors.white),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFE34F4F),
+              foregroundColor: Colors.white,
+            ),
             onPressed: () => Navigator.of(context).pop(true),
             child: const Text('Delete'),
           ),
@@ -104,16 +121,22 @@ class _SaleOrderListScreenState extends State<SaleOrderListScreen> {
       final result = await SaleOrderApi.deleteOrder(orderId);
       if (!mounted) return;
       if (result['success'] == true) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Order $billNo deleted')));
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Order $billNo deleted')));
         _load(page: _page);
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(result['message']?.toString() ?? 'Could not delete order')),
+          SnackBar(
+            content: Text(
+              result['message']?.toString() ?? 'Could not delete order',
+            ),
+          ),
         );
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Network error: $e')));
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Network error: $e')));
       }
     }
   }
@@ -125,17 +148,33 @@ class _SaleOrderListScreenState extends State<SaleOrderListScreen> {
         title: const Text('Select Print Format'),
         content: const Text('Choose how you want to print the order:'),
         actions: [
-          TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Cancel')),
-          TextButton(onPressed: () => Navigator.of(context).pop('thermal'), child: const Text('Thermal')),
-          ElevatedButton(onPressed: () => Navigator.of(context).pop('full'), child: const Text('Full Order')),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop('thermal'),
+            child: const Text('Thermal'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(context).pop('full'),
+            child: const Text('Full Order'),
+          ),
         ],
       ),
     );
     if (choice == null) return;
-    final opened = await PrintLauncher.open(orderId: orderId, thermal: choice == 'thermal');
+    final opened = await PrintLauncher.open(
+      orderId: orderId,
+      thermal: choice == 'thermal',
+    );
     if (!opened && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Could not open the print page — check your connection and try again.')),
+        const SnackBar(
+          content: Text(
+            'Could not open the print page — check your connection and try again.',
+          ),
+        ),
       );
     }
   }
@@ -150,12 +189,13 @@ class _SaleOrderListScreenState extends State<SaleOrderListScreen> {
     final message = pendingBefore == 0
         ? 'Nothing to sync'
         : pendingAfter == 0
-            ? 'All orders synced'
-            : pendingAfter < pendingBefore
-                ? '${pendingBefore - pendingAfter} synced, $pendingAfter still waiting (no connection?)'
-                : 'Still no connection — $pendingAfter order(s) waiting';
+        ? 'All orders synced'
+        : pendingAfter < pendingBefore
+        ? '${pendingBefore - pendingAfter} synced, $pendingAfter still waiting (no connection?)'
+        : 'Still no connection — $pendingAfter order(s) waiting';
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(message)));
     }
     _load(page: _page);
   }
@@ -175,7 +215,10 @@ class _SaleOrderListScreenState extends State<SaleOrderListScreen> {
                 ? const SizedBox(
                     width: 20,
                     height: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    ),
                   )
                 : const Icon(Icons.sync),
             onPressed: _manualSyncing ? null : _manualSync,
@@ -188,9 +231,8 @@ class _SaleOrderListScreenState extends State<SaleOrderListScreen> {
         icon: const Icon(Icons.add),
         label: const Text('New Order'),
         onPressed: () async {
-          await Navigator.of(context).push(
-            MaterialPageRoute(builder: (_) => const SaleOrderScreen()),
-          );
+          await Navigator.of(context)
+              .push(MaterialPageRoute(builder: (_) => const SaleOrderScreen()));
           _load();
         },
       ),
@@ -233,109 +275,159 @@ class _SaleOrderListScreenState extends State<SaleOrderListScreen> {
             child: _loading
                 ? const Center(child: CircularProgressIndicator())
                 : _error != null
-                    ? Center(
-                        child: Padding(
-                          padding: const EdgeInsets.all(24),
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(_error!, textAlign: TextAlign.center),
-                              const SizedBox(height: 12),
-                              ElevatedButton(onPressed: () => _load(), child: const Text('Retry')),
-                            ],
+                ? Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(_error!, textAlign: TextAlign.center),
+                          const SizedBox(height: 12),
+                          ElevatedButton(
+                            onPressed: () => _load(),
+                            child: const Text('Retry'),
                           ),
-                        ),
-                      )
-                    : _orders.isEmpty
-                        ? const Center(child: Text('No sale orders found.', style: TextStyle(color: Color(0xFF6B7280))))
-                        : RefreshIndicator(
-                            onRefresh: () => _load(page: _page),
-                            child: ListView.builder(
-                              padding: const EdgeInsets.fromLTRB(16, 0, 16, 90),
-                              itemCount: _orders.length + 1,
-                              itemBuilder: (context, index) {
-                                if (index == _orders.length) {
-                                  return _pager();
-                                }
-                                final order = _orders[index];
-                                final orderId = order['id'] as int;
-                                final billNo = order['bill_no']?.toString() ?? '';
-                                final netAmount = double.tryParse(order['net_amount']?.toString() ?? '') ?? 0;
-                                final saleDate = order['sale_date'] != null
-                                    ? DateFormat('dd MMM yyyy').format(DateTime.parse(order['sale_date']))
-                                    : '';
-                                final fulfillment = order['fulfillment_status']?.toString() ?? 'Pending';
-                                Color badgeBg;
-                                Color badgeFg;
-                                switch (fulfillment) {
-                                  case 'Fully Fulfilled':
-                                    badgeBg = const Color(0xFFE6F9F0);
-                                    badgeFg = const Color(0xFF2FBF71);
-                                    break;
-                                  case 'Partially Fulfilled':
-                                    badgeBg = const Color(0xFFFFF4E0);
-                                    badgeFg = const Color(0xFFB8860B);
-                                    break;
-                                  default:
-                                    badgeBg = const Color(0xFFEFF2F7);
-                                    badgeFg = const Color(0xFF6B7280);
-                                }
-                                return Card(
-                                  margin: const EdgeInsets.only(bottom: 8),
-                                  child: Padding(
-                                    padding: const EdgeInsets.fromLTRB(16, 12, 8, 4),
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Row(
-                                          children: [
-                                            Expanded(
-                                              child: Text(billNo, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15)),
-                                            ),
-                                            Container(
-                                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                              decoration: BoxDecoration(color: badgeBg, borderRadius: BorderRadius.circular(6)),
-                                              child: Text(fulfillment, style: TextStyle(fontSize: 10, color: badgeFg)),
-                                            ),
-                                          ],
+                        ],
+                      ),
+                    ),
+                  )
+                : _orders.isEmpty
+                ? const Center(
+                    child: Text(
+                      'No sale orders found.',
+                      style: TextStyle(color: Color(0xFF6B7280)),
+                    ),
+                  )
+                : RefreshIndicator(
+                    onRefresh: () => _load(page: _page),
+                    child: ListView.builder(
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 90),
+                      itemCount: _orders.length + 1,
+                      itemBuilder: (context, index) {
+                        if (index == _orders.length) {
+                          return _pager();
+                        }
+                        final order = _orders[index];
+                        final orderId = order['id'] as int;
+                        final billNo = order['bill_no']?.toString() ?? '';
+                        final netAmount =
+                            double.tryParse(
+                              order['net_amount']?.toString() ?? '',
+                            ) ??
+                            0;
+                        final saleDate = order['sale_date'] != null
+                            ? DateFormat('dd MMM yyyy')
+                                  .format(DateTime.parse(order['sale_date']))
+                            : '';
+                        final fulfillment =
+                            order['fulfillment_status']?.toString() ??
+                            'Pending';
+                        Color badgeBg;
+                        Color badgeFg;
+                        switch (fulfillment) {
+                          case 'Fully Fulfilled':
+                            badgeBg = const Color(0xFFE6F9F0);
+                            badgeFg = const Color(0xFF2FBF71);
+                            break;
+                          case 'Partially Fulfilled':
+                            badgeBg = const Color(0xFFFFF4E0);
+                            badgeFg = const Color(0xFFB8860B);
+                            break;
+                          default:
+                            badgeBg = const Color(0xFFEFF2F7);
+                            badgeFg = const Color(0xFF6B7280);
+                        }
+                        return Card(
+                          margin: const EdgeInsets.only(bottom: 8),
+                          child: Padding(
+                            padding: const EdgeInsets.fromLTRB(16, 12, 8, 4),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: Text(
+                                        billNo,
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.w600,
+                                          fontSize: 15,
                                         ),
-                                        const SizedBox(height: 2),
-                                        Text(
-                                          '${order['customer_name'] ?? 'Unknown customer'} · $saleDate · ${order['item_count'] ?? 0} item(s)',
-                                          style: const TextStyle(fontSize: 12, color: Color(0xFF6B7280)),
-                                        ),
-                                        Row(
-                                          children: [
-                                            Expanded(
-                                              child: Text(
-                                                '${order['currency_symbol'] ?? ''} ${netAmount.toStringAsFixed(2)}',
-                                                style: const TextStyle(fontWeight: FontWeight.w600),
-                                              ),
-                                            ),
-                                            IconButton(
-                                              icon: const Icon(Icons.edit_outlined, size: 19),
-                                              tooltip: 'Edit Order',
-                                              onPressed: () => _editOrder(orderId),
-                                            ),
-                                            IconButton(
-                                              icon: const Icon(Icons.print_outlined, size: 19),
-                                              tooltip: 'Print Order',
-                                              onPressed: () => _showPrintOptions(orderId),
-                                            ),
-                                            IconButton(
-                                              icon: const Icon(Icons.delete_outline, size: 19, color: Color(0xFFE34F4F)),
-                                              tooltip: 'Delete Order',
-                                              onPressed: () => _deleteOrder(orderId, billNo),
-                                            ),
-                                          ],
-                                        ),
-                                      ],
+                                      ),
                                     ),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 8,
+                                        vertical: 2,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: badgeBg,
+                                        borderRadius: BorderRadius.circular(6),
+                                      ),
+                                      child: Text(
+                                        fulfillment,
+                                        style: TextStyle(
+                                          fontSize: 10,
+                                          color: badgeFg,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  '${order['customer_name'] ?? 'Unknown customer'} · $saleDate · ${order['item_count'] ?? 0} item(s)',
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    color: Color(0xFF6B7280),
                                   ),
-                                );
-                              },
+                                ),
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: Text(
+                                        '${order['currency_symbol'] ?? ''} ${netAmount.toStringAsFixed(2)}',
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ),
+                                    IconButton(
+                                      icon: const Icon(
+                                        Icons.edit_outlined,
+                                        size: 19,
+                                      ),
+                                      tooltip: 'Edit Order',
+                                      onPressed: () => _editOrder(orderId),
+                                    ),
+                                    IconButton(
+                                      icon: const Icon(
+                                        Icons.print_outlined,
+                                        size: 19,
+                                      ),
+                                      tooltip: 'Print Order',
+                                      onPressed: () =>
+                                          _showPrintOptions(orderId),
+                                    ),
+                                    IconButton(
+                                      icon: const Icon(
+                                        Icons.delete_outline,
+                                        size: 19,
+                                        color: Color(0xFFE34F4F),
+                                      ),
+                                      tooltip: 'Delete Order',
+                                      onPressed: () =>
+                                          _deleteOrder(orderId, billNo),
+                                    ),
+                                  ],
+                                ),
+                              ],
                             ),
                           ),
+                        );
+                      },
+                    ),
+                  ),
           ),
         ],
       ),
@@ -355,7 +447,9 @@ class _SaleOrderListScreenState extends State<SaleOrderListScreen> {
           ),
           Text('Page $_page of $_totalPages'),
           TextButton(
-            onPressed: _page < _totalPages ? () => _load(page: _page + 1) : null,
+            onPressed: _page < _totalPages
+                ? () => _load(page: _page + 1)
+                : null,
             child: const Text('Next'),
           ),
         ],
@@ -423,18 +517,29 @@ class _PendingSyncBannerState extends State<_PendingSyncBanner> {
         children: [
           Row(
             children: [
-              const Icon(Icons.sync_problem, size: 18, color: Color(0xFFB8860B)),
+              const Icon(
+                Icons.sync_problem,
+                size: 18,
+                color: Color(0xFFB8860B),
+              ),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
                   '${_entries.length} order(s) waiting to sync',
-                  style: const TextStyle(fontWeight: FontWeight.w600, color: Color(0xFFB8860B)),
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFFB8860B),
+                  ),
                 ),
               ),
               TextButton(
                 onPressed: _syncing ? null : _syncNow,
                 child: _syncing
-                    ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
                     : const Text('Sync Now'),
               ),
             ],
@@ -446,8 +551,8 @@ class _PendingSyncBannerState extends State<_PendingSyncBanner> {
                 e.status == 'failed'
                     ? '${e.label} — failed${e.lastError != null ? ': ${e.lastError}' : ''}'
                     : e.status == 'syncing'
-                        ? '${e.label} — syncing…'
-                        : '${e.label} — pending',
+                    ? '${e.label} — syncing…'
+                    : '${e.label} — pending',
                 style: const TextStyle(fontSize: 12, color: Color(0xFF6B7280)),
                 overflow: TextOverflow.ellipsis,
               ),

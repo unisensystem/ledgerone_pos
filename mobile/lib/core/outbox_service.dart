@@ -1,4 +1,5 @@
 import 'dart:convert';
+
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -40,28 +41,28 @@ class OutboxEntry {
   });
 
   Map<String, dynamic> toJson() => {
-        'clientUuid': clientUuid,
-        'endpoint': endpoint,
-        'label': label,
-        'payload': payload,
-        'createdAt': createdAt.toIso8601String(),
-        'method': method,
-        'isFormData': isFormData,
-        'status': status,
-        'lastError': lastError,
-      };
+    'clientUuid': clientUuid,
+    'endpoint': endpoint,
+    'label': label,
+    'payload': payload,
+    'createdAt': createdAt.toIso8601String(),
+    'method': method,
+    'isFormData': isFormData,
+    'status': status,
+    'lastError': lastError,
+  };
 
   factory OutboxEntry.fromJson(Map<String, dynamic> json) => OutboxEntry(
-        clientUuid: json['clientUuid'] as String,
-        endpoint: json['endpoint'] as String,
-        label: json['label'] as String,
-        payload: Map<String, dynamic>.from(json['payload'] as Map),
-        createdAt: DateTime.parse(json['createdAt'] as String),
-        method: json['method'] as String? ?? 'POST',
-        isFormData: json['isFormData'] as bool? ?? false,
-        status: json['status'] as String? ?? 'pending',
-        lastError: json['lastError'] as String?,
-      );
+    clientUuid: json['clientUuid'] as String,
+    endpoint: json['endpoint'] as String,
+    label: json['label'] as String,
+    payload: Map<String, dynamic>.from(json['payload'] as Map),
+    createdAt: DateTime.parse(json['createdAt'] as String),
+    method: json['method'] as String? ?? 'POST',
+    isFormData: json['isFormData'] as bool? ?? false,
+    status: json['status'] as String? ?? 'pending',
+    lastError: json['lastError'] as String?,
+  );
 }
 
 /// Local-first queue for records created while offline (or whose live POST
@@ -99,7 +100,9 @@ class OutboxService {
     final raw = prefs.getString(_key);
     if (raw != null && raw.isNotEmpty) {
       final list = jsonDecode(raw) as List;
-      _entries = list.map((e) => OutboxEntry.fromJson(Map<String, dynamic>.from(e as Map))).toList();
+      _entries = list
+          .map((e) => OutboxEntry.fromJson(Map<String, dynamic>.from(e as Map)))
+          .toList();
     }
     _loaded = true;
     _refreshCount();
@@ -107,7 +110,10 @@ class OutboxService {
 
   Future<void> _persist() async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_key, jsonEncode(_entries.map((e) => e.toJson()).toList()));
+    await prefs.setString(
+      _key,
+      jsonEncode(_entries.map((e) => e.toJson()).toList()),
+    );
     _refreshCount();
   }
 
@@ -133,7 +139,11 @@ class OutboxService {
     await _persist();
   }
 
-  Future<void> updateStatus(String clientUuid, {required String status, String? lastError}) async {
+  Future<void> updateStatus(
+    String clientUuid, {
+    required String status,
+    String? lastError,
+  }) async {
     await _ensureLoaded();
     final entry = _entries.where((e) => e.clientUuid == clientUuid).firstOrNull;
     if (entry == null) return;

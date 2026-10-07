@@ -1,6 +1,9 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
 import 'dart:io' show Platform;
+
 import 'package:flutter/foundation.dart' show kIsWeb;
+
 import '../../core/device_id.dart';
 import '../../core/secure_storage.dart';
 import 'auth_api.dart';
@@ -109,7 +112,10 @@ class AuthNotifier extends StateNotifier<AuthState> {
           error: null,
         );
       } else {
-        state = state.copyWith(isLoading: false, error: result['message']?.toString() ?? 'Login failed');
+        state = state.copyWith(
+          isLoading: false,
+          error: result['message']?.toString() ?? 'Login failed',
+        );
       }
     } catch (e) {
       state = state.copyWith(isLoading: false, error: 'Network error: $e');
@@ -131,4 +137,6 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }
 }
 
-final authProvider = StateNotifierProvider<AuthNotifier, AuthState>((ref) => AuthNotifier());
+final authProvider = StateNotifierProvider<AuthNotifier, AuthState>(
+  (ref) => AuthNotifier(),
+);
