@@ -1,9 +1,14 @@
 /* Biometric Devices management page */
 
-const API_DEVICES  = '/server/api/hrm/biometric/biometric-devices.php';
-const API_MAPPINGS = '/server/api/hrm/biometric/biometric-mappings.php';
-const API_LOGS     = '/server/api/hrm/biometric/biometric-logs.php';
+const API_DEVICES   = '/server/api/hrm/biometric/biometric-devices.php';
+const API_MAPPINGS  = '/server/api/hrm/biometric/biometric-mappings.php';
+const API_LOGS      = '/server/api/hrm/biometric/biometric-logs.php';
 const API_EMPLOYEES = '/server/api/hrm/attendance/get_employees.php';
+
+// ── State ──────────────────────────────────────────────────────────────────
+
+let allDevices  = [];  // cached for edit modal lookup
+let allMappings = [];  // cached for edit modal lookup
 
 // ── Toast ──────────────────────────────────────────────────────────────────
 
@@ -13,16 +18,18 @@ function toast(msg, type = 'success') {
     el.textContent = msg;
     el.className = `show ${type}`;
     clearTimeout(toastTimer);
-    toastTimer = setTimeout(() => el.classList.remove('show'), 3000);
+    toastTimer = setTimeout(() => el.classList.remove('show'), 3200);
 }
 
 // ── Modals ─────────────────────────────────────────────────────────────────
 
-function openModal(id) { document.getElementById(id).classList.add('open'); }
+function openModal(id)  { document.getElementById(id).classList.add('open'); }
 function closeModal(id) { document.getElementById(id).classList.remove('open'); }
 
-document.querySelectorAll('.modal-overlay').forEach(m => {
-    m.addEventListener('click', e => { if (e.target === m) m.classList.remove('open'); });
+document.querySelectorAll('.modal-overlay').forEach(overlay => {
+    overlay.addEventListener('click', e => {
+        if (e.target === overlay) overlay.classList.remove('open');
+    });
 });
 
 // ── Tabs ───────────────────────────────────────────────────────────────────
@@ -37,6 +44,17 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     });
 });
 
+// ── XSS-safe escaping ──────────────────────────────────────────────────────
+
+function esc(str) {
+    return String(str ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
 // ── Devices ────────────────────────────────────────────────────────────────
 
 async function loadDevices() {
@@ -45,13 +63,15 @@ async function loadDevices() {
         const res  = await fetch(API_DEVICES);
         const json = await res.json();
 
-        if (!json.success || !json.data.length) {
+        allDevices = json.data || [];
+
+        if (!json.success || !allDevices.length) {
             tbody.innerHTML = '<tr><td colspan="7" class="no-data">No devices registered yet</td></tr>';
             return;
         }
 
-        tbody.innerHTML = json.data.map((d, i) => {
-            const masked  = d.api_token.substring(0, 8) + '••••••••••••••••••••••••' + d.api_token.slice(-4);
+        tbody.innerHTML = allDevices.map((d, i) => {
+            const masked   = d.api_token.substring(0, 8) + '••••••••••••••••••••' + d.api_token.slice(-4);
             const badgeCls = d.is_active == 1 ? 'badge-active' : 'badge-inactive';
             const badgeTxt = d.is_active == 1 ? 'Active' : 'Inactive';
             const lastSync = d.last_sync ? new Date(d.last_sync).toLocaleString() : '—';
@@ -59,19 +79,20 @@ async function loadDevices() {
             <tr>
                 <td>${i + 1}</td>
                 <td><strong>${esc(d.device_name)}</strong></td>
-                <td>${d.device_location ? esc(d.device_location) : '<span style="color:var(--text-secondary)">—</span>'}</td>
+                <td>${d.device_location ? esc(d.device_location) : '<span style="color:var(--subtext)">—</span>'}</td>
                 <td><span class="badge ${badgeCls}">${badgeTxt}</span></td>
-                <td style="font-size:12px;color:var(--text-secondary)">${lastSync}</td>
+                <td style="font-size:12px;color:var(--subtext)">${lastSync}</td>
                 <td>
                     <div class="token-row">
                         <span class="token-box" style="font-size:11px;padding:4px 8px">${masked}</span>
-                        <button class="btn-icon btn-copy" title="Copy full token" onclick="copyFullToken('${esc(d.api_token)}')">
+                        <button class="btn-icon btn-copy" title="Copy full token"
+                                onclick="copyFullToken('${esc(d.api_token)}')">
                             <i class="fas fa-copy"></i>
                         </button>
                     </div>
                 </td>
                 <td>
-                    <button class="btn-icon btn-edit" title="Edit" onclick="openEditDevice(${JSON.stringify(d).split('"').join('&quot;')})">
+                    <button class="btn-icon btn-edit" title="Edit" data-id="${d.id}" onclick="openEditDevice(${d.id})">
                         <i class="fas fa-edit"></i>
                     </button>
                     <button class="btn-icon btn-del" title="Delete" onclick="deleteDevice(${d.id}, '${esc(d.device_name)}')">
@@ -80,6 +101,7 @@ async function loadDevices() {
                 </td>
             </tr>`;
         }).join('');
+
     } catch {
         tbody.innerHTML = '<tr><td colspan="7" class="no-data">Failed to load devices</td></tr>';
     }
@@ -99,9 +121,9 @@ document.getElementById('btn-add-device').addEventListener('click', async () => 
     const json = await res.json();
 
     if (json.success) {
-        document.getElementById('dev-name').value = '';
+        document.getElementById('dev-name').value     = '';
         document.getElementById('dev-location').value = '';
-        loadDevices();
+        await loadDevices();
         showNewToken(json.data.api_token);
     } else {
         toast(json.message || 'Failed to register device', 'error');
@@ -122,7 +144,9 @@ function copyFullToken(token) {
     navigator.clipboard.writeText(token).then(() => toast('Token copied to clipboard'));
 }
 
-function openEditDevice(d) {
+function openEditDevice(id) {
+    const d = allDevices.find(x => x.id == id);
+    if (!d) return;
     document.getElementById('edit-dev-id').value       = d.id;
     document.getElementById('edit-dev-name').value     = d.device_name;
     document.getElementById('edit-dev-location').value = d.device_location || '';
@@ -155,23 +179,24 @@ document.getElementById('btn-save-device').addEventListener('click', async () =>
 });
 
 document.getElementById('btn-regen-token').addEventListener('click', async () => {
-    if (!confirm('Regenerate token? The old token will stop working immediately.')) return;
+    if (!confirm('Regenerate token? The old token stops working immediately.')) return;
 
-    const id   = parseInt(document.getElementById('edit-dev-id').value);
-    const name = document.getElementById('edit-dev-name').value.trim();
-    const loc  = document.getElementById('edit-dev-location').value.trim();
-    const act  = document.getElementById('edit-dev-active').value;
+    const id       = parseInt(document.getElementById('edit-dev-id').value);
+    const name     = document.getElementById('edit-dev-name').value.trim();
+    const location = document.getElementById('edit-dev-location').value.trim();
+    const active   = document.getElementById('edit-dev-active').value;
 
     const res  = await fetch(API_DEVICES, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id, device_name: name, device_location: loc, is_active: act, regenerate_token: true }),
+        body: JSON.stringify({ id, device_name: name, device_location: location,
+                               is_active: active, regenerate_token: true }),
     });
     const json = await res.json();
 
     if (json.success) {
         closeModal('modal-edit-device');
-        loadDevices();
+        await loadDevices();
         showNewToken(json.data.api_token);
     } else {
         toast(json.message || 'Failed to regenerate token', 'error');
@@ -192,22 +217,26 @@ async function deleteDevice(id, name) {
     else toast(json.message || 'Failed to delete', 'error');
 }
 
-// ── Employee Mappings ──────────────────────────────────────────────────────
+// ── Employee list (shared by both mapping selects) ─────────────────────────
 
 async function loadEmployees() {
-    const selects = ['map-employee', 'edit-map-employee'];
     try {
         const res  = await fetch(API_EMPLOYEES);
         const json = await res.json();
-        const opts = (json.employees || json.data || [])
-            .map(e => `<option value="${esc(e.employee_id)}">${esc(e.full_name)} (${esc(e.employee_id)})</option>`)
-            .join('');
-        selects.forEach(id => {
+        const employees = json.data || [];
+
+        const opts = employees.map(e =>
+            `<option value="${esc(e.employee_id)}">${esc(e.full_name)} (${esc(e.employee_id)})</option>`
+        ).join('');
+
+        ['map-employee', 'edit-map-employee'].forEach(id => {
             const el = document.getElementById(id);
             if (el) el.innerHTML = '<option value="">— Select employee —</option>' + opts;
         });
-    } catch { /* ignore */ }
+    } catch { /* non-fatal */ }
 }
+
+// ── Employee Mappings ──────────────────────────────────────────────────────
 
 async function loadMappings() {
     const tbody = document.getElementById('mappings-tbody');
@@ -215,27 +244,30 @@ async function loadMappings() {
         const res  = await fetch(API_MAPPINGS);
         const json = await res.json();
 
-        if (!json.success || !json.data.length) {
+        allMappings = json.data || [];
+
+        if (!json.success || !allMappings.length) {
             tbody.innerHTML = '<tr><td colspan="6" class="no-data">No employee mappings yet</td></tr>';
             return;
         }
 
-        tbody.innerHTML = json.data.map(m => `
+        tbody.innerHTML = allMappings.map(m => `
             <tr>
                 <td><strong>${esc(m.machine_employee_id)}</strong></td>
-                <td>${m.full_name ? esc(m.full_name) : '<span style="color:var(--text-secondary)">—</span>'}</td>
+                <td>${m.full_name ? esc(m.full_name) : '<span style="color:var(--subtext)">—</span>'}</td>
                 <td style="font-family:monospace;font-size:12px">${esc(m.employee_id)}</td>
-                <td style="color:var(--text-secondary)">${m.department_name ? esc(m.department_name) : '—'}</td>
-                <td style="font-size:12px;color:var(--text-secondary)">${new Date(m.created_at).toLocaleDateString()}</td>
+                <td style="color:var(--subtext)">${m.department_name ? esc(m.department_name) : '—'}</td>
+                <td style="font-size:12px;color:var(--subtext)">${new Date(m.created_at).toLocaleDateString()}</td>
                 <td>
-                    <button class="btn-icon btn-edit" onclick="openEditMapping(${JSON.stringify(m).split('"').join('&quot;')})">
+                    <button class="btn-icon btn-edit" title="Edit" onclick="openEditMapping(${m.id})">
                         <i class="fas fa-edit"></i>
                     </button>
-                    <button class="btn-icon btn-del" onclick="deleteMapping(${m.id})">
+                    <button class="btn-icon btn-del" title="Remove" onclick="deleteMapping(${m.id})">
                         <i class="fas fa-trash"></i>
                     </button>
                 </td>
             </tr>`).join('');
+
     } catch {
         tbody.innerHTML = '<tr><td colspan="6" class="no-data">Failed to load mappings</td></tr>';
     }
@@ -264,10 +296,12 @@ document.getElementById('btn-add-mapping').addEventListener('click', async () =>
     }
 });
 
-function openEditMapping(m) {
-    document.getElementById('edit-map-id').value        = m.id;
+function openEditMapping(id) {
+    const m = allMappings.find(x => x.id == id);
+    if (!m) return;
+    document.getElementById('edit-map-id').value         = m.id;
     document.getElementById('edit-map-machine-id').value = m.machine_employee_id;
-    document.getElementById('edit-map-employee').value  = m.employee_id;
+    document.getElementById('edit-map-employee').value   = m.employee_id;
     openModal('modal-edit-mapping');
 }
 
@@ -326,24 +360,25 @@ async function loadLogs() {
         const json = await res.json();
 
         if (!json.success || !json.data.length) {
-            tbody.innerHTML = '<tr><td colspan="8" class="no-data">No log entries found</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="8" class="no-data">No log entries found for this filter</td></tr>';
             return;
         }
 
         tbody.innerHTML = json.data.map(l => {
-            const cls = `status-${l.status}`;
+            const statusCls = `status-${l.status}`;
             return `
             <tr>
-                <td style="font-size:12px;color:var(--text-secondary)">${new Date(l.created_at).toLocaleString()}</td>
+                <td style="font-size:12px;color:var(--subtext)">${new Date(l.created_at).toLocaleString()}</td>
                 <td>${esc(l.device_name || '—')}</td>
                 <td><strong>${esc(l.machine_employee_id)}</strong></td>
                 <td style="font-family:monospace;font-size:12px">${l.employee_id ? esc(l.employee_id) : '—'}</td>
                 <td>${esc(l.punch_time)}</td>
-                <td style="color:var(--text-secondary)">${l.punch_type_raw !== null ? esc(l.punch_type_raw) : '—'}</td>
-                <td><span class="${cls}">${esc(l.status)}</span></td>
-                <td style="font-size:12px;color:var(--text-secondary)">${l.note ? esc(l.note) : '—'}</td>
+                <td style="color:var(--subtext)">${l.punch_type_raw !== null ? esc(l.punch_type_raw) : '—'}</td>
+                <td><span class="${statusCls}">${esc(l.status)}</span></td>
+                <td style="font-size:12px;color:var(--subtext)">${l.note ? esc(l.note) : '—'}</td>
             </tr>`;
         }).join('');
+
     } catch {
         tbody.innerHTML = '<tr><td colspan="8" class="no-data">Failed to load logs</td></tr>';
     }
@@ -351,22 +386,17 @@ async function loadLogs() {
 
 document.getElementById('btn-load-logs').addEventListener('click', loadLogs);
 
-// ── Utility ────────────────────────────────────────────────────────────────
-
-function esc(str) {
-    return String(str ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-}
+// ── Push URL copy ──────────────────────────────────────────────────────────
 
 function copyPushUrl() {
-    const url = document.getElementById('push-url-display').textContent;
-    navigator.clipboard.writeText(url.trim()).then(() => toast('URL copied to clipboard'));
+    const text = document.getElementById('push-url-display').textContent.trim();
+    navigator.clipboard.writeText(text).then(() => toast('URL copied to clipboard'));
 }
 
 // ── Init ───────────────────────────────────────────────────────────────────
 
+document.getElementById('log-date-filter').value = new Date().toISOString().split('T')[0];
+
 loadDevices();
 loadMappings();
 loadEmployees();
-
-// Set today's date as default for log filter
-document.getElementById('log-date-filter').value = new Date().toISOString().split('T')[0];
