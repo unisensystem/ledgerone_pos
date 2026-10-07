@@ -1,5 +1,6 @@
 // DOM Elements - will be initialized in initializeForm
 let branchSelect;
+let counterSelect;
 let asOfDateInput;
 let openingCashInput;
 let currencyInput;
@@ -30,6 +31,7 @@ let currentDeleteId = null;
 function initializeForm() {
     // Get DOM elements
     branchSelect = document.getElementById('branch');
+    counterSelect = document.getElementById('counter');
     asOfDateInput = document.getElementById('asOfDate');
     openingCashInput = document.getElementById('openingCash');
     currencyInput = document.getElementById('currency');
@@ -76,7 +78,7 @@ function initializeForm() {
     // Set up event listeners
     saveBtn.addEventListener('click', saveRecord);
     resetBtn.addEventListener('click', resetForm);
-    branchSelect.addEventListener('change', validateBranch);
+    branchSelect.addEventListener('change', function () { validateBranch(); loadCounters(this.value); });
     asOfDateInput.addEventListener('change', validateDate);
     openingCashInput.addEventListener('input', validateAmount);
     
@@ -119,6 +121,24 @@ async function loadBranches() {
     } catch (error) {
         showStatusMessage('Failed to load branches', 'error');
     }
+}
+
+// Load counters for the selected branch
+async function loadCounters(branchId) {
+    counterSelect.innerHTML = '<option value="">-- None (Branch Level) --</option>';
+    if (!branchId) return;
+    try {
+        const res = await fetch(`../../../../server/api/sale/pos_invoice/get-counters.php?branch_id=${branchId}`);
+        const data = await res.json();
+        if (data.success && data.counters.length > 0) {
+            data.counters.forEach(c => {
+                const opt = document.createElement('option');
+                opt.value = c.id;
+                opt.textContent = c.counter_name;
+                counterSelect.appendChild(opt);
+            });
+        }
+    } catch (e) { /* non-fatal */ }
 }
 
 // Load companies from API
@@ -197,20 +217,9 @@ function validateCompany() {
     return true;
 }
 
-// Check if form should be locked
+// Form is no longer globally locked — the API rejects duplicate branch+counter+date combos.
 function checkFormLock() {
-    const hasRecords = cashRecords.length > 0;
-    
-    lockOverlay.style.display = hasRecords ? 'flex' : 'none';
-    branchSelect.disabled = hasRecords;
-    asOfDateInput.disabled = hasRecords;
-    openingCashInput.disabled = hasRecords;
-    saveBtn.disabled = hasRecords;
-    resetBtn.disabled = hasRecords;
-    
-    if (hasRecords) {
-        showStatusMessage('Opening cash record already exists for this period. Form is locked.', 'warning');
-    }
+    lockOverlay.style.display = 'none';
 }
 
 // Validate date input
@@ -261,6 +270,7 @@ async function saveRecord() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 branch_id: branchSelect.value,
+                counter_id: counterSelect.value || null,
                 company_id: document.getElementById('company').value,
                 as_of_date: asOfDateInput.value,
                 opening_amount: openingCashInput.value,
@@ -310,6 +320,7 @@ async function loadRecords() {
                 const currencyCode = record.currency || '-';
                 row.innerHTML = `
                     <td>${record.branch_name || '-'}</td>
+                    <td>${record.counter_name || '<span style="color:var(--subtext);font-size:12px;">Branch Level</span>'}</td>
                     <td>${record.company_name || '-'}</td>
                     <td>${formatDate(record.as_of_date)}</td>
                     <td><strong>${currencySymbol}${parseFloat(record.opening_amount).toFixed(2)}</strong></td>
@@ -339,6 +350,7 @@ async function loadRecords() {
 function resetForm() {
     // Reset to default values
     branchSelect.value = '';
+    counterSelect.innerHTML = '<option value="">-- None (Branch Level) --</option>';
     document.getElementById('company').value = '';
     const today = new Date().toISOString().split('T')[0];
     asOfDateInput.value = today;
@@ -411,6 +423,7 @@ function openEditModal(recordId) {
     
     currentEditId = recordId;
     document.getElementById('editBranch').value = record.branch_name || '-';
+    document.getElementById('editCounter').value = record.counter_name || 'Branch Level';
     document.getElementById('editCompany').value = record.company_name || '-';
     document.getElementById('editAsOfDate').value = record.as_of_date;
     document.getElementById('editOpeningCash').value = record.opening_amount;

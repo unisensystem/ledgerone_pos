@@ -63,8 +63,8 @@ if (!$user_id) {
                     <div class="form-grid">
                         <div class="form-field">
                             <label for="branch" class="form-label required">Branch</label>
-                            <select 
-                                id="branch" 
+                            <select
+                                id="branch"
                                 class="form-input"
                                 required
                             >
@@ -72,6 +72,14 @@ if (!$user_id) {
                             </select>
                             <div class="helper-text">Select the branch</div>
                             <div id="branchError" class="error-text" style="display: none;">Please select a branch</div>
+                        </div>
+
+                        <div class="form-field">
+                            <label for="counter" class="form-label">Counter <span style="font-weight:400;color:var(--subtext);">(optional)</span></label>
+                            <select id="counter" class="form-input">
+                                <option value="">-- None (Branch Level) --</option>
+                            </select>
+                            <div class="helper-text">Select a counter for counter-wise opening cash</div>
                         </div>
                         
                         <div class="form-field">
@@ -151,6 +159,7 @@ if (!$user_id) {
                     <thead>
                         <tr>
                             <th>Branch</th>
+                            <th>Counter</th>
                             <th>Company</th>
                             <th>As of Date</th>
                             <th>Opening Cash Amount</th>
@@ -186,6 +195,10 @@ if (!$user_id) {
                 <div class="form-field">
                     <label for="editBranch" class="form-label">Branch</label>
                     <input type="text" id="editBranch" class="form-input" readonly>
+                </div>
+                <div class="form-field">
+                    <label for="editCounter" class="form-label">Counter</label>
+                    <input type="text" id="editCounter" class="form-input" readonly>
                 </div>
                 <div class="form-field">
                     <label for="editCompany" class="form-label">Company</label>

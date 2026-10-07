@@ -21,37 +21,39 @@ if (!$user_id || !$tenant_id) {
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $data = json_decode(file_get_contents('php://input'), true);
     
-    $branch_id = $data['branch_id'] ?? null;
-    $as_of_date = $data['as_of_date'] ?? null;
+    $branch_id     = $data['branch_id']     ?? null;
+    $counter_id    = !empty($data['counter_id']) ? intval($data['counter_id']) : null;
+    $as_of_date    = $data['as_of_date']    ?? null;
     $opening_amount = $data['opening_amount'] ?? null;
-    $currency_id = $data['currency'] ?? null;
-    $company_id = $data['company_id'] ?? null;
-    
+    $currency_id   = $data['currency']      ?? null;
+    $company_id    = $data['company_id']    ?? null;
+
     if (!$branch_id || !$as_of_date || !$opening_amount || !$currency_id) {
         http_response_code(400);
         echo json_encode(['error' => 'Missing required fields']);
         exit();
     }
-    
+
     try {
         $pdo->beginTransaction();
-        
-        // Check if record already exists
-        $stmt = $pdo->prepare("SELECT id FROM cash_opening WHERE tenant_id = ? AND branch_id = ? AND as_of_date = ?");
-        $stmt->execute([$tenant_id, $branch_id, $as_of_date]);
+
+        // NULL-safe duplicate check: counter_id <=> ? treats NULL = NULL as equal
+        $stmt = $pdo->prepare("SELECT id FROM cash_opening WHERE tenant_id = ? AND branch_id = ? AND as_of_date = ? AND counter_id <=> ?");
+        $stmt->execute([$tenant_id, $branch_id, $as_of_date, $counter_id]);
         if ($stmt->fetch()) {
             $pdo->rollBack();
             http_response_code(409);
-            echo json_encode(['error' => 'Opening cash already exists for this date']);
+            $label = $counter_id ? 'this counter on this date' : 'this branch on this date (branch level)';
+            echo json_encode(['error' => "Opening cash already exists for $label"]);
             exit();
         }
-        
-        // Insert cash opening record with currency_id
+
+        // Insert cash opening record
         $stmt = $pdo->prepare("
-            INSERT INTO cash_opening (tenant_id, company_id, branch_id, as_of_date, opening_amount, currency_id, entered_by, is_locked) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, 1)
+            INSERT INTO cash_opening (tenant_id, company_id, branch_id, counter_id, as_of_date, opening_amount, currency_id, entered_by, is_locked)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)
         ");
-        $stmt->execute([$tenant_id, $company_id, $branch_id, $as_of_date, $opening_amount, $currency_id, $username]);
+        $stmt->execute([$tenant_id, $company_id, $branch_id, $counter_id, $as_of_date, $opening_amount, $currency_id, $username]);
         $cash_opening_id = $pdo->lastInsertId();
         
         // Create accounting entries: Debit Cash, Credit Opening Balance Equity
@@ -90,7 +92,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $pdo, $tenant_id, $user_id, 'create', 'Cash Opening', $cash_opening_id, $as_of_date,
             "Created cash opening (as of $as_of_date): Amount " . number_format($opening_amount, 2),
             null,
-            ['as_of_date' => $as_of_date, 'branch_id' => $branch_id, 'company_id' => $company_id, 'opening_amount' => $opening_amount, 'currency_id' => $currency_id]
+            ['as_of_date' => $as_of_date, 'branch_id' => $branch_id, 'counter_id' => $counter_id, 'company_id' => $company_id, 'opening_amount' => $opening_amount, 'currency_id' => $currency_id]
         );
 
         $pdo->commit();
@@ -105,23 +107,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 } elseif ($_SERVER['REQUEST_METHOD'] === 'GET') {
     try {
         $stmt = $pdo->prepare("
-            SELECT 
-                co.id, 
-                co.as_of_date, 
-                co.opening_amount, 
-                co.currency_id, 
-                co.entered_by, 
-                co.updated_at, 
-                b.branch_name, 
+            SELECT
+                co.id,
+                co.as_of_date,
+                co.opening_amount,
+                co.currency_id,
+                co.entered_by,
+                co.updated_at,
+                b.branch_name,
                 c.company_name,
-                cur.code as currency,
-                cur.symbol as currency_symbol
-            FROM cash_opening co 
-            LEFT JOIN branches b ON co.branch_id = b.id AND co.tenant_id = b.tenant_id
-            LEFT JOIN companies c ON co.company_id = c.id AND co.tenant_id = c.tenant_id
-            LEFT JOIN ledgerone_public.currencies cur ON co.currency_id = cur.id
-            WHERE co.tenant_id = ? 
-            ORDER BY co.as_of_date DESC
+                cur.code   AS currency,
+                cur.symbol AS currency_symbol,
+                ct.counter_name
+            FROM cash_opening co
+            LEFT JOIN branches  b   ON b.id  = co.branch_id  AND b.tenant_id  = co.tenant_id
+            LEFT JOIN companies c   ON c.id  = co.company_id AND c.tenant_id  = co.tenant_id
+            LEFT JOIN ledgerone_public.currencies cur ON cur.id = co.currency_id
+            LEFT JOIN counters  ct  ON ct.id = co.counter_id
+            WHERE co.tenant_id = ?
+            ORDER BY co.as_of_date DESC, co.id DESC
         ");
         $stmt->execute([$tenant_id]);
         $records = $stmt->fetchAll(PDO::FETCH_ASSOC);
