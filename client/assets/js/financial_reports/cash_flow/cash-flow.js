@@ -32,6 +32,10 @@ async function fetchCashFlowData() {
         if (companyFilter.value) {
             params.append('company_id', companyFilter.value);
         }
+        const branchFilter = document.getElementById('branchFilter');
+if (branchFilter.value) {
+    params.append('branch_id', branchFilter.value);
+}
         
         const currencyFilter = document.getElementById('currencyFilter');
         if (currencyFilter.value) {
@@ -367,7 +371,8 @@ async function resetFilters() {
     document.getElementById('methodFilter').value = 'all';
     document.getElementById('bankAccountFilter').value = 'all';
     document.getElementById('typeFilter').value = 'all';
-    document.getElementById('companyFilter').value = '';
+   document.getElementById('companyFilter').value = '';
+document.getElementById('branchFilter').value = '';   // NEW
     
     toggleCustomDateInputs();
     currentPage = 1;
@@ -438,6 +443,22 @@ async function loadCompanies() {
     }
 }
 
+async function loadBranches() {
+    try {
+        const response = await fetch('../../../../server/api/financial_reports/cash_flow/get-branches.php');
+        const result = await response.json();
+        if (result.success) {
+            const branchFilter = document.getElementById('branchFilter');
+            branchFilter.innerHTML = '<option value="">All Branches</option>';
+            result.data.forEach(b => {
+                branchFilter.innerHTML += `<option value="${b.id}">${b.display_name}</option>`;
+            });
+        }
+    } catch (error) {
+        console.error('Error loading branches:', error);
+    }
+}
+
 // Load currencies
 async function loadCurrencies() {
     try {
@@ -465,8 +486,8 @@ document.addEventListener('DOMContentLoaded', async function () {
     await loadCurrencies();
     await populateFilterOptions();
     await loadCompanies();
-    await applyFilters();
-
+await loadBranches();
+await applyFilters();
     // Add event listeners
     document.getElementById('dateRange').addEventListener('change', toggleCustomDateInputs);
     document.getElementById('applyFiltersBtn').addEventListener('click', applyFilters);
@@ -488,6 +509,10 @@ document.addEventListener('DOMContentLoaded', async function () {
             params.append('company_id', companyFilter.value);
         }
         
+        const branchFilter = document.getElementById('branchFilter');
+if (branchFilter.value) {
+    params.append('branch_id', branchFilter.value);
+}
         const currencyFilter = document.getElementById('currencyFilter');
         if (currencyFilter.value) {
             params.append('currency_id', currencyFilter.value);

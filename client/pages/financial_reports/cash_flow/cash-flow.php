@@ -65,8 +65,14 @@ $currency_symbol = $currency['symbol'];
                         <option value="">All Companies</option>
                     </select>
                 </div>
-                <div class="filter-group">
-                    <label class="filter-label">Date Range</label>
+              <div class="filter-group">
+    <label class="filter-label">Branch</label>
+    <select class="filter-input" id="branchFilter">
+        <option value="">All Branches</option>
+    </select>
+</div>
+<div class="filter-group">
+    <label class="filter-label">Date Range</label>
                     <select class="filter-input" id="dateRange">
                         <option value="all">All Dates</option>
                         <option value="today">Today</option>

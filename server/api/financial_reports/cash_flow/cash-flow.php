@@ -45,6 +45,13 @@ try {
     $offset = ($page - 1) * $limit;
     $company_id = !empty($_GET['company_id']) ? $_GET['company_id'] : null;
 
+    // Branch filter. intval() makes it safe to inline, and inlining means the
+    // positional ? params order below does not change.
+    $branch_id = !empty($_GET['branch_id']) ? intval($_GET['branch_id']) : null;
+    $bf = function ($alias) use ($branch_id) {
+        return $branch_id ? " AND {$alias}.branch_id = {$branch_id}" : "";
+    };
+
     // Effective start-of-range date used ONLY for the "soft opening" balance calculation
     // (balance carried in from transactions before the visible range). Needed for every
     // preset range, not just 'custom' - otherwise Opening Balance always shows the raw
@@ -293,7 +300,7 @@ try {
             WHERE pdc.reference_table = 'receive_voucher' 
             AND pdc.reference_id = rv.id
         )
-        " . ($company_id ? " AND rv.company_id = ?" : "") . "
+        " . ($company_id ? " AND rv.company_id = ?" : "") . $bf('rv') . "
         {$date_conditions[0]}
         
         UNION ALL
@@ -318,7 +325,7 @@ try {
             WHERE pdc.reference_table = 'payment_voucher' 
             AND pdc.reference_id = pv.id
         )
-        " . ($company_id ? " AND pv.company_id = ?" : "") . "
+        " . ($company_id ? " AND pv.company_id = ?" : "") . $bf('pv') . "
         {$date_conditions[1]}
         
         UNION ALL
@@ -337,7 +344,7 @@ try {
         JOIN station_daily_usage sdu ON rs.station_daily_usage_id = sdu.id
         LEFT JOIN products p ON sdu.product_id = p.id
         LEFT JOIN accounts a ON rs.account_id = a.id
-        WHERE rs.tenant_id = ? AND rs.amount > 0 {$date_conditions[2]}
+        WHERE rs.tenant_id = ? AND rs.amount > 0 " . $bf('sdu') . " {$date_conditions[2]}
         
         UNION ALL
         
@@ -360,7 +367,7 @@ try {
         LEFT JOIN suppliers s ON pdc.supplier_id = s.id
         LEFT JOIN bank_accounts ba ON pdc.bank_account_id = ba.id
         WHERE pdc.tenant_id = ? AND pdc.status = 'Approved'
-        " . ($company_id ? " AND pdc.company_id = ?" : "") . "
+        " . ($company_id ? " AND pdc.company_id = ?" : "") . $bf('pdc') . "
         {$date_conditions[3]}
         
         UNION ALL
@@ -381,7 +388,7 @@ try {
         WHERE sr.tenant_id = ? 
         AND sr.status = 'Posted'
         AND sr.amount_refunded > 0
-        " . ($company_id ? " AND sr.company_id = ?" : "") . "
+        " . ($company_id ? " AND sr.company_id = ?" : "") . $bf('sr') . "
         {$date_conditions[4]}
         
         UNION ALL
@@ -404,7 +411,7 @@ try {
         WHERE evl.tenant_id = ? 
         AND evl.cheque_date IS NULL
         AND ev.is_cash_flow = 1
-        " . ($company_id ? " AND ev.company_id = ?" : "") . "
+        " . ($company_id ? " AND ev.company_id = ?" : "") . $bf('ev') . "
         {$date_conditions[5]}
         
         UNION ALL
@@ -426,7 +433,7 @@ try {
         LEFT JOIN bank_accounts ba ON pei.bank_account_id = ba.id
         WHERE pei.tenant_id = ? 
         AND pei.cheque_date IS NULL
-        " . ($company_id ? " AND pe.company_id = ?" : "") . "
+        " . ($company_id ? " AND pe.company_id = ?" : "") . $bf('pe') . "
         {$date_conditions[6]}
         
         UNION ALL
@@ -459,7 +466,7 @@ try {
         WHERE jv.tenant_id = ? 
         AND jv.status = 'posted'
         AND (cash_line.account_id = 1 OR cash_acc.sub_account_id = 75 OR cash_line.account_id IN (78, 79))
-        " . ($company_id ? " AND jv.company_id = ?" : "") . "
+        " . ($company_id ? " AND jv.company_id = ?" : "") . $bf('jv') . "
         {$date_conditions[7]}
         
         UNION ALL
@@ -477,7 +484,7 @@ try {
         FROM accounting_ledger al
         JOIN rent_management rm ON al.reference_id = rm.id AND al.reference_table = 'rent_management'
         LEFT JOIN customers c ON rm.customer_id = c.id
-        WHERE al.tenant_id = ? AND al.account_id IN (1, 7) AND al.debit > 0
+        WHERE al.tenant_id = ? AND al.account_id IN (1, 7) AND al.debit > 0 " . $bf('rm') . "
         {$date_conditions[8]}
         
         UNION ALL
@@ -493,7 +500,7 @@ try {
             pex.total_amount as outflow,
             NULL as currency_id
         FROM production_expenses pex
-        WHERE pex.tenant_id = ?
+        WHERE pex.tenant_id = ? " . $bf('pex') . "
         {$date_conditions[9]}
         
         ORDER BY date DESC, inflow DESC, outflow DESC
@@ -507,6 +514,7 @@ try {
         'from_date' => $from_date,
         'to_date' => $to_date,
         'company_id' => $company_id,
+        'branch_id' => $branch_id,
         'params_count' => count($params),
         'params' => $params,
         'rows_fetched' => count($all_transactions)
@@ -645,7 +653,7 @@ try {
                 FROM receive_voucher rv
                 LEFT JOIN bank_accounts ba ON rv.bank_account_id = ba.id
                 WHERE rv.tenant_id = ? AND rv.voucher_date < ?
-                " . ($company_id ? " AND rv.company_id = ?" : "") . "
+                " . ($company_id ? " AND rv.company_id = ?" : "") . $bf('rv') . "
                 $bank_filter
                 AND NOT EXISTS (
                     SELECT 1 FROM post_dated_cheques pdc 
@@ -659,7 +667,7 @@ try {
                 FROM payment_voucher pv
                 LEFT JOIN bank_accounts ba ON pv.bank_account_id = ba.id
                 WHERE pv.tenant_id = ? AND pv.voucher_date < ?
-                " . ($company_id ? " AND pv.company_id = ?" : "") . "
+                " . ($company_id ? " AND pv.company_id = ?" : "") . $bf('pv') . "
                 $bank_filter
                 AND NOT EXISTS (
                     SELECT 1 FROM post_dated_cheques pdc 
@@ -674,7 +682,7 @@ try {
                 JOIN station_daily_usage sdu ON rs.station_daily_usage_id = sdu.id
                 LEFT JOIN accounts a ON rs.account_id = a.id
                 WHERE rs.tenant_id = ? AND rs.amount > 0 AND sdu.usage_date < ?
-                " . ($bank_account !== 'all' ? " AND 1=0" : "") . "
+                " . ($bank_account !== 'all' ? " AND 1=0" : "") . $bf('sdu') . "
                 
                 UNION ALL
                 
@@ -685,7 +693,7 @@ try {
                 FROM post_dated_cheques pdc
                 LEFT JOIN bank_accounts ba ON pdc.bank_account_id = ba.id
                 WHERE pdc.tenant_id = ? AND pdc.status = 'Approved' AND pdc.cheque_date < ?
-                " . ($company_id ? " AND pdc.company_id = ?" : "") . "
+                " . ($company_id ? " AND pdc.company_id = ?" : "") . $bf('pdc') . "
                 $bank_filter
                 
                 UNION ALL
@@ -700,7 +708,7 @@ try {
                 LEFT JOIN accounts bank_acc ON jvl.account_id = bank_acc.id
                 " . ($bank_account !== 'all' ? "JOIN bank_accounts ba ON jvl.account_id = ba.account_id AND ba.id = $bank_account" : "") . "
                 WHERE jv.tenant_id = ? AND jv.status = 'posted' AND jv.voucher_date < ?
-                " . ($company_id ? " AND jv.company_id = ?" : "") . "
+                " . ($company_id ? " AND jv.company_id = ?" : "") . $bf('jv') . "
                 AND (jvl.account_id = 1 OR a.sub_account_id = 75 OR jvl.account_id IN (78, 79))
                 
                 UNION ALL
@@ -712,7 +720,7 @@ try {
                 FROM sale_return sr
                 LEFT JOIN bank_accounts ba ON sr.bank_account_id = ba.id
                 WHERE sr.tenant_id = ? AND sr.status = 'Posted' AND sr.amount_refunded > 0 AND sr.sale_date < ?
-                " . ($company_id ? " AND sr.company_id = ?" : "") . "
+                " . ($company_id ? " AND sr.company_id = ?" : "") . $bf('sr') . "
                 $bank_filter
                 
                 UNION ALL
@@ -725,7 +733,7 @@ try {
                 JOIN expense_voucher ev ON evl.voucher_id = ev.id
                 LEFT JOIN bank_accounts ba ON evl.bank_account_id = ba.id
                 WHERE evl.tenant_id = ? AND evl.cheque_date IS NULL AND ev.is_cash_flow = 1 AND ev.date < ?
-                " . ($company_id ? " AND ev.company_id = ?" : "") . "
+                " . ($company_id ? " AND ev.company_id = ?" : "") . $bf('ev') . "
                 $bank_filter
                 
                 UNION ALL
@@ -739,7 +747,7 @@ try {
                 LEFT JOIN employees e ON pei.employee_id COLLATE utf8mb4_unicode_ci = e.employee_id COLLATE utf8mb4_unicode_ci AND e.tenant_id = pei.tenant_id
                 LEFT JOIN bank_accounts ba ON pei.bank_account_id = ba.id
                 WHERE pei.tenant_id = ? AND pei.cheque_date IS NULL AND pe.payroll_date < ?
-                " . ($company_id ? " AND pe.company_id = ?" : "") . "
+                " . ($company_id ? " AND pe.company_id = ?" : "") . $bf('pe') . "
                 $bank_filter
             ) as soft_transactions
         ";

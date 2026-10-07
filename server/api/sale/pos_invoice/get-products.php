@@ -17,6 +17,9 @@ if (!$tenant_id) {
 
 try {
     $company_id = isset($_GET['company_id']) ? (int)$_GET['company_id'] : null;
+    // When include_children=1, child products are returned too (used by counter invoice quick add).
+    // Default behaviour (parents only) is unchanged for every other caller.
+    $include_children = isset($_GET['include_children']) && $_GET['include_children'] == '1';
 
     $sql = "
         SELECT
@@ -26,6 +29,7 @@ try {
             p.trade_offer_discount, p.sales_tax, p.sales_tax_type,
             p.uom_type, p.uom_group_id, p.product_conversion_factor,
             p.price_entry_unit_id, p.trade_price_entry_value, p.mrp_entry_value,
+            pp.name as parent_product_name,
             -- product_uom_conversions is essentially never populated in practice, and
             -- peu.conversion_factor (the UOM's own generic factor) is just a 1.0
             -- placeholder for a per_product-scoped unit like Carton — the real
@@ -43,12 +47,17 @@ try {
             u.uom_name as default_unit_name, u.unit_scope as default_unit_scope,
             u.is_base_unit as default_is_base_unit, u.conversion_factor as default_conversion_factor
         FROM products p
+        LEFT JOIN products pp ON p.parent_product_id = pp.id
         LEFT JOIN uom u ON p.default_unit_id = u.id
         LEFT JOIN uom peu ON p.price_entry_unit_id = peu.id
         LEFT JOIN product_uom_conversions puc ON puc.product_id = p.id AND puc.uom_id = p.price_entry_unit_id
-        WHERE p.tenant_id = ? AND p.is_active = 1 AND p.parent_product_id IS NULL
+        WHERE p.tenant_id = ? AND p.is_active = 1
     ";
     $params = [$tenant_id];
+
+    if (!$include_children) {
+        $sql .= " AND p.parent_product_id IS NULL";
+    }
 
     if ($company_id) {
         $sql .= " AND p.company_id = ?";
@@ -59,7 +68,7 @@ try {
     $stmt = $pdo->prepare($sql);
     $stmt->execute($params);
     $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
-    
+
     echo json_encode(['success' => true, 'products' => $products]);
 } catch (Exception $e) {
     http_response_code(500);

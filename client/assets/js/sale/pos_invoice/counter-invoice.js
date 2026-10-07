@@ -50,7 +50,14 @@ function getEffectivePrice(product) {
     } else {
         price = product.mrp;
     }
-    return parseFloat(price) || 0;
+    const parsed = parseFloat(price) || 0;
+
+    // Child product with no price of its own: fall back to the parent's price
+    if (parsed <= 0 && product.parent_product_id) {
+        const parent = productsData.find(p => p.id == product.parent_product_id);
+        if (parent && parent !== product) return getEffectivePrice(parent);
+    }
+    return parsed;
 }
 
 // Load data on page load
@@ -602,10 +609,11 @@ document.addEventListener('DOMContentLoaded', async function() {
         const matches = productsData.filter(p => 
             p.name.toLowerCase().includes(searchTerm) ||
             p.code.toLowerCase().includes(searchTerm) ||
+            (p.parent_product_name && p.parent_product_name.toLowerCase().includes(searchTerm)) ||
             (p.barcode && p.barcode.toLowerCase() === searchTerm) ||
             (p.qr_code && p.qr_code.toLowerCase() === searchTerm)
         );
-        
+
         if (matches.length === 0) {
             suggestions.style.display = 'none';
         } else if (matches.length === 1 && matches[0].barcode && matches[0].barcode.toLowerCase() === searchTerm) {
@@ -632,7 +640,7 @@ document.addEventListener('DOMContentLoaded', async function() {
                 const div = document.createElement('div');
                 div.className = 'suggestion-item';
                 div.style.cssText = 'padding: 8px 12px; cursor: pointer; border-bottom: 1px solid var(--border-default); background: white;';
-                div.innerHTML = `<strong>${product.name}</strong><br><small style="color: var(--subtext);">${product.code} - ${getEffectivePrice(product)}</small>`;
+                div.innerHTML = `<strong>${product.name}</strong><br><small style="color: var(--subtext);">${product.code} - ${getEffectivePrice(product)}${product.parent_product_id && product.parent_product_name ? ' (Child of ' + product.parent_product_name + ')' : ''}</small>`;
                 div.addEventListener('mouseenter', function() {
                     suggestions.querySelectorAll('.suggestion-item').forEach(el => {
                         el.classList.remove('selected');
@@ -876,7 +884,8 @@ window.loadDraft = async function(draftId) {
 };
 
 async function loadProducts() {
-    const response = await fetch('../../../../server/api/sale/pos_invoice/get-products.php');
+    // include_children=1 so child products also show in the Quick Add dropdown
+    const response = await fetch('../../../../server/api/sale/pos_invoice/get-products.php?include_children=1');
     const data = await response.json();
     if (data.success) productsData = data.products;
 }
@@ -1379,8 +1388,9 @@ async function checkStockAndProceed(product) {
                         });
                         addProductWithChildren(product, children);
                     } else {
-                        // Show modal for manual selection
-                        showChildProductModal(product, data.children);
+                        // Children are now selectable directly from the Quick Add dropdown,
+                        // so the manual child-selection modal is skipped here.
+                        addProductToInvoice(product);
                     }
                 } else {
                     addProductToInvoice(product);
