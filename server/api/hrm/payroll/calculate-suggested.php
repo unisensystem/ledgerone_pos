@@ -20,16 +20,10 @@
 // Unmarked days that have no attendance mark and no leave request are
 // treated as ABSENT to prevent silent under-payment when HR forgets to mark
 // attendance. This is the same rule used by the Monthly Employee Report, so
-// both always agree.
-//
-// OVERTIME (two sources, merged):
-//   1. Approved leave_records OT entries (manually logged OT) — ot_amount
-//      already stored at approval time, used as-is.
-//   2. Attendance-derived OT — if check_out_time exceeds the employee's
-//      shift end time (from shift_timing column, e.g. "09:00-18:00"), the
-//      extra hours are priced at overtime_rate_per_hour. If that rate is 0
-//      or not set, falls back to (base_salary / 30 / 8). Only surplus of
-//      >= 15 minutes is counted (avoids rounding noise).
+// both always agree. Overtime is the only thing priced at the employee's per-hour
+// overtime_rate_per_hour — that rate never touches present/absent/leave math,
+// it only feeds ot_amount which is already computed and stored on the
+// leave_records row when the OT entry was approved (see hrm/leave/leave-request.php).
 //
 // Pending and rejected leave/overtime are never counted here — only
 // 'approved' rows affect the suggested amount. Pending rows in the period
@@ -123,15 +117,14 @@ try {
     $stmt->execute([$tenant_id, $employeeCode, $periodStart, $periodEnd]);
     $pendingLeaveCount = (int) $stmt->fetchColumn();
 
-    // ── SOURCE 1: Approved overtime from leave_records ──────────────────────
-    // ot_amount here is already priced at the employee's own
-    // overtime_rate_per_hour at the time the OT was approved — this file
-    // never re-derives or re-prices it.
+    // Approved overtime logged in this period. ot_amount here is already
+    // priced at the employee's own overtime_rate_per_hour at the time the OT
+    // was approved — this file never re-derives or re-prices it.
     $stmt = $pdo->prepare("
         SELECT start_date AS ot_date, ot_hours, ot_rate_multiplier, ot_amount
         FROM leave_records
         WHERE tenant_id = ? AND employee_id = ? AND ot_hours IS NOT NULL
-          AND LOWER(status) = 'approved' AND start_date BETWEEN ? AND ?
+          AND status = 'approved' AND start_date BETWEEN ? AND ?
         ORDER BY start_date ASC
     ");
     $stmt->execute([$tenant_id, $employeeCode, $periodStart, $periodEnd]);
@@ -146,103 +139,14 @@ try {
             'hours'           => (float) $r['ot_hours'],
             'rate_multiplier' => (float) $r['ot_rate_multiplier'],
             'amount'          => (float) $r['ot_amount'],
-            'source'          => 'approved_entry',
         ];
     }
-
-    // ── SOURCE 2: Attendance-derived overtime ────────────────────────────────
-    // For every 'present' attendance row in the period that has a
-    // check_out_time past the employee's shift end time, price the surplus
-    // at overtime_rate_per_hour. Fall back to daily_rate/8 when that column
-    // is zero or null. Only surplus >= 15 minutes is counted (avoids noise
-    // from clock-rounding). Dates already covered by a leave_records OT
-    // entry (source 1 above) are skipped to avoid double-counting.
-    $attendanceOtHours  = 0.0;
-    $attendanceOtAmount = 0.0;
-    $attendanceOtRecords = [];
-
-    $shiftTiming = $employee['shift_timing'] ?? ''; // e.g. "09:00-18:00"
-    $otRatePerHour = (float) ($employee['overtime_rate_per_hour'] ?? 0);
-
-    // Fallback: if no per-hour rate set, derive from daily rate / 8 hours
-    if ($otRatePerHour <= 0) {
-        $otRatePerHour = round($dailyRate / 8, 4);
-    }
-
-    if (!empty($shiftTiming)) {
-        $shiftParts = explode('-', $shiftTiming);
-        // shift_timing stores "HH:MM-HH:MM"; take the second part as end time
-        $shiftEndStr = isset($shiftParts[1]) ? trim($shiftParts[1]) : null;
-
-        if ($shiftEndStr) {
-            // Dates already covered by an approved leave_records OT entry
-            $approvedOtDates = array_column($otRecords, 'date');
-
-            // Fetch all present attendance rows with check_out in this period
-            $stmt = $pdo->prepare("
-                SELECT attendance_date, check_out_time
-                FROM attendance
-                WHERE tenant_id = ? AND employee_id = ?
-                  AND attendance_date BETWEEN ? AND ?
-                  AND status = 'present'
-                  AND check_out_time IS NOT NULL
-                ORDER BY attendance_date ASC
-            ");
-            $stmt->execute([$tenant_id, $employeeCode, $periodStart, $periodEnd]);
-            $presentRows = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-            foreach ($presentRows as $pr) {
-                $dateStr = $pr['attendance_date'];
-
-                // Skip if already covered by a manually approved OT entry
-                if (in_array($dateStr, $approvedOtDates, true)) {
-                    continue;
-                }
-
-                // Build shift-end datetime for this attendance date
-                $shiftEndDt  = new DateTime($dateStr . ' ' . $shiftEndStr . ':00');
-                $checkOutDt  = new DateTime($pr['check_out_time']);
-
-                if ($checkOutDt <= $shiftEndDt) {
-                    continue; // Left on time or early — no OT
-                }
-
-                $diffSeconds = $checkOutDt->getTimestamp() - $shiftEndDt->getTimestamp();
-                $diffMinutes = $diffSeconds / 60;
-
-                // Ignore anything under 15 minutes (clock noise / rounding)
-                if ($diffMinutes < 15) {
-                    continue;
-                }
-
-                $extraHours  = round($diffMinutes / 60, 2);
-                $extraAmount = round($extraHours * $otRatePerHour, 2);
-
-                $attendanceOtHours  += $extraHours;
-                $attendanceOtAmount += $extraAmount;
-                $attendanceOtRecords[] = [
-                    'date'            => $dateStr,
-                    'hours'           => $extraHours,
-                    'rate_multiplier' => 1,
-                    'amount'          => $extraAmount,
-                    'source'          => 'attendance',
-                ];
-            }
-        }
-    }
-
-    $attendanceOtAmount = round($attendanceOtAmount, 2);
-
-    // Merge both OT sources
-    $otHoursTotal  += $attendanceOtHours;
-    $otAmountTotal += $attendanceOtAmount;
-    $otAmountTotal  = round($otAmountTotal, 2);
-    $otRecords      = array_merge($otRecords, $attendanceOtRecords);
+    $otAmountTotal = round($otAmountTotal, 2);
 
     // Attendance for the period. Count explicit 'present' / 'absent' marks.
     // Unmarked days (no attendance record) that aren't covered by leave are
     // treated as ABSENT — prevents silent under-payment when HR forgets to mark
-    // attendance.
+    // attendance. Working days calculated from calendar days - (total marked days).
     $stmt = $pdo->prepare("
         SELECT status, COUNT(*) AS cnt
         FROM attendance
@@ -259,15 +163,23 @@ try {
     }
 
     // Calculate calendar days in the period. This drives BOTH the
-    // unmarked-days-as-absent check below AND the gross salary proration.
+    // unmarked-days-as-absent check below AND the gross salary proration —
+    // a shorter period (e.g. 1st to the 23rd) naturally works out to fewer
+    // calendar days, which is exactly what should reduce the payout.
     $startDate = new DateTime($periodStart);
     $endDate = new DateTime($periodEnd);
-    $calendarDays = (int) $endDate->diff($startDate)->format('%a') + 1;
+    $calendarDays = (int) $endDate->diff($startDate)->format('%a') + 1; // +1 to include end date
 
+    // Total marked days (present + absent + all leaves)
     $totalMarkedDays = $presentDays + $absentDays + $paidLeaveDays + $unpaidLeaveDays;
+
+    // Unmarked days = days with no attendance record and no approved leave
     $unmarkedDays = $calendarDays - $totalMarkedDays;
 
-    // Every unmarked day counts as absent — same rule as the Monthly Employee Report.
+    // FIX: every unmarked day counts as absent — same rule as the Monthly
+    // Employee Report. Previously this only applied when the employee had ZERO
+    // present days, so an employee with even 1 present day got all their
+    // unmarked days paid in full (e.g. 3 present + 24 unmarked showed full gross).
     if ($unmarkedDays > 0) {
         $absentDays += $unmarkedDays;
     }
@@ -279,15 +191,21 @@ try {
         + (float) $employee['communication_allowance'] + (float) $employee['education_allowance']
         + (float) $employee['travel_allowance'] + (float) $employee['other_allowance'];
 
-    // Prorate gross to the days actually in this period.
+    // Prorate gross (base + allowances) to the days actually in this period,
+    // on the same /30 basis as dailyRate above. A full-month period
+    // (calendarDays == 30, or 31/28/29 — still divided by 30 to match the
+    // existing daily_rate convention) naturally comes out close to the full
+    // figure; a shorter period (e.g. 23 days) pays only that fraction.
     $grossAmount = round(($fullMonthGrossAmount / 30) * $calendarDays, 2);
 
-    // Two separate deduction buckets so the breakdown stays traceable.
+    // Two separate deduction buckets so the breakdown stays traceable, but
+    // both priced at the same daily_rate — only OT uses a different rate.
     $unpaidLeaveDeduction = round($unpaidLeaveDays * $dailyRate, 2);
     $absentDeduction = round($absentDays * $dailyRate, 2);
     $totalDeduction = round($unpaidLeaveDeduction + $absentDeduction, 2);
 
-    // Clamp at 0 — deductions should never push the suggested figure below zero.
+    // Clamp at 0 — deductions should never push the suggested figure below
+    // zero. Overtime is added back in as a straight plus.
     $netAmount = max(0, round($grossAmount - $totalDeduction + $otAmountTotal, 2));
 
     echo json_encode([
@@ -303,6 +221,7 @@ try {
             'unpaid_leave_days' => $unpaidLeaveDays,
             'pending_leave_requests' => $pendingLeaveCount,
         ],
+        // Approved leave requests overlapping the period — for the "Details" popup.
         'leave_records' => $leaveRecords,
         'overtime' => [
             'total_hours' => $otHoursTotal,

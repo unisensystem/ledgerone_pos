@@ -4,29 +4,9 @@ let paymentMethods = [];
 let bankAccounts = [];
 let companies = [];
 
-// ── FIX: race condition ──────────────────────────────────────────────
-// Previously each reference-data fetch (companies, employees, payment
-// methods, bank accounts) ran independently, and row creation was kicked
-// off after a *guessed* setTimeout (800ms / 1200ms). If a fetch happened
-// to resolve after that guessed delay (slow network, busy server, etc.)
-// the row was already built with an empty paymentMethods/bankAccounts
-// array — and since rows aren't re-rendered afterward, the dropdown
-// stayed permanently empty. This is why it "worked on some machines and
-// not others": it was purely a timing race, not a code path difference.
-//
-// Fix: wrap each fetch in a promise, and never build a row (new or from
-// view/edit data) until Promise.all() for all four reference datasets
-// has actually resolved. No more guessing how long the network will take.
-function fetchJSON(url) {
-    return fetch(url)
-        .then(res => res.json())
-        .catch(err => {
-            console.error(`Error fetching ${url}:`, err);
-            return { success: false };
-        });
-}
-
-const companiesPromise = fetchJSON('../../../../server/api/financial_reports/cash_flow/get-companies.php')
+// Fetch companies
+fetch('../../../../server/api/financial_reports/cash_flow/get-companies.php')
+    .then(res => res.json())
     .then(data => {
         if (data.success) {
             companies = data.data || [];
@@ -39,41 +19,41 @@ const companiesPromise = fetchJSON('../../../../server/api/financial_reports/cas
             });
             if (companies.length === 1) sel.value = companies[0].id;
         }
-    });
+    })
+    .catch(err => console.error('Error fetching companies:', err));
 
-const employeesPromise = fetchJSON('../../../../server/api/hrm/employees/employee-list.php')
+// Fetch employees
+fetch('../../../../server/api/hrm/employees/employee-list.php')
+    .then(res => res.json())
     .then(data => {
         if (data.success) {
             employees = data.employees || [];
             populateEmployeeDropdown();
         }
-    });
+    })
+    .catch(err => console.error('Error fetching employees:', err));
 
-const paymentMethodsPromise = fetchJSON('../../../../server/api/hrm/payroll/payment-methods.php')
+// Fetch payment methods
+fetch('../../../../server/api/hrm/payroll/payment-methods.php')
+    .then(res => res.json())
     .then(data => {
         if (data.success) {
             paymentMethods = data.payment_methods || [];
             console.log('Payment methods loaded:', paymentMethods);
         }
-    });
+    })
+    .catch(err => console.error('Error fetching payment methods:', err));
 
-const bankAccountsPromise = fetchJSON('../../../../server/api/hrm/payroll/bank-accounts.php')
+// Fetch bank accounts
+fetch('../../../../server/api/hrm/payroll/bank-accounts.php')
+    .then(res => res.json())
     .then(data => {
         if (data.success) {
             bankAccounts = data.bank_accounts || [];
             console.log('Bank accounts loaded:', bankAccounts);
         }
-    });
-
-// Resolves once ALL reference data (companies, employees, payment methods,
-// bank accounts) is actually in memory — this is what row-building code
-// now waits on instead of a guessed timeout.
-const referenceDataReady = Promise.all([
-    companiesPromise,
-    employeesPromise,
-    paymentMethodsPromise,
-    bankAccountsPromise
-]);
+    })
+    .catch(err => console.error('Error fetching bank accounts:', err));
 
 // DOM elements
 const dateInput = document.getElementById('date');
@@ -98,13 +78,6 @@ const submitBtn = document.getElementById('submitBtn');
 // month's last day, the period naturally covers the whole month as before.
 // There's no separate Attendance Period field on this form; the standalone
 // Leave module page is the single source of truth for leave/overtime.
-// Format a Date as YYYY-MM-DD from its LOCAL parts. toISOString() converts to
-// UTC first, which in timezones ahead of UTC (e.g. Pakistan, UTC+5) shifts
-// local midnight back to the previous day (1 Sep -> 31 Aug, 30 Sep -> 29 Sep).
-function formatLocalDate(dt) {
-    return dt.getFullYear() + '-' + String(dt.getMonth() + 1).padStart(2, '0') + '-' + String(dt.getDate()).padStart(2, '0');
-}
-
 function getPayrollPeriod() {
     const d = dateInput.value ? new Date(dateInput.value) : new Date();
     const year = d.getFullYear();
@@ -130,7 +103,6 @@ function getPayrollPeriod() {
 
     return { start: fmt(start), end: end };
 }
-
 // Initialize form
 function initializeForm() {
     const urlParams = new URLSearchParams(window.location.search);
@@ -154,19 +126,13 @@ function initializeForm() {
             })
             .catch(err => console.error('Error generating payroll ID:', err));
 
-        // FIX: wait for the actual reference-data fetches to resolve
-        // instead of guessing an 800ms delay. This is the core of the
-        // "payment method dropdown sometimes empty" fix — the first row
-        // is now guaranteed to be built with paymentMethods/bankAccounts
-        // already populated, no matter how slow the network is.
-        referenceDataReady.then(() => {
+        // Wait for data to load before adding first row
+        setTimeout(() => {
             addTableRow();
-        });
+        }, 800);
     }
 
-    // Populate employee dropdown (safe to call again once employees load;
-    // also called from employeesPromise above so it's not left empty if
-    // this runs before that fetch resolves)
+    // Populate employee dropdown
     populateEmployeeDropdown();
 
     // Add event listeners
@@ -180,90 +146,89 @@ function loadPayrollData(id, isViewMode) {
     if (!isViewMode) {
         editPayrollId = id;
     }
-
-    const payrollPromise = fetchJSON(`../../../../server/api/hrm/payroll/payroll-get.php?id=${id}`);
-
-    // FIX: wait for BOTH the payroll record itself AND all reference data
-    // (payment methods, bank accounts, employees, companies) before
-    // building any rows. Previously this used two guessed, stacked
-    // setTimeouts (1200ms then 200ms) with no real link to when the data
-    // had actually arrived — the same race condition as the "add new"
-    // path, just harder to hit because of the longer delay.
-    Promise.all([payrollPromise, referenceDataReady]).then(([data]) => {
-        if (data.success) {
-            const payroll = data.payroll;
-            dateInput.value = payroll.payroll_date;
-            payrollIdInput.value = payroll.payroll_code;
-            if (payroll.company_id) {
-                document.getElementById('companyId').value = payroll.company_id;
-            }
-
-            // Build one row per item — dropdowns are already populated at
-            // this point, so each row's <select> options exist immediately.
-            payroll.items.forEach(() => addTableRow());
-
-            const rows = tableBody.querySelectorAll('tr');
-            payroll.items.forEach((item, index) => {
-                if (rows[index]) {
-                    const row = rows[index];
-                    row.querySelector('.employee-code').value = `${item.employee_id} - ${item.employee_name}`;
-                    row.querySelector('.employee-id').value = item.employee_id;
-                    row.querySelector('.type').value = item.type;
-                    row.querySelector('.payment-method').value = item.payment_method_id;
-                    row.querySelector('.bank-account').value = item.bank_account_id || '';
-                    row.querySelector('.cheque-date').value = item.cheque_date || '';
-                    row.querySelector('.description').value = item.description || '';
-                    row.querySelector('.amount').value = item.amount;
-
-                    // Show the Details button for Salary rows, matching the
-                    // type-dropdown-selection behavior (see typeDropdown handler).
-                    const detailsBtn = row.querySelector('[data-action="details"]');
-                    if (detailsBtn) detailsBtn.style.display = item.type === 'Salary' ? 'inline-flex' : 'none';
-
-                    // If this item already carries a breakdown (from auto-calculate
-                    // at save time), restore it onto the row so re-submitting
-                    // without recalculating doesn't drop it.
-                    if (item.daily_rate !== null && item.daily_rate !== undefined) {
-                        row.dataset.presentDays = item.present_days || 0;
-                        row.dataset.absentDays = item.absent_days || 0;
-                        row.dataset.paidLeaveDays = item.paid_leave_days || 0;
-                        row.dataset.unpaidLeaveDays = item.unpaid_leave_days || 0;
-                        row.dataset.dailyRate = item.daily_rate;
-                        row.dataset.grossAmount = item.gross_amount;
-                        row.dataset.deductionAmount = item.deduction_amount;
-                        row.dataset.otHours = item.ot_hours || 0;
-                        row.dataset.otAmount = item.ot_amount || 0;
-                        const hint = row.querySelector('.breakdown-hint');
-                        hint.style.display = 'block';
-                        hint.textContent = `Present ${item.present_days || 0} · Absent ${item.absent_days || 0} · `
-                            + `Paid Leave ${item.paid_leave_days || 0} · Unpaid Leave ${item.unpaid_leave_days || 0} · `
-                            + `Deduction ${currencySymbol}${Number(item.deduction_amount).toFixed(2)} (@ ${currencySymbol}${Number(item.daily_rate).toFixed(2)}/day)`
-                            + (item.ot_hours > 0 ? ` · Overtime ${item.ot_hours} hrs = +${currencySymbol}${Number(item.ot_amount).toFixed(2)}` : '');
-                        // Day-by-day leave/OT rows aren't stored with a saved payroll
-                        // item (only the totals are), so "View Details" on a loaded row
-                        // re-fetches them fresh from calculate-suggested.php on click.
-                    }
-
-                    // Trigger payment method change to show/hide fields
-                    row.querySelector('.payment-method').dispatchEvent(new Event('change'));
+    fetch(`../../../../server/api/hrm/payroll/payroll-get.php?id=${id}`)
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                const payroll = data.payroll;
+                dateInput.value = payroll.payroll_date;
+                payrollIdInput.value = payroll.payroll_code;
+                if (payroll.company_id) {
+                    document.getElementById('companyId').value = payroll.company_id;
                 }
-            });
 
-            if (isViewMode) {
-                // Disable all inputs in view mode
-                document.querySelectorAll('input, select, button').forEach(el => {
-                    if (!el.id || el.id !== 'cancelBtn') el.disabled = true;
-                });
-                submitBtn.style.display = 'none';
+                // Wait for data to load
+                setTimeout(() => {
+                    payroll.items.forEach((item, index) => {
+                        addTableRow();
+                    });
+
+                    setTimeout(() => {
+                        const rows = tableBody.querySelectorAll('tr');
+                        payroll.items.forEach((item, index) => {
+                            if (rows[index]) {
+                                const row = rows[index];
+                                row.querySelector('.employee-code').value = `${item.employee_id} - ${item.employee_name}`;
+                                row.querySelector('.employee-id').value = item.employee_id;
+                                row.querySelector('.type').value = item.type;
+                                row.querySelector('.payment-method').value = item.payment_method_id;
+                                row.querySelector('.bank-account').value = item.bank_account_id || '';
+                                row.querySelector('.cheque-date').value = item.cheque_date || '';
+                                row.querySelector('.description').value = item.description || '';
+                                row.querySelector('.amount').value = item.amount;
+
+                                // Show the Details button for Salary rows, matching the
+                                // type-dropdown-selection behavior (see typeDropdown handler).
+                                const detailsBtn = row.querySelector('[data-action="details"]');
+                                if (detailsBtn) detailsBtn.style.display = item.type === 'Salary' ? 'inline-flex' : 'none';
+
+                                // If this item already carries a breakdown (from auto-calculate
+                                // at save time), restore it onto the row so re-submitting
+                                // without recalculating doesn't drop it.
+                                if (item.daily_rate !== null && item.daily_rate !== undefined) {
+                                    row.dataset.presentDays = item.present_days || 0;
+                                    row.dataset.absentDays = item.absent_days || 0;
+                                    row.dataset.paidLeaveDays = item.paid_leave_days || 0;
+                                    row.dataset.unpaidLeaveDays = item.unpaid_leave_days || 0;
+                                    row.dataset.dailyRate = item.daily_rate;
+                                    row.dataset.grossAmount = item.gross_amount;
+                                    row.dataset.deductionAmount = item.deduction_amount;
+                                    row.dataset.otHours = item.ot_hours || 0;
+                                    row.dataset.otAmount = item.ot_amount || 0;
+                                    const hint = row.querySelector('.breakdown-hint');
+                                    hint.style.display = 'block';
+                                    hint.textContent = `Present ${item.present_days || 0} · Absent ${item.absent_days || 0} · `
+                                        + `Paid Leave ${item.paid_leave_days || 0} · Unpaid Leave ${item.unpaid_leave_days || 0} · `
+                                        + `Deduction ${currencySymbol}${Number(item.deduction_amount).toFixed(2)} (@ ${currencySymbol}${Number(item.daily_rate).toFixed(2)}/day)`
+                                        + (item.ot_hours > 0 ? ` · Overtime ${item.ot_hours} hrs = +${currencySymbol}${Number(item.ot_amount).toFixed(2)}` : '');
+                                    // Day-by-day leave/OT rows aren't stored with a saved payroll
+                                    // item (only the totals are), so "View Details" on a loaded row
+                                    // re-fetches them fresh from calculate-suggested.php on click.
+                                }
+
+                                // Trigger payment method change to show/hide fields
+                                row.querySelector('.payment-method').dispatchEvent(new Event('change'));
+                            }
+                        });
+                    }, 200);
+
+                    if (isViewMode) {
+                        // Disable all inputs in view mode
+                        document.querySelectorAll('input, select, button').forEach(el => {
+                            if (!el.id || el.id !== 'cancelBtn') el.disabled = true;
+                        });
+                        submitBtn.style.display = 'none';
+                    }
+                }, 1200);
+            } else {
+                alert('Error: ' + data.message);
+                window.location.href = 'payroll-list.php';
             }
-        } else {
-            alert('Error: ' + data.message);
+        })
+        .catch(err => {
+            alert('Error loading payroll: ' + err.message);
             window.location.href = 'payroll-list.php';
-        }
-    }).catch(err => {
-        alert('Error loading payroll: ' + err.message);
-        window.location.href = 'payroll-list.php';
-    });
+        });
 }
 
 // Add a new row to the payroll table
@@ -338,37 +303,6 @@ function addTableRow() {
     // Add event listeners to the new row
     addRowEventListeners(row, rowIndex);
 }
-
-// FIX: safety net. If a row somehow got built before paymentMethods /
-// bankAccounts were ready (e.g. a future code path calls addTableRow()
-// directly), refresh every row's dropdown options once the reference data
-// is confirmed loaded, without touching a value the user may have already
-// picked.
-function refreshRowDropdownOptions() {
-    const paymentMethodOptions = (paymentMethods || []).map(method =>
-        `<option value="${method.id}">${method.name}</option>`
-    ).join('');
-    const bankAccountOptions = (bankAccounts || []).map(account =>
-        `<option value="${account.id}">${account.name}</option>`
-    ).join('');
-
-    tableBody.querySelectorAll('tr').forEach(row => {
-        const pmSelect = row.querySelector('.payment-method');
-        const baSelect = row.querySelector('.bank-account');
-
-        if (pmSelect && pmSelect.options.length <= 1 && paymentMethods.length > 0) {
-            const currentValue = pmSelect.value;
-            pmSelect.innerHTML = `<option value="">Select method</option>${paymentMethodOptions}`;
-            pmSelect.value = currentValue;
-        }
-        if (baSelect && baSelect.options.length <= 1 && bankAccounts.length > 0) {
-            const currentValue = baSelect.value;
-            baSelect.innerHTML = `<option value="">Select account</option>${bankAccountOptions}`;
-            baSelect.value = currentValue;
-        }
-    });
-}
-referenceDataReady.then(refreshRowDropdownOptions);
 
 // Populate employee dropdown
 function populateEmployeeDropdown() {
@@ -867,6 +801,7 @@ function validateForm() {
 function submitPayroll() {
     const rows = tableBody.querySelectorAll('tr');
     const items = [];
+    let anyCalculated = false;
 
     rows.forEach(row => {
         const employeeId = row.querySelector('.employee-id').value;
@@ -890,6 +825,7 @@ function submitPayroll() {
         // If this row was auto-filled from approved leave/overtime, carry the
         // breakdown along so it's stored with the payroll entry for later review.
         if (row.dataset.dailyRate !== undefined) {
+            anyCalculated = true;
             item.present_days = Number(row.dataset.presentDays || 0);
             item.absent_days = Number(row.dataset.absentDays || 0);
             item.paid_leave_days = Number(row.dataset.paidLeaveDays || 0);
@@ -915,11 +851,13 @@ function submitPayroll() {
         items: items
     };
 
-    // No draft/review step — every submit (manual or auto-calculated from
-    // leave/overtime) finalizes immediately and posts to accounting_ledger
-    // right away. `status` is intentionally left unset here; the server
-    // (payroll-add.php / payroll-edit.php) defaults to 'finalized' when it's
-    // omitted, so there's nothing to override.
+    // Payroll built from approved leave/overtime starts as a draft so HR can
+    // review before it's locked in — existing manual-entry payrolls keep
+    // defaulting to 'finalized' server-side (unchanged behavior) when this
+    // is omitted.
+    if (anyCalculated && !editPayrollId) {
+        payload.status = 'draft';
+    }
 
     if (editPayrollId) {
         payload.payroll_id = editPayrollId;
