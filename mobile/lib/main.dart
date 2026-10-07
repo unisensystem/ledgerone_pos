@@ -1,12 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'core/sync_service.dart';
 import 'features/auth/auth_provider.dart';
 import 'features/auth/login_screen.dart';
 import 'features/home/home_screen.dart';
 
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  // Warm the singleton before any screen can fire several concurrent
+  // SharedPreferences.getInstance() calls at once (e.g. a reference-data
+  // Future.wait batch on a brand new origin/device) — shared_preferences_web
+  // isn't guaranteed safe against a first-ever concurrent-init race, and an
+  // unwarmed instance here silently drops the write rather than throwing.
+  await SharedPreferences.getInstance();
   runApp(const ProviderScope(child: LedgerOneMobileApp()));
 }
 
