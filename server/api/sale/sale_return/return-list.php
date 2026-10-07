@@ -1,10 +1,15 @@
 <?php
 require_once '../../../../includes/connection.php';
+require_once '../../../../includes/mobile_auth.php';
 
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
-header('Access-Control-Allow-Methods: GET');
-header('Access-Control-Allow-Headers: Content-Type');
+header('Access-Control-Allow-Methods: GET, OPTIONS');
+header('Access-Control-Allow-Headers: Content-Type, Authorization');
+
+if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+    exit(0);
+}
 
 if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
     http_response_code(405);
@@ -12,15 +17,14 @@ if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
     exit;
 }
 
-session_start();
-$user_id = $_SESSION['user_id'] ?? null;
-$tenant_id = $_SESSION['tenant_id'] ?? null;
-
-if (!$user_id || !$tenant_id) {
+$auth = resolveMobileAuth($pdo);
+if (!$auth) {
     http_response_code(401);
     echo json_encode(['success' => false, 'message' => 'Unauthorized']);
     exit;
 }
+$user_id = $auth['user_id'];
+$tenant_id = $auth['tenant_id'];
 
 try {
     $page = isset($_GET['page']) ? max(1, (int)$_GET['page']) : 1;
@@ -31,18 +35,35 @@ try {
     $customer_id = !empty($_GET['customer_id']) ? (int)$_GET['customer_id'] : null;
     $date_from = !empty($_GET['date_from']) ? $_GET['date_from'] : null;
     $date_to = !empty($_GET['date_to']) ? $_GET['date_to'] : null;
-    $status = !empty($_GET['status']) ? $_GET['status'] : null;
+    // Distinguish "status not sent at all" (old callers, default to Posted)
+    // from "status sent as empty string" (web's own "All Status" option) —
+    // both used to collapse to the same null and silently behave like
+    // Posted, making "All Status" show only Posted and nothing else.
+    $statusSent = array_key_exists('status', $_GET);
+    $status = $statusSent ? trim($_GET['status']) : null;
     $search = !empty($_GET['search']) ? trim($_GET['search']) : null;
 
     $where = ['si.tenant_id = ?'];
     $params = [$tenant_id];
 
-    if ($status && in_array($status, ['Draft', 'Posted'], true)) {
+    if ($statusSent && $status === '') {
+        // "All Status" — no status filter, Draft and Posted both included.
+    } elseif ($status && in_array($status, ['Draft', 'Posted'], true)) {
         $where[] = 'si.status = ?';
         $params[] = $status;
     } else {
-        // Default view: only finalized returns, matching this page's prior behavior.
+        // No status param sent at all — default view, matching this page's
+        // prior behavior for any caller that doesn't send it.
         $where[] = "si.status = 'Posted'";
+    }
+
+    // A mobile bearer token always sees only its own returns — scoped by
+    // auth context, not a client-supplied flag (same hardening as
+    // order-list.php's only_mine). A web session keeps seeing the whole
+    // tenant's returns, matching this page's existing behavior.
+    if ($auth['via'] === 'token') {
+        $where[] = 'si.created_by = ?';
+        $params[] = $user_id;
     }
 
     if ($company_id) {

@@ -1,11 +1,17 @@
 <?php
 require_once '../../../../includes/connection.php';
 require_once '../../../../includes/activity-logger.php';
+require_once '../../../../includes/mobile_auth.php';
+require_once '../../../../includes/sale_order_conflict_check.php';
 
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
-header('Access-Control-Allow-Methods: POST');
-header('Access-Control-Allow-Headers: Content-Type');
+header('Access-Control-Allow-Methods: POST, OPTIONS');
+header('Access-Control-Allow-Headers: Content-Type, Authorization');
+
+if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+    exit(0);
+}
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     http_response_code(405);
@@ -13,15 +19,14 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     exit;
 }
 
-session_start();
-$user_id = $_SESSION['user_id'] ?? null;
-$tenant_id = $_SESSION['tenant_id'] ?? null;
-
-if (!$user_id || !$tenant_id) {
+$auth = resolveMobileAuth($pdo);
+if (!$auth) {
     http_response_code(401);
     echo json_encode(['success' => false, 'message' => 'Unauthorized - Please login again']);
     exit;
 }
+$user_id = $auth['user_id'];
+$tenant_id = $auth['tenant_id'];
 
 try {
     $input = json_decode(file_get_contents('php://input'), true);
@@ -41,6 +46,60 @@ try {
     if (empty($input['items']) || !is_array($input['items'])) {
         throw new Exception('At least one item is required');
     }
+
+    // Idempotent sync: the mobile app sends one client-generated UUID per
+    // order created offline, and resends the same one on every retry. If an
+    // order with this tenant_id + client_uuid already exists, hand back that
+    // existing order instead of creating a duplicate — covers the case where
+    // the sync succeeded server-side but the app never saw the response
+    // (dropped connection, app killed mid-request, etc.) and retries blind.
+    $clientUuid = !empty($input['clientUuid']) ? trim($input['clientUuid']) : null;
+    if ($clientUuid !== null) {
+        $existingStmt = $pdo->prepare("SELECT id, bill_no FROM sale_order WHERE tenant_id = ? AND client_uuid = ?");
+        $existingStmt->execute([$tenant_id, $clientUuid]);
+        $existing = $existingStmt->fetch(PDO::FETCH_ASSOC);
+        if ($existing) {
+            echo json_encode([
+                'success' => true,
+                'message' => 'Order already synced',
+                'invoice_id' => $existing['id'],
+                'bill_no' => $existing['bill_no'],
+                'already_synced' => true,
+            ]);
+            exit;
+        }
+    }
+
+    // Hybrid auto-post rule for offline-created orders: a mobile client can
+    // only know the price/stock it last cached, which may have drifted
+    // while it was offline (stock especially — several field bookers can be
+    // offline at once, each phone showing whatever it last cached, each
+    // happily booking against the same physical units nobody else can see
+    // being promised; Sale Order never touches stock_ledger itself, so
+    // nothing anywhere checked this before now). A real conflict never
+    // blocks the order outright — it posts as Draft for office review
+    // instead of auto-posting at a stale price or an oversold quantity.
+    // Web and already-authenticated-via-session calls are never
+    // second-guessed — only requests that actually went through the mobile
+    // token path, where a stale offline cache is possible.
+    $needsReview = false;
+    $priceChanges = [];
+    $stockWarnings = [];
+    $requestedStatus = $input['status'] ?? 'Posted';
+    if (!in_array($requestedStatus, ['Posted', 'Draft'], true)) {
+        throw new Exception('Invalid status');
+    }
+    // Fail closed: run the conflict check for any token request that isn't
+    // explicitly asking for Draft, not just an exact 'Posted' match — a
+    // client can't skip review by sending some other value.
+    if ($auth['via'] === 'token' && $requestedStatus !== 'Draft') {
+        $conflicts = checkSaleOrderConflicts($pdo, $tenant_id, $input['items']);
+        $needsReview = $conflicts['needsReview'];
+        $priceChanges = $conflicts['priceChanges'];
+        $stockWarnings = $conflicts['stockWarnings'];
+    }
+
+    $status = $needsReview ? 'Draft' : $requestedStatus;
 
     $pdo->beginTransaction();
 
@@ -68,13 +127,20 @@ try {
 
         try {
             // Insert sale order
+            // total_gst_percent/total_gst_amount/shipping_fees all have real
+            // columns and web has sent them in its payload all along
+            // (totalGSTPercent/totalGSTAmount/shippingFees) — they just
+            // weren't in this INSERT's column list, so they were silently
+            // discarded on both web and mobile alike. The money itself was
+            // never wrong (net_amount already includes them, computed
+            // client-side), just the breakdown wasn't recoverable later.
             $stmt = $pdo->prepare("
                 INSERT INTO sale_order (
-                    tenant_id, company_id, currency_id, bill_no, sale_date, customer_id, branch_id,
+                    tenant_id, company_id, currency_id, bill_no, client_uuid, sale_date, customer_id, branch_id,
                     previous_balance, sale_officer_id, supplier_man_id, project_id, bilty_no, transport_name, total_bill, total_discount_percent,
-                    total_discount_amount, net_amount, remarks, status,
+                    total_discount_amount, total_gst_percent, total_gst_amount, shipping_fees, net_amount, remarks, status,
                     created_by, updated_by
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ");
 
             $stmt->execute([
@@ -82,6 +148,7 @@ try {
                 $input['companyId'] ?? null,
                 $input['currencyId'],
                 $billNo,
+                $clientUuid,
                 $input['saleDate'],
                 $input['customerId'],
                 $input['branchId'],
@@ -94,9 +161,12 @@ try {
                 $input['totalBill'],
                 $input['totalDiscountPercent'] ?? 0.00,
                 $input['totalDiscountAmount'] ?? 0.00,
+                $input['totalGSTPercent'] ?? 0.00,
+                $input['totalGSTAmount'] ?? 0.00,
+                $input['shippingFees'] ?? 0.00,
                 $input['netAmount'],
                 $input['remarks'] ?? null,
-                $input['status'] ?? 'Posted',
+                $status,
                 $user_id,
                 $user_id
             ]);
@@ -111,8 +181,6 @@ try {
             throw $e;
         }
     }
-
-    $status = $input['status'] ?? 'Posted';
 
     // Insert invoice items with dynamic UOM support
     $item_stmt = $pdo->prepare("
@@ -211,10 +279,26 @@ try {
 
     $pdo->commit();
 
+    $reviewReason = null;
+    if ($needsReview) {
+        if (!empty($priceChanges) && !empty($stockWarnings)) {
+            $reviewReason = 'Price and stock changed since offline — saved as Draft for review';
+        } elseif (!empty($stockWarnings)) {
+            $reviewReason = 'Not enough stock available — saved as Draft for review';
+        } else {
+            $reviewReason = 'Price changed since offline — saved as Draft for review';
+        }
+    }
+
     echo json_encode([
         'success' => true,
-        'message' => 'Sale order saved successfully',
-        'invoice_id' => $invoice_id
+        'message' => $needsReview ? $reviewReason : 'Sale order saved successfully',
+        'invoice_id' => $invoice_id,
+        'bill_no' => $billNo,
+        'status' => $status,
+        'needs_review' => $needsReview,
+        'price_changes' => $priceChanges,
+        'stock_warnings' => $stockWarnings,
     ]);
 
 } catch (Exception $e) {

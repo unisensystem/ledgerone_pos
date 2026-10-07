@@ -144,11 +144,12 @@ $initialSearch = $_GET['search'] ?? '';
                 <table id="invoicesTable">
                     <thead>
                         <tr>
-                            <th width="12%">Return No</th>
-                            <th width="15%">Date</th>
-                            <th width="25%">Customer</th>
-                            <th width="12%">Items</th>
-                            <th width="15%">Total Amount</th>
+                            <th width="11%">Return No</th>
+                            <th width="13%">Date</th>
+                            <th width="22%">Customer</th>
+                            <th width="9%">Items</th>
+                            <th width="13%">Total Amount</th>
+                            <th width="11%">Status</th>
                             <th width="21%">Actions</th>
                         </tr>
                     </thead>

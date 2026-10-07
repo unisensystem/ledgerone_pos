@@ -1,21 +1,25 @@
 <?php
 require_once '../../../../includes/connection.php';
 require_once '../../../../includes/activity-logger.php';
+require_once '../../../../includes/mobile_auth.php';
 
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
-header('Access-Control-Allow-Methods: GET, PUT');
-header('Access-Control-Allow-Headers: Content-Type');
+header('Access-Control-Allow-Methods: GET, PUT, OPTIONS');
+header('Access-Control-Allow-Headers: Content-Type, Authorization');
 
-session_start();
-$user_id = $_SESSION['user_id'] ?? null;
-$tenant_id = $_SESSION['tenant_id'] ?? null;
+if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+    exit(0);
+}
 
-if (!$user_id || !$tenant_id) {
+$auth = resolveMobileAuth($pdo);
+if (!$auth) {
     http_response_code(401);
     echo json_encode(['success' => false, 'message' => 'Unauthorized']);
     exit;
 }
+$user_id = $auth['user_id'];
+$tenant_id = $auth['tenant_id'];
 
 if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     $invoice_id = $_GET['id'] ?? null;
@@ -74,6 +78,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
             exit;
         }
 
+        // A mobile bearer token may only view/edit its own returns —
+        // otherwise any field booker's token could read or edit any return
+        // in the tenant by guessing an id. A web session keeps the existing
+        // tenant-wide behavior.
+        if ($auth['via'] === 'token' && (int) $invoice['created_by'] !== $user_id) {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'message' => 'You can only view your own returns']);
+            exit;
+        }
+
         // Get return items
         $itemStmt = $pdo->prepare("
             SELECT 
@@ -110,6 +124,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
                     'tax_percent' => $item['tax_percent'],
                     'tax_amount' => 0,
                     'foc_quantity' => $item['foc_quantity'],
+                    'stock_status' => $item['stock_status'] ?? 'sellable',
                     'gross_amount' => 0,
                     'net_amount' => 0,
                     'unit_entries' => []
@@ -157,10 +172,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
 
     try {
         // Snapshot old header + items for the Activity Log (before mutation)
-        $stOld = $pdo->prepare("SELECT bill_no, company_id, currency_id, sale_date, customer_id, customer_phone, branch_id, net_amount, sale_invoice_no, project_id, amount_refunded, payment_method, bank_account_id, sale_officer_id, supplier_man_id, sub_account_id, remarks, status FROM sale_return WHERE id = ? AND tenant_id = ?");
+        $stOld = $pdo->prepare("SELECT bill_no, company_id, currency_id, sale_date, customer_id, customer_phone, branch_id, net_amount, sale_invoice_no, project_id, amount_refunded, payment_method, bank_account_id, sale_officer_id, supplier_man_id, sub_account_id, remarks, status, created_by FROM sale_return WHERE id = ? AND tenant_id = ?");
         $stOld->execute([$invoice_id, $tenant_id]);
         $oldReturn = $stOld->fetch(PDO::FETCH_ASSOC);
         if (!$oldReturn) throw new Exception('Sale return not found');
+
+        // Same ownership rule as the GET branch above — a mobile token may
+        // only edit its own returns.
+        if ($auth['via'] === 'token' && (int) $oldReturn['created_by'] !== $user_id) {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'message' => 'You can only edit your own returns']);
+            exit;
+        }
 
         $stOldItems = $pdo->prepare("SELECT product_id, uom_id, batch_no, quantity, sale_price, tax_percent, net_amount FROM sale_return_items WHERE sale_invoice_id = ? AND tenant_id = ? ORDER BY id");
         $stOldItems->execute([$invoice_id, $tenant_id]);
@@ -221,8 +244,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
                 tenant_id, sale_invoice_id, product_id, uom_id, batch_no, expiry_date,
                 quantity, sale_price, gross_amount, discount_percent,
                 discount_amount, trade_offer_percent, trade_offer_amount,
-                tax_percent, tax_amount, foc_quantity, net_amount, created_by, updated_by
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                tax_percent, tax_amount, foc_quantity, stock_status, net_amount, created_by, updated_by
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ");
 
         $newItemsForCompare = [];
@@ -258,7 +281,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
                             $item['tradeOfferAmount'] * $proportionOfTotal ?? 0.00,
                             $item['taxPercent'] ?? 0.00,
                             $item['taxAmount'] * $proportionOfTotal ?? 0.00,
-                            0.00,
+                            ($item['focQuantity'] ?? 0) * $proportionOfTotal,
+                            $item['stockStatus'] ?? 'sellable',
                             $item['netAmount'] * $proportionOfTotal,
                             $user_id,
                             $user_id
@@ -309,12 +333,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
                 }
                 
                 // Insert stock ledger for FOC quantity if exists
-                if (isset($item['focQty']) && $item['focQty'] > 0) {
+                if (isset($item['focQuantity']) && $item['focQuantity'] > 0) {
                     $focUomId = 9;
                     if (isset($item['unitEntries']) && count($item['unitEntries']) > 0) {
                         $focUomId = $item['unitEntries'][0]['uomId'];
                     }
-                    
+
                     $foc_stmt = $pdo->prepare("
                         INSERT INTO stock_ledger (
                             tenant_id, account_id, branch_id, product_id, reference_table, reference_id,
@@ -327,7 +351,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
                         $input['branchId'],
                         $item['productId'],
                         $invoice_id,
-                        $item['focQty'],
+                        $item['focQuantity'],
                         0,
                         $focUomId,
                         $item['batchNo'] ?? null,

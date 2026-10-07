@@ -1,5 +1,6 @@
 # Sensitive / environment-specific files
 includes/connection.php
+includes/connection_public.php
 includes/dashboard.php
 client/assets/js/dashboard/dashboard-core.js
 server/api/auth/login.php

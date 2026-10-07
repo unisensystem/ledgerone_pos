@@ -2,21 +2,36 @@
 require_once '../../../../includes/connection.php';
 require_once '../../../../includes/activity-logger.php';
 require_once 'invoice-tax-helper.php';
+require_once '../../../../includes/mobile_auth.php';
 
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
-header('Access-Control-Allow-Methods: GET, PUT');
-header('Access-Control-Allow-Headers: Content-Type');
+header('Access-Control-Allow-Methods: GET, PUT, OPTIONS');
+header('Access-Control-Allow-Headers: Content-Type, Authorization');
 
-session_start();
-$user_id = $_SESSION['user_id'] ?? null;
-$tenant_id = $_SESSION['tenant_id'] ?? null;
+if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+    exit(0);
+}
 
-if (!$user_id || !$tenant_id) {
+// GET is also called cross-module by the mobile app's Sale Return "link to
+// original invoice" picker (read-only prefill), hence the bearer-token
+// fallback here. PUT (actual POS invoice editing — tax recalculation,
+// stock/ledger mutation) stays web-session-only below: a mobile token must
+// not be able to reach it, regardless of ownership, since nothing in the
+// mobile app is meant to edit a POS invoice.
+$auth = resolveMobileAuth($pdo);
+if (!$auth) {
     http_response_code(401);
     echo json_encode(['success' => false, 'message' => 'Unauthorized']);
     exit;
 }
+if ($_SERVER['REQUEST_METHOD'] === 'PUT' && $auth['via'] !== 'session') {
+    http_response_code(403);
+    echo json_encode(['success' => false, 'message' => 'Forbidden']);
+    exit;
+}
+$user_id = $auth['user_id'];
+$tenant_id = $auth['tenant_id'];
 
 if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     $invoice_id = $_GET['id'] ?? null;

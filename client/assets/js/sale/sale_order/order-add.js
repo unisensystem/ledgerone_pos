@@ -2,6 +2,15 @@
 let productsData = [];
 let uomData = [];
 
+// bill_no/customer_name come straight from the DB and can contain whatever
+// a customer record was named — escape before any innerHTML use so a
+// crafted name can't inject markup into another staff member's session.
+function escapeHtml(value) {
+    const div = document.createElement('div');
+    div.textContent = value === null || value === undefined ? '' : String(value);
+    return div.innerHTML;
+}
+
 document.addEventListener('DOMContentLoaded', function () {
     const today = new Date().toISOString().split('T')[0];
     document.getElementById('saleDate').value = today;
@@ -40,9 +49,103 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // Button event listeners
     const viewDraftsBtn = document.getElementById('viewDraftsBtn');
-    if (viewDraftsBtn) {
+    const draftsModal = document.getElementById('draftsModal');
+    const draftsTableBody = document.getElementById('draftsTableBody');
+    const draftsSelectAll = document.getElementById('draftsSelectAll');
+    const finalizeSelectedDraftsBtn = document.getElementById('finalizeSelectedDraftsBtn');
+
+    async function loadDraftOrders() {
+        draftsTableBody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 20px;">Loading...</td></tr>';
+        if (draftsSelectAll) draftsSelectAll.checked = false;
+        try {
+            // Same order-list.php the main list uses, just with
+            // order_status=Draft — these are orders the hybrid auto-post
+            // rule flagged for review (a mobile booker's stale offline
+            // price, or not enough stock to cover what several field
+            // bookers requested at once), not a separate "save for later"
+            // draft concept.
+            const response = await fetch('../../../../server/api/sale/sale_order/order-list.php?order_status=Draft&limit=50');
+            const data = await response.json();
+            if (!data.success || !data.invoices || data.invoices.length === 0) {
+                draftsTableBody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 20px;">No draft orders.</td></tr>';
+                return;
+            }
+            draftsTableBody.innerHTML = data.invoices.map(inv => {
+                const date = inv.sale_date ? new Date(inv.sale_date).toLocaleDateString() : '';
+                const amount = parseFloat(inv.net_amount || 0).toFixed(2);
+                const invoiceId = parseInt(inv.id, 10) || 0;
+                return `
+                    <tr>
+                        <td style="padding: 8px; border-bottom: 1px solid var(--border-default);">
+                            <input type="checkbox" class="draft-row-checkbox" value="${invoiceId}">
+                        </td>
+                        <td style="padding: 8px; border-bottom: 1px solid var(--border-default);">${escapeHtml(inv.bill_no)}</td>
+                        <td style="padding: 8px; border-bottom: 1px solid var(--border-default);">${escapeHtml(date)}</td>
+                        <td style="padding: 8px; border-bottom: 1px solid var(--border-default);">${escapeHtml(inv.customer_name || 'N/A')}</td>
+                        <td style="padding: 8px; border-bottom: 1px solid var(--border-default);">${escapeHtml(inv.currency_symbol || '')} ${escapeHtml(amount)}</td>
+                        <td style="padding: 8px; border-bottom: 1px solid var(--border-default);">
+                            <button class="btn btn-primary btn-sm" onclick="window.location.href='order-add.php?edit=${invoiceId}'">Review</button>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        } catch (error) {
+            console.error('Error loading draft orders:', error);
+            draftsTableBody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 20px;">Could not load draft orders.</td></tr>';
+        }
+    }
+
+    if (viewDraftsBtn && draftsModal && draftsTableBody) {
         viewDraftsBtn.addEventListener('click', function() {
-            alert('View Drafts functionality - Coming soon!');
+            draftsModal.style.display = 'flex';
+            loadDraftOrders();
+        });
+    }
+    const closeDraftsBtn = document.getElementById('closeDraftsBtn');
+    if (closeDraftsBtn && draftsModal) {
+        closeDraftsBtn.addEventListener('click', function() {
+            draftsModal.style.display = 'none';
+        });
+    }
+    if (draftsSelectAll && draftsTableBody) {
+        draftsSelectAll.addEventListener('change', function() {
+            draftsTableBody.querySelectorAll('.draft-row-checkbox').forEach(cb => {
+                cb.checked = draftsSelectAll.checked;
+            });
+        });
+    }
+    if (finalizeSelectedDraftsBtn && draftsTableBody) {
+        finalizeSelectedDraftsBtn.addEventListener('click', async function() {
+            const ids = Array.from(draftsTableBody.querySelectorAll('.draft-row-checkbox:checked'))
+                .map(cb => parseInt(cb.value, 10))
+                .filter(id => id > 0);
+            if (ids.length === 0) {
+                alert('Select at least one draft order to finalize.');
+                return;
+            }
+            if (!confirm(`Finalize ${ids.length} selected order(s) as Posted? This treats the review as approved.`)) {
+                return;
+            }
+            finalizeSelectedDraftsBtn.disabled = true;
+            try {
+                const response = await fetch('../../../../server/api/sale/sale_order/order-finalize.php', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ ids })
+                });
+                const data = await response.json();
+                if (data.success) {
+                    alert(`Finalized ${data.finalized} order(s).`);
+                    loadDraftOrders();
+                } else {
+                    alert('Error: ' + (data.message || 'Could not finalize orders.'));
+                }
+            } catch (error) {
+                console.error('Error finalizing draft orders:', error);
+                alert('Network error — could not finalize orders.');
+            } finally {
+                finalizeSelectedDraftsBtn.disabled = false;
+            }
         });
     }
 

@@ -1,11 +1,16 @@
 <?php
 require_once '../../../../includes/connection.php';
 require_once '../../../../includes/activity-logger.php';
+require_once '../../../../includes/mobile_auth.php';
 
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
-header('Access-Control-Allow-Methods: DELETE');
-header('Access-Control-Allow-Headers: Content-Type');
+header('Access-Control-Allow-Methods: DELETE, OPTIONS');
+header('Access-Control-Allow-Headers: Content-Type, Authorization');
+
+if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+    exit(0);
+}
 
 if ($_SERVER['REQUEST_METHOD'] !== 'DELETE') {
     http_response_code(405);
@@ -13,15 +18,14 @@ if ($_SERVER['REQUEST_METHOD'] !== 'DELETE') {
     exit;
 }
 
-session_start();
-$user_id = $_SESSION['user_id'] ?? null;
-$tenant_id = $_SESSION['tenant_id'] ?? null;
-
-if (!$user_id || !$tenant_id) {
+$auth = resolveMobileAuth($pdo);
+if (!$auth) {
     http_response_code(401);
     echo json_encode(['success' => false, 'message' => 'Unauthorized']);
     exit;
 }
+$user_id = $auth['user_id'];
+$tenant_id = $auth['tenant_id'];
 
 $invoice_id = $_GET['id'] ?? null;
 
@@ -39,6 +43,15 @@ try {
     if (!$returnRow) {
         http_response_code(404);
         echo json_encode(['success' => false, 'message' => 'Return not found']);
+        exit;
+    }
+
+    // A mobile bearer token may only delete its own returns — otherwise any
+    // field booker's token could delete any return in the tenant by
+    // guessing an id. A web session keeps the existing tenant-wide behavior.
+    if ($auth['via'] === 'token' && (int) $returnRow['created_by'] !== $user_id) {
+        http_response_code(403);
+        echo json_encode(['success' => false, 'message' => 'You can only delete your own returns']);
         exit;
     }
 

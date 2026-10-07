@@ -1,15 +1,22 @@
 <?php
 require_once '../../../../includes/connection.php';
+require_once '../../../../includes/mobile_auth.php';
 
 header('Content-Type: application/json');
+header('Access-Control-Allow-Origin: *');
+header('Access-Control-Allow-Methods: GET, OPTIONS');
+header('Access-Control-Allow-Headers: Content-Type, Authorization');
 
-session_start();
-$tenant_id = $_SESSION['tenant_id'] ?? null;
+if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+    exit(0);
+}
 
-if (!$tenant_id) {
+$auth = resolveMobileAuth($pdo);
+if (!$auth) {
     echo json_encode(['success' => false, 'message' => 'Unauthorized']);
     exit;
 }
+$tenant_id = $auth['tenant_id'];
 
 try {
     $stmt = $pdo->prepare("SELECT id, company_name FROM companies WHERE tenant_id = ? AND is_active = 1 ORDER BY company_name");

@@ -308,10 +308,16 @@ if (!$user_id) {
     <div class="modal" id="draftsModal">
         <div class="modal-content" style="width: 800px; max-width: 95%;">
             <h3 class="modal-title">Draft Orders</h3>
+            <p style="color: var(--subtext); font-size: 0.85rem; margin: -8px 0 12px;">
+                Flagged for review — a mobile booker's price was stale, or stock couldn't cover what was requested.
+            </p>
             <div class="table-container" style="max-height: 400px; overflow-y: auto;">
                 <table style="width: 100%; border-collapse: collapse;">
                     <thead>
                         <tr>
+                            <th style="padding: 8px; border-bottom: 1px solid var(--border-default); width: 32px;">
+                                <input type="checkbox" id="draftsSelectAll">
+                            </th>
                             <th style="padding: 8px; border-bottom: 1px solid var(--border-default);">Bill No</th>
                             <th style="padding: 8px; border-bottom: 1px solid var(--border-default);">Date</th>
                             <th style="padding: 8px; border-bottom: 1px solid var(--border-default);">Customer</th>
@@ -321,13 +327,14 @@ if (!$user_id) {
                     </thead>
                     <tbody id="draftsTableBody">
                         <tr>
-                            <td colspan="5" style="text-align: center; padding: 20px;">Loading...</td>
+                            <td colspan="6" style="text-align: center; padding: 20px;">Loading...</td>
                         </tr>
                     </tbody>
                 </table>
             </div>
             <div class="modal-actions">
                 <button class="btn btn-secondary" id="closeDraftsBtn">Close</button>
+                <button class="btn btn-primary" id="finalizeSelectedDraftsBtn">Finalize Selected</button>
             </div>
         </div>
     </div>

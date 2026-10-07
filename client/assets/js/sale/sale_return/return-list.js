@@ -269,7 +269,13 @@ function initializeListPage(permissions) {
             row.insertCell(3).textContent = invoice.items;
             row.insertCell(4).textContent = formattedAmount;
 
-            const actionsCell = row.insertCell(5);
+            const statusCell = row.insertCell(5);
+            const statusBadge = document.createElement('span');
+            statusBadge.className = 'status-badge ' + (invoice.status === 'Draft' ? 'status-draft' : 'status-posted');
+            statusBadge.textContent = invoice.status === 'Draft' ? 'Draft' : 'Posted';
+            statusCell.appendChild(statusBadge);
+
+            const actionsCell = row.insertCell(6);
             const actionButtons = document.createElement('div');
             actionButtons.className = 'action-buttons';
 

@@ -2,11 +2,16 @@
 require_once '../../../../includes/connection.php';
 require_once '../../../../includes/posting_lock.php';
 require_once '../../../../includes/activity-logger.php';
+require_once '../../../../includes/mobile_auth.php';
 
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
-header('Access-Control-Allow-Methods: POST');
-header('Access-Control-Allow-Headers: Content-Type');
+header('Access-Control-Allow-Methods: POST, OPTIONS');
+header('Access-Control-Allow-Headers: Content-Type, Authorization');
+
+if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+    exit(0);
+}
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     http_response_code(405);
@@ -14,15 +19,14 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     exit;
 }
 
-session_start();
-$user_id = $_SESSION['user_id'] ?? null;
-$tenant_id = $_SESSION['tenant_id'] ?? null;
-
-if (!$user_id || !$tenant_id) {
+$auth = resolveMobileAuth($pdo);
+if (!$auth) {
     http_response_code(401);
     echo json_encode(['success' => false, 'message' => 'Unauthorized - Please login again']);
     exit;
 }
+$user_id = $auth['user_id'];
+$tenant_id = $auth['tenant_id'];
 
 try {
     $input = json_decode(file_get_contents('php://input'), true);
@@ -48,6 +52,28 @@ if (!$lockCheck['allowed']) {
     throw new Exception($lockCheck['message']);
 }
 
+    // Idempotent sync (same reasoning as order-add.php): the mobile app sends
+    // one client-generated UUID per return created offline, resent on every
+    // retry. If a return with this tenant_id + client_uuid already exists,
+    // hand back that existing return instead of creating a duplicate — a
+    // genuine duplicate here would restock the same items twice.
+    $clientUuid = !empty($input['clientUuid']) ? trim($input['clientUuid']) : null;
+    if ($clientUuid !== null) {
+        $existingStmt = $pdo->prepare("SELECT id, bill_no FROM sale_return WHERE tenant_id = ? AND client_uuid = ?");
+        $existingStmt->execute([$tenant_id, $clientUuid]);
+        $existing = $existingStmt->fetch(PDO::FETCH_ASSOC);
+        if ($existing) {
+            echo json_encode([
+                'success' => true,
+                'message' => 'Sale return saved successfully',
+                'invoice_id' => $existing['id'],
+                'bill_no' => $existing['bill_no'],
+                'already_synced' => true,
+            ]);
+            exit;
+        }
+    }
+
 // Generate sequential bill number...
 
     // Generate sequential bill number — tenant-wide
@@ -67,12 +93,12 @@ if (!$lockCheck['allowed']) {
     // Insert sale return
     $stmt = $pdo->prepare("
         INSERT INTO sale_return (
-            tenant_id, company_id, currency_id, bill_no, sale_date, customer_id, customer_phone, branch_id,
+            tenant_id, company_id, currency_id, bill_no, client_uuid, sale_date, customer_id, customer_phone, branch_id,
             previous_balance, total_bill, total_discount_percent,
             total_discount_amount, extra_discount_1_amount, extra_discount_2_amount, shipping_fees,
             net_amount, sale_invoice_no, amount_refunded, project_id,
             payment_method, bank_account_id, sale_officer_id, supplier_man_id, sub_account_id, remarks, status, created_by, updated_by
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ");
 
     $stmt->execute([
@@ -80,6 +106,7 @@ if (!$lockCheck['allowed']) {
         $input['companyId'] ?? null,
         $input['currencyId'],
         $billNo,
+        $clientUuid,
         $input['saleDate'],
         $input['customerId'],
         $input['customerPhone'] ?? null,
@@ -144,8 +171,8 @@ if (!$lockCheck['allowed']) {
             tenant_id, sale_invoice_id, product_id, uom_id, batch_no, expiry_date,
             quantity, sale_price, gross_amount, discount_percent,
             discount_amount, trade_offer_percent, trade_offer_amount,
-            tax_percent, tax_amount, foc_quantity, net_amount, created_by, updated_by
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            tax_percent, tax_amount, foc_quantity, stock_status, net_amount, created_by, updated_by
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ");
 
     foreach ($input['items'] as $item) {
@@ -181,6 +208,7 @@ if (!$lockCheck['allowed']) {
                         $item['taxPercent'] ?? 0.00,
                         $item['taxAmount'] * $proportionOfTotal ?? 0.00,
                         $item['focQuantity'] * $proportionOfTotal ?? 0.00,
+                        $item['stockStatus'] ?? 'sellable',
                         $item['netAmount'] * $proportionOfTotal,
                         $user_id,
                         $user_id
@@ -364,7 +392,8 @@ if (!$lockCheck['allowed']) {
     echo json_encode([
         'success' => true,
         'message' => 'Sale return saved successfully',
-        'invoice_id' => $invoice_id
+        'invoice_id' => $invoice_id,
+        'bill_no' => $billNo
     ]);
 
 } catch (Exception $e) {

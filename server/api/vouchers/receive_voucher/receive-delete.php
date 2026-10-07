@@ -1,21 +1,25 @@
 <?php
 require_once '../../../../includes/connection.php';
 require_once '../../../../includes/activity-logger.php';
+require_once '../../../../includes/mobile_auth.php';
 
 header('Content-Type: application/json');
+header('Access-Control-Allow-Origin: *');
+header('Access-Control-Allow-Methods: DELETE, OPTIONS');
+header('Access-Control-Allow-Headers: Content-Type, Authorization');
 
-if (session_status() == PHP_SESSION_NONE) {
-    session_start();
+if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+    exit(0);
 }
 
-$user_id = $_SESSION['user_id'] ?? null;
-$tenant_id = $_SESSION['tenant_id'] ?? null;
-
-if (!$user_id || !$tenant_id) {
+$auth = resolveMobileAuth($pdo);
+if (!$auth) {
     http_response_code(401);
     echo json_encode(['error' => 'Unauthorized']);
     exit();
 }
+$user_id = $auth['user_id'];
+$tenant_id = $auth['tenant_id'];
 
 if ($_SERVER['REQUEST_METHOD'] !== 'DELETE') {
     http_response_code(405);
@@ -33,12 +37,20 @@ if (!$voucher_id) {
 
 try {
     // Get payment method (to determine which table to delete from) and full row for the Activity Log
-    $stmt = $pdo->prepare("SELECT voucher_number, payment_method_id, voucher_date, customer_id, supplier_id, amount FROM receive_voucher WHERE id = ? AND tenant_id = ?");
+    $stmt = $pdo->prepare("SELECT voucher_number, payment_method_id, voucher_date, customer_id, supplier_id, amount, created_by FROM receive_voucher WHERE id = ? AND tenant_id = ?");
     $stmt->execute([$voucher_id, $tenant_id]);
     $voucher = $stmt->fetch(PDO::FETCH_ASSOC);
 
     if (!$voucher) {
         echo json_encode(['success' => false, 'error' => 'Voucher not found']);
+        exit();
+    }
+
+    // Same ownership rule as receive-edit.php — a mobile token may only
+    // delete its own vouchers.
+    if ($auth['via'] === 'token' && (int) $voucher['created_by'] !== $user_id) {
+        http_response_code(403);
+        echo json_encode(['success' => false, 'error' => 'You can only delete your own vouchers']);
         exit();
     }
 

@@ -1,20 +1,24 @@
 <?php
 require_once '../../../../includes/connection.php';
+require_once '../../../../includes/mobile_auth.php';
 
 header('Content-Type: application/json');
+header('Access-Control-Allow-Origin: *');
+header('Access-Control-Allow-Methods: GET, OPTIONS');
+header('Access-Control-Allow-Headers: Content-Type, Authorization');
 
-if (session_status() == PHP_SESSION_NONE) {
-    session_start();
+if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+    exit(0);
 }
 
-$user_id = $_SESSION['user_id'] ?? null;
-$tenant_id = $_SESSION['tenant_id'] ?? null;
-
-if (!$user_id || !$tenant_id) {
+$auth = resolveMobileAuth($pdo);
+if (!$auth) {
     http_response_code(401);
     echo json_encode(['error' => 'Unauthorized']);
     exit();
 }
+$user_id = $auth['user_id'];
+$tenant_id = $auth['tenant_id'];
 
 try {
     $receive_type = $_GET['receive_type'] ?? 'customer';
@@ -39,6 +43,11 @@ try {
     if ($receive_type === 'supplier') {
         $where = ['rv.tenant_id = ?', 'rv.supplier_id IS NOT NULL'];
         $params = [$tenant_id];
+
+        // A mobile bearer token always sees only its own vouchers — scoped
+        // by auth context, same as order-list.php's only_mine hardening. A
+        // web session keeps the existing tenant-wide behavior.
+        if ($auth['via'] === 'token') { $where[] = 'rv.created_by = ?'; $params[] = $user_id; }
 
         if ($date_from) { $where[] = 'rv.voucher_date >= ?'; $params[] = $date_from; }
         if ($date_to) { $where[] = 'rv.voucher_date <= ?'; $params[] = $date_to; }
@@ -111,6 +120,8 @@ try {
     } else {
         $where = ['rv.tenant_id = ?', 'rv.customer_id IS NOT NULL'];
         $params = [$tenant_id];
+
+        if ($auth['via'] === 'token') { $where[] = 'rv.created_by = ?'; $params[] = $user_id; }
 
         if ($date_from) { $where[] = 'rv.voucher_date >= ?'; $params[] = $date_from; }
         if ($date_to) { $where[] = 'rv.voucher_date <= ?'; $params[] = $date_to; }

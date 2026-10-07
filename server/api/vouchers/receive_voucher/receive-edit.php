@@ -1,21 +1,25 @@
 <?php
 require_once '../../../../includes/connection.php';
 require_once '../../../../includes/activity-logger.php';
+require_once '../../../../includes/mobile_auth.php';
 
 header('Content-Type: application/json');
+header('Access-Control-Allow-Origin: *');
+header('Access-Control-Allow-Methods: PUT, OPTIONS');
+header('Access-Control-Allow-Headers: Content-Type, Authorization');
 
-if (session_status() == PHP_SESSION_NONE) {
-    session_start();
+if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+    exit(0);
 }
 
-$user_id = $_SESSION['user_id'] ?? null;
-$tenant_id = $_SESSION['tenant_id'] ?? null;
-
-if (!$user_id || !$tenant_id) {
+$auth = resolveMobileAuth($pdo);
+if (!$auth) {
     http_response_code(401);
     echo json_encode(['error' => 'Unauthorized']);
     exit();
 }
+$user_id = $auth['user_id'];
+$tenant_id = $auth['tenant_id'];
 
 if ($_SERVER['REQUEST_METHOD'] !== 'PUT') {
     http_response_code(405);
@@ -62,7 +66,7 @@ $against_pdc_id = !empty($input['against_pdc_id']) ? intval($input['against_pdc_
 
     // Need customer_id/supplier_id for the PDC rebuild below, plus full old row for the Activity Log diff.
     // The party itself (and its type) cannot be changed on edit — it's read from the existing row.
-    $stmt = $pdo->prepare("SELECT voucher_number, customer_id, supplier_id, company_id, voucher_date, bill_no, dsr_no, amount, adjust_amount, currency_id, payment_method_id, bank_account_id, cheque_no, description FROM receive_voucher WHERE id = ? AND tenant_id = ?");
+    $stmt = $pdo->prepare("SELECT voucher_number, customer_id, supplier_id, company_id, voucher_date, bill_no, dsr_no, amount, adjust_amount, currency_id, payment_method_id, bank_account_id, cheque_no, description, created_by FROM receive_voucher WHERE id = ? AND tenant_id = ?");
     $stmt->execute([$voucher_id, $tenant_id]);
     $existingVoucher = $stmt->fetch(PDO::FETCH_ASSOC);
 
@@ -71,11 +75,26 @@ $against_pdc_id = !empty($input['against_pdc_id']) ? intval($input['against_pdc_
         exit();
     }
 
+    // A mobile bearer token may only edit its own vouchers — otherwise any
+    // field booker's token could edit any voucher in the tenant by
+    // guessing an id. A web session keeps the existing tenant-wide behavior.
+    if ($auth['via'] === 'token' && (int) $existingVoucher['created_by'] !== $user_id) {
+        http_response_code(403);
+        echo json_encode(['success' => false, 'error' => 'You can only edit your own vouchers']);
+        exit();
+    }
+
     $is_supplier = !empty($existingVoucher['supplier_id']);
     $customer_id = $existingVoucher['customer_id'];
     $supplier_id = $existingVoucher['supplier_id'];
     $party_id = $is_supplier ? $supplier_id : $customer_id;
     $company_id  = $input['company_id'] ?? $existingVoucher['company_id'];
+
+    // Everything from here on (header UPDATE, ledger rebuild, PDC rebuild)
+    // must land atomically — without a transaction, an error partway
+    // through could leave the voucher updated but its ledger entries
+    // stale/missing, or vice versa.
+    $pdo->beginTransaction();
 
 $stmt = $pdo->prepare("
     UPDATE receive_voucher
@@ -223,8 +242,13 @@ $stmt->execute([
         : "Updated receive voucher \"{$existingVoucher['voucher_number']}\" - no tracked field changes";
     logActivity($pdo, $tenant_id, $user_id, 'update', 'Receive Voucher', $voucher_id, $existingVoucher['voucher_number'], $editDescription, $existingVoucher, $newVoucher);
 
+    $pdo->commit();
+
     echo json_encode(['success' => true, 'message' => 'Voucher updated successfully']);
 } catch (Exception $e) {
+    if ($pdo->inTransaction()) {
+        $pdo->rollBack();
+    }
     http_response_code(500);
     echo json_encode(['error' => 'Database error', 'message' => $e->getMessage()]);
 }

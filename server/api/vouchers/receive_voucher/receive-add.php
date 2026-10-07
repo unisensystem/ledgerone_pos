@@ -2,21 +2,25 @@
 require_once '../../../../includes/connection.php';
 require_once '../../../../includes/posting_lock.php';
 require_once '../../../../includes/activity-logger.php';
+require_once '../../../../includes/mobile_auth.php';
 
 header('Content-Type: application/json');
+header('Access-Control-Allow-Origin: *');
+header('Access-Control-Allow-Methods: POST, OPTIONS');
+header('Access-Control-Allow-Headers: Content-Type, Authorization');
 
-if (session_status() == PHP_SESSION_NONE) {
-    session_start();
+if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+    exit(0);
 }
 
-$user_id = $_SESSION['user_id'] ?? null;
-$tenant_id = $_SESSION['tenant_id'] ?? null;
-
-if (!$user_id || !$tenant_id) {
+$auth = resolveMobileAuth($pdo);
+if (!$auth) {
     http_response_code(401);
     echo json_encode(['error' => 'Unauthorized']);
     exit();
 }
+$user_id = $auth['user_id'];
+$tenant_id = $auth['tenant_id'];
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     http_response_code(405);
@@ -24,15 +28,10 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     exit();
 }
 
-// Debug logging
-error_log('POST data: ' . print_r($_POST, true));
-error_log('Recovery officer: ' . ($_POST['recovery_officer'] ?? 'NOT SET'));
-
 try {
     // Get form data
     $voucher_date = $_POST['voucher_date'] ?? '';
     $lockCheck = checkPostingDateAllowed($pdo, $tenant_id, 'receive_voucher', $voucher_date);
-error_log('LOCK CHECK: ' . print_r($lockCheck, true) . ' | voucher_date: ' . $voucher_date);
 
 if (!$lockCheck['allowed']) {
     echo json_encode(['success' => false, 'error' => $lockCheck['message']]);
@@ -90,9 +89,35 @@ if (!$lockCheck['allowed']) {
     // Company is derived from the entity, not from the form's Company dropdown
     $company_id = $customer['company_id'];
 
-    // Generate sequential voucher number
+    // Idempotent sync: see sale_order's order-add.php for the full
+    // rationale. A retried mobile sync with the same client_uuid gets back
+    // the already-created voucher instead of a duplicate.
+    $client_uuid = (!empty($_POST['client_uuid']) && $_POST['client_uuid'] !== 'null') ? trim($_POST['client_uuid']) : null;
+    if ($client_uuid !== null) {
+        $existingStmt = $pdo->prepare("SELECT id, voucher_number FROM receive_voucher WHERE tenant_id = ? AND client_uuid = ?");
+        $existingStmt->execute([$tenant_id, $client_uuid]);
+        $existingVoucher = $existingStmt->fetch(PDO::FETCH_ASSOC);
+        if ($existingVoucher) {
+            echo json_encode([
+                'success' => true,
+                'message' => 'Voucher already synced',
+                'voucher_id' => $existingVoucher['id'],
+                'voucher_number' => $existingVoucher['voucher_number'],
+                'already_synced' => true,
+            ]);
+            exit();
+        }
+    }
+
+    // Generate sequential voucher number. This whole sequence (lookup through
+    // the ledger inserts below) runs inside one transaction with FOR UPDATE
+    // on the lookup, so a second concurrent request (e.g. two synced mobile
+    // vouchers landing at once) blocks here instead of reading the same
+    // "last number" and colliding on voucher_number — and so the voucher
+    // row + ledger entries can never be only partially written.
+    $pdo->beginTransaction();
     $currentYear = date('Y');
-    $stmt = $pdo->prepare("SELECT voucher_number FROM receive_voucher WHERE tenant_id = ? AND voucher_number LIKE ? ORDER BY id DESC LIMIT 1");
+    $stmt = $pdo->prepare("SELECT voucher_number FROM receive_voucher WHERE tenant_id = ? AND voucher_number LIKE ? ORDER BY id DESC LIMIT 1 FOR UPDATE");
     $stmt->execute([$tenant_id, 'RV-' . $currentYear . '-%']);
     $lastVoucher = $stmt->fetch(PDO::FETCH_ASSOC);
     
@@ -144,23 +169,29 @@ if (!$lockCheck['allowed']) {
             $finalFileName = $fileName . '.webp';
             $uploadPath = $uploadDir . $finalFileName;
             
-            // Create image from uploaded file
+            // Create image from uploaded file. Suppressed (@) deliberately —
+            // a malformed/corrupt upload makes these emit PHP warnings
+            // straight into the response body, which breaks EVERY client's
+            // JSON parsing (not just a clean error message) since the
+            // warnings print before the eventual json_encode() below. The
+            // already-correct null check right after this switch handles
+            // the failure case with a real JSON error either way.
             switch ($fileExt) {
                 case 'jpg':
                 case 'jpeg':
-                    $image = imagecreatefromjpeg($file['tmp_name']);
+                    $image = @imagecreatefromjpeg($file['tmp_name']);
                     break;
                 case 'png':
-                    $image = imagecreatefrompng($file['tmp_name']);
+                    $image = @imagecreatefrompng($file['tmp_name']);
                     break;
                 case 'gif':
-                    $image = imagecreatefromgif($file['tmp_name']);
+                    $image = @imagecreatefromgif($file['tmp_name']);
                     break;
                 case 'webp':
-                    $image = imagecreatefromwebp($file['tmp_name']);
+                    $image = @imagecreatefromwebp($file['tmp_name']);
                     break;
                 case 'avif':
-                    $image = imagecreatefromavif($file['tmp_name']);
+                    $image = @imagecreatefromavif($file['tmp_name']);
                     break;
             }
             
@@ -181,23 +212,23 @@ if (!$lockCheck['allowed']) {
             INSERT INTO receive_voucher (
                 tenant_id, company_id, voucher_number, voucher_date, supplier_id, sub_account_id, bill_no, dsr_no, project_id, container_id,
                 amount, adjust_amount, previous_balance, currency_id, payment_method_id, bank_account_id, cheque_date, cheque_no, description, attachment,
-                recovery_officer_id, against_pdc_id, created_by, updated_by
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                recovery_officer_id, against_pdc_id, client_uuid, created_by, updated_by
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ");
     } else {
         $stmt = $pdo->prepare("
             INSERT INTO receive_voucher (
                 tenant_id, company_id, voucher_number, voucher_date, customer_id, sub_account_id, bill_no, dsr_no, project_id, container_id,
                 amount, adjust_amount, previous_balance, currency_id, payment_method_id, bank_account_id, cheque_date, cheque_no, description, attachment,
-                recovery_officer_id, against_pdc_id, created_by, updated_by
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                recovery_officer_id, against_pdc_id, client_uuid, created_by, updated_by
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ");
     }
 
     $stmt->execute([
         $tenant_id, $company_id, $voucher_number, $voucher_date, $customer['id'], $sub_account_id, $bill_no, $dsr_no, $project_id, $container_id,
         $amount, $adjust_amount, $previous_balance, $currency_id, $payment_method_id, $bank_account_id, $cheque_date, $cheque_no, $description, $attachment,
-        $recovery_officer_id, $against_pdc_id, $user_id, $user_id
+        $recovery_officer_id, $against_pdc_id, $client_uuid, $user_id, $user_id
     ]);
 
     $voucher_id = $pdo->lastInsertId();
@@ -280,13 +311,18 @@ if ($adjust_amount > 0) {
         ]
     );
 
+    $pdo->commit();
+
     echo json_encode(['success' => true, 'message' => 'Receive voucher created successfully']);
 
 } catch (Exception $e) {
+    if ($pdo->inTransaction()) {
+        $pdo->rollBack();
+    }
     http_response_code(500);
     echo json_encode([
-        'success' => false, 
-        'error' => 'Database error', 
+        'success' => false,
+        'error' => 'Database error',
         'message' => $e->getMessage(),
         'file' => $e->getFile(),
         'line' => $e->getLine()

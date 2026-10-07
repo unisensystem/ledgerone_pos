@@ -1,10 +1,15 @@
 <?php
 require_once '../../../../includes/connection.php';
+require_once '../../../../includes/mobile_auth.php';
 
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
-header('Access-Control-Allow-Methods: GET');
-header('Access-Control-Allow-Headers: Content-Type');
+header('Access-Control-Allow-Methods: GET, OPTIONS');
+header('Access-Control-Allow-Headers: Content-Type, Authorization');
+
+if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+    exit(0);
+}
 
 if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
     http_response_code(405);
@@ -12,15 +17,38 @@ if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
     exit;
 }
 
-session_start();
-$user_id = $_SESSION['user_id'] ?? null;
-$tenant_id = $_SESSION['tenant_id'] ?? null;
-
-if (!$user_id || !$tenant_id) {
+$auth = resolveMobileAuth($pdo);
+if (!$auth) {
     http_response_code(401);
     echo json_encode(['success' => false, 'message' => 'Unauthorized']);
     exit;
 }
+$user_id = $auth['user_id'];
+$tenant_id = $auth['tenant_id'];
+
+// Previously this only checked "does ANY Posted sale_invoice exist for this
+// order" and called that 'Partially Fulfilled' regardless of how much was
+// actually served — so a fully-delivered order showed the same badge as one
+// with a single item delivered. Compares total ordered qty against total
+// served qty (from Posted invoices linked to this order) instead, matching
+// the per-item logic get-order-fulfillment.php already uses for its detail
+// view, just aggregated across the whole order for a list-row badge.
+define('FULFILLMENT_STATUS_SQL', "
+    CASE
+        WHEN NOT EXISTS (
+            SELECT 1 FROM sale_invoice inv WHERE inv.sale_order_id = si.id AND inv.status = 'Posted'
+        ) THEN 'Pending'
+        WHEN (
+            SELECT COALESCE(SUM(soi.quantity), 0) FROM sale_order_items soi
+            WHERE soi.sale_invoice_id = si.id AND soi.parent_row_id IS NULL
+        ) <= (
+            SELECT COALESCE(SUM(sii2.quantity), 0) FROM sale_invoice inv2
+            JOIN sale_invoice_items sii2 ON sii2.sale_invoice_id = inv2.id
+            WHERE inv2.sale_order_id = si.id AND inv2.status = 'Posted'
+        ) THEN 'Fully Fulfilled'
+        ELSE 'Partially Fulfilled'
+    END
+");
 
 try {
     $page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
@@ -33,10 +61,37 @@ try {
     $date_to     = isset($_GET['date_to']) && $_GET['date_to'] !== '' ? $_GET['date_to'] : null;
     $status      = isset($_GET['status']) && $_GET['status'] !== '' ? $_GET['status'] : null;
     $search      = isset($_GET['search']) && $_GET['search'] !== '' ? $_GET['search'] : null;
+    // Scoping is enforced server-side by auth context, not merely by the
+    // request flag — a mobile bearer token can't opt out of only_mine by
+    // sending 0; only a real web session (which already carries its own
+    // tenant-wide-view expectations) can see every order.
+    $only_mine   = $auth['via'] === 'token' || (isset($_GET['only_mine']) && $_GET['only_mine'] === '1');
+    // The order's OWN status (Posted/Draft) — not to be confused with
+    // $status above, which filters the computed fulfillment_status
+    // (Pending/Partially/Fully Fulfilled). Defaults to 'Posted' exactly
+    // like before (web never sends this param, so its behavior — every
+    // Posted order in the tenant — is unchanged); 'Draft' surfaces orders
+    // the hybrid auto-post rule flagged for review (stale offline price or
+    // insufficient stock), which previously had no list anywhere to show up
+    // in at all.
+    $order_status = isset($_GET['order_status']) && in_array($_GET['order_status'], ['Posted', 'Draft'], true)
+        ? $_GET['order_status']
+        : 'Posted';
 
     // Build WHERE clause dynamically, with typed params so we can bind correctly
-    $where = "si.tenant_id = ? AND si.status = 'Posted'";
-    $params = [['value' => $tenant_id, 'type' => PDO::PARAM_INT]];
+    $where = "si.tenant_id = ? AND si.status = ?";
+    $params = [
+        ['value' => $tenant_id, 'type' => PDO::PARAM_INT],
+        ['value' => $order_status, 'type' => PDO::PARAM_STR],
+    ];
+
+    // Opt-in only — web never sends only_mine, so its behavior (every order
+    // for the tenant) is unchanged. The mobile app always sends it: a field
+    // booker should see their own orders, not the whole tenant's.
+    if ($only_mine) {
+        $where .= " AND si.created_by = ?";
+        $params[] = ['value' => $user_id, 'type' => PDO::PARAM_INT];
+    }
 
     if ($company_id) {
         $where .= " AND si.company_id = ?";
@@ -73,22 +128,31 @@ try {
     }
 
     // ---- Count query ----
-    $countSql = "
-        SELECT COUNT(*) FROM (
-            SELECT
-                si.id,
-                CASE
-                    WHEN EXISTS(
-                        SELECT 1 FROM sale_invoice inv WHERE inv.sale_order_id = si.id AND inv.status = 'Posted'
-                    ) THEN 'Partially Fulfilled'
-                    ELSE 'Pending'
-                END as fulfillment_status
+    // fulfillment_status is only needed here when $status actually filters on it
+    // (the HAVING clause below) — otherwise evaluating that correlated EXISTS
+    // subquery per row just to discard it made this count scan every matching
+    // row at ~15s for a tenant with a few thousand orders. Skip it entirely
+    // when there's no status filter; keep the derived-table form only when needed.
+    if ($having) {
+        $countSql = "
+            SELECT COUNT(*) FROM (
+                SELECT
+                    si.id,
+                    " . FULFILLMENT_STATUS_SQL . " as fulfillment_status
+                FROM sale_order si
+                LEFT JOIN customers c ON si.customer_id = c.id
+                WHERE $where
+                $having
+            ) AS filtered
+        ";
+    } else {
+        $countSql = "
+            SELECT COUNT(*)
             FROM sale_order si
             LEFT JOIN customers c ON si.customer_id = c.id
             WHERE $where
-            $having
-        ) AS filtered
-    ";
+        ";
+    }
 
     $countStmt = $pdo->prepare($countSql);
     $bindIndex = 1;
@@ -117,12 +181,7 @@ try {
             COUNT(sii.id) as item_count,
             si.net_amount,
             cur.symbol as currency_symbol,
-            CASE 
-                WHEN EXISTS(
-                    SELECT 1 FROM sale_invoice inv WHERE inv.sale_order_id = si.id AND inv.status = 'Posted'
-                ) THEN 'Partially Fulfilled'
-                ELSE 'Pending'
-            END as fulfillment_status
+            " . FULFILLMENT_STATUS_SQL . " as fulfillment_status
         FROM sale_order si
         LEFT JOIN customers c ON si.customer_id = c.id
         LEFT JOIN employees e ON si.sale_officer_id = e.id

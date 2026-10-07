@@ -50,8 +50,12 @@ try {
 
     $pdo->beginTransaction();
 
-    // Generate sequential bill number — tenant-wide
-    $billStmt = $pdo->prepare("SELECT bill_no FROM sale_invoice WHERE tenant_id = ? ORDER BY id DESC LIMIT 1");
+    // Generate sequential bill number — tenant-wide. FOR UPDATE holds a row
+    // lock on the latest invoice for this tenant until this transaction
+    // commits/rolls back, so a second concurrent request (e.g. two synced
+    // mobile orders landing at once) blocks here instead of reading the same
+    // "last number" and colliding on bill_no.
+    $billStmt = $pdo->prepare("SELECT bill_no FROM sale_invoice WHERE tenant_id = ? ORDER BY id DESC LIMIT 1 FOR UPDATE");
     $billStmt->execute([$tenant_id]);
     $lastBill = $billStmt->fetchColumn();
 

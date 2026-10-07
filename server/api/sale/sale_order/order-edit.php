@@ -1,21 +1,26 @@
 <?php
 require_once '../../../../includes/connection.php';
 require_once '../../../../includes/activity-logger.php';
+require_once '../../../../includes/mobile_auth.php';
+require_once '../../../../includes/sale_order_conflict_check.php';
 
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
-header('Access-Control-Allow-Methods: GET, PUT');
-header('Access-Control-Allow-Headers: Content-Type');
+header('Access-Control-Allow-Methods: GET, PUT, OPTIONS');
+header('Access-Control-Allow-Headers: Content-Type, Authorization');
 
-session_start();
-$user_id = $_SESSION['user_id'] ?? null;
-$tenant_id = $_SESSION['tenant_id'] ?? null;
+if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+    exit(0);
+}
 
-if (!$user_id || !$tenant_id) {
+$auth = resolveMobileAuth($pdo);
+if (!$auth) {
     http_response_code(401);
     echo json_encode(['success' => false, 'message' => 'Unauthorized']);
     exit;
 }
+$user_id = $auth['user_id'];
+$tenant_id = $auth['tenant_id'];
 
 if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     $invoice_id = $_GET['id'] ?? null;
@@ -69,6 +74,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
         if (!$invoice) {
             http_response_code(404);
             echo json_encode(['success' => false, 'message' => 'Order not found']);
+            exit;
+        }
+
+        // A mobile bearer token may only view/edit its own orders — otherwise
+        // any field booker's token could read or edit any order in the
+        // tenant by guessing an id. A web session keeps the existing
+        // tenant-wide behavior.
+        if ($auth['via'] === 'token' && (int) $invoice['created_by'] !== $user_id) {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'message' => 'You can only view your own orders']);
             exit;
         }
 
@@ -182,7 +197,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
 
     try {
         // Grab old values before anything changes, for the Activity Log diff
-        $stmt = $pdo->prepare("SELECT bill_no, company_id, currency_id, sale_date, customer_id, branch_id, previous_balance, sale_officer_id, supplier_man_id, project_id, bilty_no, transport_name, total_bill, total_discount_percent, total_discount_amount, net_amount, remarks, status FROM sale_order WHERE id = ? AND tenant_id = ?");
+        $stmt = $pdo->prepare("SELECT bill_no, company_id, currency_id, sale_date, customer_id, branch_id, previous_balance, sale_officer_id, supplier_man_id, project_id, bilty_no, transport_name, total_bill, total_discount_percent, total_discount_amount, net_amount, remarks, status, created_by FROM sale_order WHERE id = ? AND tenant_id = ?");
         $stmt->execute([$invoice_id, $tenant_id]);
         $oldOrder = $stmt->fetch(PDO::FETCH_ASSOC);
         if (!$oldOrder) {
@@ -190,18 +205,53 @@ if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
             echo json_encode(['success' => false, 'message' => 'Order not found']);
             exit;
         }
+
+        // Same ownership rule as the GET branch above — a mobile token may
+        // only edit its own orders.
+        if ($auth['via'] === 'token' && (int) $oldOrder['created_by'] !== $user_id) {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'message' => 'You can only edit your own orders']);
+            exit;
+        }
         $stmt = $pdo->prepare("SELECT product_id, uom_id, quantity, sale_price, discount_percent, gst_percent FROM sale_order_items WHERE sale_invoice_id = ? AND tenant_id = ? ORDER BY product_id, uom_id, id");
         $stmt->execute([$invoice_id, $tenant_id]);
         $oldItems = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
+        // Same hybrid rule order-add.php applies to creates — an edit made
+        // offline (the same booker adjusting their own order on a stale
+        // local cache) carries the identical risk of a stale price or stock
+        // that's moved since. A web-session edit (office staff reviewing)
+        // is never second-guessed. excludeOrderId keeps this order's own
+        // existing rows from counting as competing demand against itself.
+        $needsReview = false;
+        $priceChanges = [];
+        $stockWarnings = [];
+        $requestedStatus = $input['status'] ?? 'Posted';
+        if (!in_array($requestedStatus, ['Posted', 'Draft'], true)) {
+            throw new Exception('Invalid status');
+        }
+        // Fail closed: same as order-add.php — any non-Draft value from a
+        // token client goes through review, not just an exact 'Posted' match.
+        if ($auth['via'] === 'token' && $requestedStatus !== 'Draft') {
+            $conflicts = checkSaleOrderConflicts($pdo, $tenant_id, $input['items'], (int) $invoice_id);
+            $needsReview = $conflicts['needsReview'];
+            $priceChanges = $conflicts['priceChanges'];
+            $stockWarnings = $conflicts['stockWarnings'];
+        }
+        $status = $needsReview ? 'Draft' : $requestedStatus;
+
         $pdo->beginTransaction();
 
         // Update sale invoice
+        // total_gst_percent/total_gst_amount/shipping_fees: same gap as
+        // order-add.php had — real columns, web sends them in its payload
+        // (totalGSTPercent/totalGSTAmount/shippingFees), just never made it
+        // into this UPDATE's column list.
         $stmt = $pdo->prepare("
             UPDATE sale_order SET
                 company_id = ?, currency_id = ?, sale_date = ?, customer_id = ?, branch_id = ?,
                 previous_balance = ?, sale_officer_id = ?, supplier_man_id = ?, project_id = ?, bilty_no = ?, transport_name = ?, total_bill = ?, total_discount_percent = ?,
-                total_discount_amount = ?, net_amount = ?, remarks = ?, status = ?, updated_by = ?
+                total_discount_amount = ?, total_gst_percent = ?, total_gst_amount = ?, shipping_fees = ?, net_amount = ?, remarks = ?, status = ?, updated_by = ?
             WHERE id = ? AND tenant_id = ?
         ");
         $stmt->execute([
@@ -219,9 +269,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
             $input['totalBill'],
             $input['totalDiscountPercent'] ?? 0.00,
             $input['totalDiscountAmount'] ?? 0.00,
+            $input['totalGSTPercent'] ?? 0.00,
+            $input['totalGSTAmount'] ?? 0.00,
+            $input['shippingFees'] ?? 0.00,
             $input['netAmount'],
             $input['remarks'] ?? null,
-            $input['status'] ?? 'Posted',
+            $status,
             $user_id,
             $invoice_id,
             $tenant_id
@@ -315,7 +368,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
 
         $pdo->commit();
 
-        echo json_encode(['success' => true, 'message' => 'Sale order updated successfully']);
+        $reviewReason = null;
+        if ($needsReview) {
+            if (!empty($priceChanges) && !empty($stockWarnings)) {
+                $reviewReason = 'Price and stock changed since offline — saved as Draft for review';
+            } elseif (!empty($stockWarnings)) {
+                $reviewReason = 'Not enough stock available — saved as Draft for review';
+            } else {
+                $reviewReason = 'Price changed since offline — saved as Draft for review';
+            }
+        }
+
+        echo json_encode([
+            'success' => true,
+            'message' => $needsReview ? $reviewReason : 'Sale order updated successfully',
+            'status' => $status,
+            'needs_review' => $needsReview,
+            'price_changes' => $priceChanges,
+            'stock_warnings' => $stockWarnings,
+        ]);
 
     } catch (Exception $e) {
         if ($pdo->inTransaction()) {
