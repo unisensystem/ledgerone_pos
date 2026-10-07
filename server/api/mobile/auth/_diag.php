@@ -22,8 +22,11 @@ try {
 }
 
 try {
+    $before = array_keys(get_defined_vars());
     require_once '../../../../includes/connection_public.php';
-    $result['steps'][] = 'connection_public.php OK, pdoPublic=' . (isset($pdoPublic) ? 'set' : 'MISSING');
+    $after = array_keys(get_defined_vars());
+    $newVars = array_diff($after, $before, ['before']);
+    $result['steps'][] = 'connection_public.php OK, pdoPublic=' . (isset($pdoPublic) ? 'set' : 'MISSING') . ', new vars: ' . implode(', ', $newVars);
 } catch (Throwable $e) {
     $result['steps'][] = 'connection_public.php THREW: ' . $e->getMessage();
 }
