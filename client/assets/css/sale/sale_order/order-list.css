@@ -91,7 +91,9 @@ body {
 
 .filters {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  /* 6 filters now (added Order Status) — 3 columns divides evenly into
+     two full rows instead of leaving a half-empty row at 4 columns. */
+  grid-template-columns: repeat(3, 1fr);
   gap: 16px;
   margin-bottom: 24px;
 }
