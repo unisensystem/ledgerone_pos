@@ -68,22 +68,26 @@ try {
     $only_mine   = $auth['via'] === 'token' || (isset($_GET['only_mine']) && $_GET['only_mine'] === '1');
     // The order's OWN status (Posted/Draft) — not to be confused with
     // $status above, which filters the computed fulfillment_status
-    // (Pending/Partially/Fully Fulfilled). Defaults to 'Posted' exactly
-    // like before (web never sends this param, so its behavior — every
-    // Posted order in the tenant — is unchanged); 'Draft' surfaces orders
-    // the hybrid auto-post rule flagged for review (stale offline price or
-    // insufficient stock), which previously had no list anywhere to show up
-    // in at all.
+    // (Pending/Partially/Fully Fulfilled). Omitted/invalid means no filter
+    // at all — both Posted and Draft orders are returned together so office
+    // staff see everything in one list, Draft rows distinguishable via the
+    // status badge, rather than needing to switch between two separate
+    // filtered views to notice a Draft exists. Mobile and the drafts modal
+    // on order-add.php both always send an explicit value ('Posted' /
+    // 'Draft' respectively), so this default change doesn't affect them.
     $order_status = isset($_GET['order_status']) && in_array($_GET['order_status'], ['Posted', 'Draft'], true)
         ? $_GET['order_status']
-        : 'Posted';
+        : null;
 
     // Build WHERE clause dynamically, with typed params so we can bind correctly
-    $where = "si.tenant_id = ? AND si.status = ?";
+    $where = "si.tenant_id = ?";
     $params = [
         ['value' => $tenant_id, 'type' => PDO::PARAM_INT],
-        ['value' => $order_status, 'type' => PDO::PARAM_STR],
     ];
+    if ($order_status !== null) {
+        $where .= " AND si.status = ?";
+        $params[] = ['value' => $order_status, 'type' => PDO::PARAM_STR];
+    }
 
     // Opt-in only — web never sends only_mine, so its behavior (every order
     // for the tenant) is unchanged. The mobile app always sends it: a field

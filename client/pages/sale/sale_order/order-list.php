@@ -64,8 +64,9 @@ $initialSearch = $_GET['search'] ?? '';
                 <div class="form-group">
                     <label for="orderStatusFilter">Order Status</label>
                     <select id="orderStatusFilter">
-                        <option value="Posted">Posted</option>
-                        <option value="Draft">Draft (needs review)</option>
+                        <option value="">All (Posted + Draft)</option>
+                        <option value="Posted">Posted only</option>
+                        <option value="Draft">Draft only (needs review)</option>
                     </select>
                 </div>
             </div>
@@ -75,7 +76,7 @@ $initialSearch = $_GET['search'] ?? '';
                     <i class="fas fa-search"></i>
 <input type="text" id="searchInput" placeholder="Search by invoice number, customer..." value="<?= htmlspecialchars($initialSearch) ?>">
                 </div>
-                <button class="btn btn-primary" id="finalizeSelectedBtn" style="display: none;">
+                <button class="btn btn-primary" id="finalizeSelectedBtn">
                     <i class="fas fa-check-double"></i> Finalize Selected
                 </button>
                 <button class="btn btn-primary" id="newInvoiceBtn">
@@ -87,7 +88,7 @@ $initialSearch = $_GET['search'] ?? '';
                 <table id="invoicesTable">
                     <thead>
                         <tr>
-                            <th width="4%" id="selectAllHeaderCell" style="display: none;"><input type="checkbox" id="selectAllCheckbox"></th>
+                            <th width="4%" id="selectAllHeaderCell"><input type="checkbox" id="selectAllCheckbox"></th>
                             <th width="10%">Order No</th>
                             <th width="12%">Date</th>
                             <th width="18%">Customer</th>

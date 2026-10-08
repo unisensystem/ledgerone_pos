@@ -62,15 +62,10 @@ function initializeListPage(permissions) {
                     currencySymbol: invoice.currency_symbol || '',
                     status: invoice.fulfillment_status || 'Pending'
                 }));
-                // Finalizing only makes sense while reviewing Drafts — the
-                // checkbox column and bulk button are only useful then.
-                const isDraftView = orderStatusVal === 'Draft';
-                document.getElementById('selectAllHeaderCell').style.display = isDraftView ? '' : 'none';
-                document.getElementById('finalizeSelectedBtn').style.display = isDraftView ? '' : 'none';
                 document.getElementById('selectAllCheckbox').checked = false;
                 currentPage = data.pagination.page;
                 totalPages = data.pagination.pages;
-                populateTable(invoices, isDraftView);
+                populateTable(invoices);
                 updatePagination(data.pagination);
             } else {
                 console.error('Error loading invoices:', data.message);
@@ -80,21 +75,19 @@ function initializeListPage(permissions) {
         }
     }
 
-    function populateTable(data, isDraftView) {
+    function populateTable(data) {
         invoicesTable.innerHTML = '';
 
         data.forEach(invoice => {
             const row = invoicesTable.insertRow();
             const isDraft = invoice.orderStatus === 'Draft';
 
-            // Checkbox cell — only populated for Draft rows, since that's
-            // the only status Finalize Selected can act on. Always present
-            // so column indexes stay stable; display is kept in sync with
-            // the header cell's (both hidden outside Draft view) so the
-            // table doesn't end up with more body columns than header
-            // columns.
+            // Checkbox cell — always present (so header/body columns never
+            // drift out of sync), only populated with an actual checkbox
+            // for Draft rows since that's the only status Finalize Selected
+            // can act on. The default list view mixes Posted and Draft
+            // together, so this can't be toggled per-filter anymore.
             const checkboxCell = row.insertCell(0);
-            checkboxCell.style.display = isDraftView ? '' : 'none';
             if (isDraft) {
                 const checkbox = document.createElement('input');
                 checkbox.type = 'checkbox';
