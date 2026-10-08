@@ -62,10 +62,17 @@ function initializeListPage(permissions) {
                     currencySymbol: invoice.currency_symbol || '',
                     status: invoice.fulfillment_status || 'Pending'
                 }));
+                // Checkbox column + Finalize Selected only make sense while
+                // specifically reviewing Drafts — narrowed to that filter,
+                // not the combined/Posted views where almost every row
+                // would have no checkbox anyway.
+                const isDraftView = orderStatusVal === 'Draft';
+                document.getElementById('selectAllHeaderCell').style.display = isDraftView ? '' : 'none';
+                document.getElementById('finalizeSelectedBtn').style.display = isDraftView ? '' : 'none';
                 document.getElementById('selectAllCheckbox').checked = false;
                 currentPage = data.pagination.page;
                 totalPages = data.pagination.pages;
-                populateTable(invoices);
+                populateTable(invoices, isDraftView);
                 updatePagination(data.pagination);
             } else {
                 console.error('Error loading invoices:', data.message);
@@ -75,19 +82,19 @@ function initializeListPage(permissions) {
         }
     }
 
-    function populateTable(data) {
+    function populateTable(data, isDraftView) {
         invoicesTable.innerHTML = '';
 
         data.forEach(invoice => {
             const row = invoicesTable.insertRow();
             const isDraft = invoice.orderStatus === 'Draft';
 
-            // Checkbox cell — always present (so header/body columns never
-            // drift out of sync), only populated with an actual checkbox
-            // for Draft rows since that's the only status Finalize Selected
-            // can act on. The default list view mixes Posted and Draft
-            // together, so this can't be toggled per-filter anymore.
+            // Checkbox cell — always created so header/body column counts
+            // match, but its *display* always mirrors the header cell's
+            // (both hidden outside the Draft-only filter) so an empty cell
+            // never sits there crowding the next column when not in use.
             const checkboxCell = row.insertCell(0);
+            checkboxCell.style.display = isDraftView ? '' : 'none';
             if (isDraft) {
                 const checkbox = document.createElement('input');
                 checkbox.type = 'checkbox';

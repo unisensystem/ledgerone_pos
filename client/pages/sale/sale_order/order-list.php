@@ -14,6 +14,16 @@ if (!$user_id) {
     exit();
 }
 $initialSearch = $_GET['search'] ?? '';
+
+// Cache-busting via filemtime: Cloudflare/browsers cache static .js/.css
+// for hours (max-age=14400 here), while this PHP page itself isn't cached
+// the same way — without this, a deployed JS/CSS fix can sit stale for up
+// to 4 hours after the page's own HTML has already updated, producing a
+// confusing half-updated page. filemtime() only changes the URL when the
+// file's actual content changes, so normal long-term caching between
+// deploys is preserved.
+$cssVersion = @filemtime(__DIR__ . '/../../../assets/css/sale/sale_order/order-list.css') ?: time();
+$jsVersion = @filemtime(__DIR__ . '/../../../assets/js/sale/sale_order/order-list.js') ?: time();
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -22,7 +32,7 @@ $initialSearch = $_GET['search'] ?? '';
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>LedgerOne ERP - Sale Orders</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="stylesheet" href="../../../assets/css/sale/sale_order/order-list.css">
+    <link rel="stylesheet" href="../../../assets/css/sale/sale_order/order-list.css?v=<?= $cssVersion ?>">
 </head>
 <body class="light-theme">
     <div class="container">
@@ -76,7 +86,7 @@ $initialSearch = $_GET['search'] ?? '';
                     <i class="fas fa-search"></i>
 <input type="text" id="searchInput" placeholder="Search by invoice number, customer..." value="<?= htmlspecialchars($initialSearch) ?>">
                 </div>
-                <button class="btn btn-primary" id="finalizeSelectedBtn">
+                <button class="btn btn-primary" id="finalizeSelectedBtn" style="display: none;">
                     <i class="fas fa-check-double"></i> Finalize Selected
                 </button>
                 <button class="btn btn-primary" id="newInvoiceBtn">
@@ -88,7 +98,7 @@ $initialSearch = $_GET['search'] ?? '';
                 <table id="invoicesTable">
                     <thead>
                         <tr>
-                            <th width="4%" id="selectAllHeaderCell"><input type="checkbox" id="selectAllCheckbox"></th>
+                            <th width="4%" id="selectAllHeaderCell" style="display: none; text-align: center;"><input type="checkbox" id="selectAllCheckbox"></th>
                             <th width="10%">Order No</th>
                             <th width="12%">Date</th>
                             <th width="18%">Customer</th>
@@ -155,7 +165,7 @@ $initialSearch = $_GET['search'] ?? '';
         </div>
     </div>
 
-<script src="../../../assets/js/sale/sale_order/order-list.js"></script>
+<script src="../../../assets/js/sale/sale_order/order-list.js?v=<?= $jsVersion ?>"></script>
 <?php if ($initialSearch): ?>
 <script>
     window.addEventListener('load', function() {
