@@ -261,6 +261,67 @@ if ($status === 'Posted' || $status === 'Draft') {
                 !empty($item['batchExpiryDate']) ? $item['batchExpiryDate'] : null,
                 $input['saleDate']
             ]);
+
+            // =====================================================================
+            // ---- CHILD SALE => PARENT STOCK BHI KAM KARO (NEW) ----
+            // Sirf standalone child par chalega (bundle ke andar wale children par
+            // nahi, warna parentRowId wale case mein double minus ho jayega).
+            // Example: "Dal 5Kg" ka 1 pack sell => parent "Dal" se 5 Kg minus.
+            // =====================================================================
+            if (empty($item['parentRowId'])) {
+                $chStmt = $pdo->prepare("
+                    SELECT p.parent_product_id,
+                           p.product_conversion_factor,
+                           u.base_unit_id, u.unit_scope, u.conversion_factor AS uom_cf,
+                           puc.conversion_factor AS puc_cf,
+                           pp.inventory_account_id AS parent_account_id,
+                           pp.default_unit_id      AS parent_unit_id
+                    FROM products p
+                    JOIN products pp ON pp.id = p.parent_product_id
+                    LEFT JOIN uom u ON u.id = ?
+                    LEFT JOIN product_uom_conversions puc
+                           ON puc.product_id = p.id AND puc.uom_id = ?
+                    WHERE p.id = ? AND p.tenant_id = ?
+                ");
+                $chStmt->execute([$item['uomId'], $item['uomId'], $item['productId'], $tenant_id]);
+                $childInfo = $chStmt->fetch(PDO::FETCH_ASSOC);
+
+                // JOIN ki wajah se row sirf tab aayegi jab yeh product kisi parent ka child ho
+                if ($childInfo) {
+                    // Conversion factor: report wali hi logic (5 Kg pack => 5)
+                    if (!empty($childInfo['base_unit_id']) && $childInfo['unit_scope'] === 'universal') {
+                        $cf = floatval($childInfo['uom_cf']);
+                    } elseif (!empty($childInfo['puc_cf'])) {
+                        $cf = floatval($childInfo['puc_cf']);
+                    } elseif (!empty($childInfo['product_conversion_factor'])) {
+                        $cf = floatval($childInfo['product_conversion_factor']);
+                    } else {
+                        $cf = 1;
+                    }
+
+                    $parentQtyOut = floatval($item['quantity']) * $cf;   // 1 pack x 5 = 5 Kg
+                    $parentCost   = getCostPrice($pdo, $tenant_id, $childInfo['parent_product_id'], $input['branchId']);
+
+                    $pStock = $pdo->prepare("
+                        INSERT INTO stock_ledger (
+                            tenant_id, account_id, branch_id, product_id, reference_table, reference_id,
+                            qty_out, unit_cost, unit_id, batch_no, expiry_date, transaction_type, transaction_date
+                        ) VALUES (?, ?, ?, ?, 'sale_invoice', ?, ?, ?, ?, NULL, NULL, 'Sale Invoice', ?)
+                    ");
+                    $pStock->execute([
+                        $tenant_id,
+                        $childInfo['parent_account_id'] ?: $inventoryAccountId,
+                        $input['branchId'],
+                        $childInfo['parent_product_id'],
+                        $invoice_id,
+                        $parentQtyOut,
+                        $parentCost,
+                        $childInfo['parent_unit_id'],
+                        $input['saleDate']
+                    ]);
+                }
+            }
+            // ---------------------- END NEW BLOCK ----------------------
             
             // Insert stock ledger for FOC quantity if exists
             if (isset($item['focQty']) && $item['focQty'] > 0) {

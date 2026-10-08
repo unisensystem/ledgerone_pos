@@ -39,7 +39,7 @@ $initialSearch = $_GET['search'] ?? '';
                 <h1>Products</h1>
                 <p class="page-description">Manage your products and services inventory</p>
             </div>
-            <div class="header-actions">
+          <div class="header-actions">
                 <button class="btn btn-secondary" id="aiqBtn">
                     <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
                         <path d="M2 4H14M2 8H14M2 12H14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
@@ -110,10 +110,22 @@ $initialSearch = $_GET['search'] ?? '';
                     Add Product
                 </button>
 
-                <a href="product-import.php" class="btn btn-secondary btn-sm" style="text-decoration:none; display:inline-flex; align-items:center; gap:6px;">
-                    <i class="fas fa-file-import"></i>
+                <button class="btn btn-secondary" id="stockRepackBtn" onclick="location.href='stock-repack.php'" title="Add bags to child products from parent stock">
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M2 5.5L8 2.5L14 5.5L8 8.5L2 5.5Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+                        <path d="M2 5.5V10.5L8 13.5V8.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+                        <path d="M14 5.5V10.5L8 13.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+                    </svg>
+                    Stock Repack
+                </button>
+                <button class="btn btn-secondary" id="importProductsBtn" onclick="location.href='product-import.php'" title="Import products from a file">
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M14 10V12.6667C14 13.0203 13.8595 13.3594 13.6095 13.6095C13.3594 13.8595 13.0203 14 12.6667 14H3.33333C2.97971 14 2.64057 13.8595 2.39052 13.6095C2.14048 13.3594 2 13.0203 2 12.6667V10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+                        <path d="M11.3334 5.33333L8.00008 2L4.66675 5.33333" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+                        <path d="M8 2V10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+                    </svg>
                     Import Products
-                </a>
+                </button>
             </div>
         </div>
 
