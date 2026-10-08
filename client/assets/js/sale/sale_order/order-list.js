@@ -70,7 +70,7 @@ function initializeListPage(permissions) {
                 document.getElementById('selectAllCheckbox').checked = false;
                 currentPage = data.pagination.page;
                 totalPages = data.pagination.pages;
-                populateTable(invoices);
+                populateTable(invoices, isDraftView);
                 updatePagination(data.pagination);
             } else {
                 console.error('Error loading invoices:', data.message);
@@ -80,7 +80,7 @@ function initializeListPage(permissions) {
         }
     }
 
-    function populateTable(data) {
+    function populateTable(data, isDraftView) {
         invoicesTable.innerHTML = '';
 
         data.forEach(invoice => {
@@ -89,9 +89,12 @@ function initializeListPage(permissions) {
 
             // Checkbox cell — only populated for Draft rows, since that's
             // the only status Finalize Selected can act on. Always present
-            // so column indexes stay stable; hidden via the header cell's
-            // display:none when not viewing Drafts.
+            // so column indexes stay stable; display is kept in sync with
+            // the header cell's (both hidden outside Draft view) so the
+            // table doesn't end up with more body columns than header
+            // columns.
             const checkboxCell = row.insertCell(0);
+            checkboxCell.style.display = isDraftView ? '' : 'none';
             if (isDraft) {
                 const checkbox = document.createElement('input');
                 checkbox.type = 'checkbox';
