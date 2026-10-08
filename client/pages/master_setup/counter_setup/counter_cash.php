@@ -1,5 +1,6 @@
 <?php
 // Counter Cash - single page (backend + frontend in one file)
+date_default_timezone_set('Asia/Karachi');
 require_once '../../../../includes/connection.php';
 if (session_status() == PHP_SESSION_NONE) session_start();
 
@@ -58,7 +59,7 @@ if (isset($_GET['action'])) {
             if ($officer_id) { $where[] = 'x.sale_officer_id = ?'; $params[] = $officer_id; }
 
             $stmt = $pdo->prepare("
-                SELECT x.id, x.entry_date, x.payment_type, x.amount, x.remarks, x.created_at,
+                SELECT x.id, x.counter_id, x.sale_officer_id, x.entry_date, x.payment_type, x.amount, x.remarks, x.created_at,
                        c.counter_name, e.full_name AS officer_name, e.employee_id AS officer_code
                 FROM counter_cash_entries x
                 LEFT JOIN counters  c ON c.id = x.counter_id
@@ -121,6 +122,55 @@ if (isset($_GET['action'])) {
             exit;
         }
 
+        // ---- Update entry ----
+        if ($action === 'update') {
+            if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+                http_response_code(405);
+                throw new Exception('Method not allowed');
+            }
+            $in = json_decode(file_get_contents('php://input'), true) ?: [];
+
+            $id         = intval($in['id'] ?? 0);
+            $counter_id = intval($in['counter_id'] ?? 0);
+            $officer_id = intval($in['sale_officer_id'] ?? 0);
+            $date       = $in['entry_date'] ?? date('Y-m-d');
+            $amount     = round((float)($in['amount'] ?? 0), 2);
+            $remarks    = trim($in['remarks'] ?? '');
+
+            if (!$id)          throw new Exception('Invalid entry');
+            if (!$counter_id)  throw new Exception('Counter is required');
+            if (!$officer_id)  throw new Exception('Sales officer is required');
+            if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) throw new Exception('Invalid date');
+            if ($amount <= 0)  throw new Exception('Cash amount must be greater than 0');
+
+            $cs = $pdo->prepare("SELECT company_id, branch_id FROM counters WHERE id = ? AND tenant_id = ?");
+            $cs->execute([$counter_id, $tenant_id]);
+            $counter = $cs->fetch(PDO::FETCH_ASSOC);
+            if (!$counter) throw new Exception('Invalid counter');
+
+            $es = $pdo->prepare("SELECT id FROM employees WHERE id = ? AND tenant_id = ?");
+            $es->execute([$officer_id, $tenant_id]);
+            if (!$es->fetchColumn()) throw new Exception('Invalid sales officer');
+
+            $chk = $pdo->prepare("SELECT id FROM counter_cash_entries WHERE id = ? AND tenant_id = ?");
+            $chk->execute([$id, $tenant_id]);
+            if (!$chk->fetchColumn()) throw new Exception('Entry not found');
+
+            $stmt = $pdo->prepare("
+                UPDATE counter_cash_entries
+                SET company_id = ?, branch_id = ?, counter_id = ?, sale_officer_id = ?,
+                    entry_date = ?, amount = ?, remarks = ?
+                WHERE id = ? AND tenant_id = ?
+            ");
+            $stmt->execute([
+                $counter['company_id'], $counter['branch_id'], $counter_id, $officer_id,
+                $date, $amount, $remarks !== '' ? $remarks : null, $id, $tenant_id
+            ]);
+
+            echo json_encode(['success' => true, 'message' => 'Cash entry updated']);
+            exit;
+        }
+
         // ---- Delete entry ----
         if ($action === 'delete') {
             if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -175,6 +225,9 @@ if (!$user_id) { header('Location: ../../auth/login.html'); exit(); }
         .btn-primary { background: #1F7BFF; color: white; }
         .btn-primary:hover { background: #1A6CDC; }
         .btn-primary:disabled { opacity: .6; cursor: not-allowed; }
+        .btn-outline { background: white; color: #2F3B4C; border: 1px solid #E1E6EE; }
+        .btn-outline:hover { background: #F7F9FC; }
+        .btn-sm { height: 28px; padding: 0 10px; font-size: 12px; }
         .btn-danger { background: #E34F4F; color: white; height: 28px; padding: 0 10px; font-size: 12px; }
         .table-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; flex-wrap: wrap; gap: 10px; }
         .table-title { font-size: 15px; font-weight: 600; }
@@ -226,7 +279,9 @@ if (!$user_id) { header('Location: ../../auth/login.html'); exit(); }
                 <input type="text" class="form-input" id="remarks" maxlength="255" placeholder="Optional">
             </div>
             <div>
+                <input type="hidden" id="editId">
                 <button class="btn btn-primary" id="saveBtn"><i class="fas fa-save"></i> Save Cash</button>
+                <button class="btn btn-outline" id="cancelEditBtn" style="display:none;margin-left:6px">Cancel</button>
             </div>
         </div>
     </div>
@@ -258,6 +313,7 @@ if (!$user_id) { header('Location: ../../auth/login.html'); exit(); }
 
 <script>
 const API = 'counter_cash.php';
+let entriesCache = [];
 const $ = id => document.getElementById(id);
 
 function todayStr() {
@@ -310,6 +366,7 @@ async function loadEntries() {
         foot.innerHTML = '';
         return;
     }
+    entriesCache = data.entries;
     body.innerHTML = data.entries.map((r, i) => `
         <tr>
             <td>${i + 1}</td>
@@ -319,13 +376,18 @@ async function loadEntries() {
             <td><span class="badge">${esc(r.payment_type)}</span></td>
             <td class="num">${fmt(r.amount)}</td>
             <td>${esc(r.remarks || '')}</td>
-            <td><button class="btn btn-danger" onclick="deleteEntry(${r.id})"><i class="fas fa-trash"></i></button></td>
+            <td style="white-space:nowrap">
+                <button class="btn btn-outline btn-sm" onclick="editEntry(${r.id})"><i class="fas fa-edit"></i> Edit</button>
+                <button class="btn btn-danger" style="margin-left:6px" onclick="deleteEntry(${r.id})"><i class="fas fa-trash"></i></button>
+            </td>
         </tr>`).join('');
     foot.innerHTML = `<tr><td colspan="5" class="num">Total Cash</td><td class="num">${fmt(data.total)}</td><td colspan="2"></td></tr>`;
 }
 
 $('saveBtn').addEventListener('click', async () => {
+    const editId = $('editId').value;
     const payload = {
+        id: editId || undefined,
         counter_id: $('counterId').value,
         sale_officer_id: $('officerId').value,
         entry_date: $('entryDate').value,
@@ -340,7 +402,7 @@ $('saveBtn').addEventListener('click', async () => {
     const btn = $('saveBtn');
     btn.disabled = true;
     try {
-        const res = await fetch(API + '?action=save', {
+        const res = await fetch(API + '?action=' + (editId ? 'update' : 'save'), {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
@@ -348,8 +410,7 @@ $('saveBtn').addEventListener('click', async () => {
         const data = await res.json();
         showToast(data.message, !data.success);
         if (data.success) {
-            $('amount').value = '';
-            $('remarks').value = '';
+            resetForm();
             $('fDate').value = payload.entry_date;   // show the date just saved
             loadEntries();
         }
@@ -359,6 +420,30 @@ $('saveBtn').addEventListener('click', async () => {
         btn.disabled = false;
     }
 });
+
+function resetForm() {
+    $('editId').value = '';
+    $('amount').value = '';
+    $('remarks').value = '';
+    $('saveBtn').innerHTML = '<i class="fas fa-save"></i> Save Cash';
+    $('cancelEditBtn').style.display = 'none';
+}
+
+function editEntry(id) {
+    const r = entriesCache.find(x => x.id == id);
+    if (!r) return;
+    $('editId').value = r.id;
+    $('counterId').value = r.counter_id;
+    $('officerId').value = r.sale_officer_id;
+    $('entryDate').value = r.entry_date;
+    $('amount').value = r.amount;
+    $('remarks').value = r.remarks || '';
+    $('saveBtn').innerHTML = '<i class="fas fa-save"></i> Update Cash';
+    $('cancelEditBtn').style.display = 'inline-flex';
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+$('cancelEditBtn').addEventListener('click', resetForm);
 
 async function deleteEntry(id) {
     if (!confirm('Delete this cash entry?')) return;
