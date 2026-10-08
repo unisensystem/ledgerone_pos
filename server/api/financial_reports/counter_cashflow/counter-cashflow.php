@@ -1,5 +1,6 @@
 <?php
 session_start();
+date_default_timezone_set('Asia/Karachi');
 require_once '../../../../includes/connection.php';
 
 header('Content-Type: application/json');
@@ -79,11 +80,13 @@ try {
                COALESCE(cu.customer_name, 'Walk-in') AS customer,
                rv.amount,
                ct.counter_name,
-               rv.counter_id
+               rv.counter_id,
+               em.full_name AS sale_officer
         FROM receive_voucher rv
         LEFT JOIN sale_invoice si ON si.bill_no = rv.bill_no AND si.tenant_id = rv.tenant_id
         LEFT JOIN customers    cu ON cu.id = rv.customer_id
         LEFT JOIN counters     ct ON ct.id = rv.counter_id
+        LEFT JOIN employees    em ON em.id = si.sale_officer_id AND em.tenant_id = rv.tenant_id
         WHERE $where
         ORDER BY rv.voucher_date DESC, rv.id DESC
         LIMIT $limit OFFSET $offset
@@ -126,12 +129,30 @@ try {
     $openingStmt->execute($openingParams);
     $openingBalance = floatval($openingStmt->fetchColumn());
 
+    // ── Cash given to sales officers at the counter (Counter Cash page) = opening float ──
+    $givenWhere  = 'x.tenant_id = ? AND x.entry_date BETWEEN ? AND ?';
+    $givenParams = [$tenant_id, $d_from, $d_to];
+    if ($branch_id)  { $givenWhere .= ' AND x.branch_id = ?';  $givenParams[] = $branch_id;  }
+    if ($counter_id) { $givenWhere .= ' AND x.counter_id = ?'; $givenParams[] = $counter_id; }
+
+    $givenStmt = $pdo->prepare("SELECT COALESCE(SUM(x.amount), 0) FROM counter_cash_entries x WHERE $givenWhere");
+    $givenStmt->execute($givenParams);
+    $openingGiven = floatval($givenStmt->fetchColumn());
+
+    // Opening = existing opening + cash given today (e.g. 1000)
+    $openingTotal = $openingBalance + $openingGiven;
+
     // ── Per-counter summary (when viewing all counters in a branch) ──
     $summaryData = [];
     if ($branch_id && !$counter_id) {
         $sumByCounterStmt = $pdo->prepare("
             SELECT ct.id, ct.counter_name,
-                   COALESCE(SUM(rv.amount), 0) AS cash_in
+                   COALESCE(SUM(rv.amount), 0) AS cash_in,
+                   (SELECT COALESCE(SUM(x.amount), 0)
+                      FROM counter_cash_entries x
+                     WHERE x.tenant_id = ct.tenant_id
+                       AND x.counter_id = ct.id
+                       AND x.entry_date BETWEEN ? AND ?) AS opening_given
             FROM counters ct
             LEFT JOIN receive_voucher rv
                    ON rv.counter_id = ct.id
@@ -142,7 +163,7 @@ try {
             GROUP BY ct.id, ct.counter_name
             ORDER BY ct.counter_name
         ");
-        $sumByCounterStmt->execute([$d_from, $d_to, $tenant_id, $branch_id]);
+        $sumByCounterStmt->execute([$d_from, $d_to, $d_from, $d_to, $tenant_id, $branch_id]);
         $summaryData = $sumByCounterStmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
@@ -156,9 +177,10 @@ try {
 
     echo json_encode([
         'success'          => true,
-        'opening_balance'  => $openingBalance,
+        'opening_balance'  => $openingTotal,
+        'opening_given'    => $openingGiven,
         'total_cash_in'    => $totalCashIn,
-        'closing_balance'  => $openingBalance + $totalCashIn,
+        'closing_balance'  => $openingTotal + $totalCashIn,
         'transactions'     => $transactions,
         'total_rows'       => $totalRows,
         'page'             => $page,

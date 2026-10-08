@@ -1040,6 +1040,13 @@ $user_employee_id = $user['employee_id'] ?? null;
                     </label>
                 </div>
 
+                <div class="form-group-micro">
+                    <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;" title="ON: save ke baad direct print nahi hoga, PRINT button aayega. OFF: save par direct print.">
+                        <input type="checkbox" id="manualPrintToggle" style="width: auto;">
+                        <span style="font-size: 11px;">Manual Print (show Print button instead of auto print)</span>
+                    </label>
+                </div>
+
                 <div class="form-group-micro" id="bankAccountContainer" style="display: none;">
                     <div class="form-label">BANK ACCOUNT</div>
                     <select id="bankAccount">
@@ -1180,6 +1187,9 @@ $user_employee_id = $user['employee_id'] ?? null;
                 </button>
                 <button class="btn btn-secondary" id="saveDraftBtn">
                     <i class="fas fa-file"></i> SAVE AS DRAFT
+                </button>
+                <button class="btn btn-success" id="printInvoiceBtn" style="display: none;">
+                    <i class="fas fa-print"></i> PRINT
                 </button>
                 <button class="btn btn-secondary" id="shortcutSettingsBtn">
                     <i class="fas fa-keyboard"></i> SHORTCUTS

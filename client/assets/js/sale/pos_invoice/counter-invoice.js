@@ -8,6 +8,7 @@ let currentInvoice = {
 };
 
 let isSaving = false;
+let lastSavedInvoiceId = null;
 let preSelectedProduct = null;
 
 let productsData = [];
@@ -58,6 +59,29 @@ function getEffectivePrice(product) {
         if (parent && parent !== product) return getEffectivePrice(parent);
     }
     return parsed;
+}
+
+// Manual print mode: ON = no auto print after save, a PRINT button is shown instead. OFF = auto print (default)
+function isManualPrintMode() {
+    return localStorage.getItem('manualPrintMode') === 'true';
+}
+
+function showPrintButton() {
+    const btn = document.getElementById('printInvoiceBtn');
+    if (btn) btn.style.display = '';
+}
+
+function hidePrintButton() {
+    const btn = document.getElementById('printInvoiceBtn');
+    if (btn) btn.style.display = 'none';
+}
+
+function printLastInvoice() {
+    if (!lastSavedInvoiceId) {
+        alert('No saved invoice to print!');
+        return;
+    }
+    window.open(`thermal-print.php?id=${lastSavedInvoiceId}`, '_blank');
 }
 
 // Load data on page load
@@ -275,6 +299,21 @@ document.addEventListener('DOMContentLoaded', async function() {
     autoAddCheckbox.addEventListener('change', function() {
         localStorage.setItem('autoAddChildren', this.checked);
     });
+
+    // Manual print switch — ON: no auto print after save, PRINT button shown. OFF: auto print (default)
+    const manualPrintCheckbox = document.getElementById('manualPrintToggle');
+    if (manualPrintCheckbox) {
+        manualPrintCheckbox.checked = isManualPrintMode();
+        manualPrintCheckbox.addEventListener('change', function() {
+            localStorage.setItem('manualPrintMode', this.checked);
+            if (!this.checked) hidePrintButton();
+        });
+    }
+
+    const printInvoiceBtn = document.getElementById('printInvoiceBtn');
+    if (printInvoiceBtn) {
+        printInvoiceBtn.addEventListener('click', printLastInvoice);
+    }
 
     // Price Setting — which product price field to use when adding items (default: MRP)
     const priceSettingSelect = document.getElementById('priceSetting');
@@ -723,7 +762,7 @@ async function loadDraftInvoices() {
                     <td style="padding: 8px; border-bottom: 1px solid var(--border-default);">${draft.bill_no}</td>
                     <td style="padding: 8px; border-bottom: 1px solid var(--border-default);">${new Date(draft.sale_date).toLocaleDateString()}</td>
                     <td style="padding: 8px; border-bottom: 1px solid var(--border-default);">${draft.customer_name}</td>
-                    <td style="padding: 8px; border-bottom: 1px solid var(--border-default); text-align: right;">${draft.currency_symbol}${parseFloat(draft.net_amount).toFixed(3)}</td>
+                    <td style="padding: 8px; border-bottom: 1px solid var(--border-default); text-align: right;">${draft.currency_symbol}${parseFloat(draft.net_amount).toFixed(2)}</td>
                     <td style="padding: 8px; border-bottom: 1px solid var(--border-default); text-align: center;">
                         <button class="btn btn-primary btn-sm" onclick="loadDraft(${draft.id})" style="padding: 4px 8px; margin-right: 4px;">
                             <i class="fas fa-edit"></i> Load
@@ -1030,8 +1069,8 @@ async function fetchCustomerBalance(customerId) {
         if (data.success && data.data.length > 0) {
             const balance = parseFloat(data.data[0].closing_balance || 0);
             currentInvoice.previousBalance = balance >= 0 
-                ? `Dr ${balance.toFixed(3)}` 
-                : `Cr ${Math.abs(balance).toFixed(3)}`;
+                ? `Dr ${balance.toFixed(2)}` 
+                : `Cr ${Math.abs(balance).toFixed(2)}`;
         } else {
             currentInvoice.previousBalance = 'Dr 0.00';
         }
@@ -1470,7 +1509,7 @@ function showChildProductModal(parent, children) {
             <input type="checkbox" class="child-check" data-id="${child.id}" data-name="${child.name}" data-stock="${child.stock_affects}" data-invoice="${child.invoice_affects}">
             <span>${child.name}</span>
             <input type="number" class="child-qty" min="0" value="0" style="padding: 4px; border: 1px solid var(--border-default); border-radius: 4px;" placeholder="Qty">
-            <input type="number" class="child-price" min="0" value="${childPrice.toFixed(3)}" step="0.01" style="padding: 4px; border: 1px solid var(--border-default); border-radius: 4px;" placeholder="Price">
+            <input type="number" class="child-price" min="0" value="${childPrice.toFixed(2)}" step="0.01" style="padding: 4px; border: 1px solid var(--border-default); border-radius: 4px;" placeholder="Price">
         `;
         childList.appendChild(div);
     });
@@ -1538,6 +1577,7 @@ function addProductWithChildren(parent, children) {
     item.net = item.gross - item.discountAmount + item.gstAmount;
 
     currentInvoice.items.push(item);
+    hidePrintButton();
     renderItems();
     updateSummary();
 
@@ -1572,6 +1612,7 @@ function addProductToInvoice(product) {
     item.net = item.gross - item.discountAmount + item.gstAmount;
 
     currentInvoice.items.push(item);
+    hidePrintButton();
     renderItems();
     updateSummary();
 
@@ -1596,10 +1637,10 @@ function renderItems() {
             <div>${item.product}${item.children ? '<br><small style="color: var(--subtext);">(' + item.children.map(c => c.name + ': ' + c.qty + ' @ ' + formatCurrency(c.price)).join(' | ') + ')</small>' : ''}</div>
             <div>${item.unit}</div>
             <input type="number" value="${item.qty}" min="1" class="text-right item-qty-input" data-item-id="${item.id}" data-product-id="${item.productId}" onchange="updateItemQty(${item.id}, this.value)">
-            <input type="number" value="${item.price.toFixed(3)}" step="0.01" class="text-right" onchange="updateItemPrice(${item.id}, this.value)">
+            <input type="number" value="${item.price.toFixed(2)}" step="0.01" class="text-right" onchange="updateItemPrice(${item.id}, this.value)">
             <div class="readonly">${formatCurrency(item.gross)}</div>
             <input type="number" value="${item.discountPercent}" step="0.1" class="text-right" data-role="disc-pct" data-item-id="${item.id}" onchange="updateItemDiscountPct(${item.id}, this.value)">
-            <input type="number" value="${item.discountAmount.toFixed(3)}" step="0.01" class="text-right" data-role="disc-amt" data-item-id="${item.id}" onchange="updateItemDiscountAmt(${item.id}, this.value)">
+            <input type="number" value="${item.discountAmount.toFixed(2)}" step="0.01" class="text-right" data-role="disc-amt" data-item-id="${item.id}" onchange="updateItemDiscountAmt(${item.id}, this.value)">
             <input type="number" value="${item.gstPercent}" step="0.1" class="text-right" onchange="updateItemGst(${item.id}, this.value)">
             <div class="readonly">${formatCurrency(item.net)}</div>
             <div class="text-center">
@@ -1827,7 +1868,7 @@ function updateReturnedAndBalance() {
     const amountReturned = difference > 0 ? difference : 0;
     const balance = difference < 0 ? Math.abs(difference) : 0;
     
-    document.getElementById('amountReturned').value = amountReturned.toFixed(3);
+    document.getElementById('amountReturned').value = amountReturned.toFixed(2);
     document.getElementById('summaryReturned').textContent = formatCurrency(amountReturned);
     document.getElementById('balanceAmount').textContent = formatCurrency(balance);
     
@@ -1857,7 +1898,7 @@ function updateInvoiceDiscount() {
     
     if (document.activeElement === percentInput) {
         const percent = parseFloat(percentInput.value) || 0;
-        amountInput.value = (totalNet * percent / 100).toFixed(3);
+        amountInput.value = (totalNet * percent / 100).toFixed(2);
     } else if (document.activeElement === amountInput) {
         const amount = parseFloat(amountInput.value) || 0;
         percentInput.value = totalNet > 0 ? ((amount / totalNet) * 100).toFixed(1) : 0;
@@ -1876,7 +1917,7 @@ function quickPay() {
     const invoiceDiscountAmount = parseFloat(document.getElementById('invoiceDiscountAmount').value) || 0;
     const finalAmount = netAmount - invoiceDiscountAmount;
     
-    document.getElementById('amountReceived').value = finalAmount.toFixed(3);
+    document.getElementById('amountReceived').value = finalAmount.toFixed(2);
     document.getElementById('amountReturned').value = 0;
     updateSummary();
     showNotification(`Quick Pay: ${formatCurrency(finalAmount)}`);
@@ -1994,8 +2035,15 @@ async function saveInvoice(status = 'Posted') {
         
         if (data.success) {
             showNotification('Invoice saved successfully!');
-            // Redirect to thermal print
-            window.open(`thermal-print.php?id=${data.invoice_id}`, '_blank');
+            lastSavedInvoiceId = data.invoice_id;
+            if (isManualPrintMode()) {
+                // Manual print mode: no auto print, just show the PRINT button
+                showPrintButton();
+            } else {
+                // Redirect to thermal print
+                hidePrintButton();
+                window.open(`thermal-print.php?id=${data.invoice_id}`, '_blank');
+            }
             setTimeout(() => {
                 currentInvoice.items = [];
                 renderItems();
@@ -2025,7 +2073,7 @@ function formatCurrency(amount) {
     const currency = currenciesData.find(c => c.code === currencyCode);
     const symbol = currency ? currency.symbol : '$';
     
-    return `${symbol}${Math.abs(amount).toFixed(3)}`;
+    return `${symbol}${Math.abs(amount).toFixed(2)}`;
 }
 
 function showNotification(message) {

@@ -244,8 +244,8 @@ async function loadReport() {
             counterCards.innerHTML = data.counter_summary.map(c => `
                 <div class="counter-card" onclick="filterByCounter(${c.id})">
                     <div class="counter-card-name"><i class="fas fa-cash-register" style="color:#1F7BFF;margin-right:6px"></i>${c.counter_name}</div>
-                    <div class="counter-card-amount">${fmt(c.cash_in)}</div>
-                    <div class="counter-card-label">Cash In Today</div>
+                    <div class="counter-card-amount">${fmt(parseFloat(c.opening_given || 0) + parseFloat(c.cash_in || 0))}</div>
+                    <div class="counter-card-label">Opening ${fmt(c.opening_given)} + Sales ${fmt(c.cash_in)}</div>
                 </div>
             `).join('');
         } else {
@@ -285,6 +285,7 @@ function renderTable(rows) {
                     <th>Voucher No</th>
                     <th>Invoice No</th>
                     <th>Customer</th>
+                    <th>Sales Officer</th>
                     <th>Counter</th>
                     <th style="text-align:right">Amount</th>
                 </tr>
@@ -297,6 +298,7 @@ function renderTable(rows) {
                         <td>${r.reference}</td>
                         <td>${r.bill_no || '-'}</td>
                         <td>${r.customer}</td>
+                        <td>${r.sale_officer || '<span style="color:#9CA3AF">-</span>'}</td>
                         <td>${r.counter_name || '<span style="color:#9CA3AF">Unassigned</span>'}</td>
                         <td class="amount-cell">${fmt(r.amount)}</td>
                     </tr>

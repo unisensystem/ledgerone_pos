@@ -61,7 +61,10 @@ if (!$user_id) { header('Location: ../../auth/login.html'); exit(); }
             <div class="page-title">Counter Setup</div>
             <div class="page-subtitle">Define POS counters per branch for separate cash tracking</div>
         </div>
-        <button class="btn btn-primary" id="addBtn"><i class="fas fa-plus"></i> Add Counter</button>
+        <div style="display:flex;gap:10px;">
+            <a href="counter_cash.php" class="btn btn-outline" style="text-decoration:none;"><i class="fas fa-cash-register"></i> Counter Cash</a>
+            <button class="btn btn-primary" id="addBtn"><i class="fas fa-plus"></i> Add Counter</button>
+        </div>
     </div>
 
     <div class="card">
