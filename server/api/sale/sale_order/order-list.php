@@ -171,8 +171,9 @@ try {
     // If item_count still looks wrong, confirm the real FK column name in
     // sale_order_items and tell me — I'll correct it instead of guessing.
     $sql = "
-        SELECT 
+        SELECT
             si.id,
+            si.status,
             si.bill_no,
             si.sale_date,
             c.customer_name,

@@ -35,6 +35,7 @@ function initializeListPage(permissions) {
             const dateToVal = document.getElementById('dateTo').value;
             const customerVal = document.getElementById('customerFilter').value;
             const statusVal = document.getElementById('statusFilter').value;
+            const orderStatusVal = document.getElementById('orderStatusFilter').value;
             const searchVal = document.getElementById('searchInput').value.trim();
 
             let url = `../../../../server/api/sale/sale_order/order-list.php?page=${page}&limit=10`;
@@ -43,6 +44,7 @@ function initializeListPage(permissions) {
             if (dateToVal) url += `&date_to=${encodeURIComponent(dateToVal)}`;
             if (customerVal) url += `&customer_id=${encodeURIComponent(customerVal)}`;
             if (statusVal) url += `&status=${encodeURIComponent(statusVal)}`;
+            if (orderStatusVal) url += `&order_status=${encodeURIComponent(orderStatusVal)}`;
             if (searchVal) url += `&search=${encodeURIComponent(searchVal)}`;
 
             const response = await fetch(url);
@@ -51,6 +53,7 @@ function initializeListPage(permissions) {
             if (data.success) {
                 invoices = data.invoices.map(invoice => ({
                     id: invoice.id,
+                    orderStatus: invoice.status,
                     invoiceNo: invoice.bill_no,
                     date: invoice.sale_date,
                     customer: invoice.customer_name,
@@ -59,6 +62,12 @@ function initializeListPage(permissions) {
                     currencySymbol: invoice.currency_symbol || '',
                     status: invoice.fulfillment_status || 'Pending'
                 }));
+                // Finalizing only makes sense while reviewing Drafts — the
+                // checkbox column and bulk button are only useful then.
+                const isDraftView = orderStatusVal === 'Draft';
+                document.getElementById('selectAllHeaderCell').style.display = isDraftView ? '' : 'none';
+                document.getElementById('finalizeSelectedBtn').style.display = isDraftView ? '' : 'none';
+                document.getElementById('selectAllCheckbox').checked = false;
                 currentPage = data.pagination.page;
                 totalPages = data.pagination.pages;
                 populateTable(invoices);
@@ -76,6 +85,20 @@ function initializeListPage(permissions) {
 
         data.forEach(invoice => {
             const row = invoicesTable.insertRow();
+            const isDraft = invoice.orderStatus === 'Draft';
+
+            // Checkbox cell — only populated for Draft rows, since that's
+            // the only status Finalize Selected can act on. Always present
+            // so column indexes stay stable; hidden via the header cell's
+            // display:none when not viewing Drafts.
+            const checkboxCell = row.insertCell(0);
+            if (isDraft) {
+                const checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                checkbox.className = 'draft-row-checkbox';
+                checkbox.value = invoice.id;
+                checkboxCell.appendChild(checkbox);
+            }
 
             // Format date
             const formattedDate = new Date(invoice.date).toLocaleDateString('en-US', {
@@ -88,20 +111,27 @@ function initializeListPage(permissions) {
             const formattedAmount = `${invoice.currencySymbol} ${parseFloat(invoice.totalAmount).toFixed(2)}`;
 
             // Create cells
-            row.insertCell(0).textContent = invoice.invoiceNo;
-            row.insertCell(1).textContent = formattedDate;
-            row.insertCell(2).textContent = invoice.customer || 'N/A';
-            row.insertCell(3).textContent = invoice.items;
-            row.insertCell(4).textContent = formattedAmount;
+            row.insertCell(1).textContent = invoice.invoiceNo;
+            row.insertCell(2).textContent = formattedDate;
+            row.insertCell(3).textContent = invoice.customer || 'N/A';
+            row.insertCell(4).textContent = invoice.items;
+            row.insertCell(5).textContent = formattedAmount;
 
-            // Status cell
-            const statusCell = row.insertCell(5);
+            // Status cell — a Draft order has no meaningful fulfillment
+            // progress yet (nothing's been posted against it), so show the
+            // order's own Draft status instead of the fulfillment badge.
+            const statusCell = row.insertCell(6);
             const statusBadge = document.createElement('span');
-            statusBadge.className = 'status ' + (invoice.status === 'Partially Fulfilled' ? 'status-pending' : 'status-overdue');
-            statusBadge.textContent = invoice.status || 'Pending';
+            if (isDraft) {
+                statusBadge.className = 'status status-overdue';
+                statusBadge.textContent = 'Draft';
+            } else {
+                statusBadge.className = 'status ' + (invoice.status === 'Partially Fulfilled' ? 'status-pending' : 'status-overdue');
+                statusBadge.textContent = invoice.status || 'Pending';
+            }
             statusCell.appendChild(statusBadge);
 
-            const actionsCell = row.insertCell(6);
+            const actionsCell = row.insertCell(7);
             const actionButtons = document.createElement('div');
             actionButtons.className = 'action-buttons';
 
@@ -117,13 +147,18 @@ function initializeListPage(permissions) {
                 editBtn.style.opacity = '0.5';
                 editBtn.style.cursor = 'not-allowed';
             }
+            actionButtons.appendChild(editBtn);
 
-            // Convert to Invoice button
-            const convertBtn = document.createElement('button');
-            convertBtn.className = 'btn btn-warning btn-sm';
-            convertBtn.innerHTML = '<i class="fas fa-exchange-alt"></i>';
-            convertBtn.title = 'Convert to Sale Invoice';
-            convertBtn.addEventListener('click', () => convertToInvoice(invoice.id));
+            // Convert to Invoice / View Fulfillment only apply to Posted
+            // orders — a Draft hasn't been reviewed/approved yet.
+            if (!isDraft) {
+                const convertBtn = document.createElement('button');
+                convertBtn.className = 'btn btn-warning btn-sm';
+                convertBtn.innerHTML = '<i class="fas fa-exchange-alt"></i>';
+                convertBtn.title = 'Convert to Sale Invoice';
+                convertBtn.addEventListener('click', () => convertToInvoice(invoice.id));
+                actionButtons.appendChild(convertBtn);
+            }
 
             // Print button
             const printBtn = document.createElement('button');
@@ -131,13 +166,16 @@ function initializeListPage(permissions) {
             printBtn.innerHTML = '<i class="fas fa-print"></i>';
             printBtn.title = 'Print Order';
             printBtn.addEventListener('click', () => printInvoice(invoice.id));
+            actionButtons.appendChild(printBtn);
 
-            // View Fulfillment button
-            const fulfillmentBtn = document.createElement('button');
-            fulfillmentBtn.className = 'btn btn-warning btn-sm';
-            fulfillmentBtn.innerHTML = '<i class="fas fa-tasks"></i>';
-            fulfillmentBtn.title = 'View Fulfillment';
-            fulfillmentBtn.addEventListener('click', () => viewFulfillment(invoice.id));
+            if (!isDraft) {
+                const fulfillmentBtn = document.createElement('button');
+                fulfillmentBtn.className = 'btn btn-warning btn-sm';
+                fulfillmentBtn.innerHTML = '<i class="fas fa-tasks"></i>';
+                fulfillmentBtn.title = 'View Fulfillment';
+                fulfillmentBtn.addEventListener('click', () => viewFulfillment(invoice.id));
+                actionButtons.appendChild(fulfillmentBtn);
+            }
 
             // Delete button
             const deleteBtn = document.createElement('button');
@@ -151,11 +189,6 @@ function initializeListPage(permissions) {
                 deleteBtn.style.opacity = '0.5';
                 deleteBtn.style.cursor = 'not-allowed';
             }
-
-            actionButtons.appendChild(editBtn);
-            actionButtons.appendChild(convertBtn);
-            actionButtons.appendChild(printBtn);
-            actionButtons.appendChild(fulfillmentBtn);
             actionButtons.appendChild(deleteBtn);
 
             actionsCell.appendChild(actionButtons);
@@ -191,6 +224,7 @@ function initializeListPage(permissions) {
     const companyFilterEl = document.getElementById('companyFilter');
     const customerFilter = document.getElementById('customerFilter');
     const statusFilter = document.getElementById('statusFilter');
+    const orderStatusFilter = document.getElementById('orderStatusFilter');
     const searchInput = document.getElementById('searchInput');
 
     // Server-side filtering: every filter change triggers a fresh page-1 fetch
@@ -204,6 +238,7 @@ function initializeListPage(permissions) {
     companyFilterEl.addEventListener('change', reload);
     customerFilter.addEventListener('change', reload);
     statusFilter.addEventListener('change', reload);
+    orderStatusFilter.addEventListener('change', reload);
     searchInput.addEventListener('input', function () {
         clearTimeout(searchDebounce);
         searchDebounce = setTimeout(reload, 300); // debounce so typing doesn't spam the API
@@ -265,6 +300,53 @@ function initializeListPage(permissions) {
             return;
         }
         window.location.href = 'order-add.php';
+    });
+
+    // Select-all checkbox for the Draft view's bulk-finalize column.
+    const selectAllCheckbox = document.getElementById('selectAllCheckbox');
+    selectAllCheckbox.addEventListener('change', function () {
+        invoicesTable.querySelectorAll('.draft-row-checkbox').forEach(cb => {
+            cb.checked = selectAllCheckbox.checked;
+        });
+    });
+
+    // Finalize Selected — bulk-posts the checked Draft orders via the same
+    // order-finalize.php the drafts modal on order-add.php already uses.
+    document.getElementById('finalizeSelectedBtn').addEventListener('click', async function () {
+        const btn = this;
+        const ids = Array.from(invoicesTable.querySelectorAll('.draft-row-checkbox:checked'))
+            .map(cb => parseInt(cb.value, 10))
+            .filter(id => id > 0);
+        if (ids.length === 0) {
+            alert('Select at least one draft order to finalize.');
+            return;
+        }
+        if (!confirm(`Finalize ${ids.length} selected order(s) as Posted? This treats the review as approved.`)) {
+            return;
+        }
+        btn.disabled = true;
+        try {
+            const response = await fetch('../../../../server/api/sale/sale_order/order-finalize.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ids })
+            });
+            const data = await response.json();
+            if (data.success) {
+                if (data.finalized === 0) {
+                    alert('None of the selected orders could be finalized — a draft you created yourself needs another user to review it.');
+                } else {
+                    alert(`Finalized ${data.finalized} order(s).`);
+                }
+                loadInvoices(currentPage);
+            } else {
+                alert('Error: ' + (data.message || 'Could not finalize orders.'));
+            }
+        } catch (error) {
+            alert('Network error — could not finalize orders.');
+        } finally {
+            btn.disabled = false;
+        }
     });
 
     // Action functions
