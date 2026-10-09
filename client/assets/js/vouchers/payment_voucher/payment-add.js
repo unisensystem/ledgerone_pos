@@ -759,6 +759,69 @@ function resetForm() {
 // =====================================================================
 let bulkRowCounter = 0;
 
+// ---- Bulk party display format: 'code' | 'name' | 'both' ----
+// Only changes what is SHOWN in the input after selecting. Posting always sends the real code.
+const BULK_PARTY_FMT_KEY = 'bulk_payment_party_format';
+let bulkPartyFormat = 'both';
+try {
+    const f = localStorage.getItem(BULK_PARTY_FMT_KEY);
+    if (['code', 'name', 'both'].includes(f)) bulkPartyFormat = f;
+} catch (e) { /* storage unavailable */ }
+
+function formatParty(p) {
+    if (!p) return '';
+    const code = String(p.code || '');
+    const name = String(p.name || '');
+    if (bulkPartyFormat === 'code') return code;
+    if (bulkPartyFormat === 'name') return name || code;
+    return name ? `${code} - ${name}` : code;
+}
+
+// Match typed text against code, name, or "code - name"
+function findPartiesByText(text) {
+    const t = String(text || '').trim().toLowerCase();
+    if (!t) return [];
+    return getBulkParties().filter(p => {
+        const code = String(p.code || '').toLowerCase();
+        const name = String(p.name || '').toLowerCase();
+        return t === code || t === name || t === `${code} - ${name}`;
+    });
+}
+
+// Re-render the text of every row's party input in the current format
+function applyBulkPartyFormat() {
+    document.querySelectorAll('#bulkTableBody tr').forEach(row => {
+        const input = row.querySelector('.bulk-supplier');
+        if (row._party && input) {
+            input.value = formatParty(row._party);
+            input.title = `${row._party.code} - ${row._party.name || ''}`;
+        }
+    });
+    try { localStorage.setItem(BULK_PARTY_FMT_KEY, bulkPartyFormat); } catch (e) { /* ignore */ }
+}
+
+function buildBulkPartyFormatSelect() {
+    const controls = document.querySelector('#bulkVoucherForm .bulk-controls > div');
+    if (!controls || document.getElementById('bulkPartyFormat')) return;
+
+    const sel = document.createElement('select');
+    sel.id = 'bulkPartyFormat';
+    sel.title = 'Supplier / Customer display';
+    sel.style.cssText = 'min-width:150px;';
+    [['both', 'Code - Name'], ['code', 'Code only'], ['name', 'Name only']].forEach(([v, t]) => {
+        const o = document.createElement('option');
+        o.value = v;
+        o.textContent = t;
+        sel.appendChild(o);
+    });
+    sel.value = bulkPartyFormat;
+    sel.addEventListener('change', () => {
+        bulkPartyFormat = sel.value;
+        applyBulkPartyFormat();
+    });
+    controls.appendChild(sel);
+}
+
 // Bulk party list follows the Payment To toggle (supplier / customer)
 function getBulkParties() {
     return currentPaymentType === 'customer' ? customers : suppliers;
@@ -780,7 +843,9 @@ function resetBulkParties() {
         const input = row.querySelector('.bulk-supplier');
         const sub = row.querySelector('.bulk-sub-account');
         const bill = row.querySelector('.bulk-bill');
-        if (input) input.value = '';
+        if (input) { input.value = ''; input.title = ''; }
+        row._party = null;
+        delete row.dataset.partyCode;
         if (bill) bill.value = '';
         row._bills = [];
         row._billToken = (row._billToken || 0) + 1;
@@ -865,6 +930,7 @@ function setupBulkSupplierSearch(row) {
     dd.style.display = 'none';
     document.body.appendChild(dd);
     row._supplierDropdown = dd;
+    row._party = null;
 
     let highlighted = -1;
 
@@ -881,8 +947,9 @@ function setupBulkSupplierSearch(row) {
     }
 
     function selectParty(party) {
-        input.value = party.code;
-        input.title = party.name || '';
+        row._party = party;
+        input.value = formatParty(party);
+        input.title = `${party.code} - ${party.name || ''}`;
         close();
         loadBulkSubAccounts(row, party.code);
     }
@@ -912,6 +979,7 @@ function setupBulkSupplierSearch(row) {
             list.slice(0, 10).forEach(p => {
                 const option = document.createElement('div');
                 option.className = 'dropdown-item';
+                // The list always shows code - name so parties are easy to tell apart
                 option.innerHTML = `<strong>${p.code}</strong> - ${p.name}`;
                 option.dataset.code = p.code;
                 option.addEventListener('click', () => selectParty(p));
@@ -925,6 +993,8 @@ function setupBulkSupplierSearch(row) {
         activeBulkDropdown = { input, dd, close };
     }
 
+    // Typing by hand invalidates the previous list selection
+    input.addEventListener('input', function() { row._party = null; });
     input.addEventListener('input', render);
     input.addEventListener('focus', render);
 
@@ -956,14 +1026,16 @@ function setupBulkSupplierSearch(row) {
         }
     });
 
-    // If user typed an exact code and left the field, still load sub accounts
+    // If user typed an exact code / name and left the field, still resolve it and load sub accounts
     input.addEventListener('change', function() {
-        const typed = input.value.trim().toLowerCase();
-        const party = getBulkParties().find(p => String(p.code).toLowerCase() === typed);
-        if (party && row.dataset.partyCode !== String(party.code)) {
-            input.value = party.code;
-            input.title = party.name || '';
-            loadBulkSubAccounts(row, party.code);
+        if (row._party) return;
+        const matches = findPartiesByText(input.value);
+        if (matches.length === 1) {
+            const party = matches[0];
+            row._party = party;
+            input.value = formatParty(party);
+            input.title = `${party.code} - ${party.name || ''}`;
+            if (row.dataset.partyCode !== String(party.code)) loadBulkSubAccounts(row, party.code);
         }
     });
 }
@@ -1417,6 +1489,7 @@ function buildBulkColumnMenu() {
     applyBulkColumnVisibility();
 }
 buildBulkColumnMenu();
+buildBulkPartyFormatSelect();
 
 // Validate one bulk row. Returns { error } or { party }
 function validateBulkRow(row) {
@@ -1429,9 +1502,18 @@ function validateBulkRow(row) {
     };
     const errors = [];
 
-    const typed = row.querySelector('.bulk-supplier').value.trim().toLowerCase();
-    const party = getBulkParties().find(p => String(p.code).toLowerCase() === typed);
+    // Party: use the list selection, else try to resolve typed code / name / "code - name"
+    let party = row._party;
     if (!party) {
+        const matches = findPartiesByText(row.querySelector('.bulk-supplier').value);
+        if (matches.length === 1) {
+            party = matches[0];
+        } else if (matches.length > 1) {
+            errors.push('Multiple parties share this name, select from the list');
+            markBad(row.querySelector('.bulk-supplier'));
+        }
+    }
+    if (!party && !errors.length) {
         errors.push(currentPaymentType === 'customer' ? 'Select a valid customer from the list' : 'Select a valid supplier from the list');
         markBad(row.querySelector('.bulk-supplier'));
     }
@@ -1525,7 +1607,7 @@ document.getElementById('postBulkBtn').addEventListener('click', async function(
         const formData = new FormData();
         formData.append('payment_type', currentPaymentType);
         formData.append('voucher_date', row.querySelector('.bulk-date').value);
-        formData.append('supplier_code', parties.get(row).code);
+        formData.append('supplier_code', parties.get(row).code); // always the real code, whatever is displayed
         formData.append('company_id', bulkCompanyId);
 
         const bulkSubAccount = row.querySelector('.bulk-sub-account').value;

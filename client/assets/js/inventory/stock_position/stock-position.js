@@ -1367,11 +1367,9 @@ function updateMovementTable(entries, currency = '$') {
 function renderMovementTable(currency = '$') {
     const tbody = document.querySelector('#item-movement .table tbody');
 
-    const startIndex = (movementCurrentPage - 1) * movementItemsPerPage;   // changed
-    const endIndex   = startIndex + movementItemsPerPage;                  // changed
+    const startIndex = (movementCurrentPage - 1) * movementItemsPerPage;
+    const endIndex   = startIndex + movementItemsPerPage;
     const pageData   = allMovementEntries.slice(startIndex, endIndex);
-
-    // ... baqi function same rehta hai
 
     const totalOpening    = allMovementEntries.reduce((s, e) => s + parseFloat(e.opening || 0), 0);
     const totalPurchase   = allMovementEntries.reduce((s, e) => s + parseFloat(e.purchase || 0), 0);
@@ -1394,6 +1392,7 @@ function renderMovementTable(currency = '$') {
     `).join('') + `
         <tr style="font-weight: bold; background-color: var(--table-header);">
             <td>Total (${allMovementEntries.length} products)</td>
+            <td>-</td>
             <td>${formatStockAmount(totalOpening, 'item-movement')}</td>
             <td>${formatStockAmount(totalPurchase, 'item-movement')}</td>
             <td>${formatStockAmount(totalSale, 'item-movement')}</td>
@@ -2029,7 +2028,7 @@ document.getElementById('movement-prev-btn').addEventListener('click', () => {
 });
 
 document.getElementById('movement-next-btn').addEventListener('click', () => {
-    const totalPages = Math.ceil(movementTotalItems / itemsPerPage);
+    const totalPages = Math.ceil(movementTotalItems / movementItemsPerPage);
     if (movementCurrentPage < totalPages) {
         movementCurrentPage++;
         renderMovementTable(movementCurrency);
