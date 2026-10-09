@@ -29,6 +29,9 @@ paymentTypeToggles.forEach(toggle => {
         document.getElementById('billNo').value = '';
         document.getElementById('crExpenseRef').innerHTML = '<option value="">Select CR Expense</option>';
         document.getElementById('crExpenseGroup').style.display = 'none';
+
+        // Bulk rows: party list changed, so clear the party/sub-account of every row
+        resetBulkParties();
     });
 });
 
@@ -39,12 +42,14 @@ const bulkForm = document.getElementById('bulkVoucherForm');
 
 modeToggles.forEach(toggle => {
     toggle.addEventListener('change', function() {
+        closeActiveBulkDropdown();
         if (this.value === 'single') {
             singleForm.style.display = 'block';
             bulkForm.style.display = 'none';
         } else {
             singleForm.style.display = 'none';
             bulkForm.style.display = 'block';
+            updateBulkPartyLabel();
         }
     });
 });
@@ -72,6 +77,7 @@ function loadProjects() {
                     opt.textContent = `${p.project_code} - ${p.project_name}${p.city_name ? ' - ' + p.city_name : ''}`;
                     projectSelect.appendChild(opt);
                 });
+                refreshAllBulkRows();
             }
         })
         .catch(error => console.error('Error fetching projects:', error));
@@ -93,6 +99,7 @@ function loadContainers() {
                     opt.textContent = `${c.container_code} - ${c.container_name}`;
                     containerSelect.appendChild(opt);
                 });
+                refreshAllBulkRows();
             }
         })
         .catch(error => console.error('Error fetching containers:', error));
@@ -158,7 +165,7 @@ fetch('../../../../server/api/vouchers/payment_voucher/get-companies.php')
                 if (index === 0 && data.data.length === 1) {
                     option.selected = true;
                 }
-                
+
                 const bulkOption = document.createElement('option');
                 bulkOption.value = company.id;
                 bulkOption.textContent = company.company_name;
@@ -193,10 +200,10 @@ function fetchBillsForSupplier(supplierCode) {
 }
 
 function fetchSubAccountsForSupplier(supplierCode) {
-    const apiUrl = currentPaymentType === 'customer' 
+    const apiUrl = currentPaymentType === 'customer'
         ? `../../../../server/api/vouchers/payment_voucher/get-customer-sub-accounts.php?customer_code=${supplierCode}`
         : `../../../../server/api/vouchers/payment_voucher/get-sub-accounts.php?supplier_code=${supplierCode}`;
-    
+
     fetch(apiUrl)
         .then(response => response.json())
         .then(data => {
@@ -281,7 +288,7 @@ fetch('../../../../server/api/vouchers/payment_voucher/get-currencies.php')
                 option.setAttribute('data-symbol', currency.symbol);
                 option.setAttribute('data-code', currency.code);
                 currencySelect.appendChild(option);
-                
+
                 // Auto-select first option
                 if (index === 0) {
                     option.selected = true;
@@ -329,9 +336,9 @@ document.getElementById('paymentMethod').addEventListener('change', function() {
     const bankAccountField = document.getElementById('bankAccount');
     const chequeNoField = document.getElementById('chequeNo');
     const chequeDateField = document.getElementById('chequeDate');
-    
+
     console.log('Selected payment method ID:', selectedId);
-    
+
     // Hide all fields by default
     bankAccountGroup.classList.add('hidden');
     chequeNoGroup.classList.add('hidden');
@@ -339,21 +346,21 @@ document.getElementById('paymentMethod').addEventListener('change', function() {
     bankAccountField.removeAttribute('required');
     chequeNoField.removeAttribute('required');
     chequeDateField.removeAttribute('required');
-    
+
     // Clear values when hiding fields
     if (selectedId === 7) {
         bankAccountField.value = '';
         chequeNoField.value = '';
         chequeDateField.value = '';
     }
-    
+
     // Show bank account for all methods except ID 7 (and when something is selected)
     if (selectedId && selectedId !== 7) {
         console.log('Showing bank account for method ID:', selectedId);
         bankAccountGroup.classList.remove('hidden');
         bankAccountField.setAttribute('required', 'required');
     }
-    
+
     // Show cheque no and cheque date for method ID 6
     if (selectedId === 6) {
         console.log('Showing cheque fields for method ID 6');
@@ -389,7 +396,7 @@ function setupSearchableDropdown(inputId, dropdownId, data, displayKey, valueKey
                 filteredData.slice(0, 10).forEach(item => {
                     const option = document.createElement('div');
                     option.className = 'dropdown-item';
-                    
+
                     if (item.date && item.amount) {
                         // For bills: show bill_no - date - amount
                         const date = new Date(item.date).toLocaleDateString();
@@ -401,13 +408,13 @@ function setupSearchableDropdown(inputId, dropdownId, data, displayKey, valueKey
                         option.innerHTML = `<strong>${item[valueKey]}</strong> - ${item[displayKey]}`;
                         option.dataset.display = item[displayKey];
                     }
-                    
+
                     option.dataset.value = item[valueKey];
 
                     option.addEventListener('click', function () {
                         input.value = `${this.dataset.value} - ${this.dataset.display}`;
                         dropdown.classList.remove('show');
-                        
+
                         if (inputId === 'supplierCode') {
                             fetchBillsForSupplier(this.dataset.value);
                             fetchSubAccountsForSupplier(this.dataset.value);
@@ -435,7 +442,7 @@ function setupSearchableDropdown(inputId, dropdownId, data, displayKey, valueKey
 
     input.addEventListener('keydown', function(e) {
         const items = dropdown.querySelectorAll('.dropdown-item');
-        
+
         if (e.key === 'ArrowDown') {
             e.preventDefault();
             highlightedIndex = Math.min(highlightedIndex + 1, items.length - 1);
@@ -450,7 +457,7 @@ function setupSearchableDropdown(inputId, dropdownId, data, displayKey, valueKey
             if (selectedItem.dataset.value) {
                 input.value = `${selectedItem.dataset.value} - ${selectedItem.dataset.display}`;
                 dropdown.classList.remove('show');
-                
+
                 if (inputId === 'supplierCode') {
                     fetchBillsForSupplier(selectedItem.dataset.value);
                     fetchSubAccountsForSupplier(selectedItem.dataset.value);
@@ -472,7 +479,7 @@ function setupSearchableDropdown(inputId, dropdownId, data, displayKey, valueKey
         if (data.length > 0) {
             const searchTerm = this.value.toLowerCase();
             dropdown.innerHTML = '';
-            
+
             const filteredData = searchTerm.length > 0 ? data.filter(item => {
                 const displayValue = item[displayKey] || '';
                 const valueValue = item[valueKey] || '';
@@ -481,12 +488,12 @@ function setupSearchableDropdown(inputId, dropdownId, data, displayKey, valueKey
                        (item.date && item.date.toLowerCase().includes(searchTerm)) ||
                        (item.amount && item.amount.toString().includes(searchTerm));
             }) : data;
-            
+
             if (filteredData.length > 0) {
                 filteredData.slice(0, 10).forEach(item => {
                     const option = document.createElement('div');
                     option.className = 'dropdown-item';
-                    
+
                     if (item.date && item.amount) {
                         const date = new Date(item.date).toLocaleDateString();
                         const currency = item.currency || '$';
@@ -496,23 +503,23 @@ function setupSearchableDropdown(inputId, dropdownId, data, displayKey, valueKey
                         option.innerHTML = `<strong>${item[valueKey]}</strong> - ${item[displayKey]}`;
                         option.dataset.display = item[displayKey];
                     }
-                    
+
                     option.dataset.value = item[valueKey];
-                    
+
                     option.addEventListener('click', function () {
                         input.value = `${this.dataset.value} - ${this.dataset.display}`;
                         dropdown.classList.remove('show');
-                        
+
                         if (inputId === 'supplierCode') {
                             fetchBillsForSupplier(this.dataset.value);
                             fetchSubAccountsForSupplier(this.dataset.value);
                             fetchCRExpensesForSupplier(this.dataset.value);
                         }
                     });
-                    
+
                     dropdown.appendChild(option);
                 });
-                
+
                 dropdown.classList.add('show');
             }
         }
@@ -583,7 +590,7 @@ attachmentInput.addEventListener('change', function () {
 attachmentThumbnail.addEventListener('click', function() {
     if (currentFile) {
         modalTitle.textContent = currentFile.name;
-        
+
         if (currentFile.type.startsWith('image/')) {
             const reader = new FileReader();
             reader.onload = function(e) {
@@ -596,7 +603,7 @@ attachmentThumbnail.addEventListener('click', function() {
         } else {
             modalBody.innerHTML = `<p>Preview not available for this file type.</p><p>File: ${currentFile.name}</p>`;
         }
-        
+
         modal.classList.add('show');
     }
 });
@@ -654,17 +661,17 @@ form.addEventListener('submit', function (e) {
     formData.append('voucher_date', document.getElementById('voucherDate').value);
     formData.append('supplier_code', document.getElementById('supplierCode').value.split(' - ')[0]);
     formData.append('company_id', document.getElementById('company').value);
-    
+
     const subAccountValue = document.getElementById('subAccount').value;
     if (subAccountValue) formData.append('sub_account_id', subAccountValue);
-    
+
     const billNoValue = document.getElementById('billNo').value.split(' - ')[0];
     if (billNoValue) formData.append('bill_no', billNoValue);
-    
+
     formData.append('amount', document.getElementById('amount').value);
     formData.append('currency_id', document.getElementById('currency').value);
     formData.append('payment_method_id', document.getElementById('paymentMethod').value);
-    
+
     const projectValue = document.getElementById('project').value;
     if (projectValue) formData.append('project_id', projectValue);
 
@@ -676,16 +683,16 @@ form.addEventListener('submit', function (e) {
 
     const bankAccountValue = document.getElementById('bankAccount').value;
     if (bankAccountValue) formData.append('bank_account', bankAccountValue);
-    
+
     const chequeNoValue = document.getElementById('chequeNo').value;
     if (chequeNoValue) formData.append('cheque_no', chequeNoValue);
-    
+
     const chequeDateValue = document.getElementById('chequeDate').value;
     if (chequeDateValue) formData.append('cheque_date', chequeDateValue);
-    
+
     const descriptionValue = document.getElementById('description').value;
     if (descriptionValue) formData.append('description', descriptionValue);
-    
+
     // Add attachment if selected
     if (currentFile) {
         formData.append('attachment', currentFile);
@@ -747,17 +754,312 @@ function resetForm() {
     });
 }
 
+// =====================================================================
 // Bulk voucher functionality
+// =====================================================================
 let bulkRowCounter = 0;
-let bulkDataLoaded = { suppliers: false, currencies: false, methods: false, banks: false };
+
+// Bulk party list follows the Payment To toggle (supplier / customer)
+function getBulkParties() {
+    return currentPaymentType === 'customer' ? customers : suppliers;
+}
+
+function updateBulkPartyLabel() {
+    const isCustomer = currentPaymentType === 'customer';
+    const th = document.querySelector('#bulkTable thead th:nth-child(2)');
+    if (th) th.textContent = isCustomer ? 'Customer' : 'Supplier';
+    document.querySelectorAll('#bulkTableBody .bulk-supplier').forEach(input => {
+        input.placeholder = isCustomer ? 'Search customer...' : 'Search supplier...';
+    });
+}
+
+// Clear party + sub account on all rows (used when Payment To type changes)
+function resetBulkParties() {
+    closeActiveBulkDropdown();
+    document.querySelectorAll('#bulkTableBody tr').forEach(row => {
+        const input = row.querySelector('.bulk-supplier');
+        const sub = row.querySelector('.bulk-sub-account');
+        if (input) input.value = '';
+        if (sub) {
+            row._subToken = (row._subToken || 0) + 1;
+            sub.innerHTML = '<option value="">Select Sub Account</option>';
+        }
+    });
+    updateBulkPartyLabel();
+}
+
+// ---- Floating dropdown (fixed position, appended to <body>) ----
+// The table wrapper scrolls, so an absolutely positioned dropdown inside it
+// gets clipped. A fixed dropdown outside the wrapper is never clipped.
+let activeBulkDropdown = null; // { input, dd, close }
+
+function closeActiveBulkDropdown() {
+    if (activeBulkDropdown) activeBulkDropdown.close();
+}
+
+function positionBulkDropdown(input, dd) {
+    const rect = input.getBoundingClientRect();
+    const width = Math.max(rect.width, 280);
+    const left = Math.max(8, Math.min(rect.left, window.innerWidth - width - 8));
+    const spaceBelow = window.innerHeight - rect.bottom;
+    const spaceAbove = rect.top;
+
+    dd.style.position = 'fixed';
+    dd.style.zIndex = '10000';
+    dd.style.right = 'auto';
+    dd.style.margin = '0';
+    dd.style.left = left + 'px';
+    dd.style.width = width + 'px';
+    dd.style.overflowY = 'auto';
+
+    // Open upwards if there is not enough room below
+    if (spaceBelow < 220 && spaceAbove > spaceBelow) {
+        dd.style.maxHeight = Math.min(240, spaceAbove - 12) + 'px';
+        dd.style.top = 'auto';
+        dd.style.bottom = (window.innerHeight - rect.top + 2) + 'px';
+    } else {
+        dd.style.maxHeight = Math.min(240, Math.max(120, spaceBelow - 12)) + 'px';
+        dd.style.bottom = 'auto';
+        dd.style.top = (rect.bottom + 2) + 'px';
+    }
+}
+
+function repositionActiveBulkDropdown(e) {
+    if (!activeBulkDropdown) return;
+    if (e && e.target && activeBulkDropdown.dd.contains(e.target)) return; // scrolling inside the list itself
+    const { input, dd } = activeBulkDropdown;
+
+    // Hide if the input scrolled out of the table's visible area
+    const wrapper = input.closest('.table-wrapper');
+    if (wrapper) {
+        const w = wrapper.getBoundingClientRect();
+        const r = input.getBoundingClientRect();
+        if (r.bottom < w.top || r.top > w.bottom || r.right < w.left || r.left > w.right) {
+            activeBulkDropdown.close();
+            return;
+        }
+    }
+    positionBulkDropdown(input, dd);
+}
+
+window.addEventListener('scroll', repositionActiveBulkDropdown, true);
+window.addEventListener('resize', repositionActiveBulkDropdown);
+
+// One global outside-click handler (previously every row added its own listener)
+document.addEventListener('click', function(e) {
+    if (!activeBulkDropdown) return;
+    const { input, dd } = activeBulkDropdown;
+    if (!input.contains(e.target) && !dd.contains(e.target)) {
+        activeBulkDropdown.close();
+    }
+});
+
+function setupBulkSupplierSearch(row) {
+    const input = row.querySelector('.bulk-supplier');
+    const dd = document.createElement('div');
+    dd.className = 'dropdown-list bulk-supplier-dropdown';
+    dd.style.display = 'none';
+    document.body.appendChild(dd);
+    row._supplierDropdown = dd;
+
+    let highlighted = -1;
+
+    function close() {
+        dd.classList.remove('show');
+        dd.style.display = 'none';
+        highlighted = -1;
+        if (activeBulkDropdown && activeBulkDropdown.dd === dd) activeBulkDropdown = null;
+    }
+
+    function setHighlight(items) {
+        items.forEach((item, i) => item.classList.toggle('highlighted', i === highlighted));
+        if (items[highlighted]) items[highlighted].scrollIntoView({ block: 'nearest' });
+    }
+
+    function selectParty(party) {
+        input.value = party.code;
+        input.title = party.name || '';
+        close();
+        loadBulkSubAccounts(row, party.code);
+    }
+
+    function render() {
+        // Close any other open dropdown first
+        if (activeBulkDropdown && activeBulkDropdown.dd !== dd) activeBulkDropdown.close();
+
+        const term = input.value.trim().toLowerCase();
+        const list = getBulkParties().filter(p =>
+            !term ||
+            String(p.code || '').toLowerCase().includes(term) ||
+            String(p.name || '').toLowerCase().includes(term)
+        );
+
+        dd.innerHTML = '';
+        highlighted = -1;
+
+        if (list.length === 0) {
+            const none = document.createElement('div');
+            none.className = 'dropdown-item';
+            none.textContent = currentPaymentType === 'customer' ? 'No customers found' : 'No suppliers found';
+            none.style.cursor = 'default';
+            none.style.opacity = '0.7';
+            dd.appendChild(none);
+        } else {
+            list.slice(0, 10).forEach(p => {
+                const option = document.createElement('div');
+                option.className = 'dropdown-item';
+                option.innerHTML = `<strong>${p.code}</strong> - ${p.name}`;
+                option.dataset.code = p.code;
+                option.addEventListener('click', () => selectParty(p));
+                dd.appendChild(option);
+            });
+        }
+
+        positionBulkDropdown(input, dd);
+        dd.classList.add('show');
+        dd.style.display = 'block';
+        activeBulkDropdown = { input, dd, close };
+    }
+
+    input.addEventListener('input', render);
+    input.addEventListener('focus', render);
+
+    input.addEventListener('keydown', function(e) {
+        const open = dd.style.display === 'block';
+        const items = dd.querySelectorAll('.dropdown-item[data-code]');
+
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            if (!open) { render(); return; }
+            highlighted = Math.min(highlighted + 1, items.length - 1);
+            setHighlight(items);
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            if (!open) return;
+            highlighted = Math.max(highlighted - 1, 0);
+            setHighlight(items);
+        } else if (e.key === 'Enter') {
+            if (open && items.length > 0) {
+                e.preventDefault();
+                const pick = items[highlighted >= 0 ? highlighted : 0];
+                const party = getBulkParties().find(p => String(p.code) === pick.dataset.code);
+                if (party) selectParty(party);
+            }
+        } else if (e.key === 'Escape') {
+            close();
+        } else if (e.key === 'Tab') {
+            close();
+        }
+    });
+
+    // If user typed an exact code and left the field, still load sub accounts
+    input.addEventListener('change', function() {
+        const typed = input.value.trim().toLowerCase();
+        const party = getBulkParties().find(p => String(p.code).toLowerCase() === typed);
+        if (party && row.dataset.partyCode !== String(party.code)) {
+            input.value = party.code;
+            input.title = party.name || '';
+            loadBulkSubAccounts(row, party.code);
+        }
+    });
+}
+
+function loadBulkSubAccounts(row, code) {
+    const subAccountSelect = row.querySelector('.bulk-sub-account');
+    row.dataset.partyCode = String(code);
+    row._subToken = (row._subToken || 0) + 1;
+    const token = row._subToken;
+
+    const apiUrl = currentPaymentType === 'customer'
+        ? `../../../../server/api/vouchers/payment_voucher/get-customer-sub-accounts.php?customer_code=${encodeURIComponent(code)}`
+        : `../../../../server/api/vouchers/payment_voucher/get-sub-accounts.php?supplier_code=${encodeURIComponent(code)}`;
+
+    subAccountSelect.innerHTML = '<option value="">Select Sub Account</option>';
+
+    fetch(apiUrl)
+        .then(response => response.json())
+        .then(data => {
+            if (token !== row._subToken) return; // a newer selection happened meanwhile
+            subAccountSelect.innerHTML = '<option value="">Select Sub Account</option>';
+            if (data.success && data.data.length > 0) {
+                data.data.forEach(sa => {
+                    const opt = document.createElement('option');
+                    opt.value = sa.id;
+                    opt.textContent = sa.sub_account_name;
+                    subAccountSelect.appendChild(opt);
+                });
+            }
+        })
+        .catch(error => console.error('Error fetching sub-accounts:', error));
+}
+
+// Rebuild a <select> keeping the current value if it still exists
+function fillBulkSelect(select, placeholder, items, valueFn, textFn, selectFirst) {
+    const previous = select.value;
+    select.innerHTML = '';
+    if (placeholder !== null) {
+        const ph = document.createElement('option');
+        ph.value = '';
+        ph.textContent = placeholder;
+        select.appendChild(ph);
+    }
+    items.forEach(item => {
+        const opt = document.createElement('option');
+        opt.value = valueFn(item);
+        opt.textContent = textFn(item);
+        select.appendChild(opt);
+    });
+    if (previous && Array.from(select.options).some(o => o.value === previous)) {
+        select.value = previous;
+    } else if (selectFirst && items.length > 0) {
+        select.value = valueFn(items[0]);
+    }
+}
+
+function populateBulkRow(row) {
+    fillBulkSelect(row.querySelector('.bulk-currency'), 'Select Currency', bulkCurrencies,
+        c => c.currency_id, c => c.code, true);
+    fillBulkSelect(row.querySelector('.bulk-payment-method'), 'Select Method', bulkPaymentMethods,
+        m => m.id, m => m.name, false);
+    fillBulkSelect(row.querySelector('.bulk-project'), 'Select Project', bulkProjects,
+        p => p.id, p => `${p.project_code} - ${p.project_name}${p.city_name ? ' - ' + p.city_name : ''}`, false);
+    fillBulkSelect(row.querySelector('.bulk-container'), 'Select Container', bulkContainers,
+        c => c.id, c => `${c.container_code} - ${c.container_name}`, false);
+    fillBulkSelect(row.querySelector('.bulk-bank-account'), 'Select Bank', bulkBankAccounts,
+        b => b.id, b => `${b.bank_name} - ${b.account_number}`, false);
+    applyBulkMethod(row);
+}
+
+// Late-loading lists (projects, containers, banks...) fill rows that already exist
+function refreshAllBulkRows() {
+    document.querySelectorAll('#bulkTableBody tr').forEach(populateBulkRow);
+}
+
+// Same rules as single mode: method 7 = no bank; method 6 = cheque (bank + cheque no + date)
+function applyBulkMethod(row) {
+    const id = parseInt(row.querySelector('.bulk-payment-method').value) || 0;
+    const bank = row.querySelector('.bulk-bank-account');
+    const chequeNo = row.querySelector('.bulk-cheque-no');
+    const chequeDate = row.querySelector('.bulk-cheque-date');
+
+    const needBank = id !== 0 && id !== 7;
+    const needCheque = id === 6;
+
+    bank.disabled = !needBank;
+    if (!needBank) bank.value = '';
+
+    chequeNo.disabled = !needCheque;
+    chequeDate.disabled = !needCheque;
+    if (!needCheque) {
+        chequeNo.value = '';
+        chequeDate.value = '';
+    }
+}
 
 function checkBulkDataReady() {
-    if (bulkSuppliers.length > 0) bulkDataLoaded.suppliers = true;
-    if (bulkCurrencies.length > 0) bulkDataLoaded.currencies = true;
-    if (bulkPaymentMethods.length > 0) bulkDataLoaded.methods = true;
-    if (bulkBankAccounts.length > 0) bulkDataLoaded.banks = true;
-    
-    if (bulkDataLoaded.suppliers && bulkDataLoaded.currencies && bulkDataLoaded.methods && bulkDataLoaded.banks) {
+    refreshAllBulkRows();
+    // Banks / suppliers may legitimately be empty, so only currencies + methods gate the first row
+    if (bulkCurrencies.length > 0 && bulkPaymentMethods.length > 0) {
         if (document.getElementById('bulkTableBody').children.length === 0) {
             addBulkRow();
         }
@@ -767,15 +1069,14 @@ function checkBulkDataReady() {
 function addBulkRow() {
     const tbody = document.getElementById('bulkTableBody');
     const row = document.createElement('tr');
-    const rowId = `row_${bulkRowCounter++}`;
-    
+
     const today = new Date().toISOString().split('T')[0];
-    
+    const partyPlaceholder = currentPaymentType === 'customer' ? 'Search customer...' : 'Search supplier...';
+
     row.innerHTML = `
         <td><input type="date" class="bulk-date" value="${today}" required></td>
         <td>
-            <input type="text" class="bulk-supplier" placeholder="Search supplier..." autocomplete="off" required>
-            <div class="dropdown-list bulk-supplier-dropdown"></div>
+            <input type="text" class="bulk-supplier" placeholder="${partyPlaceholder}" autocomplete="off" required>
         </td>
         <td>
             <select class="bulk-sub-account">
@@ -810,7 +1111,6 @@ function addBulkRow() {
             </select>
         </td>
         <td><input type="text" class="bulk-cheque-no" placeholder="Cheque No"></td>
-
         <td><input type="date" class="bulk-cheque-date"></td>
         <td><textarea class="bulk-description" placeholder="Description"></textarea></td>
         <td>
@@ -819,170 +1119,154 @@ function addBulkRow() {
             </button>
         </td>
     `;
-    
+
     tbody.appendChild(row);
 
-// Apply global date lock immediately if active
-if (localStorage.getItem('global_date_locked') === 'true') {
-    const lockedDate = localStorage.getItem('global_locked_date');
-    const dateInput = row.querySelector('.bulk-date');
-    if (dateInput && lockedDate) {
-        dateInput.value = lockedDate;
-        dateInput.readOnly = true;
-        dateInput.style.backgroundColor = '#f3f4f6';
-        dateInput.style.cursor = 'not-allowed';
+    // Apply global date lock immediately if active
+    if (localStorage.getItem('global_date_locked') === 'true') {
+        const lockedDate = localStorage.getItem('global_locked_date');
+        const dateInput = row.querySelector('.bulk-date');
+        if (dateInput && lockedDate) {
+            dateInput.value = lockedDate;
+            dateInput.readOnly = true;
+            dateInput.style.backgroundColor = '#f3f4f6';
+            dateInput.style.cursor = 'not-allowed';
+        }
     }
-}
 
-    
-    // Setup searchable supplier dropdown
-    const supplierInput = row.querySelector('.bulk-supplier');
-    const supplierDropdown = row.querySelector('.bulk-supplier-dropdown');
-    
-    supplierInput.addEventListener('input', function() {
-        const searchTerm = this.value.toLowerCase();
-        supplierDropdown.innerHTML = '';
-        
-        if (searchTerm.length > 0) {
-            const filtered = bulkSuppliers.filter(s => 
-                s.code.toLowerCase().includes(searchTerm) || 
-                s.name.toLowerCase().includes(searchTerm)
-            );
-            
-            if (filtered.length > 0) {
-                filtered.slice(0, 10).forEach(s => {
-                    const option = document.createElement('div');
-                    option.className = 'dropdown-item';
-                    option.innerHTML = `<strong>${s.code}</strong> - ${s.name}`;
-                    option.dataset.code = s.code;
-                    option.addEventListener('click', function() {
-                        supplierInput.value = this.dataset.code;
-                        supplierDropdown.classList.remove('show');
-                        
-                        const subAccountSelect = row.querySelector('.bulk-sub-account');
-                        fetch(`../../../../server/api/vouchers/payment_voucher/get-sub-accounts.php?supplier_code=${this.dataset.code}`)
-                            .then(response => response.json())
-                            .then(data => {
-                                subAccountSelect.innerHTML = '<option value="">Select Sub Account</option>';
-                                if (data.success && data.data.length > 0) {
-                                    data.data.forEach(sa => {
-                                        const opt = document.createElement('option');
-                                        opt.value = sa.id;
-                                        opt.textContent = sa.sub_account_name;
-                                        subAccountSelect.appendChild(opt);
-                                    });
-                                }
-                            });
-                    });
-                    supplierDropdown.appendChild(option);
-                });
-                supplierDropdown.classList.add('show');
-            }
-        } else {
-            supplierDropdown.classList.remove('show');
-        }
-    });
-    
-    supplierInput.addEventListener('focus', function() {
-        if (this.value.length > 0) {
-            this.dispatchEvent(new Event('input'));
-        }
-    });
-    
-    document.addEventListener('click', function(e) {
-        if (!supplierInput.contains(e.target) && !supplierDropdown.contains(e.target)) {
-            supplierDropdown.classList.remove('show');
-        }
-    });
-    
-    const currencySelect = row.querySelector('.bulk-currency');
-    bulkCurrencies.forEach((c, i) => {
-        const opt = document.createElement('option');
-        opt.value = c.currency_id;
-        opt.textContent = c.code;
-        opt.setAttribute('data-symbol', c.symbol);
-        if (i === 0) opt.selected = true;
-        currencySelect.appendChild(opt);
-    });
-    
-    const methodSelect = row.querySelector('.bulk-payment-method');
-    bulkPaymentMethods.forEach(m => {
-        const opt = document.createElement('option');
-        opt.value = m.id;
-        opt.textContent = m.name;
-        methodSelect.appendChild(opt);
-    });
-    
-    const projectSelect = row.querySelector('.bulk-project');
-    bulkProjects.forEach(p => {
-        const opt = document.createElement('option');
-        opt.value = p.id;
-        opt.textContent = `${p.project_code} - ${p.project_name}${p.city_name ? ' - ' + p.city_name : ''}`;
-        projectSelect.appendChild(opt);
-    });
-
-    const containerSelect = row.querySelector('.bulk-container');
-    bulkContainers.forEach(c => {
-        const opt = document.createElement('option');
-        opt.value = c.id;
-        opt.textContent = `${c.container_code} - ${c.container_name}`;
-        containerSelect.appendChild(opt);
-    });
-
-    const bankSelect = row.querySelector('.bulk-bank-account');
-    bulkBankAccounts.forEach(b => {
-        const opt = document.createElement('option');
-        opt.value = b.id;
-        opt.textContent = `${b.bank_name} - ${b.account_number}`;
-        bankSelect.appendChild(opt);
+    // Fill selects, wire searchable supplier/customer, wire payment method rules
+    populateBulkRow(row);
+    setupBulkSupplierSearch(row);
+    row.querySelector('.bulk-payment-method').addEventListener('change', function() {
+        applyBulkMethod(row);
     });
 }
 
 function removeRow(btn) {
-    btn.closest('tr').remove();
+    const row = btn.closest('tr');
+    if (row._supplierDropdown) {
+        if (activeBulkDropdown && activeBulkDropdown.dd === row._supplierDropdown) activeBulkDropdown = null;
+        row._supplierDropdown.remove();
+    }
+    row.remove();
 }
 
 document.getElementById('addRowBtn').addEventListener('click', addBulkRow);
 
+// Validate one bulk row. Returns { error } or { party }
+function validateBulkRow(row) {
+    const markBad = el => { if (el) el.style.borderColor = 'var(--error)'; };
+    const errors = [];
+
+    const typed = row.querySelector('.bulk-supplier').value.trim().toLowerCase();
+    const party = getBulkParties().find(p => String(p.code).toLowerCase() === typed);
+    if (!party) {
+        errors.push(currentPaymentType === 'customer' ? 'Select a valid customer from the list' : 'Select a valid supplier from the list');
+        markBad(row.querySelector('.bulk-supplier'));
+    }
+
+    if (!row.querySelector('.bulk-date').value) {
+        errors.push('Date is required');
+        markBad(row.querySelector('.bulk-date'));
+    }
+    if (!row.querySelector('.bulk-currency').value) {
+        errors.push('Currency is required');
+        markBad(row.querySelector('.bulk-currency'));
+    }
+    const amount = parseFloat(row.querySelector('.bulk-amount').value);
+    if (!(amount > 0)) {
+        errors.push('Amount must be greater than 0');
+        markBad(row.querySelector('.bulk-amount'));
+    }
+
+    const methodId = parseInt(row.querySelector('.bulk-payment-method').value) || 0;
+    if (!methodId) {
+        errors.push('Payment method is required');
+        markBad(row.querySelector('.bulk-payment-method'));
+    } else {
+        if (methodId !== 7 && !row.querySelector('.bulk-bank-account').value) {
+            errors.push('Bank account is required');
+            markBad(row.querySelector('.bulk-bank-account'));
+        }
+        if (methodId === 6) {
+            if (!row.querySelector('.bulk-cheque-no').value.trim()) {
+                errors.push('Cheque no is required');
+                markBad(row.querySelector('.bulk-cheque-no'));
+            }
+            if (!row.querySelector('.bulk-cheque-date').value) {
+                errors.push('Cheque date is required');
+                markBad(row.querySelector('.bulk-cheque-date'));
+            }
+        }
+    }
+
+    return errors.length ? { error: errors.join(', ') } : { party };
+}
+
 // Post bulk vouchers
 document.getElementById('postBulkBtn').addEventListener('click', async function() {
-    const rows = document.querySelectorAll('#bulkTableBody tr');
-    
+    closeActiveBulkDropdown();
+    const rows = Array.from(document.querySelectorAll('#bulkTableBody tr'));
+
     if (rows.length === 0) {
         alert('Please add at least one voucher');
         return;
     }
-    
+
     const bulkCompanyId = document.getElementById('bulkCompany').value;
     if (!bulkCompanyId) {
         alert('Please select a company');
         return;
     }
-    
+
+    // Reset previous highlighting, then validate every row BEFORE posting anything
+    const parties = new Map();
+    let invalidCount = 0;
+    rows.forEach(row => {
+        row.style.backgroundColor = '';
+        row.title = '';
+        row.querySelectorAll('input, select, textarea').forEach(el => { el.style.borderColor = ''; });
+
+        const result = validateBulkRow(row);
+        if (result.error) {
+            invalidCount++;
+            row.style.backgroundColor = 'rgba(227, 79, 79, 0.1)';
+            row.title = result.error;
+        } else {
+            parties.set(row, result.party);
+        }
+    });
+
+    if (invalidCount > 0) {
+        alert(`${invalidCount} row(s) have missing or invalid data (highlighted in red). Hover over a row to see the problem.`);
+        return;
+    }
+
     const btn = this;
     btn.disabled = true;
     btn.innerHTML = '<div class="spinner"></div> Processing...';
-    
+
     let successCount = 0;
     let errorCount = 0;
-    
+    const failedMessages = [];
+
     for (const row of rows) {
         const formData = new FormData();
         formData.append('payment_type', currentPaymentType);
         formData.append('voucher_date', row.querySelector('.bulk-date').value);
-        formData.append('supplier_code', row.querySelector('.bulk-supplier').value);
+        formData.append('supplier_code', parties.get(row).code);
         formData.append('company_id', bulkCompanyId);
-        
+
         const bulkSubAccount = row.querySelector('.bulk-sub-account').value;
         if (bulkSubAccount) formData.append('sub_account_id', bulkSubAccount);
-        
+
         const bulkBillNo = row.querySelector('.bulk-bill').value;
         if (bulkBillNo) formData.append('bill_no', bulkBillNo);
-        
+
         formData.append('amount', row.querySelector('.bulk-amount').value);
         formData.append('currency_id', row.querySelector('.bulk-currency').value);
         formData.append('payment_method_id', row.querySelector('.bulk-payment-method').value);
-        
+
         const bulkProject = row.querySelector('.bulk-project').value;
         if (bulkProject) formData.append('project_id', bulkProject);
 
@@ -991,46 +1275,63 @@ document.getElementById('postBulkBtn').addEventListener('click', async function(
 
         const bulkBankAccount = row.querySelector('.bulk-bank-account').value;
         if (bulkBankAccount) formData.append('bank_account', bulkBankAccount);
+
         const bulkChequeNo = row.querySelector('.bulk-cheque-no').value;
-if (bulkChequeNo) formData.append('cheque_no', bulkChequeNo);
-        
+        if (bulkChequeNo) formData.append('cheque_no', bulkChequeNo);
+
         const bulkChequeDate = row.querySelector('.bulk-cheque-date').value;
         if (bulkChequeDate) formData.append('cheque_date', bulkChequeDate);
-        
+
         const bulkDescription = row.querySelector('.bulk-description').value;
         if (bulkDescription) formData.append('description', bulkDescription);
-        
+
         try {
             const response = await fetch('../../../../server/api/vouchers/payment_voucher/payment-add.php', {
                 method: 'POST',
                 body: formData
             });
             const data = await response.json();
-            
+
             if (data.success) {
                 successCount++;
+                row.dataset.posted = '1';
                 row.style.backgroundColor = 'rgba(47, 191, 113, 0.1)';
             } else {
                 errorCount++;
+                const msg = data.error || 'Unknown error';
                 row.style.backgroundColor = 'rgba(227, 79, 79, 0.1)';
+                row.title = msg;
+                failedMessages.push(`${parties.get(row).code}: ${msg}`);
             }
         } catch (error) {
             errorCount++;
             row.style.backgroundColor = 'rgba(227, 79, 79, 0.1)';
+            row.title = 'Network error';
+            failedMessages.push(`${parties.get(row).code}: Network error`);
         }
     }
-    
+
     btn.disabled = false;
     btn.innerHTML = '<i class="fas fa-paper-plane"></i> Post All Vouchers';
-    
-    alert(`Completed!\nSuccess: ${successCount}\nFailed: ${errorCount}`);
-    
-    if (successCount > 0) {
-        setTimeout(() => {
-            document.getElementById('bulkTableBody').innerHTML = '';
-            addBulkRow();
-        }, 2000);
+
+    let summary = `Completed!\nSuccess: ${successCount}\nFailed: ${errorCount}`;
+    if (failedMessages.length > 0) {
+        summary += '\n\n' + failedMessages.slice(0, 5).join('\n');
+        if (failedMessages.length > 5) summary += `\n...and ${failedMessages.length - 5} more`;
     }
+    alert(summary);
+
+    // Remove only the posted rows. Failed rows stay so the user can fix and re-post
+    // (and posted rows can never be posted twice).
+    setTimeout(() => {
+        document.querySelectorAll('#bulkTableBody tr[data-posted="1"]').forEach(row => {
+            if (row._supplierDropdown) row._supplierDropdown.remove();
+            row.remove();
+        });
+        if (document.getElementById('bulkTableBody').children.length === 0) {
+            addBulkRow();
+        }
+    }, 1000);
 });
 
 // ===== GLOBAL DATE LOCK (Single Mode + Bulk Mode) =====
@@ -1058,7 +1359,7 @@ if (bulkChequeNo) formData.append('cheque_no', bulkChequeNo);
                 voucherDate.style.backgroundColor = '';
                 voucherDate.style.cursor = 'auto';
                 voucherDate.title = '';
-                
+
                 if (!voucherDate.value) {
                     voucherDate.valueAsDate = new Date();
                 }
@@ -1073,7 +1374,7 @@ if (bulkChequeNo) formData.append('cheque_no', bulkChequeNo);
                 bulkJournalDate.style.backgroundColor = '#f3f4f6';
                 bulkJournalDate.style.cursor = 'not-allowed';
                 bulkJournalDate.title = 'Date is locked from dashboard';
-                
+
                 // Auto-apply locked date to all existing rows
                 document.querySelectorAll('#bulkTableBody .bulk-date').forEach(input => {
                     input.value = lockedDate;
@@ -1086,7 +1387,7 @@ if (bulkChequeNo) formData.append('cheque_no', bulkChequeNo);
                 bulkJournalDate.style.backgroundColor = '';
                 bulkJournalDate.style.cursor = 'auto';
                 bulkJournalDate.title = '';
-                
+
                 // Make all row dates editable again
                 document.querySelectorAll('#bulkTableBody .bulk-date').forEach(input => {
                     input.readOnly = false;

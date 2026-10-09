@@ -421,7 +421,7 @@ function renderPermissionsTree(permissions) {
         'Chart of Accounts': [],
         'Financial Reports': ['General Ledger', 'Customer Ledger', 'Our Standing', 'Supplier Ledger', 'Both (Customer + Supplier) Ledger', 'Customer Aging', 'Supplier Aging', 'Recovery Sheet', 'Customer Summary Division Report (CSDR)', 'Sales Officer-wise Recovery', 'Trial Balance', 'Balance Sheet', 'Profit & Loss Statement', 'Cash Flow', 'Counter Cash Flow', 'Financial Summary', 'Pending DSR Sheet', 'Project Tracking', 'Container Tracking'],
         'HRM': ['New Employee', 'Record Attendance', 'Leave Management', 'New Payroll', 'Employees Ledger'],
-        'Master Setup': ['Branch Setup', 'Counter Setup', 'Territory Setup', 'Rate List Setup', 'Tax Rates Setup', 'Tax Regimes Setup', 'Project Setup'],
+        'Master Setup': ['Branch Setup', 'Counter Setup', 'Counter Cash', 'Counter Settlement', 'Territory Setup', 'Rate List Setup', 'Tax Rates Setup', 'Tax Regimes Setup', 'Project Setup'],
 'System Setup': ['Company Profile', 'Admin Panel', 'Currency Setup', 'Software Info', 'GL Debug']
     };
 

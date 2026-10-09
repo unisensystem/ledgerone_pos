@@ -1336,6 +1336,7 @@ $user_employee_id = $user['employee_id'] ?? null;
     </div>
 
     <script src="../../../assets/js/sale/pos_invoice/counter-invoice.js?v=<?php echo time(); ?>"></script>
+    <script src="../../../assets/js/sale/pos_invoice/pos-settings.js?v=<?php echo time(); ?>"></script>
     <script>
         const userEmployeeId = <?php echo json_encode($user_employee_id); ?>;
         let stockData = [];

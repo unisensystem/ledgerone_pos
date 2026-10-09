@@ -44,6 +44,19 @@ $sym = $cur['symbol'] ?? '';
         .summary-card.green .summary-value { color: #2FBF71; }
         .summary-card.blue  .summary-value { color: #1F7BFF; }
         .summary-card.amber .summary-value { color: #E8B23F; }
+        .summary-card.red   .summary-value { color: #E34F4F; }
+        .summary-grid.three { grid-template-columns: repeat(3, 1fr); }
+        .summary-card.clickable { cursor: pointer; transition: box-shadow .15s; }
+        .summary-card.clickable:hover { box-shadow: 0 4px 12px rgba(31,123,255,.18); }
+        .summary-hint { font-size: 11px; color: #6B7280; margin-top: 4px; }
+        .sum-sub { font-size: 12px; color: #6B7280; margin-bottom: 16px; }
+        .eq-box { background: #F7F9FC; border: 1px solid #E1E6EE; border-radius: 8px; padding: 14px 16px; margin-bottom: 18px; font-size: 14px; }
+        .eq-row { display: flex; justify-content: space-between; padding: 4px 0; }
+        .eq-row.total { border-top: 1px solid #E1E6EE; margin-top: 6px; padding-top: 8px; font-weight: 700; font-size: 16px; }
+        .sec-title { font-size: 13px; font-weight: 600; color: #0E1A2B; margin: 18px 0 8px; display: flex; justify-content: space-between; }
+        .sec-title.flash { background: #FFF8E1; }
+        .mini-table th, .mini-table td { padding: 8px 10px; }
+        .mini-empty { font-size: 12px; color: #9CA3AF; padding: 8px 2px; }
         /* Counter summary grid */
         .counter-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 14px; margin-bottom: 20px; }
         .counter-card { background: white; border-radius: 8px; box-shadow: 0 1px 4px rgba(0,0,0,.07); padding: 16px; border-left: 4px solid #1F7BFF; cursor: pointer; transition: box-shadow .15s; }
@@ -80,6 +93,7 @@ $sym = $cur['symbol'] ?? '';
             <div class="page-subtitle">Cash inflow per POS counter — cash payments only</div>
         </div>
         <div class="actions" style="display:flex;gap:8px">
+            <button class="btn btn-primary" id="viewToggleBtn" onclick="toggleView()"><i class="fas fa-list-check"></i> Summary</button>
             <button class="btn btn-secondary" onclick="window.print()"><i class="fas fa-print"></i> Print</button>
         </div>
     </div>
@@ -126,21 +140,38 @@ $sym = $cur['symbol'] ?? '';
 
     <!-- Summary Cards -->
     <div class="summary-grid">
-        <div class="summary-card">
+        <div class="summary-card clickable" onclick="openSummary('opening')">
             <div class="summary-label">Opening Cash</div>
             <div class="summary-value" id="summaryOpening"><?= $sym ?> 0.00</div>
+            <div class="summary-hint">Click for date / counter / officer</div>
         </div>
-        <div class="summary-card green">
+        <div class="summary-card green clickable" onclick="openSummary('sales')">
             <div class="summary-label">Cash In (Sales)</div>
             <div class="summary-value" id="summaryCashIn"><?= $sym ?> 0.00</div>
         </div>
-        <div class="summary-card blue">
-            <div class="summary-label">Closing Cash</div>
+        <div class="summary-card blue clickable" onclick="openSummary()">
+            <div class="summary-label">Closing Cash (Opening + Sales)</div>
             <div class="summary-value" id="summaryClosing"><?= $sym ?> 0.00</div>
         </div>
         <div class="summary-card amber">
             <div class="summary-label">Transactions</div>
             <div class="summary-value" id="summaryCount">0</div>
+        </div>
+    </div>
+
+    <!-- Settlement summary -->
+    <div class="summary-grid three">
+        <div class="summary-card green clickable" onclick="openSummary('received')">
+            <div class="summary-label">Received (Returned by Sales Officer)</div>
+            <div class="summary-value" id="summaryReceived"><?= $sym ?> 0.00</div>
+        </div>
+        <div class="summary-card amber clickable" onclick="openSummary('adjustment')">
+            <div class="summary-label">Adjustments (Expenses)</div>
+            <div class="summary-value" id="summaryAdjust"><?= $sym ?> 0.00</div>
+        </div>
+        <div class="summary-card clickable" id="shortCard" onclick="openSummary()">
+            <div class="summary-label" id="shortLabel">Short Cash</div>
+            <div class="summary-value" id="summaryShort"><?= $sym ?> 0.00</div>
         </div>
     </div>
 
@@ -151,12 +182,20 @@ $sym = $cur['symbol'] ?? '';
     </div>
 
     <!-- Transactions -->
-    <div class="card">
+    <div class="card" id="transactionsCard">
         <div class="card-title"><i class="fas fa-list"></i> Cash Transactions</div>
         <div id="tableWrap">
             <div class="empty-state"><i class="fas fa-filter" style="font-size:24px;margin-bottom:8px;display:block"></i>Apply filters to see transactions</div>
         </div>
         <div class="pagination" id="pagination"></div>
+    </div>
+
+    <!-- Summary view (replaces the transactions table when Summary is clicked) -->
+    <div class="card" id="summaryCard" style="display:none">
+        <div class="card-title"><i class="fas fa-list-check"></i> Cash Summary</div>
+        <div class="sum-sub" id="summarySub"></div>
+        <div class="eq-box" id="summaryEq"></div>
+        <div id="summaryBody"></div>
     </div>
 </div>
 
@@ -164,6 +203,8 @@ $sym = $cur['symbol'] ?? '';
 const SYM = '<?= addslashes($sym) ?>';
 let currentPage = 1;
 let currentFilters = {};
+let lastData = null;
+let currentView = 'transactions';
 
 function fmt(n) {
     return SYM + ' ' + parseFloat(n || 0).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
@@ -229,12 +270,32 @@ async function loadReport() {
         const res  = await fetch(url);
         const data = await res.json();
         if (!data.success) throw new Error(data.message);
+        lastData = data;
 
         // Summary cards
         document.getElementById('summaryOpening').textContent = fmt(data.opening_balance);
         document.getElementById('summaryCashIn').textContent  = fmt(data.total_cash_in);
         document.getElementById('summaryClosing').textContent = fmt(data.closing_balance);
         document.getElementById('summaryCount').textContent   = data.total_rows;
+
+        // Settlement cards
+        document.getElementById('summaryReceived').textContent = fmt(data.total_received);
+        document.getElementById('summaryAdjust').textContent   = fmt(data.total_adjustment);
+        const shortVal  = parseFloat(data.short_cash || 0);
+        const shortCard = document.getElementById('shortCard');
+        if (shortVal > 0.004) {
+            shortCard.className = 'summary-card red';
+            document.getElementById('shortLabel').textContent = 'Short Cash (Pending)';
+            document.getElementById('summaryShort').textContent = fmt(shortVal);
+        } else if (shortVal < -0.004) {
+            shortCard.className = 'summary-card amber';
+            document.getElementById('shortLabel').textContent = 'Excess Cash';
+            document.getElementById('summaryShort').textContent = fmt(-shortVal);
+        } else {
+            shortCard.className = 'summary-card green';
+            document.getElementById('shortLabel').textContent = 'Short Cash';
+            document.getElementById('summaryShort').textContent = fmt(0);
+        }
 
         // Per-counter cards
         const counterSection = document.getElementById('counterSummarySection');
@@ -246,12 +307,16 @@ async function loadReport() {
                     <div class="counter-card-name"><i class="fas fa-cash-register" style="color:#1F7BFF;margin-right:6px"></i>${c.counter_name}</div>
                     <div class="counter-card-amount">${fmt(parseFloat(c.opening_given || 0) + parseFloat(c.cash_in || 0))}</div>
                     <div class="counter-card-label">Opening ${fmt(c.opening_given)} + Sales ${fmt(c.cash_in)}</div>
+                    <div class="counter-card-label">Received ${fmt(c.received)} | Adj ${fmt(c.adjustment)}</div>
+                    <div class="counter-card-label" style="font-weight:600;color:${(parseFloat(c.opening_given) + parseFloat(c.cash_in) - parseFloat(c.received) - parseFloat(c.adjustment)) > 0.004 ? '#E34F4F' : '#2FBF71'}">Short ${fmt(parseFloat(c.opening_given) + parseFloat(c.cash_in) - parseFloat(c.received) - parseFloat(c.adjustment))}</div>
                 </div>
             `).join('');
         } else {
             counterSection.style.display = counter ? 'none' : 'block';
             counterCards.innerHTML = '<div style="color:#6B7280;font-size:13px">No counters configured for this branch</div>';
         }
+
+        if (currentView === 'summary') renderSummary();
 
         // Transactions table
         renderTable(data.transactions);
@@ -261,6 +326,81 @@ async function loadReport() {
         document.getElementById('tableWrap').innerHTML = `<div class="empty-state" style="color:#E34F4F"><i class="fas fa-exclamation-circle" style="display:block;font-size:24px;margin-bottom:8px"></i>${e.message}</div>`;
     } finally {
         document.getElementById('loadingOverlay').classList.remove('show');
+    }
+}
+
+function esc(s) {
+    return String(s ?? '').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+}
+
+function detailTable(rows, cols, emptyMsg) {
+    if (!rows || !rows.length) return `<div class="mini-empty">${emptyMsg}</div>`;
+    const total = rows.reduce((s, r) => s + parseFloat(r.amount || 0), 0);
+    return `<table class="mini-table">
+        <thead><tr>${cols.map(c => `<th${c.num ? ' style="text-align:right"' : ''}>${c.label}</th>`).join('')}</tr></thead>
+        <tbody>${rows.map(r => `<tr>${cols.map(c => `<td${c.num ? ' class="amount-cell"' : ''}>${c.render(r)}</td>`).join('')}</tr>`).join('')}</tbody>
+        <tfoot><tr><td colspan="${cols.length - 1}" style="text-align:right;font-weight:700">Total</td><td class="amount-cell" style="font-weight:700">${fmt(total)}</td></tr></tfoot>
+    </table>`;
+}
+
+function renderSummary() {
+    if (!lastData) return;
+    const d = lastData, det = d.details || {};
+    const dash = '<span style="color:#9CA3AF">-</span>';
+    const colDate    = { label: 'Date',          render: r => esc(r.txn_date) };
+    const colCounter = { label: 'Counter',       render: r => esc(r.counter_name || '-') };
+    const colOfficer = { label: 'Sales Officer', render: r => r.sale_officer ? esc(r.sale_officer) : dash };
+    const colAmount  = { label: 'Amount',        render: r => fmt(r.amount), num: true };
+    const colRemarks = { label: 'Remarks',       render: r => esc(r.remarks || '') };
+
+    document.getElementById('summarySub').textContent = `Period: ${d.date_from} to ${d.date_to}`;
+
+    const short = parseFloat(d.short_cash || 0);
+    const shortLbl = short > 0.004 ? 'Short Cash (Pending)' : (short < -0.004 ? 'Excess Cash' : 'Short Cash');
+    document.getElementById('summaryEq').innerHTML = `
+        <div class="eq-row"><span>Opening Cash</span><span>${fmt(d.opening_balance)}</span></div>
+        <div class="eq-row"><span>+ Cash Sales</span><span>${fmt(d.total_cash_in)}</span></div>
+        <div class="eq-row total"><span>Total Cash</span><span>${fmt(d.closing_balance)}</span></div>
+        <div class="eq-row"><span>- Received</span><span>${fmt(d.total_received)}</span></div>
+        <div class="eq-row"><span>- Adjustments</span><span>${fmt(d.total_adjustment)}</span></div>
+        <div class="eq-row total" style="color:${short > 0.004 ? '#E34F4F' : (short < -0.004 ? '#E8B23F' : '#2FBF71')}"><span>${shortLbl}</span><span>${fmt(Math.abs(short))}</span></div>`;
+
+    document.getElementById('summaryBody').innerHTML = `
+        <div class="sec-title" id="sec-opening">Opening Cash - given to sales officers</div>
+        ${detailTable(det.opening, [colDate, colCounter, colOfficer, { label: 'Source', render: r => esc(r.source) }, colRemarks, colAmount], 'No opening cash in this period')}
+        <div class="sec-title" id="sec-sales">Cash Sales - by date / counter / officer</div>
+        ${detailTable(det.sales, [colDate, colCounter, colOfficer, { label: 'Txns', render: r => r.txn_count }, colAmount], 'No cash sales in this period')}
+        <div class="sec-title" id="sec-received">Received - returned by sales officers</div>
+        ${detailTable(det.received, [colDate, colCounter, colOfficer, colRemarks, colAmount], 'Nothing received in this period')}
+        <div class="sec-title" id="sec-adjustment">Adjustments - expenses / advances</div>
+        ${detailTable(det.adjustment, [colDate, colCounter, colOfficer, { label: 'Reason', render: r => esc(r.remarks || '') }, colAmount], 'No adjustments in this period')}`;
+
+}
+
+/* Switch the main area between Cash Transactions table and Summary (no popup) */
+function showView(view) {
+    currentView = view;
+    const isSummary = view === 'summary';
+    document.getElementById('transactionsCard').style.display = isSummary ? 'none' : '';
+    document.getElementById('summaryCard').style.display      = isSummary ? '' : 'none';
+    document.getElementById('viewToggleBtn').innerHTML = isSummary
+        ? '<i class="fas fa-table-list"></i> Transactions'
+        : '<i class="fas fa-list-check"></i> Summary';
+}
+
+function toggleView() {
+    if (currentView === 'summary') showView('transactions');
+    else openSummary();
+}
+
+function openSummary(section) {
+    if (!lastData) return;
+    renderSummary();
+    showView('summary');
+    const target = section ? document.getElementById('sec-' + section) : document.getElementById('summaryCard');
+    if (target) {
+        target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        if (section) { target.classList.add('flash'); setTimeout(() => target.classList.remove('flash'), 1500); }
     }
 }
 

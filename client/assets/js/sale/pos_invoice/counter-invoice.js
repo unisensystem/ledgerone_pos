@@ -82,6 +82,7 @@ function printLastInvoice() {
         return;
     }
     window.open(`thermal-print.php?id=${lastSavedInvoiceId}`, '_blank');
+    document.getElementById('quickProduct').focus();
 }
 
 // Load data on page load
@@ -1933,8 +1934,26 @@ async function saveInvoice(status = 'Posted') {
         return;
     }
     
-    if (!currentInvoice.customer || !currentInvoice.branch || !currentInvoice.currency) {
-        alert('Please select customer, branch, and currency!');
+    // Branch: auto-pick the first available branch if none is selected yet
+    if (!currentInvoice.branch && branchesData.length > 0) {
+        currentInvoice.branch = parseInt(branchesData[0].id);
+        document.getElementById('branch').value = branchesData[0].id;
+    }
+
+    // Currency is not mandatory: fall back to the base currency, then the first available one
+    if (!currentInvoice.currency && currenciesData.length > 0) {
+        const fallbackCurrency = currenciesData.find(c => c.is_base_currency == 1) || currenciesData[0];
+        currentInvoice.currency = fallbackCurrency.currency_id;
+    }
+
+    if (!currentInvoice.customer) {
+        alert('Please select a customer!');
+        isSaving = false;
+        return;
+    }
+
+    if (!currentInvoice.branch) {
+        alert('No branch available. Please add a branch first!');
         isSaving = false;
         return;
     }
@@ -1946,7 +1965,8 @@ async function saveInvoice(status = 'Posted') {
         return;
     }
     
-    // Validate stock for all items
+    // Check stock for all items - warn only, never block saving
+    const stockWarnings = [];
     for (const item of currentInvoice.items) {
         if (item.productId) {
             try {
@@ -1956,15 +1976,16 @@ async function saveInvoice(status = 'Posted') {
                 if (data.success) {
                     const availableStock = Math.floor(data.stock);
                     if (availableStock < item.qty) {
-                        alert(`Insufficient stock for ${item.product}!\nAvailable: ${availableStock}, Required: ${item.qty}`);
-                        isSaving = false;
-                        return;
+                        stockWarnings.push(`${item.product} (Available: ${availableStock}, Required: ${item.qty})`);
                     }
                 }
             } catch (error) {
                 console.error('Error validating stock:', error);
             }
         }
+    }
+    if (stockWarnings.length > 0) {
+        showNotification('Stock warning - invoice will still be saved:\n' + stockWarnings.join('\n'), true);
     }
     
     const invoiceData = {
@@ -2053,6 +2074,8 @@ async function saveInvoice(status = 'Posted') {
                 document.getElementById('invoiceDiscountAmount').value = 0;
                 document.getElementById('amountReceived').value = 0;
                 document.getElementById('amountReturned').value = 0;
+                // Manual print mode: ready for the next invoice, focus back on product
+                if (isManualPrintMode()) document.getElementById('quickProduct').focus();
             }, 500);
         } else {
             alert('Error: ' + data.message);
@@ -2076,23 +2099,25 @@ function formatCurrency(amount) {
     return `${symbol}${Math.abs(amount).toFixed(2)}`;
 }
 
-function showNotification(message) {
+function showNotification(message, isWarning = false) {
     const notification = document.createElement('div');
     notification.textContent = message;
     notification.style.cssText = `
         position: fixed;
-        top: 20px;
+        top: ${isWarning ? '70px' : '20px'};
         right: 20px;
-        background: var(--success);
-        color: white;
+        background: ${isWarning ? 'var(--warning)' : 'var(--success)'};
+        color: ${isWarning ? '#1a1a1a' : 'white'};
         padding: 8px 16px;
         border-radius: 4px;
         z-index: 10000;
         font-weight: 500;
+        white-space: pre-line;
+        max-width: 360px;
         box-shadow: 0 2px 8px rgba(0,0,0,0.2);
     `;
     document.body.appendChild(notification);
-    setTimeout(() => notification.remove(), 3000);
+    setTimeout(() => notification.remove(), isWarning ? 6000 : 3000);
 }
 
 async function loadSupplierMen() {

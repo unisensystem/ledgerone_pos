@@ -142,6 +142,84 @@ try {
     // Opening = existing opening + cash given today (e.g. 1000)
     $openingTotal = $openingBalance + $openingGiven;
 
+    // ── Received back from sales officers + adjustments (Counter Settlement page) ──
+    $setWhere  = 's.tenant_id = ? AND s.entry_date BETWEEN ? AND ?';
+    $setParams = [$tenant_id, $d_from, $d_to];
+    if ($branch_id)  { $setWhere .= ' AND s.branch_id = ?';  $setParams[] = $branch_id;  }
+    if ($counter_id) { $setWhere .= ' AND s.counter_id = ?'; $setParams[] = $counter_id; }
+
+    $setStmt = $pdo->prepare("
+        SELECT COALESCE(SUM(CASE WHEN s.entry_type = 'Received'   THEN s.amount END), 0) AS received,
+               COALESCE(SUM(CASE WHEN s.entry_type = 'Adjustment' THEN s.amount END), 0) AS adjustment
+        FROM counter_settlements s
+        WHERE $setWhere
+    ");
+    $setStmt->execute($setParams);
+    $setRow = $setStmt->fetch(PDO::FETCH_ASSOC);
+    $totalReceived   = floatval($setRow['received']);
+    $totalAdjustment = floatval($setRow['adjustment']);
+    // > 0 = short cash, < 0 = excess
+    $shortCash = ($openingTotal + $totalCashIn) - $totalReceived - $totalAdjustment;
+
+    // ── Summary details (shown when user clicks Summary) ──
+    $details = ['opening' => [], 'sales' => [], 'received' => [], 'adjustment' => []];
+
+    // Opening: cash given to sales officers (date, counter, officer)
+    $opDetStmt = $pdo->prepare("
+        SELECT x.entry_date AS txn_date, ct.counter_name, em.full_name AS sale_officer,
+               x.amount, x.remarks, 'Cash given' AS source
+        FROM counter_cash_entries x
+        LEFT JOIN counters  ct ON ct.id = x.counter_id
+        LEFT JOIN employees em ON em.id = x.sale_officer_id
+        WHERE $givenWhere
+        ORDER BY x.entry_date, x.id
+    ");
+    $opDetStmt->execute($givenParams);
+    $details['opening'] = $opDetStmt->fetchAll(PDO::FETCH_ASSOC);
+
+    // Opening: old cash_opening setup rows (no officer)
+    $opOldStmt = $pdo->prepare("
+        SELECT co.as_of_date AS txn_date, ct.counter_name, NULL AS sale_officer,
+               co.opening_amount AS amount, NULL AS remarks, 'Opening setup' AS source
+        FROM cash_opening co
+        LEFT JOIN counters ct ON ct.id = co.counter_id
+        WHERE $openingWhere AND co.opening_amount <> 0
+        ORDER BY co.id
+    ");
+    $opOldStmt->execute($openingParams);
+    $details['opening'] = array_merge($opOldStmt->fetchAll(PDO::FETCH_ASSOC), $details['opening']);
+
+    // Sales: cash sales grouped by date / counter / officer
+    $slDetStmt = $pdo->prepare("
+        SELECT rv.voucher_date AS txn_date, ct.counter_name, em.full_name AS sale_officer,
+               COUNT(*) AS txn_count, SUM(rv.amount) AS amount
+        FROM receive_voucher rv
+        LEFT JOIN sale_invoice si ON si.bill_no = rv.bill_no AND si.tenant_id = rv.tenant_id
+        LEFT JOIN counters     ct ON ct.id = rv.counter_id
+        LEFT JOIN employees    em ON em.id = si.sale_officer_id AND em.tenant_id = rv.tenant_id
+        WHERE $where
+        GROUP BY rv.voucher_date, rv.counter_id, ct.counter_name, si.sale_officer_id, em.full_name
+        ORDER BY rv.voucher_date, ct.counter_name
+    ");
+    $slDetStmt->execute($params);
+    $details['sales'] = $slDetStmt->fetchAll(PDO::FETCH_ASSOC);
+
+    // Received + adjustments
+    $stDetStmt = $pdo->prepare("
+        SELECT s.entry_date AS txn_date, s.entry_type, ct.counter_name, em.full_name AS sale_officer,
+               s.amount, s.remarks
+        FROM counter_settlements s
+        LEFT JOIN counters  ct ON ct.id = s.counter_id
+        LEFT JOIN employees em ON em.id = s.sale_officer_id
+        WHERE $setWhere
+        ORDER BY s.entry_date, s.id
+    ");
+    $stDetStmt->execute($setParams);
+    foreach ($stDetStmt->fetchAll(PDO::FETCH_ASSOC) as $r) {
+        if ($r['entry_type'] === 'Received') $details['received'][] = $r;
+        else                                 $details['adjustment'][] = $r;
+    }
+
     // ── Per-counter summary (when viewing all counters in a branch) ──
     $summaryData = [];
     if ($branch_id && !$counter_id) {
@@ -152,7 +230,17 @@ try {
                       FROM counter_cash_entries x
                      WHERE x.tenant_id = ct.tenant_id
                        AND x.counter_id = ct.id
-                       AND x.entry_date BETWEEN ? AND ?) AS opening_given
+                       AND x.entry_date BETWEEN ? AND ?) AS opening_given,
+                   (SELECT COALESCE(SUM(s.amount), 0)
+                      FROM counter_settlements s
+                     WHERE s.tenant_id = ct.tenant_id AND s.counter_id = ct.id
+                       AND s.entry_type = 'Received'
+                       AND s.entry_date BETWEEN ? AND ?) AS received,
+                   (SELECT COALESCE(SUM(s.amount), 0)
+                      FROM counter_settlements s
+                     WHERE s.tenant_id = ct.tenant_id AND s.counter_id = ct.id
+                       AND s.entry_type = 'Adjustment'
+                       AND s.entry_date BETWEEN ? AND ?) AS adjustment
             FROM counters ct
             LEFT JOIN receive_voucher rv
                    ON rv.counter_id = ct.id
@@ -163,7 +251,7 @@ try {
             GROUP BY ct.id, ct.counter_name
             ORDER BY ct.counter_name
         ");
-        $sumByCounterStmt->execute([$d_from, $d_to, $d_from, $d_to, $tenant_id, $branch_id]);
+        $sumByCounterStmt->execute([$d_from, $d_to, $d_from, $d_to, $d_from, $d_to, $d_from, $d_to, $tenant_id, $branch_id]);
         $summaryData = $sumByCounterStmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
@@ -179,6 +267,10 @@ try {
         'success'          => true,
         'opening_balance'  => $openingTotal,
         'opening_given'    => $openingGiven,
+        'details'          => $details,
+        'total_received'   => $totalReceived,
+        'total_adjustment' => $totalAdjustment,
+        'short_cash'       => $shortCash,
         'total_cash_in'    => $totalCashIn,
         'closing_balance'  => $openingTotal + $totalCashIn,
         'transactions'     => $transactions,
