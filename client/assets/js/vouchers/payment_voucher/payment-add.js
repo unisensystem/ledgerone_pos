@@ -30,7 +30,7 @@ paymentTypeToggles.forEach(toggle => {
         document.getElementById('crExpenseRef').innerHTML = '<option value="">Select CR Expense</option>';
         document.getElementById('crExpenseGroup').style.display = 'none';
 
-        // Bulk rows: party list changed, so clear the party/sub-account of every row
+        // Bulk rows: party list changed, so clear the party/sub-account/bill of every row
         resetBulkParties();
     });
 });
@@ -773,13 +773,17 @@ function updateBulkPartyLabel() {
     });
 }
 
-// Clear party + sub account on all rows (used when Payment To type changes)
+// Clear party + sub account + bill on all rows (used when Payment To type changes)
 function resetBulkParties() {
     closeActiveBulkDropdown();
     document.querySelectorAll('#bulkTableBody tr').forEach(row => {
         const input = row.querySelector('.bulk-supplier');
         const sub = row.querySelector('.bulk-sub-account');
+        const bill = row.querySelector('.bulk-bill');
         if (input) input.value = '';
+        if (bill) bill.value = '';
+        row._bills = [];
+        row._billToken = (row._billToken || 0) + 1;
         if (sub) {
             row._subToken = (row._subToken || 0) + 1;
             sub.innerHTML = '<option value="">Select Sub Account</option>';
@@ -976,6 +980,9 @@ function loadBulkSubAccounts(row, code) {
 
     subAccountSelect.innerHTML = '<option value="">Select Sub Account</option>';
 
+    // Also load this party's bills for the Bill No search
+    loadBulkBills(row, code);
+
     fetch(apiUrl)
         .then(response => response.json())
         .then(data => {
@@ -991,6 +998,129 @@ function loadBulkSubAccounts(row, code) {
             }
         })
         .catch(error => console.error('Error fetching sub-accounts:', error));
+}
+
+// ---- Bulk bill search (per row, same floating dropdown as supplier) ----
+function loadBulkBills(row, code) {
+    row._bills = [];
+    row._billToken = (row._billToken || 0) + 1;
+    const token = row._billToken;
+
+    fetch(`../../../../server/api/vouchers/payment_voucher/get-bills.php?supplier_code=${encodeURIComponent(code)}`)
+        .then(response => response.json())
+        .then(data => {
+            if (token !== row._billToken) return; // newer selection happened meanwhile
+            if (data.success && Array.isArray(data.data)) {
+                row._bills = data.data.map(bill => ({
+                    number: bill.bill_no,
+                    amount: bill.net_amount,
+                    date: bill.purchase_date,
+                    currency: bill.currency_symbol || '$'
+                }));
+            }
+        })
+        .catch(error => console.error('Error fetching bills:', error));
+}
+
+function setupBulkBillSearch(row) {
+    const input = row.querySelector('.bulk-bill');
+    const dd = document.createElement('div');
+    dd.className = 'dropdown-list bulk-bill-dropdown';
+    dd.style.display = 'none';
+    document.body.appendChild(dd);
+    row._billDropdown = dd;
+    row._bills = [];
+
+    let highlighted = -1;
+
+    function close() {
+        dd.classList.remove('show');
+        dd.style.display = 'none';
+        highlighted = -1;
+        if (activeBulkDropdown && activeBulkDropdown.dd === dd) activeBulkDropdown = null;
+    }
+
+    function setHighlight(items) {
+        items.forEach((item, i) => item.classList.toggle('highlighted', i === highlighted));
+        if (items[highlighted]) items[highlighted].scrollIntoView({ block: 'nearest' });
+    }
+
+    function selectBill(bill) {
+        input.value = bill.number;
+        input.title = `${new Date(bill.date).toLocaleDateString()} - ${bill.currency}${parseFloat(bill.amount).toFixed(2)}`;
+        close();
+    }
+
+    function render() {
+        const billList = row._bills || [];
+        if (billList.length === 0) return; // nothing to show (no supplier selected / no bills)
+
+        if (activeBulkDropdown && activeBulkDropdown.dd !== dd) activeBulkDropdown.close();
+
+        const term = input.value.trim().toLowerCase();
+        const list = billList.filter(b =>
+            !term ||
+            String(b.number || '').toLowerCase().includes(term) ||
+            String(b.date || '').toLowerCase().includes(term) ||
+            String(b.amount || '').includes(term)
+        );
+
+        dd.innerHTML = '';
+        highlighted = -1;
+
+        if (list.length === 0) {
+            const none = document.createElement('div');
+            none.className = 'dropdown-item';
+            none.textContent = 'No bills found';
+            none.style.cursor = 'default';
+            none.style.opacity = '0.7';
+            dd.appendChild(none);
+        } else {
+            list.slice(0, 30).forEach(b => {
+                const option = document.createElement('div');
+                option.className = 'dropdown-item';
+                const date = new Date(b.date).toLocaleDateString();
+                option.innerHTML = `<strong>${b.number}</strong> - ${date} - ${b.currency}${parseFloat(b.amount).toFixed(2)}`;
+                option.dataset.number = b.number;
+                option.addEventListener('click', () => selectBill(b));
+                dd.appendChild(option);
+            });
+        }
+
+        positionBulkDropdown(input, dd);
+        dd.classList.add('show');
+        dd.style.display = 'block';
+        activeBulkDropdown = { input, dd, close };
+    }
+
+    input.addEventListener('input', render);
+    input.addEventListener('focus', render);
+
+    input.addEventListener('keydown', function(e) {
+        const open = dd.style.display === 'block';
+        const items = dd.querySelectorAll('.dropdown-item[data-number]');
+
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            if (!open) { render(); return; }
+            highlighted = Math.min(highlighted + 1, items.length - 1);
+            setHighlight(items);
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            if (!open) return;
+            highlighted = Math.max(highlighted - 1, 0);
+            setHighlight(items);
+        } else if (e.key === 'Enter') {
+            if (open && items.length > 0) {
+                e.preventDefault();
+                const pick = items[highlighted >= 0 ? highlighted : 0];
+                const bill = (row._bills || []).find(b => String(b.number) === pick.dataset.number);
+                if (bill) selectBill(bill);
+            }
+        } else if (e.key === 'Escape' || e.key === 'Tab') {
+            close();
+        }
+    });
 }
 
 // Rebuild a <select> keeping the current value if it still exists
@@ -1083,7 +1213,7 @@ function addBulkRow() {
                 <option value="">Select Sub Account</option>
             </select>
         </td>
-        <td><input type="text" class="bulk-bill" placeholder="Bill No"></td>
+        <td><input type="text" class="bulk-bill" placeholder="Search bill..." autocomplete="off"></td>
         <td>
             <select class="bulk-currency" required>
                 <option value="">Select Currency</option>
@@ -1134,9 +1264,10 @@ function addBulkRow() {
         }
     }
 
-    // Fill selects, wire searchable supplier/customer, wire payment method rules
+    // Fill selects, wire searchable supplier/customer + bill, wire payment method rules
     populateBulkRow(row);
     setupBulkSupplierSearch(row);
+    setupBulkBillSearch(row);
     row.querySelector('.bulk-payment-method').addEventListener('change', function() {
         applyBulkMethod(row);
     });
@@ -1148,14 +1279,154 @@ function removeRow(btn) {
         if (activeBulkDropdown && activeBulkDropdown.dd === row._supplierDropdown) activeBulkDropdown = null;
         row._supplierDropdown.remove();
     }
+    if (row._billDropdown) {
+        if (activeBulkDropdown && activeBulkDropdown.dd === row._billDropdown) activeBulkDropdown = null;
+        row._billDropdown.remove();
+    }
     row.remove();
 }
 
 document.getElementById('addRowBtn').addEventListener('click', addBulkRow);
 
+// ---- Bulk column show/hide ----
+// Locked columns are always visible (they are needed to post a voucher)
+const BULK_COLUMNS = [
+    { index: 1,  label: 'Date',                locked: true },
+    { index: 2,  label: 'Supplier / Customer', locked: true },
+    { index: 3,  label: 'Sub Account' },
+    { index: 4,  label: 'Bill No' },
+    { index: 5,  label: 'Currency' },
+    { index: 6,  label: 'Amount',              locked: true },
+    { index: 7,  label: 'Payment Method',      locked: true },
+    { index: 8,  label: 'Project' },
+    { index: 9,  label: 'Container' },
+    { index: 10, label: 'Bank Account' },
+    { index: 11, label: 'Cheque No' },
+    { index: 12, label: 'Cheque Date' },
+    { index: 13, label: 'Description' }
+];
+const BULK_HIDDEN_COLS_KEY = 'bulk_payment_hidden_columns';
+let bulkHiddenCols = new Set();
+
+try {
+    const saved = JSON.parse(localStorage.getItem(BULK_HIDDEN_COLS_KEY) || '[]');
+    if (Array.isArray(saved)) {
+        saved.forEach(i => {
+            const col = BULK_COLUMNS.find(c => c.index === i);
+            if (col && !col.locked) bulkHiddenCols.add(i);
+        });
+    }
+} catch (e) { /* ignore corrupt storage */ }
+
+const bulkColStyle = document.createElement('style');
+bulkColStyle.id = 'bulkColumnStyle';
+document.head.appendChild(bulkColStyle);
+
+function applyBulkColumnVisibility() {
+    closeActiveBulkDropdown();
+    bulkColStyle.textContent = Array.from(bulkHiddenCols).map(i =>
+        `#bulkTable th:nth-child(${i}), #bulkTable td:nth-child(${i}) { display: none; }`
+    ).join('\n');
+
+    document.querySelectorAll('#bulkColumnMenu input[data-col]').forEach(cb => {
+        cb.checked = !bulkHiddenCols.has(parseInt(cb.dataset.col));
+    });
+
+    const btnText = document.getElementById('bulkColumnsCount');
+    if (btnText) btnText.textContent = bulkHiddenCols.size > 0 ? ` (${bulkHiddenCols.size} hidden)` : '';
+
+    try {
+        localStorage.setItem(BULK_HIDDEN_COLS_KEY, JSON.stringify(Array.from(bulkHiddenCols)));
+    } catch (e) { /* storage unavailable */ }
+}
+
+function setBulkColumnVisible(index, visible) {
+    if (visible) bulkHiddenCols.delete(index);
+    else bulkHiddenCols.add(index);
+    applyBulkColumnVisibility();
+}
+
+function buildBulkColumnMenu() {
+    const controls = document.querySelector('#bulkVoucherForm .bulk-controls > div');
+    if (!controls || document.getElementById('bulkColumnsBtn')) return;
+
+    const wrap = document.createElement('div');
+    wrap.style.position = 'relative';
+
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'btn btn-secondary';
+    btn.id = 'bulkColumnsBtn';
+    btn.innerHTML = '<i class="fas fa-columns"></i> Columns<span id="bulkColumnsCount"></span>';
+
+    const menu = document.createElement('div');
+    menu.id = 'bulkColumnMenu';
+    menu.style.cssText = 'display:none; position:absolute; top:calc(100% + 6px); left:0; z-index:10001; ' +
+        'min-width:230px; max-height:380px; overflow-y:auto; padding:8px; border-radius:8px; ' +
+        'background:var(--card-bg, var(--card, #fff)); color:inherit; ' +
+        'border:1px solid var(--border, #d1d5db); box-shadow:0 8px 24px rgba(0,0,0,0.18);';
+
+    const actions = document.createElement('div');
+    actions.style.cssText = 'display:flex; gap:8px; padding:4px 6px 8px; border-bottom:1px solid var(--border, #e5e7eb); margin-bottom:6px;';
+    const showAll = document.createElement('button');
+    showAll.type = 'button';
+    showAll.className = 'btn btn-secondary';
+    showAll.textContent = 'Show all';
+    showAll.style.cssText = 'padding:4px 10px; font-size:12px;';
+    showAll.addEventListener('click', () => { bulkHiddenCols.clear(); applyBulkColumnVisibility(); });
+    const hideOptional = document.createElement('button');
+    hideOptional.type = 'button';
+    hideOptional.className = 'btn btn-secondary';
+    hideOptional.textContent = 'Hide optional';
+    hideOptional.style.cssText = 'padding:4px 10px; font-size:12px;';
+    hideOptional.addEventListener('click', () => {
+        BULK_COLUMNS.forEach(c => { if (!c.locked) bulkHiddenCols.add(c.index); });
+        applyBulkColumnVisibility();
+    });
+    actions.appendChild(showAll);
+    actions.appendChild(hideOptional);
+    menu.appendChild(actions);
+
+    BULK_COLUMNS.forEach(col => {
+        const label = document.createElement('label');
+        label.style.cssText = 'display:flex; align-items:center; gap:8px; padding:6px; cursor:' +
+            (col.locked ? 'not-allowed' : 'pointer') + '; opacity:' + (col.locked ? '0.6' : '1') + '; font-size:14px;';
+        const cb = document.createElement('input');
+        cb.type = 'checkbox';
+        cb.dataset.col = col.index;
+        cb.checked = !bulkHiddenCols.has(col.index);
+        cb.disabled = !!col.locked;
+        cb.addEventListener('change', () => setBulkColumnVisible(col.index, cb.checked));
+        label.appendChild(cb);
+        label.appendChild(document.createTextNode(col.label + (col.locked ? ' (required)' : '')));
+        menu.appendChild(label);
+    });
+
+    btn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        closeActiveBulkDropdown();
+        menu.style.display = menu.style.display === 'block' ? 'none' : 'block';
+    });
+    document.addEventListener('click', function(e) {
+        if (!wrap.contains(e.target)) menu.style.display = 'none';
+    });
+
+    wrap.appendChild(btn);
+    wrap.appendChild(menu);
+    controls.appendChild(wrap);
+    applyBulkColumnVisibility();
+}
+buildBulkColumnMenu();
+
 // Validate one bulk row. Returns { error } or { party }
 function validateBulkRow(row) {
-    const markBad = el => { if (el) el.style.borderColor = 'var(--error)'; };
+    const markBad = el => {
+        if (!el) return;
+        el.style.borderColor = 'var(--error)';
+        // If the invalid field is in a hidden column, show that column so the user can fix it
+        const td = el.closest('td');
+        if (td && bulkHiddenCols.has(td.cellIndex + 1)) setBulkColumnVisible(td.cellIndex + 1, true);
+    };
     const errors = [];
 
     const typed = row.querySelector('.bulk-supplier').value.trim().toLowerCase();
@@ -1326,6 +1597,7 @@ document.getElementById('postBulkBtn').addEventListener('click', async function(
     setTimeout(() => {
         document.querySelectorAll('#bulkTableBody tr[data-posted="1"]').forEach(row => {
             if (row._supplierDropdown) row._supplierDropdown.remove();
+            if (row._billDropdown) row._billDropdown.remove();
             row.remove();
         });
         if (document.getElementById('bulkTableBody').children.length === 0) {

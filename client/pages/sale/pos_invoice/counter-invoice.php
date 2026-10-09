@@ -723,6 +723,8 @@ $user_employee_id = $user['employee_id'] ?? null;
             grid-template-columns: repeat(4, 1fr);
             gap: 8px;
             align-items: end;
+                grid-template-columns: repeat(3, 1fr);   /* was repeat(4, 1fr) */
+
         }
 
         /* Action Buttons - Ultra Compact */
@@ -1054,7 +1056,7 @@ $user_employee_id = $user['employee_id'] ?? null;
                     </select>
                 </div>
 
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                <!-- <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
                     <div class="form-group-micro">
                         <div class="form-label">AMOUNT RECEIVED</div>
                         <input type="number" id="amountReceived" value="0" step="0.01">
@@ -1063,7 +1065,7 @@ $user_employee_id = $user['employee_id'] ?? null;
                         <div class="form-label">AMOUNT RETURNED</div>
                         <input type="number" id="amountReturned" value="0" step="0.01">
                     </div>
-                </div>
+                </div> -->
             </div>
         </div>
 
@@ -1159,26 +1161,34 @@ $user_employee_id = $user['employee_id'] ?? null;
                 </div>
             </div>
 
-            <!-- Payment Section -->
-            <div class="payment-panel">
-                <div class="form-group-micro">
-                    <div class="form-label">INVOICE DISC %</div>
-                    <input type="number" id="invoiceDiscountPercent" value="0" min="0" max="100" step="0.1">
-                </div>
-                <div class="form-group-micro">
-                    <div class="form-label">INVOICE DISC AMT</div>
-                    <input type="number" id="invoiceDiscountAmount" value="0" step="0.01">
-                </div>
-                <div class="form-group-micro">
-                    <div class="form-label">CURRENCY</div>
-                    <select id="currency">
-                        <option value="<?php echo $currency['symbol']; ?>" selected><?php echo $currency['symbol']; ?></option>
-                    </select>
-                </div>
-                <button class="btn btn-success" id="quickPayBtn" style="height: 32px;">
-                    <i class="fas fa-bolt"></i> QUICK PAY (F9)
-                </button>
-            </div>
+          <!-- Payment Section -->
+<div class="payment-panel">
+    <div class="form-group-micro">
+        <div class="form-label">INVOICE DISC %</div>
+        <input type="number" id="invoiceDiscountPercent" value="0" min="0" max="100" step="0.1">
+    </div>
+    <div class="form-group-micro">
+        <div class="form-label">INVOICE DISC AMT</div>
+        <input type="number" id="invoiceDiscountAmount" value="0" step="0.01">
+    </div>
+    <div class="form-group-micro">
+        <div class="form-label">CURRENCY</div>
+        <select id="currency">
+            <option value="<?php echo $currency['symbol']; ?>" selected><?php echo $currency['symbol']; ?></option>
+        </select>
+    </div>
+    <div class="form-group-micro">
+        <div class="form-label">AMOUNT RECEIVED</div>
+        <input type="number" id="amountReceived" value="0" step="0.01">
+    </div>
+    <div class="form-group-micro">
+        <div class="form-label">AMOUNT RETURNED</div>
+        <input type="number" id="amountReturned" value="0" step="0.01">
+    </div>
+    <button class="btn btn-success" id="quickPayBtn" style="height: 32px;">
+        <i class="fas fa-bolt"></i> QUICK PAY (F9)
+    </button>
+</div>
 
             <!-- Action Buttons -->
             <div class="action-buttons">
