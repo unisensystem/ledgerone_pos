@@ -244,4 +244,35 @@ class SaleOrderApi {
     final res = await ApiClient.dio.post(createOrderEndpoint, data: payload);
     return Map<String, dynamic>.from(res.data as Map);
   }
+
+  /// Creates a brand-new customer on the spot (server/api/customer_supplier/
+  /// customers/customer-add.php — same endpoint web's full customer-add page
+  /// uses). Requires connectivity: customer_code is assigned by a server-side
+  /// locked counter, so this is never queued in the offline outbox.
+  static Future<Map<String, dynamic>> createCustomer({
+    required int companyId,
+    required String customerName,
+    String? primaryPhone,
+    String? address,
+    int? salesOfficerId,
+    int? supplierManId,
+  }) async {
+    final res = await ApiClient.dio.post(
+      '/server/api/customer_supplier/customers/customer-add.php',
+      data: {
+        'companyId': companyId,
+        'customerName': customerName,
+        if (primaryPhone != null && primaryPhone.isNotEmpty)
+          'primaryPhone': primaryPhone,
+        if (address != null && address.isNotEmpty) 'address': address,
+        if (salesOfficerId != null) 'salesOfficerId': salesOfficerId,
+        if (supplierManId != null) 'supplierManId': supplierManId,
+      },
+    );
+    final data = res.data as Map;
+    if (data['success'] != true) {
+      throw Exception(data['message'] ?? 'Failed to create customer');
+    }
+    return Map<String, dynamic>.from(data);
+  }
 }

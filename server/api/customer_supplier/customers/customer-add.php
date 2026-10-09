@@ -1,27 +1,30 @@
 <?php
 require_once '../../../../includes/connection.php';
 require_once '../../../../includes/activity-logger.php';
+require_once '../../../../includes/mobile_auth.php';
 
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
-header('Access-Control-Allow-Methods: POST');
-header('Access-Control-Allow-Headers: Content-Type');
+header('Access-Control-Allow-Methods: POST, OPTIONS');
+header('Access-Control-Allow-Headers: Content-Type, Authorization');
 
+if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+    exit(0);
+}
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     http_response_code(405);
     echo json_encode(['success' => false, 'message' => 'Method not allowed']);
     exit;
 }
 
-session_start();
-$user_id = $_SESSION['user_id'] ?? null;
-$tenant_id = $_SESSION['tenant_id'] ?? null;
-
-if (!$user_id || !$tenant_id) {
+$auth = resolveMobileAuth($pdo);
+if (!$auth) {
     http_response_code(401);
     echo json_encode(['success' => false, 'message' => 'Unauthorized - Please login again']);
     exit;
 }
+$user_id = $auth['user_id'];
+$tenant_id = $auth['tenant_id'];
 
 try {
     $input = json_decode(file_get_contents('php://input'), true);

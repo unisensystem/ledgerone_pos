@@ -5,6 +5,7 @@ import '../../core/outbox_service.dart';
 import '../../core/sync_service.dart';
 import '../auth/auth_provider.dart';
 import '../receive_voucher/receive_voucher_list_screen.dart';
+import '../sale_order/add_customer_screen.dart';
 import '../sale_order/sale_order_list_screen.dart';
 import '../sale_return/sale_return_list_screen.dart';
 
@@ -108,6 +109,8 @@ class HomeScreen extends ConsumerWidget {
                     pendingSubtitle: _pendingLabel,
                     screen: ReceiveVoucherListScreen(),
                   ),
+                  SizedBox(height: 12),
+                  _AddCustomerActionCard(),
                   SizedBox(height: 28),
                 ],
               ),
@@ -468,6 +471,27 @@ class _FilteredOutboxActionCardState extends State<_FilteredOutboxActionCard> {
       onTap: () =>
           Navigator.of(context)
               .push(MaterialPageRoute(builder: (_) => widget.screen)),
+    );
+  }
+}
+
+/// Standalone "Add Customer" entry — no outbox badge (customer creation
+/// is never queued offline; see add_customer_screen.dart), just a direct
+/// link into the proper create-customer form.
+class _AddCustomerActionCard extends StatelessWidget {
+  const _AddCustomerActionCard();
+
+  @override
+  Widget build(BuildContext context) {
+    return _ActionCard(
+      icon: Icons.person_add_alt_1_rounded,
+      accent: const Color(0xFF7C3AED),
+      accentBg: const Color(0xFFF1E8FE),
+      title: 'Add Customer',
+      subtitle: 'Register a new customer',
+      onTap: () => Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => const AddCustomerScreen()),
+      ),
     );
   }
 }

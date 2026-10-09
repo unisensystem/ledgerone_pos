@@ -5,6 +5,7 @@ import 'package:uuid/uuid.dart';
 import '../../core/outbox_service.dart';
 import '../../core/reference_cache.dart';
 import '../../core/sync_service.dart';
+import 'add_customer_screen.dart';
 import 'sale_order_api.dart';
 import 'sale_order_calc.dart';
 import 'sale_order_field_settings.dart';
@@ -484,6 +485,38 @@ class _SaleOrderScreenState extends State<SaleOrderScreen> {
     );
   }
 
+  /// Opens the quick "new customer on the spot" form (for a booker who just
+  /// met a customer that isn't in the system yet) and, on success, selects
+  /// the newly created customer exactly as if it had been picked from the
+  /// search field — so the booker can continue straight into the order.
+  Future<void> _openAddCustomer() async {
+    if (_selectedCompanyId == null) {
+      setState(
+        () => _submitResult = 'Please select a company before adding a new customer.',
+      );
+      return;
+    }
+    final newCustomer = await Navigator.push<Map<String, dynamic>>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => AddCustomerScreen(
+          initialCompanyId: _selectedCompanyId!,
+          defaultSalesOfficerId: _selectedSalesOfficerId,
+          defaultSupplierManId: _selectedSupplierManId,
+        ),
+      ),
+    );
+    if (newCustomer == null || !mounted) return;
+    setState(() {
+      _customers = [newCustomer, ..._customers];
+      _selectedCustomer = newCustomer;
+      // Forces the Customer Autocomplete field to rebuild with the new
+      // initialText — it only reads initialValue once per widget instance
+      // (see _searchableField's key usage elsewhere in this screen).
+      _formResetCounter++;
+    });
+  }
+
   Future<void> _submit({required String status}) async {
     if (_selectedCustomer == null ||
         _selectedBranchId == null ||
@@ -916,6 +949,18 @@ class _SaleOrderScreenState extends State<SaleOrderScreen> {
                     if (supplierManId != null)
                       _selectedSupplierManId = supplierManId;
                   }),
+                ),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: TextButton.icon(
+                    onPressed: _openAddCustomer,
+                    icon: const Icon(Icons.person_add_alt_1, size: 18),
+                    label: const Text('Add New Customer'),
+                    style: TextButton.styleFrom(
+                      foregroundColor: const Color(0xFF1F7BFF),
+                      padding: EdgeInsets.zero,
+                    ),
+                  ),
                 ),
                 if (_selectedCustomer != null) ...[
                   const SizedBox(height: 12),
