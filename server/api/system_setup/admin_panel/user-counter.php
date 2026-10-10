@@ -1,5 +1,6 @@
 <?php
 require_once '../../../../includes/connection.php';
+require_once '../../../../includes/check_permission.php';
 
 header('Content-Type: application/json');
 
@@ -15,6 +16,12 @@ if (!$user_id || !$tenant_id) {
 
 try {
     if ($_SERVER['REQUEST_METHOD'] === 'GET') {
+        if (!hasPermission($pdo, $user_id, 'System Setup', 'Admin Panel', 'View')) {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'message' => 'Forbidden']);
+            exit;
+        }
+
         $target = (int)($_GET['user_id'] ?? 0);
         if (!$target) {
             echo json_encode(['success' => false, 'message' => 'user_id required']);
@@ -32,9 +39,15 @@ try {
     }
 
     if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+        if (!hasPermission($pdo, $user_id, 'System Setup', 'Admin Panel', 'Edit')) {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'message' => 'Forbidden']);
+            exit;
+        }
+
         $input = json_decode(file_get_contents('php://input'), true);
         $target = (int)($input['user_id'] ?? 0);
-        $counterIds = array_unique(array_map('intval', $input['counter_ids'] ?? []));
+        $requestedCounterIds = array_unique(array_map('intval', $input['counter_ids'] ?? []));
 
         if (!$target) {
             echo json_encode(['success' => false, 'message' => 'user_id required']);
@@ -48,6 +61,16 @@ try {
             http_response_code(404);
             echo json_encode(['success' => false, 'message' => 'User not found']);
             exit;
+        }
+
+        // Only accept counter IDs that actually belong to this tenant — otherwise a
+        // crafted request could assign another tenant's counter_id to this user.
+        $counterIds = [];
+        if (!empty($requestedCounterIds)) {
+            $placeholders = implode(',', array_fill(0, count($requestedCounterIds), '?'));
+            $validStmt = $pdo->prepare("SELECT id FROM counters WHERE tenant_id = ? AND id IN ({$placeholders})");
+            $validStmt->execute(array_merge([$tenant_id], $requestedCounterIds));
+            $counterIds = $validStmt->fetchAll(PDO::FETCH_COLUMN);
         }
 
         $pdo->beginTransaction();
