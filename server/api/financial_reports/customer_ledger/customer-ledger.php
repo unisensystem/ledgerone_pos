@@ -77,6 +77,12 @@ try {
     // PDC's linked receive_voucher counts too, matching the detailed view.
     $pdc_pending_status_filter = $pending_pdc_affects_ledger ? "AND 1=0" : "AND pdc.status = 'Pending'";
 
+    // Toggle ON: RVs received against a Pending PDC are already covered by the PDC's full
+    // amount, so they must not be subtracted again (would double count).
+    $pdc_covered_rv_filter = $pending_pdc_affects_ledger
+        ? " AND (rv.against_pdc_id IS NULL OR rv.against_pdc_id NOT IN (SELECT pdc_c.id FROM post_dated_cheques pdc_c WHERE pdc_c.tenant_id = " . intval($tenant_id) . " AND pdc_c.status = 'Pending'))"
+        : "";
+
     if ($type === 'currencies') {
         $stmt = $pdo->prepare("SELECT tc.currency_id as id, c.name, c.symbol, c.code, tc.is_base_currency FROM tenant_currencies tc JOIN ledgerone_public.currencies c ON tc.currency_id = c.id WHERE tc.tenant_id = ? AND tc.is_active = 1 ORDER BY tc.is_base_currency DESC, c.name");
         $stmt->execute([$tenant_id]);
@@ -234,7 +240,7 @@ try {
     AND rv.id NOT IN (
         SELECT pdc.reference_id FROM post_dated_cheques pdc
         WHERE pdc.tenant_id = ? AND pdc.reference_table = 'receive_voucher' {$pdc_pending_status_filter}
-    )");
+    )" . $pdc_covered_rv_filter);
                 $params_prev = [$tenant_id, $customer['id'], $from_date];
                 if ($company_id) $params_prev[] = $company_id;
                 $params_prev[] = $tenant_id;
@@ -356,7 +362,7 @@ try {
     AND rv.id NOT IN (
         SELECT pdc.reference_id FROM post_dated_cheques pdc
         WHERE pdc.tenant_id = ? AND pdc.reference_table = 'receive_voucher' {$pdc_pending_status_filter}
-    )";
+    )" . $pdc_covered_rv_filter;
             $payment_params = [$tenant_id, $customer['id']];
             if ($company_id) $payment_params[] = $company_id;
             $payment_params[] = $tenant_id;
@@ -714,11 +720,11 @@ $prev_payments_sub = $stmt->fetch()['total'];
         $invoices = $stmt->fetchAll(PDO::FETCH_ASSOC);
         
         // Get receive vouchers (exclude those linked to PDCs)
-             // Get receive vouchers (exclude those linked to PDCs)
         $sql = "SELECT voucher_date as date, CONCAT('Receipt - ', voucher_number) as description,
                 voucher_number as reference, 0 as debit, amount as credit, 'payment' as type, sub_account_id, currency_id,
-                bill_no, adjust_amount
-                FROM receive_voucher 
+                                bill_no, adjust_amount, against_pdc_id as pdc_id,
+                (SELECT cheque_no FROM post_dated_cheques WHERE post_dated_cheques.id = receive_voucher.against_pdc_id) as against_cheque_no
+                FROM receive_voucher
                 WHERE tenant_id = ? AND customer_id = ?{$company_filter}
                 AND id NOT IN (
                     SELECT reference_id FROM post_dated_cheques 
@@ -740,9 +746,22 @@ $prev_payments_sub = $stmt->fetch()['total'];
         $stmt->execute($params);
         $payments = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
+        // Pending PDC ids for this customer (only needed when toggle is ON)
+        $pending_pdc_ids = [];
+        if ($pending_pdc_affects_ledger) {
+            $s = $pdo->prepare("SELECT id FROM post_dated_cheques WHERE tenant_id = ? AND customer_id = ? AND transaction_type = 'Received' AND status = 'Pending'");
+            $s->execute([$tenant_id, $customer_id]);
+            $pending_pdc_ids = array_map('intval', $s->fetchAll(PDO::FETCH_COLUMN));
+        }
+
         // Split adjust_amount into its own "Adjustment" credit line, tagged with the bill_no
         $adjustment_rows = [];
         foreach ($payments as &$p) {
+            // RV against a Pending PDC: show in brackets, don't subtract (PDC already counts in full)
+            if ($pending_pdc_ids && !empty($p['pdc_id']) && in_array((int)$p['pdc_id'], $pending_pdc_ids, true)) {
+                $p['covered_amount'] = floatval($p['credit']);
+                $p['credit'] = 0;
+            }
             if (!empty($p['adjust_amount']) && floatval($p['adjust_amount']) > 0) {
                 $adjustment_rows[] = [
                     'date' => $p['date'],
@@ -755,7 +774,7 @@ $prev_payments_sub = $stmt->fetch()['total'];
                     'currency_id' => $p['currency_id']
                 ];
             }
-            unset($p['bill_no'], $p['adjust_amount']);
+            unset($p['bill_no'], $p['adjust_amount'], $p['pdc_id']);
         }
         unset($p);
         $payments = array_merge($payments, $adjustment_rows);
@@ -798,6 +817,7 @@ $prev_payments_sub = $stmt->fetch()['total'];
         $returns = $stmt->fetchAll(PDO::FETCH_ASSOC);
         
         // Get PDCs with currency from receive_voucher
+        // received_date = date the cheque was received; against_rvs = all RVs received against this cheque
         $sql = "SELECT pdc.cheque_date as date,
                 CONCAT('PDC ', pdc.cheque_no, ' (', pdc.status, ')') as description,
                 pdc.cheque_no as reference,
@@ -806,6 +826,8 @@ $prev_payments_sub = $stmt->fetch()['total'];
                 pdc.amount as pdc_amount,
                 pdc.status as pdc_status,
                 rv.currency_id,
+                rv.voucher_date as received_date,
+                                (SELECT GROUP_CONCAT(arv.voucher_number ORDER BY arv.voucher_date, arv.id SEPARATOR ', ') FROM receive_voucher arv WHERE arv.tenant_id = pdc.tenant_id AND arv.against_pdc_id = pdc.id) as against_rvs,
                 'pdc' as type
                 FROM post_dated_cheques pdc
                 LEFT JOIN receive_voucher rv ON pdc.reference_id = rv.id AND pdc.reference_table = 'receive_voucher'
@@ -1066,11 +1088,14 @@ $prev_payments_sub = $stmt->fetch()['total'];
                     if (isset($transaction['pdc_amount'])) {
                         $transaction['pdc_amount'] = $converter->convert($transaction['pdc_amount'], $transaction['currency_id'], $target_currency_id);
                     }
+                    if (isset($transaction['covered_amount'])) {
+                        $transaction['covered_amount'] = $converter->convert($transaction['covered_amount'], $transaction['currency_id'], $target_currency_id);
+                    }
                 }
-                
+
                 $running_balance += $transaction['debit'] - $transaction['credit'];
                 $transaction['running_balance'] = $running_balance;
-                
+
                 if (isset($transaction['pdc_status']) && $transaction['pdc_status'] !== 'Approved' && !$pending_pdc_affects_ledger) {
                     $transaction['pdc_display'] = $transaction['pdc_amount'];
                 }
@@ -1172,8 +1197,11 @@ $prev_payments_sub = $stmt->fetch()['total'];
                         if (isset($transaction['pdc_amount'])) {
                             $transaction['pdc_amount'] = $converter->convert($transaction['pdc_amount'], $transaction['currency_id'], $target_currency_id);
                         }
+                        if (isset($transaction['covered_amount'])) {
+                            $transaction['covered_amount'] = $converter->convert($transaction['covered_amount'], $transaction['currency_id'], $target_currency_id);
+                        }
                     }
-                    
+
                     $running_balance += $transaction['debit'] - $transaction['credit'];
                     $transaction['running_balance'] = $running_balance;
                     
