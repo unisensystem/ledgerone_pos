@@ -406,6 +406,12 @@ class _CustomerLedgerScreenState extends State<CustomerLedgerScreen> {
     final debit = _num(t['debit']);
     final credit = _num(t['credit']);
     final running = _num(t['running_balance']);
+    final coveredAmount = _num(t['covered_amount']);
+    final pdcDisplay = _num(t['pdc_display']);
+    final receivedDate = type == 'pdc' ? t['received_date']?.toString() : null;
+    final againstRvs = type == 'pdc' ? t['against_rvs']?.toString() : null;
+    final againstChequeNo =
+        type == 'payment' ? t['against_cheque_no']?.toString() : null;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
@@ -428,10 +434,34 @@ class _CustomerLedgerScreenState extends State<CustomerLedgerScreen> {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  '${t['date'] ?? ''}'
+                  '${receivedDate != null && receivedDate.isNotEmpty ? 'Received ${t['date']}, cheque dated $receivedDate' : t['date'] ?? ''}'
                   '${t['reference'] != null ? ' · ${t['reference']}' : ''}',
                   style: const TextStyle(fontSize: 11.5, color: _subtext),
                 ),
+                if (againstRvs != null && againstRvs.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 2),
+                    child: Text(
+                      'Against $againstRvs',
+                      style: const TextStyle(fontSize: 11, color: _subtext, fontStyle: FontStyle.italic),
+                    ),
+                  ),
+                if (againstChequeNo != null && againstChequeNo.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 2),
+                    child: Text(
+                      'Against Cheque $againstChequeNo',
+                      style: const TextStyle(fontSize: 11, color: _subtext, fontStyle: FontStyle.italic),
+                    ),
+                  ),
+                if (coveredAmount > 0)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 2),
+                    child: Text(
+                      'Covered by PDC',
+                      style: const TextStyle(fontSize: 11, color: _subtext, fontStyle: FontStyle.italic),
+                    ),
+                  ),
               ],
             ),
           ),
@@ -448,6 +478,11 @@ class _CustomerLedgerScreenState extends State<CustomerLedgerScreen> {
                 Text(
                   'Cr ${credit.toStringAsFixed(2)}',
                   style: const TextStyle(color: _error, fontWeight: FontWeight.w600, fontSize: 13),
+                ),
+              if (debit == 0 && credit == 0 && (pdcDisplay > 0 || coveredAmount > 0))
+                Text(
+                  '(${(pdcDisplay > 0 ? pdcDisplay : coveredAmount).toStringAsFixed(2)})',
+                  style: const TextStyle(color: _subtext, fontWeight: FontWeight.w600, fontSize: 13),
                 ),
               const SizedBox(height: 2),
               Text(
