@@ -232,6 +232,7 @@ $all_symbols = $stmt2->fetchAll();
                     <thead>
                         <tr>
                             <th>Transaction Date</th>
+                            <th>Received Date</th>
                             <th>Description</th>
                             <th>Reference</th>
                             <th>Debit (Dr)</th>
@@ -290,6 +291,6 @@ $all_symbols = $stmt2->fetchAll();
     </script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<script src="../../../assets/js/financial_reports/customer_ledger/customer-ledger.js"></script>
+<script src="../../../assets/js/financial_reports/customer_ledger/customer-ledger.js?v=<?php echo filemtime(__DIR__ . '/../../../assets/js/financial_reports/customer_ledger/customer-ledger.js'); ?>"></script>
 </body>
 </html>
