@@ -4,6 +4,7 @@ import 'package:uuid/uuid.dart';
 
 import '../../core/outbox_service.dart';
 import '../../core/reference_cache.dart';
+import '../../core/searchable_field.dart';
 import '../../core/sync_service.dart';
 import 'add_customer_screen.dart';
 import 'sale_order_api.dart';
@@ -101,95 +102,6 @@ class _OrderLine {
     tradeOfferAmount: tradeOfferAmount,
     gstPercent: gstPercent,
     focQuantity: focQuantity,
-  );
-}
-
-/// A searchable, typeahead picker — matches the web app's searchable
-/// Customer/Branch dropdowns (plain <select> fields stay plain dropdowns,
-/// matching web). Built on Flutter's own Autocomplete widget rather than a
-/// DropdownButtonFormField, which ALSO fixes a real bug the plain dropdowns
-/// had: DropdownButtonFormField only shows a value as "selected" when it is
-/// `==`-identical to one of the objects in its `items` list. Since our
-/// Customer/Product options are freshly-built Map objects on every rebuild,
-/// a picked value could never match by reference/equality again, so the
-/// field silently reverted to showing nothing picked even though a real
-/// selection was stored. Autocomplete manages its own display text
-/// directly from the selected option, so this class of bug can't recur.
-Widget _searchableField<T extends Object>({
-  Key? key,
-  required String label,
-  required List<T> options,
-  required String Function(T) displayStringForOption,
-  required bool Function(T option, String query) matches,
-  required ValueChanged<T> onSelected,
-  String? initialText,
-}) {
-  return Autocomplete<T>(
-    key: key,
-    displayStringForOption: displayStringForOption,
-    initialValue: initialText != null
-        ? TextEditingValue(text: initialText)
-        : null,
-    optionsBuilder: (textEditingValue) {
-      final query = textEditingValue.text.toLowerCase();
-      if (query.isEmpty) return options;
-      return options.where((o) => matches(o, query));
-    },
-    onSelected: onSelected,
-    fieldViewBuilder: (context, controller, focusNode, onFieldSubmitted) {
-      return TextField(
-        controller: controller,
-        focusNode: focusNode,
-        decoration: InputDecoration(
-          labelText: label,
-          border: const OutlineInputBorder(),
-          filled: true,
-          fillColor: Colors.white,
-          suffixIcon: const Icon(Icons.search, size: 20),
-        ),
-      );
-    },
-    optionsViewBuilder: (context, onSelectedCb, optionsList) {
-      final list = optionsList.toList();
-      return Align(
-        alignment: Alignment.topLeft,
-        child: Material(
-          elevation: 4,
-          borderRadius: BorderRadius.circular(8),
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(
-              maxHeight: 280,
-              minWidth: 280,
-              maxWidth: 560,
-            ),
-            child: list.isEmpty
-                ? const Padding(
-                    padding: EdgeInsets.all(16),
-                    child: Text(
-                      'No matches',
-                      style: TextStyle(color: Color(0xFF6B7280)),
-                    ),
-                  )
-                : ListView.builder(
-                    padding: EdgeInsets.zero,
-                    shrinkWrap: true,
-                    itemCount: list.length,
-                    itemBuilder: (context, index) {
-                      final option = list[index];
-                      return ListTile(
-                        dense: true,
-                        title: Text(
-                          displayStringForOption(option),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        onTap: () => onSelectedCb(option),
-                      );
-                    },
-                  ),
-          ),
-        ),
-      );
-    },
   );
 }
 
@@ -512,7 +424,7 @@ class _SaleOrderScreenState extends State<SaleOrderScreen> {
       _selectedCustomer = newCustomer;
       // Forces the Customer Autocomplete field to rebuild with the new
       // initialText — it only reads initialValue once per widget instance
-      // (see _searchableField's key usage elsewhere in this screen).
+      // (see searchableField's key usage elsewhere in this screen).
       _formResetCounter++;
     });
   }
@@ -899,7 +811,7 @@ class _SaleOrderScreenState extends State<SaleOrderScreen> {
                   const SizedBox(height: 12),
                 ],
                 if (_fieldSettings.showBranchField) ...[
-                  _searchableField<Map<String, dynamic>>(
+                  searchableField<Map<String, dynamic>>(
                     label: 'Branch (type to search)',
                     options: _branches.cast<Map<String, dynamic>>(),
                     displayStringForOption: (b) => b['branch_name'].toString(),
@@ -921,7 +833,7 @@ class _SaleOrderScreenState extends State<SaleOrderScreen> {
                   ),
                   const SizedBox(height: 12),
                 ],
-                _searchableField<Map<String, dynamic>>(
+                searchableField<Map<String, dynamic>>(
                   key: ValueKey('customer-field-$_formResetCounter'),
                   label: 'Customer (type to search)',
                   options: _customers.cast<Map<String, dynamic>>(),
@@ -1610,7 +1522,7 @@ class _AddLineDialogState extends State<_AddLineDialog> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            _searchableField<Map<String, dynamic>>(
+            searchableField<Map<String, dynamic>>(
               label: 'Product (type to search)',
               options: widget.products.cast<Map<String, dynamic>>(),
               displayStringForOption: (p) => p['name'].toString(),

@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/outbox_service.dart';
 import '../../core/sync_service.dart';
 import '../auth/auth_provider.dart';
+import '../customer_ledger/customer_ledger_screen.dart';
 import '../receive_voucher/receive_voucher_list_screen.dart';
 import '../sale_order/add_customer_screen.dart';
 import '../sale_order/sale_order_list_screen.dart';
@@ -111,6 +112,8 @@ class HomeScreen extends ConsumerWidget {
                   ),
                   SizedBox(height: 12),
                   _AddCustomerActionCard(),
+                  SizedBox(height: 12),
+                  _CustomerLedgerActionCard(),
                   SizedBox(height: 28),
                 ],
               ),
@@ -491,6 +494,25 @@ class _AddCustomerActionCard extends StatelessWidget {
       subtitle: 'Register a new customer',
       onTap: () => Navigator.of(context).push(
         MaterialPageRoute(builder: (_) => const AddCustomerScreen()),
+      ),
+    );
+  }
+}
+
+/// Standalone "Customer Ledger" entry — read-only report, no outbox badge.
+class _CustomerLedgerActionCard extends StatelessWidget {
+  const _CustomerLedgerActionCard();
+
+  @override
+  Widget build(BuildContext context) {
+    return _ActionCard(
+      icon: Icons.receipt_long_rounded,
+      accent: const Color(0xFF0E7490),
+      accentBg: const Color(0xFFE0F5F9),
+      title: 'Customer Ledger',
+      subtitle: 'Check a customer\'s balance & history',
+      onTap: () => Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => const CustomerLedgerScreen()),
       ),
     );
   }
