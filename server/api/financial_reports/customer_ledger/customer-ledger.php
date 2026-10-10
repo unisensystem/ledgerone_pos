@@ -1,24 +1,30 @@
 <?php
-session_start();
 require_once '../../../../includes/connection.php';
+require_once '../../../../includes/mobile_auth.php';
 require_once 'currency-converter.php';
 
 header('Content-Type: application/json');
+header('Access-Control-Allow-Origin: *');
+header('Access-Control-Allow-Methods: GET, OPTIONS');
+header('Access-Control-Allow-Headers: Content-Type, Authorization');
 
+if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+    exit(0);
+}
 if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
     http_response_code(405);
     echo json_encode(['success' => false, 'message' => 'Method not allowed']);
     exit;
 }
 
-$user_id = $_SESSION['user_id'] ?? null;
-$tenant_id = $_SESSION['tenant_id'] ?? null;
-
-if (!$user_id || !$tenant_id) {
+$auth = resolveMobileAuth($pdo);
+if (!$auth) {
     http_response_code(401);
     echo json_encode(['success' => false, 'message' => 'Unauthorized']);
     exit;
 }
+$user_id = $auth['user_id'];
+$tenant_id = $auth['tenant_id'];
 
 try {
     $customer_id = $_GET['customer_id'] ?? null;
@@ -717,7 +723,7 @@ $prev_payments_sub = $stmt->fetch()['total'];
         $sql = "SELECT voucher_date as date, CONCAT('Receipt - ', voucher_number) as description,
                 voucher_number as reference, 0 as debit, amount as credit, 'payment' as type, sub_account_id, currency_id,
                                 bill_no, adjust_amount, against_pdc_id as pdc_id,
-                (SELECT cheque_no FROM post_dated_cheques WHERE post_dated_cheques.id = receive_voucher.against_pdc_id) as against_cheque_no
+                (SELECT cheque_no FROM post_dated_cheques WHERE post_dated_cheques.id = receive_voucher.against_pdc_id AND post_dated_cheques.tenant_id = receive_voucher.tenant_id) as against_cheque_no
                 FROM receive_voucher 
                 WHERE tenant_id = ? AND customer_id = ?{$company_filter}
                 AND id NOT IN (
