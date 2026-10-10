@@ -723,7 +723,7 @@ $prev_payments_sub = $stmt->fetch()['total'];
         $sql = "SELECT voucher_date as date, CONCAT('Receipt - ', voucher_number) as description,
                 voucher_number as reference, 0 as debit, amount as credit, 'payment' as type, sub_account_id, currency_id,
                                 bill_no, adjust_amount, against_pdc_id as pdc_id,
-                (SELECT cheque_no FROM post_dated_cheques WHERE post_dated_cheques.id = receive_voucher.against_pdc_id) as against_cheque_no
+                (SELECT cheque_no FROM post_dated_cheques WHERE post_dated_cheques.id = receive_voucher.against_pdc_id AND post_dated_cheques.tenant_id = receive_voucher.tenant_id) as against_cheque_no
                 FROM receive_voucher
                 WHERE tenant_id = ? AND customer_id = ?{$company_filter}
                 AND id NOT IN (
