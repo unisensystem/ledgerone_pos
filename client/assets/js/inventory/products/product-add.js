@@ -11,6 +11,10 @@ window.addEventListener('load', function () {
     document.getElementById('selectAllFields').addEventListener('change', function() {
         document.querySelectorAll('.field-toggle').forEach(cb => cb.checked = this.checked);
     });
+    // Keep "Select All" in sync when individual toggles change
+    document.querySelectorAll('.field-toggle').forEach(cb => {
+        cb.addEventListener('change', syncSelectAllCheckbox);
+    });
     
     const urlParams = new URLSearchParams(window.location.search);
     const productId = urlParams.get('id');
@@ -88,17 +92,15 @@ window.addEventListener('load', function () {
     // Initialize parent product dropdown
     initParentProductDropdown();
     
-        // Load companies
+    // Load companies
     loadCompanies();
 
     // Load item companies
     loadItemCompanies();
     // Load tax regimes
     loadTaxRegimes();
-    
 
-
-        // Item Company modal functionality
+    // Item Company modal functionality
     document.getElementById('addItemCompany').addEventListener('click', function () {
         document.getElementById('itemCompanyModalTitle').textContent = 'Add New Item Company';
         document.getElementById('saveItemCompany').textContent = 'Save Item Company';
@@ -508,13 +510,9 @@ window.addEventListener('load', function () {
 });
 
 function loadFieldPreferences() {
-    // BUG FIX: [data-field] also matches the Customize Fields modal's own
-    // .field-toggle checkboxes (they carry data-field="X" too, for reading
-    // their own dataset.field when saving). Without :not(.field-toggle),
-    // unchecking a field and saving applied display:none to BOTH the actual
-    // form field AND that field's own toggle checkbox in the modal — so the
-    // checkbox itself vanished and could never be clicked again to turn the
-    // field back on.
+    // [data-field] also matches the Customize Fields modal's own .field-toggle
+    // checkboxes, so they're excluded — otherwise a hidden field would also hide
+    // its own toggle and it could never be turned back on.
     const prefs = JSON.parse(localStorage.getItem('fieldPreferences') || '{}');
     document.querySelectorAll('[data-field]:not(.field-toggle)').forEach(el => {
         const field = el.dataset.field;
@@ -522,11 +520,18 @@ function loadFieldPreferences() {
     });
 }
 
+function syncSelectAllCheckbox() {
+    const all = document.getElementById('selectAllFields');
+    if (!all) return;
+    all.checked = Array.from(document.querySelectorAll('.field-toggle')).every(cb => cb.checked);
+}
+
 function openCustomizeModal() {
     const prefs = JSON.parse(localStorage.getItem('fieldPreferences') || '{}');
     document.querySelectorAll('.field-toggle').forEach(cb => {
         cb.checked = prefs[cb.dataset.field] !== false;
     });
+    syncSelectAllCheckbox();
     document.getElementById('customizeFieldsModal').style.display = 'flex';
 }
 
@@ -620,7 +625,6 @@ function handleProductTypeChange() {
     // Elements to show/hide based on product type
     const elementsToToggle = [
         'defaultUnitGroup',
-
         'qrCodeGroup',
         'barcodeGroup',
         'purchasePriceGroup',
@@ -937,11 +941,11 @@ function addStockEntry() {
     const groupId = document.getElementById('uomGroup').value;
     
     const batchFields = `
-        <div class="form-group">
+        <div class="form-group" data-field="batchNo">
             <label>Batch No</label>
             <input type="text" name="batchNo[]" placeholder="e.g., B-2026-001">
         </div>
-        <div class="form-group">
+        <div class="form-group" data-field="batchExpiry">
             <label>Batch Expiry Date</label>
             <input type="date" name="batchExpiryDate[]">
         </div>
@@ -1008,6 +1012,7 @@ function addStockEntry() {
     
     stockEntries.appendChild(newEntry);
     initBranchDropdown(newEntry.querySelector('.custom-dropdown'));
+    loadFieldPreferences(); // apply saved Customize Fields preferences to this new row
     calculateTotalStock();
 
     // Keep this new entry's "Opening Price" label consistent with the
@@ -1117,9 +1122,8 @@ function rebuildStockEntries() {
             branchId: branchHidden ? branchHidden.value : '',
             price: priceInput ? priceInput.value : ''
         };
-        // paste yahan ↓
-data.batchNo = entry.querySelector('input[name="batchNo[]"]') ? entry.querySelector('input[name="batchNo[]"]').value : '';
-data.batchExpiryDate = entry.querySelector('input[name="batchExpiryDate[]"]') ? entry.querySelector('input[name="batchExpiryDate[]"]').value : '';
+        data.batchNo = entry.querySelector('input[name="batchNo[]"]') ? entry.querySelector('input[name="batchNo[]"]').value : '';
+        data.batchExpiryDate = entry.querySelector('input[name="batchExpiryDate[]"]') ? entry.querySelector('input[name="batchExpiryDate[]"]').value : '';
         
         // Save qty data based on current mode
         const uomType = document.querySelector('input[name="uomType"]:checked').value;
@@ -1159,10 +1163,10 @@ data.batchExpiryDate = entry.querySelector('input[name="batchExpiryDate[]"]') ? 
             const priceInput = entry.querySelector('input[name="openingPrice[]"]');
             if (priceInput) priceInput.value = data.price;
 
-const batchNoInput = entry.querySelector('input[name="batchNo[]"]');
-if (batchNoInput) batchNoInput.value = data.batchNo || '';
-const batchExpiryInput = entry.querySelector('input[name="batchExpiryDate[]"]');
-if (batchExpiryInput) batchExpiryInput.value = data.batchExpiryDate || '';
+            const batchNoInput = entry.querySelector('input[name="batchNo[]"]');
+            if (batchNoInput) batchNoInput.value = data.batchNo || '';
+            const batchExpiryInput = entry.querySelector('input[name="batchExpiryDate[]"]');
+            if (batchExpiryInput) batchExpiryInput.value = data.batchExpiryDate || '';
             
             // Restore qty data (won't work across mode changes, but preserves within same mode)
             const uomType = document.querySelector('input[name="uomType"]:checked').value;
@@ -1475,6 +1479,7 @@ function deleteCategory(categoryId) {
         alert('An error occurred while deleting the category');
     });
 }
+
 function editItemCompany(itemCompanyId, itemCompanyName) {
     showConfirmModal(
         'Item Company Action',
@@ -2262,7 +2267,7 @@ function loadProductForEdit(productId) {
             
             // Set dropdown values after they are loaded
             setTimeout(() => {
-                                if (product.company_id) {
+                if (product.company_id) {
                     safeSetValue('company', product.company_id);
                 }
                 if (product.item_company_id) {
@@ -2333,11 +2338,11 @@ function loadProductForEdit(productId) {
                     if (searchInput) searchInput.value = product.regime_name;
                     if (hiddenInput) hiddenInput.value = product.tax_regime_id;
                 }
-                    // Wait for the UOM Group's per-unit Opening Qty columns (Carton,
-                    // Dozen, etc.) to actually exist in the DOM before trying to
-                    // populate them — handleUomGroupChange() above builds them
-                    // asynchronously and isn't guaranteed to have finished yet.
-                    uomReadyPromise.then(() => loadStockOpeningData(productId));
+                // Wait for the UOM Group's per-unit Opening Qty columns (Carton,
+                // Dozen, etc.) to actually exist in the DOM before trying to
+                // populate them — handleUomGroupChange() above builds them
+                // asynchronously and isn't guaranteed to have finished yet.
+                uomReadyPromise.then(() => loadStockOpeningData(productId));
 
             }, 1000);
             
@@ -2378,8 +2383,6 @@ function loadProductForEdit(productId) {
                     generateBarcode(product.barcode);
                 }
             }
-            
-            
             
             // Load existing schemes
             loadExistingSchemesForEdit(productId);
@@ -2433,128 +2436,127 @@ function loadStockOpeningData(productId) {
                     // only ever render the first one and silently hide the rest, so key
                     // each one uniquely instead.
                     const entriesByBranch = {};
-                stockEntries.forEach(entry => {
-                    const groupKey = uomType === 'group' ? entry.branch_id : `${entry.branch_id}_${entry.id}`;
-                    if (!entriesByBranch[groupKey]) {
-                        entriesByBranch[groupKey] = [];
-                    }
-                    entriesByBranch[groupKey].push(entry);
-                });
-                
-                // Clear existing stock entry rows (except first empty template)
-                const stockEntriesContainer = document.getElementById('stockEntries');
-                while (stockEntriesContainer.children.length > 1) {
-                    stockEntriesContainer.removeChild(stockEntriesContainer.lastChild);
-                }
-                
-                // Populate first row with first entry data
-                if (stockEntries.length > 0) {
-                    const firstBranchId = Object.keys(entriesByBranch)[0];
-                    const branchEntries = entriesByBranch[firstBranchId];
-                    const firstEntry = branchEntries[0];
+                    stockEntries.forEach(entry => {
+                        const groupKey = uomType === 'group' ? entry.branch_id : `${entry.branch_id}_${entry.id}`;
+                        if (!entriesByBranch[groupKey]) {
+                            entriesByBranch[groupKey] = [];
+                        }
+                        entriesByBranch[groupKey].push(entry);
+                    });
                     
-                    const firstRow = stockEntriesContainer.querySelector('.stock-entry');
-                    
-                    // Set branch
-                    const branchHidden = firstRow.querySelector('input[type="hidden"][name="branch[]"]');
-                    const branchSearch = firstRow.querySelector('.branch-search');
-                    if (branchHidden && branchSearch && firstEntry.branch_display) {
-                        branchHidden.value = firstEntry.branch_id;
-                        branchSearch.value = firstEntry.branch_display;
+                    // Clear existing stock entry rows (except first empty template)
+                    const stockEntriesContainer = document.getElementById('stockEntries');
+                    while (stockEntriesContainer.children.length > 1) {
+                        stockEntriesContainer.removeChild(stockEntriesContainer.lastChild);
                     }
                     
-                    // Set price (same for all units in this branch) — prefer the exact
-                    // raw value the user originally typed (e.g. Carton price 2000) over
-                    // the stored per-Piece rate, so it doesn't get divided again on save.
-                    const priceInput = firstRow.querySelector('input[name="openingPrice[]"]');
-                    if (priceInput && (firstEntry.opening_price_entry_value || firstEntry.opening_price)) {
-                        priceInput.value = firstEntry.opening_price_entry_value || firstEntry.opening_price;
-                    }
-                    // paste yahan ↓
-const batchNoInput = firstRow.querySelector('input[name="batchNo[]"]');
-if (batchNoInput && firstEntry.batch_no) {
-    batchNoInput.value = firstEntry.batch_no;
-}
-const batchExpiryInput = firstRow.querySelector('input[name="batchExpiryDate[]"]');
-if (batchExpiryInput && firstEntry.expiry_date && firstEntry.expiry_date !== '0000-00-00') {
-    batchExpiryInput.value = firstEntry.expiry_date;
-}
-                    
-                    if (uomType === 'group') {
-                        // For UOM groups, populate individual unit quantities
-                        branchEntries.forEach(entry => {
-                            const unitInput = firstRow.querySelector(`input[name="openingQty[${entry.unit_id}][]"]`);
-                            if (unitInput && entry.unit_id) {
-                                unitInput.value = entry.opening_qty;
+                    // Populate first row with first entry data
+                    if (stockEntries.length > 0) {
+                        const firstBranchId = Object.keys(entriesByBranch)[0];
+                        const branchEntries = entriesByBranch[firstBranchId];
+                        const firstEntry = branchEntries[0];
+                        
+                        const firstRow = stockEntriesContainer.querySelector('.stock-entry');
+                        
+                        // Set branch
+                        const branchHidden = firstRow.querySelector('input[type="hidden"][name="branch[]"]');
+                        const branchSearch = firstRow.querySelector('.branch-search');
+                        if (branchHidden && branchSearch && firstEntry.branch_display) {
+                            branchHidden.value = firstEntry.branch_id;
+                            branchSearch.value = firstEntry.branch_display;
+                        }
+                        
+                        // Set price (same for all units in this branch) — prefer the exact
+                        // raw value the user originally typed (e.g. Carton price 2000) over
+                        // the stored per-Piece rate, so it doesn't get divided again on save.
+                        const priceInput = firstRow.querySelector('input[name="openingPrice[]"]');
+                        if (priceInput && (firstEntry.opening_price_entry_value || firstEntry.opening_price)) {
+                            priceInput.value = firstEntry.opening_price_entry_value || firstEntry.opening_price;
+                        }
+                        const batchNoInput = firstRow.querySelector('input[name="batchNo[]"]');
+                        if (batchNoInput && firstEntry.batch_no) {
+                            batchNoInput.value = firstEntry.batch_no;
+                        }
+                        const batchExpiryInput = firstRow.querySelector('input[name="batchExpiryDate[]"]');
+                        if (batchExpiryInput && firstEntry.expiry_date && firstEntry.expiry_date !== '0000-00-00') {
+                            batchExpiryInput.value = firstEntry.expiry_date;
+                        }
+                        
+                        if (uomType === 'group') {
+                            // For UOM groups, populate individual unit quantities
+                            branchEntries.forEach(entry => {
+                                const unitInput = firstRow.querySelector(`input[name="openingQty[${entry.unit_id}][]"]`);
+                                if (unitInput && entry.unit_id) {
+                                    unitInput.value = entry.opening_qty;
+                                }
+                            });
+                        } else {
+                            // For single unit mode
+                            const qtyInput = firstRow.querySelector('input[name="openingQty[]"]');
+                            if (qtyInput && firstEntry.opening_qty) {
+                                qtyInput.value = firstEntry.opening_qty;
                             }
-                        });
-                    } else {
-                        // For single unit mode
-                        const qtyInput = firstRow.querySelector('input[name="openingQty[]"]');
-                        if (qtyInput && firstEntry.opening_qty) {
-                            qtyInput.value = firstEntry.opening_qty;
                         }
                     }
-                }
-                
-                // Add additional rows for other branches
-                let branchIndex = 0;
-                for (const branchId of Object.keys(entriesByBranch)) {
-                    if (branchIndex === 0) {
+                    
+                    // Add additional rows for other branches
+                    let branchIndex = 0;
+                    for (const branchId of Object.keys(entriesByBranch)) {
+                        if (branchIndex === 0) {
+                            branchIndex++;
+                            continue; // Skip first, already populated
+                        }
+                        
+                        const branchEntries = entriesByBranch[branchId];
+                        addStockEntry();
+                        
+                        const newRow = stockEntriesContainer.lastElementChild;
+                        
+                        // Set branch
+                        const branchHidden = newRow.querySelector('input[type="hidden"][name="branch[]"]');
+                        const branchSearch = newRow.querySelector('.branch-search');
+                        if (branchHidden && branchSearch && branchEntries[0].branch_display) {
+                            branchHidden.value = branchEntries[0].branch_id;
+                            branchSearch.value = branchEntries[0].branch_display;
+                        }
+                        
+                        // Set price — prefer the exact raw entered value (see comment above).
+                        const priceInput = newRow.querySelector('input[name="openingPrice[]"]');
+                        if (priceInput && (branchEntries[0].opening_price_entry_value || branchEntries[0].opening_price)) {
+                            priceInput.value = branchEntries[0].opening_price_entry_value || branchEntries[0].opening_price;
+                        }
+                        const batchNoInput = newRow.querySelector('input[name="batchNo[]"]');
+                        if (batchNoInput && branchEntries[0].batch_no) {
+                            batchNoInput.value = branchEntries[0].batch_no;
+                        }
+                        const batchExpiryInput = newRow.querySelector('input[name="batchExpiryDate[]"]');
+                        if (batchExpiryInput && branchEntries[0].expiry_date && branchEntries[0].expiry_date !== '0000-00-00') {
+                            batchExpiryInput.value = branchEntries[0].expiry_date;
+                        }
+                        
+                        if (uomType === 'group') {
+                            // For UOM groups, populate individual unit quantities
+                            branchEntries.forEach(entry => {
+                                const unitInput = newRow.querySelector(`input[name="openingQty[${entry.unit_id}][]"]`);
+                                if (unitInput && entry.unit_id) {
+                                    unitInput.value = entry.opening_qty;
+                                }
+                            });
+                        } else {
+                            // For single unit mode
+                            const qtyInput = newRow.querySelector('input[name="openingQty[]"]');
+                            if (qtyInput && branchEntries[0].opening_qty) {
+                                qtyInput.value = branchEntries[0].opening_qty;
+                            }
+                        }
+                        
                         branchIndex++;
-                        continue; // Skip first, already populated
                     }
                     
-                    const branchEntries = entriesByBranch[branchId];
-                    addStockEntry();
-                    
-                    const newRow = stockEntriesContainer.lastElementChild;
-                    
-                    // Set branch
-                    const branchHidden = newRow.querySelector('input[type="hidden"][name="branch[]"]');
-                    const branchSearch = newRow.querySelector('.branch-search');
-                    if (branchHidden && branchSearch && branchEntries[0].branch_display) {
-                        branchHidden.value = branchEntries[0].branch_id;
-                        branchSearch.value = branchEntries[0].branch_display;
-                    }
-                    
-                    // Set price — prefer the exact raw entered value (see comment above).
-                    const priceInput = newRow.querySelector('input[name="openingPrice[]"]');
-                    if (priceInput && (branchEntries[0].opening_price_entry_value || branchEntries[0].opening_price)) {
-                        priceInput.value = branchEntries[0].opening_price_entry_value || branchEntries[0].opening_price;
-                    }
-                    const batchNoInput = newRow.querySelector('input[name="batchNo[]"]');
-if (batchNoInput && branchEntries[0].batch_no) {
-    batchNoInput.value = branchEntries[0].batch_no;
-}
-const batchExpiryInput = newRow.querySelector('input[name="batchExpiryDate[]"]');
-if (batchExpiryInput && branchEntries[0].expiry_date && branchEntries[0].expiry_date !== '0000-00-00') {
-    batchExpiryInput.value = branchEntries[0].expiry_date;
-}
-                    
-                    if (uomType === 'group') {
-                        // For UOM groups, populate individual unit quantities
-                        branchEntries.forEach(entry => {
-                            const unitInput = newRow.querySelector(`input[name="openingQty[${entry.unit_id}][]"]`);
-                            if (unitInput && entry.unit_id) {
-                                unitInput.value = entry.opening_qty;
-                            }
-                        });
-                    } else {
-                        // For single unit mode
-                        const qtyInput = newRow.querySelector('input[name="openingQty[]"]');
-                        if (qtyInput && branchEntries[0].opening_qty) {
-                            qtyInput.value = branchEntries[0].opening_qty;
-                        }
-                    }
-                    
-                    branchIndex++;
+                    calculateTotalStock();
+                } else {
+                    console.log('No stock entries found');
                 }
-                
-                calculateTotalStock();
-            } else {
-                console.log('No stock entries found');
-            }
             })
             .catch(error => console.error('Error loading stock opening data:', error));
         })
@@ -2729,7 +2731,6 @@ function handleUnitSubmit(e) {
         alert('An error occurred while saving the unit');
     });
 }
-
 
 function handleUomGroupChange() {
     const groupSelect = document.getElementById('uomGroup');
@@ -2939,7 +2940,6 @@ function loadGroupConversionFactorsForEdit(productId) {
     })
     .catch(error => console.error('Error loading conversion factors:', error));
 }
-
 
 // Scheme Modal Handlers
 document.addEventListener('DOMContentLoaded', function() {

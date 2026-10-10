@@ -1,4 +1,5 @@
 <?php
+// NOTE: Is file ko apni product list page ("product-list.php", client wali) ke naam se save karna hai
 require_once '../../../../includes/dashboard.php';
 // Start session if not already started
 if (session_status() == PHP_SESSION_NONE) {
@@ -133,8 +134,10 @@ $initialSearch = $_GET['search'] ?? '';
             <!-- Filters Section -->
             <div class="filters-section">
                 <div class="filter-group">
-                    <label for="search">Search</label>
-                    <input type="text" id="search" placeholder="Product name or code..." value="<?= htmlspecialchars($initialSearch) ?>">
+                    <label for="search">Search / Scan Barcode</label>
+                    <input type="text" id="search" autocomplete="off" autofocus
+                        placeholder="Product name, code or scan barcode..."
+                        value="<?= htmlspecialchars($initialSearch) ?>">
                 </div>
                 <div class="filter-group">
                     <label>Price Type</label>
@@ -229,7 +232,7 @@ $initialSearch = $_GET['search'] ?? '';
 
             <!-- Empty State (hidden by default) -->
             <div id="emptyState" class="empty-state" style="display: none;">
-                <div class="empty-state-icon">≡ƒôª</div>
+                <div class="empty-state-icon">📦</div>
                 <h3>No products found</h3>
                 <p>Try adjusting your search or filters, or add a new product.</p>
                 <button class="btn btn-primary" id="addFirstProduct" style="margin-top: 16px;">Add Your First Product</button>
@@ -280,7 +283,8 @@ $initialSearch = $_GET['search'] ?? '';
     <script src="https://cdn.jsdelivr.net/npm/qrious@4.0.2/dist/qrious.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jsbarcode/3.11.5/JsBarcode.all.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<script src="../../../assets/js/inventory/products/product-list.js?v=2"></script>
+    <!-- v=3: browser cache bypass taake naya JS load ho -->
+    <script src="../../../assets/js/inventory/products/product-list.js?v=3"></script>
     <?php if ($initialSearch): ?>
         <script>
             window.addEventListener('load', function() {

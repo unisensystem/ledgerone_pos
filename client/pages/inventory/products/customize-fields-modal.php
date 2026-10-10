@@ -1,3 +1,38 @@
+<?php
+// $enableCartonPriceEntry is set in product-add.php (this file is included there)
+$enableCartonPriceEntry = $enableCartonPriceEntry ?? false;
+
+$fields = [
+    'code'               => 'Code',
+    'company'            => 'Company',
+    'category'           => 'Category',
+    'subcategory'        => 'Sub-category',
+    'inventoryAccount'   => 'Inventory Account',
+    'vendor'             => 'Vendor',
+    'parentProduct'      => 'Parent Product',
+    'description'        => 'Description',
+    'itemCompany'        => 'Item Company',
+    'weight'             => 'Weight (per base unit)',
+    'qrCode'             => 'QR Code',
+    'barcode'            => 'Barcode',
+    'photo'              => 'Photo',
+    'status'             => 'Status',
+    'stockAffects'       => 'Stock Affects',
+    'invoiceAffects'     => 'Invoice Affects',
+    'purchasePrice'      => 'Purchase Price',
+    'wholesalePrice'     => 'Wholesale Price',
+    'defaultDiscount'    => 'Default Discount',
+    'taxation'           => 'Taxation Section',
+    'stock'              => 'Stock Section',
+    'minStock'           => 'Min Stock Level',
+    'maxStock'           => 'Max Stock Level',
+    'batchNo'            => 'Batch No',
+    'batchExpiry'        => 'Batch Expiry Date',
+    'additionalInfo'     => 'Additional Info Section',
+    'manufacturingDate'  => 'Manufacturing Date',
+    'expiryDate'         => 'Expiry Date',
+];
+?>
 <!-- Customize Fields Modal -->
 <div id="customizeFieldsModal" class="modal" style="display: none;">
     <div class="modal-content" style="max-width: 600px;">
@@ -20,94 +55,12 @@
                 </label>
             </div>
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                <?php foreach ($fields as $key => $label): ?>
                 <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
-                    <input type="checkbox" class="field-toggle" data-field="code" checked>
-                    Code
+                    <input type="checkbox" class="field-toggle" data-field="<?= htmlspecialchars($key) ?>" checked>
+                    <?= htmlspecialchars($label) ?>
                 </label>
-                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
-                    <input type="checkbox" class="field-toggle" data-field="category" checked>
-                    Category
-                </label>
-                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
-                    <input type="checkbox" class="field-toggle" data-field="subcategory" checked>
-                    Sub-category
-                </label>
-                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
-                    <input type="checkbox" class="field-toggle" data-field="inventoryAccount" checked>
-                    Inventory Account
-                </label>
-                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
-                    <input type="checkbox" class="field-toggle" data-field="vendor" checked>
-                    Vendor
-                </label>
-                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
-                    <input type="checkbox" class="field-toggle" data-field="parentProduct" checked>
-                    Parent Product
-                </label>
-                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
-                    <input type="checkbox" class="field-toggle" data-field="description" checked>
-                    Description
-                </label>
-                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
-                    <input type="checkbox" class="field-toggle" data-field="qrCode" checked>
-                    QR Code
-                </label>
-                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
-                    <input type="checkbox" class="field-toggle" data-field="barcode" checked>
-                    Barcode
-                </label>
-                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
-                    <input type="checkbox" class="field-toggle" data-field="photo" checked>
-                    Photo
-                </label>
-                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
-                    <input type="checkbox" class="field-toggle" data-field="status" checked>
-                    Status
-                </label>
-                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
-                    <input type="checkbox" class="field-toggle" data-field="stockAffects" checked>
-                    Stock Affects
-                </label>
-                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
-                    <input type="checkbox" class="field-toggle" data-field="invoiceAffects" checked>
-                    Invoice Affects
-                </label>
-                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
-                    <input type="checkbox" class="field-toggle" data-field="purchasePrice" checked>
-                    Purchase Price
-                </label>
-                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
-                    <input type="checkbox" class="field-toggle" data-field="wholesalePrice" checked>
-                    Wholesale Price
-                </label>
-                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
-                    <input type="checkbox" class="field-toggle" data-field="defaultDiscount" checked>
-                    Default Discount
-                </label>
-                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
-                    <input type="checkbox" class="field-toggle" data-field="tradeOfferDiscount" checked>
-                    Trade Offer Discount
-                </label>
-                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
-                    <input type="checkbox" class="field-toggle" data-field="defaultFoc" checked>
-                    Default FOC
-                </label>
-                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
-                    <input type="checkbox" class="field-toggle" data-field="cartonConversion" checked>
-                    Carton Conversion
-                </label>
-                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
-                    <input type="checkbox" class="field-toggle" data-field="taxation" checked>
-                    Taxation Section
-                </label>
-                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
-                    <input type="checkbox" class="field-toggle" data-field="stock" checked>
-                    Stock Section
-                </label>
-                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
-                    <input type="checkbox" class="field-toggle" data-field="additionalInfo" checked>
-                    Additional Info Section
-                </label>
+                <?php endforeach; ?>
             </div>
         </div>
         <div class="modal-footer">

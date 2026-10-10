@@ -63,16 +63,6 @@ document.addEventListener('DOMContentLoaded', function () {
     let allCustomers = [];
     let currentCurrencySymbol = window.currencySymbol;
 
-    // Free-text fields that end up in this ledger (cheque numbers, voucher numbers
-    // entered elsewhere in the app) are rendered via innerHTML template strings here —
-    // escape before interpolating so a crafted value can't inject markup/script into
-    // another staff member's ledger view.
-    function escapeHtml(value) {
-        return String(value ?? '').replace(/[&<>"']/g, (c) => ({
-            '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
-        }[c]));
-    }
-
     function formatAmount(value) {
         const amount = Number(value) || 0;
         return roundOffToggle.checked
@@ -277,16 +267,16 @@ document.addEventListener('DOMContentLoaded', function () {
     customerSearch.addEventListener('input', function() {
         const searchTerm = this.value.toLowerCase().trim();
         selectedIndex = -1;
-
+        
         const filtered = searchTerm.length === 0 || searchTerm === ' '
             ? allCustomers
-            : allCustomers.filter(customer =>
+            : allCustomers.filter(customer => 
                 customer.customer_name.toLowerCase().includes(searchTerm) ||
                 customer.customer_code.toLowerCase().includes(searchTerm)
             );
-
+        
         if (filtered.length > 0) {
-            customerDropdown.innerHTML = filtered.map(customer =>
+            customerDropdown.innerHTML = filtered.map(customer => 
                 `<div class="customer-option" data-id="${customer.id}">${customer.customer_code} - ${customer.customer_name}</div>`
             ).join('');
             customerDropdown.style.display = 'block';
@@ -317,7 +307,7 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     customerSearch.addEventListener('focus', openCustomerDropdown);
-customerSearch.addEventListener('click', openCustomerDropdown);
+    customerSearch.addEventListener('click', openCustomerDropdown);
 
     // Arrow key navigation
     customerSearch.addEventListener('keydown', function(e) {
@@ -846,14 +836,14 @@ customerSearch.addEventListener('click', openCustomerDropdown);
                         <td>
                             ${hasItems ? `<button class="expand-btn" data-row-id="${rowIndex}"><i class="fas fa-chevron-right"></i></button>` : ''}
                             ${row.description}
-                            ${row.type === 'pdc' && row.against_rvs ? `<br><small style="color:var(--text-muted);font-size:11px;"><i class="fas fa-receipt" style="margin-right:4px;"></i>Against ${escapeHtml(row.against_rvs)}</small>` : ''}
+                            ${row.type === 'pdc' && row.against_rvs ? `<br><small style="color:var(--text-muted);font-size:11px;"><i class="fas fa-receipt" style="margin-right:4px;"></i>Against ${row.against_rvs}</small>` : ''}
                             ${coveredAmount > 0 ? `<br><small style="color:var(--text-muted);font-size:11px;"><i class="fas fa-link" style="margin-right:4px;"></i>Covered by PDC</small>` : ''}
                             ${row.type === 'adjustment' && row.contra_account_name ? `<br><small style="color:var(--text-muted);font-size:11px;"><i class="fas fa-exchange-alt" style="margin-right:4px;"></i>${row.contra_account_name}</small>` : ''}
                             ${row.type === 'adjustment' && row.adj_note ? `<br><small style="color:var(--text-muted);font-size:11px;font-style:italic;">${row.adj_note}</small>` : ''}
                         </td>
                         <td>
                             ${row.reference}
-                            ${row.type === 'payment' && row.against_cheque_no ? `<br><small style="color:var(--text-muted);font-size:11px;"><i class="fas fa-money-check-alt" style="margin-right:4px;"></i>Against Cheque ${escapeHtml(row.against_cheque_no)}</small>` : ''}
+                            ${row.type === 'payment' && row.against_cheque_no ? `<br><small style="color:var(--text-muted);font-size:11px;"><i class="fas fa-money-check-alt" style="margin-right:4px;"></i>Against Cheque ${row.against_cheque_no}</small>` : ''}
                         </td>
                         <td>${debit > 0 ? formatMoney(debit) : ''}</td>
                         <td>${creditDisplay}</td>
@@ -935,8 +925,7 @@ customerSearch.addEventListener('click', openCustomerDropdown);
                 }
 
                 // Keep the Expand All / Collapse All button's label accurate even after a
-                // manual per-row toggle (e.g. expanding every row one by one by hand should
-                // still flip the button to "Collapse All").
+                // manual per-row toggle.
                 const allExpandBtns = detailedLedgerTable.querySelectorAll('.expand-btn');
                 allRowsExpanded = allExpandBtns.length > 0 && Array.from(allExpandBtns).every(b => {
                     const r = document.getElementById(`items-${b.dataset.rowId}`);

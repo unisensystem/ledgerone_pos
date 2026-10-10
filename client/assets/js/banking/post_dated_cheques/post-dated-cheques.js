@@ -19,6 +19,13 @@ const addPdcBtn = document.getElementById('add-pdc');
 const prevPageBtn = document.getElementById('prev-page');
 const nextPageBtn = document.getElementById('next-page');
 
+// A Pending PDC whose cash payments already cover the full cheque amount
+function isFullyPaidPdc(pdc) {
+    const paid = Number(pdc.paidAmount) || 0;
+    const amount = Number(pdc.amount) || 0;
+    return pdc.status === 'Pending' && amount > 0 && paid >= amount;
+}
+
 // Initialize the application
 async function initApp() {
     await loadBanks();
@@ -70,7 +77,7 @@ async function loadBanks() {
     try {
         const response = await fetch('../../../../server/api/banking/post_dated_cheques/get_banks.php');
         const result = await response.json();
-        
+
         if (result.success) {
             const bankFilter = document.getElementById('bank-filter');
             result.data.forEach(bank => {
@@ -103,7 +110,7 @@ async function loadCompanies() {
     try {
         const response = await fetch('../../../../server/api/banking/post_dated_cheques/get_companies.php');
         const result = await response.json();
-        
+
         if (result.success) {
             companies = result.data;
             const companyFilter = document.getElementById('company-filter');
@@ -123,7 +130,7 @@ async function loadCompanies() {
 async function fetchPDCs() {
     try {
         const params = new URLSearchParams();
-        
+
         const chequeNo = document.getElementById('cheque-no-filter').value;
         const account = document.getElementById('account-filter').value;
         const bank = document.getElementById('bank-filter').value;
@@ -133,7 +140,7 @@ async function fetchPDCs() {
         const minAmount = document.getElementById('min-amount').value;
         const maxAmount = document.getElementById('max-amount').value;
         const companyId = document.getElementById('company-filter').value;
-        
+
         if (chequeNo) params.append('cheque_no', chequeNo);
         if (account) params.append('account', account);
         if (bank) params.append('bank', bank);
@@ -143,10 +150,10 @@ async function fetchPDCs() {
         if (minAmount) params.append('min_amount', minAmount);
         if (maxAmount) params.append('max_amount', maxAmount);
         if (companyId) params.append('company_id', companyId);
-        
+
         const response = await fetch(`../../../../server/api/banking/post_dated_cheques/post_dated_cheques.php?${params}`);
         const result = await response.json();
-        
+
         if (result.success) {
             pdcsData = result.data;
             filteredData = [...pdcsData];
@@ -201,8 +208,8 @@ function renderTable() {
         }).format(pdc.amount).replace('$', CURRENCY_SYMBOL);
 
         // Partial paid info
-        const isPartiallyPaid = pdc.paidAmount > 0 && pdc.status === 'Pending';
-        const isFullyPaid = pdc.paidAmount >= pdc.amount && pdc.status === 'Pending';
+        const isFullyPaid = isFullyPaidPdc(pdc);
+        const isPartiallyPaid = pdc.paidAmount > 0 && pdc.status === 'Pending' && !isFullyPaid;
         const paidBadge = isFullyPaid
             ? `<span style="display:inline-block;margin-left:6px;padding:2px 8px;border-radius:12px;font-size:11px;background:#e6f7ef;color:#2fbf71;font-weight:600;">Fully Paid</span>`
             : isPartiallyPaid
@@ -221,6 +228,11 @@ function renderTable() {
             case 'Cancelled': statusClass = 'status-cancelled'; break;
         }
 
+        // Status badge — a fully paid cheque shows "Paid" instead of "Pending"
+        const statusBadge = isFullyPaid
+            ? `<span class="status-badge status-approved">Paid</span>`
+            : `<span class="status-badge ${statusClass}">${pdc.status}</span>`;
+
         // Create row HTML
         row.innerHTML = `
                     <td>${pdc.chequeNo}</td>
@@ -229,7 +241,7 @@ function renderTable() {
                     <td>${pdc.type}</td>
                     <td><strong>${formattedAmount}</strong>${paidBadge}</td>
                     <td>${formattedDate}</td>
-                    <td><span class="status-badge ${statusClass}">${pdc.status}</span></td>
+                    <td>${statusBadge}</td>
                     <td>
                         <div class="action-buttons">
                             ${canApprove ? `
@@ -270,15 +282,15 @@ function updatePaginationInfo() {
     // Update pagination button states
     prevPageBtn.disabled = currentPage === 1;
     nextPageBtn.disabled = endIndex >= filteredData.length;
-    
+
     // Generate page number buttons
     const paginationControls = document.getElementById('pagination-controls');
     const totalPages = Math.ceil(filteredData.length / itemsPerPage);
-    
+
     // Clear existing page buttons (keep prev/next)
     const pageButtons = paginationControls.querySelectorAll('.pagination-btn:not(#prev-page):not(#next-page)');
     pageButtons.forEach(btn => btn.remove());
-    
+
     // Insert page number buttons before next button
     for (let i = 1; i <= totalPages; i++) {
         const pageBtn = document.createElement('button');
@@ -296,7 +308,7 @@ function updatePaginationInfo() {
 function updateStats() {
     // Calculate stats
     const totalPdcs = filteredData.length;
-    const pendingPdcs = filteredData.filter(pdc => pdc.status === 'Pending').length;
+    const pendingPdcs = filteredData.filter(pdc => pdc.status === 'Pending' && !isFullyPaidPdc(pdc)).length;
     const totalAmount = filteredData.reduce((sum, pdc) => sum + pdc.amount, 0);
     const avgAmount = totalPdcs > 0 ? totalAmount / totalPdcs : 0;
 
@@ -343,11 +355,11 @@ async function updateStatus(id, newStatus) {
         // Open approve modal with bank selection
         const pdc = filteredData.find(p => p.id === id);
         pendingStatusUpdate = { id, newStatus };
-        
+
         document.getElementById('approve-cheque-no').textContent = pdc?.chequeNo || '';
-        document.getElementById('approve-amount').textContent = 
+        document.getElementById('approve-amount').textContent =
             CURRENCY_SYMBOL + parseFloat(pdc?.amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2 });
-        
+
         // Populate bank dropdown
         const select = document.getElementById('approve-bank-select');
         select.innerHTML = '';
@@ -358,7 +370,7 @@ async function updateStatus(id, newStatus) {
             if (bank.id == pdc?.bankAccountId) opt.selected = true;
             select.appendChild(opt);
         });
-        
+
         document.getElementById('approve-modal').classList.add('active');
     } else {
         pendingStatusUpdate = { id, newStatus };
@@ -371,23 +383,23 @@ async function updateStatus(id, newStatus) {
 
 async function confirmStatusUpdate(bankAccountId = null) {
     if (!pendingStatusUpdate) return;
-    
+
     const { id, newStatus } = pendingStatusUpdate;
     document.getElementById('confirmation-modal').classList.remove('active');
     document.getElementById('approve-modal').classList.remove('active');
-    
+
     try {
         const body = { id, status: newStatus };
         if (bankAccountId) body.bank_account_id = parseInt(bankAccountId);
-        
+
         const response = await fetch('../../../../server/api/banking/post_dated_cheques/update_status.php', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(body)
         });
-        
+
         const result = await response.json();
-        
+
         if (result.success) {
             showNotification(`PDC status updated to ${newStatus}`);
             await fetchPDCs();
@@ -398,7 +410,7 @@ async function confirmStatusUpdate(bankAccountId = null) {
         console.error('Error updating status:', error);
         showNotification('Error updating status', 'error');
     }
-    
+
     pendingStatusUpdate = null;
 }
 
@@ -466,7 +478,7 @@ function showNotification(message, type = 'success') {
     const notification = document.createElement('div');
     const color = type === 'success' ? '#2FBF71' : '#E34F4F';
     const icon = type === 'success' ? 'fa-check-circle' : 'fa-exclamation-circle';
-    
+
     notification.style.cssText = `
         position: fixed;
         top: 20px;
@@ -518,7 +530,8 @@ function initializeChart() {
 
     // Calculate data for chart
     const statusCounts = {
-        'Pending': filteredData.filter(pdc => pdc.status === 'Pending').length,
+        'Pending': filteredData.filter(pdc => pdc.status === 'Pending' && !isFullyPaidPdc(pdc)).length,
+        'Paid': filteredData.filter(pdc => isFullyPaidPdc(pdc)).length,
         'Approved': filteredData.filter(pdc => pdc.status === 'Approved').length,
         'Rejected': filteredData.filter(pdc => pdc.status === 'Rejected').length,
         'Cancelled': filteredData.filter(pdc => pdc.status === 'Cancelled').length
@@ -539,23 +552,26 @@ function initializeChart() {
     window.pdcsChart = new Chart(ctx, {
         type: 'bar',
         data: {
-            labels: ['Pending', 'Approved', 'Rejected', 'Cancelled'],
+            labels: ['Pending', 'Paid', 'Approved', 'Rejected', 'Cancelled'],
             datasets: [{
                 label: 'PDCs by Status',
                 data: [
                     statusCounts.Pending,
+                    statusCounts.Paid,
                     statusCounts.Approved,
                     statusCounts.Rejected,
                     statusCounts.Cancelled
                 ],
                 backgroundColor: [
                     'rgba(232, 178, 63, 0.7)',
+                    'rgba(31, 123, 255, 0.7)',
                     'rgba(47, 191, 113, 0.7)',
                     'rgba(227, 79, 79, 0.7)',
                     'rgba(107, 114, 128, 0.7)'
                 ],
                 borderColor: [
                     '#E8B23F',
+                    '#1F7BFF',
                     '#2FBF71',
                     '#E34F4F',
                     '#6B7280'
@@ -629,21 +645,21 @@ function setupEventListeners() {
     document.getElementById('account-filter').addEventListener('keyup', (e) => {
         if (e.key === 'Enter') applyFilters();
     });
-    
+
     // Modal event listeners
     document.getElementById('modal-confirm').addEventListener('click', confirmStatusUpdate);
     document.getElementById('modal-cancel').addEventListener('click', () => {
         document.getElementById('confirmation-modal').classList.remove('active');
         pendingStatusUpdate = null;
     });
-    
+
     document.getElementById('confirmation-modal').addEventListener('click', (e) => {
         if (e.target.id === 'confirmation-modal') {
             document.getElementById('confirmation-modal').classList.remove('active');
             pendingStatusUpdate = null;
         }
     });
-    
+
     // Approve modal event listeners
     document.getElementById('approve-modal-confirm').addEventListener('click', () => {
         const bankAccountId = document.getElementById('approve-bank-select').value;

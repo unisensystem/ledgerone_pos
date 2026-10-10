@@ -82,15 +82,13 @@ if ($tenant_id) {
                         <input type="text" id="name" name="name" required>
                     </div>
                     
-                                      <div class="form-group optional-field" data-field="company">
+                    <div class="form-group optional-field" data-field="company">
                         <label>Company</label>
                         <select id="company" name="company">
                             <option value="">Select Company</option>
                         </select>
                     </div>
 
-                   
-                    
                     <div class="form-group full-width">
                         <label class="required">UOM Type</label>
                         <div class="radio-group">
@@ -190,7 +188,8 @@ if ($tenant_id) {
                         <label>Description</label>
                         <textarea id="description" name="description"></textarea>
                     </div>
-                     <div class="form-group optional-field" data-field="itemCompany">
+
+                    <div class="form-group optional-field" data-field="itemCompany">
                         <label>Item Company</label>
                         <div class="input-with-buttons">
                             <select id="itemCompany" name="itemCompany">
@@ -339,9 +338,6 @@ if ($tenant_id) {
                         <label>Default Discount (%)</label>
                         <input type="number" id="defaultDiscount" name="defaultDiscount" step="0.01" min="0" max="100">
                     </div>
-                    
-
-
                 </div>
             </div>
             
@@ -366,12 +362,12 @@ if ($tenant_id) {
                 <h2 class="section-title">Stock</h2>
                 
                 <div class="form-row">
-                    <div class="form-group">
+                    <div class="form-group" data-field="minStock">
                         <label>Min Stock Level</label>
                         <input type="number" id="minStock" name="minStock" step="0.01" min="0">
                     </div>
                     
-                    <div class="form-group">
+                    <div class="form-group" data-field="maxStock">
                         <label>Max Stock Level</label>
                         <input type="number" id="maxStock" name="maxStock" step="0.01" min="0">
                     </div>
@@ -379,39 +375,39 @@ if ($tenant_id) {
                 
                 <div class="stock-opening-section">
                     <h3 class="subsection-title">Branch-wise Opening Stock</h3>
-                  <div class="stock-entries" id="stockEntries">
-    <div class="stock-entry">
-        <div class="form-row">
-            <div class="form-group">
-                <label>Branch</label>
-                <div class="custom-dropdown">
-                    <input type="text" class="branch-search" placeholder="Search branches..." autocomplete="off">
-                    <input type="hidden" name="branch[]">
-                    <div class="dropdown-list" style="display: none;"></div>
-                </div>
-            </div>
-            <div class="form-group">
-                <label>Opening Qty</label>
-                <input type="number" name="openingQty[]" step="0.01" min="0">
-            </div>
-            <div class="form-group">
-                <label class="opening-price-label">Opening Price / Unit</label>
-                <input type="number" name="openingPrice[]" step="0.01" min="0">
-            </div>
-            <div class="form-group">
-                <label>Batch No</label>
-                <input type="text" name="batchNo[]" placeholder="e.g., B-2026-001">
-            </div>
-            <div class="form-group">
-                <label>Batch Expiry Date</label>
-                <input type="date" name="batchExpiryDate[]">
-            </div>
-            <div class="form-group">
-                <button type="button" class="btn btn-danger remove-stock-entry" style="margin-top: 24px;">Remove</button>
-            </div>
-        </div>
-    </div>
-</div>
+                    <div class="stock-entries" id="stockEntries">
+                        <div class="stock-entry">
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>Branch</label>
+                                    <div class="custom-dropdown">
+                                        <input type="text" class="branch-search" placeholder="Search branches..." autocomplete="off">
+                                        <input type="hidden" name="branch[]">
+                                        <div class="dropdown-list" style="display: none;"></div>
+                                    </div>
+                                </div>
+                                <div class="form-group">
+                                    <label>Opening Qty</label>
+                                    <input type="number" name="openingQty[]" step="0.01" min="0">
+                                </div>
+                                <div class="form-group">
+                                    <label class="opening-price-label">Opening Price / Unit</label>
+                                    <input type="number" name="openingPrice[]" step="0.01" min="0">
+                                </div>
+                                <div class="form-group" data-field="batchNo">
+                                    <label>Batch No</label>
+                                    <input type="text" name="batchNo[]" placeholder="e.g., B-2026-001">
+                                </div>
+                                <div class="form-group" data-field="batchExpiry">
+                                    <label>Batch Expiry Date</label>
+                                    <input type="date" name="batchExpiryDate[]">
+                                </div>
+                                <div class="form-group">
+                                    <button type="button" class="btn btn-danger remove-stock-entry" style="margin-top: 24px;">Remove</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                     <button type="button" class="btn btn-secondary" id="addStockEntry">Add Another Branch</button>
                     
                     <div class="total-stock-summary">
@@ -439,12 +435,12 @@ if ($tenant_id) {
                 <h2 class="section-title">Additional Information</h2>
                 
                 <div class="form-row">
-                    <div class="form-group">
+                    <div class="form-group" data-field="manufacturingDate">
                         <label>Manufacturing Date</label>
                         <input type="date" id="manufacturingDate" name="manufacturingDate">
                     </div>
                     
-                    <div class="form-group">
+                    <div class="form-group" data-field="expiryDate">
                         <label>Expiry Date</label>
                         <input type="date" id="expiryDate" name="expiryDate">
                     </div>
@@ -464,7 +460,7 @@ if ($tenant_id) {
     <?php include 'unit-modal.php'; ?>
     <?php include 'uom-group-modal.php'; ?>
     <?php include 'category-modal.php'; ?>
-        <?php include 'item-company-modal.php'; ?>
+    <?php include 'item-company-modal.php'; ?>
     <?php include 'confirm-modal.php'; ?>
     <?php include 'customize-fields-modal.php'; ?>
     <?php include 'scheme-modal.php'; ?>

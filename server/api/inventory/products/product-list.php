@@ -1,4 +1,5 @@
 <?php
+// NOTE: Is file ko server par "server/api/inventory/products/product-list.php" ke naam se save karna hai
 require_once '../../../../includes/connection.php';
 
 header('Content-Type: application/json');
@@ -23,7 +24,8 @@ if (!$user_id || !$tenant_id) {
 }
 
 try {
-    $search = $_GET['search'] ?? '';
+    // trim: scanner kabhi kabhi aage/peeche space ya newline laga deta hai
+    $search = trim($_GET['search'] ?? '');
     $category = $_GET['category'] ?? '';
     $type = $_GET['type'] ?? '';
     $status = $_GET['status'] ?? '';
@@ -32,14 +34,14 @@ try {
     $uom_filter = $_GET['uom_filter'] ?? '';
     $page = max(1, (int)($_GET['page'] ?? 1));
 
-// Allowed page sizes — whitelist taake koi arbitrary/negative value na bhej sake
-$allowedLimits = [10, 20, 30, 40, 50, 60, 70, 80, 100];
-$limit = (int)($_GET['per_page'] ?? 10);
-if (!in_array($limit, $allowedLimits, true)) {
-    $limit = 10;
-}
+    // Allowed page sizes — whitelist taake koi arbitrary/negative value na bhej sake
+    $allowedLimits = [10, 20, 30, 40, 50, 60, 70, 80, 100];
+    $limit = (int)($_GET['per_page'] ?? 10);
+    if (!in_array($limit, $allowedLimits, true)) {
+        $limit = 10;
+    }
 
-$offset = ($page - 1) * $limit;
+    $offset = ($page - 1) * $limit;
 
     // Base-unit conversion factor for stock ledger rows — same logic used in
     // stock-position.php's "Show in Base Units" mode. Without this, qty_in/qty_out
@@ -47,7 +49,7 @@ $offset = ($page - 1) * $limit;
     // producing a wrong current_stock (e.g. 6 instead of the correct base-unit 74).
     $stockConversionFactor = "COALESCE(CASE WHEN slu.base_unit_id IS NOT NULL AND slu.unit_scope = 'universal' THEN slu.conversion_factor WHEN puc.conversion_factor IS NOT NULL THEN puc.conversion_factor ELSE 1 END, 1)";
 
-   $sql = "
+    $sql = "
  SELECT p.id, p.code, p.name, p.product_type, p.mrp, p.trade_price, p.wholesale_price, p.is_active,
            p.parent_product_id, p.qr_code, p.barcode, p.company_id, p.uom_type,
 p.purchase_price, lb.batch_no, lb.expiry_date AS batch_expiry_date,
@@ -78,36 +80,39 @@ LEFT JOIN item_companies comp2 ON p.item_company_id = comp2.id
 ) lb ON lb.product_id = p.id
     WHERE p.tenant_id = ?
 ";
-    
+
     $params = [$tenant_id];
-    
-    if ($search) {
-        $sql .= " AND (p.name LIKE ? OR p.code LIKE ?)";
+
+    // Search: name / code (partial match) + barcode / QR code (exact match, scanner ke liye)
+    if ($search !== '') {
+        $sql .= " AND (p.name LIKE ? OR p.code LIKE ? OR p.barcode = ? OR p.qr_code = ?)";
         $params[] = "%$search%";
         $params[] = "%$search%";
+        $params[] = $search;
+        $params[] = $search;
     }
-    
+
     if ($category) {
         $sql .= " AND p.category_id = ?";
         $params[] = $category;
     }
-    
+
     if ($type) {
         $sql .= " AND p.product_type = ?";
         $params[] = $type;
     }
-    
+
     if ($status) {
         $active = ($status === 'active') ? 1 : 0;
         $sql .= " AND p.is_active = ?";
         $params[] = $active;
     }
-    
+
     if ($uom_filter) {
         $sql .= " AND p.uom_type = ?";
         $params[] = $uom_filter;
     }
-    
+
     if ($vendor) {
         $sql .= " AND p.vendor_id = ?";
         $params[] = $vendor;
@@ -117,20 +122,22 @@ LEFT JOIN item_companies comp2 ON p.item_company_id = comp2.id
         $sql .= " AND p.item_company_id = ?";
         $params[] = $item_company;
     }
-    
+
     $sql .= " GROUP BY p.id ORDER BY COALESCE(p.parent_product_id, p.id), p.parent_product_id IS NOT NULL, p.created_at DESC";
-    
+
     // Get total count
     $countSql = "SELECT COUNT(DISTINCT p.id) as total FROM products p
                  LEFT JOIN categories c ON p.category_id = c.id
                  LEFT JOIN subcategories sc ON p.subcategory_id = sc.id
                  WHERE p.tenant_id = ?";
-    
+
     $countParams = [$tenant_id];
-    if ($search) {
-        $countSql .= " AND (p.name LIKE ? OR p.code LIKE ?)";
+    if ($search !== '') {
+        $countSql .= " AND (p.name LIKE ? OR p.code LIKE ? OR p.barcode = ? OR p.qr_code = ?)";
         $countParams[] = "%$search%";
         $countParams[] = "%$search%";
+        $countParams[] = $search;
+        $countParams[] = $search;
     }
     if ($category) {
         $countSql .= " AND p.category_id = ?";
@@ -157,21 +164,21 @@ LEFT JOIN item_companies comp2 ON p.item_company_id = comp2.id
         $countSql .= " AND p.item_company_id = ?";
         $countParams[] = $item_company;
     }
-    
+
     $countStmt = $pdo->prepare($countSql);
     $countStmt->execute($countParams);
     $totalRecords = $countStmt->fetch()['total'];
     $totalPages = ceil($totalRecords / $limit);
-    
+
     // Add pagination to main query
     $sql .= " LIMIT $limit OFFSET $offset";
-    
+
     $stmt = $pdo->prepare($sql);
     $stmt->execute($params);
     $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
-    
+
     echo json_encode([
-        'success' => true, 
+        'success' => true,
         'products' => $products,
         'pagination' => [
             'current_page' => $page,
@@ -180,7 +187,7 @@ LEFT JOIN item_companies comp2 ON p.item_company_id = comp2.id
             'per_page' => $limit
         ]
     ]);
-    
+
 } catch (PDOException $e) {
     http_response_code(500);
     echo json_encode(['success' => false, 'message' => 'Database error: ' . $e->getMessage()]);

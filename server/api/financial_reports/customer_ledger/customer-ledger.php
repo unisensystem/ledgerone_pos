@@ -1,30 +1,24 @@
 <?php
+session_start();
 require_once '../../../../includes/connection.php';
-require_once '../../../../includes/mobile_auth.php';
 require_once 'currency-converter.php';
 
 header('Content-Type: application/json');
-header('Access-Control-Allow-Origin: *');
-header('Access-Control-Allow-Methods: GET, OPTIONS');
-header('Access-Control-Allow-Headers: Content-Type, Authorization');
 
-if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
-    exit(0);
-}
 if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
     http_response_code(405);
     echo json_encode(['success' => false, 'message' => 'Method not allowed']);
     exit;
 }
 
-$auth = resolveMobileAuth($pdo);
-if (!$auth) {
+$user_id = $_SESSION['user_id'] ?? null;
+$tenant_id = $_SESSION['tenant_id'] ?? null;
+
+if (!$user_id || !$tenant_id) {
     http_response_code(401);
     echo json_encode(['success' => false, 'message' => 'Unauthorized']);
     exit;
 }
-$user_id = $auth['user_id'];
-$tenant_id = $auth['tenant_id'];
 
 try {
     $customer_id = $_GET['customer_id'] ?? null;
@@ -79,7 +73,7 @@ try {
 
     // Toggle ON: RVs received against a Pending PDC are already covered by the PDC's full
     // amount, so they must not be subtracted again (would double count).
-    $pdc_covered_rv_filter = $pending_pdc_affects_ledger
+       $pdc_covered_rv_filter = $pending_pdc_affects_ledger
         ? " AND (rv.against_pdc_id IS NULL OR rv.against_pdc_id NOT IN (SELECT pdc_c.id FROM post_dated_cheques pdc_c WHERE pdc_c.tenant_id = " . intval($tenant_id) . " AND pdc_c.status = 'Pending'))"
         : "";
 
@@ -723,8 +717,8 @@ $prev_payments_sub = $stmt->fetch()['total'];
         $sql = "SELECT voucher_date as date, CONCAT('Receipt - ', voucher_number) as description,
                 voucher_number as reference, 0 as debit, amount as credit, 'payment' as type, sub_account_id, currency_id,
                                 bill_no, adjust_amount, against_pdc_id as pdc_id,
-                (SELECT cheque_no FROM post_dated_cheques WHERE post_dated_cheques.id = receive_voucher.against_pdc_id AND post_dated_cheques.tenant_id = receive_voucher.tenant_id) as against_cheque_no
-                FROM receive_voucher
+                (SELECT cheque_no FROM post_dated_cheques WHERE post_dated_cheques.id = receive_voucher.against_pdc_id) as against_cheque_no
+                FROM receive_voucher 
                 WHERE tenant_id = ? AND customer_id = ?{$company_filter}
                 AND id NOT IN (
                     SELECT reference_id FROM post_dated_cheques 
@@ -1092,10 +1086,10 @@ $prev_payments_sub = $stmt->fetch()['total'];
                         $transaction['covered_amount'] = $converter->convert($transaction['covered_amount'], $transaction['currency_id'], $target_currency_id);
                     }
                 }
-
+                
                 $running_balance += $transaction['debit'] - $transaction['credit'];
                 $transaction['running_balance'] = $running_balance;
-
+                
                 if (isset($transaction['pdc_status']) && $transaction['pdc_status'] !== 'Approved' && !$pending_pdc_affects_ledger) {
                     $transaction['pdc_display'] = $transaction['pdc_amount'];
                 }
@@ -1201,7 +1195,7 @@ $prev_payments_sub = $stmt->fetch()['total'];
                             $transaction['covered_amount'] = $converter->convert($transaction['covered_amount'], $transaction['currency_id'], $target_currency_id);
                         }
                     }
-
+                    
                     $running_balance += $transaction['debit'] - $transaction['credit'];
                     $transaction['running_balance'] = $running_balance;
                     

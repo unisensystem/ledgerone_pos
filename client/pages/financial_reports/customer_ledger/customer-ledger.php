@@ -228,7 +228,7 @@ $all_symbols = $stmt2->fetchAll();
                     </tbody>
                 </table>
 
-                <table id="detailed-ledger-table" style="display: none;">
+                                <table id="detailed-ledger-table" style="display: none;">
                     <thead>
                         <tr>
                             <th>Transaction Date</th>

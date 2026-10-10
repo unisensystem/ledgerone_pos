@@ -338,6 +338,15 @@ let containers = [];
 let currentCustomerId = null;
 let pendingPdcs = [];
 
+// Returns an error message when `amount` is more than the PDC's pending amount, otherwise null.
+// `remaining` comes from get-pending-pdcs.php (cheque amount minus what is already paid against it).
+function getPdcOverpayMessage(amount, remaining) {
+    if (Math.round(amount * 100) > Math.round(remaining * 100)) {
+        return `Amount cannot be more than the cheque's pending amount (${remaining.toFixed(2)}). You entered ${amount.toFixed(2)}.`;
+    }
+    return null;
+}
+
 // Fetch customers from API, optionally filtered by recovery officer (associated_sales_officer_id)
 // and/or by location (city_id / city_zone_id / area_id) — used by bulk mode's City/Zone/Area filter
 function fetchCustomers(recoveryOfficerId, locationFilters) {
@@ -1461,6 +1470,7 @@ function setupBulkCustomerDropdown(row) {
                                     opt.value = pdc.id;
                                     const date = new Date(pdc.cheque_date).toLocaleDateString();
                                     opt.textContent = `${pdc.cheque_no} (${date}) Rem:${parseFloat(pdc.remaining).toFixed(0)}`;
+                                    opt.dataset.remaining = pdc.remaining;
                                     pdcSelect.appendChild(opt);
                                 });
                             }
@@ -1669,6 +1679,23 @@ document.getElementById('postBulkBtn').addEventListener('click', async function(
         alert('Please select a company');
         return;
     }
+
+    // Against PDC: total amount entered against a cheque (across all rows) cannot exceed its pending amount
+    const pdcTotals = {};
+    rows.forEach(r => { r.style.backgroundColor = ''; });
+    for (const row of rows) {
+        const pdcSelect = row.querySelector('.bulk-against-pdc');
+        if (!pdcSelect.value) continue;
+        const rowAmount = parseFloat(row.querySelector('.bulk-amount').value) || 0;
+        pdcTotals[pdcSelect.value] = (pdcTotals[pdcSelect.value] || 0) + rowAmount;
+        const pdcRemaining = parseFloat(pdcSelect.options[pdcSelect.selectedIndex].dataset.remaining) || 0;
+        const pdcError = getPdcOverpayMessage(pdcTotals[pdcSelect.value], pdcRemaining);
+        if (pdcError) {
+            row.style.backgroundColor = 'rgba(227, 79, 79, 0.1)';
+            alert(pdcError);
+            return;
+        }
+    }
     
     this.disabled = true;
     this.innerHTML = '<div class="spinner"></div> Processing...';
@@ -1772,6 +1799,19 @@ form.addEventListener('submit', function (e) {
     if (!isValid) {
         alert('Please fill in all required fields.');
         return;
+    }
+
+    // Against PDC: amount cannot exceed the cheque's pending amount
+    const pdcSelect = document.getElementById('againstPdc');
+    if (pdcSelect.value) {
+        const pdcRemaining = parseFloat(pdcSelect.options[pdcSelect.selectedIndex].dataset.remaining) || 0;
+        const pdcAmount = parseFloat(document.getElementById('amount').value) || 0;
+        const pdcError = getPdcOverpayMessage(pdcAmount, pdcRemaining);
+        if (pdcError) {
+            document.getElementById('amount').style.borderColor = 'var(--error)';
+            alert(pdcError);
+            return;
+        }
     }
 
     // Lock the button and show spinner

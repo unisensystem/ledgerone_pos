@@ -5,6 +5,7 @@ let totalPages = 1;
 let totalRecords = 0;
 let collapsedParents = new Set();
 let selectedProducts = new Set();
+let loadRequestId = 0; // stale response ko ignore karne ke liye (scanner fast requests bhejta hai)
 
 document.addEventListener('DOMContentLoaded', function () {
     // Load and render products
@@ -14,11 +15,11 @@ document.addEventListener('DOMContentLoaded', function () {
     document.getElementById('addProductBtn').addEventListener('click', function () {
         window.location.href = 'product-add.php';
     });
-    
+
     document.getElementById('pageSize').addEventListener('change', function () {
-    pageSize = parseInt(this.value);
-    loadProducts(1); // page size change → wapas page 1 se start
-});
+        pageSize = parseInt(this.value);
+        loadProducts(1); // page size change → wapas page 1 se start
+    });
 
     // Bulk Opening Stock button
     document.getElementById('bulkOpeningStockBtn').addEventListener('click', function () {
@@ -29,20 +30,20 @@ document.addEventListener('DOMContentLoaded', function () {
     document.getElementById('addFirstProduct').addEventListener('click', function () {
         window.location.href = 'product-add.php';
     });
-    
+
     // AIQ button
     if (document.getElementById('aiqBtn')) {
         document.getElementById('aiqBtn').addEventListener('click', openAiqModal);
         document.getElementById('closeAiqModal').addEventListener('click', closeAiqModal);
         document.getElementById('cancelAiq').addEventListener('click', closeAiqModal);
         document.getElementById('confirmAiqPrint').addEventListener('click', handleAiqPrint);
-        document.getElementById('aiqModal').addEventListener('click', function(e) {
+        document.getElementById('aiqModal').addEventListener('click', function (e) {
             if (e.target === this) closeAiqModal();
         });
     }
-    
+
     // Select All checkbox
-    document.getElementById('selectAll').addEventListener('change', function() {
+    document.getElementById('selectAll').addEventListener('change', function () {
         const checkboxes = document.querySelectorAll('.product-checkbox');
         checkboxes.forEach(cb => {
             cb.checked = this.checked;
@@ -55,31 +56,31 @@ document.addEventListener('DOMContentLoaded', function () {
         updateAssignUomButton();
         updateBulkDeleteButton();
     });
-    
+
     // Assign UOM button (for selected products)
-    document.getElementById('assignUomBtn').addEventListener('click', function() {
+    document.getElementById('assignUomBtn').addEventListener('click', function () {
         openBulkUomModal(false);
     });
 
     // Delete Selected button (for selected products)
     if (document.getElementById('deleteSelectedBtn')) {
-        document.getElementById('deleteSelectedBtn').addEventListener('click', function() {
+        document.getElementById('deleteSelectedBtn').addEventListener('click', function () {
             if (selectedProducts.size === 0) return;
             showBulkDeleteModal();
         });
     }
-    
+
     // Bulk UOM modal handlers
     document.getElementById('closeBulkUomModal').addEventListener('click', closeBulkUomModal);
     document.getElementById('cancelBulkUom').addEventListener('click', closeBulkUomModal);
     document.getElementById('bulkUomForm').addEventListener('submit', handleBulkUomSubmit);
-    
+
     // Bulk UOM Type radio handlers
     document.querySelectorAll('input[name="bulkUomType"]').forEach(radio => {
         radio.addEventListener('change', handleBulkUomTypeChange);
     });
-    
-    document.getElementById('bulkUomModal').addEventListener('click', function(e) {
+
+    document.getElementById('bulkUomModal').addEventListener('click', function (e) {
         if (e.target === this) {
             closeBulkUomModal();
         }
@@ -91,7 +92,7 @@ document.addEventListener('DOMContentLoaded', function () {
         const dropdown = document.getElementById('exportDropdown');
         dropdown.classList.toggle('show');
     });
-    
+
     // Export options
     document.getElementById('printList').addEventListener('click', function () {
         const params = new URLSearchParams({
@@ -102,21 +103,21 @@ document.addEventListener('DOMContentLoaded', function () {
             vendor: document.getElementById('vendor').value,
             item_company: document.getElementById('itemCompany').value
         });
-        
+
         window.open(`print.php?${params}`, '_blank');
         document.getElementById('exportDropdown').classList.remove('show');
     });
-    
-   document.getElementById('exportExcel').addEventListener('click', function () {
-    exportProductsToExcel();
-    document.getElementById('exportDropdown').classList.remove('show');
-});
-    
+
+    document.getElementById('exportExcel').addEventListener('click', function () {
+        exportProductsToExcel();
+        document.getElementById('exportDropdown').classList.remove('show');
+    });
+
     document.getElementById('exportJson').addEventListener('click', function () {
         alert('Export JSON functionality would be implemented here');
         document.getElementById('exportDropdown').classList.remove('show');
     });
-    
+
     // Close dropdown when clicking outside
     document.addEventListener('click', function () {
         document.getElementById('exportDropdown').classList.remove('show');
@@ -125,34 +126,53 @@ document.addEventListener('DOMContentLoaded', function () {
     // Auto-apply filters on change (not require Apply button click)
     document.getElementById('applyFilters').addEventListener('click', applyFilters);
     document.getElementById('resetFilters').addEventListener('click', resetFilters);
-    
-    // Auto-apply on any filter change
-   // Auto-apply search on input (with debounce to avoid excessive API calls)
-let searchTimeout;
-document.getElementById('search').addEventListener('input', function () {
-    clearTimeout(searchTimeout);
-    searchTimeout = setTimeout(() => {
-        applyFilters();
-    }, 500); // Wait 500ms after user stops typing, then search
-});
 
-// Auto-apply on any other filter change (immediate)
-document.getElementById('category').addEventListener('change', () => applyFilters());
-document.getElementById('type').addEventListener('change', () => applyFilters());
-document.getElementById('status').addEventListener('change', () => applyFilters());
-document.getElementById('vendor').addEventListener('change', () => applyFilters());
-document.getElementById('itemCompany').addEventListener('change', () => applyFilters());
-document.getElementById('uomFilter').addEventListener('change', () => applyFilters());
-    
+    // Auto-apply search on input (with debounce to avoid excessive API calls)
+    let searchTimeout;
+    const searchInput = document.getElementById('search');
+
+    searchInput.addEventListener('input', function () {
+        clearTimeout(searchTimeout);
+        searchTimeout = setTimeout(() => {
+            applyFilters();
+        }, 500); // Wait 500ms after user stops typing, then search
+    });
+
+    // Search on Enter key
+    // Barcode scanner code type karne ke baad automatically Enter bhejta hai,
+    // is liye Enter par foran search karte hain (debounce cancel karke) aur
+    // text select kar dete hain taake agla scan purane code ko replace kar de.
+    searchInput.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            clearTimeout(searchTimeout);
+            applyFilters();
+            this.select();
+        }
+    });
+
+    // Page khulte hi search box par focus, taake seedha scan kiya ja sake
+    // (agar URL se search aaya ho to focus bhi theek hai, text select ho jayega)
+    searchInput.focus();
+    if (searchInput.value) searchInput.select();
+
+    // Auto-apply on any other filter change (immediate)
+    document.getElementById('category').addEventListener('change', () => applyFilters());
+    document.getElementById('type').addEventListener('change', () => applyFilters());
+    document.getElementById('status').addEventListener('change', () => applyFilters());
+    document.getElementById('vendor').addEventListener('change', () => applyFilters());
+    document.getElementById('itemCompany').addEventListener('change', () => applyFilters());
+    document.getElementById('uomFilter').addEventListener('change', () => applyFilters());
+
     // Price type change - auto apply
     document.querySelectorAll('input[name="priceType"]').forEach(radio => {
         radio.addEventListener('change', () => applyFilters());
     });
-    
+
     // Load categories for filter
     loadCategoriesFilter();
     // Column show/hide
-initColumnToggle();
+    initColumnToggle();
     // Load vendors for filter
     loadVendorsFilter();
     loadItemCompaniesFilter();
@@ -167,13 +187,6 @@ initColumnToggle();
     document.getElementById('nextPage').addEventListener('click', function () {
         if (currentPage < totalPages) {
             loadProducts(currentPage + 1);
-        }
-    });
-
-    // Search on Enter key
-    document.getElementById('search').addEventListener('keyup', function (e) {
-        if (e.key === 'Enter') {
-            applyFilters();
         }
     });
 });
@@ -201,7 +214,7 @@ function renderProductTable(productsToRender) {
     // Populate table with products
     productsToRender.forEach(product => {
         const row = document.createElement('tr');
-        
+
         // Hide child products if parent is collapsed
         if (product.parentProductId && collapsedParents.has(product.parentProductId)) {
             row.style.display = 'none';
@@ -244,7 +257,7 @@ function renderProductTable(productsToRender) {
         // Check if this product has children
         const hasChildren = productsToRender.some(p => p.parentProductId === product.id);
         const isCollapsed = collapsedParents.has(product.id);
-        
+
         row.innerHTML = `
                     <td style="text-align: center;">
                         <input type="checkbox" class="product-checkbox" value="${product.id}">
@@ -312,7 +325,7 @@ function renderProductTable(productsToRender) {
             printCode(qr, barcode, name, code, tradePrice, company, currency, wholesalePrice, mrpPrice);
         });
     });
-    
+
     document.querySelectorAll('.edit-product').forEach(button => {
         button.addEventListener('click', function () {
             const productId = this.getAttribute('data-id');
@@ -326,13 +339,13 @@ function renderProductTable(productsToRender) {
             deleteProduct(productId);
         });
     });
-    
+
     // Add toggle functionality
     document.querySelectorAll('.toggle-children').forEach(toggle => {
-        toggle.addEventListener('click', function(e) {
+        toggle.addEventListener('click', function (e) {
             e.stopPropagation();
             const parentId = parseInt(this.dataset.parentId);
-            
+
             if (collapsedParents.has(parentId)) {
                 collapsedParents.delete(parentId);
                 this.textContent = '▼';
@@ -340,17 +353,17 @@ function renderProductTable(productsToRender) {
                 collapsedParents.add(parentId);
                 this.textContent = '▶';
             }
-            
+
             // Toggle child rows
             document.querySelectorAll(`tr[data-parent-id="${parentId}"]`).forEach(row => {
                 row.style.display = collapsedParents.has(parentId) ? 'none' : '';
             });
         });
     });
-    
+
     // Add checkbox change listeners
     document.querySelectorAll('.product-checkbox').forEach(checkbox => {
-        checkbox.addEventListener('change', function() {
+        checkbox.addEventListener('change', function () {
             const productId = parseInt(this.value);
             if (this.checked) {
                 selectedProducts.add(productId);
@@ -363,7 +376,7 @@ function renderProductTable(productsToRender) {
         });
     });
 
-     applyColumnVisibility();
+    applyColumnVisibility();
     // Pagination info will be updated by updatePagination function
 }
 
@@ -387,7 +400,7 @@ function updateBulkDeleteButton() {
 function openBulkUomModal(showAllProducts = false) {
     const selectedProductsInfo = document.getElementById('selectedProductsInfo');
     const bulkSelectedCount = document.getElementById('bulkSelectedCount');
-    
+
     if (showAllProducts || selectedProducts.size === 0) {
         // Show all products mode
         selectedProductsInfo.style.display = 'none';
@@ -396,7 +409,7 @@ function openBulkUomModal(showAllProducts = false) {
         selectedProductsInfo.style.display = 'block';
         bulkSelectedCount.textContent = selectedProducts.size;
     }
-    
+
     document.getElementById('bulkUomModal').style.display = 'flex';
     document.getElementById('bulkUomTypeUnit').checked = true;
     handleBulkUomTypeChange();
@@ -415,7 +428,7 @@ function handleBulkUomTypeChange() {
     const uomGroupField = document.getElementById('bulkUomGroupField');
     const defaultUnitSelect = document.getElementById('bulkDefaultUnit');
     const uomGroupSelect = document.getElementById('bulkUomGroup');
-    
+
     if (isUnit) {
         defaultUnitGroup.style.display = '';
         uomGroupField.style.display = 'none';
@@ -433,20 +446,20 @@ function handleBulkUomTypeChange() {
 
 function loadBulkUnits() {
     fetch('../../../../server/api/inventory/products/unit-list.php')
-    .then(response => response.json())
-    .then(data => {
-        if (data.success && data.units) {
-            const select = document.getElementById('bulkDefaultUnit');
-            select.innerHTML = '<option value="">Select Unit</option>';
-            data.units.forEach(unit => {
-                const option = document.createElement('option');
-                option.value = unit.id;
-                option.textContent = unit.uom_name;
-                select.appendChild(option);
-            });
-        }
-    })
-    .catch(error => console.error('Error loading units:', error));
+        .then(response => response.json())
+        .then(data => {
+            if (data.success && data.units) {
+                const select = document.getElementById('bulkDefaultUnit');
+                select.innerHTML = '<option value="">Select Unit</option>';
+                data.units.forEach(unit => {
+                    const option = document.createElement('option');
+                    option.value = unit.id;
+                    option.textContent = unit.uom_name;
+                    select.appendChild(option);
+                });
+            }
+        })
+        .catch(error => console.error('Error loading units:', error));
 }
 
 function exportProductsToExcel() {
@@ -470,13 +483,14 @@ function exportProductsToExcel() {
         'Category': p.category,
         'Subcategory': p.subcategory || '',
         'Vendor': p.vendor || '',
-       'Current Stock': p.stock !== null ? p.stock : 'N/A',
-'Purchase Price': p.purchasePrice,
-'Trade Price': p.tradePrice,
-'Wholesale Price': p.wholesalePrice,
-'MRP': p.mrp,
-'Batch No': p.batchNo,
-'Batch Expiry Date': p.batchExpiryDate,
+        'Barcode': p.barcode || '',
+        'Current Stock': p.stock !== null ? p.stock : 'N/A',
+        'Purchase Price': p.purchasePrice,
+        'Trade Price': p.tradePrice,
+        'Wholesale Price': p.wholesalePrice,
+        'MRP': p.mrp,
+        'Batch No': p.batchNo,
+        'Batch Expiry Date': p.batchExpiryDate,
     }));
 
     const worksheet = XLSX.utils.json_to_sheet(rows);
@@ -484,8 +498,8 @@ function exportProductsToExcel() {
     // Reasonable column widths
     worksheet['!cols'] = [
         { wch: 14 }, { wch: 28 }, { wch: 10 }, { wch: 16 }, { wch: 16 },
-        { wch: 16 }, { wch: 16 }, { wch: 12 }, { wch: 12 }, { wch: 14 },
-        { wch: 12 }, { wch: 10 }
+        { wch: 16 }, { wch: 16 }, { wch: 18 }, { wch: 12 }, { wch: 14 },
+        { wch: 12 }, { wch: 14 }, { wch: 10 }, { wch: 14 }, { wch: 16 }
     ];
 
     const workbook = XLSX.utils.book_new();
@@ -497,43 +511,43 @@ function exportProductsToExcel() {
 
 function loadBulkUomGroups() {
     fetch('../../../../server/api/inventory/products/uom-group-list.php')
-    .then(response => response.json())
-    .then(data => {
-        if (data.success && data.groups) {
-            const select = document.getElementById('bulkUomGroup');
-            select.innerHTML = '<option value="">Select UOM Group</option>';
-            data.groups.forEach(group => {
-                const option = document.createElement('option');
-                option.value = group.id;
-                option.textContent = group.group_name;
-                select.appendChild(option);
-            });
-        }
-    })
-    .catch(error => console.error('Error loading UOM groups:', error));
+        .then(response => response.json())
+        .then(data => {
+            if (data.success && data.groups) {
+                const select = document.getElementById('bulkUomGroup');
+                select.innerHTML = '<option value="">Select UOM Group</option>';
+                data.groups.forEach(group => {
+                    const option = document.createElement('option');
+                    option.value = group.id;
+                    option.textContent = group.group_name;
+                    select.appendChild(option);
+                });
+            }
+        })
+        .catch(error => console.error('Error loading UOM groups:', error));
 }
 
 function handleBulkUomSubmit(e) {
     e.preventDefault();
-    
+
     const selectedProductsInfo = document.getElementById('selectedProductsInfo');
     const isAllProductsMode = selectedProductsInfo.style.display === 'none';
-    
+
     if (!isAllProductsMode && selectedProducts.size === 0) {
         alert('Please select at least one product');
         return;
     }
-    
+
     const formData = new FormData();
     const uomType = document.querySelector('input[name="bulkUomType"]:checked').value;
     formData.append('uomType', uomType);
-    
+
     if (uomType === 'unit') {
         formData.append('defaultUnit', document.getElementById('bulkDefaultUnit').value);
     } else {
         formData.append('uomGroup', document.getElementById('bulkUomGroup').value);
     }
-    
+
     if (isAllProductsMode) {
         // Apply to all products
         formData.append('applyToAll', '1');
@@ -543,29 +557,29 @@ function handleBulkUomSubmit(e) {
             formData.append('productIds[]', id);
         });
     }
-    
+
     fetch('../../../../server/api/inventory/products/bulk-uom-assign.php', {
         method: 'POST',
         body: formData
     })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            alert(data.message);
-            closeBulkUomModal();
-            selectedProducts.clear();
-            document.getElementById('selectAll').checked = false;
-            updateAssignUomButton();
-            updateBulkDeleteButton();
-            loadProducts(currentPage);
-        } else {
-            alert('Error: ' + data.message);
-        }
-    })
-    .catch(error => {
-        console.error('Error:', error);
-        alert('An error occurred while assigning UOM');
-    });
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert(data.message);
+                closeBulkUomModal();
+                selectedProducts.clear();
+                document.getElementById('selectAll').checked = false;
+                updateAssignUomButton();
+                updateBulkDeleteButton();
+                loadProducts(currentPage);
+            } else {
+                alert('Error: ' + data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('An error occurred while assigning UOM');
+        });
 }
 
 function applyFilters() {
@@ -584,9 +598,8 @@ function resetFilters() {
     collapsedParents.clear();
 
     loadProducts(1);
+    document.getElementById('search').focus();
 }
-
-
 
 function editProduct(productId) {
     window.location.href = `product-add.php?id=${productId}`;
@@ -600,33 +613,33 @@ function deleteProduct(productId) {
 }
 
 function showDeleteModal(productName, productId) {
-    document.getElementById('deleteModalMessage').textContent = 
+    document.getElementById('deleteModalMessage').textContent =
         `Are you sure you want to delete "${productName}"? This action cannot be undone.`;
-    
+
     const modal = document.getElementById('deleteModal');
     modal.style.display = 'flex';
-    
+
     // Remove previous event listeners
     const newCancelBtn = document.getElementById('cancelDelete').cloneNode(true);
     const newConfirmBtn = document.getElementById('confirmDelete').cloneNode(true);
     document.getElementById('cancelDelete').parentNode.replaceChild(newCancelBtn, document.getElementById('cancelDelete'));
     document.getElementById('confirmDelete').parentNode.replaceChild(newConfirmBtn, document.getElementById('confirmDelete'));
-    
+
     // Add new event listeners
     newCancelBtn.addEventListener('click', () => {
         modal.style.display = 'none';
     });
-    
+
     newConfirmBtn.addEventListener('click', () => {
         modal.style.display = 'none';
         performDelete(productId);
     });
-    
+
     // Close button
     document.getElementById('closeDeleteModal').onclick = () => {
         modal.style.display = 'none';
     };
-    
+
     // Close on outside click
     modal.onclick = (e) => {
         if (e.target === modal) {
@@ -682,19 +695,19 @@ function performDelete(productId) {
         },
         body: `id=${productId}`
     })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            alert('Product deleted successfully!');
-            loadProducts(); // Refresh the product list
-        } else {
-            alert('Error: ' + data.message);
-        }
-    })
-    .catch(error => {
-        console.error('Error:', error);
-        alert('An error occurred while deleting the product');
-    });
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert('Product deleted successfully!');
+                loadProducts(); // Refresh the product list
+            } else {
+                alert('Error: ' + data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('An error occurred while deleting the product');
+        });
 }
 
 function performBulkDelete(ids) {
@@ -707,23 +720,23 @@ function performBulkDelete(ids) {
         },
         body: body
     })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            alert(data.message);
-            selectedProducts.clear();
-            document.getElementById('selectAll').checked = false;
-            updateAssignUomButton();
-            updateBulkDeleteButton();
-            loadProducts(currentPage);
-        } else {
-            alert('Error: ' + data.message);
-        }
-    })
-    .catch(error => {
-        console.error('Error:', error);
-        alert('An error occurred while deleting products');
-    });
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert(data.message);
+                selectedProducts.clear();
+                document.getElementById('selectAll').checked = false;
+                updateAssignUomButton();
+                updateBulkDeleteButton();
+                loadProducts(currentPage);
+            } else {
+                alert('Error: ' + data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('An error occurred while deleting products');
+        });
 }
 
 // Formats a number for display: comma-separates the integer part only,
@@ -743,147 +756,151 @@ function formatNumber(num) {
 
 function loadProducts(page = 1) {
     currentPage = page;
+    const requestId = ++loadRequestId; // is request ki id yaad rakho
     const priceType = document.querySelector('input[name="priceType"]:checked').value;
     const params = new URLSearchParams({
-        search: document.getElementById('search').value,
+        search: document.getElementById('search').value.trim(),
         category: document.getElementById('category').value,
         type: document.getElementById('type').value,
         status: document.getElementById('status').value,
         vendor: document.getElementById('vendor').value,
         item_company: document.getElementById('itemCompany').value,
         uom_filter: document.getElementById('uomFilter').value,
-page: page,
-        per_page: pageSize 
-        });
-    
-    fetch(`../../../../server/api/inventory/products/product-list.php?${params}`)
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            // Reset selection whenever the underlying data set changes
-            selectedProducts.clear();
-
-            products = data.products.map(product => {
-                let uomDisplay = '';
-                if (product.uom_type === 'unit' && product.default_unit_name) {
-                    uomDisplay = `<span style="color: var(--heading);">${product.default_unit_name}</span><br><span style="font-size: 11px; color: var(--subtext);">Default Unit</span>`;
-                } else if (product.uom_type === 'group' && product.uom_group_name) {
-                    uomDisplay = `<span style="color: var(--heading);">${product.uom_group_name}</span><br><span style="font-size: 11px; color: var(--subtext);">UOM Group</span>`;
-                }
-                
-               return {
-    id: product.id,
-    code: product.code,
-    name: product.name,
-    type: product.product_type,
-    uomDisplay: uomDisplay,
-    category: product.category_name || 'Uncategorized',
-    vendor: product.supplier_name || '',
-itemCompany: product.item_company_name || '',
-subcategory: product.subcategory_name || '',
-    currentStock: product.current_stock,
-    price: parseFloat(priceType === 'tp' ? product.trade_price : product.mrp),
-    tradePrice: parseFloat(product.trade_price),
-    wholesalePrice: parseFloat(product.wholesale_price),
-    mrp: parseFloat(product.mrp),
-    purchasePrice: parseFloat(product.purchase_price || 0),
-batchExpiryDate: (product.batch_expiry_date && product.batch_expiry_date !== '0000-00-00') ? product.batch_expiry_date : '',
-batchNo: product.batch_no || '',
-stock: (product.no_stock_records == 1) ? null : parseFloat(product.current_stock || 0),
-    status: product.is_active ? 'active' : 'inactive',
-    noStockRecords: product.no_stock_records == 1,
-    currencySymbol: product.currency_symbol || '₹',
-    parentProductId: product.parent_product_id,
-    qrCode: product.qr_code,
-    barcode: product.barcode,
-    companyName: product.company_name || ''
-};
-            });
-            
-            // Update pagination info
-            currentPage = data.pagination.current_page;
-            totalPages = data.pagination.total_pages;
-            totalRecords = data.pagination.total_records;
-            
-            renderProductTable(products);
-            updatePagination();
-            document.getElementById('selectAll').checked = false;
-            updateAssignUomButton();
-            updateBulkDeleteButton();
-        } else {
-            console.error('Error loading products:', data.message);
-        }
-    })
-    .catch(error => {
-        console.error('Error:', error);
+        page: page,
+        per_page: pageSize
     });
+
+    fetch(`../../../../server/api/inventory/products/product-list.php?${params}`)
+        .then(response => response.json())
+        .then(data => {
+            // Agar is dauran naya search ho chuka hai to purana response ignore karo
+            if (requestId !== loadRequestId) return;
+
+            if (data.success) {
+                // Reset selection whenever the underlying data set changes
+                selectedProducts.clear();
+
+                products = data.products.map(product => {
+                    let uomDisplay = '';
+                    if (product.uom_type === 'unit' && product.default_unit_name) {
+                        uomDisplay = `<span style="color: var(--heading);">${product.default_unit_name}</span><br><span style="font-size: 11px; color: var(--subtext);">Default Unit</span>`;
+                    } else if (product.uom_type === 'group' && product.uom_group_name) {
+                        uomDisplay = `<span style="color: var(--heading);">${product.uom_group_name}</span><br><span style="font-size: 11px; color: var(--subtext);">UOM Group</span>`;
+                    }
+
+                    return {
+                        id: product.id,
+                        code: product.code,
+                        name: product.name,
+                        type: product.product_type,
+                        uomDisplay: uomDisplay,
+                        category: product.category_name || 'Uncategorized',
+                        vendor: product.supplier_name || '',
+                        itemCompany: product.item_company_name || '',
+                        subcategory: product.subcategory_name || '',
+                        currentStock: product.current_stock,
+                        price: parseFloat(priceType === 'tp' ? product.trade_price : product.mrp),
+                        tradePrice: parseFloat(product.trade_price),
+                        wholesalePrice: parseFloat(product.wholesale_price),
+                        mrp: parseFloat(product.mrp),
+                        purchasePrice: parseFloat(product.purchase_price || 0),
+                        batchExpiryDate: (product.batch_expiry_date && product.batch_expiry_date !== '0000-00-00') ? product.batch_expiry_date : '',
+                        batchNo: product.batch_no || '',
+                        stock: (product.no_stock_records == 1) ? null : parseFloat(product.current_stock || 0),
+                        status: product.is_active ? 'active' : 'inactive',
+                        noStockRecords: product.no_stock_records == 1,
+                        currencySymbol: product.currency_symbol || '₹',
+                        parentProductId: product.parent_product_id,
+                        qrCode: product.qr_code,
+                        barcode: product.barcode,
+                        companyName: product.company_name || ''
+                    };
+                });
+
+                // Update pagination info
+                currentPage = data.pagination.current_page;
+                totalPages = data.pagination.total_pages;
+                totalRecords = data.pagination.total_records;
+
+                renderProductTable(products);
+                updatePagination();
+                document.getElementById('selectAll').checked = false;
+                updateAssignUomButton();
+                updateBulkDeleteButton();
+            } else {
+                console.error('Error loading products:', data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+        });
 }
 
 function loadCategoriesFilter() {
     fetch('../../../../server/api/inventory/products/category-list.php')
-    .then(response => response.json())
-    .then(data => {
-        if (data.success && data.categories) {
-            const select = document.getElementById('category');
-            data.categories.forEach(category => {
-                const option = document.createElement('option');
-                option.value = category.id;
-                option.textContent = category.category_name;
-                select.appendChild(option);
-            });
-        }
-    })
-    .catch(error => console.error('Error loading categories:', error));
+        .then(response => response.json())
+        .then(data => {
+            if (data.success && data.categories) {
+                const select = document.getElementById('category');
+                data.categories.forEach(category => {
+                    const option = document.createElement('option');
+                    option.value = category.id;
+                    option.textContent = category.category_name;
+                    select.appendChild(option);
+                });
+            }
+        })
+        .catch(error => console.error('Error loading categories:', error));
 }
 
 function loadVendorsFilter() {
     fetch('../../../../server/api/inventory/products/supplier-list.php')
-    .then(response => response.json())
-    .then(data => {
-        if (data.success && data.suppliers) {
-            const select = document.getElementById('vendor');
-            data.suppliers.forEach(supplier => {
-                const option = document.createElement('option');
-                option.value = supplier.id;
-                option.textContent = supplier.supplier_name;
-                select.appendChild(option);
-            });
-        }
-    })
-    .catch(error => console.error('Error loading vendors:', error));
+        .then(response => response.json())
+        .then(data => {
+            if (data.success && data.suppliers) {
+                const select = document.getElementById('vendor');
+                data.suppliers.forEach(supplier => {
+                    const option = document.createElement('option');
+                    option.value = supplier.id;
+                    option.textContent = supplier.supplier_name;
+                    select.appendChild(option);
+                });
+            }
+        })
+        .catch(error => console.error('Error loading vendors:', error));
 }
 
 function updatePagination() {
-      const startRecord = totalRecords === 0 ? 0 : (currentPage - 1) * pageSize + 1;
+    const startRecord = totalRecords === 0 ? 0 : (currentPage - 1) * pageSize + 1;
     const endRecord = Math.min(currentPage * pageSize, totalRecords);
-    
-    document.getElementById('paginationInfo').textContent = 
+
+    document.getElementById('paginationInfo').textContent =
         `Showing ${startRecord}-${endRecord} of ${totalRecords} products`;
-    
+
     // Update prev/next button states
     document.getElementById('prevPage').disabled = currentPage <= 1;
     document.getElementById('nextPage').disabled = currentPage >= totalPages;
-    
+
     // Update page numbers
     const paginationControls = document.querySelector('.pagination-controls');
     const pageButtons = paginationControls.querySelectorAll('.pagination-btn:not(#prevPage):not(#nextPage)');
     pageButtons.forEach(btn => btn.remove());
-    
+
     // Add page number buttons
     const maxVisiblePages = 5;
     let startPage = Math.max(1, currentPage - Math.floor(maxVisiblePages / 2));
     let endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
-    
+
     if (endPage - startPage + 1 < maxVisiblePages) {
         startPage = Math.max(1, endPage - maxVisiblePages + 1);
     }
-    
+
     for (let i = startPage; i <= endPage; i++) {
         const pageBtn = document.createElement('button');
         pageBtn.className = `pagination-btn ${i === currentPage ? 'active' : ''}`;
         pageBtn.textContent = i;
         pageBtn.addEventListener('click', () => loadProducts(i));
-        
+
         paginationControls.insertBefore(pageBtn, document.getElementById('nextPage'));
     }
 }
@@ -891,38 +908,31 @@ function updatePagination() {
 function updatePriceTypePreview() {
     const modal = document.getElementById('printCodeModal');
     const priceDisplay = document.querySelector('#printCodeContent .priceDisplay');
-    
+
     if (!modal || !priceDisplay) {
         console.log('Modal or price display not found');
         return;
     }
-    
+
     const showPrice = document.getElementById('showPrice').checked;
     const selectedRadio = document.querySelector('input[name="printPriceType"]:checked');
-    
+
     if (!selectedRadio) {
         console.log('No price type selected');
         return;
     }
-    
+
     const priceType = selectedRadio.value;
     const currencySymbol = modal.dataset.currencySymbol || 'Rs.';
-    
+
     let displayPrice = modal.dataset.tradePrice || '0';
-    
-    console.log('Price Type:', priceType);
-    console.log('TP:', modal.dataset.tradePrice);
-    console.log('Wholesale:', modal.dataset.wholesalePrice);
-    console.log('MRP:', modal.dataset.mrpPrice);
-    
+
     if (priceType === 'wholesale') {
         displayPrice = modal.dataset.wholesalePrice || modal.dataset.tradePrice || '0';
     } else if (priceType === 'mrp') {
         displayPrice = modal.dataset.mrpPrice || modal.dataset.tradePrice || '0';
     }
-    
-    console.log('Display Price:', displayPrice);
-    
+
     if (showPrice) {
         priceDisplay.style.display = 'block';
         priceDisplay.textContent = currencySymbol + ' ' + parseFloat(displayPrice).toFixed(2);
@@ -935,7 +945,7 @@ function printCode(qr, barcode, productName, productCode, tradePrice, companyNam
     const modal = document.getElementById('printCodeModal');
     const content = document.getElementById('printCodeContent');
     content.innerHTML = '';
-    
+
     // Add company name at top if exists
     if (companyName) {
         const companyDiv = document.createElement('div');
@@ -943,10 +953,10 @@ function printCode(qr, barcode, productName, productCode, tradePrice, companyNam
         companyDiv.textContent = companyName;
         content.appendChild(companyDiv);
     }
-    
+
     let canvas;
     let imageData = '';
-    
+
     if (qr) {
         canvas = document.createElement('canvas');
         canvas.width = 200;
@@ -960,7 +970,7 @@ function printCode(qr, barcode, productName, productCode, tradePrice, companyNam
         content.appendChild(canvas);
         imageData = canvas.toDataURL();
     }
-    
+
     // Add product details below code
     const detailsDiv = document.createElement('div');
     detailsDiv.style.cssText = 'margin-top: 16px; text-align: center; line-height: 1.6;';
@@ -969,10 +979,10 @@ function printCode(qr, barcode, productName, productCode, tradePrice, companyNam
         <div class="priceDisplay" style="font-size: 15px; font-weight: 700; color: var(--primary);">${currencySymbol} ${parseFloat(tradePrice).toFixed(2)}</div>
     `;
     content.appendChild(detailsDiv);
-    
+
     modal.style.display = 'flex';
     document.getElementById('printCopies').value = 1;
-    
+
     // Store prices and currency in dataset for easy access
     modal.dataset.tradePrice = tradePrice.toString();
     modal.dataset.wholesalePrice = (wholesalePrice || tradePrice).toString();
@@ -981,38 +991,36 @@ function printCode(qr, barcode, productName, productCode, tradePrice, companyNam
     modal.dataset.imageData = imageData;
     modal.dataset.productName = productName;
     modal.dataset.companyName = companyName;
-    
+
     // Close handlers
     const closePrintCodeModal = document.getElementById('closePrintCodeModal');
     const cancelPrintCode = document.getElementById('cancelPrintCode');
-    
+
     if (closePrintCodeModal) {
         closePrintCodeModal.onclick = () => modal.style.display = 'none';
     }
     if (cancelPrintCode) {
         cancelPrintCode.onclick = () => modal.style.display = 'none';
     }
-    
+
     // Setup event listeners for price type and show price changes
     const priceTypeRadios = document.querySelectorAll('input[name="printPriceType"]');
     const showPriceCheckbox = document.getElementById('showPrice');
-    
+
     // Setup radio button listeners with arrow function to ensure proper context
     priceTypeRadios.forEach(radio => {
         radio.onchange = () => {
-            console.log('Radio changed to:', radio.value);
             updatePriceTypePreview();
         };
     });
-    
+
     // Setup checkbox listener
     if (showPriceCheckbox) {
         showPriceCheckbox.onchange = () => {
-            console.log('Show price toggled');
             updatePriceTypePreview();
         };
     }
-    
+
     // Set confirmPrintCode handler
     const confirmPrintCode = document.getElementById('confirmPrintCode');
     if (confirmPrintCode) {
@@ -1020,19 +1028,19 @@ function printCode(qr, barcode, productName, productCode, tradePrice, companyNam
             const copies = parseInt(document.getElementById('printCopies').value) || 1;
             const showPrice = document.getElementById('showPrice').checked;
             const priceType = document.querySelector('input[name="printPriceType"]:checked').value;
-            
+
             let displayPrice = tradePrice;
             if (priceType === 'wholesale') {
                 displayPrice = wholesalePrice || tradePrice;
             } else if (priceType === 'mrp') {
                 displayPrice = mrpPrice || tradePrice;
             }
-            
+
             const printWindow = window.open('', '', 'width=800,height=600');
             printWindow.document.write('<html><head><title>Print Code</title>');
             printWindow.document.write('<style>body{font-family:Arial,sans-serif;text-align:center;padding:20px;}.print-item{margin:20px;page-break-inside:avoid;display:inline-block;}.company{font-size:18px;font-weight:700;margin-bottom:10px;}.details{margin-top:10px;}.name{font-size:16px;font-weight:600;margin-bottom:8px;}.price{font-size:15px;font-weight:700;color:#1f7bff;}</style>');
             printWindow.document.write('</head><body>');
-            
+
             for (let i = 0; i < copies; i++) {
                 printWindow.document.write('<div class="print-item">');
                 if (companyName) {
@@ -1048,7 +1056,7 @@ function printCode(qr, barcode, productName, productCode, tradePrice, companyNam
                 }
                 printWindow.document.write('</div></div>');
             }
-            
+
             printWindow.document.write('</body></html>');
             printWindow.document.close();
             printWindow.focus();
@@ -1059,9 +1067,9 @@ function printCode(qr, barcode, productName, productCode, tradePrice, companyNam
             modal.style.display = 'none';
         };
     }
-    
+
     modal.onclick = (e) => { if (e.target === modal) modal.style.display = 'none'; };
-    
+
     // Update preview on initial load
     updatePriceTypePreview();
 }
@@ -1069,15 +1077,15 @@ function printCode(qr, barcode, productName, productCode, tradePrice, companyNam
 function openAiqModal() {
     const aiqModal = document.getElementById('aiqModal');
     if (!aiqModal) return;
-    
+
     const mfgDateInput = document.getElementById('aiqMfgDate');
     const expDateInput = document.getElementById('aiqExpDate');
     const copiesInput = document.getElementById('aiqCopies');
-    
+
     if (mfgDateInput) mfgDateInput.value = '';
     if (expDateInput) expDateInput.value = '';
     if (copiesInput) copiesInput.value = '1';
-    
+
     aiqModal.style.display = 'flex';
 }
 
@@ -1090,13 +1098,13 @@ function handleAiqPrint() {
     const mfgDateInput = document.getElementById('aiqMfgDate');
     const expDateInput = document.getElementById('aiqExpDate');
     const copiesInput = document.getElementById('aiqCopies');
-    
+
     if (!mfgDateInput || !expDateInput || !copiesInput) return;
-    
+
     const mfgDate = mfgDateInput.value;
     const expDate = expDateInput.value;
     const copies = parseInt(copiesInput.value) || 1;
-    
+
     const printWindow = window.open('', '', 'width=800,height=600');
     printWindow.document.write('<html><head><title></title>');
     printWindow.document.write(`<style>
@@ -1110,17 +1118,17 @@ function handleAiqPrint() {
         @media print { body { margin: 0; padding: 5px; } .page { page-break-after: always; } }
     </style>`);
     printWindow.document.write('</head><body>');
-    
+
     let labelCount = 0;
     let pageLabels = 0;
-    
+
     for (let i = 0; i < copies; i++) {
         if (labelCount === 0) {
             if (pageLabels > 0) printWindow.document.write('</div>');
             printWindow.document.write('<div class="page">');
             pageLabels++;
         }
-        
+
         printWindow.document.write('<div class="label">');
         printWindow.document.write('<div class="label-header"></div>');
         if (mfgDate) {
@@ -1130,13 +1138,13 @@ function handleAiqPrint() {
             printWindow.document.write('<div class="label-row"><span class="label-key">Exp Date:</span><div class="label-value">' + expDate + '</div></div>');
         }
         printWindow.document.write('</div>');
-        
+
         labelCount++;
         if (labelCount === 20) {
             labelCount = 0;
         }
     }
-    
+
     printWindow.document.write('</div></body></html>');
     printWindow.document.close();
     printWindow.focus();
@@ -1147,21 +1155,20 @@ function handleAiqPrint() {
     closeAiqModal();
 }
 
-
 const ALL_COLUMNS = [
     { key: 'code', label: 'Product Code' },
     { key: 'name', label: 'Name' },
     { key: 'type', label: 'Type' },
     { key: 'uom', label: 'UOM' },
     { key: 'category', label: 'Category' },
-   { key: 'vendor', label: 'Vendor' },
-{ key: 'itemCompany', label: 'Item Company' },
-{ key: 'price', label: 'Price' },
-   { key: 'purchasePrice', label: 'Purchase Price' },
-{ key: 'batchNo', label: 'Batch No' },
-{ key: 'batchExpiryDate', label: 'Batch Expiry Date' },
-{ key: 'stock', label: 'Stock' },
-{ key: 'status', label: 'Status' }
+    { key: 'vendor', label: 'Vendor' },
+    { key: 'itemCompany', label: 'Item Company' },
+    { key: 'price', label: 'Price' },
+    { key: 'purchasePrice', label: 'Purchase Price' },
+    { key: 'batchNo', label: 'Batch No' },
+    { key: 'batchExpiryDate', label: 'Batch Expiry Date' },
+    { key: 'stock', label: 'Stock' },
+    { key: 'status', label: 'Status' }
 ];
 
 function getColumnPrefs() {
