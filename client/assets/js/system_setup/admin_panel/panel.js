@@ -2,6 +2,7 @@ let users = [];
 let roles = [];
 let employees = [];
 let allBranches = [];
+let allCounters = [];
 let stats = { total: 0, active: 0, blocked: 0 };
 
 // ========== PROGRESS BAR HELPER FUNCTIONS ==========
@@ -95,6 +96,17 @@ async function fetchBranches() {
         if (data.success) allBranches = data.branches;
     } catch (error) {
         console.error('Error fetching branches:', error);
+    }
+}
+
+// Fetch counters from API
+async function fetchCounters() {
+    try {
+        const response = await fetch('../../../../server/api/system_setup/admin_panel/get-counters.php');
+        const data = await response.json();
+        if (data.success) allCounters = data.counters;
+    } catch (error) {
+        console.error('Error fetching counters:', error);
     }
 }
 
@@ -214,7 +226,7 @@ function renderUsersTable() {
     });
 }
 
-// ─── Branch Multi-Select Helper ────────────────────────────────────────────
+// ─── Multi-Select Picker Helpers ───────────────────────────────────────────
 
 function initPicker(searchId, dropdownId, tagsId, hiddenId, allItems, getLabel, getTag, preselected = [], emptyHint = '') {
     const searchInput = document.getElementById(searchId);
@@ -287,14 +299,32 @@ function initBranchPicker(searchId, dropdownId, tagsId, hiddenId, preselected = 
     );
 }
 
+function initCounterPicker(searchId, dropdownId, tagsId, hiddenId, preselected = []) {
+    initPicker(
+        searchId, dropdownId, tagsId, hiddenId,
+        allCounters,
+        c => `${c.branch_code ? c.branch_code + ' - ' : ''}${c.branch_name ? c.branch_name + ' > ' : ''}${c.counter_name}`,
+        c => `${c.branch_code ? c.branch_code + ' / ' : ''}${c.counter_name}`,
+        preselected,
+        'No counter selected.'
+    );
+}
+
 // ─── Modal functions ─────────────────────────────────────────────────────────
 function openCreateUserModal() {
     document.getElementById('createUserModal').style.display = 'flex';
+
     document.getElementById('createBranchIds').value = '[]';
     document.getElementById('createSelectedBranches').innerHTML = '';
     document.getElementById('createBranchSearch').value = '';
     document.getElementById('createBranchDropdown').style.display = 'none';
     initBranchPicker('createBranchSearch', 'createBranchDropdown', 'createSelectedBranches', 'createBranchIds', []);
+
+    document.getElementById('createCounterIds').value = '[]';
+    document.getElementById('createSelectedCounters').innerHTML = '';
+    document.getElementById('createCounterSearch').value = '';
+    document.getElementById('createCounterDropdown').style.display = 'none';
+    initCounterPicker('createCounterSearch', 'createCounterDropdown', 'createSelectedCounters', 'createCounterIds', []);
 }
 
 function closeCreateUserModal() {
@@ -302,6 +332,8 @@ function closeCreateUserModal() {
     document.getElementById('createUserForm').reset();
     document.getElementById('createSelectedBranches').innerHTML = '';
     document.getElementById('createBranchIds').value = '';
+    document.getElementById('createSelectedCounters').innerHTML = '';
+    document.getElementById('createCounterIds').value = '';
 }
 
 async function openEditUserModal(userId) {
@@ -313,6 +345,13 @@ async function openEditUserModal(userId) {
         const brRes = await fetch(`../../../../server/api/system_setup/admin_panel/user-branch.php?user_id=${userId}`);
         const brData = await brRes.json();
         if (brData.success) preselectedBranches = brData.branches.map(b => b.branch_id);
+    } catch (_) { }
+
+    let preselectedCounters = [];
+    try {
+        const cRes = await fetch(`../../../../server/api/system_setup/admin_panel/user-counter.php?user_id=${userId}`);
+        const cData = await cRes.json();
+        if (cData.success) preselectedCounters = cData.counters.map(c => c.counter_id);
     } catch (_) { }
 
     const modalBody = document.querySelector('#editUserModal .modal-body');
@@ -361,6 +400,15 @@ async function openEditUserModal(userId) {
                     <div id="editSelectedBranches" style="display:flex; flex-wrap:wrap; gap:6px; margin-top:8px;"></div>
                     <input type="hidden" id="editBranchIds" value="">
                 </div>
+                <div class="form-group" style="grid-column: 1 / -1;">
+                    <label class="form-label">Counter Access</label>
+                    <div style="position: relative;">
+                        <input type="text" id="editCounterSearch" class="form-input" placeholder="Search counters..." autocomplete="off">
+                        <div id="editCounterDropdown" style="display:none; position:absolute; top:100%; left:0; right:0; background:var(--surface-card); border:1px solid var(--border-default); border-radius:var(--radius); max-height:200px; overflow-y:auto; z-index:1050; box-shadow:0 4px 12px rgba(0,0,0,0.1);"></div>
+                    </div>
+                    <div id="editSelectedCounters" style="display:flex; flex-wrap:wrap; gap:6px; margin-top:8px;"></div>
+                    <input type="hidden" id="editCounterIds" value="">
+                </div>
             </div>
         </form>
     `;
@@ -369,6 +417,7 @@ async function openEditUserModal(userId) {
     window.currentEditingUserId = userId;
 
     initBranchPicker('editBranchSearch', 'editBranchDropdown', 'editSelectedBranches', 'editBranchIds', preselectedBranches);
+    initCounterPicker('editCounterSearch', 'editCounterDropdown', 'editSelectedCounters', 'editCounterIds', preselectedCounters);
 }
 
 function closeEditUserModal() {
@@ -422,7 +471,7 @@ function renderPermissionsTree(permissions) {
         'Financial Reports': ['General Ledger', 'Customer Ledger', 'Our Standing', 'Supplier Ledger', 'Both (Customer + Supplier) Ledger', 'Customer Aging', 'Supplier Aging', 'Recovery Sheet', 'Customer Summary Division Report (CSDR)', 'Sales Officer-wise Recovery', 'Trial Balance', 'Balance Sheet', 'Profit & Loss Statement', 'Cash Flow', 'Counter Cash Flow', 'Financial Summary', 'Pending DSR Sheet', 'Project Tracking', 'Container Tracking'],
         'HRM': ['New Employee', 'Record Attendance', 'Biometric Devices', 'Leave Management', 'New Payroll', 'Employees Ledger'],
         'Master Setup': ['Branch Setup', 'Counter Setup', 'Counter Cash', 'Counter Settlement', 'Territory Setup', 'Rate List Setup', 'Tax Rates Setup', 'Tax Regimes Setup', 'Project Setup'],
-'System Setup': ['Company Profile', 'Admin Panel', 'Currency Setup', 'Software Info', 'GL Debug']
+        'System Setup': ['Company Profile', 'Admin Panel', 'Currency Setup', 'Software Info', 'GL Debug']
     };
 
     const subPermissions = ['Add', 'Edit', 'Delete'];
@@ -793,6 +842,12 @@ async function createUser() {
         branchIds = JSON.parse(document.getElementById('createBranchIds').value || '[]');
     } catch (_) { branchIds = []; }
 
+    // Parse selected counter IDs
+    let counterIds = [];
+    try {
+        counterIds = JSON.parse(document.getElementById('createCounterIds').value || '[]');
+    } catch (_) { counterIds = []; }
+
     try {
         // Step 1 — create user
         const response = await fetch('../../../../server/api/system_setup/admin_panel/user-add.php', {
@@ -838,6 +893,20 @@ async function createUser() {
             }
         }
 
+        // Step 4 — save counter access
+        if (counterIds.length > 0 && newUserId) {
+            const counterResponse = await fetch('../../../../server/api/system_setup/admin_panel/user-counter.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ user_id: newUserId, counter_ids: counterIds })
+            });
+            const counterData = await counterResponse.json();
+            if (!counterData.success) {
+                alert('User created but counter access assignment failed: ' + counterData.message);
+                closeCreateUserModal(); fetchUsers(); return;
+            }
+        }
+
         alert('User created successfully!');
         closeCreateUserModal();
         fetchUsers();
@@ -863,6 +932,9 @@ async function saveUser() {
 
     let branchIds = [];
     try { branchIds = JSON.parse(document.getElementById('editBranchIds').value || '[]'); } catch (_) { }
+
+    let counterIds = [];
+    try { counterIds = JSON.parse(document.getElementById('editCounterIds').value || '[]'); } catch (_) { }
 
     try {
         // Step 1 — update user details
@@ -909,6 +981,18 @@ async function saveUser() {
         const branchData = await branchResponse.json();
         if (!branchData.success) {
             alert('User updated but branch access save failed: ' + branchData.message);
+            closeEditUserModal(); fetchUsers(); return;
+        }
+
+        // Step 4 — save counter access
+        const counterResponse = await fetch('../../../../server/api/system_setup/admin_panel/user-counter.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ user_id: parseInt(userId), counter_ids: counterIds })
+        });
+        const counterData = await counterResponse.json();
+        if (!counterData.success) {
+            alert('User updated but counter access save failed: ' + counterData.message);
             closeEditUserModal(); fetchUsers(); return;
         }
 
@@ -1243,6 +1327,7 @@ document.addEventListener('DOMContentLoaded', function () {
     fetchUsers();
     fetchRoles();
     fetchBranches();
+    fetchCounters();
 
     // Close modals when clicking outside
     const modals = document.querySelectorAll('.modal-overlay');

@@ -441,6 +441,15 @@ if (!$user_id) {
                             <div id="createSelectedBranches" style="display:flex; flex-wrap:wrap; gap:6px; margin-top:8px;"></div>
                             <input type="hidden" id="createBranchIds" value="">
                         </div>
+                        <div class="form-group" style="grid-column: 1 / -1;">
+    <label class="form-label">Counter Access</label>
+    <div style="position: relative;">
+        <input type="text" id="createCounterSearch" class="form-input" placeholder="Search counters..." autocomplete="off">
+        <div id="createCounterDropdown" style="display:none; position:absolute; top:100%; left:0; right:0; background:var(--surface-card); border:1px solid var(--border-default); border-radius:var(--radius); max-height:200px; overflow-y:auto; z-index:1050; box-shadow:0 4px 12px rgba(0,0,0,0.1);"></div>
+    </div>
+    <div id="createSelectedCounters" style="display:flex; flex-wrap:wrap; gap:6px; margin-top:8px;"></div>
+    <input type="hidden" id="createCounterIds" value="">
+</div>
                     </div>
                 </form>
             </div>
