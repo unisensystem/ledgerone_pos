@@ -17,7 +17,7 @@
         }
         
         body {
-            font-family: 'Courier New', monospace;
+               font-family: math;
             font-size: 14px;
             line-height: 1.5;
             color: #000;
