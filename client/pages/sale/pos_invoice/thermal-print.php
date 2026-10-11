@@ -386,7 +386,7 @@
         <div class="footer text-center">
             <div>Payment Method: <span id="paymentMethod">-</span></div>
             <div style="margin-top: 5px;">Thank you for your business!</div>
-            <div style="margin-top: 8px; font-size: 10px;">Printed By: <span id="printedBy">-</span></div>
+            <div style="margin-top: 8px; font-size: 10px; display: none;">Printed By: <span id="printedBy">-</span></div>
             <div style="font-size: 10px;">Printed: <span id="printedDate"></span></div>
             <div id="qrCodeSection" style="margin-top: 8px; display: none;">
                 <div id="qrCode" style="display: inline-block;"></div>
@@ -394,9 +394,9 @@
             <div style="margin-top: 10px; border-top: 1px dashed #000; padding-top: 8px; font-size: 10px; line-height: 1.6;">
                 <div style="font-weight: bold;">Software by: UNISEN SYSTEMS</div>
                 <div>Contact: +92 346 8918711</div>
-                <div>+92 335 3789981</div>
-                <div>Email: support@unisensystems.com</div>
-                <div>www.unisensystems.com</div>
+                <!-- <div>+92 335 3789981</div> -->
+                <!-- <div>Email: support@unisensystems.com</div>
+                <div>www.unisensystems.com</div> -->
             </div>
         </div>
     </div>
