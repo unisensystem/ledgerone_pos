@@ -1047,12 +1047,14 @@ function initCustomerSearch() {
             e.preventDefault();
             selectedIndex = Math.max(selectedIndex - 1, -1);
             updateSelection(visible);
-        } else if (e.key === 'Enter') {
+                } else if (e.key === 'Enter') {
             e.preventDefault();
             if (selectedIndex >= 0 && visible[selectedIndex]) {
                 visible[selectedIndex].click();
             } else if (visible.length > 0) {
                 visible[0].click();
+            } else if (search.value.trim()) {
+                createCustomerByName(search.value.trim());
             }
         }
     });
@@ -1060,6 +1062,60 @@ function initCustomerSearch() {
     document.addEventListener('click', function() {
         optionsDiv.style.display = 'none';
     });
+}
+async function createCustomerByName(name) {
+    if (createCustomerByName._busy) return;
+
+    const companyId = currentInvoice.company || document.getElementById('company').value;
+    if (!companyId) {
+        alert('Please select a company first!');
+        return;
+    }
+if (!confirm(`Customer "${name}" not found. Would you like to create a new customer?`)) return;
+
+    createCustomerByName._busy = true;
+    try {
+const response = await fetch('../../../../server/api/sale/pos_invoice/quick-add-customer.php', {
+                method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ customerName: name, companyId: parseInt(companyId) })
+        });
+        const data = await response.json();
+
+        if (!data.success) {
+            alert('Error: ' + data.message);
+            return;
+        }
+
+        const c = data.customer;
+        customersData.push(c);
+
+        // Add to dropdown list (without reloading everything)
+        const label = `${c.customer_code} - ${c.customer_name}`;
+        const div = document.createElement('div');
+        div.className = 'dropdown-option';
+        div.style.cssText = 'padding: 8px 10px; cursor: pointer; border-bottom: 1px solid var(--border-default);';
+        div.textContent = label;
+        div.dataset.id = c.id;
+        div.addEventListener('click', function () {
+            selectCustomer(c.id, label);
+            document.getElementById('customer')._justSelected = true;
+            fetchCustomerBalance(c.id);
+            document.getElementById('supplierMan').value = '';
+        });
+        document.getElementById('customerOptions').appendChild(div);
+
+        selectCustomer(c.id, label);
+        document.getElementById('customer')._justSelected = true;
+        await fetchCustomerBalance(c.id);
+        document.getElementById('supplierMan').value = '';
+        showNotification('New customer added: ' + c.customer_name);
+        document.getElementById('quickProduct').focus();
+    } catch (error) {
+        alert('Error adding customer: ' + error.message);
+    } finally {
+        createCustomerByName._busy = false;
+    }
 }
 
 async function fetchCustomerBalance(customerId) {
