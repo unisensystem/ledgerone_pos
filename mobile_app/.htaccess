@@ -1,0 +1,14 @@
+# Flutter web keeps the same filenames (main.dart.js, ledgerone-worker.js,
+# index.html, ...) across every deploy -- only their content changes. Without
+# this, Cloudflare/the browser can keep serving a stale copy of these for
+# hours after a deploy (the default static-asset cache lifetime), which also
+# starves our own service worker's update check: the browser only notices a
+# new ledgerone-worker.js if the HTTP fetch for it actually reaches the
+# network instead of being satisfied from cache. That combination is what let
+# a deployed fix sit invisible to already-installed PWA users. CanvasKit/font
+# binaries aren't in this list -- those are fine to cache normally.
+<IfModule mod_headers.c>
+    <FilesMatch "\.(html|js|json|wasm)$">
+        Header set Cache-Control "no-cache, must-revalidate"
+    </FilesMatch>
+</IfModule>
