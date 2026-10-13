@@ -157,10 +157,11 @@ class _CustomerLedgerScreenState extends State<CustomerLedgerScreen> {
           _hasLoadedSummary = true;
         });
       } else {
+        debugPrint('Customer Ledger summary load failed: $e');
         setState(
           () => _ledgerError =
               'Could not load balance. Make sure you have an internet '
-              'connection, then try again.\n($e)',
+              'connection, then try again.',
         );
       }
     }
@@ -182,10 +183,11 @@ class _CustomerLedgerScreenState extends State<CustomerLedgerScreen> {
           _hasLoadedDetailed = true;
         });
       } catch (e) {
+        debugPrint('Customer Ledger detailed load failed: $e');
         setState(
           () => _detailedError =
               'Detailed transactions need an internet connection. '
-              'The balance above is still available offline.\n($e)',
+              'The balance above is still available offline.',
         );
       }
     }
