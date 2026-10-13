@@ -31395,7 +31395,7 @@ break
 case 3:s=2
 break
 case 6:k=b?"thermal":"full"
-q=A.aUb(A.eO("http://localhost/ledgerone_erp/server/api/mobile/auth/print-bridge.php?nonce="+A.h(j)+"&id="+a+"&type="+k,0,null),B.Lo)
+q=A.aUb(A.eO("https://ledgerone.unisensystems.com/server/api/mobile/auth/print-bridge.php?nonce="+A.h(j)+"&id="+a+"&type="+k,0,null),B.Lo)
 s=1
 break
 case 1:return A.p(q,r)
@@ -115254,7 +115254,7 @@ r($,"bpu","aVe",()=>A.aZT("initializeDateFormatting(<locale>)",B.PQ))
 s($,"bph","b5i",()=>48)
 s($,"bk1","b2b",()=>A.b([A.bx("^'(?:[^']|'')*'",!1,!1),A.bx("^(?:G+|y+|M+|k+|S+|E+|a+|h+|K+|H+|c+|L+|Q+|d+|D+|m+|s+|v+|z+|Z+)",!1,!1),A.bx("^[^'GyMkSEahKHcLQdDmsvzZ]+",!1,!1)],A.aH("E<aYJ>")))
 s($,"bn3","b3H",()=>A.bx("''",!1,!1))
-s($,"bjG","bN",()=>{var q=A.b67("http://localhost/ledgerone_erp",B.q4,B.q4,new A.a5Y()),p=A.b1i(),o=new A.Qf(A.b([B.Fw],A.aH("E<ij?>")))
+s($,"bjG","bN",()=>{var q=A.b67("https://ledgerone.unisensystems.com",B.q4,B.q4,new A.a5Y()),p=A.b1i(),o=new A.Qf(A.b([B.Fw],A.aH("E<ij?>")))
 o.J(o,B.NC)
 p=new A.a9f(p,o,A.b1i(),new A.adm(51200),!1)
 p.a1T$=q
