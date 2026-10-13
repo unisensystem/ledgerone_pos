@@ -8,5 +8,5 @@
 /// local XAMPP dev setup). Switch back to a `localhost`/LAN-IP value only
 /// for local dev testing against XAMPP.
 class ApiConfig {
-  static const String baseUrl = 'https://ledgerone.unisensystems.com';
+  static const String baseUrl = 'http://localhost/ledgerone_erp';
 }

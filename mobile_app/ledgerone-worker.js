@@ -13,7 +13,7 @@
 // data, and the app's own ReferenceCache (see lib/core/reference_cache.dart)
 // already handles graceful offline fallback for that data at the Dart
 // level. This worker is only responsible for the app shell booting at all.
-const CACHE_VERSION = '20261013211925';
+const CACHE_VERSION = '20261014020232';
 const CACHE_NAME = 'ledgerone-shell-' + CACHE_VERSION;
 const SCOPE = self.registration.scope;
 

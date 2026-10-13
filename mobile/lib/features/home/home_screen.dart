@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/outbox_service.dart';
+import '../../core/sync_everything_service.dart';
 import '../../core/sync_service.dart';
 import '../auth/auth_provider.dart';
 import '../customer_ledger/customer_ledger_screen.dart';
@@ -68,6 +69,8 @@ class HomeScreen extends ConsumerWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: const [
                   _SyncSummaryCard(),
+                  SizedBox(height: 12),
+                  _SyncEverythingCard(),
                   SizedBox(height: 22),
                   Text(
                     'Quick Actions',
@@ -393,6 +396,238 @@ class _SyncSummaryCardState extends State<_SyncSummaryCard> {
                       ),
               ),
             ),
+        ],
+      ),
+    );
+  }
+}
+
+String _timeAgo(DateTime t) {
+  final diff = DateTime.now().difference(t);
+  if (diff.inMinutes < 1) return 'just now';
+  if (diff.inMinutes < 60) return '${diff.inMinutes} min ago';
+  if (diff.inHours < 24) return '${diff.inHours} hour${diff.inHours == 1 ? '' : 's'} ago';
+  return '${diff.inDays} day${diff.inDays == 1 ? '' : 's'} ago';
+}
+
+/// One-tap "refresh everything" — meant to be used once while on office
+/// WiFi before heading into the field, so every screen's cached reference
+/// data and every customer's Customer Ledger balance is as current as
+/// possible. See SyncEverythingService's doc comment for the full
+/// reasoning (manager/office requirement: offline Customer Ledger access
+/// shouldn't require having opened every single customer online first).
+class _SyncEverythingCard extends StatefulWidget {
+  const _SyncEverythingCard();
+
+  @override
+  State<_SyncEverythingCard> createState() => _SyncEverythingCardState();
+}
+
+class _SyncEverythingCardState extends State<_SyncEverythingCard> {
+  DateTime? _lastSync;
+  bool _running = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadLastSync();
+  }
+
+  Future<void> _loadLastSync() async {
+    final t = await SyncEverythingService.getLastSyncTime();
+    if (mounted) setState(() => _lastSync = t);
+  }
+
+  Future<void> _start() async {
+    final online = await SyncService.instance.isOnline();
+    if (!online) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Connect to the internet first, then try again.'),
+          ),
+        );
+      }
+      return;
+    }
+    if (!mounted) return;
+    setState(() => _running = true);
+    final failed = await showModalBottomSheet<int>(
+      context: context,
+      isDismissible: false,
+      enableDrag: false,
+      isScrollControlled: true,
+      builder: (_) => const _SyncEverythingSheet(),
+    );
+    if (!mounted) return;
+    setState(() => _running = false);
+    await _loadLastSync();
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          failed == null
+              ? 'Sync cancelled.'
+              : failed > 0
+              ? 'Synced — $failed customer balance${failed == 1 ? '' : 's'} could not be refreshed.'
+              : 'Everything refreshed.',
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 42,
+            height: 42,
+            decoration: BoxDecoration(
+              color: const Color(0xFFE8F1FF),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
+              Icons.sync_rounded,
+              color: _primaryBlue,
+              size: 22,
+            ),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Sync Everything',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 14,
+                    color: _textDark,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  _lastSync == null
+                      ? 'Never synced — tap to refresh all data'
+                      : 'Last synced: ${_timeAgo(_lastSync!)}',
+                  style: const TextStyle(fontSize: 12, color: _textMuted),
+                ),
+              ],
+            ),
+          ),
+          SizedBox(
+            height: 34,
+            child: ElevatedButton(
+              onPressed: _running ? null : _start,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: _primaryBlue,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 14),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              child: const Text(
+                'Sync Now',
+                style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Modal content for _SyncEverythingCard's run — a live progress bar plus
+/// the current step's label, so a long sync (large tenant, many customers)
+/// doesn't look stuck. Pops itself with the failure count once done.
+class _SyncEverythingSheet extends StatefulWidget {
+  const _SyncEverythingSheet();
+
+  @override
+  State<_SyncEverythingSheet> createState() => _SyncEverythingSheetState();
+}
+
+class _SyncEverythingSheetState extends State<_SyncEverythingSheet> {
+  String _label = 'Starting...';
+  int _current = 0;
+  int _total = 1;
+
+  @override
+  void initState() {
+    super.initState();
+    _run();
+  }
+
+  Future<void> _run() async {
+    final failed = await SyncEverythingService.run(
+      onProgress: (label, current, total) {
+        if (!mounted) return;
+        setState(() {
+          _label = label;
+          _current = current;
+          _total = total;
+        });
+      },
+    );
+    if (mounted) Navigator.of(context).pop(failed);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final progress = _total > 0 ? _current / _total : 0.0;
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+        24,
+        24,
+        24,
+        24 + MediaQuery.of(context).viewInsets.bottom,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Syncing everything...',
+            style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
+          ),
+          const SizedBox(height: 4),
+          const Text(
+            'This may take a while for a large customer list — it\'s safe to '
+            'leave this open.',
+            style: TextStyle(fontSize: 12, color: _textMuted),
+          ),
+          const SizedBox(height: 18),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(6),
+            child: LinearProgressIndicator(
+              value: progress.clamp(0.0, 1.0),
+              minHeight: 8,
+              backgroundColor: const Color(0xFFE8F1FF),
+              valueColor: const AlwaysStoppedAnimation(_primaryBlue),
+            ),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            '$_current / $_total — $_label',
+            style: const TextStyle(fontSize: 12.5, color: _textMuted),
+            overflow: TextOverflow.ellipsis,
+          ),
         ],
       ),
     );
