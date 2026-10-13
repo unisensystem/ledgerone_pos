@@ -1377,27 +1377,21 @@ class _SaleReturnScreenState extends State<SaleReturnScreen> {
     );
   }
 
+  // Field-use control: a return is always dated today, no picker — same
+  // "today only" rule as Sale Order's Sale Date (see sale_order_screen.dart's
+  // _dateField for the full reasoning). Doesn't apply to a line item's batch
+  // expiry date elsewhere on this screen — that's a product attribute, not
+  // a transaction date.
   Widget _dateField() {
-    return InkWell(
-      onTap: () async {
-        final picked = await showDatePicker(
-          context: context,
-          initialDate: _selectedReturnDate,
-          firstDate: DateTime(2020),
-          lastDate: DateTime.now().add(const Duration(days: 365)),
-        );
-        if (picked != null) setState(() => _selectedReturnDate = picked);
-      },
-      child: InputDecorator(
-        decoration: InputDecoration(
-          labelText: 'Return Date',
-          border: const OutlineInputBorder(),
-          filled: true,
-          fillColor: Colors.white,
-          suffixIcon: const Icon(Icons.calendar_today_outlined, size: 18),
-        ),
-        child: Text(DateFormat('dd MMM yyyy').format(_selectedReturnDate)),
+    return InputDecorator(
+      decoration: const InputDecoration(
+        labelText: 'Return Date',
+        border: OutlineInputBorder(),
+        filled: true,
+        fillColor: Color(0xFFF0F0F0),
+        suffixIcon: Icon(Icons.lock_outline, size: 16),
       ),
+      child: Text(DateFormat('dd MMM yyyy').format(_selectedReturnDate)),
     );
   }
 

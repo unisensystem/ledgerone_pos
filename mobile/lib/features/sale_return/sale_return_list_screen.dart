@@ -52,10 +52,22 @@ class _SaleReturnListScreenState extends State<SaleReturnListScreen> {
       final search = _searchController.text.trim().isEmpty
           ? null
           : _searchController.text.trim();
-      final fetchReturns = () =>
-          SaleReturnApi.getReturns(page: page, search: search, status: _status);
+      // Field-use control: a booker's list only ever shows today's own
+      // returns — matches the Return Date field being locked to today on
+      // the create/edit form (see sale_return_screen.dart's _dateField).
+      final today = DateFormat('yyyy-MM-dd').format(DateTime.now());
+      final fetchReturns = () => SaleReturnApi.getReturns(
+        page: page,
+        search: search,
+        status: _status,
+        dateFrom: today,
+        dateTo: today,
+      );
       final result = (page == 1 && search == null)
-          ? await ReferenceCache.cached('sr_list_page1_$_status', fetchReturns)
+          ? await ReferenceCache.cached(
+              'sr_list_page1_${_status}_$today',
+              fetchReturns,
+            )
           : await fetchReturns();
       setState(() {
         _returns = result['invoices'] as List<dynamic>? ?? [];

@@ -1160,30 +1160,21 @@ class _SaleOrderScreenState extends State<SaleOrderScreen> {
     ),
   );
 
-  // Matches web (order-add.php's <input type="date" id="saleDate" required>,
-  // defaulted to today but editable) — the mobile form was silently always
-  // sending today's date with no field to change it at all.
+  // Field-use control: a mobile order is always dated today, no picker — a
+  // booker backdating/forward-dating an order from their phone is exactly
+  // the kind of gap office review can't easily catch. _selectedSaleDate is
+  // reset to DateTime.now() on every "Create Another" (see _resetFormForAnother)
+  // so this stays correct even across a long session spanning midnight.
   Widget _dateField() {
-    return InkWell(
-      onTap: () async {
-        final picked = await showDatePicker(
-          context: context,
-          initialDate: _selectedSaleDate,
-          firstDate: DateTime(2020),
-          lastDate: DateTime.now().add(const Duration(days: 365)),
-        );
-        if (picked != null) setState(() => _selectedSaleDate = picked);
-      },
-      child: InputDecorator(
-        decoration: InputDecoration(
-          labelText: 'Sale Date',
-          border: const OutlineInputBorder(),
-          filled: true,
-          fillColor: Colors.white,
-          suffixIcon: const Icon(Icons.calendar_today_outlined, size: 18),
-        ),
-        child: Text(DateFormat('dd MMM yyyy').format(_selectedSaleDate)),
+    return InputDecorator(
+      decoration: const InputDecoration(
+        labelText: 'Sale Date',
+        border: OutlineInputBorder(),
+        filled: true,
+        fillColor: Color(0xFFF0F0F0),
+        suffixIcon: Icon(Icons.lock_outline, size: 16),
       ),
+      child: Text(DateFormat('dd MMM yyyy').format(_selectedSaleDate)),
     );
   }
 

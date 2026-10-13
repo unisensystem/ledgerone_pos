@@ -133,11 +133,16 @@ class ReceiveVoucherApi {
   }
 
   /// Vouchers this booker created (always only_mine for a mobile token —
-  /// enforced server-side, see receive-list.php).
+  /// enforced server-side, see receive-list.php). [dateFrom]/[dateTo]
+  /// (yyyy-MM-dd) default to today on both ends — see
+  /// receive_voucher_list_screen.dart — matching the "today only" control
+  /// vouchers are created under.
   static Future<Map<String, dynamic>> getVouchers({
     int page = 1,
     int limit = 20,
     String? search,
+    String? dateFrom,
+    String? dateTo,
   }) async {
     final res = await ApiClient.dio.get(
       '/server/api/vouchers/receive_voucher/receive-list.php',
@@ -146,6 +151,8 @@ class ReceiveVoucherApi {
         'limit': limit,
         'receive_type': 'customer',
         if (search != null && search.isNotEmpty) 'search': search,
+        if (dateFrom != null) 'date_from': dateFrom,
+        if (dateTo != null) 'date_to': dateTo,
       },
     );
     final data = res.data as Map;

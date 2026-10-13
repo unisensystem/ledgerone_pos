@@ -59,12 +59,17 @@ class SaleOrderApi {
   /// scoped to the signed-in booker's own orders (only_mine=1) — a field
   /// opt-in param web never sends, so web's own "every order in the
   /// tenant" behavior is untouched; a booker on the phone should see their
-  /// own work, not everyone's.
+  /// own work, not everyone's. [dateFrom]/[dateTo] (yyyy-MM-dd) default to
+  /// today on both ends — see sale_order_list_screen.dart — so a booker's
+  /// list only ever shows today's work, matching the "today only" control
+  /// orders are created under.
   static Future<Map<String, dynamic>> getOrders({
     int page = 1,
     int limit = 20,
     String? search,
     String orderStatus = 'Posted',
+    String? dateFrom,
+    String? dateTo,
   }) async {
     final res = await ApiClient.dio.get(
       '/server/api/sale/sale_order/order-list.php',
@@ -74,6 +79,8 @@ class SaleOrderApi {
         'only_mine': '1',
         'order_status': orderStatus,
         if (search != null && search.isNotEmpty) 'search': search,
+        if (dateFrom != null) 'date_from': dateFrom,
+        if (dateTo != null) 'date_to': dateTo,
       },
     );
     final data = res.data as Map;

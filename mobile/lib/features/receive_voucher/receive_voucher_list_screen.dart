@@ -54,12 +54,20 @@ class _ReceiveVoucherListScreenState extends State<ReceiveVoucherListScreen> {
       final search = _searchController.text.trim().isEmpty
           ? null
           : _searchController.text.trim();
-      final fetchVouchers = () =>
-          ReceiveVoucherApi.getVouchers(page: page, search: search);
+      // Field-use control: a booker's list only ever shows today's own
+      // vouchers — matches the Voucher Date field being locked to today on
+      // the create/edit form (see receive_voucher_screen.dart's _dateField).
+      final today = DateFormat('yyyy-MM-dd').format(DateTime.now());
+      final fetchVouchers = () => ReceiveVoucherApi.getVouchers(
+        page: page,
+        search: search,
+        dateFrom: today,
+        dateTo: today,
+      );
       // Only the unfiltered first page is worth caching for offline viewing
       // — search results are inherently a live server query.
       final result = (page == 1 && search == null)
-          ? await ReferenceCache.cached('rv_list_page1', fetchVouchers)
+          ? await ReferenceCache.cached('rv_list_page1_$today', fetchVouchers)
           : await fetchVouchers();
       setState(() {
         _vouchers = result['data'] as List<dynamic>? ?? [];

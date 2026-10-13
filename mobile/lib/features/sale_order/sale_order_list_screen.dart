@@ -61,14 +61,20 @@ class _SaleOrderListScreenState extends State<SaleOrderListScreen> {
       final search = _searchController.text.trim().isEmpty
           ? null
           : _searchController.text.trim();
+      // Field-use control: a booker's list only ever shows today's own
+      // orders — matches the Sale Date field being locked to today on the
+      // create/edit form (see sale_order_screen.dart's _dateField).
+      final today = DateFormat('yyyy-MM-dd').format(DateTime.now());
       final fetchOrders = () => SaleOrderApi.getOrders(
         page: page,
         search: search,
         orderStatus: _orderStatus,
+        dateFrom: today,
+        dateTo: today,
       );
       final result = (page == 1 && search == null)
           ? await ReferenceCache.cached(
-              'so_list_page1_$_orderStatus',
+              'so_list_page1_${_orderStatus}_$today',
               fetchOrders,
             )
           : await fetchOrders();

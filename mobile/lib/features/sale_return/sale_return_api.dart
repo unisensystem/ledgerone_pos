@@ -110,6 +110,8 @@ class SaleReturnApi {
     int limit = 20,
     String? search,
     String status = 'Posted',
+    String? dateFrom,
+    String? dateTo,
   }) async {
     final res = await ApiClient.dio.get(
       '/server/api/sale/sale_return/return-list.php',
@@ -118,6 +120,8 @@ class SaleReturnApi {
         'limit': limit,
         'status': status,
         if (search != null && search.isNotEmpty) 'search': search,
+        if (dateFrom != null) 'date_from': dateFrom,
+        if (dateTo != null) 'date_to': dateTo,
       },
     );
     final data = res.data as Map;
