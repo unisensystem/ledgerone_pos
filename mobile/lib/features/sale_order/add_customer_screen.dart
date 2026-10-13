@@ -127,43 +127,63 @@ class _AddCustomerScreenState extends State<AddCustomerScreen> {
     final phone = _phoneController.text.trim();
     final address = _addressController.text.trim();
 
-    // Offline-first: don't even attempt the network round trip if we
-    // already know there's no connectivity — go straight to the outbox,
-    // same as Sale Order/Receive Voucher.
-    if (!await SyncService.instance.isOnline()) {
-      await _queueOffline(clientUuid, name, phone, address);
-      return;
-    }
-
+    // Everything below is wrapped in one outer try/catch as a last-resort
+    // safety net: whatever goes wrong (the create call, the outbox write,
+    // the post-save dialog), the booker always sees a clear message with
+    // the real error attached, instead of the request silently going
+    // nowhere or a blank/stuck screen with no way to tell what happened.
     try {
-      final result = await SaleOrderApi.createCustomer(
-        companyId: _selectedCompanyId!,
-        customerName: name,
-        primaryPhone: phone,
-        address: address,
-        salesOfficerId: _selectedSalesOfficerId,
-        supplierManId: widget.defaultSupplierManId,
-        clientUuid: clientUuid,
-      );
+      // Offline-first: don't even attempt the network round trip if we
+      // already know there's no connectivity — go straight to the outbox,
+      // same as Sale Order/Receive Voucher.
+      if (!await SyncService.instance.isOnline()) {
+        await _queueOffline(clientUuid, name, phone, address);
+        return;
+      }
+
+      try {
+        final result = await SaleOrderApi.createCustomer(
+          companyId: _selectedCompanyId!,
+          customerName: name,
+          primaryPhone: phone,
+          address: address,
+          salesOfficerId: _selectedSalesOfficerId,
+          supplierManId: widget.defaultSupplierManId,
+          clientUuid: clientUuid,
+        );
+        if (!mounted) return;
+        setState(() => _saving = false);
+        await _handleCreated(
+          customerId: result['customer_id'],
+          customerCode: result['customer_code']?.toString(),
+          name: name,
+          address: address,
+        );
+      } catch (e) {
+        // The connectivity check above passed but the request still failed
+        // (dropped mid-flight, server unreachable, timeout) — fall back to
+        // the outbox instead of losing the booker's work. Same
+        // unconditional catch-then-queue as Sale Order/Receive Voucher —
+        // no "is this really a connectivity error" type check, since in
+        // practice (form validation already ran above) a failure here
+        // almost always is one, and even in the rare case it's a genuine
+        // server rejection, the retry at sync time will surface that
+        // clearly via the outbox's own failed-entry UI instead of
+        // silently losing the customer.
+        await _queueOffline(clientUuid, name, phone, address);
+      }
+    } catch (e, st) {
+      // Something failed outside the expected create-or-queue path itself
+      // (e.g. the outbox write, or building/showing the result dialog) —
+      // show it plainly rather than leaving the booker stuck on a
+      // spinner or a screen that silently did nothing.
+      debugPrint('AddCustomerScreen._save failed: $e\n$st');
       if (!mounted) return;
-      setState(() => _saving = false);
-      await _handleCreated(
-        customerId: result['customer_id'],
-        customerCode: result['customer_code']?.toString(),
-        name: name,
-        address: address,
-      );
-    } catch (e) {
-      // The connectivity check above passed but the request still failed
-      // (dropped mid-flight, server unreachable, timeout) — fall back to
-      // the outbox instead of losing the booker's work. Same unconditional
-      // catch-then-queue as Sale Order/Receive Voucher — no "is this really
-      // a connectivity error" type check, since in practice (form
-      // validation already ran above) a failure here almost always is one,
-      // and even in the rare case it's a genuine server rejection, the
-      // retry at sync time will surface that clearly via the outbox's own
-      // failed-entry UI instead of silently losing the customer.
-      await _queueOffline(clientUuid, name, phone, address);
+      setState(() {
+        _saving = false;
+        _error = 'Something went wrong saving this customer.\n'
+            '(${e.runtimeType}: $e)';
+      });
     }
   }
 
