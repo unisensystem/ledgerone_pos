@@ -36,7 +36,7 @@ try {
     }
 
     // Validate required fields
-    $required = ['saleDate', 'customerId', 'branchId', 'items'];
+    $required = ['saleDate', 'branchId', 'items'];
     foreach ($required as $field) {
         if (empty($input[$field])) {
             throw new Exception("Field {$field} is required");
@@ -45,6 +45,27 @@ try {
 
     if (empty($input['items']) || !is_array($input['items'])) {
         throw new Exception('At least one item is required');
+    }
+
+    // A customer created offline (mobile's "Add New Customer" while taking
+    // this very order) may not have a real customerId yet — it only gets
+    // one once ITS OWN outbox entry syncs. The order carries the customer's
+    // clientUuid instead in that case, resolved to a real id here. The
+    // outbox replays entries in creation order, so the customer's own entry
+    // syncs first; if it hasn't (still offline, or failed), resolution
+    // below fails loudly and this order stays queued for the next retry
+    // rather than silently attaching to the wrong/no customer.
+    if (!empty($input['customerId'])) {
+        $customerId = (int) $input['customerId'];
+    } elseif (!empty($input['customerClientUuid'])) {
+        $custStmt = $pdo->prepare("SELECT id FROM customers WHERE tenant_id = ? AND client_uuid = ?");
+        $custStmt->execute([$tenant_id, trim($input['customerClientUuid'])]);
+        $customerId = $custStmt->fetchColumn();
+        if (!$customerId) {
+            throw new Exception('Customer not yet synced — will retry once it syncs');
+        }
+    } else {
+        throw new Exception('Field customerId is required');
     }
 
     // Idempotent sync: the mobile app sends one client-generated UUID per
@@ -150,7 +171,7 @@ try {
                 $billNo,
                 $clientUuid,
                 $input['saleDate'],
-                $input['customerId'],
+                $customerId,
                 $input['branchId'],
                 extractBalanceAmount($input['previousBalance'] ?? '0.00'),
                 $input['salesOfficerId'] ?? null,
@@ -249,7 +270,7 @@ try {
             $input['currencyId'],
             $voucherNumber,
             $input['saleDate'],
-            $input['customerId'],
+            $customerId,
             $billNo,
             $input['amountPaid'],
             $paymentMethodId,
@@ -267,7 +288,7 @@ try {
         null,
         [
             'bill_no' => $billNo, 'sale_date' => $input['saleDate'], 'company_id' => $input['companyId'] ?? null,
-            'currency_id' => $input['currencyId'], 'customer_id' => $input['customerId'], 'branch_id' => $input['branchId'],
+            'currency_id' => $input['currencyId'], 'customer_id' => $customerId, 'branch_id' => $input['branchId'],
             'sale_officer_id' => $input['salesOfficerId'] ?? null, 'supplier_man_id' => $input['supplierManId'] ?? null,
             'project_id' => $input['projectId'] ?? null, 'bilty_no' => $input['biltyNo'] ?? null,
             'transport_name' => $input['transportName'] ?? null, 'total_bill' => $input['totalBill'],

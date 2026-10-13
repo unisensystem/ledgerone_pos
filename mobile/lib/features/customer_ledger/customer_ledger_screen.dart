@@ -1,5 +1,8 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../core/reference_cache.dart';
 import '../../core/searchable_field.dart';
@@ -20,10 +23,15 @@ const _subtext = Color(0xFF6B7280);
 /// and export/share/print tools — those are back-office report tooling, not
 /// something a field check needs; the summary + transaction list is.
 ///
-/// Requires connectivity: this is live financial data (invoices, payments,
-/// returns, PDCs, adjustments) computed server-side on every request, so
-/// there is nothing safe to cache/serve stale here the way reference data
-/// (companies/products) is cached elsewhere in this app.
+/// Live financial data (invoices, payments, returns, PDCs, adjustments) is
+/// computed server-side on every request, so it can never be truly
+/// "offline-capable" the way creating a record is — there's no live number
+/// to show without asking the server. What it CAN do, and does: after any
+/// successful load, the result is cached per customer; if a later load
+/// fails (no connectivity), that cached result is shown instead of a bare
+/// error, clearly labeled with when it was last fetched, so a booker who
+/// already checked a customer's balance before going offline can still see
+/// it in the field.
 class CustomerLedgerScreen extends StatefulWidget {
   const CustomerLedgerScreen({super.key});
 
@@ -48,6 +56,10 @@ class _CustomerLedgerScreenState extends State<CustomerLedgerScreen> {
   Map<String, dynamic>? _summary;
   List<dynamic> _transactions = [];
   bool _hasLoaded = false;
+  // Set when the data on screen is a cached fallback from a previous
+  // successful load, not what was just requested (that request failed —
+  // typically no connectivity).
+  DateTime? _cachedAsOf;
 
   @override
   void initState() {
@@ -106,9 +118,10 @@ class _CustomerLedgerScreenState extends State<CustomerLedgerScreen> {
       _loadingLedger = true;
       _ledgerError = null;
       _hasLoaded = false;
+      _cachedAsOf = null;
     });
+    final customerId = customer['id'] as int;
     try {
-      final customerId = customer['id'] as int;
       final fromStr = _fromDate != null ? _fmtDate(_fromDate!) : null;
       final toStr = _toDate != null ? _fmtDate(_toDate!) : null;
       final results = await Future.wait([
@@ -126,19 +139,73 @@ class _CustomerLedgerScreenState extends State<CustomerLedgerScreen> {
         ),
       ]);
       if (!mounted) return;
+      final summary = results[0] as Map<String, dynamic>?;
+      final transactions = results[1] as List<dynamic>;
       setState(() {
-        _summary = results[0] as Map<String, dynamic>?;
-        _transactions = results[1] as List<dynamic>;
+        _summary = summary;
+        _transactions = transactions;
         _hasLoaded = true;
       });
+      await _cacheLedger(customerId, summary, transactions);
     } catch (e) {
-      setState(
-        () => _ledgerError =
-            'Could not load ledger. Make sure you have an internet '
-            'connection, then try again.\n($e)',
-      );
+      final cached = await _loadCachedLedger(customerId);
+      if (cached != null) {
+        if (!mounted) return;
+        setState(() {
+          _summary = cached.$1;
+          _transactions = cached.$2;
+          _cachedAsOf = cached.$3;
+          _hasLoaded = true;
+        });
+      } else {
+        setState(
+          () => _ledgerError =
+              'Could not load ledger. Make sure you have an internet '
+              'connection, then try again.\n($e)',
+        );
+      }
     } finally {
       if (mounted) setState(() => _loadingLedger = false);
+    }
+  }
+
+  String _ledgerCacheKey(int customerId) => 'customer_ledger_cache_$customerId';
+
+  Future<void> _cacheLedger(
+    int customerId,
+    Map<String, dynamic>? summary,
+    List<dynamic> transactions,
+  ) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(
+        _ledgerCacheKey(customerId),
+        jsonEncode({
+          'summary': summary,
+          'transactions': transactions,
+          'cachedAt': DateTime.now().toIso8601String(),
+        }),
+      );
+    } catch (_) {
+      // Caching is best-effort — a failure here shouldn't affect the
+      // screen the booker is actually looking at.
+    }
+  }
+
+  Future<(Map<String, dynamic>?, List<dynamic>, DateTime)?> _loadCachedLedger(
+    int customerId,
+  ) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(_ledgerCacheKey(customerId));
+      if (raw == null) return null;
+      final decoded = jsonDecode(raw) as Map<String, dynamic>;
+      final summary = decoded['summary'] as Map<String, dynamic>?;
+      final transactions = List<dynamic>.from(decoded['transactions'] as List);
+      final cachedAt = DateTime.parse(decoded['cachedAt'] as String);
+      return (summary, transactions, cachedAt);
+    } catch (_) {
+      return null;
     }
   }
 
@@ -273,6 +340,37 @@ class _CustomerLedgerScreenState extends State<CustomerLedgerScreen> {
                 ],
                 if (_hasLoaded) ...[
                   const SizedBox(height: 20),
+                  if (_cachedAsOf != null) ...[
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFFF3E0),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(
+                            Icons.history_rounded,
+                            size: 16,
+                            color: Color(0xFFD97706),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Offline — showing data as of '
+                              '${DateFormat('dd MMM, hh:mm a').format(_cachedAsOf!)}. '
+                              'May not reflect the latest transactions.',
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: Color(0xFFD97706),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                  ],
                   _buildSummaryCard(),
                   const SizedBox(height: 16),
                   const Text(

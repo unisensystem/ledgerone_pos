@@ -37,7 +37,31 @@ try {
     if (empty($input['companyId'])) {
         throw new Exception('Company is required');
     }
-    
+
+    // Idempotent sync: the mobile app sends one client-generated UUID per
+    // customer created offline, and resends the same one on every retry. If
+    // a customer with this tenant_id + client_uuid already exists, hand
+    // back that existing customer instead of creating a duplicate — covers
+    // the case where the sync succeeded server-side but the app never saw
+    // the response (dropped connection, app killed mid-request, etc.) and
+    // retries blind.
+    $clientUuid = !empty($input['clientUuid']) ? trim($input['clientUuid']) : null;
+    if ($clientUuid !== null) {
+        $existingStmt = $pdo->prepare("SELECT id, customer_code, customer_name FROM customers WHERE tenant_id = ? AND client_uuid = ?");
+        $existingStmt->execute([$tenant_id, $clientUuid]);
+        $existing = $existingStmt->fetch(PDO::FETCH_ASSOC);
+        if ($existing) {
+            echo json_encode([
+                'success' => true,
+                'message' => 'Customer already synced',
+                'customer_code' => $existing['customer_code'],
+                'customer_id' => $existing['id'],
+                'already_synced' => true,
+            ]);
+            exit;
+        }
+    }
+
     $pdo->beginTransaction();
 
     // Generate customer code tenant-wide with lock to prevent duplicates
@@ -62,6 +86,7 @@ try {
         'customer_category_id' => !empty($input['customerCategoryId']) ? (int)$input['customerCategoryId'] : null,
         'brand_id' => !empty($input['brandId']) ? (int)$input['brandId'] : null,
         'customer_code' => $customer_code,
+        'client_uuid' => $clientUuid,
         'customer_name' => trim($input['customerName']),
         'shop_name' => !empty($input['shopName']) ? trim($input['shopName']) : null,
         'address' => !empty($input['address']) ? trim($input['address']) : null,
@@ -103,7 +128,7 @@ try {
     $data['id'] = $new_id;
     
     // Insert customer
-    $sql = "INSERT INTO customers (id, tenant_id, company_id, customer_type_id, customer_category_id, brand_id, customer_code, customer_name, shop_name, address, po_box_no, primary_phone, secondary_phone, identity_card_no, license_no, email, country_id, region_id, city_id, city_zone_id, area_id, associated_sales_officer_id, supplier_man_id, project_id, is_sales_tax_registered, strn, is_filer, ntn, advance_income_tax_percentage, default_discount_percentage, opening_debit_amount, opening_credit_amount, credit_limit, credit_period_limit_days, is_wholesaler, is_blacklisted, is_out_station, created_by, updated_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+    $sql = "INSERT INTO customers (id, tenant_id, company_id, customer_type_id, customer_category_id, brand_id, customer_code, client_uuid, customer_name, shop_name, address, po_box_no, primary_phone, secondary_phone, identity_card_no, license_no, email, country_id, region_id, city_id, city_zone_id, area_id, associated_sales_officer_id, supplier_man_id, project_id, is_sales_tax_registered, strn, is_filer, ntn, advance_income_tax_percentage, default_discount_percentage, opening_debit_amount, opening_credit_amount, credit_limit, credit_period_limit_days, is_wholesaler, is_blacklisted, is_out_station, created_by, updated_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
 
     $stmt = $pdo->prepare($sql);
     $stmt->execute([
@@ -114,6 +139,7 @@ try {
         $data['customer_category_id'],
         $data['brand_id'],
         $data['customer_code'],
+        $data['client_uuid'],
         $data['customer_name'],
         $data['shop_name'],
         $data['address'],

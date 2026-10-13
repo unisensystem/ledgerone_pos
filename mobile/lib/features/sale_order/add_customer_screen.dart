@@ -1,6 +1,10 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:uuid/uuid.dart';
 
+import '../../core/outbox_service.dart';
 import '../../core/reference_cache.dart';
+import '../../core/sync_service.dart';
 import 'sale_order_api.dart';
 
 /// "New customer on the spot" form. Calls the SAME
@@ -21,9 +25,13 @@ import 'sale_order_api.dart';
 ///   success it shows a confirmation and offers "Add Another" or "Done"
 ///   instead of returning anything.
 ///
-/// Requires connectivity either way: customer_code is generated server-side
-/// via a locked sequential counter (see customer-add.php), the same reason
-/// voucher/invoice numbers are never generated offline elsewhere in this app.
+/// Works offline like Sale Order/Receive Voucher: a failed online attempt
+/// queues into the shared outbox and the booker gets back a "pending"
+/// customer (see SaleOrderApi.buildPendingCustomer) they can immediately
+/// pick for an order — customer_code itself still only gets assigned once
+/// the entry actually syncs (it's a server-side locked sequential counter,
+/// same reason voucher/invoice numbers are never generated offline), but
+/// the booker never has to wait for that to keep working.
 class AddCustomerScreen extends StatefulWidget {
   final int? initialCompanyId;
   final int? defaultSalesOfficerId;
@@ -114,72 +122,158 @@ class _AddCustomerScreenState extends State<AddCustomerScreen> {
       _saving = true;
       _error = null;
     });
+
+    final clientUuid = const Uuid().v4();
+    final name = _nameController.text.trim();
+    final phone = _phoneController.text.trim();
+    final address = _addressController.text.trim();
+
+    // Offline-first: don't even attempt the network round trip if we
+    // already know there's no connectivity — go straight to the outbox,
+    // same as Sale Order/Receive Voucher.
+    if (!await SyncService.instance.isOnline()) {
+      await _queueOffline(clientUuid, name, phone, address);
+      return;
+    }
+
     try {
       final result = await SaleOrderApi.createCustomer(
         companyId: _selectedCompanyId!,
-        customerName: _nameController.text.trim(),
-        primaryPhone: _phoneController.text.trim(),
-        address: _addressController.text.trim(),
+        customerName: name,
+        primaryPhone: phone,
+        address: address,
         salesOfficerId: _selectedSalesOfficerId,
         supplierManId: widget.defaultSupplierManId,
+        clientUuid: clientUuid,
       );
       if (!mounted) return;
-
-      if (widget.embedded) {
-        Navigator.pop(context, {
-          'id': result['customer_id'],
-          'customer_code': result['customer_code'],
-          'customer_name': _nameController.text.trim(),
-          'current_balance': 0,
-          'address': _addressController.text.trim(),
-          'default_discount_percentage': 0,
-          'credit_limit': 0,
-          'associated_sales_officer_id': _selectedSalesOfficerId,
-          'supplier_man_id': widget.defaultSupplierManId,
-        });
-        return;
-      }
-
-      final customerName = _nameController.text.trim();
-      final customerCode = result['customer_code']?.toString() ?? '';
-      await showDialog<void>(
-        context: context,
-        builder: (dialogContext) => AlertDialog(
-          title: const Text('Customer Created'),
-          content: Text(
-            '"$customerName" was created successfully.\nCustomer Code: $customerCode',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.pop(dialogContext);
-                Navigator.pop(context);
-              },
-              child: const Text('Done'),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.pop(dialogContext);
-                _resetFormForAnother();
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF1F7BFF),
-                foregroundColor: Colors.white,
-              ),
-              child: const Text('Add Another'),
-            ),
-          ],
-        ),
+      setState(() => _saving = false);
+      await _handleCreated(
+        customerId: result['customer_id'],
+        customerCode: result['customer_code']?.toString(),
+        name: name,
+        address: address,
       );
     } catch (e) {
-      setState(
-        () => _error =
-            'Could not create customer. Make sure you have an internet '
-            'connection, then try again.\n($e)',
-      );
-    } finally {
-      if (mounted) setState(() => _saving = false);
+      if (e is DioException) {
+        // Connectivity check passed but the request still failed mid-flight
+        // (dropped connection, server unreachable) — fall back to the
+        // outbox instead of losing the booker's work, same as Sale Order.
+        await _queueOffline(clientUuid, name, phone, address);
+        return;
+      }
+      // Genuine server-side rejection (validation etc.) — show as an
+      // error; nothing to queue, retrying would just fail the same way.
+      setState(() {
+        _saving = false;
+        _error = 'Could not create customer.\n($e)';
+      });
     }
+  }
+
+  Future<void> _queueOffline(
+    String clientUuid,
+    String name,
+    String phone,
+    String address,
+  ) async {
+    await OutboxService.instance.add(
+      OutboxEntry(
+        clientUuid: clientUuid,
+        endpoint: SaleOrderApi.customerAddEndpoint,
+        label: 'New customer: $name',
+        payload: {
+          'clientUuid': clientUuid,
+          'customerName': name,
+          'companyId': _selectedCompanyId,
+          if (phone.isNotEmpty) 'primaryPhone': phone,
+          if (address.isNotEmpty) 'address': address,
+          if (_selectedSalesOfficerId != null)
+            'salesOfficerId': _selectedSalesOfficerId,
+          if (widget.defaultSupplierManId != null)
+            'supplierManId': widget.defaultSupplierManId,
+        },
+        createdAt: DateTime.now(),
+      ),
+    );
+    SyncService.instance.syncNow();
+    if (!mounted) return;
+    setState(() => _saving = false);
+    await _handleCreated(
+      customerId: null,
+      customerCode: null,
+      name: name,
+      address: address,
+      offline: true,
+      clientUuid: clientUuid,
+    );
+  }
+
+  Future<void> _handleCreated({
+    required dynamic customerId,
+    required String? customerCode,
+    required String name,
+    required String address,
+    bool offline = false,
+    String? clientUuid,
+  }) async {
+    if (!mounted) return;
+    if (widget.embedded) {
+      final customerMap = offline
+          ? SaleOrderApi.buildPendingCustomer(
+              clientUuid: clientUuid!,
+              customerName: name,
+              address: address,
+              salesOfficerId: _selectedSalesOfficerId,
+              supplierManId: widget.defaultSupplierManId,
+            )
+          : {
+              'id': customerId,
+              'customer_code': customerCode,
+              'customer_name': name,
+              'current_balance': 0,
+              'address': address,
+              'default_discount_percentage': 0,
+              'credit_limit': 0,
+              'associated_sales_officer_id': _selectedSalesOfficerId,
+              'supplier_man_id': widget.defaultSupplierManId,
+            };
+      Navigator.pop(context, customerMap);
+      return;
+    }
+
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(offline ? 'Saved Offline' : 'Customer Created'),
+        content: Text(
+          offline
+              ? '"$name" saved offline — it will sync automatically once '
+                  'you\'re back online. You can select it for an order right away.'
+              : '"$name" was created successfully.\nCustomer Code: $customerCode',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(dialogContext);
+              Navigator.pop(context);
+            },
+            child: const Text('Done'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(dialogContext);
+              _resetFormForAnother();
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF1F7BFF),
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Add Another'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override

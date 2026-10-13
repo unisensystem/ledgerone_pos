@@ -205,9 +205,13 @@ class _SaleOrderScreenState extends State<SaleOrderScreen> {
         SaleOrderRemembered.getCurrencyId(),
       ];
       final results = await Future.wait(futures);
+      final pendingCustomers = await SaleOrderApi.getPendingCustomers();
       _companies = results[0] as List<dynamic>;
       _branches = results[1] as List<dynamic>;
-      _customers = results[2] as List<dynamic>;
+      // Pending (offline-created, not yet synced) customers first so a
+      // booker picking up where they left off sees their own just-added
+      // customer at the top of the search results.
+      _customers = [...pendingCustomers, ...(results[2] as List<dynamic>)];
       _products = results[3] as List<dynamic>;
       _currencies = results[4] as List<dynamic>;
       _employees = results[5] as List<dynamic>;
@@ -476,10 +480,17 @@ class _SaleOrderScreenState extends State<SaleOrderScreen> {
 
     final customerLabel =
         '${_selectedCustomer!['customer_code']} - ${_selectedCustomer!['customer_name']}';
+    // A customer added offline moments ago (see _openAddCustomer) has no
+    // real id yet — send its clientUuid instead, resolved server-side once
+    // that customer's own outbox entry has synced.
+    final pendingCustomerUuid = _selectedCustomer!['client_uuid'] as String?;
     final payload = SaleOrderApi.buildOrderPayload(
       clientUuid: clientUuid,
       saleDate: DateFormat('yyyy-MM-dd').format(_selectedSaleDate),
-      customerId: _selectedCustomer!['id'] as int,
+      customerId: pendingCustomerUuid == null
+          ? _selectedCustomer!['id'] as int
+          : null,
+      customerClientUuid: pendingCustomerUuid,
       branchId: _selectedBranchId!,
       companyId: _selectedCompanyId!,
       currencyId: _selectedCurrencyId ?? 1,

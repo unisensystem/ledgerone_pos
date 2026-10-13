@@ -1,4 +1,5 @@
 import '../../core/api_client.dart';
+import '../../core/outbox_service.dart';
 
 /// Calls the existing server/api/sale/sale_order/*.php endpoints — the SAME
 /// backend the web app's Sale Order screen uses. No parallel mobile API.
@@ -189,7 +190,13 @@ class SaleOrderApi {
   static Map<String, dynamic> buildOrderPayload({
     required String clientUuid,
     required String saleDate,
-    required int customerId,
+    // Exactly one of these two is set: a real customerId for a customer
+    // that already exists server-side, or customerClientUuid when the
+    // booker picked a customer they created offline moments ago (see
+    // buildPendingCustomer) whose own outbox entry hasn't synced yet —
+    // order-add.php resolves that uuid to the real id once it has.
+    int? customerId,
+    String? customerClientUuid,
     required int branchId,
     required int companyId,
     required int currencyId,
@@ -213,7 +220,8 @@ class SaleOrderApi {
     return {
       'clientUuid': clientUuid,
       'saleDate': saleDate,
-      'customerId': customerId,
+      if (customerId != null) 'customerId': customerId,
+      if (customerClientUuid != null) 'customerClientUuid': customerClientUuid,
       'branchId': branchId,
       'companyId': companyId,
       'currencyId': currencyId,
@@ -245,10 +253,15 @@ class SaleOrderApi {
     return Map<String, dynamic>.from(res.data as Map);
   }
 
+  static const String customerAddEndpoint =
+      '/server/api/customer_supplier/customers/customer-add.php';
+
   /// Creates a brand-new customer on the spot (server/api/customer_supplier/
   /// customers/customer-add.php — same endpoint web's full customer-add page
-  /// uses). Requires connectivity: customer_code is assigned by a server-side
-  /// locked counter, so this is never queued in the offline outbox.
+  /// uses). [clientUuid] makes this idempotent on retry — if it's ever
+  /// queued offline (see [buildPendingCustomer]) and the sync replays it,
+  /// a repeat send with the same uuid returns the already-created customer
+  /// instead of making a duplicate.
   static Future<Map<String, dynamic>> createCustomer({
     required int companyId,
     required String customerName,
@@ -256,9 +269,10 @@ class SaleOrderApi {
     String? address,
     int? salesOfficerId,
     int? supplierManId,
+    String? clientUuid,
   }) async {
     final res = await ApiClient.dio.post(
-      '/server/api/customer_supplier/customers/customer-add.php',
+      customerAddEndpoint,
       data: {
         'companyId': companyId,
         'customerName': customerName,
@@ -267,6 +281,7 @@ class SaleOrderApi {
         if (address != null && address.isNotEmpty) 'address': address,
         if (salesOfficerId != null) 'salesOfficerId': salesOfficerId,
         if (supplierManId != null) 'supplierManId': supplierManId,
+        if (clientUuid != null) 'clientUuid': clientUuid,
       },
     );
     final data = res.data as Map;
@@ -274,5 +289,54 @@ class SaleOrderApi {
       throw Exception(data['message'] ?? 'Failed to create customer');
     }
     return Map<String, dynamic>.from(data);
+  }
+
+  /// Builds the local stand-in for a customer created while offline — same
+  /// shape as a real row from [getCustomers] so it drops straight into the
+  /// Customer search field, except `id` is null and `client_uuid` is set.
+  /// Screens that build an order payload must check for `client_uuid` and
+  /// send `customerClientUuid` instead of `customerId` when it's set — see
+  /// order-add.php, which resolves it to the real id once this customer's
+  /// own outbox entry has synced.
+  static Map<String, dynamic> buildPendingCustomer({
+    required String clientUuid,
+    required String customerName,
+    String? address,
+    int? salesOfficerId,
+    int? supplierManId,
+  }) {
+    return {
+      'id': null,
+      'client_uuid': clientUuid,
+      'customer_code': 'PENDING',
+      'customer_name': customerName,
+      'current_balance': 0,
+      'address': address ?? '',
+      'default_discount_percentage': 0,
+      'credit_limit': 0,
+      'associated_sales_officer_id': salesOfficerId,
+      'supplier_man_id': supplierManId,
+    };
+  }
+
+  /// Customers created offline whose outbox entry hasn't synced yet — read
+  /// live from the shared outbox (not a separate store) so this list can
+  /// never drift out of sync with what's actually still pending. Lets a
+  /// freshly reopened app still offer a just-created, not-yet-synced
+  /// customer in the Sale Order picker.
+  static Future<List<Map<String, dynamic>>> getPendingCustomers() async {
+    final entries = await OutboxService.instance.getAll();
+    return entries
+        .where((e) => e.endpoint == customerAddEndpoint)
+        .map(
+          (e) => buildPendingCustomer(
+            clientUuid: e.clientUuid,
+            customerName: e.payload['customerName']?.toString() ?? '',
+            address: e.payload['address']?.toString(),
+            salesOfficerId: e.payload['salesOfficerId'] as int?,
+            supplierManId: e.payload['supplierManId'] as int?,
+          ),
+        )
+        .toList();
   }
 }
