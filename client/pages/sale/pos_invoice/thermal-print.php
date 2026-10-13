@@ -95,7 +95,7 @@
         .items-table th {
             border-bottom: 1px solid #000;
             padding: 4px 0;
-            text-align: left;
+            text-align: center;
             font-weight: bold;
         }
         
@@ -332,11 +332,11 @@
         <table class="items-table">
             <thead>
                 <tr>
-                    <th style="width: 40%;">Item</th>
-                    <th style="width: 12%;" class="text-right">Qty</th>
-                    <th style="width: 18%;" class="text-right">Price</th>
-                    <th style="width: 15%;" class="text-right disc-col">Disc</th>
-                    <th style="width: 15%;" class="text-right">Total</th>
+                    <th style="width: 40%; text-align: left;">Item</th>
+                    <th style="width: 12%;" class="text-center">Qty</th>
+                    <th style="width: 18%;" class="text-center">Price</th>
+                    <th style="width: 15%;" class="text-center disc-col">Disc</th>
+                    <th style="width: 15%;" class="text-center">Total</th>
                 </tr>
             </thead>
             <tbody id="itemsTableBody">
@@ -598,14 +598,14 @@
                     const tradeOfferAmt = parseFloat(item.trade_offer_amount || 0);
                     const totalDisc = discountAmt + tradeOfferAmt;
                     
-                    const discCell = (!enableCashDiscountAmount && !enableTradeOfferAmount) ? '' : `<td class="text-right disc-col">${currencySymbol + totalDisc.toFixed(2)}</td>`;
+                    const discCell = (!enableCashDiscountAmount && !enableTradeOfferAmount) ? '' : `<td class="text-center disc-col">${totalDisc.toFixed(2)}</td>`;
                     
                     row.innerHTML = `
                         <td>${item.product_name}${childrenText}</td>
-                        <td class="text-right">${parseFloat(item.quantity).toFixed(2)}</td>
-                        <td class="text-right">${currencySymbol + parseFloat(item.sale_price).toFixed(2)}</td>
+                        <td class="text-center">${parseFloat(item.quantity).toFixed(2)}</td>
+                        <td class="text-center">${parseFloat(item.sale_price).toFixed(2)}</td>
                         ${discCell}
-                        <td class="text-right">${currencySymbol + parseFloat(item.net_amount).toFixed(2)}</td>
+                        <td class="text-center">${parseFloat(item.net_amount).toFixed(2)}</td>
                     `;
                 });
             } else {
@@ -621,14 +621,14 @@
                     const tradeOfferAmt = parseFloat(item.trade_offer_amount || 0);
                     const totalDisc = discountAmt + tradeOfferAmt;
                     
-                    const discCell = (!enableCashDiscountAmount && !enableTradeOfferAmount) ? '' : `<td class="text-right disc-col">${isChild ? '-' : currencySymbol + totalDisc.toFixed(2)}</td>`;
+                    const discCell = (!enableCashDiscountAmount && !enableTradeOfferAmount) ? '' : `<td class="text-center disc-col">${isChild ? '-' : totalDisc.toFixed(2)}</td>`;
                     
                     row.innerHTML = `
                         <td style="${textStyle}">${indent}${item.product_name}</td>
-                        <td class="text-right">${parseFloat(item.quantity).toFixed(2)}</td>
-                        <td class="text-right">${isChild ? '-' : currencySymbol + parseFloat(item.sale_price).toFixed(2)}</td>
+                        <td class="text-center">${parseFloat(item.quantity).toFixed(2)}</td>
+                        <td class="text-center">${isChild ? '-' : parseFloat(item.sale_price).toFixed(2)}</td>
                         ${discCell}
-                        <td class="text-right">${isChild ? '-' : currencySymbol + parseFloat(item.net_amount).toFixed(2)}</td>
+                        <td class="text-center">${isChild ? '-' : parseFloat(item.net_amount).toFixed(2)}</td>
                     `;
                 });
             }
@@ -659,14 +659,14 @@
                 });
             }
             
-            const totalsDiscCell = (!enableCashDiscountAmount && !enableTradeOfferAmount) ? '' : `<td class="text-right disc-col"></td>`;
+            const totalsDiscCell = (!enableCashDiscountAmount && !enableTradeOfferAmount) ? '' : `<td class="text-center disc-col"></td>`;
             
             totalsRow.innerHTML = `
                 <td>TOTALS</td>
-                <td class="text-right">${totalQty.toFixed(2)}</td>
-                <td class="text-right"></td>
+                <td class="text-center">${totalQty.toFixed(2)}</td>
+                <td class="text-center"></td>
                 ${totalsDiscCell}
-                <td class="text-right">${currencySymbol}${totalAmount.toFixed(2)}</td>
+                <td class="text-center">${totalAmount.toFixed(2)}</td>
             `;
             
             document.getElementById('totalBill').textContent = `${currencySymbol}${parseFloat(invoice.total_bill).toFixed(2)}`;

@@ -989,7 +989,7 @@ $user_employee_id = $user['employee_id'] ?? null;
 
             <!-- Customer & Payment -->
             <div class="customer-panel">
-                <div class="form-group-micro">
+                <!-- <div class="form-group-micro">
                     <div class="form-label">CUSTOMER</div>
                     <div style="display: flex; gap: 4px; position: relative;">
                         <div style="position: relative; flex: 1;">
@@ -1002,7 +1002,7 @@ $user_employee_id = $user['employee_id'] ?? null;
                         </button>
                     </div>
                     <div style="font-size: 10px; color: var(--subtext); margin-top: 2px;">F2: Change Customer</div>
-                </div>
+                </div> -->
 
                 <div class="form-group-micro">
                     <div class="form-label">SUPPLIER MAN</div>
@@ -1071,6 +1071,25 @@ $user_employee_id = $user['employee_id'] ?? null;
 
         <!-- Right Panel -->
         <div class="right-panel">
+
+                    <!-- Top Bar: Hide Panel | Customer | POS LIST -->
+            <div class="customer-panel" style="flex-direction: row; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 12px;">
+                <div id="topBarLeft" style="display: flex; align-items: center; gap: 8px;"></div>
+
+                <div style="display: flex; align-items: center; gap: 4px; margin-left: auto;">
+                    <div style="position: relative; width: 280px;">
+                        <input type="text" id="customerSearch" placeholder="Search customer..." autocomplete="off" class="font-bold" style="width: 100%;">
+                        <div id="customerOptions" style="display: none; position: absolute; top: 100%; left: 0; right: 0; background: white; border: 1px solid var(--border-default); border-radius: 4px; max-height: 200px; overflow-y: auto; z-index: 1000; box-shadow: 0 4px 8px rgba(0,0,0,0.1);"></div>
+                    </div>
+                    <input type="hidden" id="customer">
+                    <button class="btn btn-primary btn-micro" onclick="openCustomerForm()" title="Add New Customer (F2: Change Customer)" style="height: 32px; width: 32px;">
+                        <i class="fas fa-plus"></i>
+                    </button>
+<button class="btn btn-secondary" id="posListBtn" onclick="window.location.href='pos-list.php?from=pos'" style="padding: 0 12px;">
+                            <i class="fas fa-list"></i> POS LIST
+                    </button>
+                </div>
+            </div>
             <!-- Quick Product Entry -->
             <div class="quick-entry">
                 <div class="form-group-micro" style="position: relative; flex: 1;">
@@ -1508,6 +1527,18 @@ $user_employee_id = $user['employee_id'] ?? null;
                 if (themeToggleText) themeToggleText.textContent = 'Dark Mode';
             }
         }
+
+
+                    // Move Hide/Show Panel button into the top bar
+            const moveHideBtn = setInterval(() => {
+                const hideBtn = Array.from(document.querySelectorAll('button'))
+                    .find(b => /(hide|show)\s*panel/i.test(b.textContent));
+                const target = document.getElementById('topBarLeft');
+                if (hideBtn && target) {
+                    target.appendChild(hideBtn);
+                    clearInterval(moveHideBtn);
+                }
+            }, 200);
 
 
     </script>

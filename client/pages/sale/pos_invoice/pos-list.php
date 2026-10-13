@@ -29,7 +29,7 @@ $initialSearch = $_GET['search'] ?? '';
 <body class="light-theme">
     <div class="container">
         <div class="header">
-            <h1 class="page-title">Sale Invoices</h1>
+<h1 class="page-title" id="pageTitle">Sale Invoices</h1>
         </div>
 
         <div class="card">
@@ -278,6 +278,17 @@ $initialSearch = $_GET['search'] ?? '';
     </div>
 
     <script src="../../../assets/js/sale/pos_invoice/pos-list.js?v=<?= filemtime(__DIR__ . '/../../../assets/js/sale/pos_invoice/pos-list.js') ?>"></script>
+
+    <script>
+    (function () {
+        const params = new URLSearchParams(window.location.search);
+        if (params.get('from') === 'pos') {
+            const title = document.getElementById('pageTitle');
+            if (title) title.textContent = 'POS Invoices';
+            document.title = 'LedgerOne ERP - POS Invoices';
+        }
+    })();
+</script>
 <?php if ($initialSearch): ?>
 <script>
     window.addEventListener('load', function() {
