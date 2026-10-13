@@ -21,17 +21,18 @@ const _subtext = Color(0xFF6B7280);
 /// needing the office. Deliberately leaves out web's city/zone/area/
 /// salesman filters, sub-account/distribution breakdown, currency override
 /// and export/share/print tools — those are back-office report tooling, not
-/// something a field check needs; the summary + transaction list is.
+/// something a field check needs; the balance + transaction list is.
 ///
-/// Live financial data (invoices, payments, returns, PDCs, adjustments) is
-/// computed server-side on every request, so it can never be truly
-/// "offline-capable" the way creating a record is — there's no live number
-/// to show without asking the server. What it CAN do, and does: after any
-/// successful load, the result is cached per customer; if a later load
-/// fails (no connectivity), that cached result is shown instead of a bare
-/// error, clearly labeled with when it was last fetched, so a booker who
-/// already checked a customer's balance before going offline can still see
-/// it in the field.
+/// Matches web's Summary Ledger / Detailed Ledger split, per office
+/// direction: a full line-by-line transaction history is only meaningful
+/// read live (it's an audit trail — a stale offline copy inviting a booker
+/// to make a decision off outdated transactions is worse than no copy), so
+/// the Detailed tab always requires connectivity. The Summary (just the
+/// opening/debit/credit/closing balance) is much lower-risk to show
+/// slightly stale, and is what a booker needs 90% of the time ("what does
+/// this customer owe me") — so it's cached after every successful load and
+/// falls back to that cache when offline, clearly labeled with when it was
+/// last fetched.
 class CustomerLedgerScreen extends StatefulWidget {
   const CustomerLedgerScreen({super.key});
 
@@ -51,15 +52,23 @@ class _CustomerLedgerScreenState extends State<CustomerLedgerScreen> {
   DateTime? _fromDate;
   DateTime? _toDate;
 
+  // 'summary' | 'detailed' — matches web's Summary Ledger / Detailed Ledger
+  // tabs. Summary can fall back to a cached balance when offline; Detailed
+  // always needs a live connection (see class doc comment for why).
+  String _ledgerType = 'summary';
+
   bool _loadingLedger = false;
   String? _ledgerError;
   Map<String, dynamic>? _summary;
-  List<dynamic> _transactions = [];
-  bool _hasLoaded = false;
-  // Set when the data on screen is a cached fallback from a previous
+  bool _hasLoadedSummary = false;
+  // Set when the summary on screen is a cached fallback from a previous
   // successful load, not what was just requested (that request failed —
   // typically no connectivity).
   DateTime? _cachedAsOf;
+
+  List<dynamic> _transactions = [];
+  bool _hasLoadedDetailed = false;
+  String? _detailedError;
 
   @override
   void initState() {
@@ -68,10 +77,7 @@ class _CustomerLedgerScreenState extends State<CustomerLedgerScreen> {
   }
 
   Future<void> _loadReferenceData() async {
-    setState(() {
-      _loadingReference = true;
-      _loadError = null;
-    });
+    setState(() => _loadingReference = true);
     try {
       final results = await Future.wait([
         ReferenceCache.cached('so_companies', SaleOrderApi.getCompanies),
@@ -117,72 +123,89 @@ class _CustomerLedgerScreenState extends State<CustomerLedgerScreen> {
     setState(() {
       _loadingLedger = true;
       _ledgerError = null;
-      _hasLoaded = false;
+      _detailedError = null;
+      _hasLoadedSummary = false;
+      _hasLoadedDetailed = false;
       _cachedAsOf = null;
     });
     final customerId = customer['id'] as int;
+    final fromStr = _fromDate != null ? _fmtDate(_fromDate!) : null;
+    final toStr = _toDate != null ? _fmtDate(_toDate!) : null;
+
+    // Summary: always fetched (it's the quick balance header either tab
+    // shows), with an offline-cache fallback.
     try {
-      final fromStr = _fromDate != null ? _fmtDate(_fromDate!) : null;
-      final toStr = _toDate != null ? _fmtDate(_toDate!) : null;
-      final results = await Future.wait([
-        CustomerLedgerApi.getSummary(
-          customerId: customerId,
-          companyId: _selectedCompanyId,
-          fromDate: fromStr,
-          toDate: toStr,
-        ),
-        CustomerLedgerApi.getDetailed(
-          customerId: customerId,
-          companyId: _selectedCompanyId,
-          fromDate: fromStr,
-          toDate: toStr,
-        ),
-      ]);
+      final summary = await CustomerLedgerApi.getSummary(
+        customerId: customerId,
+        companyId: _selectedCompanyId,
+        fromDate: fromStr,
+        toDate: toStr,
+      );
       if (!mounted) return;
-      final summary = results[0] as Map<String, dynamic>?;
-      final transactions = results[1] as List<dynamic>;
       setState(() {
         _summary = summary;
-        _transactions = transactions;
-        _hasLoaded = true;
+        _hasLoadedSummary = true;
       });
-      await _cacheLedger(customerId, summary, transactions);
+      await _cacheSummary(customerId, summary);
     } catch (e) {
-      final cached = await _loadCachedLedger(customerId);
+      final cached = await _loadCachedSummary(customerId);
       if (cached != null) {
         if (!mounted) return;
         setState(() {
           _summary = cached.$1;
-          _transactions = cached.$2;
-          _cachedAsOf = cached.$3;
-          _hasLoaded = true;
+          _cachedAsOf = cached.$2;
+          _hasLoadedSummary = true;
         });
       } else {
         setState(
           () => _ledgerError =
-              'Could not load ledger. Make sure you have an internet '
+              'Could not load balance. Make sure you have an internet '
               'connection, then try again.\n($e)',
         );
       }
-    } finally {
-      if (mounted) setState(() => _loadingLedger = false);
     }
+
+    // Detailed: only fetched when that tab is active, and never falls back
+    // to a cache — a stale transaction history is misleading in a way a
+    // stale balance figure isn't (see class doc comment).
+    if (_ledgerType == 'detailed') {
+      try {
+        final transactions = await CustomerLedgerApi.getDetailed(
+          customerId: customerId,
+          companyId: _selectedCompanyId,
+          fromDate: fromStr,
+          toDate: toStr,
+        );
+        if (!mounted) return;
+        setState(() {
+          _transactions = transactions;
+          _hasLoadedDetailed = true;
+        });
+      } catch (e) {
+        setState(
+          () => _detailedError =
+              'Detailed transactions need an internet connection. '
+              'The balance above is still available offline.\n($e)',
+        );
+      }
+    }
+
+    if (mounted) setState(() => _loadingLedger = false);
   }
 
-  String _ledgerCacheKey(int customerId) => 'customer_ledger_cache_$customerId';
+  String _summaryCacheKey(int customerId) =>
+      'customer_ledger_summary_$customerId';
 
-  Future<void> _cacheLedger(
+  Future<void> _cacheSummary(
     int customerId,
     Map<String, dynamic>? summary,
-    List<dynamic> transactions,
   ) async {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(
-        _ledgerCacheKey(customerId),
+        _summaryCacheKey(customerId),
         jsonEncode({
           'summary': summary,
-          'transactions': transactions,
           'cachedAt': DateTime.now().toIso8601String(),
         }),
       );
@@ -192,18 +215,17 @@ class _CustomerLedgerScreenState extends State<CustomerLedgerScreen> {
     }
   }
 
-  Future<(Map<String, dynamic>?, List<dynamic>, DateTime)?> _loadCachedLedger(
+  Future<(Map<String, dynamic>?, DateTime)?> _loadCachedSummary(
     int customerId,
   ) async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final raw = prefs.getString(_ledgerCacheKey(customerId));
+      final raw = prefs.getString(_summaryCacheKey(customerId));
       if (raw == null) return null;
       final decoded = jsonDecode(raw) as Map<String, dynamic>;
       final summary = decoded['summary'] as Map<String, dynamic>?;
-      final transactions = List<dynamic>.from(decoded['transactions'] as List);
       final cachedAt = DateTime.parse(decoded['cachedAt'] as String);
-      return (summary, transactions, cachedAt);
+      return (summary, cachedAt);
     } catch (_) {
       return null;
     }
@@ -303,6 +325,8 @@ class _CustomerLedgerScreenState extends State<CustomerLedgerScreen> {
                   ],
                 ),
                 const SizedBox(height: 16),
+                _ledgerTypeToggle(),
+                const SizedBox(height: 16),
                 SizedBox(
                   height: 46,
                   child: ElevatedButton.icon(
@@ -338,7 +362,7 @@ class _CustomerLedgerScreenState extends State<CustomerLedgerScreen> {
                     ),
                   ),
                 ],
-                if (_hasLoaded) ...[
+                if (_hasLoadedSummary) ...[
                   const SizedBox(height: 20),
                   if (_cachedAsOf != null) ...[
                     Container(
@@ -357,7 +381,7 @@ class _CustomerLedgerScreenState extends State<CustomerLedgerScreen> {
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text(
-                              'Offline — showing data as of '
+                              'Offline — showing balance as of '
                               '${DateFormat('dd MMM, hh:mm a').format(_cachedAsOf!)}. '
                               'May not reflect the latest transactions.',
                               style: const TextStyle(
@@ -372,27 +396,101 @@ class _CustomerLedgerScreenState extends State<CustomerLedgerScreen> {
                     const SizedBox(height: 12),
                   ],
                   _buildSummaryCard(),
-                  const SizedBox(height: 16),
-                  const Text(
-                    'Transactions',
-                    style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
-                  ),
-                  const SizedBox(height: 8),
-                  if (_transactions.isEmpty)
-                    const Padding(
-                      padding: EdgeInsets.symmetric(vertical: 24),
-                      child: Center(
-                        child: Text(
-                          'No transactions in this period.',
-                          style: TextStyle(color: _subtext),
-                        ),
+                  if (_ledgerType == 'detailed') ...[
+                    const SizedBox(height: 16),
+                    const Text(
+                      'Transactions',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 15,
                       ),
-                    )
-                  else
-                    ..._transactions.map(_buildTransactionTile),
+                    ),
+                    const SizedBox(height: 8),
+                    if (_detailedError != null)
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFDE8E8),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Icon(
+                              Icons.wifi_off_rounded,
+                              size: 18,
+                              color: _error,
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                _detailedError!,
+                                style: const TextStyle(color: _error),
+                              ),
+                            ),
+                          ],
+                        ),
+                      )
+                    else if (_hasLoadedDetailed && _transactions.isEmpty)
+                      const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 24),
+                        child: Center(
+                          child: Text(
+                            'No transactions in this period.',
+                            style: TextStyle(color: _subtext),
+                          ),
+                        ),
+                      )
+                    else if (_hasLoadedDetailed)
+                      ..._transactions.map(_buildTransactionTile),
+                  ],
                 ],
               ],
             ),
+    );
+  }
+
+  Widget _ledgerTypeToggle() {
+    Widget tab(String value, String label) {
+      final selected = _ledgerType == value;
+      return Expanded(
+        child: GestureDetector(
+          onTap: () => setState(() => _ledgerType = value),
+          child: Container(
+            padding: const EdgeInsets.symmetric(vertical: 10),
+            decoration: BoxDecoration(
+              color: selected ? _primaryBlue : Colors.white,
+              border: Border.all(
+                color: selected ? _primaryBlue : const Color(0xFFE1E6EE),
+              ),
+              borderRadius: BorderRadius.horizontal(
+                left: value == 'summary'
+                    ? const Radius.circular(8)
+                    : Radius.zero,
+                right: value == 'detailed'
+                    ? const Radius.circular(8)
+                    : Radius.zero,
+              ),
+            ),
+            child: Text(
+              label,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: selected ? Colors.white : _subtext,
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    return Row(
+      children: [
+        tab('summary', 'Summary (works offline)'),
+        tab('detailed', 'Detailed (needs internet)'),
+      ],
     );
   }
 
