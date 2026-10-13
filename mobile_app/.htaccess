@@ -7,6 +7,12 @@
 # network instead of being satisfied from cache. That combination is what let
 # a deployed fix sit invisible to already-installed PWA users. CanvasKit/font
 # binaries aren't in this list -- those are fine to cache normally.
+<IfModule mod_expires.c>
+    <FilesMatch "\.(html|js|json|wasm)$">
+        ExpiresActive Off
+    </FilesMatch>
+</IfModule>
+
 <IfModule mod_headers.c>
     <FilesMatch "\.(html|js|json|wasm)$">
         Header set Cache-Control "no-cache, must-revalidate"
