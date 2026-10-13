@@ -1,4 +1,3 @@
-import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
 
@@ -155,19 +154,16 @@ class _AddCustomerScreenState extends State<AddCustomerScreen> {
         address: address,
       );
     } catch (e) {
-      if (e is DioException) {
-        // Connectivity check passed but the request still failed mid-flight
-        // (dropped connection, server unreachable) — fall back to the
-        // outbox instead of losing the booker's work, same as Sale Order.
-        await _queueOffline(clientUuid, name, phone, address);
-        return;
-      }
-      // Genuine server-side rejection (validation etc.) — show as an
-      // error; nothing to queue, retrying would just fail the same way.
-      setState(() {
-        _saving = false;
-        _error = 'Could not create customer.\n($e)';
-      });
+      // The connectivity check above passed but the request still failed
+      // (dropped mid-flight, server unreachable, timeout) — fall back to
+      // the outbox instead of losing the booker's work. Same unconditional
+      // catch-then-queue as Sale Order/Receive Voucher — no "is this really
+      // a connectivity error" type check, since in practice (form
+      // validation already ran above) a failure here almost always is one,
+      // and even in the rare case it's a genuine server rejection, the
+      // retry at sync time will surface that clearly via the outbox's own
+      // failed-entry UI instead of silently losing the customer.
+      await _queueOffline(clientUuid, name, phone, address);
     }
   }
 
