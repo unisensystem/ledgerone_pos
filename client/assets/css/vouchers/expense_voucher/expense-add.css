@@ -1,0 +1,589 @@
+/* Reset and Base Styles */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+}
+
+:root {
+  /* Light Theme Colors - From DS */
+  --primary: #1f7bff;
+  --primary-hover: #1a6cdc;
+  --primary-active: #1559b8;
+
+  --surface-0: #ffffff;
+  --surface-1: #f7f9fc;
+  --surface-2: #eff2f7;
+
+  --heading: #0e1a2b;
+  --body: #2f3b4c;
+  --subtext: #6b7280;
+
+  --border-default: #e1e6ee;
+  --border-strong: #c9cfda;
+
+  --success: #2fbf71;
+  --warning: #e8b23f;
+  --error: #e34f4f;
+
+  --radius: 8px;
+  --card-radius: 12px;
+  --shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
+  --topbar-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+body {
+  background-color: var(--surface-1);
+  color: var(--body);
+  line-height: 1.5;
+  padding: 20px;
+  min-height: 100vh;
+}
+
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+/* Header */
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 32px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border-default);
+}
+
+.header h1 {
+  color: var(--heading);
+  font-size: 24px;
+  font-weight: 600;
+}
+
+.help-toggle {
+  background-color: var(--surface-2);
+  color: var(--primary);
+  border: none;
+  border-radius: var(--radius);
+  padding: 8px 16px;
+  font-weight: 500;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.help-toggle:hover {
+  background-color: var(--surface-1);
+}
+
+/* Cards */
+.card {
+  background-color: var(--surface-0);
+  border-radius: var(--card-radius);
+  box-shadow: var(--shadow);
+  padding: 24px;
+  margin-bottom: 24px;
+}
+
+.card-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--heading);
+  margin-bottom: 20px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border-default);
+}
+
+/* Form Grid */
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 24px;
+}
+
+@media (max-width: 992px) {
+  .form-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Form Fields */
+.form-group {
+  display: flex;
+  flex-direction: column;
+}
+
+.form-group.full-width {
+  grid-column: 1 / -1;
+}
+
+label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--body);
+  margin-bottom: 6px;
+}
+
+.required::after {
+  content: " *";
+  color: var(--error);
+}
+
+input,
+select,
+textarea {
+  height: 40px;
+  padding: 0 14px;
+  border: 1.5px solid var(--border-default);
+  background-color: var(--surface-0);
+  border-radius: var(--radius);
+  font-size: 14px;
+  color: var(--body);
+  transition: all 0.2s ease;
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px rgba(31, 123, 255, 0.1);
+}
+
+textarea {
+  height: 100px;
+  padding: 12px 14px;
+  resize: vertical;
+}
+
+input[readonly],
+input[disabled] {
+  background-color: var(--surface-2);
+  color: var(--subtext);
+  cursor: not-allowed;
+}
+
+.error {
+  border-color: var(--error) !important;
+}
+
+.error-text {
+  font-size: 12px;
+  color: var(--error);
+  margin-top: 4px;
+  display: none;
+}
+
+/* Expense Entries Table */
+.table-wrapper {
+  overflow-x: auto;
+  margin-top: 8px;
+}
+
+.entries-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 1000px;
+}
+
+.entries-table thead {
+  background-color: var(--surface-1);
+}
+
+.entries-table th {
+  padding: 12px;
+  text-align: left;
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--heading);
+  border-bottom: 1px solid var(--border-default);
+}
+
+.entries-table td {
+  padding: 12px;
+  border-bottom: 1px solid var(--border-default);
+}
+
+.entries-table tbody tr:hover {
+  background-color: rgba(240, 246, 255, 0.5);
+}
+
+.entries-table tbody tr:nth-child(even) {
+  background-color: var(--surface-1);
+}
+
+.entries-table tbody tr:nth-child(even):hover {
+  background-color: rgba(240, 246, 255, 0.7);
+}
+
+/* Action Buttons in Table */
+.table-action-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--surface-2);
+  color: var(--body);
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.table-action-btn:hover {
+  background-color: var(--surface-1);
+}
+
+.table-action-btn.delete {
+  color: var(--error);
+}
+
+.table-action-btn.add {
+  color: var(--primary);
+}
+
+/* Buttons */
+.button-group {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+.btn {
+  height: 40px;
+  padding: 0 20px;
+  border-radius: var(--radius);
+  font-weight: 500;
+  font-size: 14px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: all 0.2s ease;
+  border: none;
+}
+
+.btn-primary {
+  background-color: var(--primary);
+  color: white;
+}
+
+.btn-primary:hover {
+  background-color: var(--primary-hover);
+}
+
+.btn-primary:active {
+  background-color: var(--primary-active);
+}
+
+.btn-secondary {
+  background-color: var(--surface-2);
+  color: var(--body);
+  border: 1px solid var(--border-strong);
+}
+
+.btn-secondary:hover {
+  background-color: var(--surface-1);
+}
+
+.btn-ghost {
+  background-color: transparent;
+  color: var(--primary);
+  border: none;
+}
+
+.btn-ghost:hover {
+  background-color: rgba(31, 123, 255, 0.05);
+}
+
+/* Help Panel */
+.help-panel {
+  background-color: var(--surface-0);
+  border-radius: var(--card-radius);
+  box-shadow: var(--shadow);
+  padding: 20px;
+  margin-bottom: 24px;
+  display: none;
+}
+
+.help-panel.active {
+  display: block;
+}
+
+.help-panel h3 {
+  color: var(--heading);
+  margin-bottom: 16px;
+  font-size: 16px;
+}
+
+.help-item {
+  margin-bottom: 16px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border-default);
+}
+
+.help-item:last-child {
+  margin-bottom: 0;
+  border-bottom: none;
+}
+
+.help-item h4 {
+  font-size: 14px;
+  color: var(--primary);
+  margin-bottom: 6px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.help-item p {
+  font-size: 13px;
+  color: var(--body);
+}
+
+/* Footer Actions */
+.footer-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 32px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border-default);
+}
+
+.left-actions {
+  display: flex;
+  gap: 12px;
+}
+
+/* Searchable Dropdown */
+.searchable-dropdown {
+  position: relative;
+}
+
+.dropdown-search {
+  width: 100%;
+  margin-bottom: 8px;
+}
+
+.dropdown-options {
+  position: fixed;
+  background-color: var(--surface-0);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius);
+  max-height: 200px;
+  overflow-y: auto;
+  z-index: 99999;
+  display: none;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  min-width: 200px;
+}
+
+.dropdown-options.active {
+  display: block;
+}
+
+.dropdown-option {
+  padding: 10px 14px;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.dropdown-option:hover {
+  background-color: var(--surface-1);
+}
+
+.dropdown-option.selected {
+  background-color: rgba(31, 123, 255, 0.1);
+  color: var(--primary);
+}
+
+/* Validation */
+.validation-message {
+  padding: 16px;
+  border-radius: var(--radius);
+  margin-bottom: 20px;
+  display: none;
+}
+
+.validation-message.error {
+  background-color: rgba(227, 79, 79, 0.1);
+  border-left: 4px solid var(--error);
+  display: block;
+}
+
+.validation-message.success {
+  background-color: rgba(47, 191, 113, 0.1);
+  border-left: 4px solid var(--success);
+  display: block;
+}
+
+/* Modal */
+.modal {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.5);
+  z-index: 1000;
+  align-items: center;
+  justify-content: center;
+}
+
+.modal.active {
+  display: flex;
+}
+
+.modal-content {
+  background-color: var(--surface-0);
+  border-radius: var(--card-radius);
+  width: 90%;
+  max-width: 500px;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.modal-header {
+  padding: 20px;
+  border-bottom: 1px solid var(--border-default);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.modal-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--heading);
+}
+
+.modal-close {
+  background: none;
+  border: none;
+  font-size: 24px;
+  color: var(--subtext);
+  cursor: pointer;
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+.modal-close:hover {
+  background-color: var(--surface-1);
+}
+
+.modal-body {
+  padding: 20px;
+}
+
+.modal-body .form-group {
+  margin-bottom: 16px;
+}
+
+.modal-body .form-group:last-child {
+  margin-bottom: 0;
+}
+
+.modal-footer {
+  padding: 20px;
+  border-top: 1px solid var(--border-default);
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+/* Checkbox Toggle */
+.checkbox-toggle-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 40px;
+}
+
+.checkbox-toggle {
+  position: relative;
+  display: inline-block;
+  width: 44px;
+  height: 24px;
+  flex-shrink: 0;
+}
+
+.checkbox-toggle input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+  position: absolute;
+}
+
+.checkbox-toggle-slider {
+  position: absolute;
+  inset: 0;
+  background-color: var(--border-strong);
+  border-radius: 24px;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.checkbox-toggle-slider::before {
+  content: '';
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  left: 3px;
+  top: 3px;
+  background-color: white;
+  border-radius: 50%;
+  transition: transform 0.2s ease;
+}
+
+.checkbox-toggle input:checked + .checkbox-toggle-slider {
+  background-color: var(--success);
+}
+
+.checkbox-toggle input:checked + .checkbox-toggle-slider::before {
+  transform: translateX(20px);
+}
+
+.checkbox-toggle-label {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--body);
+}
+
+/* Type CR/DR Toggle */
+.type-btn {
+  background-color: var(--surface-2);
+  color: var(--body);
+  border: 1.5px solid var(--border-strong);
+  font-weight: 600;
+  transition: all 0.2s ease;
+}
+
+.type-btn.active[data-type="CR"] {
+  background-color: rgba(47, 191, 113, 0.15);
+  border-color: var(--success);
+  color: var(--success);
+}
+
+.type-btn.active[data-type="DR"] {
+  background-color: rgba(227, 79, 79, 0.15);
+  border-color: var(--error);
+  color: var(--error);
+}

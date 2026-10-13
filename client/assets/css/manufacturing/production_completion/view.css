@@ -1,0 +1,139 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Inter', sans-serif;
+    background: #F3F4F6;
+}
+
+.main-content {
+    padding: 24px;
+}
+
+.view-container {
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.card {
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.card-header {
+    padding: 20px 24px;
+    border-bottom: 1px solid #E5E7EB;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.card-header h2 {
+    font-size: 20px;
+    font-weight: 600;
+    color: #111827;
+}
+
+.detail-section {
+    padding: 24px;
+    border-bottom: 1px solid #E5E7EB;
+}
+
+.section-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: #111827;
+    margin-bottom: 16px;
+}
+
+.detail-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 16px;
+}
+
+.detail-item {
+    display: flex;
+    flex-direction: column;
+}
+
+.detail-label {
+    font-size: 12px;
+    font-weight: 500;
+    color: #6B7280;
+    margin-bottom: 4px;
+}
+
+.detail-value {
+    font-size: 14px;
+    color: #111827;
+}
+
+.table-responsive {
+    overflow-x: auto;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+thead {
+    background: #F9FAFB;
+}
+
+th {
+    padding: 12px 16px;
+    text-align: left;
+    font-size: 12px;
+    font-weight: 600;
+    color: #6B7280;
+    text-transform: uppercase;
+    border-bottom: 1px solid #E5E7EB;
+}
+
+td {
+    padding: 12px 16px;
+    font-size: 14px;
+    color: #111827;
+    border-bottom: 1px solid #E5E7EB;
+}
+
+.btn {
+    padding: 10px 20px;
+    border: none;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.btn-primary {
+    background: #3B82F6;
+    color: white;
+}
+
+.btn-primary:hover {
+    background: #2563EB;
+}
+
+.btn-secondary {
+    background: #F3F4F6;
+    color: #374151;
+}
+
+.btn-secondary:hover {
+    background: #E5E7EB;
+}
+
+.total-row {
+    background: #F9FAFB;
+    font-weight: 600;
+}

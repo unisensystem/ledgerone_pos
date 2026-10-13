@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>LedgerOne ERP | Login</title>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+    <link rel="stylesheet" href="../../assets/css/auth/login.css">
+</head>
+<body class="light-theme">
+    <div class="container">
+        <section class="brand-section">
+            <button class="theme-toggle" id="themeToggle">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M12 16C14.2091 16 16 14.2091 16 12C16 9.79086 14.2091 8 12 8C9.79086 8 8 9.79086 8 12C8 14.2091 9.79086 16 12 16Z" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    <path d="M12 2V4" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    <path d="M12 20V22" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    <path d="M4.93 4.93L6.34 6.34" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    <path d="M17.66 17.66L19.07 19.07" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    <path d="M2 12H4" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    <path d="M20 12H22" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    <path d="M6.34 17.66L4.93 19.07" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    <path d="M19.07 4.93L17.66 6.34" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+            </button>
+            
+            <div class="brand-logo">
+                <svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <rect x="6" y="8" width="36" height="32" rx="4" fill="white"/>
+                    <path d="M12 16h24M12 22h20M12 28h16M12 34h12" stroke="#1F7BFF" stroke-width="2" stroke-linecap="round"/>
+                    <circle cx="38" cy="14" r="4" fill="#1F7BFF"/>
+                </svg>
+                LedgerOne ERP
+            </div>
+            
+            <p class="brand-tagline">Complete business management solution for modern enterprises</p>
+            
+            <div class="brand-features">
+                <div class="feature">
+                    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M9 12L11 14L15 10M21 12C21 16.9706 16.9706 21 12 21C7.02944 21 3 16.9706 3 12C3 7.02944 7.02944 3 12 3C16.9706 3 21 7.02944 21 12Z" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                    <span>Financial management</span>
+                </div>
+                <div class="feature">
+                    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M12 15C13.6569 15 15 13.6569 15 12C15 10.3431 13.6569 9 12 9C10.3431 9 9 10.3431 9 12C9 13.6569 10.3431 15 12 15Z" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        <path d="M19.4 15C19.2669 15.3031 19.1338 15.6062 19.0006 15.9094C18.5133 16.941 17.9922 17.9328 17.4711 18.9247C16.6034 20.5969 15.7357 22.2691 14.868 23.9412C14.5951 24.4775 13.8409 24.4775 13.568 23.9412C12.2643 21.4315 10.9606 18.9218 9.65687 16.4121C9.384 15.8758 8.62982 15.8758 8.35695 16.4121C7.71934 17.6156 7.08173 18.8192 6.44412 20.0227" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        <path d="M4.60078 15C4.73391 14.6969 4.86703 14.3938 5.00016 14.0906C5.48746 13.059 6.00856 12.0672 6.52966 11.0753C7.39737 9.40313 8.26508 7.73094 9.13279 6.05875C9.40566 5.5225 10.1598 5.5225 10.4327 6.05875C11.7364 8.56844 13.0401 11.0781 14.3438 13.5878C14.6167 14.1241 15.3709 14.1241 15.6437 13.5878C16.2813 12.3844 16.9189 11.1808 17.5565 9.97734" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                    <span>Multi-company operations</span>
+                </div>
+                <div class="feature">
+                    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M13 10V3L4 14H11V21L20 10H13Z" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                    <span>Business intelligence</span>
+                </div>
+            </div>
+        </section>
+        
+        <section class="login-section">
+            <div class="login-card">
+                <div class="login-header">
+                    <h1 class="login-title">Welcome Back</h1>
+                    <p class="login-subtitle">Sign in to your LedgerOne ERP account</p>
+                </div>
+                
+                <form id="loginForm">
+                    <div class="form-group">
+                        <label for="email" class="form-label">Email Address</label>
+                        <input type="email" id="email" class="form-input" placeholder="you@company.com" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="password" class="form-label">Password</label>
+                        <input type="password" id="password" class="form-input" placeholder="Enter your password" required>
+                    </div>
+                    
+                    <div class="form-options">
+                        <div class="remember-me">
+                            <input type="checkbox" id="remember">
+                            <label for="remember">Remember me</label>
+                        </div>
+                        <a href="#" class="forgot-password">Forgot password?</a>
+                    </div>
+                    
+                    <button type="submit" class="login-button">Sign In</button>
+                </form>
+                
+                <div class="signup-link">
+                    Don't have an account? <a href="register.html">Sign up here</a>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <script src="../../assets/js/auth/login.js"></script>
+</body>
+</html>

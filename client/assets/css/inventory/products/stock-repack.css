@@ -1,0 +1,41 @@
+/* Stock Repack page — extends product-add.css */
+
+.repack-info {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 12px;
+    margin-top: 16px;
+    padding: 16px;
+    border: 1px solid var(--border-default);
+    border-radius: 8px;
+    background: var(--surface-1);
+}
+
+.repack-info-item label {
+    display: block;
+    font-size: 12px;
+    color: var(--subtext);
+    margin-bottom: 4px;
+}
+
+.repack-info-value {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--heading);
+}
+
+.repack-preview {
+    margin-top: 12px;
+    padding: 12px 16px;
+    border: 1px solid var(--border-default);
+    border-radius: 8px;
+    background: var(--surface-1);
+    font-size: 14px;
+    color: var(--heading);
+    line-height: 1.7;
+}
+
+.repack-preview.repack-error {
+    border-color: var(--error);
+    color: var(--error);
+}

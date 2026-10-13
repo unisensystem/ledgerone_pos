@@ -1,0 +1,23 @@
+<?php
+session_start();
+require_once '../../../../includes/connection.php';
+
+header('Content-Type: application/json');
+
+$tenant_id = $_SESSION['tenant_id'] ?? null;
+$country_id = $_GET['country_id'] ?? null;
+
+if (!$tenant_id || !$country_id) {
+    echo json_encode(['success' => false, 'message' => 'Invalid request']);
+    exit;
+}
+
+try {
+    $stmt = $pdo->prepare("SELECT id, region_name FROM regions WHERE tenant_id = ? AND country_id = ? ORDER BY region_name");
+    $stmt->execute([$tenant_id, $country_id]);
+    $regions = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    
+    echo json_encode(['success' => true, 'data' => $regions]);
+} catch (Exception $e) {
+    echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+}

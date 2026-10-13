@@ -1,0 +1,362 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+}
+
+body {
+  background-color: #f7f9fc; /* Surface-1 */
+  color: #2f3b4c; /* Body text */
+  line-height: 1.5;
+  padding: 24px; /* Layout spacing */
+}
+
+.container {
+  max-width: 1400px;
+  margin: 0 auto;
+  background-color: #ffffff; /* Surface-0 */
+  border-radius: 12px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06); /* Card shadow */
+  overflow: hidden;
+}
+
+/* Header */
+.header {
+  padding: 24px;
+  border-bottom: 1px solid #e1e6ee; /* Default border */
+  background: linear-gradient(135deg, #1f7bff 0%, #1a6cdc 100%);
+  color: white;
+}
+
+.title-section h1 {
+  font-size: 28px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.title-section p {
+  font-size: 14px;
+  opacity: 0.9;
+}
+
+.report-meta {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 20px;
+  padding: 16px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.meta-item {
+  display: flex;
+  flex-direction: column;
+  min-width: 180px;
+}
+
+.meta-label {
+  font-size: 12px;
+  opacity: 0.8;
+  margin-bottom: 4px;
+}
+
+.meta-value {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+/* Report Actions */
+.report-actions {
+  padding: 16px 24px;
+  border-bottom: 1px solid #e1e6ee;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background-color: #ffffff;
+}
+
+.filters {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+/* Buttons - Light Theme */
+.btn {
+  height: 40px;
+  border-radius: 8px;
+  padding: 0 20px;
+  font-weight: 500;
+  font-size: 14px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: all 0.2s;
+  border: none;
+}
+
+.btn-primary {
+  background-color: #1f7bff; /* Primary */
+  color: #ffffff;
+}
+
+.btn-primary:hover {
+  background-color: #1a6cdc; /* Primary Hover */
+}
+
+.btn-secondary {
+  background-color: #eff2f7; /* Secondary */
+  border: 1px solid #c9cfda; /* Strong border */
+  color: #1f1f1f;
+}
+
+.btn-secondary:hover {
+  background-color: #e4e8ef; /* Secondary Hover */
+}
+
+.btn-ghost {
+  background-color: transparent;
+  color: #1f7bff; /* Primary */
+  border: 1px solid #1f7bff;
+}
+
+.btn-ghost:hover {
+  background-color: #f0f6ff; /* Ghost Hover */
+}
+
+/* Select fields */
+.select-field {
+  height: 40px;
+  padding: 0 14px;
+  border: 1.5px solid #d6dbe4;
+  background-color: #ffffff;
+  border-radius: 8px;
+  font-size: 14px;
+  color: #2f3b4c;
+  cursor: pointer;
+  min-width: 200px;
+}
+
+/* Report Table */
+.report-container {
+  padding: 0 24px 24px;
+  overflow-x: auto;
+}
+
+.report-table {
+  width: 100%;
+  border-collapse: collapse;
+  border: 1px solid #e1e6ee; /* Default border */
+  border-radius: 8px;
+  overflow: hidden;
+  margin-top: 16px;
+}
+
+.report-table thead {
+  background-color: #f7f9fc; /* Table header */
+}
+
+.report-table th {
+  padding: 16px 12px;
+  text-align: left;
+  font-weight: 600;
+  color: #0e1a2b; /* Heading color */
+  border-bottom: 2px solid #e1e6ee; /* Default border */
+  font-size: 14px;
+  position: sticky;
+  top: 0;
+  background-color: #f7f9fc;
+}
+
+.report-table td {
+  padding: 14px 12px;
+  border-bottom: 1px solid #e1e6ee; /* Default border */
+  font-size: 14px;
+}
+
+.report-table tbody tr:nth-child(even) {
+  background-color: #fafbfd; /* Alternating row */
+}
+
+.report-table tbody tr:hover {
+  background-color: #f0f6ff; /* Hover row */
+}
+
+/* Column styles */
+.date-col {
+  width: 120px;
+  min-width: 120px;
+}
+
+.details-col {
+  width: 300px;
+  min-width: 300px;
+}
+
+.in-col,
+.out-col,
+.balance-col {
+  width: 150px;
+  min-width: 150px;
+}
+
+.highlight-col {
+  font-weight: 600;
+  color: #0e1a2b;
+}
+
+/* IN/OUT indicators */
+.in-amount {
+  color: #2fbf71; /* Success color for IN */
+  font-weight: 600;
+}
+
+.out-amount {
+  color: #e34f4f; /* Error color for OUT */
+  font-weight: 600;
+}
+
+/* Transaction type indicator */
+.transaction-type {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  margin-right: 8px;
+}
+
+.type-in {
+  background-color: rgba(47, 191, 113, 0.1);
+  color: #2fbf71;
+}
+
+.type-out {
+  background-color: rgba(227, 79, 79, 0.1);
+  color: #e34f4f;
+}
+
+/* Summary Section */
+.summary-section {
+  margin-top: 24px;
+  padding: 20px;
+  background-color: #f7f9fc;
+  border-radius: 8px;
+  border: 1px solid #e1e6ee;
+}
+
+.summary-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: #0e1a2b;
+  margin-bottom: 16px;
+}
+
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 20px;
+}
+
+.summary-card {
+  background: white;
+  padding: 16px;
+  border-radius: 8px;
+  border: 1px solid #e1e6ee;
+}
+
+.summary-card .label {
+  font-size: 13px;
+  color: #6b7280;
+  margin-bottom: 8px;
+}
+
+.summary-card .value {
+  font-size: 24px;
+  font-weight: 600;
+  color: #0e1a2b;
+}
+
+.summary-card .subtext {
+  font-size: 12px;
+  color: #6b7280;
+  margin-top: 4px;
+}
+
+/* Pagination */
+.pagination {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 16px;
+  margin-top: 24px;
+  padding: 16px;
+  border-top: 1px solid #e1e6ee;
+}
+
+.pagination-info {
+  font-size: 14px;
+  color: #6b7280;
+}
+
+/* Print styles */
+@media print {
+  body {
+    padding: 0;
+    background: white;
+  }
+
+  .container {
+    box-shadow: none;
+    border-radius: 0;
+  }
+
+  .report-actions,
+  .btn {
+    display: none !important;
+  }
+
+  .header {
+    background: #1f7bff !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}
+
+/* Responsive */
+@media (max-width: 1024px) {
+  .report-table {
+    min-width: 800px;
+  }
+}
+
+@media (max-width: 768px) {
+  body {
+    padding: 12px;
+  }
+
+  .report-meta {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .report-actions {
+    flex-direction: column;
+    gap: 16px;
+    align-items: flex-start;
+  }
+
+  .filters {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
+  .select-field {
+    min-width: 150px;
+  }
+}

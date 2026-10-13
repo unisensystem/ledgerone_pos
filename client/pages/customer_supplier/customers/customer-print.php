@@ -1,0 +1,372 @@
+<?php
+// Start session if not already started
+if (session_status() == PHP_SESSION_NONE) {
+    session_start();
+}
+
+// Get user_id from session
+$user_id = $_SESSION['user_id'] ?? null;
+$tenant_id = $_SESSION['tenant_id'] ?? null;
+
+if (!$user_id || !$tenant_id) {
+    // Redirect to login if no user_id in session
+    header('Location: ../../auth/login.html');
+    exit();
+}
+
+// Get user's full name and base currency
+require_once '../../../../includes/connection.php';
+$stmt = $pdo->prepare("SELECT full_name FROM users WHERE id = ? AND tenant_id = ?");
+$stmt->execute([$user_id, $tenant_id]);
+$user = $stmt->fetch();
+$user_name = $user['full_name'] ?? 'System User';
+
+// Get base currency symbol
+$stmt = $pdo->prepare("
+    SELECT c.symbol 
+    FROM tenant_currencies tc 
+    JOIN ledgerone_public.currencies c ON tc.currency_id = c.id 
+    WHERE tc.tenant_id = ? AND tc.is_base_currency = 1
+");
+$stmt->execute([$tenant_id]);
+$currency = $stmt->fetch();
+$currency_symbol = $currency['symbol'] ?? '$';
+?>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LedgerOne ERP - Customers List (Print)</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: Arial, sans-serif;
+            font-size: 12px;
+            line-height: 1.4;
+            color: #333;
+            background: white;
+        }
+
+        .print-header {
+            text-align: center;
+            margin-bottom: 30px;
+            border-bottom: 2px solid #333;
+            padding-bottom: 20px;
+        }
+
+        .company-name {
+            font-size: 24px;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .report-title {
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+
+        .print-info {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 20px;
+            font-size: 11px;
+        }
+
+        .filter-info {
+            font-size: 11px;
+            margin-bottom: 15px;
+            padding: 10px;
+            background: #f9f9f9;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+
+        .customers-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+        }
+
+        .customers-table th,
+        .customers-table td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+
+        .customers-table th {
+            background-color: #f5f5f5;
+            font-weight: bold;
+            font-size: 11px;
+        }
+
+        .customers-table td {
+            font-size: 10px;
+        }
+
+        .customer-code {
+            font-family: monospace;
+            font-weight: bold;
+        }
+
+        .print-footer {
+            margin-top: 30px;
+            border-top: 1px solid #ddd;
+            padding-top: 10px;
+            font-size: 10px;
+            text-align: center;
+            color: #666;
+        }
+
+        .summary-stats {
+            display: flex;
+            justify-content: space-around;
+            margin-bottom: 20px;
+            background: #f9f9f9;
+            padding: 15px;
+            border: 1px solid #ddd;
+        }
+
+        .stat-item {
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 16px;
+            font-weight: bold;
+            color: #333;
+        }
+
+        .stat-label {
+            font-size: 10px;
+            color: #666;
+            margin-top: 2px;
+        }
+
+        @media print {
+            body {
+                margin: 0;
+                padding: 20px;
+            }
+            
+            .no-print {
+                display: none !important;
+            }
+            
+            .customers-table {
+                page-break-inside: avoid;
+            }
+            
+            .customers-table th {
+                background-color: #f0f0f0 !important;
+                -webkit-print-color-adjust: exact;
+            }
+        }
+
+        .print-controls {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1000;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            margin: 0 5px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        .btn-primary {
+            background: #1f7bff;
+            color: white;
+        }
+
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <div class="print-controls no-print">
+        <button class="btn btn-primary" onclick="window.print()">
+            <i class="fas fa-print"></i> Print
+        </button>
+        <a href="customer-list.php" class="btn btn-secondary">
+            <i class="fas fa-arrow-left"></i> Back to List
+        </a>
+    </div>
+
+    <div class="print-header">
+        <div class="company-name">LedgerOne ERP</div>
+        <div class="report-title">Customers List</div>
+    </div>
+
+    <div class="print-info">
+        <div>
+            <strong>Generated:</strong> <?php echo date('F j, Y g:i A'); ?>
+        </div>
+        <div>
+            <strong>User:</strong> <?php echo $user_name; ?>
+        </div>
+    </div>
+
+    <!-- Filter info display -->
+    <div class="filter-info" id="filterInfo"></div>
+
+    <div class="summary-stats" id="summaryStats">
+        <div class="stat-item">
+            <div class="stat-value" id="totalCustomers">-</div>
+            <div class="stat-label">Total Customers</div>
+        </div>
+        <div class="stat-item">
+            <div class="stat-value" id="activeCustomers">-</div>
+            <div class="stat-label">Active</div>
+        </div>
+        <div class="stat-item">
+            <div class="stat-value" id="blacklistedCustomers">-</div>
+            <div class="stat-label">Blacklisted</div>
+        </div>
+    </div>
+
+    <table class="customers-table">
+        <thead>
+            <tr>
+                <th>Customer Code</th>
+                <th>Customer Name</th>
+                <th>Group</th>
+                <th>Category</th>
+                <th>City</th>
+                <th>Zone</th>
+                <th>Area</th>
+                <th>Phone</th>
+                <th>Address</th>
+            </tr>
+        </thead>
+        <tbody id="customersTableBody">
+            <!-- Customers will be loaded here -->
+        </tbody>
+    </table>
+
+    <div class="print-footer">
+        <p>This report was generated by LedgerOne ERP on <?php echo date('F j, Y \a\t g:i A'); ?></p>
+        <p>© <?php echo date('Y'); ?> LedgerOne ERP. All rights reserved.</p>
+    </div>
+
+    <script>
+        const currencySymbol = '<?php echo $currency_symbol; ?>';
+
+        function escHtml(v) {
+            return String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            loadCustomersForPrint();
+        });
+
+        function loadCustomersForPrint() {
+            // ✅ FIX: Get filters from URL query parameters
+            const urlParams = new URLSearchParams(window.location.search);
+            const search = urlParams.get('search') || '';
+            const status = urlParams.get('status') || '';
+            const company = urlParams.get('company') || '';
+
+            // Build API query with filters
+            const params = new URLSearchParams({
+                search: search,
+                status: status,
+                company: company,
+                limit: 9999 // Get all filtered results
+            });
+
+            // Display what filters are applied
+            displayFilterInfo(search, status, company);
+
+            fetch(`../../../../server/api/customer_supplier/customers/customer-list.php?${params}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        renderCustomersForPrint(data.customers);
+                        updatePrintStats(data.stats);
+                    } else {
+                        console.error('Failed to load customers:', data.message);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error loading customers:', error);
+                });
+        }
+
+        function displayFilterInfo(search, status, company) {
+            const filterInfo = document.getElementById('filterInfo');
+            let filterText = '<strong>Filters Applied:</strong> ';
+            let hasFilters = false;
+
+            if (search) {
+                filterText += `Search: "${escHtml(search)}" | `;
+                hasFilters = true;
+            }
+            if (status) {
+                filterText += `Status: ${escHtml(status.charAt(0).toUpperCase() + status.slice(1))} | `;
+                hasFilters = true;
+            }
+            if (company) {
+                filterText += `Company: ${escHtml(company)} | `;
+                hasFilters = true;
+            }
+
+            if (hasFilters) {
+                filterText = filterText.slice(0, -3); // Remove last " | "
+            } else {
+                filterText += 'None (All Customers)';
+            }
+
+            filterInfo.innerHTML = filterText;
+        }
+
+        function renderCustomersForPrint(customers) {
+            const tbody = document.getElementById('customersTableBody');
+            tbody.innerHTML = '';
+
+            if (customers.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="9" style="text-align: center; padding: 20px;">No customers found</td></tr>';
+                return;
+            }
+
+            customers.forEach(customer => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td><span class="customer-code">${escHtml(customer.customer_code)}</span></td>
+                    <td>${escHtml(customer.customer_name)}</td>
+                    <td>${escHtml(customer.customer_group_name || '-')}</td>
+                    <td>${escHtml(customer.customer_category_name || '-')}</td>
+                    <td>${escHtml(customer.city_name || '-')}</td>
+                    <td>${escHtml(customer.zone_name || '-')}</td>
+                    <td>${escHtml(customer.area_name || '-')}</td>
+                    <td>${escHtml(customer.primary_phone || '-')}</td>
+                    <td>${escHtml(customer.address || '-')}</td>
+                `;
+                tbody.appendChild(row);
+            });
+        }
+
+        function updatePrintStats(stats) {
+            document.getElementById('totalCustomers').textContent = stats.total_customers;
+            document.getElementById('activeCustomers').textContent = stats.active_customers;
+            document.getElementById('blacklistedCustomers').textContent = stats.blacklisted_customers;
+        }
+    </script>
+</body>
+</html>

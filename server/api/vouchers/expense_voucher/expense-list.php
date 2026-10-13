@@ -1,0 +1,66 @@
+<?php
+require_once '../../../../includes/connection.php';
+
+header('Content-Type: application/json');
+
+if (session_status() == PHP_SESSION_NONE) {
+    session_start();
+}
+
+$user_id = $_SESSION['user_id'] ?? null;
+$tenant_id = $_SESSION['tenant_id'] ?? null;
+
+if (!$user_id || $tenant_id === null) {
+    http_response_code(401);
+    echo json_encode(['error' => 'Unauthorized']);
+    exit();
+}
+
+try {
+    $project_id = $_GET['project_id'] ?? null;
+
+    // One row per voucher (not per line) — expense_accounts/cost_centers/expense_amounts/
+    // expense_account_ids/cost_center_ids are comma-lists, one entry per line item in the
+    // same order, which is what the frontend's per-voucher stats, charts, and the
+    // Expense Account / Cost Center filters (filterData() in expense-list.js) all expect.
+    $stmt = $pdo->prepare("
+        SELECT
+            ev.id as voucher_id,
+            ev.voucher_no,
+            ev.date,
+            ev.description,
+            ev.total_amount,
+            ev.total_items,
+            ev.company_id,
+            ev.project_id,
+            ev.is_cash_flow,
+            p.project_name,
+            GROUP_CONCAT(a.name ORDER BY evl.id SEPARATOR ',') as expense_accounts,
+            GROUP_CONCAT(cc.name ORDER BY evl.id SEPARATOR ',') as cost_centers,
+            GROUP_CONCAT(evl.amount ORDER BY evl.id SEPARATOR ',') as expense_amounts,
+            GROUP_CONCAT(evl.account_id ORDER BY evl.id SEPARATOR ',') as expense_account_ids,
+            GROUP_CONCAT(evl.cost_center_id ORDER BY evl.id SEPARATOR ',') as cost_center_ids
+        FROM expense_voucher ev
+        LEFT JOIN projects p ON ev.project_id = p.id
+        LEFT JOIN expense_voucher_line evl ON evl.voucher_id = ev.id
+        LEFT JOIN accounts a ON evl.account_id = a.id
+        LEFT JOIN cost_centers cc ON evl.cost_center_id = cc.id
+        WHERE ev.tenant_id = ?
+        " . ($project_id ? "AND ev.project_id = ?" : "") . "
+        GROUP BY ev.id
+        ORDER BY ev.id DESC
+    ");
+    
+    if ($project_id) {
+        $stmt->execute([$tenant_id, $project_id]);
+    } else {
+        $stmt->execute([$tenant_id]);
+    }
+    $vouchers = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    
+    echo json_encode(['success' => true, 'data' => $vouchers]);
+} catch (Exception $e) {
+    http_response_code(500);
+    echo json_encode(['error' => 'Failed to fetch expense vouchers']);
+}
+?>

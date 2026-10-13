@@ -1,0 +1,12 @@
+IMPORTANT: Currency Conversion Implementation
+=============================================
+
+The post_dated_cheques table does NOT have a currency_id column.
+
+Instead, we get the currency_id by joining with payment_voucher table:
+- post_dated_cheques.reference_id = payment_voucher.id
+- post_dated_cheques.reference_table = 'payment_voucher'
+
+This allows PDC amounts to be converted to the selected currency properly.
+
+NO DATABASE MIGRATION REQUIRED - The system uses JOIN to get currency information.

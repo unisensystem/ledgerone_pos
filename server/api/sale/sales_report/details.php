@@ -1,0 +1,187 @@
+<?php
+require_once '../../../../includes/connection.php';
+
+header('Content-Type: application/json');
+
+session_start();
+$tenant_id = $_SESSION['tenant_id'] ?? 1;
+$type = $_GET['type'] ?? '';
+$id = $_GET['id'] ?? 0;
+$date_from = $_GET['date_from'] ?? date('Y-m-01');
+$date_to = $_GET['date_to'] ?? date('Y-m-d');
+
+// Same base-unit conversion formula used in sales-report.php and the Stock Position
+// report, so aggregated quantities across mixed units (Carton + Piece, say) add up to
+// a meaningful number instead of a meaningless raw sum of different units.
+const UOM_BASE_FACTOR_SQL = "COALESCE(CASE WHEN u.unit_scope = 'universal' THEN u.conversion_factor WHEN puc.conversion_factor IS NOT NULL THEN puc.conversion_factor ELSE 1 END, 1)";
+const UOM_BASE_FACTOR_JOINS = "LEFT JOIN uom u ON sii.uom_id = u.id
+            LEFT JOIN product_uom_conversions puc ON puc.product_id = sii.product_id AND puc.uom_id = sii.uom_id
+            LEFT JOIN uom base_u ON COALESCE(u.base_unit_id, u.id) = base_u.id";
+
+try {
+    if ($type === 'product_invoices') {
+        // Get invoices for a specific product
+        // Includes item_company_name from the product's item company relationship
+        // and the actual unit that particular sale was made in (not base-converted -
+        // this is a single real transaction, so show it the way it was sold).
+        $stmt = $pdo->prepare("
+            SELECT
+                si.bill_no,
+                si.sale_date,
+                COALESCE(c.customer_name, 'Walk-in') as customer_name,
+                sii.quantity,
+                COALESCE(u.uom_name, '') as unit_symbol,
+                sii.sale_price,
+                sii.batch_no,
+                sii.expiry_date as expiry_date,
+                sii.net_amount,
+                COALESCE(ic.company_name, 'Unknown') as item_company_name
+            FROM sale_invoice_items sii
+            JOIN sale_invoice si ON sii.sale_invoice_id = si.id AND si.tenant_id = ?
+            LEFT JOIN customers c ON si.customer_id = c.id AND c.tenant_id = ?
+            LEFT JOIN products p ON sii.product_id = p.id AND p.tenant_id = ?
+            LEFT JOIN item_companies ic ON p.item_company_id = ic.id
+            LEFT JOIN uom u ON sii.uom_id = u.id
+            WHERE sii.tenant_id = ? AND sii.product_id = ? AND si.sale_date BETWEEN ? AND ? AND si.status = 'Posted'
+            ORDER BY si.sale_date DESC
+        ");
+        $stmt->execute([$tenant_id, $tenant_id, $tenant_id, $tenant_id, $id, $date_from, $date_to]);
+    }
+    elseif ($type === 'vendor_products') {
+        // Get products sold for a specific vendor
+        // Includes item_company_name aggregated from sale_invoice_items
+        $stmt = $pdo->prepare("
+            SELECT
+                p.name as product_name,
+                SUM(sii.quantity * " . UOM_BASE_FACTOR_SQL . ") as total_quantity,
+                MIN(base_u.uom_name) as unit_symbol,
+                SUM(sii.net_amount) as total_sales,
+                GROUP_CONCAT(DISTINCT NULLIF(sii.batch_no,'') SEPARATOR ', ') as batch_no,
+                MIN(CASE WHEN sii.expiry_date >= CURDATE() THEN sii.expiry_date END) as nearest_expiry,
+                COALESCE(ic.company_name, 'Unknown') as item_company_name
+            FROM sale_invoice_items sii
+            JOIN sale_invoice si ON sii.sale_invoice_id = si.id AND si.tenant_id = ?
+            JOIN products p ON sii.product_id = p.id AND p.tenant_id = ?
+            LEFT JOIN item_companies ic ON p.item_company_id = ic.id
+            " . UOM_BASE_FACTOR_JOINS . "
+            WHERE sii.tenant_id = ? AND p.vendor_id = ? AND si.sale_date BETWEEN ? AND ? AND si.status = 'Posted'
+            GROUP BY p.id, p.name, ic.company_name
+            ORDER BY total_sales DESC
+        ");
+        $stmt->execute([$tenant_id, $tenant_id, $tenant_id, $id, $date_from, $date_to]);
+    }
+    elseif ($type === 'customer_invoices') {
+        // Get invoices for a specific customer
+        // Uses invoice-batch subquery to aggregate item_company_name
+        $stmt = $pdo->prepare("
+            SELECT 
+                si.bill_no,
+                si.sale_date,
+                si.total_bill,
+                si.total_discount_amount,
+                si.net_amount,
+                ib.batch_no,
+                ib.nearest_expiry,
+                ib.item_company_name
+            FROM sale_invoice si
+            LEFT JOIN (
+                SELECT sii.sale_invoice_id,
+                       GROUP_CONCAT(DISTINCT NULLIF(sii.batch_no,'') SEPARATOR ', ') as batch_no,
+                       MIN(CASE WHEN sii.expiry_date >= CURDATE() THEN sii.expiry_date END) as nearest_expiry,
+                       GROUP_CONCAT(DISTINCT COALESCE(ic.company_name, 'Unknown') SEPARATOR ', ') as item_company_name
+                FROM sale_invoice_items sii
+                LEFT JOIN products p ON sii.product_id = p.id
+                LEFT JOIN item_companies ic ON p.item_company_id = ic.id
+                WHERE sii.tenant_id = ?
+                GROUP BY sii.sale_invoice_id
+            ) ib ON ib.sale_invoice_id = si.id
+            WHERE si.tenant_id = ? AND si.customer_id = ? AND si.sale_date BETWEEN ? AND ? AND si.status = 'Posted'
+            ORDER BY si.sale_date DESC
+        ");
+        $stmt->execute([$tenant_id, $tenant_id, $id, $date_from, $date_to]);
+    } 
+    elseif ($type === 'invoice_items') {
+        // Get items for a specific invoice
+        // Includes item_company_name directly from product relationship
+        $stmt = $pdo->prepare("
+            SELECT
+                p.name as product_name,
+                sii.quantity,
+                COALESCE(u.uom_name, '') as unit_symbol,
+                sii.sale_price,
+                sii.batch_no,
+                sii.expiry_date as expiry_date,
+                sii.discount_amount,
+                sii.net_amount,
+                COALESCE(ic.company_name, 'Unknown') as item_company_name
+            FROM sale_invoice_items sii
+            JOIN products p ON sii.product_id = p.id AND p.tenant_id = ?
+            LEFT JOIN item_companies ic ON p.item_company_id = ic.id
+            LEFT JOIN uom u ON sii.uom_id = u.id
+            WHERE sii.tenant_id = ? AND sii.sale_invoice_id = ?
+            ORDER BY sii.id
+        ");
+        $stmt->execute([$tenant_id, $tenant_id, $id]);
+    } 
+    elseif ($type === 'territory_invoices') {
+        // Get invoices for a specific territory (Country, Region, City, Zone, Area)
+        // Uses invoice-batch subquery to aggregate item_company_name
+        $country = $_GET['country'] ?? '';
+        $region = $_GET['region'] ?? '';
+        $city = $_GET['city'] ?? '';
+        $zone = $_GET['zone'] ?? '';
+        $area = $_GET['area'] ?? '';
+        
+        $stmt = $pdo->prepare("
+            SELECT 
+                si.bill_no,
+                si.sale_date,
+                COALESCE(c.customer_name, 'Walk-in') as customer_name,
+                si.net_amount,
+                ib.batch_no,
+                ib.nearest_expiry,
+                ib.item_company_name
+            FROM sale_invoice si
+            LEFT JOIN customers c ON si.customer_id = c.id AND c.tenant_id = ?
+            LEFT JOIN countries co ON c.country_id = co.id
+            LEFT JOIN regions r ON c.region_id = r.id
+            LEFT JOIN cities ci ON c.city_id = ci.id
+            LEFT JOIN city_zones cz ON c.city_zone_id = cz.id
+            LEFT JOIN areas a ON c.area_id = a.id
+            LEFT JOIN (
+                SELECT sii.sale_invoice_id,
+                       GROUP_CONCAT(DISTINCT NULLIF(sii.batch_no,'') SEPARATOR ', ') as batch_no,
+                       MIN(CASE WHEN sii.expiry_date >= CURDATE() THEN sii.expiry_date END) as nearest_expiry,
+                       GROUP_CONCAT(DISTINCT COALESCE(ic.company_name, 'Unknown') SEPARATOR ', ') as item_company_name
+                FROM sale_invoice_items sii
+                LEFT JOIN products p ON sii.product_id = p.id
+                LEFT JOIN item_companies ic ON p.item_company_id = ic.id
+                WHERE sii.tenant_id = ?
+                GROUP BY sii.sale_invoice_id
+            ) ib ON ib.sale_invoice_id = si.id
+            WHERE si.tenant_id = ? 
+                AND si.sale_date BETWEEN ? AND ? 
+                AND si.status = 'Posted'
+                AND COALESCE(co.country_name, 'Unknown') = ?
+                AND COALESCE(r.region_name, '-') = ?
+                AND COALESCE(ci.city_name, '-') = ?
+                AND COALESCE(cz.city_zone_name, '-') = ?
+                AND COALESCE(a.area_name, '-') = ?
+            ORDER BY si.sale_date DESC
+        ");
+        $stmt->execute([$tenant_id, $tenant_id, $tenant_id, $date_from, $date_to, $country, $region, $city, $zone, $area]);
+    } 
+    else {
+        throw new Exception('Invalid type: ' . $type);
+    }
+    
+    $details = $stmt->fetchAll();
+    
+    echo json_encode([
+        'success' => true,
+        'data' => $details
+    ]);
+} catch (Exception $e) {
+    echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+}
+?>

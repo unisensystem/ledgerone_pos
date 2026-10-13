@@ -1,0 +1,578 @@
+:root {
+  /* Light Theme Colors */
+  --primary: #1f7bff;
+  --primary-hover: #1a6cdc;
+  --primary-active: #1559b8;
+  --surface-0: #ffffff;
+  --surface-1: #f7f9fc;
+  --surface-2: #eff2f7;
+  --heading: #0e1a2b;
+  --body: #2f3b4c;
+  --subtext: #6b7280;
+  --border-default: #e1e6ee;
+  --border-strong: #c9cfda;
+  --success: #2fbf71;
+  --warning: #e8b23f;
+  --error: #e34f4f;
+  --shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
+  --shadow-light: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+}
+
+body {
+  background-color: var(--surface-1);
+  color: var(--body);
+  line-height: 1.6;
+  padding: 20px;
+}
+
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+/* Header */
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 32px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border-default);
+}
+
+.header h1 {
+  color: var(--heading);
+  font-size: 28px;
+  font-weight: 700;
+}
+
+/* Main Layout */
+.main-content {
+  display: flex;
+  gap: 24px;
+}
+
+/* Help Panel */
+.help-panel {
+  width: 320px;
+  background-color: var(--surface-0);
+  border-radius: 12px;
+  padding: 24px;
+  box-shadow: var(--shadow);
+  height: fit-content;
+  position: sticky;
+  top: 20px;
+}
+
+.help-panel h2 {
+  color: var(--heading);
+  font-size: 20px;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border-default);
+}
+
+.help-section {
+  margin-bottom: 24px;
+}
+
+.help-section h3 {
+  color: var(--primary);
+  font-size: 16px;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.help-section p {
+  font-size: 14px;
+  color: var(--subtext);
+  margin-bottom: 12px;
+}
+
+.help-tip {
+  background-color: var(--surface-1);
+  border-left: 4px solid var(--primary);
+  padding: 12px;
+  border-radius: 4px;
+  margin-top: 16px;
+}
+
+.help-tip h4 {
+  color: var(--heading);
+  font-size: 14px;
+  margin-bottom: 4px;
+}
+
+.account-heads {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.account-head-tag {
+  background-color: var(--surface-2);
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--body);
+}
+
+.rules-list {
+  list-style-type: none;
+  padding-left: 0;
+}
+
+.rules-list li {
+  padding: 6px 0;
+  font-size: 14px;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.rules-list li i {
+  color: var(--primary);
+  margin-top: 2px;
+}
+
+/* CoA Panel */
+.coa-panel {
+  flex: 1;
+  background-color: var(--surface-0);
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: var(--shadow);
+}
+
+.panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--border-default);
+  background-color: var(--surface-0);
+}
+
+.panel-header h2 {
+  color: var(--heading);
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.panel-actions {
+  display: flex;
+  gap: 12px;
+}
+
+/* Buttons */
+.btn {
+  height: 40px;
+  padding: 0 16px;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: all 0.2s ease;
+}
+
+.btn-primary {
+  background-color: var(--primary);
+  color: white;
+}
+
+.btn-primary:hover {
+  background-color: var(--primary-hover);
+}
+
+.btn-primary:active {
+  background-color: var(--primary-active);
+}
+
+.btn-secondary {
+  background-color: var(--surface-2);
+  color: var(--body);
+  border: 1px solid var(--border-strong);
+}
+
+.btn-secondary:hover {
+  background-color: var(--border-default);
+}
+
+.btn-sm {
+  height: 32px;
+  padding: 0 12px;
+  font-size: 13px;
+}
+
+.account-creation-buttons {
+  display: flex;
+  gap: 8px;
+}
+
+/* CoA Tree */
+.coa-tree {
+  padding: 16px 24px;
+  max-height: 600px;
+  overflow-y: auto;
+}
+
+.tree-controls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 24px 16px 24px;
+  border-bottom: 1px solid var(--border-default);
+}
+
+.tree-controls .btn {
+  font-size: 13px;
+  height: 32px;
+  padding: 0 12px;
+}
+
+.account-node {
+  margin-bottom: 8px;
+}
+
+.account-header {
+  display: flex;
+  align-items: center;
+  padding: 12px 16px;
+  background-color: var(--surface-1);
+  border-radius: 8px;
+  border: 1px solid var(--border-default);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.account-header:hover {
+  background-color: var(--surface-2);
+}
+
+.account-header.active {
+  border-left: 4px solid var(--primary);
+}
+
+.account-header.system-locked {
+  border-left: 4px solid var(--subtext);
+}
+
+.account-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 12px;
+  color: white;
+  font-weight: bold;
+  font-size: 14px;
+}
+
+.account-icon.assets {
+  background-color: #1f7bff;
+}
+
+.account-icon.liabilities {
+  background-color: #e8b23f;
+}
+
+.account-icon.equity {
+  background-color: #2fbf71;
+}
+
+.account-icon.income {
+  background-color: #8b5cf6;
+}
+
+.account-icon.expenses {
+  background-color: #e34f4f;
+}
+
+.account-icon.sub-account {
+  background-color: #6b7280;
+}
+
+.account-info {
+  flex: 1;
+}
+
+.account-name {
+  font-weight: 600;
+  color: var(--heading);
+  font-size: 16px;
+  margin-bottom: 2px;
+}
+
+.account-id {
+  font-size: 13px;
+  color: var(--subtext);
+  font-weight: 500;
+}
+
+.account-type {
+  font-size: 12px;
+  color: var(--primary);
+  background-color: rgba(31, 123, 255, 0.1);
+  padding: 2px 8px;
+  border-radius: 10px;
+  margin-left: 8px;
+}
+
+.account-actions {
+  display: flex;
+  gap: 8px;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.account-header:hover .account-actions {
+  opacity: 1;
+}
+
+.account-toggle {
+  margin-right: 12px;
+  color: var(--subtext);
+  transition: transform 0.2s ease;
+}
+
+.account-toggle.collapsed {
+  transform: rotate(-90deg);
+}
+
+.account-status {
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+  margin-left: 12px;
+}
+
+.status-manageable {
+  background-color: rgba(47, 191, 113, 0.1);
+  color: var(--success);
+}
+
+.status-system-locked {
+  background-color: rgba(107, 114, 128, 0.1);
+  color: var(--subtext);
+}
+
+.account-children {
+  margin-left: 40px;
+  margin-top: 8px;
+  display: none;
+}
+
+.account-children.expanded {
+  display: block;
+}
+
+.sub-account {
+  padding-left: 24px;
+  border-left: 2px dashed var(--border-default);
+}
+
+/* Modal */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  opacity: 0;
+  visibility: hidden;
+  transition: all 0.3s ease;
+}
+
+.modal-overlay.active {
+  opacity: 1;
+  visibility: visible;
+}
+
+.modal {
+  background-color: var(--surface-0);
+  border-radius: 12px;
+  width: 90%;
+  max-width: 500px;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+}
+
+.modal-header {
+  padding: 24px 24px 16px;
+  border-bottom: 1px solid var(--border-default);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.modal-header h3 {
+  color: var(--heading);
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.modal-close {
+  background: none;
+  border: none;
+  font-size: 24px;
+  color: var(--subtext);
+  cursor: pointer;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.modal-close:hover {
+  background-color: var(--surface-1);
+}
+
+.modal-body {
+  padding: 24px;
+}
+
+.form-group {
+  margin-bottom: 20px;
+}
+
+.form-label {
+  display: block;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--body);
+  margin-bottom: 6px;
+}
+
+.form-input {
+  width: 100%;
+  height: 40px;
+  padding: 0 14px;
+  border: 1.5px solid var(--border-default);
+  background-color: var(--surface-0);
+  border-radius: 8px;
+  font-size: 14px;
+  color: var(--body);
+  transition: all 0.2s ease;
+}
+
+.form-input:focus {
+  outline: none;
+  border: 2px solid var(--primary);
+  box-shadow: 0 0 0 2px rgba(31, 123, 255, 0.1);
+}
+
+.form-row {
+  display: flex;
+  gap: 16px;
+}
+
+.form-row .form-group {
+  flex: 1;
+}
+
+.radio-group {
+  display: flex;
+  gap: 24px;
+  margin-top: 8px;
+}
+
+.radio-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+
+.radio-option input[type="radio"] {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--primary);
+}
+
+.modal-footer {
+  padding: 16px 24px;
+  border-top: 1px solid var(--border-default);
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.modal-info {
+  background-color: var(--surface-1);
+  border-radius: 8px;
+  padding: 12px 16px;
+  margin-bottom: 20px;
+  border-left: 4px solid var(--primary);
+}
+
+.modal-info p {
+  font-size: 14px;
+  color: var(--body);
+  margin: 0;
+}
+
+/* Responsive */
+@media (max-width: 992px) {
+  .main-content {
+    flex-direction: column;
+  }
+
+  .help-panel {
+    width: 100%;
+    position: static;
+  }
+}
+
+@media (max-width: 768px) {
+  .panel-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 16px;
+  }
+
+  .panel-actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+
+  .form-row {
+    flex-direction: column;
+    gap: 0;
+  }
+
+  .account-creation-buttons {
+    flex-direction: column;
+    width: 100%;
+  }
+
+  .account-creation-buttons .btn {
+    width: 100%;
+  }
+}

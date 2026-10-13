@@ -1,0 +1,2049 @@
+const API_BASE = '../../../../server/api/inventory/stock_position/stock-position.php';
+
+function escLedger(v) {
+    return String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+// Pagination variables
+let currentPage = 1;
+const itemsPerPage = 20;  // Increased from 10 to show more rows per page (fixes FOC pagination issue)
+let totalItems = 0;
+let allPositions = [];
+let currentCurrency = '$';
+let currentDashboardStats = null;
+let currentDashboardCurrency = '$';
+// Customer-wise Ledger pagination variables
+let customerCurrentPage = 1;
+let customerTotalItems = 0;
+let allCustomerEntries = [];
+let customerCurrency = '$';
+// Company-wise Ledger pagination variables
+let movementCurrentPage = 1;
+let movementTotalItems = 0;
+let allMovementEntries = [];
+let movementCurrency = '$';
+let movementItemsPerPage = 50; // NEW: user-selectable via "Show" dropdown (10/50/100/250)
+
+let rawMovementData = [];      // NEW: unfiltered data from last fetch (before hide-no-movement filter)
+let hideNoMovement = false;
+// Item-wise Ledger pagination variables
+let itemCurrentPage = 1;
+let itemTotalItems = 0;
+let allLedgerEntries = [];
+let itemCurrency = '$';
+
+// Branch-wise Ledger pagination variables
+let branchCurrentPage = 1;
+let branchTotalItems = 0;
+let allBranchEntries = [];
+let branchCurrency = '$';
+
+// Detailed Ledger pagination variables
+let detailedCurrentPage = 1;
+let detailedTotalItems = 0;
+let allDetailedEntries = [];
+let detailedCurrency = '$';
+
+const ROUND_OFF_SWITCH_IDS = {
+    position: 'round-off-position',
+    'item-ledger': 'round-off-item-ledger',
+    'branch-ledger': 'round-off-branch-ledger',
+    'detailed-ledger': 'round-off-detailed-ledger',
+    'customer-ledger': 'round-off-customer-ledger',
+    'item-movement': 'round-off-item-movement'
+};
+
+function isRoundOffEnabled(tabId) {
+    return document.getElementById(ROUND_OFF_SWITCH_IDS[tabId])?.checked || false;
+}
+
+function formatStockAmount(value, tabId) {
+    const amount = Number(value) || 0;
+    return isRoundOffEnabled(tabId)
+        ? Math.round(amount).toLocaleString()
+        : amount.toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 });
+}
+
+function formatStockQuantity(value, unit, tabId) {
+    return `${formatStockAmount(value, tabId)} ${unit || 'L'}`;
+}
+
+function formatStockMoney(value, currency, tabId) {
+    return `${currency || ''}${formatStockAmount(value, tabId)}`;
+}
+
+function rerenderStockTab(tabId) {
+    if (tabId === 'position') {
+        updatePositionTable(currentCurrency);
+        if (currentDashboardStats) updateDashboardStats(currentDashboardStats, currentDashboardCurrency);
+    }
+    if (tabId === 'item-ledger') renderLedgerTable(itemCurrency);
+    if (tabId === 'branch-ledger') renderBranchLedgerTable(branchCurrency);
+    if (tabId === 'detailed-ledger') renderDetailedLedgerTable(detailedCurrency);
+    if (tabId === 'customer-ledger') renderCustomerLedgerTable(customerCurrency);
+    if (tabId === 'item-movement') renderMovementTable(movementCurrency);
+}
+
+// Column visibility state
+let columnVisibility = {
+    branch: true,
+    inventoryType: true,
+    openingBalance: true,
+    qtyIn: true,
+    qtyOut: true,
+    currentStock: true,
+    unitCost: true,
+    stockValue: true,
+    status: true
+};
+
+// Load column visibility from localStorage
+function loadColumnVisibility() {
+    const saved = localStorage.getItem('stockPositionColumnVisibility');
+    if (saved) {
+        columnVisibility = JSON.parse(saved);
+    }
+    applyColumnVisibility();
+}
+
+// Save column visibility to localStorage
+function saveColumnVisibility() {
+    localStorage.setItem('stockPositionColumnVisibility', JSON.stringify(columnVisibility));
+}
+
+// Apply column visibility
+function applyColumnVisibility() {
+    const columns = {
+        'branch': document.querySelectorAll('.col-branch'),
+        'inventoryType': document.querySelectorAll('.col-inventory-type'),
+        'openingBalance': document.querySelectorAll('.col-opening-balance'),
+        'qtyIn': document.querySelectorAll('.col-qty-in'),
+        'qtyOut': document.querySelectorAll('.col-qty-out'),
+        'currentStock': document.querySelectorAll('.col-current-stock'),
+        'unitCost': document.querySelectorAll('.col-unit-cost'),
+        'stockValue': document.querySelectorAll('.col-stock-value'),
+        'status': document.querySelectorAll('.col-status')
+    };
+    
+    Object.keys(columns).forEach(key => {
+        columns[key].forEach(col => {
+            col.style.display = columnVisibility[key] ? '' : 'none';
+        });
+    });
+    
+    // Update checkboxes
+    const checkboxes = {
+        'branch': document.getElementById('toggle-branch'),
+        'inventoryType': document.getElementById('toggle-inventory-type'),
+        'openingBalance': document.getElementById('toggle-opening-balance'),
+        'qtyIn': document.getElementById('toggle-qty-in'),
+        'qtyOut': document.getElementById('toggle-qty-out'),
+        'currentStock': document.getElementById('toggle-current-stock'),
+        'unitCost': document.getElementById('toggle-unit-cost'),
+        'stockValue': document.getElementById('toggle-stock-value'),
+        'status': document.getElementById('toggle-status')
+    };
+    
+    Object.keys(checkboxes).forEach(key => {
+        if (checkboxes[key]) checkboxes[key].checked = columnVisibility[key];
+    });
+}
+
+// Toggle children for a specific product
+function toggleChildren(productId) {
+    const childRows = document.querySelectorAll(`tr.child-row[data-parent-id="${productId}"]`);
+    const toggleIcon = document.querySelector(`tr[data-product-id="${productId}"] i`);
+    
+    if (childRows.length > 0) {
+        const isHidden = childRows[0].style.display === 'none';
+        childRows.forEach(row => row.style.display = isHidden ? '' : 'none');
+        if (toggleIcon) {
+            toggleIcon.className = isHidden ? 'fas fa-chevron-down' : 'fas fa-chevron-right';
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Shared From/To Date filter sync
+// ---------------------------------------------------------------------------
+// Setting From Date / To Date on any one tab now keeps every other tab's
+// From Date / To Date in sync automatically, until the user changes it again.
+// All tabs' date inputs already live in the DOM at the same time (tabs are
+// just shown/hidden via CSS), so keeping their values mirrored is enough —
+// each tab's load function already reads straight from its own input.
+const FROM_DATE_IDS = ['from-date', 'item-from-date', 'from-date-branch', 'from-date-customer', 'detailed-from-date', 'from-date-movement'];
+const TO_DATE_IDS = ['to-date', 'item-to-date', 'to-date-branch', 'to-date-customer', 'detailed-to-date', 'to-date-movement'];
+
+function syncDateFilters(sourceId, value, idList) {
+    idList.forEach(id => {
+        if (id === sourceId) return;
+        const el = document.getElementById(id);
+        if (el) el.value = value;
+    });
+}
+
+function initDateFilterSync() {
+    FROM_DATE_IDS.forEach(id => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.addEventListener('change', () => syncDateFilters(id, el.value, FROM_DATE_IDS));
+    });
+    TO_DATE_IDS.forEach(id => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.addEventListener('change', () => syncDateFilters(id, el.value, TO_DATE_IDS));
+    });
+}
+
+// Clears a tab's own From/To Date fields and mirrors the empty value to every
+// other tab too, so "Clear" on one tab doesn't leave the others out of sync.
+function clearAndSyncDateFilters(fromId, toId) {
+    const fromEl = document.getElementById(fromId);
+    const toEl = document.getElementById(toId);
+    if (fromEl) fromEl.value = '';
+    if (toEl) toEl.value = '';
+    syncDateFilters(fromId, '', FROM_DATE_IDS);
+    syncDateFilters(toId, '', TO_DATE_IDS);
+}
+
+// Print function
+function printList() {
+    const activeTab = getActiveTabId();
+
+    if (activeTab === 'customer-ledger') {
+        openCustomerLedgerPreview();
+        return;
+    }
+
+   if (activeTab === 'item-movement') {
+    openItemMovementPreview();
+    return;
+}
+    const branch = document.getElementById('branch').value;
+    const product = document.getElementById('product').value;
+    const inventoryType = document.getElementById('inventory-type').value;
+    const stockStatus = document.getElementById('stock-status').value;
+    const status = document.getElementById('status').value;
+    const stockLevelFilter = document.getElementById('stock-level-filter').value;
+    const fromDate = document.getElementById('from-date').value;
+    const toDate = document.getElementById('to-date').value;
+    const valuationMethod = document.getElementById('valuation-method').value;
+    const positionProjectId = document.getElementById('position-project')?.value;
+
+    let url = `print.php?type=${activeTab}&round_off=${isRoundOffEnabled(activeTab) ? '1' : '0'}&`;
+    if (activeTab === 'position') {
+        if (branch) url += `branch_id=${branch}&`;
+        if (product) url += `product_id=${product}&`;
+        if (inventoryType) url += `inventory_type_id=${inventoryType}&`;
+        if (stockStatus) url += `stock_status=${stockStatus}&`;
+        if (status) url += `status=${status}&`;
+        if (stockLevelFilter) url += `stock_level=${stockLevelFilter}&`;
+        if (fromDate) url += `from_date=${fromDate}&`;
+        if (toDate) url += `to_date=${toDate}&`;
+        if (valuationMethod) url += `valuation_method=${valuationMethod}&`;
+        if (positionProjectId) url += `project_id=${positionProjectId}&`;
+    } else if (activeTab === 'item-ledger') {
+        // Item-wise Ledger tab filters
+        const itemName = document.getElementById('item').value;
+        let productId = null;
+        if (itemName) {
+            const options = document.querySelectorAll('#item-list option');
+            for (let option of options) {
+                if (option.value === itemName) {
+                    productId = option.getAttribute('data-id');
+                    break;
+                }
+            }
+        }
+        const companyId = document.getElementById('item-company').value;
+        const itemCompanyId = document.getElementById('item-ledger-item-company')?.value;
+        const customerName = document.getElementById('item-customer')?.value;
+        let customerId = null;
+        if (customerName) {
+            const options = document.querySelectorAll('#item-customer-list option');
+            for (let option of options) {
+                if (option.value === customerName) {
+                    customerId = option.getAttribute('data-id');
+                    break;
+                }
+            }
+        }
+        const projectId = document.getElementById('item-project')?.value;
+        const itemFromDate = document.getElementById('item-from-date').value;
+        const itemToDate = document.getElementById('item-to-date').value;
+        const batchFilter = document.getElementById('item-batch-filter')?.value;
+        const expiryFilter = document.getElementById('item-expiry-filter')?.value;
+
+        if (productId) url += `product_id=${productId}&`;
+        if (companyId) url += `vendor_id=${companyId}&`;
+        if (itemCompanyId) url += `item_company_id=${itemCompanyId}&`;
+        if (customerId) url += `customer_id=${customerId}&`;
+        if (projectId) url += `project_id=${projectId}&`;
+        if (itemFromDate) url += `from_date=${itemFromDate}&`;
+        if (itemToDate) url += `to_date=${itemToDate}&`;
+        if (batchFilter) url += `batch_no=${encodeURIComponent(batchFilter)}&`;
+        if (expiryFilter) url += `expiry_date=${expiryFilter}&`;
+    } else if (activeTab === 'branch-ledger') {
+        const branchName = document.querySelector('input[list="branch-ledger-list"]')?.value;
+        let branchId = null;
+        if (branchName) {
+            const options = document.querySelectorAll('#branch-ledger-list option');
+            for (let option of options) {
+                if (option.value === branchName) {
+                    branchId = option.getAttribute('data-id');
+                    break;
+                }
+            }
+        }
+        const branchFromDate = document.getElementById('from-date-branch')?.value;
+        const branchToDate = document.getElementById('to-date-branch')?.value;
+        const branchProjectId = document.getElementById('branch-project')?.value;
+        const itemCompanyId = document.getElementById('branch-item-company')?.value;
+
+        if (branchId) url += `branch_id=${branchId}&`;
+        if (branchFromDate) url += `from_date=${branchFromDate}&`;
+        if (branchToDate) url += `to_date=${branchToDate}&`;
+        if (branchProjectId) url += `project_id=${branchProjectId}&`;
+        if (itemCompanyId) url += `item_company_id=${itemCompanyId}&`;
+    } else if (activeTab === 'detailed-ledger') {
+        const branchInput = document.getElementById('detailed-branch').value;
+        const productInput = document.getElementById('detailed-product').value;
+        let branchId = null;
+        if (branchInput) {
+            const options = document.querySelectorAll('#detailed-branch-list option');
+            for (let option of options) {
+                if (option.value === branchInput) {
+                    branchId = option.getAttribute('data-id');
+                    break;
+                }
+            }
+        }
+        let productId = null;
+        if (productInput) {
+            const options = document.querySelectorAll('#detailed-product-list option');
+            for (let option of options) {
+                if (option.value === productInput) {
+                    productId = option.getAttribute('data-id');
+                    break;
+                }
+            }
+        }
+        const detailedFromDate = document.getElementById('detailed-from-date').value;
+        const detailedToDate = document.getElementById('detailed-to-date').value;
+        const batchFilter = document.getElementById('detailed-batch-filter')?.value;
+        const expiryFilter = document.getElementById('detailed-expiry-filter')?.value;
+        const detailedProjectId = document.getElementById('detailed-project')?.value;
+        const itemCompanyId = document.getElementById('detailed-item-company')?.value;
+
+        if (branchId) url += `branch_id=${branchId}&`;
+        if (productId) url += `product_id=${productId}&`;
+        if (detailedFromDate) url += `from_date=${detailedFromDate}&`;
+        if (detailedToDate) url += `to_date=${detailedToDate}&`;
+        if (batchFilter) url += `batch_no=${encodeURIComponent(batchFilter)}&`;
+        if (expiryFilter) url += `expiry_date=${expiryFilter}&`;
+        if (detailedProjectId) url += `project_id=${detailedProjectId}&`;
+        if (itemCompanyId) url += `item_company_id=${itemCompanyId}&`;
+    }
+
+    window.open(url, '_blank');
+}
+
+// Returns the data-tab id of whichever tab is currently active
+function getActiveTabId() {
+    const activeTab = document.querySelector('.tab.active');
+    return activeTab ? activeTab.getAttribute('data-tab') : 'position';
+}
+
+// Shared running-balance calculation used by Detailed Ledger & Customer-wise Ledger exports
+// (mirrors the logic already used when rendering those two tables)
+function computeRunningBalances(entries) {
+    const balances = {};
+    return entries.map(entry => {
+        const key = `${entry.product_name}-${entry.branch_name}`;
+        if (!balances[key]) balances[key] = 0;
+        balances[key] += parseFloat(entry.qty_in || 0) - parseFloat(entry.qty_out || 0) - parseFloat(entry.qty_foc || 0);
+        return {
+            ...entry,
+            balance: balances[key],
+            value: balances[key] * parseFloat(entry.unit_cost || 0)
+        };
+    });
+}
+// Builds a CSV file from an array of plain objects and triggers a download.
+// No external library needed — Excel opens CSV files natively.
+function downloadAsExcelCSV(rows, filename) {
+    if (!rows || rows.length === 0) {
+        alert('No data available to export.');
+        return;
+    }
+
+    const headers = Object.keys(rows[0]);
+    const escapeCell = (val) => {
+        let str = (val === undefined || val === null) ? '' : String(val);
+        if (/[",\n]/.test(str)) {
+            str = '"' + str.replace(/"/g, '""') + '"';
+        }
+        return str;
+    };
+
+    const lines = [headers.map(escapeCell).join(',')];
+    rows.forEach(row => {
+        lines.push(headers.map(h => escapeCell(row[h])).join(','));
+    });
+
+    // BOM prefix so Excel correctly detects UTF-8 (needed for currency symbols etc.)
+    const csvContent = '\uFEFF' + lines.join('\r\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    link.style.display = 'none';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+}
+
+function exportToExcel() {
+    const activeTab = getActiveTabId();
+    const today = new Date().toISOString().slice(0, 10);
+    let rows = [];
+    let filename = `export_${today}.csv`;
+
+    // Customer-wise Ledger: seedha CSV download nahi — pehle print preview khulega,
+    // wahan se user Print ya Export to Excel kar sakta hai (jaisa Stock Position tab me hota hai)
+    if (activeTab === 'customer-ledger') {
+        openCustomerLedgerPreview();
+        return;
+    }
+
+    // Company-wise Ledger: same pattern as Customer-wise Ledger — open the print preview first.
+    if (activeTab === 'item-movement') {
+    openItemMovementPreview();
+    return;
+}
+    switch (activeTab) {
+        case 'position': {
+            filename = `stock_position_${today}.csv`;
+            rows = allPositions.map(pos => {
+                const unit = pos.unit_symbol || 'L';
+                const row = { 'Product': pos.product_name };
+                if (columnVisibility.branch) row['Branch'] = pos.branch_display;
+                if (columnVisibility.inventoryType) row['Inventory Type'] = pos.inventory_type || '-';
+                if (columnVisibility.openingBalance) row['Opening Balance'] = formatStockQuantity(pos.opening_balance, unit, 'position');
+                if (columnVisibility.qtyIn) row['Total Qty In'] = formatStockQuantity(pos.total_qty_in, unit, 'position');
+                if (columnVisibility.qtyOut) row['Total Qty Out'] = formatStockQuantity(pos.total_qty_out, unit, 'position');
+                if (columnVisibility.currentStock) row['Current Stock'] = formatStockQuantity(pos.current_stock, unit, 'position');
+                if (columnVisibility.unitCost) row['Unit Cost'] = formatStockAmount(pos.unit_cost, 'position');
+                if (columnVisibility.stockValue) row['Stock Value'] = formatStockAmount(pos.stock_value, 'position');
+                if (columnVisibility.status) row['Status'] = pos.status.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase());
+                return row;
+            });
+            break;
+        }
+        case 'item-ledger': {
+            filename = `item_ledger_${today}.csv`;
+            rows = allLedgerEntries.map(entry => ({
+                'Date': entry.transaction_date,
+                'Invoice #': entry.invoice_number || '-',
+                'Product': entry.product_name,
+                'Item Company': entry.item_company_name || '-',
+                'Company': entry.company_name || '-',
+                'Customer': entry.customer_name || '-',
+                'Transaction': entry.transaction_type,
+                'Batch No': entry.batch_no || '-',
+                'Expiry Date': entry.batch_expiry_date || '-',
+                'Qty In': entry.qty_in > 0 ? formatStockQuantity(entry.qty_in, entry.unit_symbol, 'item-ledger') : '-',
+                'Qty Out': entry.qty_out > 0 ? formatStockQuantity(entry.qty_out, entry.unit_symbol, 'item-ledger') : '-',
+                'Balance': formatStockQuantity(entry.balance, entry.unit_symbol, 'item-ledger'),
+                'Unit Cost': formatStockAmount(entry.unit_cost, 'item-ledger'),
+                'Value': formatStockAmount(entry.value, 'item-ledger')
+            }));
+            break;
+        }
+        case 'branch-ledger': {
+            filename = `branch_ledger_${today}.csv`;
+            rows = allBranchEntries.map(entry => ({
+                'Date': entry.transaction_date,
+                'Product': entry.product_name,
+                'Item Company': entry.item_company_name || '-',
+                'Transaction': entry.transaction_type,
+                'Qty In': entry.qty_in > 0 ? formatStockQuantity(entry.qty_in, entry.unit_symbol, 'branch-ledger') : '-',
+                'Qty Out': entry.qty_out > 0 ? formatStockQuantity(entry.qty_out, entry.unit_symbol, 'branch-ledger') : '-',
+                'Unit Cost': formatStockAmount(entry.unit_cost, 'branch-ledger'),
+                'Value': formatStockAmount((parseFloat(entry.qty_in || 0) - parseFloat(entry.qty_out || 0)) * parseFloat(entry.unit_cost), 'branch-ledger')
+            }));
+            break;
+            
+        }
+
+        case 'detailed-ledger': {
+            filename = `detailed_ledger_${today}.csv`;
+            rows = computeRunningBalances(allDetailedEntries).map(entry => ({
+                'Date': entry.transaction_date,
+                'Product': entry.product_name,
+                'Item Company': entry.item_company_name || '-',
+                'Branch': entry.branch_name,
+                'Transaction': entry.transaction_type,
+                 'Batch No': entry.batch_no || '-',
+                'Expiry Date': entry.batch_expiry_date || '-',
+                'Qty In': entry.qty_in > 0 ? formatStockQuantity(entry.qty_in, entry.unit_symbol, 'detailed-ledger') : '-',
+                'Qty Out': entry.qty_out > 0 ? formatStockQuantity(entry.qty_out, entry.unit_symbol, 'detailed-ledger') : '-',
+                'Balance': formatStockQuantity(entry.balance, entry.unit_symbol, 'detailed-ledger'),
+                'Unit Cost': formatStockAmount(entry.unit_cost, 'detailed-ledger'),
+                'Value': formatStockAmount(entry.value, 'detailed-ledger')
+            }));
+            break;
+        }
+        default:
+            alert('No data available to export for this tab.');
+            return;
+    }
+
+    downloadAsExcelCSV(rows, filename);
+}
+
+// Customer-wise Ledger ke liye print preview page kholta hai (CSV direct download ki jagah)
+function openCustomerLedgerPreview() {
+    const customerName = document.getElementById('customer-ledger-input').value;
+    const productName = document.getElementById('customer-product-input').value;
+
+    if ((!customerName || customerName.trim() === '') && (!productName || productName.trim() === '')) {
+        alert('Please select a Customer or a Product');
+        return;
+    }
+
+    let customerId = null;
+    if (customerName) {
+        const options = document.querySelectorAll('#customer-ledger-list option');
+        for (let option of options) {
+            if (option.value === customerName) {
+                customerId = option.getAttribute('data-id');
+                break;
+            }
+        }
+        if (!customerId) {
+            alert('Invalid customer selected. Please pick a customer from the list.');
+            return;
+        }
+    }
+
+    let productId = null;
+    if (productName) {
+        const productOptions = document.querySelectorAll('#customer-product-list option');
+        for (let option of productOptions) {
+            if (option.value === productName) {
+                productId = option.getAttribute('data-id');
+                break;
+            }
+        }
+        if (!productId) {
+            alert('Invalid product selected. Please pick a product from the list.');
+            return;
+        }
+    }
+
+    const fromDate = document.getElementById('from-date-customer').value;
+    const toDate = document.getElementById('to-date-customer').value;
+    const batchFilter = document.getElementById('customer-batch-filter')?.value;
+    const expiryFilter = document.getElementById('customer-expiry-filter')?.value;
+    const projectId = document.getElementById('customer-project')?.value;
+    const itemCompanyId = document.getElementById('customer-item-company')?.value;
+
+    let url = `print_customer_ledger.php?`;
+    if (customerId) url += `customer_id=${customerId}&`;
+    if (productId) url += `product_id=${productId}&`;
+    if (fromDate) url += `from_date=${fromDate}&`;
+    if (toDate) url += `to_date=${toDate}&`;
+    if (batchFilter) url += `batch_no=${encodeURIComponent(batchFilter)}&`;
+    if (expiryFilter) url += `expiry_date=${expiryFilter}&`;
+    if (projectId) url += `project_id=${projectId}&`;
+    if (itemCompanyId) url += `item_company_id=${itemCompanyId}&`;
+    url += `round_off=${isRoundOffEnabled('customer-ledger') ? '1' : '0'}&`;
+
+    window.open(url, '_blank');
+}
+
+// Company-wise (Supplier) Ledger ke liye print preview page kholta hai
+// Company-wise (Supplier) Ledger ke liye print preview page kholta hai
+function openItemMovementPreview() {
+    const productName = document.getElementById('movement-product-input').value;
+    const branchName = document.getElementById('movement-branch-input').value;
+
+    let productId = null;
+    if (productName) {
+        const options = document.querySelectorAll('#movement-product-list option');
+        for (let option of options) {
+            if (option.value === productName) { productId = option.getAttribute('data-id'); break; }
+        }
+    }
+
+    let branchId = null;
+    if (branchName) {
+        const options = document.querySelectorAll('#movement-branch-list option');
+        for (let option of options) {
+            if (option.value === branchName) { branchId = option.getAttribute('data-id'); break; }
+        }
+    }
+
+    const companyId  = document.getElementById('movement-company')?.value || '';
+    const itemCompanyId = document.getElementById('movement-item-company')?.value || '';
+    const fromDate   = document.getElementById('from-date-movement').value;
+    const toDate     = document.getElementById('to-date-movement').value;
+    const projectId  = document.getElementById('movement-project')?.value;
+    const sortBy     = document.getElementById('movement-sort')?.value || '';
+    const sortOrder  = document.getElementById('movement-sort-order')?.value || 'asc';
+
+    let url = `print_item_movement.php?`;
+    if (productId) url += `product_id=${productId}&`;
+    if (branchId) url += `branch_id=${branchId}&`;
+    if (companyId) url += `vendor_id=${companyId}&`;
+    if (itemCompanyId) url += `item_company_id=${itemCompanyId}&`;
+    if (fromDate) url += `from_date=${fromDate}&`;
+    if (toDate) url += `to_date=${toDate}&`;
+    if (projectId) url += `project_id=${projectId}&`;
+    if (sortBy) url += `sort_by=${sortBy}&sort_order=${sortOrder}&`;
+    // hideNoMovement is the module-level toggle state already tracked for the on-screen table
+    if (hideNoMovement) url += `hide_no_movement=1&`;
+    url += `round_off=${isRoundOffEnabled('item-movement') ? '1' : '0'}&`;
+
+    window.open(url, '_blank');
+}
+function exportToJSON() {
+    alert('JSON export functionality to be implemented');
+}
+
+// Tab Functionality
+const tabs = document.querySelectorAll('.tab');
+const tabContents = document.querySelectorAll('.tab-content');
+
+tabs.forEach(tab => {
+    tab.addEventListener('click', () => {
+        const tabId = tab.getAttribute('data-tab');
+        tabs.forEach(t => t.classList.remove('active'));
+        tabContents.forEach(c => c.classList.remove('active'));
+        tab.classList.add('active');
+        document.getElementById(tabId).classList.add('active');
+        
+        if (tabId === 'position') loadStockPosition();
+        if (tabId === 'item-ledger') loadItemLedger();
+        if (tabId === 'detailed-ledger') loadDetailedLedger();
+        if (tabId === 'item-movement') loadItemMovement();
+        // Customer-wise Ledger used to stay empty until a Customer/Product filter
+        // was applied — every other ledger tab auto-loads full data on open, so
+        // this brings it in line with that same pattern.
+        if (tabId === 'customer-ledger') loadCustomerLedger();
+    });
+});
+
+// Load Stock Position
+async function loadStockPosition() {
+    try {
+        const branchInput = document.getElementById('branch').value;
+        const product = document.getElementById('product').value;
+        const inventoryType = document.getElementById('inventory-type').value;
+        const distribution = document.getElementById('distribution').value;
+        const itemCompanyId = document.getElementById('position-item-company')?.value;
+        const stockStatus = document.getElementById('stock-status').value;
+        const status = document.getElementById('status').value;
+        const stockLevelFilter = document.getElementById('stock-level-filter').value;
+        const fromDate = document.getElementById('from-date').value;
+        const toDate = document.getElementById('to-date').value;
+        const valuationMethod = document.getElementById('valuation-method').value;
+        const showBaseUnits = document.getElementById('show-base-units').checked;
+        const projectId = document.getElementById('position-project')?.value;
+        
+        // Show/hide trade price note
+        const tradePriceNote = document.getElementById('trade-price-note');
+        if (valuationMethod === 'TRADE_PRICE') {
+            tradePriceNote.style.display = 'block';
+        } else {
+            tradePriceNote.style.display = 'none';
+        }
+        
+        // Find branch ID from datalist
+        let branchId = null;
+        if (branchInput) {
+            const options = document.querySelectorAll('#branch-list option');
+            for (let option of options) {
+                if (option.value === branchInput) {
+                    branchId = option.getAttribute('data-id');
+                    break;
+                }
+            }
+        }
+        
+        // Find product ID from datalist
+        let productId = null;
+        if (product) {
+            const options = document.querySelectorAll('#product-list option');
+            for (let option of options) {
+                if (option.value === product) {
+                    productId = option.getAttribute('data-id');
+                    break;
+                }
+            }
+        }
+        
+        let url = `${API_BASE}?action=position`;
+        if (branchId) url += `&branch_id=${branchId}`;
+        if (productId) url += `&product_id=${productId}`;
+        if (inventoryType) url += `&inventory_type_id=${inventoryType}`;
+        if (distribution) url += `&vendor_id=${distribution}`;
+        if (itemCompanyId) url += `&item_company_id=${itemCompanyId}`;
+        if (stockStatus) url += `&stock_status=${stockStatus}`;
+        if (status) url += `&status=${status}`;
+        if (fromDate) url += `&from_date=${fromDate}`;
+        if (toDate) url += `&to_date=${toDate}`;
+        if (valuationMethod) url += `&valuation_method=${valuationMethod}`;
+        if (showBaseUnits) url += `&show_base_units=true`;
+        if (projectId) url += `&project_id=${projectId}`;
+        
+        const response = await fetch(url);
+        const data = await response.json();
+        
+        if (data.success) {
+            allPositions = Array.isArray(data.data) ? data.data : [];
+            
+            // Apply stock level filter
+            if (stockLevelFilter === 'zero-or-less') {
+                allPositions = allPositions.filter(pos => {
+                    const stock = parseFloat(pos.current_stock);
+                    return stock <= 0;
+                });
+            } else if (stockLevelFilter === 'greater-than-zero') {
+                allPositions = allPositions.filter(pos => {
+                    const stock = parseFloat(pos.current_stock);
+                    return stock > 0;
+                });
+            }
+            
+            // Add product_id to each position for toggle functionality
+            allPositions = allPositions.map((pos, idx) => ({
+                ...pos,
+                product_id: pos.product_id || `temp_${idx}`
+            }));
+            
+            totalItems = allPositions.length;
+            currentPage = 1;
+            currentCurrency = data.currency || '$';
+            updatePositionTable(currentCurrency);
+            updatePaginationControls();
+        }
+    } catch (error) {
+        console.error('Error loading stock position:', error);
+    }
+}
+
+function populateProductDropdowns(products) {
+const productLists = ['#product-list', '#item-list', '#detailed-product-list', '#customer-product-list', '#movement-product-list'];
+    productLists.forEach(selector => {
+        const datalist = document.querySelector(selector);
+        if (datalist) {
+            datalist.innerHTML = products.map(product => `<option value="${product.name}" data-id="${product.id}">`).join('');
+        }
+    });
+}
+
+function updatePositionTable(currency = '$') {
+    const tbody = document.querySelector('#position .table tbody');
+    
+    // Get current page data
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    const pageData = allPositions.slice(startIndex, endIndex);
+    
+    // Calculate totals for all data (only parent products or standalone products - exclude children)
+    const totalValue = allPositions.reduce((sum, pos) => {
+        if (!pos.parent_product_id) {  // Only count if it's NOT a child (parent or standalone)
+            return sum + parseFloat(pos.stock_value);
+        }
+        return sum;
+    }, 0);
+    const totalEntries = allPositions.filter(pos => !pos.parent_product_id).length;
+    
+    // Calculate unit-wise totals for all data (only parent products or standalone products)
+    const unitTotals = allPositions.reduce((totals, pos) => {
+        if (!pos.parent_product_id) {  // Only count if it's NOT a child
+            const unit = pos.unit_symbol || 'L';
+            totals[unit] = (totals[unit] || 0) + parseFloat(pos.current_stock);
+        }
+        return totals;
+    }, {});
+    
+    const unitTotalsText = Object.entries(unitTotals)
+        .map(([unit, total]) => formatStockQuantity(total, unit, 'position'))
+        .join(', ');
+    
+    tbody.innerHTML = pageData.map((pos, idx) => {
+        const isChild = pos.parent_product_id;
+        const hasChildren = !isChild && pageData.some(p => p.parent_product_id === pos.product_id);
+        const toggleBtn = hasChildren ? `<i class="fas fa-chevron-down" style="cursor: pointer; margin-right: 8px;" onclick="toggleChildren(${pos.product_id})"></i>` : '';
+        const productDisplay = isChild ? `<span style="margin-left: 28px; color: var(--subtext);">↳ ${escLedger(pos.product_name)}</span>` : `${toggleBtn}${escLedger(pos.product_name)}`;
+
+        return `
+        <tr class="${isChild ? 'child-row' : 'parent-row'}" data-product-id="${pos.product_id}" data-parent-id="${pos.parent_product_id || ''}" style="${isChild ? 'background-color: var(--table-row-alt);' : ''}">
+            <td>${productDisplay}</td>
+            <td class="col-branch">${escLedger(pos.branch_display)}</td>
+            <td class="col-inventory-type">${escLedger(pos.inventory_type || '-')}</td>
+            <td class="col-opening-balance">${formatStockQuantity(pos.opening_balance, escLedger(pos.unit_symbol || 'L'), 'position')}</td>
+            <td class="col-qty-in">${formatStockQuantity(pos.total_qty_in, escLedger(pos.unit_symbol || 'L'), 'position')}</td>
+            <td class="col-qty-out">${formatStockQuantity(pos.total_qty_out, escLedger(pos.unit_symbol || 'L'), 'position')}</td>
+            <td class="col-current-stock">${formatStockQuantity(pos.current_stock, escLedger(pos.unit_symbol || 'L'), 'position')}</td>
+            <td class="col-unit-cost">${formatStockMoney(pos.unit_cost, currency, 'position')}</td>
+            <td class="col-stock-value">${formatStockMoney(pos.stock_value, currency, 'position')}</td>
+            <td class="col-status"><span class="status-badge status-${pos.status}">${pos.status.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase())}</span></td>
+        </tr>
+    `;
+    }).join('') + `
+        <tr style="font-weight: bold; background-color: var(--table-header);">
+            <td colspan="3">Total (${totalEntries} entries)</td>
+            <td class="col-opening-balance">-</td>
+            <td class="col-qty-in">-</td>
+            <td class="col-qty-out">-</td>
+            <td class="col-current-stock">${unitTotalsText}</td>
+            <td class="col-unit-cost">-</td>
+            <td class="col-stock-value">${formatStockMoney(totalValue, currency, 'position')}</td>
+            <td class="col-status"></td>
+        </tr>
+    `;
+    
+    applyColumnVisibility();
+}
+function filterLedgerByBatchExpiry(entries, batchFilter, expiryFilter) {
+    const batch = (batchFilter || '').trim().toLowerCase();
+
+    return entries.filter(entry => {
+        // Batch No filter
+        if (batch) {
+            const entryBatch = String(entry.batch_no || '').toLowerCase();
+
+            if (!entryBatch.includes(batch)) {
+                return false;
+            }
+        }
+
+        // Expiry Date filter
+        if (expiryFilter) {
+            const entryExpiry = String(entry.batch_expiry_date || '').slice(0, 10);
+
+            if (entryExpiry !== expiryFilter) {
+                return false;
+            }
+        }
+
+        return true;
+    });
+}
+function updatePaginationControls() {
+    const totalPages = Math.ceil(totalItems / itemsPerPage);
+    const startItem = totalItems === 0 ? 0 : (currentPage - 1) * itemsPerPage + 1;
+    const endItem = Math.min(currentPage * itemsPerPage, totalItems);
+    
+    document.getElementById('position-pagination-info').textContent = `Showing ${startItem} - ${endItem} of ${totalItems} entries`;
+    document.getElementById('position-page-info').textContent = `Page ${currentPage} of ${totalPages}`;
+    
+    document.getElementById('position-prev-btn').disabled = currentPage === 1;
+    document.getElementById('position-next-btn').disabled = currentPage === totalPages || totalPages === 0;
+}
+
+function updateLedgerTable(ledger, currency = '$') {
+    allLedgerEntries = ledger;
+    itemTotalItems = allLedgerEntries.length;
+    itemCurrentPage = 1;
+    itemCurrency = currency;
+    
+    renderLedgerTable(itemCurrency);
+    updateItemPaginationControls();
+}
+
+function renderLedgerTable(currency = '$') {
+    const tbody = document.querySelector('#item-ledger .table tbody');
+    
+    // Get current page data
+    const startIndex = (itemCurrentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    const pageData = allLedgerEntries.slice(startIndex, endIndex);
+    
+    // Calculate totals for all data
+    const totalQtyIn = allLedgerEntries.reduce((sum, entry) => sum + parseFloat(entry.qty_in || 0), 0);
+    const totalQtyOut = allLedgerEntries.reduce((sum, entry) => sum + parseFloat(entry.qty_out || 0), 0);
+
+    // Final balance/value per product_id, summed — a Company-only filter can span
+    // several products, each with its own running balance, so we can't just take
+    // the last row like the single-item case used to.
+    const finalBalances = {};
+    const finalValues = {};
+    allLedgerEntries.forEach(entry => {
+        finalBalances[entry.product_id] = parseFloat(entry.balance);
+        finalValues[entry.product_id] = parseFloat(entry.value);
+    });
+    const finalBalance = Object.values(finalBalances).reduce((sum, b) => sum + b, 0);
+    const finalValue = Object.values(finalValues).reduce((sum, v) => sum + v, 0);
+    
+tbody.innerHTML = pageData.map(entry => `
+    <tr>
+        <td>${entry.transaction_date}</td>
+        <td>${escLedger(entry.invoice_number || '-')}</td>
+        <td>${escLedger(entry.product_name)}</td>
+        <td>${escLedger(entry.item_company_name || '-')}</td>
+        <td>${escLedger(entry.company_name || '-')}</td>
+        <td>${escLedger(entry.customer_name || '-')}</td>
+        <td><span class="transaction-badge transaction-${entry.transaction_type.toLowerCase().replace(' ', '-')}">${escLedger(entry.transaction_type)}</span></td>
+        <td>${escLedger(entry.batch_no || '-')}</td>
+        <td>${escLedger(entry.batch_expiry_date || '-')}</td>
+        <td>${entry.qty_in > 0 ? formatStockQuantity(entry.qty_in, escLedger(entry.unit_symbol || 'L'), 'item-ledger') : '-'}</td>
+        <td>${entry.qty_out > 0 ? formatStockQuantity(entry.qty_out, escLedger(entry.unit_symbol || 'L'), 'item-ledger') : '-'}</td>
+        <td>${formatStockQuantity(entry.balance, escLedger(entry.unit_symbol || 'L'), 'item-ledger')}</td>
+        <td>${formatStockMoney(entry.unit_cost, currency, 'item-ledger')}</td>
+        <td>${formatStockMoney(entry.value, currency, 'item-ledger')}</td>
+    </tr>
+`).join('') + `
+    <tr style="font-weight: bold; background-color: var(--table-header);">
+        <td colspan="9">Total (${allLedgerEntries.length} transactions)</td>
+        <td>${formatStockQuantity(totalQtyIn, escLedger(allLedgerEntries[0]?.unit_symbol || 'L'), 'item-ledger')}</td>
+        <td>${formatStockQuantity(totalQtyOut, escLedger(allLedgerEntries[0]?.unit_symbol || 'L'), 'item-ledger')}</td>
+        <td>${formatStockQuantity(finalBalance, escLedger(allLedgerEntries[0]?.unit_symbol || 'L'), 'item-ledger')}</td>
+        <td>-</td>
+        <td>${formatStockMoney(finalValue, currency, 'item-ledger')}</td>
+    </tr>
+`;
+}
+
+function updateItemPaginationControls() {
+    const totalPages = Math.ceil(itemTotalItems / itemsPerPage);
+    const startItem = itemTotalItems === 0 ? 0 : (itemCurrentPage - 1) * itemsPerPage + 1;
+    const endItem = Math.min(itemCurrentPage * itemsPerPage, itemTotalItems);
+    
+    document.getElementById('item-pagination-info').textContent = `Showing ${startItem} - ${endItem} of ${itemTotalItems} entries`;
+    document.getElementById('item-page-info').textContent = `Page ${itemCurrentPage} of ${totalPages}`;
+    
+    document.getElementById('item-prev-btn').disabled = itemCurrentPage === 1;
+    document.getElementById('item-next-btn').disabled = itemCurrentPage === totalPages || totalPages === 0;
+}
+
+// Load Item-wise Ledger (auto-loads full tenant-wide data when no filter is set)
+async function loadItemLedger() {
+    try {
+        const itemName = document.getElementById('item').value;
+        const companyId = document.getElementById('item-company').value;
+        const itemCompanyId = document.getElementById('item-ledger-item-company')?.value;
+        const customerName = document.getElementById('item-customer')?.value;
+        const projectId = document.getElementById('item-project')?.value;
+        const fromDate = document.getElementById('item-from-date').value;
+        const toDate = document.getElementById('item-to-date').value;
+        const batchFilter = document.getElementById('item-batch-filter').value;
+        const expiryFilter = document.getElementById('item-expiry-filter').value;
+
+        // Find product ID from datalist (optional)
+        let productId = null;
+        if (itemName) {
+            const options = document.querySelectorAll('#item-list option');
+            for (let option of options) {
+                if (option.value === itemName) {
+                    productId = option.getAttribute('data-id');
+                    break;
+                }
+            }
+        }
+
+        // Find customer ID from datalist (optional)
+        let customerId = null;
+        if (customerName) {
+            const options = document.querySelectorAll('#item-customer-list option');
+            for (let option of options) {
+                if (option.value === customerName) {
+                    customerId = option.getAttribute('data-id');
+                    break;
+                }
+            }
+        }
+
+        let url = `${API_BASE}?action=ledger`;
+        if (productId) url += `&product_id=${productId}`;
+        if (companyId) url += `&vendor_id=${companyId}`;
+        if (itemCompanyId) url += `&item_company_id=${itemCompanyId}`;
+        if (customerId) url += `&customer_id=${customerId}`;
+        if (projectId) url += `&project_id=${projectId}`;
+        if (fromDate) url += `&from_date=${fromDate}`;
+        if (toDate) url += `&to_date=${toDate}`;
+
+        const response = await fetch(url);
+        const data = await response.json();
+
+        if (data.success) {
+            const filteredData = filterLedgerByBatchExpiry(data.data, batchFilter, expiryFilter);
+            updateLedgerTable(filteredData, data.currency);
+        } else {
+            console.error('Failed to load item ledger:', data.message);
+        }
+    } catch (error) {
+        console.error('Error loading item ledger:', error);
+    }
+}
+
+// Load Detailed Ledger
+async function loadDetailedLedger() {
+    try {
+        const branchInput = document.getElementById('detailed-branch').value;
+        const productInput = document.getElementById('detailed-product').value;
+        const projectId = document.getElementById('detailed-project')?.value;
+        const fromDate = document.getElementById('detailed-from-date').value;
+        const toDate = document.getElementById('detailed-to-date').value;
+        // NEW: Batch No and Expiry Date filters
+        const batchFilter = document.getElementById('detailed-batch-filter').value;
+        const expiryFilter = document.getElementById('detailed-expiry-filter').value;
+        
+        // Find branch ID from datalist
+        let branchId = null;
+        if (branchInput) {
+            const options = document.querySelectorAll('#detailed-branch-list option');
+            for (let option of options) {
+                if (option.value === branchInput) {
+                    branchId = option.getAttribute('data-id');
+                    break;
+                }
+            }
+        }
+        
+        // Find product ID from datalist
+        let productId = null;
+        if (productInput) {
+            const options = document.querySelectorAll('#detailed-product-list option');
+            for (let option of options) {
+                if (option.value === productInput) {
+                    productId = option.getAttribute('data-id');
+                    break;
+                }
+            }
+        }
+        
+        let url = `${API_BASE}?action=detailed-ledger`;
+        const itemCompanyId = document.getElementById('detailed-item-company')?.value;
+        if (branchId) url += `&branch_id=${branchId}`;
+        if (productId) url += `&product_id=${productId}`;
+        if (itemCompanyId) url += `&item_company_id=${itemCompanyId}`;
+        if (projectId) url += `&project_id=${projectId}`;
+        if (fromDate) url += `&from_date=${fromDate}`;
+        if (toDate) url += `&to_date=${toDate}`;
+        
+        const response = await fetch(url);
+        const data = await response.json();
+        
+       if (data.success) {
+    // Filter by Batch No and Expiry Date
+    const filteredData = filterLedgerByBatchExpiry(
+        data.data,
+        batchFilter,
+        expiryFilter
+    );
+
+    updateDetailedLedgerTable(filteredData, data.currency);
+}
+    } catch (error) {
+        console.error('Error loading detailed ledger:', error);
+    }
+}
+
+function updateDetailedLedgerTable(ledger, currency = '$') {
+    allDetailedEntries = ledger;
+    detailedTotalItems = allDetailedEntries.length;
+    detailedCurrentPage = 1;
+    detailedCurrency = currency;
+    
+    renderDetailedLedgerTable(detailedCurrency);
+    updateDetailedPaginationControls();
+}
+
+function renderDetailedLedgerTable(currency = '$') {
+    const tbody = document.querySelector('#detailed-ledger .table tbody');
+    
+    // Calculate running balance by product-branch combination for all data
+    const balances = {};
+    const processedLedger = allDetailedEntries.map(entry => {
+        const key = `${entry.product_name}-${entry.branch_name}`;
+        if (!balances[key]) balances[key] = 0;
+        
+        balances[key] += parseFloat(entry.qty_in || 0) - parseFloat(entry.qty_out || 0);
+        entry.balance = balances[key];
+        entry.value = balances[key] * parseFloat(entry.unit_cost);
+        
+        return entry;
+    });
+    
+    // Get current page data
+    const startIndex = (detailedCurrentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    const pageData = processedLedger.slice(startIndex, endIndex);
+    
+    // Calculate total balance - sum of all final balances per product-branch
+    const totalBalance = Object.values(balances).reduce((sum, balance) => sum + balance, 0);
+
+    // Calculate total value - sum of final values per product-branch
+    const finalValues = {};
+    Object.keys(balances).forEach(key => {
+        const entries = processedLedger.filter(e => `${e.product_name}-${e.branch_name}` === key);
+        const lastEntry = entries[entries.length - 1];
+        if (lastEntry) {
+            finalValues[key] = parseFloat(lastEntry.value);
+        }
+    });
+    const totalValue = Object.values(finalValues).reduce((sum, value) => sum + value, 0);
+
+    // Totals in BASE units (e.g. Piece), not mixed transaction units — a transaction
+    // recorded in Dozen and one recorded in Piece can't be summed as raw numbers.
+    // Grouped by base unit so mixing products with different base units (e.g. Piece
+    // vs Kg) still shows a correct breakdown instead of one meaningless combined sum.
+    const baseUnitTotals = {};
+    processedLedger.forEach(entry => {
+        const unit = entry.base_unit_symbol || entry.unit_symbol || 'L';
+        if (!baseUnitTotals[unit]) baseUnitTotals[unit] = { in: 0, out: 0 };
+        baseUnitTotals[unit].in += parseFloat(entry.qty_in_base ?? entry.qty_in ?? 0);
+        baseUnitTotals[unit].out += parseFloat(entry.qty_out_base ?? entry.qty_out ?? 0);
+    });
+    const baseUnitRows = Object.keys(baseUnitTotals).map(unit => {
+        const t = baseUnitTotals[unit];
+        const net = t.in - t.out;
+        return `
+        <tr class="base-unit-total-row" style="font-weight: 600; background: linear-gradient(to right, rgba(46,125,50,0.08), rgba(46,125,50,0.03)); border-top: 2px solid rgba(46,125,50,0.35);">
+            <td colspan="7" style="text-align:right;"><i class="fas fa-calculator" style="margin-right:6px; opacity:0.6;"></i>Total in Base Unit — ${escLedger(unit)}</td>
+            <td>${formatStockQuantity(t.in, escLedger(unit), 'detailed-ledger')}</td>
+            <td>${formatStockQuantity(t.out, escLedger(unit), 'detailed-ledger')}</td>
+            <td>${formatStockQuantity(net, escLedger(unit), 'detailed-ledger')}</td>
+            <td>-</td>
+            <td>-</td>
+        </tr>`;
+    }).join('');
+
+   tbody.innerHTML = pageData.map(entry => `
+    <tr>
+        <td>${entry.transaction_date}</td>
+        <td>${escLedger(entry.product_name)}</td>
+        <td>${escLedger(entry.item_company_name || '-')}</td>
+        <td>${escLedger(entry.branch_name)}</td>
+        <td><span class="transaction-badge transaction-${entry.transaction_type.toLowerCase().replace(' ', '-')}">${escLedger(entry.transaction_type)}</span></td>
+        <td>${escLedger(entry.batch_no || '-')}</td>
+        <td>${escLedger(entry.batch_expiry_date || '-')}</td>
+        <td>${entry.qty_in > 0 ? formatStockQuantity(entry.qty_in, escLedger(entry.unit_symbol || 'L'), 'detailed-ledger') : '-'}</td>
+        <td>${entry.qty_out > 0 ? formatStockQuantity(entry.qty_out, escLedger(entry.unit_symbol || 'L'), 'detailed-ledger') : '-'}</td>
+        <td>${formatStockQuantity(entry.balance, escLedger(entry.unit_symbol || 'L'), 'detailed-ledger')}</td>
+        <td>${formatStockMoney(entry.unit_cost, currency, 'detailed-ledger')}</td>
+        <td>${formatStockMoney(entry.value, currency, 'detailed-ledger')}</td>
+    </tr>
+`).join('') + `
+    <tr style="font-weight: bold; background-color: var(--table-header);">
+        <td colspan="7">Total (${allDetailedEntries.length} transactions)</td>
+        <td colspan="2" style="text-align:center; color: var(--subtext, #666); font-weight: normal;">see base-unit totals below — transactions may use mixed units</td>
+        <td>-</td>
+        <td>-</td>
+        <td>${formatStockMoney(totalValue, currency, 'detailed-ledger')}</td>
+    </tr>
+` + baseUnitRows;
+}
+
+function updateDetailedPaginationControls() {
+    const totalPages = Math.ceil(detailedTotalItems / itemsPerPage);
+    const startItem = detailedTotalItems === 0 ? 0 : (detailedCurrentPage - 1) * itemsPerPage + 1;
+    const endItem = Math.min(detailedCurrentPage * itemsPerPage, detailedTotalItems);
+    
+    document.getElementById('detailed-pagination-info').textContent = `Showing ${startItem} - ${endItem} of ${detailedTotalItems} entries`;
+    document.getElementById('detailed-page-info').textContent = `Page ${detailedCurrentPage} of ${totalPages}`;
+    
+    document.getElementById('detailed-prev-btn').disabled = detailedCurrentPage === 1;
+    document.getElementById('detailed-next-btn').disabled = detailedCurrentPage === totalPages || totalPages === 0;
+}
+
+function updateBranchLedgerTable(ledger, currency = '$') {
+    allBranchEntries = ledger;
+    branchTotalItems = allBranchEntries.length;
+    branchCurrentPage = 1;
+    branchCurrency = currency;
+    
+    renderBranchLedgerTable(branchCurrency);
+    updateBranchPaginationControls();
+}
+
+function renderBranchLedgerTable(currency = '$') {
+    const tbody = document.querySelector('#branch-ledger .table tbody');
+    
+    // Get current page data
+    const startIndex = (branchCurrentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    const pageData = allBranchEntries.slice(startIndex, endIndex);
+    
+    // Calculate totals for all data
+    const totalQtyIn = allBranchEntries.reduce((sum, entry) => sum + parseFloat(entry.qty_in || 0), 0);
+    const totalQtyOut = allBranchEntries.reduce((sum, entry) => sum + parseFloat(entry.qty_out || 0), 0);
+    const totalBalance = totalQtyIn - totalQtyOut;
+    const totalValue = allBranchEntries.reduce((sum, entry) => sum + (parseFloat(entry.qty_in || 0) - parseFloat(entry.qty_out || 0)) * parseFloat(entry.unit_cost), 0);
+    
+    tbody.innerHTML = pageData.map(entry => `
+        <tr>
+            <td>${entry.transaction_date}</td>
+            <td>${escLedger(entry.product_name)}</td>
+            <td>${escLedger(entry.item_company_name || '-')}</td>
+            <td><span class="transaction-badge transaction-${entry.transaction_type.toLowerCase().replace(' ', '-')}">${escLedger(entry.transaction_type)}</span></td>
+            <td>${entry.qty_in > 0 ? formatStockQuantity(entry.qty_in, escLedger(entry.unit_symbol || 'L'), 'branch-ledger') : '-'}</td>
+            <td>${entry.qty_out > 0 ? formatStockQuantity(entry.qty_out, escLedger(entry.unit_symbol || 'L'), 'branch-ledger') : '-'}</td>
+            <td>-</td>
+            <td>${formatStockMoney(entry.unit_cost, currency, 'branch-ledger')}</td>
+            <td>${formatStockMoney((parseFloat(entry.qty_in || 0) - parseFloat(entry.qty_out || 0)) * parseFloat(entry.unit_cost), currency, 'branch-ledger')}</td>
+        </tr>
+    `).join('') + `
+        <tr style="font-weight: bold; background-color: var(--table-header);">
+            <td colspan="4">Total (${allBranchEntries.length} transactions)</td>
+            <td>${formatStockQuantity(totalQtyIn, escLedger(allBranchEntries[0]?.unit_symbol || 'L'), 'branch-ledger')}</td>
+            <td>${formatStockQuantity(totalQtyOut, escLedger(allBranchEntries[0]?.unit_symbol || 'L'), 'branch-ledger')}</td>
+            <td>${formatStockQuantity(totalBalance, escLedger(allBranchEntries[0]?.unit_symbol || 'L'), 'branch-ledger')}</td>
+            <td>-</td>
+            <td>${formatStockMoney(totalValue, currency, 'branch-ledger')}</td>
+        </tr>
+    `;
+}
+
+function updateBranchPaginationControls() {
+    const totalPages = Math.ceil(branchTotalItems / itemsPerPage);
+    const startItem = branchTotalItems === 0 ? 0 : (branchCurrentPage - 1) * itemsPerPage + 1;
+    const endItem = Math.min(branchCurrentPage * itemsPerPage, branchTotalItems);
+    
+    document.getElementById('branch-pagination-info').textContent = `Showing ${startItem} - ${endItem} of ${branchTotalItems} entries`;
+    document.getElementById('branch-page-info').textContent = `Page ${branchCurrentPage} of ${totalPages}`;
+    
+    document.getElementById('branch-prev-btn').disabled = branchCurrentPage === 1;
+    document.getElementById('branch-next-btn').disabled = branchCurrentPage === totalPages || totalPages === 0;
+}
+function updateCustomerLedgerTable(ledger, currency = '$') {
+    allCustomerEntries = ledger;
+    customerTotalItems = allCustomerEntries.length;
+    customerCurrentPage = 1;
+    customerCurrency = currency;
+
+    renderCustomerLedgerTable(customerCurrency);
+    updateCustomerPaginationControls();
+}
+
+function renderCustomerLedgerTable(currency = '$') {
+    const tbody = document.querySelector('#customer-ledger .table tbody');
+
+    const balances = {};
+    const processedLedger = allCustomerEntries.map(entry => {
+        const key = `${entry.product_name}-${entry.branch_name}`;
+        if (!balances[key]) balances[key] = 0;
+        balances[key] += parseFloat(entry.qty_in || 0) - parseFloat(entry.qty_out || 0);
+        entry.balance = balances[key];
+        entry.value = balances[key] * parseFloat(entry.unit_cost);
+        return entry;
+    });
+
+    const startIndex = (customerCurrentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    const pageData = processedLedger.slice(startIndex, endIndex);
+
+    const totalQtyIn = processedLedger.reduce((sum, e) => sum + parseFloat(e.qty_in || 0), 0);
+    const totalQtyOut = processedLedger.reduce((sum, e) => sum + parseFloat(e.qty_out || 0), 0);
+    const totalValue = processedLedger.reduce((sum, e) => sum + parseFloat(e.value || 0), 0);
+
+tbody.innerHTML = pageData.map(entry => `
+    <tr>
+        <td>${entry.transaction_date}</td>
+        <td>${escLedger(entry.invoice_number || '-')}</td>
+                <td>${escLedger(entry.customer_name || '-')}</td>
+
+            <td>${escLedger(entry.product_name)}</td>
+            <td>${escLedger(entry.item_company_name || '-')}</td>
+            <td>${escLedger(entry.branch_name)}</td>
+        <td><span class="transaction-badge transaction-${entry.transaction_type.toLowerCase().replace(' ', '-')}">${escLedger(entry.transaction_type)}</span></td>
+        <td>${escLedger(entry.batch_no || '-')}</td>
+        <td>${escLedger(entry.batch_expiry_date || '-')}</td>
+        <td>${entry.qty_in > 0 ? formatStockQuantity(entry.qty_in, escLedger(entry.unit_symbol || 'L'), 'customer-ledger') : '-'}</td>
+        <td>${entry.qty_out > 0 ? formatStockQuantity(entry.qty_out, escLedger(entry.unit_symbol || 'L'), 'customer-ledger') : '-'}</td>
+        <td>${formatStockQuantity(entry.balance, escLedger(entry.unit_symbol || 'L'), 'customer-ledger')}</td>
+        <td>${formatStockMoney(entry.unit_cost, currency, 'customer-ledger')}</td>
+        <td>${formatStockMoney(entry.value, currency, 'customer-ledger')}</td>
+    </tr>
+`).join('') + `
+    <tr style="font-weight: bold; background-color: var(--table-header);">
+        <td colspan="9">Total (${allCustomerEntries.length} transactions)</td>
+        <td>${formatStockQuantity(totalQtyIn, escLedger(allCustomerEntries[0]?.unit_symbol || 'L'), 'customer-ledger')}</td>
+        <td>${formatStockQuantity(totalQtyOut, escLedger(allCustomerEntries[0]?.unit_symbol || 'L'), 'customer-ledger')}</td>
+        <td>-</td>
+        <td>-</td>
+        <td>${formatStockMoney(totalValue, currency, 'customer-ledger')}</td>
+    </tr>
+`;
+}
+
+function updateCustomerPaginationControls() {
+    const totalPages = Math.ceil(customerTotalItems / itemsPerPage);
+    const startItem = customerTotalItems === 0 ? 0 : (customerCurrentPage - 1) * itemsPerPage + 1;
+    const endItem = Math.min(customerCurrentPage * itemsPerPage, customerTotalItems);
+
+    document.getElementById('customer-pagination-info').textContent = `Showing ${startItem} - ${endItem} of ${customerTotalItems} entries`;
+    document.getElementById('customer-page-info').textContent = `Page ${customerCurrentPage} of ${totalPages}`;
+
+    document.getElementById('customer-prev-btn').disabled = customerCurrentPage === 1;
+    document.getElementById('customer-next-btn').disabled = customerCurrentPage === totalPages || totalPages === 0;
+}
+
+// Load Customer-wise Ledger (auto-loads full tenant-wide data when no Customer/Product
+// filter is set — same "no mandatory selection" pattern as loadItemLedger above).
+// Used both when the tab is opened and when "Apply Filters" is clicked.
+async function loadCustomerLedger() {
+    const batchFilter = document.getElementById('customer-batch-filter').value;
+    const expiryFilter = document.getElementById('customer-expiry-filter').value;
+    const customerName = document.getElementById('customer-ledger-input').value;
+    const productName = document.getElementById('customer-product-input').value;
+    const projectId = document.getElementById('customer-project')?.value;
+    const fromDate = document.getElementById('from-date-customer').value;
+    const toDate = document.getElementById('to-date-customer').value;
+
+    // Resolve customer id (optional)
+    let customerId = null;
+    if (customerName) {
+        const options = document.querySelectorAll('#customer-ledger-list option');
+        for (let option of options) {
+            if (option.value === customerName) {
+                customerId = option.getAttribute('data-id');
+                break;
+            }
+        }
+        if (!customerId) {
+            alert('Invalid customer selected. Please pick from the list.');
+            return;
+        }
+    }
+
+    // Resolve product id (optional)
+    let productId = null;
+    if (productName) {
+        const productOptions = document.querySelectorAll('#customer-product-list option');
+        for (let option of productOptions) {
+            if (option.value === productName) {
+                productId = option.getAttribute('data-id');
+                break;
+            }
+        }
+        if (!productId) {
+            alert('Invalid product selected. Please pick from the list.');
+            return;
+        }
+    }
+
+    try {
+        let url = `${API_BASE}?action=customer-ledger`;
+        const itemCompanyId = document.getElementById('customer-item-company')?.value;
+        if (customerId) url += `&customer_id=${customerId}`;
+        if (productId) url += `&product_id=${productId}`;
+        if (itemCompanyId) url += `&item_company_id=${itemCompanyId}`;
+        if (projectId) url += `&project_id=${projectId}`;
+        if (fromDate) url += `&from_date=${fromDate}`;
+        if (toDate) url += `&to_date=${toDate}`;
+
+        const response = await fetch(url);
+        const data = await response.json();
+
+        if (data.success) {
+            const filteredData = filterLedgerByBatchExpiry(data.data, batchFilter, expiryFilter);
+            updateCustomerLedgerTable(filteredData, data.currency);
+        } else {
+            alert(data.message || 'Failed to load ledger');
+        }
+    } catch (error) {
+        console.error('Error loading customer ledger:', error);
+    }
+}
+
+function updateMovementTable(entries, currency = '$') {
+    allMovementEntries = entries;
+    movementTotalItems = allMovementEntries.length;
+    movementCurrentPage = 1;
+    movementCurrency = currency;
+    renderMovementTable(movementCurrency);
+    updateMovementPaginationControls();
+}
+
+function renderMovementTable(currency = '$') {
+    const tbody = document.querySelector('#item-movement .table tbody');
+
+    const startIndex = (movementCurrentPage - 1) * movementItemsPerPage;
+    const endIndex   = startIndex + movementItemsPerPage;
+    const pageData   = allMovementEntries.slice(startIndex, endIndex);
+
+    const totalOpening    = allMovementEntries.reduce((s, e) => s + parseFloat(e.opening || 0), 0);
+    const totalPurchase   = allMovementEntries.reduce((s, e) => s + parseFloat(e.purchase || 0), 0);
+    const totalSale       = allMovementEntries.reduce((s, e) => s + parseFloat(e.sale || 0), 0);
+    const totalCreditNote = allMovementEntries.reduce((s, e) => s + parseFloat(e.credit_note || 0), 0);
+    const totalDebitNote  = allMovementEntries.reduce((s, e) => s + parseFloat(e.debit_note || 0), 0);
+    const totalClosing    = allMovementEntries.reduce((s, e) => s + parseFloat(e.closing || 0), 0);
+
+    tbody.innerHTML = pageData.map(entry => `
+        <tr>
+            <td>${escLedger(entry.product_name)}</td>
+            <td>${escLedger(entry.item_company_name || '-')}</td>
+            <td>${formatStockAmount(entry.opening, 'item-movement')}</td>
+            <td>${formatStockAmount(entry.purchase, 'item-movement')}</td>
+            <td>${formatStockAmount(entry.sale, 'item-movement')}</td>
+            <td>${formatStockAmount(entry.credit_note, 'item-movement')}</td>
+            <td>${formatStockAmount(entry.debit_note, 'item-movement')}</td>
+            <td>${formatStockAmount(entry.closing, 'item-movement')}</td>
+        </tr>
+    `).join('') + `
+        <tr style="font-weight: bold; background-color: var(--table-header);">
+            <td>Total (${allMovementEntries.length} products)</td>
+            <td>-</td>
+            <td>${formatStockAmount(totalOpening, 'item-movement')}</td>
+            <td>${formatStockAmount(totalPurchase, 'item-movement')}</td>
+            <td>${formatStockAmount(totalSale, 'item-movement')}</td>
+            <td>${formatStockAmount(totalCreditNote, 'item-movement')}</td>
+            <td>${formatStockAmount(totalDebitNote, 'item-movement')}</td>
+            <td>${formatStockAmount(totalClosing, 'item-movement')}</td>
+        </tr>
+    `;
+}
+
+function updateMovementPaginationControls() {
+    const totalPages = Math.ceil(movementTotalItems / movementItemsPerPage);   // changed
+    const startItem = movementTotalItems === 0 ? 0 : (movementCurrentPage - 1) * movementItemsPerPage + 1;  // changed
+    const endItem = Math.min(movementCurrentPage * movementItemsPerPage, movementTotalItems);  // changed
+
+    document.getElementById('movement-pagination-info').textContent = `Showing ${startItem} - ${endItem} of ${movementTotalItems} entries`;
+    document.getElementById('movement-page-info').textContent = `Page ${movementCurrentPage} of ${totalPages}`;
+
+    document.getElementById('movement-prev-btn').disabled = movementCurrentPage === 1;
+    document.getElementById('movement-next-btn').disabled = movementCurrentPage === totalPages || totalPages === 0;
+}
+
+// Filters rawMovementData down to rows that actually had movement (if hideNoMovement
+// is on), then renders/paginates. Runs both after a fresh fetch and when the toggle
+// button is clicked (no re-fetch needed for the toggle).
+function applyMovementFilterAndRender(currency) {
+    let displayData = rawMovementData;
+
+    if (hideNoMovement) {
+        displayData = displayData.filter(entry => {
+            const purchase = parseFloat(entry.purchase || 0);
+            const sale = parseFloat(entry.sale || 0);
+            const creditNote = parseFloat(entry.credit_note || 0);
+            const debitNote = parseFloat(entry.debit_note || 0);
+            return purchase !== 0 || sale !== 0 || creditNote !== 0 || debitNote !== 0;
+        });
+    }
+
+    updateMovementTable(displayData, currency || movementCurrency);
+}
+async function loadItemMovement() {
+    try {
+        const productName = document.getElementById('movement-product-input').value;
+        const branchName  = document.getElementById('movement-branch-input').value;
+        const companyId   = document.getElementById('movement-company')?.value || '';
+        const itemCompanyId = document.getElementById('movement-item-company')?.value || '';
+        const projectId   = document.getElementById('movement-project')?.value || '';
+        const fromDate    = document.getElementById('from-date-movement').value;
+        const toDate      = document.getElementById('to-date-movement').value;
+        const sortBy      = document.getElementById('movement-sort')?.value || '';
+        const sortOrder   = document.getElementById('movement-sort-order')?.value || 'asc';
+
+        let productId = null;
+        if (productName) {
+            const options = document.querySelectorAll('#movement-product-list option');
+            for (let option of options) {
+                if (option.value === productName) { productId = option.getAttribute('data-id'); break; }
+            }
+        }
+
+        let branchId = null;
+        if (branchName) {
+            const options = document.querySelectorAll('#movement-branch-list option');
+            for (let option of options) {
+                if (option.value === branchName) { branchId = option.getAttribute('data-id'); break; }
+            }
+        }
+
+        let url = `${API_BASE}?action=item-movement`;
+        if (productId) url += `&product_id=${productId}`;
+        if (branchId)  url += `&branch_id=${branchId}`;
+        if (companyId) url += `&vendor_id=${companyId}`;
+        if (itemCompanyId) url += `&item_company_id=${itemCompanyId}`;
+        if (projectId) url += `&project_id=${projectId}`;
+        if (fromDate)  url += `&from_date=${fromDate}`;
+        if (toDate)    url += `&to_date=${toDate}`;
+
+        const response = await fetch(url);
+        const data = await response.json();
+
+        if (data.success) {
+            let movementData = Array.isArray(data.data) ? [...data.data] : [];
+
+            if (sortBy) {
+                movementData.sort((a, b) => {
+                    const diff = parseFloat(a[sortBy] || 0) - parseFloat(b[sortBy] || 0);
+                    return sortOrder === 'desc' ? -diff : diff;
+                });
+            }
+
+            rawMovementData = movementData;
+            applyMovementFilterAndRender(data.currency);
+        } else {
+            console.error('Failed to load item movement:', data.message);
+        }
+    } catch (error) {
+        console.error('Error loading item movement:', error);
+    }
+}
+async function loadCustomers() {
+    try {
+        const response = await fetch(`${API_BASE}?action=customers`);
+        const data = await response.json();
+        if (data.success) {
+            const customerLists = ['#customer-ledger-list', '#item-customer-list'];
+            customerLists.forEach(selector => {
+                const datalist = document.querySelector(selector);
+                if (datalist) {
+                    datalist.innerHTML = data.data.map(c => `<option value="${c.customer_name}" data-id="${c.id}">`).join('');
+                }
+            });
+        }
+    } catch (error) {
+        console.error('Error loading customers:', error);
+    }
+}
+
+// Load Projects — populates the "Project" filter dropdown on every ledger tab
+async function loadProjects() {
+    try {
+        const response = await fetch(`${API_BASE}?action=projects`);
+        const data = await response.json();
+        if (data.success) {
+            const projectSelects = ['#position-project', '#item-project', '#branch-project', '#customer-project', '#detailed-project', '#movement-project'];
+            projectSelects.forEach(selector => {
+                const select = document.querySelector(selector);
+                if (select) {
+                    data.data.forEach(project => {
+                        const option = document.createElement('option');
+                        option.value = project.id;
+                        option.textContent = `${project.project_code} - ${project.project_name}`;
+                        select.appendChild(option);
+                    });
+                }
+            });
+        }
+    } catch (error) {
+        console.error('Error loading projects:', error);
+    }
+}
+
+
+// Load Dashboard Stats
+async function loadDashboardStats() {
+    try {
+        const valuationMethod = document.getElementById('valuation-method').value;
+        let url = `${API_BASE}?action=stats`;
+        if (valuationMethod) url += `&valuation_method=${valuationMethod}`;
+        
+        const response = await fetch(url);
+        const data = await response.json();
+        
+        if (data.success) {
+            updateDashboardStats(data.data, data.currency || '$');
+        }
+    } catch (error) {
+        console.error('Error loading dashboard stats:', error);
+    }
+}
+
+function updateDashboardStats(stats, currency = '$') {
+    currentDashboardStats = stats;
+    currentDashboardCurrency = currency;
+    document.querySelector('.stat-card:nth-child(1) .stat-value').textContent = formatStockMoney(stats.total_value, currency, 'position');
+    document.querySelector('.stat-card:nth-child(2) .stat-value').textContent = `${stats.in_stock || 0} Products`;
+    document.querySelector('.stat-card:nth-child(3) .stat-value').textContent = `${stats.low_stock || 0} Products`;
+    document.querySelector('.stat-card:nth-child(4) .stat-value').textContent = `${stats.out_of_stock || 0} Products`;
+    document.querySelector('.stat-card:nth-child(5) .stat-value').textContent = `${stats.overstock || 0} Products`;
+}
+
+// Load Branches
+async function loadBranches() {
+    try {
+        const response = await fetch(`${API_BASE}?action=branches`);
+        const data = await response.json();
+        
+        if (data.success) {
+            populateBranchDropdowns(data.data);
+        }
+    } catch (error) {
+        console.error('Error loading branches:', error);
+    }
+}
+
+function populateBranchDropdowns(branches) {
+const branchLists = ['#branch-list', '#branch-ledger-list', '#detailed-branch-list', '#movement-branch-list'];
+
+branchLists.forEach(selector => {
+        const datalist = document.querySelector(selector);
+        if (datalist) {
+            datalist.innerHTML = branches.map(branch => `<option value="${branch.display_name}" data-id="${branch.id}">`).join('');
+        }
+    });
+}
+
+// Load Products
+async function loadProducts() {
+    try {
+        const response = await fetch(`${API_BASE}?action=products`);
+        const data = await response.json();
+        
+        if (data.success) {
+            populateProductDropdowns(data.data);
+        }
+    } catch (error) {
+        console.error('Error loading products:', error);
+    }
+}
+
+
+// Load Inventory Types
+async function loadInventoryTypes() {
+    try {
+        const response = await fetch(`${API_BASE}?action=inventory-types`);
+        const data = await response.json();
+        
+        if (data.success) {
+            const select = document.getElementById('inventory-type');
+            data.data.forEach(type => {
+                const option = document.createElement('option');
+                option.value = type.id;
+                option.textContent = type.name;
+                select.appendChild(option);
+            });
+        }
+    } catch (error) {
+        console.error('Error loading inventory types:', error);
+    }
+}
+
+// Load Distributions
+async function loadDistributions() {
+    try {
+        const response = await fetch(`${API_BASE}?action=distributions`);
+        const data = await response.json();
+        
+        if (data.success) {
+            const select = document.getElementById('distribution');
+            const itemCompanySelect = document.getElementById('item-company');
+            const movementCompanySelect = document.getElementById('movement-company'); // ← yeh add kiya
+
+            data.data.forEach(dist => {
+                // Stock Position - Distribution
+                if (select) {
+                    const option = document.createElement('option');
+                    option.value = dist.id;
+                    option.textContent = dist.supplier_name;
+                    select.appendChild(option);
+                }
+
+                // Item-wise Ledger - Company
+                if (itemCompanySelect) {
+                    const option2 = document.createElement('option');
+                    option2.value = dist.id;
+                    option2.textContent = dist.supplier_name;
+                    itemCompanySelect.appendChild(option2);
+                }
+
+                // Item Stock Movement - Company / Supplier
+                if (movementCompanySelect) {
+                    const option3 = document.createElement('option');
+                    option3.value = dist.id;
+                    option3.textContent = dist.supplier_name;
+                    movementCompanySelect.appendChild(option3);
+                }
+            });
+        }
+    } catch (error) {
+        console.error('Error loading distributions:', error);
+    }
+}
+
+async function loadItemCompanies() {
+    try {
+        const response = await fetch(`${API_BASE}?action=item-companies`);
+        const data = await response.json();
+        if (!data.success) return;
+
+        ['#position-item-company', '#item-ledger-item-company', '#branch-item-company', '#customer-item-company', '#movement-item-company', '#detailed-item-company']
+            .forEach(selector => {
+                const select = document.querySelector(selector);
+                if (!select) return;
+                data.data.forEach(itemCompany => {
+                    const option = document.createElement('option');
+                    option.value = itemCompany.id;
+                    option.textContent = itemCompany.company_name;
+                    select.appendChild(option);
+                });
+            });
+    } catch (error) {
+        console.error('Error loading item companies:', error);
+    }
+}
+
+// Load Companies
+async function loadCompanies() {
+    // Removed - no longer needed
+}
+
+// DOMContentLoaded event handler
+document.addEventListener('DOMContentLoaded', () => {
+    // Load column visibility settings
+    loadColumnVisibility();
+
+    // Keep From/To Date synced across every tab until the user changes them
+    initDateFilterSync();
+
+    Object.entries(ROUND_OFF_SWITCH_IDS).forEach(([tabId, switchId]) => {
+        document.getElementById(switchId).addEventListener('change', () => rerenderStockTab(tabId));
+    });
+    
+    // Column visibility toggles
+    const toggles = [
+        { id: 'toggle-branch', key: 'branch' },
+        { id: 'toggle-inventory-type', key: 'inventoryType' },
+        { id: 'toggle-opening-balance', key: 'openingBalance' },
+        { id: 'toggle-qty-in', key: 'qtyIn' },
+        { id: 'toggle-qty-out', key: 'qtyOut' },
+        { id: 'toggle-current-stock', key: 'currentStock' },
+        { id: 'toggle-unit-cost', key: 'unitCost' },
+        { id: 'toggle-stock-value', key: 'stockValue' },
+        { id: 'toggle-status', key: 'status' }
+    ];
+    
+    toggles.forEach(toggle => {
+        document.getElementById(toggle.id).addEventListener('change', (e) => {
+            columnVisibility[toggle.key] = e.target.checked;
+            saveColumnVisibility();
+            applyColumnVisibility();
+        });
+    });
+    
+
+
+    document.getElementById('hideNoMovementBtn').addEventListener('click', () => {
+    hideNoMovement = !hideNoMovement;
+    const btn = document.getElementById('hideNoMovementBtn');
+    btn.classList.toggle('btn-primary', hideNoMovement);
+    btn.classList.toggle('btn-secondary', !hideNoMovement);
+    btn.innerHTML = hideNoMovement
+        ? '<i class="fas fa-eye"></i> Show All'
+        : '<i class="fas fa-eye-slash"></i> Hide No Movement';
+    applyMovementFilterAndRender();
+});
+
+// NEW: "Show" per-page dropdown for Item Stock Movement
+document.getElementById('movement-per-page').addEventListener('change', (e) => {
+    movementItemsPerPage = parseInt(e.target.value, 10) || 50;
+    movementCurrentPage = 1; // reset to first page on change
+    renderMovementTable(movementCurrency);
+    updateMovementPaginationControls();
+});
+    // Apply Position Filters
+    document.getElementById('applyPositionFilters').addEventListener('click', () => {
+        loadStockPosition();
+        loadDashboardStats();
+    });
+// Clear Customer Filters
+ document.getElementById('clearCustomerFilters').addEventListener('click', () => {
+    document.getElementById('customer-ledger-input').value = '';
+    document.getElementById('customer-product-input').value = '';
+    document.getElementById('customer-item-company').value = '';
+    if (document.getElementById('customer-project')) document.getElementById('customer-project').value = '';
+    clearAndSyncDateFilters('from-date-customer', 'to-date-customer');
+
+    document.getElementById('customer-batch-filter').value = '';
+    document.getElementById('customer-expiry-filter').value = '';
+
+    // Clear means "back to default" — reload the full, unfiltered ledger
+    // instead of leaving the table empty (matches the other tabs' Clear buttons).
+    loadCustomerLedger();
+});
+
+    // Apply Customer Filters
+    document.getElementById('applyCustomerFilters').addEventListener('click', () => {
+        loadCustomerLedger();
+    });
+    // Customer-wise Ledger pagination event listeners
+    document.getElementById('customer-prev-btn').addEventListener('click', () => {
+        if (customerCurrentPage > 1) {
+            customerCurrentPage--;
+            renderCustomerLedgerTable(customerCurrency);
+            updateCustomerPaginationControls();
+        }
+    });
+
+    document.getElementById('customer-next-btn').addEventListener('click', () => {
+        const totalPages = Math.ceil(customerTotalItems / itemsPerPage);
+        if (customerCurrentPage < totalPages) {
+            customerCurrentPage++;
+            renderCustomerLedgerTable(customerCurrency);
+            updateCustomerPaginationControls();
+        }
+    });
+    // Clear Position Filters
+    document.getElementById('clearPositionFilters').addEventListener('click', () => {
+        document.getElementById('branch').value = '';
+        document.getElementById('product').value = '';
+        document.getElementById('inventory-type').value = '';
+        document.getElementById('distribution').value = '';
+        document.getElementById('position-item-company').value = '';
+        document.getElementById('stock-status').value = '';
+        document.getElementById('status').value = '';
+        document.getElementById('stock-level-filter').value = '';
+        if (document.getElementById('position-project')) document.getElementById('position-project').value = '';
+        clearAndSyncDateFilters('from-date', 'to-date');
+        document.getElementById('valuation-method').value = 'AVCO';
+        loadStockPosition();
+        loadDashboardStats();
+    });
+
+    // Clear Item Filters — clears inputs then reloads the FULL ledger (not empty)
+    document.getElementById('clearItemFilters').addEventListener('click', () => {
+        document.getElementById('item').value = '';
+        document.getElementById('item-company').value = '';
+        document.getElementById('item-ledger-item-company').value = '';
+        if (document.getElementById('item-customer')) document.getElementById('item-customer').value = '';
+        if (document.getElementById('item-project')) document.getElementById('item-project').value = '';
+        clearAndSyncDateFilters('item-from-date', 'item-to-date');
+
+        document.getElementById('item-batch-filter').value = '';
+        document.getElementById('item-expiry-filter').value = '';
+
+        loadItemLedger();
+    });
+
+    // Apply Item Filters — no mandatory selection anymore; empty filters load all records
+    document.getElementById('applyFilters').addEventListener('click', () => {
+        loadItemLedger();
+    });
+
+    // Clear Branch Filters
+    document.getElementById('clearBranchFilters').addEventListener('click', () => {
+        document.querySelector('input[list="branch-ledger-list"]').value = '';
+        document.getElementById('branch-item-company').value = '';
+        if (document.getElementById('branch-project')) document.getElementById('branch-project').value = '';
+        clearAndSyncDateFilters('from-date-branch', 'to-date-branch');
+        const tbody = document.querySelector('#branch-ledger .table tbody');
+        tbody.innerHTML = '';
+        document.getElementById('branch-pagination-info').textContent = 'Showing 0 - 0 of 0 entries';
+        document.getElementById('branch-page-info').textContent = 'Page 1 of 1';
+    });
+
+    // Apply Branch Filters
+    document.getElementById('applyBranchFilters').addEventListener('click', async () => {
+        const branchName = document.querySelector('input[list="branch-ledger-list"]').value;
+        const itemCompanyId = document.getElementById('branch-item-company')?.value;
+        const fromDate = document.getElementById('from-date-branch').value;
+        const toDate = document.getElementById('to-date-branch').value;
+        const projectId = document.getElementById('branch-project')?.value;
+        
+        if (!branchName || branchName.trim() === '') {
+            alert('Please select a branch');
+            return;
+        }
+        
+        // Find branch ID from datalist
+        const options = document.querySelectorAll('#branch-ledger-list option');
+        let branchId = null;
+        for (let option of options) {
+            if (option.value === branchName) {
+                branchId = option.getAttribute('data-id');
+                break;
+            }
+        }
+        
+        if (!branchId) {
+            alert('Invalid branch selected');
+            return;
+        }
+        
+        try {
+            let url = `${API_BASE}?action=branch-ledger&branch_id=${branchId}`;
+            if (fromDate) url += `&from_date=${fromDate}`;
+            if (toDate) url += `&to_date=${toDate}`;
+            if (itemCompanyId) url += `&item_company_id=${itemCompanyId}`;
+            if (projectId) url += `&project_id=${projectId}`;
+            
+            const response = await fetch(url);
+            const data = await response.json();
+            
+            if (data.success) {
+                updateBranchLedgerTable(data.data, data.currency);
+            }
+        } catch (error) {
+            console.error('Error loading branch ledger:', error);
+        }
+    });
+
+    // Stock Position pagination event listeners
+    document.getElementById('position-prev-btn').addEventListener('click', () => {
+        if (currentPage > 1) {
+            currentPage--;
+            updatePositionTable(currentCurrency);
+            updatePaginationControls();
+        }
+    });
+    
+    document.getElementById('position-next-btn').addEventListener('click', () => {
+        const totalPages = Math.ceil(totalItems / itemsPerPage);
+        if (currentPage < totalPages) {
+            currentPage++;
+            updatePositionTable(currentCurrency);
+            updatePaginationControls();
+        }
+    });
+
+    // Item-wise Ledger pagination event listeners
+    document.getElementById('item-prev-btn').addEventListener('click', () => {
+        if (itemCurrentPage > 1) {
+            itemCurrentPage--;
+            renderLedgerTable(itemCurrency);
+            updateItemPaginationControls();
+        }
+    });
+    
+    document.getElementById('item-next-btn').addEventListener('click', () => {
+        const totalPages = Math.ceil(itemTotalItems / itemsPerPage);
+        if (itemCurrentPage < totalPages) {
+            itemCurrentPage++;
+            renderLedgerTable(itemCurrency);
+            updateItemPaginationControls();
+        }
+    });
+
+    // Branch-wise Ledger pagination event listeners
+    document.getElementById('branch-prev-btn').addEventListener('click', () => {
+        if (branchCurrentPage > 1) {
+            branchCurrentPage--;
+            renderBranchLedgerTable(branchCurrency);
+            updateBranchPaginationControls();
+        }
+    });
+    
+    document.getElementById('branch-next-btn').addEventListener('click', () => {
+        const totalPages = Math.ceil(branchTotalItems / itemsPerPage);
+        if (branchCurrentPage < totalPages) {
+            branchCurrentPage++;
+            renderBranchLedgerTable(branchCurrency);
+            updateBranchPaginationControls();
+        }
+    });
+
+    // Detailed Ledger pagination event listeners
+    document.getElementById('detailed-prev-btn').addEventListener('click', () => {
+        if (detailedCurrentPage > 1) {
+            detailedCurrentPage--;
+            renderDetailedLedgerTable(detailedCurrency);
+            updateDetailedPaginationControls();
+        }
+    });
+    
+    document.getElementById('detailed-next-btn').addEventListener('click', () => {
+        const totalPages = Math.ceil(detailedTotalItems / itemsPerPage);
+        if (detailedCurrentPage < totalPages) {
+            detailedCurrentPage++;
+            renderDetailedLedgerTable(detailedCurrency);
+            updateDetailedPaginationControls();
+        }
+    });
+
+    // Apply Detailed Filters
+    document.getElementById('applyDetailedFilters').addEventListener('click', () => {
+        loadDetailedLedger();
+    });
+
+    // Clear Detailed Filters
+    document.getElementById('clearDetailedFilters').addEventListener('click', () => {
+        document.getElementById('detailed-branch').value = '';
+        document.getElementById('detailed-product').value = '';
+        document.getElementById('detailed-item-company').value = '';
+        if (document.getElementById('detailed-project')) document.getElementById('detailed-project').value = '';
+        clearAndSyncDateFilters('detailed-from-date', 'detailed-to-date');
+        loadDetailedLedger();
+    });
+   
+
+
+   
+    // Load initial data
+    loadDashboardStats();
+    loadBranches();
+    loadProducts();
+    loadInventoryTypes();
+    loadDistributions();
+    loadItemCompanies();
+        loadCustomers();
+        loadProjects();
+        document.getElementById('applyMovementFilters').addEventListener('click', () => {
+    loadItemMovement();
+});
+
+document.getElementById('clearMovementFilters').addEventListener('click', () => {
+    document.getElementById('movement-product-input').value = '';
+    document.getElementById('movement-branch-input').value = '';
+    document.getElementById('movement-item-company').value = '';
+    if (document.getElementById('movement-project')) document.getElementById('movement-project').value = '';
+    clearAndSyncDateFilters('from-date-movement', 'to-date-movement');
+    if (document.getElementById('movement-sort')) {
+        document.getElementById('movement-sort').value = '';
+    }
+
+    // NEW: reset per-page dropdown back to default too
+    document.getElementById('movement-per-page').value = '50';
+    movementItemsPerPage = 50;
+
+    hideNoMovement = false;
+    rawMovementData = [];
+    const hideBtn = document.getElementById('hideNoMovementBtn');
+    hideBtn.classList.remove('btn-primary');
+    hideBtn.classList.add('btn-secondary');
+    hideBtn.innerHTML = '<i class="fas fa-eye-slash"></i> Hide No Movement';
+
+    const tbody = document.querySelector('#item-movement .table tbody');
+    tbody.innerHTML = '';
+    document.getElementById('movement-pagination-info').textContent = 'Showing 0 - 0 of 0 entries';
+    document.getElementById('movement-page-info').textContent = 'Page 1 of 1';
+});
+// NEW: re-run the movement query/sort as soon as the user picks a Sort By option,
+// so they don't have to also click "Apply Filters".
+if (document.getElementById('movement-sort')) {
+    document.getElementById('movement-sort').addEventListener('change', () => {
+        loadItemMovement();
+    });
+}
+
+document.getElementById('movement-prev-btn').addEventListener('click', () => {
+    if (movementCurrentPage > 1) {
+        movementCurrentPage--;
+        renderMovementTable(movementCurrency);
+        updateMovementPaginationControls();
+    }
+});
+
+document.getElementById('movement-next-btn').addEventListener('click', () => {
+    const totalPages = Math.ceil(movementTotalItems / movementItemsPerPage);
+    if (movementCurrentPage < totalPages) {
+        movementCurrentPage++;
+        renderMovementTable(movementCurrency);
+        updateMovementPaginationControls();
+    }
+});
+
+    loadStockPosition();
+    
+    // Expand/Collapse functionality
+    document.getElementById('expandAllBtn').addEventListener('click', () => {
+        document.querySelectorAll('.child-row').forEach(row => row.style.display = '');
+    });
+    
+    document.getElementById('collapseAllBtn').addEventListener('click', () => {
+        document.querySelectorAll('.child-row').forEach(row => row.style.display = 'none');
+    });
+});

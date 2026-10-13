@@ -1,0 +1,35 @@
+.report-head {
+    margin-bottom: 12px;
+    font-size: 13px;
+    color: var(--text-body, #2F3B4C);
+}
+
+.report-head div {
+    margin-bottom: 2px;
+}
+
+#outstanding-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+#outstanding-table th,
+#outstanding-table td {
+    padding: 8px 10px;
+    text-align: left;
+    border-bottom: 1px solid var(--border-default, #E1E6EE);
+}
+
+.area-header-row td {
+    background: var(--surface-1, #F7F9FC);
+    font-weight: 600;
+}
+
+.area-total-row td {
+    border-top: 1px dashed var(--border-strong, #C9CFDA);
+}
+
+.grand-total-row td {
+    border-top: 2px solid var(--border-strong, #C9CFDA);
+    font-size: 14px;
+}
