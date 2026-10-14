@@ -45,6 +45,20 @@ $all_symbols = $stmt2->fetchAll();
     <title>Customer Ledger Report | LedgerOne ERP</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="../../../assets/css/financial_reports/customer_ledger/customer-ledger.css">
+    <style>
+        /* Multi-select filter (Customer / Distribution / Salesman) */
+        .ms { position: relative; }
+        .ms-toggle { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; text-align: left; cursor: pointer; }
+        .ms-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .ms-panel { position: absolute; top: calc(100% + 4px); left: 0; right: 0; min-width: 240px; z-index: 50; padding: 8px; background: var(--surface-1, #fff); border: 1px solid var(--border-strong, #d0d5dd); border-radius: 8px; box-shadow: 0 8px 24px rgba(0,0,0,0.12); }
+        .ms-search { margin-bottom: 6px; }
+        .ms-actions { display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 6px; }
+        .ms-actions a { color: var(--primary, #1f7bff); text-decoration: none; }
+        .ms-list { max-height: 220px; overflow-y: auto; }
+        .ms-item { display: flex; align-items: center; gap: 8px; padding: 6px 4px; font-size: 14px; cursor: pointer; border-radius: 4px; }
+        .ms-item:hover { background: var(--surface-2, #f3f4f6); }
+        .ms-empty { padding: 8px 4px; font-size: 13px; color: var(--text-muted, #888); }
+    </style>
 </head>
 <body>
     <div class="container">
@@ -57,7 +71,7 @@ $all_symbols = $stmt2->fetchAll();
         </div>
 
         <div class="card" style="background: #f0f9ff; border-left: 4px solid #1f7bff; margin-bottom: 16px;">
-            <p style="margin: 0; font-size: 14px; color: #1f7bff;"><strong>Tip:</strong> Press Space bar in Customer Name field to see all customers, or type to search for a specific customer</p>
+            <p style="margin: 0; font-size: 14px; color: #1f7bff;"><strong>Tip:</strong> Customer, Distribution and Salesman filters allow multiple selections. Tick several customers to filter the Summary Ledger; pick exactly one customer to open the Detailed Ledger</p>
         </div>
 
         <div class="card">
@@ -86,18 +100,12 @@ $all_symbols = $stmt2->fetchAll();
                     </select>
                 </div>
                 <div class="form-group">
-                    <label class="form-label" for="customer-code">Customer Code</label>
-                    <input type="text" class="form-control" id="customer-search" placeholder="Search customers..." autocomplete="off">
-                    <select class="form-control" id="customer-code" style="display: none;">
-                        <option value="">Select Customer</option>
-                    </select>
-                    <div id="customer-dropdown" class="customer-dropdown"></div>
+                    <label class="form-label">Customer Code</label>
+                    <div id="customer-ms"></div>
                 </div>
                 <div class="form-group">
-                    <label class="form-label" for="distribution">Distribution</label>
-                    <select class="form-control" id="distribution">
-                        <option value="">All Distributions</option>
-                    </select>
+                    <label class="form-label">Distribution</label>
+                    <div id="distribution-ms"></div>
                 </div>
 
                 <!-- City / Zone / Area / Salesman filters (Summary Ledger only) — City -> Zone
@@ -122,10 +130,8 @@ $all_symbols = $stmt2->fetchAll();
                     </select>
                 </div>
                 <div class="form-group">
-                    <label class="form-label" for="salesman-filter">Salesman</label>
-                    <select class="form-control" id="salesman-filter">
-                        <option value="">All Salesmen</option>
-                    </select>
+                    <label class="form-label">Salesman</label>
+                    <div id="salesman-ms"></div>
                 </div>
 
                 <div class="form-group" id="sub-account-group" style="display: none;">
@@ -232,7 +238,7 @@ $all_symbols = $stmt2->fetchAll();
                     <thead>
                         <tr>
                             <th>Transaction Date</th>
-                            <th>Received Date</th>
+                            <th>Cheque Date</th>
                             <th>Description</th>
                             <th>Reference</th>
                             <th>Debit (Dr)</th>

@@ -1400,6 +1400,7 @@ $user_employee_id = $user['employee_id'] ?? null;
             document.getElementById('invoiceDiscountAmount').addEventListener('input', updateInvoiceDiscount);
 
             // Keyboard shortcuts
+            // NOTE: F10 (save / print) is handled only in counter-invoice.js to avoid a double save
             document.addEventListener('keydown', function (e) {
                 switch (e.key) {
                     case 'F2':
@@ -1413,10 +1414,6 @@ $user_employee_id = $user['employee_id'] ?? null;
                     case 'F9':
                         e.preventDefault();
                         quickPay();
-                        break;
-                    case 'F10':
-                        e.preventDefault();
-                        saveInvoice();
                         break;
                     case 'F12':
                         e.preventDefault();

@@ -2,9 +2,6 @@ document.addEventListener('DOMContentLoaded', function () {
     // DOM Elements
     const summaryLedgerBtn = document.getElementById('summary-ledger-btn');
     const detailedLedgerBtn = document.getElementById('detailed-ledger-btn');
-    const customerCode = document.getElementById('customer-code');
-    const customerSearch = document.getElementById('customer-search');
-    const customerDropdown = document.getElementById('customer-dropdown');
     const fromDate = document.getElementById('from-date');
     const toDate = document.getElementById('to-date');
     const fromDateError = document.getElementById('from-date-error');
@@ -27,7 +24,6 @@ document.addEventListener('DOMContentLoaded', function () {
     const prevBtn = document.getElementById('prev-btn');
     const nextBtn = document.getElementById('next-btn');
     const pageInfo = document.getElementById('page-info');
-    const distribution = document.getElementById('distribution');
     const subAccount = document.getElementById('sub-account');
     const subAccountGroup = document.getElementById('sub-account-group');
     const currencyFilter = document.getElementById('currency-filter');
@@ -41,7 +37,6 @@ document.addEventListener('DOMContentLoaded', function () {
     const cityFilter = document.getElementById('city-filter');
     const zoneFilter = document.getElementById('zone-filter');
     const areaFilter = document.getElementById('area-filter');
-    const salesmanFilter = document.getElementById('salesman-filter');
 
     // Sort By field (Summary Ledger only) — combines with Sort Order (Less to Greater /
     // Greater to Less) to do a real numeric sort on the selected column instead of just
@@ -60,7 +55,6 @@ document.addEventListener('DOMContentLoaded', function () {
     const itemsPerPage = 10;
     let expandedRows = new Set();
     let allRowsExpanded = false; // drives the Expand All / Collapse All button's label + behavior
-    let allCustomers = [];
     let currentCurrencySymbol = window.currencySymbol;
 
     // Free-text fields that end up in this ledger (cheque numbers, voucher numbers
@@ -87,6 +81,152 @@ document.addEventListener('DOMContentLoaded', function () {
     function formatBalance(value) {
         const amount = Number(value) || 0;
         return formatMoney(Math.abs(amount)) + (amount >= 0 ? ' Dr' : ' Cr');
+    }
+
+    // ---------------------------------------------------------------------------------
+    // Multi-select dropdown (checkbox list with optional search, Select all / Clear).
+    // Used for Customer, Distribution and Salesman filters.
+    // ---------------------------------------------------------------------------------
+    function createMultiSelect(root, { placeholder, searchable = false }) {
+        let options = [];                 // [{ value, label }]
+        const selected = new Set();       // selected values (strings)
+        const listeners = [];
+
+        root.classList.add('ms');
+        root.innerHTML = `
+            <button type="button" class="form-control ms-toggle">
+                <span class="ms-label"></span>
+                <i class="fas fa-chevron-down"></i>
+            </button>
+            <div class="ms-panel" style="display:none;">
+                ${searchable ? '<input type="text" class="form-control ms-search" placeholder="Search..." autocomplete="off">' : ''}
+                <div class="ms-actions">
+                    <a href="#" class="ms-all">Select all</a>
+                    <a href="#" class="ms-none">Clear</a>
+                </div>
+                <div class="ms-list"></div>
+            </div>
+        `;
+
+        const toggleBtn = root.querySelector('.ms-toggle');
+        const labelEl = root.querySelector('.ms-label');
+        const panel = root.querySelector('.ms-panel');
+        const searchEl = root.querySelector('.ms-search');
+        const listEl = root.querySelector('.ms-list');
+
+        function visibleOptions() {
+            const term = searchEl ? searchEl.value.toLowerCase().trim() : '';
+            return term ? options.filter(o => o.label.toLowerCase().includes(term)) : options;
+        }
+
+        function renderLabel() {
+            if (selected.size === 0) {
+                labelEl.textContent = placeholder;
+            } else if (selected.size === 1) {
+                const only = options.find(o => selected.has(o.value));
+                labelEl.textContent = only ? only.label : '1 selected';
+            } else {
+                labelEl.textContent = `${selected.size} selected`;
+            }
+        }
+
+        function renderList() {
+            const items = visibleOptions();
+            listEl.innerHTML = items.length === 0
+                ? '<div class="ms-empty">No results</div>'
+                : items.map(o => `
+                    <label class="ms-item">
+                        <input type="checkbox" value="${escapeHtml(o.value)}" ${selected.has(o.value) ? 'checked' : ''}>
+                        <span>${escapeHtml(o.label)}</span>
+                    </label>`).join('');
+        }
+
+        function fireChange() {
+            renderLabel();
+            listeners.forEach(fn => fn(Array.from(selected)));
+        }
+
+        function open() {
+            panel.style.display = 'block';
+            if (searchEl) { searchEl.value = ''; renderList(); searchEl.focus(); }
+        }
+        function close() { panel.style.display = 'none'; }
+
+        toggleBtn.addEventListener('click', function (e) {
+            e.stopPropagation();
+            panel.style.display === 'none' ? open() : close();
+        });
+        panel.addEventListener('click', e => e.stopPropagation());
+        document.addEventListener('click', function (e) {
+            if (!root.contains(e.target)) close();
+        });
+
+        if (searchEl) searchEl.addEventListener('input', renderList);
+
+        listEl.addEventListener('change', function (e) {
+            if (e.target.type !== 'checkbox') return;
+            e.target.checked ? selected.add(e.target.value) : selected.delete(e.target.value);
+            fireChange();
+        });
+
+        // Select all / Clear act on what is currently visible (so search + select all works)
+        root.querySelector('.ms-all').addEventListener('click', function (e) {
+            e.preventDefault();
+            visibleOptions().forEach(o => selected.add(o.value));
+            renderList();
+            fireChange();
+        });
+        root.querySelector('.ms-none').addEventListener('click', function (e) {
+            e.preventDefault();
+            const visible = visibleOptions();
+            if (searchEl && searchEl.value.trim()) {
+                visible.forEach(o => selected.delete(o.value));
+            } else {
+                selected.clear();
+            }
+            renderList();
+            fireChange();
+        });
+
+        renderLabel();
+
+        return {
+            setOptions(list) {
+                options = list.map(o => ({ value: String(o.value), label: String(o.label) }));
+                // drop selections that no longer exist
+                Array.from(selected).forEach(v => { if (!options.some(o => o.value === v)) selected.delete(v); });
+                renderList();
+                renderLabel();
+            },
+            getValues() { return Array.from(selected); },
+            // silent: caller handles any follow-up itself (no onChange callbacks fired)
+            clear() { selected.clear(); renderList(); renderLabel(); },
+            onChange(fn) { listeners.push(fn); }
+        };
+    }
+
+    const customerMS = createMultiSelect(document.getElementById('customer-ms'), { placeholder: 'All Customers', searchable: true });
+    const distributionMS = createMultiSelect(document.getElementById('distribution-ms'), { placeholder: 'All Distributions', searchable: true });
+    const salesmanMS = createMultiSelect(document.getElementById('salesman-ms'), { placeholder: 'All Salesmen', searchable: true });
+
+    // Detailed Ledger works on exactly one customer; returns that id, or '' if none/many selected.
+    function singleCustomerId() {
+        const v = customerMS.getValues();
+        return v.length === 1 ? v[0] : '';
+    }
+
+    // Adds the multi-select filters to a querystring. The comma-separated *_ids params carry
+    // the full selection; when exactly one is picked the old singular param is sent too so
+    // pages that haven't been updated yet (e.g. print.php) keep working.
+    function appendMultiParams(params) {
+        const cust = customerMS.getValues();
+        const dist = distributionMS.getValues();
+        const sales = salesmanMS.getValues();
+        if (cust.length) params.append('customer_ids', cust.join(','));
+        if (dist.length) params.append('distribution_ids', dist.join(','));
+        if (sales.length) params.append('salesman_ids', sales.join(','));
+        if (dist.length === 1) params.append('distribution_id', dist[0]);
+        if (sales.length === 1) params.append('salesman_id', sales[0]);
     }
 
     // Set default dates
@@ -185,8 +325,7 @@ document.addEventListener('DOMContentLoaded', function () {
     
     // Reload customers when company changes
     document.getElementById('company').addEventListener('change', function() {
-        customerCode.value = '';
-        customerSearch.value = '';
+        customerMS.clear();
         showSummaryLedger();
         loadLedgerData();
     });
@@ -251,10 +390,7 @@ document.addEventListener('DOMContentLoaded', function () {
             const result = await response.json();
 
             if (result.success) {
-                salesmanFilter.innerHTML = '<option value="">All Salesmen</option>';
-                result.data.forEach(s => {
-                    salesmanFilter.innerHTML += `<option value="${s.id}">${s.full_name}</option>`;
-                });
+                salesmanMS.setOptions(result.data.map(s => ({ value: s.id, label: s.full_name })));
             }
         } catch (error) {
             console.error('Error loading salesmen:', error);
@@ -269,106 +405,6 @@ document.addEventListener('DOMContentLoaded', function () {
 
     zoneFilter.addEventListener('change', function () {
         loadAreas(this.value);
-    });
-
-    // Searchable dropdown functionality
-    let selectedIndex = -1;
-    
-    customerSearch.addEventListener('input', function() {
-        const searchTerm = this.value.toLowerCase().trim();
-        selectedIndex = -1;
-        
-        const filtered = searchTerm.length === 0 || searchTerm === ' '
-            ? allCustomers
-            : allCustomers.filter(customer => 
-                customer.customer_name.toLowerCase().includes(searchTerm) ||
-                customer.customer_code.toLowerCase().includes(searchTerm)
-            );
-        
-        if (filtered.length > 0) {
-            customerDropdown.innerHTML = filtered.map(customer => 
-                `<div class="customer-option" data-id="${customer.id}">${customer.customer_code} - ${customer.customer_name}</div>`
-            ).join('');
-            customerDropdown.style.display = 'block';
-        } else {
-            customerDropdown.style.display = 'none';
-        }
-    });
-
-    // Click/focus pe bhi dropdown khulay, chahay kuch type na kiya ho — sab customers show hon
-    function openCustomerDropdown() {
-        if (allCustomers.length === 0) return;
-        selectedIndex = -1;
-
-        const searchTerm = customerSearch.value.toLowerCase().trim();
-        const filtered = searchTerm.length === 0 || searchTerm === ' '
-            ? allCustomers
-            : allCustomers.filter(customer =>
-                customer.customer_name.toLowerCase().includes(searchTerm) ||
-                customer.customer_code.toLowerCase().includes(searchTerm)
-            );
-
-        if (filtered.length > 0) {
-            customerDropdown.innerHTML = filtered.map(customer =>
-                `<div class="customer-option" data-id="${customer.id}">${customer.customer_code} - ${customer.customer_name}</div>`
-            ).join('');
-            customerDropdown.style.display = 'block';
-        }
-    }
-
-    customerSearch.addEventListener('focus', openCustomerDropdown);
-    customerSearch.addEventListener('click', openCustomerDropdown);
-
-    // Arrow key navigation
-    customerSearch.addEventListener('keydown', function(e) {
-        const options = customerDropdown.querySelectorAll('.customer-option');
-        if (options.length === 0) return;
-        
-        if (e.key === 'ArrowDown') {
-            e.preventDefault();
-            selectedIndex = Math.min(selectedIndex + 1, options.length - 1);
-            updateSelection(options);
-        } else if (e.key === 'ArrowUp') {
-            e.preventDefault();
-            selectedIndex = Math.max(selectedIndex - 1, -1);
-            updateSelection(options);
-        } else if (e.key === 'Enter' && selectedIndex >= 0) {
-            e.preventDefault();
-            options[selectedIndex].click();
-        }
-    });
-
-    function updateSelection(options) {
-        options.forEach((option, index) => {
-            option.classList.toggle('selected', index === selectedIndex);
-        });
-    }
-
-    // Handle customer selection
-    customerDropdown.addEventListener('click', function(e) {
-        if (e.target.classList.contains('customer-option')) {
-            const customerId = e.target.dataset.id;
-            const customerText = e.target.textContent;
-            
-            customerSearch.value = customerText;
-            customerCode.value = customerId;
-            customerDropdown.style.display = 'none';
-            
-            if (customerId) {
-                loadSubAccounts(customerId);
-                showDetailedLedger();
-            } else {
-                subAccountGroup.style.display = 'none';
-                subAccount.value = '';
-            }
-        }
-    });
-
-    // Hide dropdown when clicking outside
-    document.addEventListener('click', function(e) {
-        if (!customerSearch.contains(e.target) && !customerDropdown.contains(e.target)) {
-            customerDropdown.style.display = 'none';
-        }
     });
 
     // Toggle ledger type
@@ -390,7 +426,7 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function showDetailedLedger() {
-        if (!customerCode.value) {
+        if (!singleCustomerId()) {
             showCustomerError();
             return;
         }
@@ -454,7 +490,7 @@ document.addEventListener('DOMContentLoaded', function () {
             errorCard = document.createElement('div');
             errorCard.id = 'customer-error-card';
             errorCard.className = 'card';
-            errorCard.innerHTML = '<p style="color: var(--error); text-align: center; margin: 0;">Please select a Customer Code first to view detailed ledger.</p>';
+            errorCard.innerHTML = '<p style="color: var(--error); text-align: center; margin: 0;">Please select exactly one customer to view the detailed ledger.</p>';
             document.querySelector('.card:last-of-type').insertAdjacentElement('afterend', errorCard);
         }
         errorCard.style.display = 'block';
@@ -475,10 +511,12 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
-    // Customer code change handler
-    customerCode.addEventListener('change', function () {
-        if (customerCode.value) {
-            loadSubAccounts(customerCode.value);
+    // Customer selection change: exactly one customer -> Detailed Ledger (as before);
+    // none or several -> Summary Ledger, filtered to the selected customers on Load Ledger.
+    customerMS.onChange(function () {
+        const id = singleCustomerId();
+        if (id) {
+            loadSubAccounts(id);
             showDetailedLedger();
         } else {
             subAccountGroup.style.display = 'none';
@@ -523,12 +561,7 @@ document.addEventListener('DOMContentLoaded', function () {
             const result = await response.json();
             
             if (result.success) {
-                allCustomers = result.data;
-                customerCode.innerHTML = '<option value="">All Customers</option>';
-                result.data.forEach(customer => {
-                    customerCode.innerHTML += `<option value="${customer.id}">${customer.customer_code} - ${customer.customer_name}</option>`;
-                });
-                customerSearch.value = '';
+                customerMS.setOptions(result.data.map(c => ({ value: c.id, label: `${c.customer_code} - ${c.customer_name}` })));
             }
         } catch (error) {
             console.error('Error loading customers:', error);
@@ -542,10 +575,7 @@ document.addEventListener('DOMContentLoaded', function () {
             const result = await response.json();
             
             if (result.success) {
-                distribution.innerHTML = '<option value="">All Distributions</option>';
-                result.data.forEach(dist => {
-                    distribution.innerHTML += `<option value="${dist.id}">${dist.supplier_code} - ${dist.supplier_name}</option>`;
-                });
+                distributionMS.setOptions(result.data.map(d => ({ value: d.id, label: `${d.supplier_code} - ${d.supplier_name}` })));
             }
         } catch (error) {
             console.error('Error loading distributions:', error);
@@ -576,13 +606,12 @@ document.addEventListener('DOMContentLoaded', function () {
             from_date: fromDate.value,
             to_date: toDate.value
         });
-        if (distribution.value) params.append('distribution_id', distribution.value);
+        appendMultiParams(params);
         if (company.value) params.append('company_id', company.value);
         if (currencyFilter.value) params.append('currency_id', currencyFilter.value);
         if (cityFilter.value) params.append('city_id', cityFilter.value);
         if (zoneFilter.value) params.append('zone_id', zoneFilter.value);
         if (areaFilter.value) params.append('area_id', areaFilter.value);
-        if (salesmanFilter.value) params.append('salesman_id', salesmanFilter.value);
         return params;
     }
 
@@ -612,10 +641,10 @@ document.addEventListener('DOMContentLoaded', function () {
                 .catch(() => showNotification('Network error occurred while loading Summary Ledger', 'error'))
         );
 
-        if (customerCode.value) {
+        if (singleCustomerId()) {
             const detailedParams = sharedLedgerParams();
             detailedParams.set('type', 'detailed');
-            detailedParams.append('customer_id', customerCode.value);
+            detailedParams.append('customer_id', singleCustomerId());
             if (subAccount.value) detailedParams.append('sub_account_id', subAccount.value);
             requests.push(
                 fetch(`../../../../server/api/financial_reports/customer_ledger/customer-ledger.php?${detailedParams}`)
@@ -837,12 +866,16 @@ document.addEventListener('DOMContentLoaded', function () {
                                       (pdcDisplay > 0 ? `(${formatMoney(pdcDisplay)})` :
                                       (coveredAmount > 0 ? `(${formatMoney(coveredAmount)})` : ''));
 
-                const receivedDate = row.type === 'pdc' ? (row.received_date || '') : '';
+                // PDC (cheque) rows only: Transaction Date shows the date the cheque was
+                // received, and the Cheque Date column shows the cheque's own date.
+                const isPdc = row.type === 'pdc';
+                const transactionDate = isPdc ? (row.received_date || row.date) : row.date;
+                const chequeDate = isPdc ? (row.date || '') : '';
 
                 tbody.innerHTML += `
                     <tr class="ledger-row" data-row-id="${rowIndex}">
-                        <td>${row.date}</td>
-                        <td>${receivedDate}</td>
+                        <td>${transactionDate}</td>
+                        <td>${chequeDate}</td>
                         <td>
                             ${hasItems ? `<button class="expand-btn" data-row-id="${rowIndex}"><i class="fas fa-chevron-right"></i></button>` : ''}
                             ${row.description}
@@ -972,12 +1005,10 @@ document.addEventListener('DOMContentLoaded', function () {
     // Reset filters
     resetFiltersBtn.addEventListener('click', function () {
         company.value = '';
-        customerCode.value = '';
-        customerSearch.value = '';
-        customerDropdown.style.display = 'none';
+        customerMS.clear();
         fromDate.value = '';
         toDate.value = '';
-        distribution.value = '';
+        distributionMS.clear();
         subAccount.value = '';
         sortOrder.value = 'asc';
 
@@ -988,7 +1019,7 @@ document.addEventListener('DOMContentLoaded', function () {
         cityFilter.value = '';
         zoneFilter.value = '';
         areaFilter.value = '';
-        salesmanFilter.value = '';
+        salesmanMS.clear();
         loadZones();
         loadAreas();
 
@@ -1013,15 +1044,13 @@ document.addEventListener('DOMContentLoaded', function () {
             round_off: roundOffToggle.checked ? '1' : '0'
         });
         
-        if (customerCode.value) {
-            const encryptedCode = encryptCustomerCode(customerCode.value);
+        if (singleCustomerId()) {
+            const encryptedCode = encryptCustomerCode(singleCustomerId());
             params.append('customer_code', encryptedCode);
-            params.append('customer_id', customerCode.value);
+            params.append('customer_id', singleCustomerId());
         }
-        
-        if (distribution.value) {
-            params.append('distribution_id', distribution.value);
-        }
+
+        appendMultiParams(params);
         
         if (subAccount.value) {
             params.append('sub_account_id', subAccount.value);
@@ -1055,10 +1084,6 @@ document.addEventListener('DOMContentLoaded', function () {
             params.append('area_id', areaFilter.value);
         }
 
-        if (salesmanFilter.value) {
-            params.append('salesman_id', salesmanFilter.value);
-        }
-
         window.open(`print.php?${params}`, '_blank');
     });
 
@@ -1090,8 +1115,8 @@ document.addEventListener('DOMContentLoaded', function () {
                 const balance = parseFloat(row.running_balance) || 0;
 
                 rows.push({
-                    'Date': row.date,
-                    'Received Date': row.type === 'pdc' ? (row.received_date || '') : '',
+                    'Date': row.type === 'pdc' ? (row.received_date || row.date) : row.date,
+                    'Cheque Date': row.type === 'pdc' ? (row.date || '') : '',
                     'Description': row.description || '',
                     'Against RV': row.type === 'pdc' ? (row.against_rvs || '') : '',
                     'Reference': (row.reference || '') + (row.against_cheque_no ? ` (Against Cheque ${row.against_cheque_no})` : ''),
@@ -1152,12 +1177,12 @@ document.addEventListener('DOMContentLoaded', function () {
             pdf: '1',
             round_off: roundOffToggle.checked ? '1' : '0'
         });
-        if (customerCode.value) {
-            const encryptedCode = encryptCustomerCode(customerCode.value);
+        if (singleCustomerId()) {
+            const encryptedCode = encryptCustomerCode(singleCustomerId());
             params.append('customer_code', encryptedCode);
-            params.append('customer_id', customerCode.value);
+            params.append('customer_id', singleCustomerId());
         }
-        if (distribution.value) params.append('distribution_id', distribution.value);
+        appendMultiParams(params);
         if (subAccount.value) params.append('sub_account_id', subAccount.value);
         if (isDetailed && expandedRows.size > 0) params.append('expanded_rows', Array.from(expandedRows).join(','));
         if (company.value) params.append('company_id', company.value);
@@ -1166,7 +1191,6 @@ document.addEventListener('DOMContentLoaded', function () {
         if (cityFilter.value) params.append('city_id', cityFilter.value);
         if (zoneFilter.value) params.append('zone_id', zoneFilter.value);
         if (areaFilter.value) params.append('area_id', areaFilter.value);
-        if (salesmanFilter.value) params.append('salesman_id', salesmanFilter.value);
         window.open(`print.php?${params}`, '_blank');
     });
 
@@ -1179,14 +1203,14 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // Share ledger modal
     shareLedgerBtn.addEventListener('click', function () {
-        const selectedCustomer = customerCode.value;
+        const selectedCustomer = singleCustomerId();
         const shareableUrl = document.getElementById('shareable-url');
         
         if (selectedCustomer) {
             const encryptedCode = encryptCustomerCode(selectedCustomer);
             shareableUrl.value = `${window.location.origin}/client/pages/financial_reports/customer_ledger/view.php?code=${encryptedCode}`;
         } else {
-            shareableUrl.value = 'Please select a customer first';
+            shareableUrl.value = 'Please select a single customer first';
         }
         
         shareModal.classList.add('show');

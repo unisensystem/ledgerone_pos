@@ -8,6 +8,7 @@ let currentInvoice = {
 };
 
 let isSaving = false;
+let justSaved = false; // true from a successful save until the cart is cleared
 let lastSavedInvoiceId = null;
 let preSelectedProduct = null;
 
@@ -1982,6 +1983,16 @@ function quickPay() {
 
 async function saveInvoice(status = 'Posted') {
     if (isSaving) return;
+
+    // Pressing save again right after a save (or on an empty cart) prints the last saved invoice
+    // (Manual Print mode only; in auto print mode the invoice is already printed on save)
+    if (status !== 'Draft' && lastSavedInvoiceId && (justSaved || currentInvoice.items.length === 0) && isManualPrintMode()) {
+        printLastInvoice();
+        return;
+    }
+    // Never save the same cart twice
+    if (justSaved) return;
+
     isSaving = true;
     
     if (currentInvoice.items.length === 0) {
@@ -2113,6 +2124,7 @@ async function saveInvoice(status = 'Posted') {
         if (data.success) {
             showNotification('Invoice saved successfully!');
             lastSavedInvoiceId = data.invoice_id;
+            justSaved = true;
             if (isManualPrintMode()) {
                 // Manual print mode: no auto print, just show the PRINT button
                 showPrintButton();
@@ -2123,6 +2135,7 @@ async function saveInvoice(status = 'Posted') {
             }
             setTimeout(() => {
                 currentInvoice.items = [];
+                justSaved = false;
                 renderItems();
                 updateSummary();
                 loadNextInvoiceNo();

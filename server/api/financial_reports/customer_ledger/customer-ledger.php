@@ -26,12 +26,30 @@ if (!$auth) {
 $user_id = $auth['user_id'];
 $tenant_id = $auth['tenant_id'];
 
+// Accepts "1,2,3" (or an array) and returns a clean list of unique integer ids.
+// Used by the multi-select filters (customers, distributions, salesmen).
+function parseIdList($value) {
+    if (is_array($value)) $value = implode(',', $value);
+    $ids = [];
+    foreach (explode(',', (string)$value) as $v) {
+        $v = trim($v);
+        if ($v !== '' && ctype_digit($v)) $ids[] = (int)$v;
+    }
+    return array_values(array_unique($ids));
+}
+
 try {
     $customer_id = $_GET['customer_id'] ?? null;
     $from_date = $_GET['from_date'] ?? null;
     $to_date = $_GET['to_date'] ?? null;
     $type = $_GET['type'] ?? 'summary';
-    $distribution_id = $_GET['distribution_id'] ?? null;
+    // Multi-select: distribution_ids=1,2,3 (single distribution_id still accepted).
+    // $distribution_id stays as a truthy flag used by the existing if/else branches below.
+    $distribution_ids = parseIdList($_GET['distribution_ids'] ?? ($_GET['distribution_id'] ?? ''));
+    $distribution_id = $distribution_ids ? implode(',', $distribution_ids) : null;
+    $dist_in = $distribution_ids ? implode(',', array_fill(0, count($distribution_ids), '?')) : '';
+    // Multi-select customers for the Summary Ledger: customer_ids=1,2,3
+    $customer_ids = parseIdList($_GET['customer_ids'] ?? ($_GET['customer_id'] ?? ''));
     $company_id = $_GET['company_id'] ?? null;
     $target_currency_id = $_GET['currency_id'] ?? null;
 
@@ -41,7 +59,8 @@ try {
     $city_id = $_GET['city_id'] ?? null;
     $city_zone_id = $_GET['zone_id'] ?? null;
     $area_id = $_GET['area_id'] ?? null;
-    $salesman_id = $_GET['salesman_id'] ?? null;
+    // Multi-select: salesman_ids=1,2,3 (single salesman_id still accepted)
+    $salesman_ids = parseIdList($_GET['salesman_ids'] ?? ($_GET['salesman_id'] ?? ''));
     
     // Initialize currency converter
     $converter = new CurrencyConverter($pdo, $tenant_id);
@@ -169,9 +188,9 @@ try {
         $sql = "SELECT c.id, c.customer_name, c.opening_debit_amount, c.opening_credit_amount FROM customers c WHERE c.tenant_id = ? AND c.status = 'ACTIVE'";
         $params = [$tenant_id];
         
-        if ($customer_id) {
-            $sql .= " AND c.id = ?";
-            $params[] = $customer_id;
+        if ($customer_ids) {
+            $sql .= " AND c.id IN (" . implode(',', array_fill(0, count($customer_ids), '?')) . ")";
+            $params = array_merge($params, $customer_ids);
         }
 
         if ($city_id) {
@@ -189,9 +208,9 @@ try {
             $params[] = $area_id;
         }
 
-        if ($salesman_id) {
-            $sql .= " AND c.associated_sales_officer_id = ?";
-            $params[] = $salesman_id;
+        if ($salesman_ids) {
+            $sql .= " AND c.associated_sales_officer_id IN (" . implode(',', array_fill(0, count($salesman_ids), '?')) . ")";
+            $params = array_merge($params, $salesman_ids);
         }
         
         $sql .= " ORDER BY c.customer_name";
@@ -336,8 +355,8 @@ try {
                 FROM sale_invoice_items sii
                 JOIN sale_invoice si ON sii.sale_invoice_id = si.id
                 JOIN products p ON sii.product_id = p.id
-                WHERE si.tenant_id = ? AND si.customer_id = ? AND p.vendor_id = ?";
-                $invoice_params = [$tenant_id, $customer['id'], $distribution_id];
+                WHERE si.tenant_id = ? AND si.customer_id = ? AND p.vendor_id IN ({$dist_in})";
+                $invoice_params = array_merge([$tenant_id, $customer['id']], $distribution_ids);
                 
                 $return_sql = "SELECT COALESCE(SUM(
                     sri.net_amount + 
@@ -346,8 +365,8 @@ try {
                 FROM sale_return_items sri
                 JOIN sale_return sr ON sri.sale_invoice_id = sr.id
                 JOIN products p ON sri.product_id = p.id
-                WHERE sr.tenant_id = ? AND sr.customer_id = ? AND sr.status = 'Posted' AND p.vendor_id = ?";
-                $return_params = [$tenant_id, $customer['id'], $distribution_id];
+                WHERE sr.tenant_id = ? AND sr.customer_id = ? AND sr.status = 'Posted' AND p.vendor_id IN ({$dist_in})";
+                $return_params = array_merge([$tenant_id, $customer['id']], $distribution_ids);
             } else {
                 $invoice_sql = "SELECT net_amount, currency_id FROM sale_invoice WHERE tenant_id = ? AND customer_id = ?{$company_filter}";
                 $invoice_params = [$tenant_id, $customer['id']];
@@ -693,8 +712,8 @@ $prev_payments_sub = $stmt->fetch()['total'];
                     FROM sale_invoice si
                     JOIN sale_invoice_items sii ON si.id = sii.sale_invoice_id
                     JOIN products p ON sii.product_id = p.id
-                    WHERE si.tenant_id = ? AND si.customer_id = ? AND p.vendor_id = ?";
-            $params = [$tenant_id, $customer_id, $distribution_id];
+                    WHERE si.tenant_id = ? AND si.customer_id = ? AND p.vendor_id IN ({$dist_in})";
+            $params = array_merge([$tenant_id, $customer_id], $distribution_ids);
         } else {
             $sql = "SELECT id, sale_date as date, CONCAT('Sale Invoice - ', bill_no) as description, 
                     bill_no as reference, net_amount as debit, 0 as credit, 'invoice' as type, sub_account_id, currency_id
@@ -790,8 +809,8 @@ $prev_payments_sub = $stmt->fetch()['total'];
                     FROM sale_return sr
                     JOIN sale_return_items sri ON sr.id = sri.sale_invoice_id
                     JOIN products p ON sri.product_id = p.id
-                    WHERE sr.tenant_id = ? AND sr.customer_id = ? AND sr.status = 'Posted' AND p.vendor_id = ?";
-            $params = [$tenant_id, $customer_id, $distribution_id];
+                    WHERE sr.tenant_id = ? AND sr.customer_id = ? AND sr.status = 'Posted' AND p.vendor_id IN ({$dist_in})";
+            $params = array_merge([$tenant_id, $customer_id], $distribution_ids);
         } else {
             $sql = "SELECT id, sale_date as date, CONCAT('Sale Return - ', bill_no) as description,
                     bill_no as reference, amount_refunded as debit, (net_amount - amount_refunded) as credit, 'return' as type, sub_account_id, currency_id
@@ -1108,9 +1127,9 @@ $prev_payments_sub = $stmt->fetch()['total'];
                                  LEFT JOIN uom u ON sii.uom_id = u.id
                                  WHERE sii.sale_invoice_id = ?";
                     if ($distribution_id) {
-                        $items_sql .= " AND p.vendor_id = ?";
+                        $items_sql .= " AND p.vendor_id IN ({$dist_in})";
                         $items_stmt = $pdo->prepare($items_sql);
-                        $items_stmt->execute([$transaction['id'], $distribution_id]);
+                        $items_stmt->execute(array_merge([$transaction['id']], $distribution_ids));
                     } else {
                         $items_stmt = $pdo->prepare($items_sql);
                         $items_stmt->execute([$transaction['id']]);
@@ -1123,9 +1142,9 @@ $prev_payments_sub = $stmt->fetch()['total'];
                                  LEFT JOIN uom u ON sri.uom_id = u.id
                                  WHERE sri.sale_invoice_id = ?";
                     if ($distribution_id) {
-                        $items_sql .= " AND p.vendor_id = ?";
+                        $items_sql .= " AND p.vendor_id IN ({$dist_in})";
                         $items_stmt = $pdo->prepare($items_sql);
-                        $items_stmt->execute([$transaction['id'], $distribution_id]);
+                        $items_stmt->execute(array_merge([$transaction['id']], $distribution_ids));
                     } else {
                         $items_stmt = $pdo->prepare($items_sql);
                         $items_stmt->execute([$transaction['id']]);
@@ -1220,9 +1239,9 @@ $prev_payments_sub = $stmt->fetch()['total'];
                                      LEFT JOIN uom u ON sii.uom_id = u.id
                                      WHERE sii.sale_invoice_id = ?";
                         if ($distribution_id) {
-                            $items_sql .= " AND p.vendor_id = ?";
+                            $items_sql .= " AND p.vendor_id IN ({$dist_in})";
                             $items_stmt = $pdo->prepare($items_sql);
-                            $items_stmt->execute([$transaction['id'], $distribution_id]);
+                            $items_stmt->execute(array_merge([$transaction['id']], $distribution_ids));
                         } else {
                             $items_stmt = $pdo->prepare($items_sql);
                             $items_stmt->execute([$transaction['id']]);
@@ -1235,9 +1254,9 @@ $prev_payments_sub = $stmt->fetch()['total'];
                                      LEFT JOIN uom u ON sri.uom_id = u.id
                                      WHERE sri.sale_invoice_id = ?";
                         if ($distribution_id) {
-                            $items_sql .= " AND p.vendor_id = ?";
+                            $items_sql .= " AND p.vendor_id IN ({$dist_in})";
                             $items_stmt = $pdo->prepare($items_sql);
-                            $items_stmt->execute([$transaction['id'], $distribution_id]);
+                            $items_stmt->execute(array_merge([$transaction['id']], $distribution_ids));
                         } else {
                             $items_stmt = $pdo->prepare($items_sql);
                             $items_stmt->execute([$transaction['id']]);
