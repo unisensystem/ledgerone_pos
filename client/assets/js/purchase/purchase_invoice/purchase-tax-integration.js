@@ -11,6 +11,15 @@ document.addEventListener('DOMContentLoaded', function() {
         mutations.forEach(function(mutation) {
             if (mutation.type === 'attributes' && mutation.attributeName === 'data-product-id') {
                 const row = mutation.target;
+                // Set by edit-mode/PO-import row population right before it writes the
+                // row's own saved tax_percent/tax_amount — those are the actual saved
+                // values (which may legitimately be 0, e.g. tax manually removed), and
+                // must not be clobbered by a fresh recalculation here. Consumed once so
+                // a genuine later product change on this same row still auto-loads tax.
+                if (row.dataset.skipAutoTaxOnce === '1') {
+                    delete row.dataset.skipAutoTaxOnce;
+                    return;
+                }
                 if (row.dataset.productId) {
                     setTimeout(() => loadTaxForProduct(row), 100);
                 }

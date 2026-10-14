@@ -575,8 +575,11 @@ if (isGlobalDateLocked && globalLockedDate) {
                         // Get UOM details and set product data
                         const uomDetails = getProductUOMDetails(product);
                         lastRow.dataset.productUomData = JSON.stringify(uomDetails);
+                        // Tax % / Amt below come straight from the PO's own saved values —
+                        // skip the auto tax-reload that'd otherwise overwrite them.
+                        lastRow.dataset.skipAutoTaxOnce = '1';
                         lastRow.dataset.productId = product.id;
-                        
+
                         // Set price and other fields
                         lastRow.querySelector('.price-cell input').value = item.purchase_price;
                         lastRow.querySelector('.disc-percent-cell input').value = item.discount_percent;
@@ -703,6 +706,9 @@ if (isGlobalDateLocked && globalLockedDate) {
 
                         lastRow.cells[1].querySelector('.search-input').value = `${item.product_code || ''} - ${item.product_name || ''}`;
                         lastRow.cells[1].querySelector('.item-code').value = item.product_id || '';
+                        // This row's own saved tax_percent/tax_amount get set below (second
+                        // pass) — skip the auto tax-reload that'd otherwise overwrite them.
+                        lastRow.dataset.skipAutoTaxOnce = '1';
                         lastRow.dataset.productId = item.product_id || '';
 
                         // Use real product UOM details if available, else build from unit_entries
