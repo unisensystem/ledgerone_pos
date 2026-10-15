@@ -28,6 +28,7 @@ const defaultShortcuts = {
     customer: 'F2',
     branch: 'F3',
     qty: 'F4',
+    price: 'F6',
     quickPay: 'F9',
     save: 'F10',
     draft: 'F8',
@@ -82,7 +83,7 @@ function printLastInvoice() {
         alert('No saved invoice to print!');
         return;
     }
-    window.open(`thermal-print.php?id=${lastSavedInvoiceId}`, '_blank');
+    window.open(`thermal-print.php?id=${lastSavedInvoiceId}&autoprint=1`, '_blank');
     document.getElementById('quickProduct').focus();
 }
 
@@ -364,7 +365,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     document.getElementById('resetShortcutsBtn').addEventListener('click', resetShortcuts);
     
     // Shortcut input listeners
-    ['shortcutProduct', 'shortcutCustomer', 'shortcutBranch', 'shortcutQty', 'shortcutQuickPay', 'shortcutSave', 'shortcutDraft', 'shortcutClear', 'shortcutReturn', 'shortcutNextField', 'shortcutPrevField'].forEach(id => {
+    ['shortcutProduct', 'shortcutCustomer', 'shortcutBranch', 'shortcutQty', 'shortcutPrice', 'shortcutQuickPay', 'shortcutSave', 'shortcutDraft', 'shortcutClear', 'shortcutReturn', 'shortcutNextField', 'shortcutPrevField'].forEach(id => {
         const input = document.getElementById(id);
         input.addEventListener('keydown', function(e) {
             e.preventDefault();
@@ -416,6 +417,9 @@ document.addEventListener('DOMContentLoaded', async function() {
         } else if (combo === shortcuts.qty) {
             e.preventDefault();
             document.getElementById('quickQty').focus();
+        } else if (combo === shortcuts.price) {
+            e.preventDefault();
+            focusLastItemPrice();
         } else if (combo === shortcuts.quickPay) {
             e.preventDefault();
             quickPay();
@@ -1072,7 +1076,6 @@ async function createCustomerByName(name) {
         alert('Please select a company first!');
         return;
     }
-if (!confirm(`Customer "${name}" not found. Would you like to create a new customer?`)) return;
 
     createCustomerByName._busy = true;
     try {
@@ -1438,6 +1441,7 @@ async function checkStockAndProceed(product) {
     const branchId = currentInvoice.branch;
     if (!branchId) {
         alert('Please select a branch first!');
+        isAddingProduct = false;
         return;
     }
     
@@ -1482,16 +1486,7 @@ async function checkStockAndProceed(product) {
                 }
             }
             
-            if (availableStock < requestedQty) {
-                const proceed = confirm(`Low stock! Available: ${availableStock}, Requested: ${requestedQty}\n\nDo you want to continue?`);
-                if (!proceed) {
-                    quickQtyInput.style.background = '';
-                    quickQtyInput.style.borderColor = '';
-                    quickQtyInput.style.color = '';
-                    isAddingProduct = false;
-                    return;
-                }
-            }
+            // Low stock popup removed: product is added directly (qty field colour still shows stock status)
         }
     } catch (error) {
         console.error('Error checking stock:', error);
@@ -1695,7 +1690,7 @@ function renderItems() {
             <div>${item.product}${item.children ? '<br><small style="color: var(--subtext);">(' + item.children.map(c => c.name + ': ' + c.qty + ' @ ' + formatCurrency(c.price)).join(' | ') + ')</small>' : ''}</div>
             <div>${item.unit}</div>
             <input type="number" value="${item.qty}" min="1" class="text-right item-qty-input" data-item-id="${item.id}" data-product-id="${item.productId}" onchange="updateItemQty(${item.id}, this.value)">
-            <input type="number" value="${item.price.toFixed(2)}" step="0.01" class="text-right" onchange="updateItemPrice(${item.id}, this.value)">
+            <input type="number" value="${item.price.toFixed(2)}" step="0.01" class="text-right item-price-input" data-item-id="${item.id}" onkeydown="if(event.key==='Enter'){event.preventDefault();document.getElementById('quickProduct').focus();}" onchange="updateItemPrice(${item.id}, this.value)">
             <div class="readonly">${formatCurrency(item.gross)}</div>
             <input type="number" value="${item.discountPercent}" step="0.1" class="text-right" data-role="disc-pct" data-item-id="${item.id}" onchange="updateItemDiscountPct(${item.id}, this.value)">
             <input type="number" value="${item.discountAmount.toFixed(2)}" step="0.01" class="text-right" data-role="disc-amt" data-item-id="${item.id}" onchange="updateItemDiscountAmt(${item.id}, this.value)">
@@ -1839,10 +1834,21 @@ async function checkAllItemsStock() {
     }
 }
 
+// Focus (and select) the PRICE input of the last item row so the price can be typed right after QTY.
+// ENTER in the price field returns focus to Quick Add Product.
+function focusLastItemPrice() {
+    const inputs = document.querySelectorAll('.item-price-input');
+    if (inputs.length === 0) return;
+    const last = inputs[inputs.length - 1];
+    last.focus();
+    last.select();
+}
+
 function loadShortcuts() {
     const saved = localStorage.getItem('pos_shortcuts');
     if (saved) {
-        shortcuts = JSON.parse(saved);
+        // merge with defaults so newly added shortcuts (e.g. price) exist for already-saved settings
+        shortcuts = { ...defaultShortcuts, ...JSON.parse(saved) };
     }
     loadShortcutInputs();
 }
@@ -1852,6 +1858,7 @@ function loadShortcutInputs() {
     document.getElementById('shortcutCustomer').value = shortcuts.customer;
     document.getElementById('shortcutBranch').value = shortcuts.branch;
     document.getElementById('shortcutQty').value = shortcuts.qty;
+    document.getElementById('shortcutPrice').value = shortcuts.price;
     document.getElementById('shortcutQuickPay').value = shortcuts.quickPay;
     document.getElementById('shortcutSave').value = shortcuts.save;
     document.getElementById('shortcutDraft').value = shortcuts.draft;
@@ -1863,6 +1870,7 @@ function loadShortcutInputs() {
 
 function saveShortcutSettings() {
     shortcuts = {
+        price: document.getElementById('shortcutPrice').value || defaultShortcuts.price,
         product: document.getElementById('shortcutProduct').value || defaultShortcuts.product,
         customer: document.getElementById('shortcutCustomer').value || defaultShortcuts.customer,
         branch: document.getElementById('shortcutBranch').value || defaultShortcuts.branch,
@@ -1981,6 +1989,44 @@ function quickPay() {
     showNotification(`Quick Pay: ${formatCurrency(finalAmount)}`);
 }
 
+// Returns the id of the default walk-in customer ("Cash Customer"), creating it once if the tenant doesn't have one yet.
+async function getWalkInCustomerId() {
+    const existing = customersData.find(c => (c.customer_name || '').trim().toLowerCase() === 'cash customer');
+    if (existing) return parseInt(existing.id);
+
+    const companyId = currentInvoice.company || document.getElementById('company').value;
+    if (!companyId) return null;
+
+    try {
+        const response = await fetch('../../../../server/api/sale/pos_invoice/quick-add-customer.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ customerName: 'Cash Customer', companyId: parseInt(companyId) })
+        });
+        const data = await response.json();
+        if (data.success && data.customer) {
+            customersData.push(data.customer);
+            return parseInt(data.customer.id);
+        }
+    } catch (error) {
+        console.error('Error creating walk-in customer:', error);
+    }
+    return null;
+}
+
+// After a save the next bill starts with NO customer, so the previous bill's customer
+// never carries over to the next invoice and its print.
+function resetCustomer() {
+    currentInvoice.customer = null;
+    currentInvoice.previousBalance = 'Dr 0.00';
+    document.getElementById('customer').value = '';
+    const search = document.getElementById('customerSearch');
+    search.value = '';
+    search._prevValue = '';
+    const supplierManSelect = document.getElementById('supplierMan');
+    if (supplierManSelect) supplierManSelect.value = '';
+}
+
 async function saveInvoice(status = 'Posted') {
     if (isSaving) return;
 
@@ -2013,8 +2059,12 @@ async function saveInvoice(status = 'Posted') {
         currentInvoice.currency = fallbackCurrency.currency_id;
     }
 
-    if (!currentInvoice.customer) {
-        alert('Please select a customer!');
+    // No customer selected = walk-in sale: post it against the default "Cash Customer" account
+    // (pos-add.php requires a customer for tax, receive voucher and ledger). The receipt hides
+    // the Cash Customer name, so a walk-in bill prints without any customer.
+    const invoiceCustomerId = currentInvoice.customer || await getWalkInCustomerId();
+    if (!invoiceCustomerId) {
+        alert('Walk-in (Cash Customer) could not be set up. Please select a customer!');
         isSaving = false;
         return;
     }
@@ -2057,7 +2107,7 @@ async function saveInvoice(status = 'Posted') {
     
     const invoiceData = {
         saleDate: new Date().toISOString().split('T')[0],
-        customerId: currentInvoice.customer,
+        customerId: invoiceCustomerId,
         branchId: currentInvoice.branch,
         currencyId: currentInvoice.currency,
         projectId: currentInvoice.project || null,
@@ -2131,7 +2181,7 @@ async function saveInvoice(status = 'Posted') {
             } else {
                 // Redirect to thermal print
                 hidePrintButton();
-                window.open(`thermal-print.php?id=${data.invoice_id}`, '_blank');
+                window.open(`thermal-print.php?id=${data.invoice_id}&autoprint=1`, '_blank');
             }
             setTimeout(() => {
                 currentInvoice.items = [];
@@ -2139,6 +2189,7 @@ async function saveInvoice(status = 'Posted') {
                 renderItems();
                 updateSummary();
                 loadNextInvoiceNo();
+                resetCustomer();
                 document.getElementById('invoiceDiscountPercent').value = 0;
                 document.getElementById('invoiceDiscountAmount').value = 0;
                 document.getElementById('amountReceived').value = 0;

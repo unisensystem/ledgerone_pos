@@ -1261,6 +1261,10 @@ $user_employee_id = $user['employee_id'] ?? null;
                     <input type="text" id="shortcutQty" value="F4" style="width: 100%; padding: 8px; border: 1px solid var(--border-default); border-radius: 4px;">
                 </div>
                 <div>
+                    <label style="font-size: 12px; color: var(--subtext);">Focus Price (last item):</label>
+                    <input type="text" id="shortcutPrice" value="F6" style="width: 100%; padding: 8px; border: 1px solid var(--border-default); border-radius: 4px;">
+                </div>
+                <div>
                     <label style="font-size: 12px; color: var(--subtext);">Quick Pay:</label>
                     <input type="text" id="shortcutQuickPay" value="F9" style="width: 100%; padding: 8px; border: 1px solid var(--border-default); border-radius: 4px;">
                 </div>

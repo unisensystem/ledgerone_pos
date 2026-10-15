@@ -533,7 +533,10 @@
         function populateInvoiceData(invoice, items) {
             document.getElementById('invoiceNo').textContent = invoice.bill_no;
             document.getElementById('invoiceDate').textContent = new Date(invoice.sale_date).toLocaleDateString();
-            document.getElementById('customerName').textContent = invoice.customer_name;
+            // Walk-in bills are posted to the default "Cash Customer" - don't print a customer line for them
+            const isWalkIn = (invoice.customer_name || '').trim().toLowerCase() === 'cash customer';
+            document.getElementById('customerName').textContent = isWalkIn ? '' : invoice.customer_name;
+            if (isWalkIn) document.getElementById('customerName').parentElement.style.display = 'none';
             
             // Show previous balance only if it exists and is non-zero
             const previousBalance = parseFloat(invoice.previous_balance || 0);
@@ -728,7 +731,24 @@
         
         document.getElementById('printedDate').textContent = new Date().toLocaleString();
         
-        loadData();
+        // Auto print: when opened with &autoprint=1 (POS F10 save), print as soon as the
+        // receipt is fully rendered (data, logo, QR code and brand note) - no button click needed.
+        const autoPrint = urlParams.get('autoprint') === '1';
+
+        loadData().then(() => {
+            if (!autoPrint) return;
+            if (document.getElementById('invoiceNo').textContent === 'Loading...') return; // load failed, don't print a blank receipt
+            // QR code renders after 500ms and brand note after 1000ms, so wait a little longer than that
+            setTimeout(() => {
+                const imgs = Array.from(document.images);
+                Promise.all(imgs.map(img => img.complete ? Promise.resolve() :
+                    new Promise(res => { img.onload = img.onerror = res; })
+                )).then(() => {
+                    window.onafterprint = () => window.close();
+                    window.print();
+                });
+            }, 1300);
+        });
         
         // Generate QR Code after data loads
         window.addEventListener('load', function() {
