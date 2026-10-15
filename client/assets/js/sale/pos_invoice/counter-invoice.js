@@ -964,6 +964,8 @@ async function loadCustomers() {
                 const c = customersData.find(x => x.id == customer.id);
                 if (c && c.supplier_man_id) document.getElementById('supplierMan').value = c.supplier_man_id;
                 else document.getElementById('supplierMan').value = '';
+                // Customer chosen (ENTER or click): jump straight to Quick Add Product
+                document.getElementById('quickProduct').focus();
             });
             optionsDiv.appendChild(div);
         });
