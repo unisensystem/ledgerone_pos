@@ -352,6 +352,20 @@ if (!$user_id) {
                                 </button>
                             </div>
                         </div>
+                        <div class="sysmgmt-group">
+                            <div class="sysmgmt-group-header">
+                                <span class="sysmgmt-group-icon"><i class="fas fa-location-dot"></i></span>
+                                <div>
+                                    <div class="sysmgmt-group-title">Live Tracking</div>
+                                    <div class="sysmgmt-group-desc">See where mobile app officers are right now</div>
+                                </div>
+                            </div>
+                            <div class="sysmgmt-actions">
+                                <button class="btn btn-secondary btn-block" onclick="window.location.href='officer-tracking.php'">
+                                    <i class="fas fa-map-location-dot"></i> Live Tracking Map
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>

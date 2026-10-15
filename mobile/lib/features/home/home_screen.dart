@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/location_tracking_service.dart';
 import '../../core/outbox_service.dart';
 import '../../core/sync_everything_service.dart';
 import '../../core/sync_service.dart';
@@ -117,6 +118,8 @@ class HomeScreen extends ConsumerWidget {
                   _AddCustomerActionCard(),
                   SizedBox(height: 12),
                   _CustomerLedgerActionCard(),
+                  SizedBox(height: 12),
+                  _LocationTrackingCard(),
                   SizedBox(height: 28),
                 ],
               ),
@@ -749,6 +752,111 @@ class _CustomerLedgerActionCard extends StatelessWidget {
       onTap: () => Navigator.of(context).push(
         MaterialPageRoute(builder: (_) => const CustomerLedgerScreen()),
       ),
+    );
+  }
+}
+
+/// Shows the Live Tracking status and lets the officer pause/resume
+/// sharing their location (their own "personal time" switch — see
+/// LocationTrackingService's doc comment for the full on/off model). Reacts
+/// to LocationTrackingService.instance.state directly rather than through
+/// Riverpod, since this is the one and only place in the app that needs it.
+class _LocationTrackingCard extends StatelessWidget {
+  const _LocationTrackingCard();
+
+  @override
+  Widget build(BuildContext context) {
+    return ValueListenableBuilder<String>(
+      valueListenable: LocationTrackingService.instance.state,
+      builder: (context, state, _) {
+        final isAdminDisabled = state == 'disabled_by_admin';
+        final isOfficerPaused = state == 'paused_by_officer';
+        final isOn = state == 'active';
+
+        final Color accent = isAdminDisabled
+            ? const Color(0xFFE34F4F)
+            : isOfficerPaused
+            ? const Color(0xFF7C3AED)
+            : const Color(0xFF15966B);
+        final Color accentBg = isAdminDisabled
+            ? const Color(0xFFFDE8E8)
+            : isOfficerPaused
+            ? const Color(0xFFF1E8FE)
+            : const Color(0xFFE3F6EE);
+        final String subtitle = isAdminDisabled
+            ? 'Turned off by your admin'
+            : isOfficerPaused
+            ? 'Paused by you — tap to resume'
+            : 'Active while this app is open';
+
+        return Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.05),
+                blurRadius: 10,
+                offset: const Offset(0, 3),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 46,
+                height: 46,
+                decoration: BoxDecoration(
+                  color: accentBg,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(
+                  isAdminDisabled
+                      ? Icons.location_off_rounded
+                      : Icons.location_on_rounded,
+                  color: accent,
+                  size: 23,
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Location Sharing',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 15,
+                        color: _textDark,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      subtitle,
+                      style: TextStyle(
+                        color: isAdminDisabled ? accent : _textMuted,
+                        fontSize: 12.5,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Switch(
+                value: isOn,
+                activeTrackColor: const Color(0xFF15966B),
+                onChanged: isAdminDisabled
+                    ? null
+                    : (value) =>
+                          LocationTrackingService.instance.setOfficerEnabled(
+                            value,
+                          ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 }

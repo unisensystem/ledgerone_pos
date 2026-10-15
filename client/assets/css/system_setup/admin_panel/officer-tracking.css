@@ -1,0 +1,270 @@
+.ot-back-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--subtext);
+    text-decoration: none;
+    font-size: 13px;
+    margin-bottom: 12px;
+}
+.ot-back-link:hover { color: var(--primary); }
+
+.ot-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-bottom: 16px;
+}
+.ot-title {
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--heading);
+    margin: 0 0 4px 0;
+}
+.ot-subtitle {
+    font-size: 13px;
+    color: var(--subtext);
+    margin: 0;
+}
+.ot-header-right {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+.ot-updated {
+    font-size: 12px;
+    color: var(--subtext);
+}
+
+.ot-tabs {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 16px;
+    border-bottom: 1px solid var(--border-default);
+}
+.ot-tab {
+    background: none;
+    border: none;
+    padding: 10px 16px;
+    font-size: 13.5px;
+    font-weight: 600;
+    color: var(--subtext);
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+}
+.ot-tab:hover { color: var(--primary); }
+.ot-tab.active {
+    color: var(--primary);
+    border-bottom-color: var(--primary);
+}
+
+.ot-panel { display: none; }
+.ot-panel.active { display: block; }
+
+.ot-report-filters {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    margin-bottom: 16px;
+}
+.ot-report-filters .form-group { margin-bottom: 0; min-width: 160px; }
+
+.ot-status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 20px;
+}
+.ot-status-moving { background: rgba(47, 191, 113, 0.12); color: #15966b; }
+.ot-status-stopped { background: rgba(217, 119, 6, 0.12); color: #d97706; }
+.ot-status-offline { background: rgba(107, 114, 128, 0.12); color: #6b7280; }
+.ot-status-alert { background: rgba(227, 79, 79, 0.12); color: #e34f4f; }
+.ot-status-paused { background: rgba(124, 58, 237, 0.12); color: #7c3aed; }
+
+.ot-officer-distance {
+    font-size: 11.5px;
+    color: var(--subtext);
+}
+
+.ot-access-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--border-default);
+}
+.ot-access-row:last-child { border-bottom: none; }
+.ot-access-name { font-size: 13.5px; font-weight: 600; color: var(--heading); }
+.ot-access-sub { font-size: 11.5px; color: var(--subtext); }
+
+.ot-switch {
+    position: relative;
+    display: inline-block;
+    width: 40px;
+    height: 22px;
+    flex-shrink: 0;
+}
+.ot-switch input { opacity: 0; width: 0; height: 0; }
+.ot-switch-slider {
+    position: absolute;
+    cursor: pointer;
+    inset: 0;
+    background: #d1d5db;
+    border-radius: 22px;
+    transition: 0.2s;
+}
+.ot-switch-slider::before {
+    content: '';
+    position: absolute;
+    height: 18px;
+    width: 18px;
+    left: 2px;
+    top: 2px;
+    background: white;
+    border-radius: 50%;
+    transition: 0.2s;
+}
+.ot-switch input:checked + .ot-switch-slider { background: var(--primary); }
+.ot-switch input:checked + .ot-switch-slider::before { transform: translateX(18px); }
+
+.ot-layout {
+    display: grid;
+    grid-template-columns: 280px 1fr;
+    gap: 16px;
+    align-items: stretch;
+}
+@media (max-width: 860px) {
+    .ot-layout {
+        grid-template-columns: 1fr;
+    }
+}
+
+.ot-sidebar {
+    background: var(--surface-card, #fff);
+    border-radius: var(--radius);
+    border: 1px solid var(--border-default);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    max-height: 640px;
+}
+.ot-sidebar-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 14px 16px;
+    font-weight: 600;
+    font-size: 13.5px;
+    color: var(--heading);
+    border-bottom: 1px solid var(--border-default);
+}
+.ot-count-badge {
+    background: rgba(47, 191, 113, 0.12);
+    color: var(--success);
+    font-size: 12px;
+    font-weight: 700;
+    padding: 2px 9px;
+    border-radius: 20px;
+}
+.ot-officer-list {
+    overflow-y: auto;
+    flex: 1;
+}
+.ot-officer-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 16px;
+    cursor: pointer;
+    border-bottom: 1px solid var(--border-default);
+    transition: background 0.15s;
+}
+.ot-officer-item:hover {
+    background: rgba(31, 123, 255, 0.05);
+}
+.ot-officer-item.active {
+    background: rgba(31, 123, 255, 0.1);
+}
+.ot-officer-dot {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background: var(--success);
+    flex-shrink: 0;
+    box-shadow: 0 0 0 3px rgba(47, 191, 113, 0.18);
+}
+.ot-officer-dot.dot-moving { background: #2fbf71; box-shadow: 0 0 0 3px rgba(47, 191, 113, 0.18); }
+.ot-officer-dot.dot-stopped { background: #d97706; box-shadow: 0 0 0 3px rgba(217, 119, 6, 0.18); }
+.ot-officer-dot.dot-offline { background: #9ca3af; box-shadow: 0 0 0 3px rgba(156, 163, 175, 0.18); }
+.ot-officer-dot.dot-alert { background: #e34f4f; box-shadow: 0 0 0 3px rgba(227, 79, 79, 0.18); }
+.ot-officer-dot.dot-paused { background: #7c3aed; box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.18); }
+.ot-officer-info {
+    min-width: 0;
+}
+.ot-officer-name {
+    font-size: 13.5px;
+    font-weight: 600;
+    color: var(--heading);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.ot-officer-time {
+    font-size: 11.5px;
+    color: var(--subtext);
+}
+
+.ot-empty {
+    text-align: center;
+    padding: 40px 16px;
+    color: var(--subtext);
+    font-size: 13px;
+}
+.ot-empty i {
+    font-size: 24px;
+    margin-bottom: 10px;
+    display: block;
+    opacity: 0.5;
+}
+
+.ot-map-wrap {
+    position: relative;
+    border-radius: var(--radius);
+    overflow: hidden;
+    border: 1px solid var(--border-default);
+    min-height: 480px;
+}
+#otMap {
+    width: 100%;
+    height: 100%;
+    min-height: 480px;
+}
+.ot-map-legend {
+    position: absolute;
+    bottom: 12px;
+    left: 12px;
+    z-index: 1000;
+    background: rgba(255, 255, 255, 0.95);
+    border-radius: 8px;
+    padding: 8px 12px;
+    font-size: 12px;
+    display: flex;
+    gap: 14px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.ot-popup-name {
+    font-weight: 700;
+    margin-bottom: 2px;
+}
+.ot-popup-time {
+    font-size: 12px;
+    color: var(--subtext);
+}

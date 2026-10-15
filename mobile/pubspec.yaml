@@ -62,6 +62,9 @@ dependencies:
   url_launcher: ^6.3.1
   file_picker: ^11.0.3
 
+  # GPS for Live Tracking (foreground-only — see LocationTrackingService)
+  geolocator: ^13.0.2
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

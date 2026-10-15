@@ -5,6 +5,7 @@ import 'dart:io' show Platform;
 import 'package:flutter/foundation.dart' show kIsWeb;
 
 import '../../core/device_id.dart';
+import '../../core/location_tracking_service.dart';
 import '../../core/secure_storage.dart';
 import 'auth_api.dart';
 
@@ -123,6 +124,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }
 
   Future<void> logout() async {
+    LocationTrackingService.instance.stop();
     try {
       await AuthApi.logout();
     } catch (_) {
