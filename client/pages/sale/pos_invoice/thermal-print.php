@@ -302,15 +302,15 @@
         
         <div class="text-center invoice-header">SALE INVOICE</div>
         
-        <div class="info-row">
+        <div class="info-row" id="rowInvoiceNo">
             <span>Invoice #:</span>
             <span class="bold" id="invoiceNo">Loading...</span>
         </div>
-        <div class="info-row">
+        <div class="info-row" id="rowDate">
             <span>Date:</span>
             <span id="invoiceDate">Loading...</span>
         </div>
-        <div class="info-row">
+        <div class="info-row" id="rowCustomer">
             <span>Customer:</span>
             <span id="customerName">Loading...</span>
         </div>
@@ -318,7 +318,7 @@
             <span>Prev Balance:</span>
             <span id="previousBalance">0.00</span>
         </div>
-        <div class="info-row">
+        <div class="info-row" id="rowBranch">
             <span>Branch:</span>
             <span id="branchName">Loading...</span>
         </div>
@@ -348,7 +348,7 @@
         
         <div class="divider"></div>
         
-        <div class="total-row">
+        <div class="total-row" id="rowSubtotal">
             <span>Subtotal:</span>
             <span id="totalBill">0.00</span>
         </div>
@@ -360,19 +360,19 @@
             <span>GST:</span>
             <span id="gstAmount">0.00</span>
         </div>
-        <div class="total-row grand-total">
+        <div class="total-row grand-total" id="rowTotal">
             <span>TOTAL:</span>
             <span id="netAmount">0.00</span>
         </div>
-        <div class="total-row">
+        <div class="total-row" id="rowReceived">
             <span>Received:</span>
             <span id="amountPaid">0.00</span>
         </div>
-        <div class="total-row">
+        <div class="total-row" id="rowReturned">
             <span>Returned:</span>
             <span id="amountReturned">0.00</span>
         </div>
-        <div class="total-row">
+        <div class="total-row" id="rowBalance">
             <span>Balance:</span>
             <span id="remainingBalance">0.00</span>
         </div>
@@ -384,14 +384,14 @@
         <div class="divider"></div>
         
         <div class="footer text-center">
-            <div>Payment Method: <span id="paymentMethod">-</span></div>
-            <div style="margin-top: 5px;">Thank you for your business!</div>
+            <div id="rowPaymentMethod">Payment Method: <span id="paymentMethod">-</span></div>
+            <div id="rowThankYou" style="margin-top: 5px;">Thank you for your business!</div>
             <div style="margin-top: 8px; font-size: 10px; display: none;">Printed By: <span id="printedBy">-</span></div>
-            <div style="font-size: 10px;">Printed: <span id="printedDate"></span></div>
+            <div id="rowPrintedDate" style="font-size: 10px;">Printed: <span id="printedDate"></span></div>
             <div id="qrCodeSection" style="margin-top: 8px; display: none;">
                 <div id="qrCode" style="display: inline-block;"></div>
             </div>
-            <div style="margin-top: 10px; border-top: 1px dashed #000; padding-top: 8px; font-size: 10px; line-height: 1.6;">
+            <div id="rowSoftwareBy" style="margin-top: 10px; border-top: 1px dashed #000; padding-top: 8px; font-size: 10px; line-height: 1.6;">
                 <div style="font-weight: bold;">Software by: UNISEN SYSTEMS</div>
                 <div>Contact: +92 346 8918711</div>
                 <!-- <div>+92 335 3789981</div> -->
@@ -452,6 +452,59 @@
                 return originalRemoveItem(sharedKeys.has(key) ? prefix + key : key);
             };
         })();
+
+        // ===================== CUSTOMIZE PRINT (set from counter-invoice.php) =====================
+        // 'counterPrintCustomize' is NOT in sharedKeys above, so it is read un-prefixed,
+        // exactly the same key counter-invoice.php saves. Value = { key: true/false }, false = hide.
+        // Keys must match PRINT_GROUPS in counter-invoice.php.
+        const PRINT_MAP = {
+            logo:           '.company-logo',
+            companyName:    '#companyName',
+            companyAddress: '#companyAddress',
+            companyPhone:   '#companyPhone',
+            invoiceTitle:   '.invoice-header',
+            invoiceNo:      '#rowInvoiceNo',
+            date:           '#rowDate',
+            customer:       '#rowCustomer',
+            prevBalance:    '#previousBalanceRow',
+            branch:         '#rowBranch',
+            supplierMan:    '#supplierManRow',
+            discCol:        '.disc-col',
+            totalsRow:      '.totals-row',
+            subtotal:       '#rowSubtotal',
+            discount:       '#discountRow',
+            gst:            '#gstRow',
+            total:          '#rowTotal',
+            received:       '#rowReceived',
+            returned:       '#rowReturned',
+            balance:        '#rowBalance',
+            paymentMethod:  '#rowPaymentMethod',
+            thankYou:       '#rowThankYou',
+            brandNote:      '#notesSection',
+            qr:             '#qrCodeSection',
+            printedDate:    '#rowPrintedDate',
+            softwareBy:     '#rowSoftwareBy'
+        };
+
+        // CSS based hiding: also works for elements that are created later
+        // (logo, items table totals row, QR code, brand note).
+        (function applyPrintCustomization() {
+            let saved = {};
+            try { saved = JSON.parse(localStorage.getItem('counterPrintCustomize') || '{}') || {}; } catch (e) { saved = {}; }
+
+            const selectors = [];
+            Object.keys(PRINT_MAP).forEach(key => {
+                if (saved[key] === false) selectors.push(PRINT_MAP[key]);
+            });
+
+            if (selectors.length > 0) {
+                const style = document.createElement('style');
+                style.id = 'printCustomizeStyle';
+                style.textContent = selectors.join(',\n') + ' { display: none !important; }';
+                document.head.appendChild(style);
+            }
+        })();
+        // =========================================================================================
 
         // Apply invoice settings
         const enableCashDiscountAmount = localStorage.getItem('enableCashDiscountAmount') === 'true';
@@ -638,6 +691,7 @@
             
             // Add totals row
             const totalsRow = tbody.insertRow();
+            totalsRow.className = 'totals-row';
             totalsRow.style.borderTop = '2px solid #000';
             totalsRow.style.fontWeight = 'bold';
             

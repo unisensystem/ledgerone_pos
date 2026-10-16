@@ -901,6 +901,52 @@ $user_employee_id = $user['employee_id'] ?? null;
             background: var(--surface-1) !important;
         }
 
+        /* Customize Print modal */
+        .pc-group-title {
+            font-size: 12px;
+            font-weight: 700;
+            color: #1F7BFF;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin: 14px 0 6px;
+            padding-bottom: 4px;
+            border-bottom: 1px solid #E1E6EE;
+        }
+
+        .pc-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 6px 16px;
+        }
+
+        .pc-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+            padding: 4px 6px;
+            border-radius: 4px;
+            color: #0E1A2B;
+            font-size: 13px;
+        }
+
+        .pc-item:hover {
+            background: #F7F9FC;
+        }
+
+        .pc-item input {
+            width: auto !important;
+            height: auto !important;
+            margin: 0;
+            cursor: pointer;
+        }
+
+        .pc-item span {
+            font-size: 13px !important;
+            font-weight: 500 !important;
+            color: #0E1A2B !important;
+        }
+
         /* Scrollbar Styling */
         ::-webkit-scrollbar {
             width: 6px;
@@ -1232,6 +1278,9 @@ $user_employee_id = $user['employee_id'] ?? null;
                 <button class="btn btn-secondary" id="draftsBtn">
                     <i class="fas fa-history"></i> DRAFT INVOICES
                 </button>
+                <button class="btn btn-secondary" id="customizePrintBtn" type="button">
+                    <i class="fas fa-sliders-h"></i> CUSTOMIZE PRINT
+                </button>
                 <button class="btn btn-danger">
                     <i class="fas fa-times"></i> CANCEL
                 </button>
@@ -1297,6 +1346,28 @@ $user_employee_id = $user['employee_id'] ?? null;
                 <button class="btn btn-secondary" id="resetShortcutsBtn">Reset to Default</button>
                 <button class="btn btn-secondary" id="closeShortcutSettingsBtn">Close</button>
                 <button class="btn btn-primary" id="saveShortcutSettingsBtn">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Customize Print Modal -->
+    <div class="modal" id="customizePrintModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 10000; align-items: center; justify-content: center;">
+        <div class="modal-content" style="background: white; padding: 24px; border-radius: 8px; max-width: 640px; width: 90%; max-height: 85vh; overflow-y: auto;">
+            <h3 style="margin-bottom: 4px; color: #0E1A2B;">Customize Print</h3>
+            <div style="font-size: 12px; color: #6B7280; margin-bottom: 4px;">
+                Tick = receipt par dikhega, Untick = receipt se hide hoga. Save ke baad thermal print me apply ho jayega.
+            </div>
+            <div id="customizePrintBody"></div>
+            <div style="margin-top: 18px; display: flex; gap: 8px; justify-content: space-between; flex-wrap: wrap;">
+                <div style="display: flex; gap: 8px;">
+                    <button class="btn btn-secondary" id="pcSelectAllBtn" type="button">Show All</button>
+                    <button class="btn btn-secondary" id="pcHideAllBtn" type="button">Hide All</button>
+                    <button class="btn btn-secondary" id="pcResetBtn" type="button">Reset to Default</button>
+                </div>
+                <div style="display: flex; gap: 8px;">
+                    <button class="btn btn-secondary" id="pcCloseBtn" type="button">Close</button>
+                    <button class="btn btn-primary" id="pcSaveBtn" type="button">Save</button>
+                </div>
             </div>
         </div>
     </div>
@@ -1542,6 +1613,158 @@ $user_employee_id = $user['employee_id'] ?? null;
             }, 200);
 
 
+    </script>
+
+    <!-- ===================== CUSTOMIZE PRINT ===================== -->
+    <script>
+        (function () {
+            // localStorage key - thermal-print.php reads the SAME key
+            const STORAGE_KEY = 'counterPrintCustomize';
+
+            // key = thermal-print.php ke PRINT_MAP ki key. Dono jagah same honi chahiye.
+            const PRINT_GROUPS = [
+                {
+                    title: 'Header (Company)',
+                    items: [
+                        { key: 'logo',           label: 'Company Logo' },
+                        { key: 'companyName',    label: 'Company Name' },
+                        { key: 'companyAddress', label: 'Company Address' },
+                        { key: 'companyPhone',   label: 'Company Phone' },
+                        { key: 'invoiceTitle',   label: '"SALE INVOICE" Heading' }
+                    ]
+                },
+                {
+                    title: 'Invoice Info',
+                    items: [
+                        { key: 'invoiceNo',   label: 'Invoice No' },
+                        { key: 'date',        label: 'Date' },
+                        { key: 'customer',    label: 'Customer Name' },
+                        { key: 'prevBalance', label: 'Previous Balance' },
+                        { key: 'branch',      label: 'Branch' },
+                        { key: 'supplierMan', label: 'Supplier Man' }
+                    ]
+                },
+                {
+                    title: 'Items Table',
+                    items: [
+                        { key: 'discCol',   label: 'Discount Column' },
+                        { key: 'totalsRow', label: 'TOTALS Row (Qty / Amount)' }
+                    ]
+                },
+                {
+                    title: 'Amounts',
+                    items: [
+                        { key: 'subtotal', label: 'Subtotal' },
+                        { key: 'discount', label: 'Discount' },
+                        { key: 'gst',      label: 'GST' },
+                        { key: 'total',    label: 'TOTAL (Net Amount)' },
+                        { key: 'received', label: 'Received' },
+                        { key: 'returned', label: 'Returned' },
+                        { key: 'balance',  label: 'Balance' }
+                    ]
+                },
+                {
+                    title: 'Footer',
+                    items: [
+                        { key: 'paymentMethod', label: 'Payment Method' },
+                        { key: 'thankYou',      label: '"Thank you for your business!"' },
+                        { key: 'brandNote',     label: 'Brand Note' },
+                        { key: 'qr',            label: 'QR Code' },
+                        { key: 'printedDate',   label: 'Printed Date/Time' },
+                    ]
+                }
+            ];
+
+            function allKeys() {
+                const keys = [];
+                PRINT_GROUPS.forEach(g => g.items.forEach(i => keys.push(i.key)));
+                return keys;
+            }
+
+            function loadSettings() {
+                let saved = {};
+                try { saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}') || {}; } catch (e) { saved = {}; }
+                const result = {};
+                allKeys().forEach(k => { result[k] = saved[k] === false ? false : true; }); // default = show
+                return result;
+            }
+
+            function renderChecklist() {
+                const settings = loadSettings();
+                const body = document.getElementById('customizePrintBody');
+                body.innerHTML = '';
+
+                PRINT_GROUPS.forEach(group => {
+                    const title = document.createElement('div');
+                    title.className = 'pc-group-title';
+                    title.textContent = group.title;
+                    body.appendChild(title);
+
+                    const grid = document.createElement('div');
+                    grid.className = 'pc-grid';
+
+                    group.items.forEach(item => {
+                        const label = document.createElement('label');
+                        label.className = 'pc-item';
+
+                        const cb = document.createElement('input');
+                        cb.type = 'checkbox';
+                        cb.dataset.key = item.key;
+                        cb.checked = settings[item.key];
+
+                        const span = document.createElement('span');
+                        span.textContent = item.label;
+
+                        label.appendChild(cb);
+                        label.appendChild(span);
+                        grid.appendChild(label);
+                    });
+
+                    body.appendChild(grid);
+                });
+            }
+
+            function setAll(value) {
+                document.querySelectorAll('#customizePrintBody input[type="checkbox"]').forEach(cb => { cb.checked = value; });
+            }
+
+            function openModal() {
+                renderChecklist();
+                document.getElementById('customizePrintModal').style.display = 'flex';
+            }
+
+            function closeModal() {
+                document.getElementById('customizePrintModal').style.display = 'none';
+            }
+
+            function saveSettings() {
+                const settings = {};
+                document.querySelectorAll('#customizePrintBody input[type="checkbox"]').forEach(cb => {
+                    settings[cb.dataset.key] = cb.checked;
+                });
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
+                closeModal();
+                if (typeof showNotification === 'function') {
+                    showNotification('Print settings saved!');
+                } else {
+                    alert('Print settings saved!');
+                }
+            }
+
+            document.addEventListener('DOMContentLoaded', function () {
+                document.getElementById('customizePrintBtn').addEventListener('click', openModal);
+                document.getElementById('pcCloseBtn').addEventListener('click', closeModal);
+                document.getElementById('pcSaveBtn').addEventListener('click', saveSettings);
+                document.getElementById('pcSelectAllBtn').addEventListener('click', function () { setAll(true); });
+                document.getElementById('pcHideAllBtn').addEventListener('click', function () { setAll(false); });
+                document.getElementById('pcResetBtn').addEventListener('click', function () { setAll(true); });
+
+                // Click outside the box closes the modal
+                document.getElementById('customizePrintModal').addEventListener('click', function (e) {
+                    if (e.target === this) closeModal();
+                });
+            });
+        })();
     </script>
 </body>
 
