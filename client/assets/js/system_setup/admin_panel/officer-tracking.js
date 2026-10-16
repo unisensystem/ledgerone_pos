@@ -10,6 +10,22 @@
 const OT_API_BASE = '../../../../server/api/system_setup/admin_panel/';
 const OT_POLL_MS = 30000;
 
+// Same tenant timezone the dashboard clock uses (companies.timezone, via
+// get_company_info.php) — every timestamp this page shows is converted
+// through this, not the viewing device's own OS timezone, so a
+// Karachi-based tenant's "today"/times stay correct even if an admin
+// happens to be viewing from a phone set to a different timezone.
+let otTenantTimezone = 'UTC';
+async function loadTenantTimezone() {
+    try {
+        const res = await fetch('../../../../server/api/get_company_info.php');
+        const data = await res.json();
+        if (data.timezone) otTenantTimezone = data.timezone;
+    } catch (e) {
+        console.error('Failed to load tenant timezone, defaulting to UTC', e);
+    }
+}
+
 const OT_STATUS_LABELS = {
     moving: 'Moving',
     stopped: 'Stopped',
@@ -28,8 +44,9 @@ let otRouteMarkers = [];
 let otSelectedUserId = null;
 let otOfficers = [];
 
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
     initMap();
+    await loadTenantTimezone();
     loadLiveLocations();
     setInterval(loadLiveLocations, OT_POLL_MS);
 
@@ -184,7 +201,7 @@ async function selectOfficer(userId) {
     otSelectedUserId = userId;
     renderOfficerList();
 
-    const today = new Date().toISOString().slice(0, 10);
+    const today = otTenantTodayDate();
     try {
         const res = await fetch(`${OT_API_BASE}get-officer-route.php?user_id=${userId}&date=${today}`);
         const data = await res.json();
@@ -299,8 +316,8 @@ async function loadAccessList() {
 // ===== History Report tab =====
 
 function initReportTab() {
-    const today = new Date().toISOString().slice(0, 10);
-    const weekAgo = new Date(Date.now() - 6 * 86400000).toISOString().slice(0, 10);
+    const today = otTenantTodayDate();
+    const weekAgo = otDaysAgoDate(today, 6);
     document.getElementById('otReportFrom').value = weekAgo;
     document.getElementById('otReportTo').value = today;
 
@@ -368,11 +385,32 @@ async function loadReport() {
 
 // ===== Helpers =====
 
-function formatTime(isoLike) {
-    if (!isoLike) return '—';
-    const d = new Date(isoLike.replace(' ', 'T'));
-    if (isNaN(d.getTime())) return isoLike;
-    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+/** Today's date (YYYY-MM-DD) in the tenant's own timezone — NOT
+ * `new Date().toISOString()`, which is always UTC and can land on the
+ * wrong calendar day for a tenant whose business day has already
+ * started/ended relative to UTC. en-CA formats as YYYY-MM-DD directly. */
+function otTenantTodayDate() {
+    return new Date().toLocaleDateString('en-CA', { timeZone: otTenantTimezone });
+}
+
+/** [dateStr] minus [days] days, as YYYY-MM-DD. Pure calendar-day
+ * arithmetic anchored to UTC midnight — safe regardless of timezone since
+ * no conversion happens, just subtracting whole days. */
+function otDaysAgoDate(dateStr, days) {
+    const d = new Date(dateStr + 'T00:00:00Z');
+    d.setUTCDate(d.getUTCDate() - days);
+    return d.toISOString().slice(0, 10);
+}
+
+function formatTime(isoUtc) {
+    if (!isoUtc) return '—';
+    const d = new Date(isoUtc);
+    if (isNaN(d.getTime())) return isoUtc;
+    return d.toLocaleTimeString('en-US', {
+        timeZone: otTenantTimezone,
+        hour: '2-digit',
+        minute: '2-digit',
+    });
 }
 
 function escapeHtml(str) {

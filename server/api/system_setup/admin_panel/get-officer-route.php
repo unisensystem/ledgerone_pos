@@ -49,14 +49,39 @@ function otDistanceMeters($lat1, $lon1, $lat2, $lon2)
     return $earthRadius * 2 * atan2(sqrt($a), sqrt(1 - $a));
 }
 
+/** Same tenant timezone the dashboard clock uses — see get-live-locations.php. */
+function otTenantTimezone($pdo, $tenantId)
+{
+    $stmt = $pdo->prepare("SELECT timezone FROM companies WHERE tenant_id = ? AND is_active = 1 LIMIT 1");
+    $stmt->execute([$tenantId]);
+    $tz = $stmt->fetchColumn();
+    return $tz ?: 'UTC';
+}
+
+function otToIso($mysqlDateTime)
+{
+    return $mysqlDateTime ? str_replace(' ', 'T', $mysqlDateTime) . 'Z' : null;
+}
+
 try {
+    $tenantTz = new DateTimeZone(otTenantTimezone($pdo, $tenant_id));
+    $utc = new DateTimeZone('UTC');
+
+    // Convert the requested tenant-calendar date into a UTC range —
+    // `DATE(recorded_at) = ?` would compare against the DB server's own
+    // system date instead of the tenant's (see get-live-locations.php's
+    // doc comment for why that's wrong on the production VPS).
+    $dayStart = new DateTime($date, $tenantTz);
+    $dayStart->setTimezone($utc);
+    $dayEnd = (clone $dayStart)->modify('+1 day');
+
     $stmt = $pdo->prepare("
         SELECT latitude, longitude, accuracy_meters, recorded_at
         FROM officer_location_pings
-        WHERE tenant_id = ? AND user_id = ? AND DATE(recorded_at) = ?
+        WHERE tenant_id = ? AND user_id = ? AND recorded_at >= ? AND recorded_at < ?
         ORDER BY recorded_at ASC
     ");
-    $stmt->execute([$tenant_id, $officerUserId, $date]);
+    $stmt->execute([$tenant_id, $officerUserId, $dayStart->format('Y-m-d H:i:s'), $dayEnd->format('Y-m-d H:i:s')]);
     $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
     $data = array_map(function ($row) {
@@ -64,7 +89,7 @@ try {
             'latitude' => (float) $row['latitude'],
             'longitude' => (float) $row['longitude'],
             'accuracy_meters' => $row['accuracy_meters'] !== null ? (float) $row['accuracy_meters'] : null,
-            'recorded_at' => $row['recorded_at'],
+            'recorded_at' => otToIso($row['recorded_at']),
         ];
     }, $rows);
 
@@ -92,8 +117,8 @@ try {
         'summary' => [
             'distance_km' => round($distanceMeters / 1000, 2),
             'stops' => $stops,
-            'first_seen' => $rows[0]['recorded_at'] ?? null,
-            'last_seen' => $rows[count($rows) - 1]['recorded_at'] ?? null,
+            'first_seen' => otToIso($rows[0]['recorded_at'] ?? null),
+            'last_seen' => otToIso($rows[count($rows) - 1]['recorded_at'] ?? null),
         ],
     ]);
 } catch (Exception $e) {

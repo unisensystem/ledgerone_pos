@@ -1249,7 +1249,16 @@ function initializePage(permissions) {
                     const option = document.createElement('div');
                     option.className = 'dropdown-option';
                     option.setAttribute('data-value', order.id);
-                    option.textContent = order.bill_no;
+                    // "date - number - salesman - customer" so this is
+                    // actually searchable by any of those, not just the
+                    // bill number — the saved value is still just order.id.
+                    const parts = [
+                        order.sale_date || '',
+                        order.bill_no,
+                        order.sale_officer_name || '—',
+                        order.customer_name,
+                    ];
+                    option.textContent = parts.join(' - ');
                     fragment.appendChild(option);
                 });
                 saleOrderOptions.appendChild(fragment);
@@ -1742,8 +1751,11 @@ if (dueDateEl) dueDateEl.value = invoice.due_date || '';
                 const childItems = data.items.filter(item => item.parent_row_id);
                 const itemIdToRowMap = {};
 
-                // Populate parent items
-                parentItems.forEach(item => {
+                // Populate parent items. A plain .forEach can't await, and
+                // loadProductStock below needs to — for...of runs each
+                // iteration's awaits in order instead of firing them all
+                // concurrently.
+                for (const item of parentItems) {
                     addRowDynamic();
                     const lastRow = itemsTable.rows[itemsTable.rows.length - 1];
                     itemIdToRowMap[item.id] = lastRow;
@@ -1773,7 +1785,19 @@ if (dueDateEl) dueDateEl.value = invoice.due_date || '';
 
                     // Show variants button if has children
                     checkAndShowVariantsButton(lastRow, item.product_id);
-                });
+
+                    // Sale orders don't carry a batch — unlike editing an
+                    // already-posted invoice (which restores what was
+                    // actually sold), creating an invoice FROM an order is
+                    // still picking stock fresh, so this matches the normal
+                    // manual "pick a product" flow: run the same stock
+                    // check (red highlight if the order's quantity exceeds
+                    // what's on hand). This module has no batch/expiry
+                    // columns, so there's no loadProductBatches call here.
+                    if (typeof loadProductStock === 'function') {
+                        await loadProductStock(item.product_id);
+                    }
+                }
 
                 // Store child items in parent dataset
                 childItems.forEach(child => {

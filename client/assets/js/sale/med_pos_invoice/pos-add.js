@@ -1384,7 +1384,16 @@ const invoiceSettingCheckboxes = [
                     const option = document.createElement('div');
                     option.className = 'dropdown-option';
                     option.setAttribute('data-value', order.id);
-                    option.textContent = order.bill_no;
+                    // "date - number - salesman - customer" so this is
+                    // actually searchable by any of those, not just the
+                    // bill number — the saved value is still just order.id.
+                    const parts = [
+                        order.sale_date || '',
+                        order.bill_no,
+                        order.sale_officer_name || '—',
+                        order.customer_name,
+                    ];
+                    option.textContent = parts.join(' - ');
                     fragment.appendChild(option);
                 });
                 saleOrderOptions.appendChild(fragment);
@@ -2099,6 +2108,27 @@ data.items.forEach(item => {
                             const unitInput = lastRow.querySelector(`.unit-input[data-unit-id="${unit.uom_id}"]`);
                             if (unitInput) unitInput.value = unit.quantity;
                         });
+
+                        // Sale orders don't carry a batch — unlike editing an
+                        // already-posted invoice (which restores the batch
+                        // actually sold), creating an invoice FROM an order
+                        // is still picking stock fresh, so this matches the
+                        // normal manual "pick a product" flow: auto-select
+                        // the best available batch, fill Expiry Date, and
+                        // run the same stock check (red highlight if the
+                        // order's quantity exceeds what's on hand). Same
+                        // call order the manual pick uses — loadProductStock
+                        // is what builds the #requiredQtyDisplay element
+                        // validateStockForRow needs to actually render the
+                        // red highlight, so it must run even though its own
+                        // shared single-row panel will just end up showing
+                        // whichever item in this order was processed last.
+                        if (typeof loadProductBatches === 'function') {
+                            await loadProductBatches(lastRow, item.product_id);
+                        }
+                        if (typeof loadProductStock === 'function') {
+                            await loadProductStock(item.product_id);
+                        }
                     }
 
                     const priceInput = lastRow.querySelector('.price-cell input');

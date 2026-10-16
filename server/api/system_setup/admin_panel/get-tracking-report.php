@@ -48,15 +48,42 @@ function otrDistanceMeters($lat1, $lon1, $lat2, $lon2)
     return $earthRadius * 2 * atan2(sqrt($a), sqrt(1 - $a));
 }
 
+/** Same tenant timezone the dashboard clock uses — see get-live-locations.php. */
+function otrTenantTimezone($pdo, $tenantId)
+{
+    $stmt = $pdo->prepare("SELECT timezone FROM companies WHERE tenant_id = ? AND is_active = 1 LIMIT 1");
+    $stmt->execute([$tenantId]);
+    $tz = $stmt->fetchColumn();
+    return $tz ?: 'UTC';
+}
+
+function otrToIso($mysqlDateTime)
+{
+    return $mysqlDateTime ? str_replace(' ', 'T', $mysqlDateTime) . 'Z' : null;
+}
+
 try {
+    $tenantTz = new DateTimeZone(otrTenantTimezone($pdo, $tenant_id));
+    $utc = new DateTimeZone('UTC');
+
+    // Convert the requested tenant-calendar date range into a UTC bound —
+    // `DATE(p.recorded_at) BETWEEN ? AND ?` would compare against the DB
+    // server's own system date (UTC on the production VPS), not the
+    // tenant's, which both shifts which pings are included near midnight
+    // and — more visibly — mis-groups them into the wrong calendar day.
+    $rangeStart = new DateTime($fromDate, $tenantTz);
+    $rangeStart->setTimezone($utc);
+    $rangeEnd = new DateTime($toDate, $tenantTz);
+    $rangeEnd->modify('+1 day');
+    $rangeEnd->setTimezone($utc);
+
     $sql = "
-        SELECT p.user_id, u.full_name, u.email, DATE(p.recorded_at) AS ping_date,
-               p.latitude, p.longitude, p.recorded_at
+        SELECT p.user_id, u.full_name, u.email, p.latitude, p.longitude, p.recorded_at
         FROM officer_location_pings p
         LEFT JOIN users u ON u.id = p.user_id AND u.tenant_id = p.tenant_id
-        WHERE p.tenant_id = ? AND DATE(p.recorded_at) BETWEEN ? AND ?
+        WHERE p.tenant_id = ? AND p.recorded_at >= ? AND p.recorded_at < ?
     ";
-    $params = [$tenant_id, $fromDate, $toDate];
+    $params = [$tenant_id, $rangeStart->format('Y-m-d H:i:s'), $rangeEnd->format('Y-m-d H:i:s')];
     if ($filterUserId) {
         $sql .= " AND p.user_id = ?";
         $params[] = $filterUserId;
@@ -67,16 +94,23 @@ try {
     $stmt->execute($params);
     $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-    // Group by user + day, computing distance/stops the same way the
-    // single-officer route view does, just once per (user, date) bucket.
+    // Group by user + tenant-calendar day, computing distance/stops the
+    // same way the single-officer route view does, just once per
+    // (user, date) bucket. The day each ping belongs to is derived by
+    // converting its UTC recorded_at into the tenant's own timezone —
+    // not a SQL DATE(), for the same reason as the query bound above.
     $groups = [];
     foreach ($rows as $row) {
-        $key = $row['user_id'] . '|' . $row['ping_date'];
+        $recordedAtUtc = new DateTime($row['recorded_at'], $utc);
+        $recordedAtUtc->setTimezone($tenantTz);
+        $pingDate = $recordedAtUtc->format('Y-m-d');
+
+        $key = $row['user_id'] . '|' . $pingDate;
         if (!isset($groups[$key])) {
             $groups[$key] = [
                 'user_id' => (int) $row['user_id'],
                 'name' => $row['full_name'] ?: $row['email'],
-                'date' => $row['ping_date'],
+                'date' => $pingDate,
                 'points' => [],
             ];
         }
@@ -106,8 +140,8 @@ try {
             'date' => $g['date'],
             'distance_km' => round($distanceMeters / 1000, 2),
             'stops' => $stops,
-            'first_seen' => $points[0]['at'],
-            'last_seen' => $points[count($points) - 1]['at'],
+            'first_seen' => otrToIso($points[0]['at']),
+            'last_seen' => otrToIso($points[count($points) - 1]['at']),
             'ping_count' => count($points),
         ];
     }

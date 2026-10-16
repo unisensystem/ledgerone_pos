@@ -62,7 +62,7 @@ try {
             exit;
         }
         $pdo->prepare(
-            "UPDATE officer_tracking_settings SET last_status = ?, last_status_at = NOW() WHERE tenant_id = ? AND user_id = ?"
+            "UPDATE officer_tracking_settings SET last_status = ?, last_status_at = UTC_TIMESTAMP() WHERE tenant_id = ? AND user_id = ?"
         )->execute([$status, $tenantId, $userId]);
 
         echo json_encode(['success' => true]);
@@ -79,9 +79,15 @@ try {
         exit;
     }
 
+    // UTC_TIMESTAMP(), not NOW() — NOW() follows the DB server's own system
+    // timezone, which differs between local dev (PKT) and the production
+    // VPS (UTC). Storing a deterministic UTC value here means every reader
+    // of recorded_at can convert it the same way regardless of where it
+    // was written from (see get-live-locations.php / get-officer-route.php
+    // / get-tracking-report.php's tenant-timezone conversion on the way out).
     $stmt = $pdo->prepare(
         "INSERT INTO officer_location_pings (tenant_id, user_id, latitude, longitude, accuracy_meters, recorded_at)
-         VALUES (?, ?, ?, ?, ?, NOW())"
+         VALUES (?, ?, ?, ?, ?, UTC_TIMESTAMP())"
     );
     $stmt->execute([$tenantId, $userId, $latitude, $longitude, $accuracy]);
 
@@ -90,6 +96,19 @@ try {
     $pdo->prepare(
         "UPDATE officer_tracking_settings SET last_status = NULL, last_status_at = NULL WHERE tenant_id = ? AND user_id = ?"
     )->execute([$tenantId, $userId]);
+
+    // Self-trimming retention: with a bulk ping writer and no cron/scheduled
+    // task runner anywhere in this project's deployment (everything is
+    // plain git push -> VM), the simplest way to keep this table from
+    // growing forever is to piggyback a cheap cleanup on a small fraction
+    // of writes rather than requiring a separate job. ~1 in 300 pings is
+    // often enough per active tenant (every ~2.5 hours at the normal 30s
+    // interval) without adding a DELETE to every single request.
+    if (random_int(1, 300) === 1) {
+        $pdo->prepare(
+            "DELETE FROM officer_location_pings WHERE tenant_id = ? AND recorded_at < UTC_TIMESTAMP() - INTERVAL 90 DAY"
+        )->execute([$tenantId]);
+    }
 
     echo json_encode(['success' => true]);
 } catch (Exception $e) {
