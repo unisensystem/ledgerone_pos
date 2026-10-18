@@ -414,8 +414,8 @@ function convertToWebP($source_path, $destination_path, $source_ext) {
             $image = imagecreatefromjpeg($source_path);
             break;
         case 'png':
-            $image = imagecreatefrompng($source_path);
-            break;
+    $image = @imagecreatefrompng($source_path);
+    break;
         case 'gif':
             $image = imagecreatefromgif($source_path);
             break;
