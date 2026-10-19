@@ -90,6 +90,10 @@ try {
             echo json_encode(['success' => false, 'message' => $photo_result['message']]);
             exit;
         }
+    } elseif (isset($_FILES['photo']) && $_FILES['photo']['error'] !== UPLOAD_ERR_NO_FILE) {
+        // e.g. file bigger than php.ini upload_max_filesize / post_max_size
+        echo json_encode(['success' => false, 'message' => 'Photo upload failed (server upload limit). Please try a smaller file.']);
+        exit;
     }
     
     // Validate required fields
@@ -364,13 +368,12 @@ try {
 }
 
 function handlePhotoUpload($file) {
-    $allowed_types = ['png', 'jpg', 'jpeg', 'gif', 'pdf', 'webp', 'avif'];
-    $max_size = 5 * 1024 * 1024; // 5MB
-    
-    if ($file['size'] > $max_size) {
-        return ['success' => false, 'message' => 'File size exceeds 5MB limit'];
-    }
-    
+    $allowed_types = ['png', 'jpg', 'jpeg', 'jfif', 'jpe', 'gif', 'pdf', 'webp', 'avif', 'bmp'];
+    // No file size limit here — any image size is accepted. Large images are
+    // decoded by GD, which needs memory, so allow more for this request.
+    @ini_set('memory_limit', '512M');
+    @set_time_limit(120);
+
     $file_ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
     
     if (!in_array($file_ext, $allowed_types)) {
@@ -411,7 +414,14 @@ function convertToWebP($source_path, $destination_path, $source_ext) {
     switch ($source_ext) {
         case 'jpg':
         case 'jpeg':
+        case 'jfif': // .jfif is just a JPEG
+        case 'jpe':
             $image = imagecreatefromjpeg($source_path);
+            break;
+        case 'bmp':
+            if (function_exists('imagecreatefrombmp')) {
+                $image = imagecreatefrombmp($source_path);
+            }
             break;
         case 'png':
     $image = @imagecreatefrompng($source_path);

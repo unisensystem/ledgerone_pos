@@ -3,9 +3,6 @@ require_once '../../../../includes/connection.php';
 require_once '../../../../includes/activity-logger.php';
 
 header('Content-Type: application/json');
-header('Access-Control-Allow-Origin: *');
-header('Access-Control-Allow-Methods: POST, GET');
-header('Access-Control-Allow-Headers: Content-Type');
 
 session_start();
 $user_id = $_SESSION['user_id'] ?? null;
@@ -17,232 +14,190 @@ if (!$user_id || !$tenant_id) {
     exit;
 }
 
-function convertToWebP($sourcePath, $targetPath) {
-    $imageInfo = getimagesize($sourcePath);
-    $mimeType = $imageInfo['mime'];
-    
-    switch ($mimeType) {
-        case 'image/jpeg':
-            $image = imagecreatefromjpeg($sourcePath);
-            break;
-        case 'image/png':
-            $image = imagecreatefrompng($sourcePath);
-            break;
-        case 'image/gif':
-            $image = imagecreatefromgif($sourcePath);
-            break;
-        default:
-            return false;
+// ---------- GET: load one company ----------
+if ($_SERVER['REQUEST_METHOD'] === 'GET') {
+    $id = (int) ($_GET['id'] ?? 0);
+    $stmt = $pdo->prepare("SELECT * FROM companies WHERE id = ? AND tenant_id = ?");
+    $stmt->execute([$id, $tenant_id]);
+    $company = $stmt->fetch(PDO::FETCH_ASSOC);
+    if (!$company) {
+        http_response_code(404);
+        echo json_encode(['success' => false, 'message' => 'Company not found']);
+        exit;
     }
-    
+    echo json_encode(['success' => true, 'company' => $company]);
+    exit;
+}
+
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    http_response_code(405);
+    echo json_encode(['success' => false, 'message' => 'Method not allowed']);
+    exit;
+}
+
+// ---------- POST: update ----------
+function normalizeCompanyNameWords($name) {
+    $words = preg_split('/[^a-z0-9]+/', strtolower($name), -1, PREG_SPLIT_NO_EMPTY);
+    $stopwords = ['the', 'and', 'of', 'co', 'company', 'corp', 'corporation', 'inc',
+        'incorporated', 'ltd', 'limited', 'pvt', 'private', 'llc', 'llp', 'plc'];
+    return array_values(array_diff($words, $stopwords));
+}
+
+function companyNameSimilarity($a, $b) {
+    $w1 = normalizeCompanyNameWords($a);
+    $w2 = normalizeCompanyNameWords($b);
+    $smaller = min(count($w1), count($w2));
+    if ($smaller === 0) return 0;
+    return count(array_intersect($w1, $w2)) / $smaller;
+}
+
+function convertToWebP($sourcePath, $targetPath) {
+    $info = getimagesize($sourcePath);
+    if (!$info) return false;
+    switch ($info['mime']) {
+        case 'image/jpeg': $image = imagecreatefromjpeg($sourcePath); break;
+        case 'image/png':  $image = imagecreatefrompng($sourcePath); break;
+        case 'image/gif':  $image = imagecreatefromgif($sourcePath); break;
+        default: return false;
+    }
     if ($image) {
-        $result = imagewebp($image, $targetPath, 80);
+        $ok = imagewebp($image, $targetPath, 80);
         imagedestroy($image);
-        return $result;
+        return $ok;
     }
     return false;
 }
 
 $uploadDir = '../../../../client/assets/uploads/company_logo/';
+$allowedBT = ['restaurant', 'bakery', 'karyana', 'general', 'medical', 'mall'];
+$newLogo = null;
 
 try {
-    if ($_SERVER['REQUEST_METHOD'] === 'GET') {
-        // Get company by ID
-        $id = $_GET['id'] ?? null;
-        if (!$id) {
-            http_response_code(400);
-            echo json_encode(['success' => false, 'message' => 'Company ID required']);
-            exit;
-        }
-        
-        $stmt = $pdo->prepare("SELECT * FROM companies WHERE id = ? AND tenant_id = ?");
-        $stmt->execute([$id, $tenant_id]);
-        $company = $stmt->fetch(PDO::FETCH_ASSOC);
-        
-        if (!$company) {
-            http_response_code(404);
-            echo json_encode(['success' => false, 'message' => 'Company not found']);
-            exit;
-        }
-        
-        echo json_encode(['success' => true, 'company' => $company]);
-        
-    } elseif ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['id'])) {
-        // Update company with file upload support
-        $id = $_POST['id'] ?? null;
-        
-        if (!$id || empty($_POST['company_name'])) {
-            http_response_code(400);
-            echo json_encode(['success' => false, 'message' => 'Company ID and name are required']);
-            exit;
-        }
-        
-        $logoFileName = null;
-        
-        // Handle logo upload if provided
-        if (isset($_FILES['logo_file']) && $_FILES['logo_file']['error'] === UPLOAD_ERR_OK) {
-            if (!is_dir($uploadDir)) {
-                mkdir($uploadDir, 0755, true);
-            }
-            
-            $file = $_FILES['logo_file'];
-            $allowedTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/gif', 'application/pdf', 'image/webp', 'image/avif'];
-            $maxSize = 5 * 1024 * 1024; // 5MB
-            
-            if (!in_array($file['type'], $allowedTypes)) {
-                throw new Exception('Invalid file type');
-            }
-            
-            if ($file['size'] > $maxSize) {
-                throw new Exception('File size exceeds 5MB limit');
-            }
-            
-            // Get current logo to delete old file
-            $currentStmt = $pdo->prepare("SELECT logo_url FROM companies WHERE id = ? AND tenant_id = ?");
-            $currentStmt->execute([$id, $tenant_id]);
-            $currentLogo = $currentStmt->fetch();
-            
-            $fileExtension = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
-            
-            if (in_array($fileExtension, ['webp', 'avif', 'pdf'])) {
-                $logoFileName = uniqid('logo_') . '.' . $fileExtension;
-                $targetPath = $uploadDir . $logoFileName;
-                if (!move_uploaded_file($file['tmp_name'], $targetPath)) {
-                    throw new Exception('Failed to upload file');
-                }
-            } else {
-                $logoFileName = uniqid('logo_') . '.webp';
-                $targetPath = $uploadDir . $logoFileName;
-                if (!function_exists('imagewebp') || !convertToWebP($file['tmp_name'], $targetPath)) {
-                    // Fallback: save original format if WebP conversion not supported
-                    $logoFileName = uniqid('logo_') . '.' . $fileExtension;
-                    $targetPath = $uploadDir . $logoFileName;
-                    if (!move_uploaded_file($file['tmp_name'], $targetPath)) {
-                        throw new Exception('Failed to upload file');
-                    }
-                }
-            }
-            
-            // Delete old logo file
-            if ($currentLogo && $currentLogo['logo_url'] && file_exists($uploadDir . $currentLogo['logo_url'])) {
-                unlink($uploadDir . $currentLogo['logo_url']);
-            }
-        }
-        
-        // Snapshot old values for the Activity Log (before mutation)
-        $oldStmt = $pdo->prepare("SELECT company_code, company_name, email, phone, mobile_no, website, address, city, is_active FROM companies WHERE id = ? AND tenant_id = ?");
-        $oldStmt->execute([$id, $tenant_id]);
-        $oldCompany = $oldStmt->fetch(PDO::FETCH_ASSOC);
-
-        // Build SQL based on whether logo is being updated
-        if ($logoFileName) {
-            $sql = "UPDATE companies SET 
-                    company_name = ?, legal_name = ?, email = ?, phone = ?, mobile_no = ?, website = ?,
-                    address = ?, country_id = ?, country = ?, state = ?, city = ?, zipcode = ?, po_box_no = ?,
-                    industry_type = ?, registration_number = ?, tax_identification_number = ?,
-                    sales_tax_number = ?, logo_url = ?, language_code = ?, timezone = ?,
-                    currency_code = ?, inventory_valuation_method = ?, is_active = ?
-                    WHERE id = ? AND tenant_id = ?";
-            
-            $params = [
-                $_POST['company_name'],
-                $_POST['legal_name'] ?? null,
-                $_POST['email'] ?? null,
-                $_POST['phone'] ?? null,
-                $_POST['mobile_no'] ?? null,
-                $_POST['website'] ?? null,
-                $_POST['address'] ?? null,
-                !empty($_POST['country_id']) ? (int)$_POST['country_id'] : null,
-                $_POST['country'] ?? null,
-                $_POST['state'] ?? null,
-                $_POST['city'] ?? null,
-                $_POST['zipcode'] ?? null,
-                $_POST['po_box_no'] ?? null,
-                $_POST['industry_type'] ?? null,
-                $_POST['registration_number'] ?? null,
-                $_POST['tax_identification_number'] ?? null,
-                $_POST['sales_tax_number'] ?? null,
-                $logoFileName,
-                $_POST['language_code'] ?? 'en',
-                $_POST['timezone'] ?? 'UTC',
-                $_POST['currency_code'] ?? 'USD',
-                $_POST['inventory_valuation_method'] ?? 'FIFO',
-                isset($_POST['is_active']) ? ($_POST['is_active'] === 'true' ? 1 : 0) : 1,
-                $id,
-                $tenant_id
-            ];
-        } else {
-            $sql = "UPDATE companies SET 
-                    company_name = ?, legal_name = ?, email = ?, phone = ?, mobile_no = ?, website = ?,
-                    address = ?, country_id = ?, country = ?, state = ?, city = ?, zipcode = ?, po_box_no = ?,
-                    industry_type = ?, registration_number = ?, tax_identification_number = ?,
-                    sales_tax_number = ?, language_code = ?, timezone = ?,
-                    currency_code = ?, inventory_valuation_method = ?, is_active = ?
-                    WHERE id = ? AND tenant_id = ?";
-            
-            $params = [
-                $_POST['company_name'],
-                $_POST['legal_name'] ?? null,
-                $_POST['email'] ?? null,
-                $_POST['phone'] ?? null,
-                $_POST['mobile_no'] ?? null,
-                $_POST['website'] ?? null,
-                $_POST['address'] ?? null,
-                !empty($_POST['country_id']) ? (int)$_POST['country_id'] : null,
-                $_POST['country'] ?? null,
-                $_POST['state'] ?? null,
-                $_POST['city'] ?? null,
-                $_POST['zipcode'] ?? null,
-                $_POST['po_box_no'] ?? null,
-                $_POST['industry_type'] ?? null,
-                $_POST['registration_number'] ?? null,
-                $_POST['tax_identification_number'] ?? null,
-                $_POST['sales_tax_number'] ?? null,
-                $_POST['language_code'] ?? 'en',
-                $_POST['timezone'] ?? 'UTC',
-                $_POST['currency_code'] ?? 'USD',
-                $_POST['inventory_valuation_method'] ?? 'FIFO',
-                isset($_POST['is_active']) ? ($_POST['is_active'] === 'true' ? 1 : 0) : 1,
-                $id,
-                $tenant_id
-            ];
-        }
-        
-        $stmt = $pdo->prepare($sql);
-        $result = $stmt->execute($params);
-        
-        if ($result) {
-            if ($oldCompany) {
-                $newCompany = [
-                    'company_code' => $oldCompany['company_code'], 'company_name' => $_POST['company_name'],
-                    'email' => $_POST['email'] ?? null, 'phone' => $_POST['phone'] ?? null, 'mobile_no' => $_POST['mobile_no'] ?? null,
-                    'website' => $_POST['website'] ?? null, 'address' => $_POST['address'] ?? null, 'city' => $_POST['city'] ?? null,
-                    'is_active' => isset($_POST['is_active']) ? ($_POST['is_active'] === 'true' ? 1 : 0) : 1
-                ];
-                $changeDescriptions = buildChangeDescription($oldCompany, $newCompany, [
-                    'company_name' => 'Name', 'email' => 'Email', 'phone' => 'Phone', 'mobile_no' => 'Mobile',
-                    'website' => 'Website', 'address' => 'Address', 'city' => 'City', 'is_active' => 'Active'
-                ]);
-                if ($logoFileName) $changeDescriptions[] = 'Logo updated';
-                $editDescription = !empty($changeDescriptions)
-                    ? "Updated company \"{$_POST['company_name']}\" ({$oldCompany['company_code']}): " . implode('; ', $changeDescriptions)
-                    : "Updated company \"{$_POST['company_name']}\" ({$oldCompany['company_code']}) - no tracked field changes";
-                logActivity($pdo, $tenant_id, $user_id, 'update', 'Company', $id, $oldCompany['company_code'], $editDescription, $oldCompany, $newCompany);
-            }
-
-            echo json_encode(['success' => true, 'message' => 'Company updated successfully']);
-        } else {
-            throw new Exception('Failed to update company');
-        }
-    } else {
-        http_response_code(405);
-        echo json_encode(['success' => false, 'message' => 'Method not allowed']);
+    $id = (int) ($_POST['id'] ?? 0);
+    $stmt = $pdo->prepare("SELECT * FROM companies WHERE id = ? AND tenant_id = ?");
+    $stmt->execute([$id, $tenant_id]);
+    $old = $stmt->fetch(PDO::FETCH_ASSOC);
+    if (!$old) {
+        http_response_code(404);
+        echo json_encode(['success' => false, 'message' => 'Company not found']);
+        exit;
     }
-    
+
+    $companyName = trim($_POST['company_name'] ?? '');
+    if ($companyName === '') {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'message' => 'Company name is required']);
+        exit;
+    }
+    $businessType = in_array($_POST['business_type'] ?? '', $allowedBT, true) ? $_POST['business_type'] : 'general';
+
+    // exact duplicate (other companies only)
+    $dup = $pdo->prepare("SELECT id FROM companies WHERE tenant_id = ? AND id != ? AND LOWER(TRIM(company_name)) = LOWER(?)");
+    $dup->execute([$tenant_id, $id, $companyName]);
+    if ($dup->fetch()) {
+        http_response_code(409);
+        echo json_encode(['success' => false, 'message' => "A company named \"$companyName\" already exists."]);
+        exit;
+    }
+
+    // near-duplicate warning only when the name actually changed
+    $nameChanged = strtolower(trim($old['company_name'])) !== strtolower($companyName);
+    if ($nameChanged && !(isset($_POST['confirm_duplicate']) && $_POST['confirm_duplicate'] === '1')) {
+        $ex = $pdo->prepare("SELECT id, company_name FROM companies WHERE tenant_id = ? AND id != ?");
+        $ex->execute([$tenant_id, $id]);
+        foreach ($ex->fetchAll() as $existing) {
+            if (companyNameSimilarity($companyName, $existing['company_name']) >= 0.6) {
+                echo json_encode([
+                    'success' => false,
+                    'duplicate_warning' => true,
+                    'message' => "This looks similar to an existing company \"{$existing['company_name']}\". Save it with this name anyway?",
+                    'similar_company' => $existing
+                ]);
+                exit;
+            }
+        }
+    }
+
+    // logo handling
+    $logoFileName = $old['logo_url'];
+    if (isset($_FILES['logo_file']) && $_FILES['logo_file']['error'] === UPLOAD_ERR_OK) {
+        if (!is_dir($uploadDir)) mkdir($uploadDir, 0755, true);
+        $file = $_FILES['logo_file'];
+        $allowedTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/gif', 'application/pdf', 'image/webp', 'image/avif'];
+        if (!in_array($file['type'], $allowedTypes)) throw new Exception('Invalid file type');
+        if ($file['size'] > 5 * 1024 * 1024) throw new Exception('File size exceeds 5MB limit');
+
+        $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+        if (in_array($ext, ['webp', 'avif', 'pdf'])) {
+            $newLogo = uniqid('logo_') . '.' . $ext;
+            if (!move_uploaded_file($file['tmp_name'], $uploadDir . $newLogo)) throw new Exception('Failed to upload file');
+        } else {
+            $newLogo = uniqid('logo_') . '.webp';
+            if (!function_exists('imagewebp') || !convertToWebP($file['tmp_name'], $uploadDir . $newLogo)) {
+                $newLogo = uniqid('logo_') . '.' . $ext;
+                if (!move_uploaded_file($file['tmp_name'], $uploadDir . $newLogo)) throw new Exception('Failed to upload file');
+            }
+        }
+        $logoFileName = $newLogo;
+    } elseif (($_POST['remove_logo'] ?? '0') === '1') {
+        $logoFileName = null;
+    }
+
+    $sql = "UPDATE companies SET
+        company_name = ?, legal_name = ?, email = ?, phone = ?, mobile_no = ?, website = ?,
+        address = ?, country = ?, state = ?, city = ?, zipcode = ?, po_box_no = ?,
+        industry_type = ?, business_type = ?, registration_number = ?, tax_identification_number = ?,
+        sales_tax_number = ?, logo_url = ?, language_code = ?, timezone = ?,
+        inventory_valuation_method = ?, is_active = ?
+        WHERE id = ? AND tenant_id = ?";
+
+    $ok = $pdo->prepare($sql)->execute([
+        $companyName,
+        $_POST['legal_name'] ?? null,
+        $_POST['email'] ?? null,
+        $_POST['phone'] ?? null,
+        $_POST['mobile_no'] ?? null,
+        $_POST['website'] ?? null,
+        $_POST['address'] ?? null,
+        $_POST['country'] ?? null,
+        $_POST['state'] ?? null,
+        $_POST['city'] ?? null,
+        $_POST['zipcode'] ?? null,
+        $_POST['po_box_no'] ?? null,
+        $_POST['industry_type'] ?? null,
+        $businessType,
+        $_POST['registration_number'] ?? null,
+        $_POST['tax_identification_number'] ?? null,
+        $_POST['sales_tax_number'] ?? null,
+        $logoFileName,
+        $_POST['language_code'] ?? 'en',
+        $_POST['timezone'] ?? 'UTC',
+        $_POST['inventory_valuation_method'] ?? 'FIFO',
+        ($_POST['is_active'] ?? 'true') === 'true' ? 1 : 0,
+        $id,
+        $tenant_id
+    ]);
+
+    if (!$ok) throw new Exception('Failed to update company');
+
+    // delete the old logo file if it was replaced/removed
+    if ($old['logo_url'] && $old['logo_url'] !== $logoFileName && file_exists($uploadDir . $old['logo_url'])) {
+        @unlink($uploadDir . $old['logo_url']);
+    }
+
+    logActivity(
+        $pdo, $tenant_id, $user_id, 'update', 'Company', $id, $old['company_code'],
+        "Updated company \"$companyName\" ({$old['company_code']})",
+        ['company_name' => $old['company_name'], 'business_type' => $old['business_type'] ?? null,
+         'email' => $old['email'], 'phone' => $old['phone']],
+        ['company_name' => $companyName, 'business_type' => $businessType,
+         'email' => $_POST['email'] ?? null, 'phone' => $_POST['phone'] ?? null]
+    );
+
+    echo json_encode(['success' => true, 'message' => 'Company updated successfully']);
 } catch (Exception $e) {
-    // Clean up uploaded file if update fails
-    if (isset($logoFileName) && $logoFileName && file_exists($uploadDir . $logoFileName)) {
-        unlink($uploadDir . $logoFileName);
+    if ($newLogo && file_exists($uploadDir . $newLogo)) {
+        @unlink($uploadDir . $newLogo);
     }
     http_response_code(500);
     echo json_encode(['success' => false, 'message' => $e->getMessage()]);

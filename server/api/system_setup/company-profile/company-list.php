@@ -35,9 +35,8 @@ try {
     $totalRecords = $countStmt->fetch(PDO::FETCH_ASSOC)['total'];
     
     // Get paginated companies
-    $sql = "SELECT id, company_code, company_name, industry_type, email, phone, 
-                   registration_number, is_active, created_at 
-            FROM companies 
+    $sql = "SELECT id, company_code, company_name, industry_type, business_type, email, phone, registration_number, is_active, created_at
+FROM companies
             WHERE tenant_id = ?
             ORDER BY created_at DESC 
             LIMIT ? OFFSET ?";

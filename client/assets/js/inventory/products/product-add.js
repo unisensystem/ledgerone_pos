@@ -216,9 +216,14 @@ window.addEventListener('load', function () {
         document.getElementById('photo').click();
     });
 
-    document.getElementById('photo').addEventListener('change', function (e) {
-        const file = e.target.files[0];
+    document.getElementById('photo').addEventListener('change', async function (e) {
+        const photoInput = e.target;
+        let file = photoInput.files[0];
         if (file) {
+            // Any image of any size is accepted: large images are resized/compressed
+            // in the browser before upload, so server upload limits never block them.
+            file = await compressImageFile(file, photoInput);
+
             const reader = new FileReader();
             reader.onload = function (event) {
                 const preview = document.getElementById('photoPreview');
@@ -508,6 +513,65 @@ window.addEventListener('load', function () {
     // Initial call to set form state based on default product type
     handleProductTypeChange();
 });
+
+// Resize + compress an image in the browser so that ANY image size can be uploaded.
+// - Images larger than maxDimension (on the longest side) are scaled down.
+// - Output is WebP; the compressed file replaces the one inside <input type="file">,
+//   so the normal FormData submit sends the small version automatically.
+// - PDFs and anything the browser can't decode are left untouched.
+async function compressImageFile(file, inputEl, maxDimension = 1600, quality = 0.8) {
+    try {
+        if (!file.type || !file.type.startsWith('image/')) {
+            return file; // PDF etc. — leave as is
+        }
+
+        const objectUrl = URL.createObjectURL(file);
+        const img = await new Promise((resolve, reject) => {
+            const image = new Image();
+            image.onload = () => resolve(image);
+            image.onerror = () => reject(new Error('Image decode failed'));
+            image.src = objectUrl;
+        });
+        URL.revokeObjectURL(objectUrl);
+
+        const srcW = img.naturalWidth || img.width;
+        const srcH = img.naturalHeight || img.height;
+        const scale = Math.min(1, maxDimension / Math.max(srcW, srcH));
+
+        // Already small in both dimensions and file size — no need to touch it
+        if (scale === 1 && file.size <= 1024 * 1024) {
+            return file;
+        }
+
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.max(1, Math.round(srcW * scale));
+        canvas.height = Math.max(1, Math.round(srcH * scale));
+        canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+
+        const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/webp', quality));
+        if (!blob) return file;
+
+        // Never make a file bigger
+        if (scale === 1 && blob.size >= file.size) {
+            return file;
+        }
+
+        const extMap = { 'image/webp': 'webp', 'image/jpeg': 'jpg', 'image/png': 'png' };
+        const ext = extMap[blob.type] || 'webp';
+        const baseName = file.name.replace(/\.[^.]+$/, '') || 'photo';
+        const newFile = new File([blob], `${baseName}.${ext}`, { type: blob.type, lastModified: Date.now() });
+
+        const dt = new DataTransfer();
+        dt.items.add(newFile);
+        inputEl.files = dt.files;
+
+        console.log(`Photo compressed: ${(file.size / 1024).toFixed(0)} KB -> ${(newFile.size / 1024).toFixed(0)} KB`);
+        return newFile;
+    } catch (err) {
+        console.warn('Photo compression skipped:', err);
+        return file;
+    }
+}
 
 function loadFieldPreferences() {
     // [data-field] also matches the Customize Fields modal's own .field-toggle

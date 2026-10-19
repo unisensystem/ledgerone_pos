@@ -1,15 +1,10 @@
 <?php
 require_once '../../../../includes/dashboard.php';
-// Start session if not already started
 if (session_status() == PHP_SESSION_NONE) {
     session_start();
 }
-
-// Get user_id from session
 $user_id = $_SESSION['user_id'] ?? null;
-
 if (!$user_id) {
-    // Redirect to login if no user_id in session
     header('Location: ../../auth/login.html');
     exit();
 }
@@ -24,7 +19,6 @@ if (!$user_id) {
 </head>
 <body>
     <div class="container">
-        <!-- Page Header -->
         <div class="page-header">
             <div class="header-left">
                 <div>
@@ -40,27 +34,13 @@ if (!$user_id) {
             </button>
         </div>
 
-        <!-- Stats Cards -->
         <div class="stats-cards">
-            <div class="stat-card">
-                <div class="stat-value">0</div>
-                <div class="stat-label">Total Companies</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-value">0</div>
-                <div class="stat-label">Active Companies</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-value">0</div>
-                <div class="stat-label">Inactive Companies</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-value">0</div>
-                <div class="stat-label">New This Month</div>
-            </div>
+            <div class="stat-card"><div class="stat-value">0</div><div class="stat-label">Total Companies</div></div>
+            <div class="stat-card"><div class="stat-value">0</div><div class="stat-label">Active Companies</div></div>
+            <div class="stat-card"><div class="stat-value">0</div><div class="stat-label">Inactive Companies</div></div>
+            <div class="stat-card"><div class="stat-value">0</div><div class="stat-label">New This Month</div></div>
         </div>
 
-        <!-- Actions Bar -->
         <div class="actions-bar">
             <div class="search-box">
                 <input type="text" placeholder="Search companies..." id="searchInput">
@@ -69,18 +49,8 @@ if (!$user_id) {
                     <path d="m21 21-4.3-4.3"/>
                 </svg>
             </div>
-            <div class="action-buttons">
-                <button class="btn btn-secondary">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M22 3H2l10 12.5L22 3z"/>
-                        <path d="M2 3l7 18 3-9 3 9 7-18"/>
-                    </svg>
-                    Filter
-                </button>
-            </div>
         </div>
 
-        <!-- Filters -->
         <div class="filters-bar">
             <div class="filter-group">
                 <div class="filter-label">Status</div>
@@ -90,7 +60,6 @@ if (!$user_id) {
                     <option value="inactive">Inactive</option>
                 </select>
             </div>
-
             <div class="filter-group">
                 <div class="filter-label">Sort By</div>
                 <select class="filter-select" id="sortBy">
@@ -101,7 +70,6 @@ if (!$user_id) {
             </div>
         </div>
 
-        <!-- Table -->
         <div class="table-card">
             <div class="table-container">
                 <table>
@@ -110,6 +78,7 @@ if (!$user_id) {
                             <th>Company Code</th>
                             <th>Company Name</th>
                             <th>Industry</th>
+                            <th>Business Type</th>
                             <th>Contact</th>
                             <th>Registration No.</th>
                             <th>Status</th>
@@ -117,27 +86,19 @@ if (!$user_id) {
                             <th>Actions</th>
                         </tr>
                     </thead>
-                    <tbody id="companiesTableBody">
-                        <!-- Companies will be populated here by JavaScript -->
-                    </tbody>
+                    <tbody id="companiesTableBody"></tbody>
                 </table>
             </div>
 
-            <!-- Pagination -->
             <div class="pagination">
                 <div class="pagination-info">Showing 0-0 of 0 companies</div>
                 <div class="pagination-controls">
                     <button class="pagination-btn">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M15 18l-6-6 6-6"/>
-                        </svg>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>
                     </button>
-                    <div class="pagination-pages">
-                    </div>
+                    <div class="pagination-pages"></div>
                     <button class="pagination-btn">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M9 18l6-6-6-6"/>
-                        </svg>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
                     </button>
                 </div>
             </div>
@@ -169,6 +130,17 @@ if (!$user_id) {
                     <div class="form-group">
                         <label>Industry Type</label>
                         <input type="text" id="edit_industry_type" name="industry_type">
+                    </div>
+                    <div class="form-group">
+                        <label>Business Type (POS) *</label>
+                        <select id="edit_business_type" name="business_type" required>
+                            <option value="restaurant">🍔 Restaurant</option>
+                            <option value="bakery">🥐 Bakery</option>
+                            <option value="karyana">🛒 Karyana Store</option>
+                            <option value="general">🏪 General Store</option>
+                            <option value="medical">💊 Medical Store</option>
+                            <option value="mall">🏬 Mall / Retail</option>
+                        </select>
                     </div>
                     <div class="form-group">
                         <label>Email</label>
@@ -234,6 +206,9 @@ if (!$user_id) {
                             <option value="en">English</option>
                             <option value="ur">Urdu</option>
                             <option value="sd">Sindhi</option>
+                            <option value="pa">Punjabi</option>
+                            <option value="bal">Balochi</option>
+                            <option value="ps">Pashto</option>
                         </select>
                     </div>
                     <div class="form-group">
@@ -260,6 +235,7 @@ if (!$user_id) {
                             <option value="FIFO">FIFO</option>
                             <option value="LIFO">LIFO</option>
                             <option value="AVCO">AVCO</option>
+                            <option value="SPECIFIC_IDENTIFICATION">Specific Identification</option>
                         </select>
                     </div>
                     <div class="form-group">
@@ -275,16 +251,7 @@ if (!$user_id) {
                             <div class="logo-preview" id="edit-logo-preview">
                                 <span style="color: var(--text-subtext); font-size: 12px;">No logo selected</span>
                             </div>
-                            <label for="edit_logo_file" class="logo-upload-btn">
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 4px;">
-                                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                                    <polyline points="14,2 14,8 20,8" />
-                                    <line x1="16" y1="13" x2="8" y2="13" />
-                                    <line x1="16" y1="17" x2="8" y2="17" />
-                                    <polyline points="10,9 9,9 8,9" />
-                                </svg>
-                                Choose Logo
-                            </label>
+                            <label for="edit_logo_file" class="logo-upload-btn">Choose Logo</label>
                             <input type="file" id="edit_logo_file" name="logo_file" accept="image/*" style="display: none;">
                         </div>
                     </div>

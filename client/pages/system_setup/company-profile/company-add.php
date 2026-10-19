@@ -1,15 +1,10 @@
 <?php
 require_once '../../../../includes/dashboard.php';
-// Start session if not already started
 if (session_status() == PHP_SESSION_NONE) {
     session_start();
 }
-
-// Get user_id from session
 $user_id = $_SESSION['user_id'] ?? null;
-
 if (!$user_id) {
-    // Redirect to login if no user_id in session
     header('Location: ../../auth/login.html');
     exit();
 }
@@ -34,23 +29,16 @@ if (!$user_id) {
         </div>
 
         <div class="notification success" id="success-notification">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M20 6L9 17l-5-5" />
-            </svg>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5" /></svg>
             Company information saved successfully!
         </div>
-
         <div class="notification error" id="error-notification">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <circle cx="12" cy="12" r="10" />
-                <path d="m15 9-6 6M9 9l6 6" />
-            </svg>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10" /><path d="m15 9-6 6M9 9l6 6" /></svg>
             Please fill in all required fields correctly.
         </div>
 
         <div class="main-card">
             <form id="company-form">
-                <!-- Basic Information Section -->
                 <div class="form-section">
                     <h2 class="section-title">Basic Information</h2>
                     <div class="form-grid">
@@ -70,10 +58,20 @@ if (!$user_id) {
                             <label for="industry_type">Industry Type</label>
                             <input type="text" id="industry_type" name="industry_type" placeholder="e.g., Manufacturing, Technology">
                         </div>
+                        <div class="form-group">
+                            <label for="business_type" class="required">Business Type (POS)</label>
+                            <select id="business_type" name="business_type" required>
+                                <option value="restaurant">🍔 Restaurant</option>
+                                <option value="bakery">🥐 Bakery</option>
+                                <option value="karyana">🛒 Karyana Store</option>
+                                <option value="general" selected>🏪 General Store</option>
+                                <option value="medical">💊 Medical Store</option>
+                                <option value="mall">🏬 Mall / Retail</option>
+                            </select>
+                        </div>
                     </div>
                 </div>
 
-                <!-- Contact Information Section -->
                 <div class="form-section">
                     <h2 class="section-title">Contact Information</h2>
                     <div class="form-grid">
@@ -96,7 +94,6 @@ if (!$user_id) {
                     </div>
                 </div>
 
-                <!-- Address Information Section -->
                 <div class="form-section">
                     <h2 class="section-title">Address Information</h2>
                     <div class="form-grid">
@@ -133,7 +130,6 @@ if (!$user_id) {
                     </div>
                 </div>
 
-                <!-- Registration & Tax Information -->
                 <div class="form-section">
                     <h2 class="section-title">Registration & Tax Information</h2>
                     <div class="form-grid">
@@ -152,7 +148,6 @@ if (!$user_id) {
                     </div>
                 </div>
 
-                <!-- System Configuration -->
                 <div class="form-section">
                     <h2 class="section-title">System Configuration</h2>
                     <div class="form-grid">
@@ -164,7 +159,7 @@ if (!$user_id) {
                                 <option value="sd">Sindhi</option>
                                 <option value="pa">Punjabi</option>
                                 <option value="bal">Balochi</option>
-                                <option value="ps">Pashto</option>                                
+                                <option value="ps">Pashto</option>
                             </select>
                         </div>
                         <div class="form-group">
@@ -183,7 +178,6 @@ if (!$user_id) {
                     </div>
                 </div>
 
-                <!-- Company Logo -->
                 <div class="form-section">
                     <h2 class="section-title">Company Logo</h2>
                     <div class="form-grid">
@@ -191,32 +185,14 @@ if (!$user_id) {
                             <div class="logo-upload">
                                 <div class="logo-preview" id="logo-preview">
                                     <span style="color: var(--text-subtext); font-size: 12px;">No logo selected</span>
-                                    <button type="button" class="logo-remove-btn" id="logo-remove-btn" style="display: none;">
-                                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                            <line x1="18" y1="6" x2="6" y2="18"></line>
-                                            <line x1="6" y1="6" x2="18" y2="18"></line>
-                                        </svg>
-                                    </button>
                                 </div>
-                                <label for="logo_url" class="logo-upload-btn">
-                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                        stroke-width="2" style="margin-right: 4px;">
-                                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                                        <polyline points="14,2 14,8 20,8" />
-                                        <line x1="16" y1="13" x2="8" y2="13" />
-                                        <line x1="16" y1="17" x2="8" y2="17" />
-                                        <polyline points="10,9 9,9 8,9" />
-                                    </svg>
-                                    Choose Logo
-                                </label>
-                                <input type="file" id="logo_url" name="logo_url" accept="image/*"
-                                    style="display: none;">
+                                <label for="logo_url" class="logo-upload-btn">Choose Logo</label>
+                                <input type="file" id="logo_url" name="logo_url" accept="image/*" style="display: none;">
                             </div>
                         </div>
                     </div>
                 </div>
 
-                <!-- Status Settings -->
                 <div class="form-section">
                     <h2 class="section-title">Status Settings</h2>
                     <div class="form-grid">
@@ -229,21 +205,9 @@ if (!$user_id) {
                     </div>
                 </div>
 
-                <!-- Form Actions -->
                 <div class="form-actions">
-                    <button type="button" class="btn btn-secondary" id="resetBtn">
-                        <i class="fas fa-undo"></i>
-                        Reset Form
-                    </button>
-                    <button type="submit" class="btn btn-primary">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                            stroke-width="2">
-                            <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
-                            <polyline points="17,21 17,13 7,13 7,21" />
-                            <polyline points="7,3 7,8 15,8" />
-                        </svg>
-                        Save Company
-                    </button>
+                    <button type="button" class="btn btn-secondary" id="resetBtn"><i class="fas fa-undo"></i> Reset Form</button>
+                    <button type="submit" class="btn btn-primary">Save Company</button>
                 </div>
             </form>
         </div>

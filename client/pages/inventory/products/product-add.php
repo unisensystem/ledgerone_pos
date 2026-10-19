@@ -268,8 +268,8 @@ if ($tenant_id) {
                     <div class="form-group full-width optional-field" data-field="photo">
                         <label>Attached Photo</label>
                         <div class="photo-upload" id="photoUpload">
-                            <p>Click to upload product photo (Max 5MB)</p>
-                            <input type="file" id="photo" name="photo" accept=".png,.jpg,.jpeg,.gif,.pdf,.webp,.avif" style="display: none;">
+                            <p>Click to upload product photo (any size)</p>
+                            <input type="file" id="photo" name="photo" accept=".png,.jpg,.jpeg,.jfif,.jpe,.gif,.pdf,.webp,.avif,.bmp" style="display: none;">
                             <img id="photoPreview" class="photo-preview" alt="Product photo preview">
                             <button type="button" class="btn btn-danger" id="removePhoto" style="display: none; position: absolute; top: 5px; right: 5px; width: 30px; height: 30px; padding: 0; border-radius: 50%;">×</button>
                         </div>
