@@ -9,8 +9,14 @@ $tenant_id = $_SESSION['tenant_id'] ?? null;
 if (!$user_id || !$tenant_id) { http_response_code(401); echo json_encode(['success' => false, 'message' => 'Unauthorized']); exit; }
 
 try {
-    $s = $pdo->prepare("SELECT id FROM customers WHERE tenant_id = ? AND LOWER(TRIM(customer_name)) = 'cash customer' LIMIT 1");
-    $s->execute([$tenant_id]);
+    // Cash Customer: tenant ki apni row pehle, phir ACTIVE, phir global (tenant_id = 0) - get-customers.php jaisi visibility
+    $s = $pdo->prepare("
+        SELECT id FROM customers
+        WHERE (tenant_id = ? OR tenant_id = 0)
+          AND LOWER(TRIM(customer_name)) = 'cash customer'
+        ORDER BY (tenant_id = ?) DESC, (status = 'ACTIVE') DESC, id ASC
+        LIMIT 1");
+    $s->execute([$tenant_id, $tenant_id]);
     $cashCustomerId = $s->fetchColumn() ?: null;
 
     $s = $pdo->prepare("SELECT id, branch_name FROM branches WHERE tenant_id = ? ORDER BY id");
@@ -33,7 +39,7 @@ try {
 
     echo json_encode([
         'success' => true,
-        'cash_customer_id' => $cashCustomerId,
+        'cash_customer_id' => $cashCustomerId ? (int) $cashCustomerId : null,
         'branches' => $branches,
         'currency_id' => $cur['id'],
         'currency_symbol' => $cur['symbol'],
