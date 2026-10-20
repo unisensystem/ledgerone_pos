@@ -183,6 +183,7 @@ if (!in_array($businessType, $allowedBT, true)) {
     // Mode is fixed by the company's business type (no switching)
     const BT = '<?= $businessType ?>';
     const mode = MODES[BT] ? BT : 'general';
+    const CASH = 'Cash Customer';
     const ACT = {
         save: {l: 'Save Bill (follows the Auto print setting)', k: 'Ctrl+Enter'},
         saveNoPrint: {l: 'Save Bill - without printing', k: 'Ctrl+Shift+Enter'},
@@ -204,6 +205,7 @@ if (!in_array($businessType, $allowedBT, true)) {
     let M = {}, products = [], cats = [], custs = [], banks = [], cat = 'all', cart = [], holds = LS.get('hold', []), busy = false;
     let KEYS = Object.assign({}, DEFKEYS, LS.get('keys', {})), autoPrint = LS.get('autoprint', true), capturing = null, lastId = null;
     const $ = id => document.getElementById(id);
+    const setCash = () => { if (M.cash_customer_id) $('posCust').value = CASH; };
     const sym = () => (typeof currencySymbol !== 'undefined' ? currencySymbol : (M.currency_symbol || 'Rs')) + ' ';
     const f = n => sym() + (Math.round(n * 100) / 100).toLocaleString('en-PK');
     const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]));
@@ -340,11 +342,11 @@ if (!in_array($businessType, $allowedBT, true)) {
         else addItem(products.find(p => p.id === +btn.dataset.pid), q, nt, pr);
         $('posPm').classList.remove('on'); drawCart();
     }
-    function resetCart() { cart = []; $('posDp').value = 0; $('posDa').value = 0; $('posDel').value = 0; $('posTend').value = ''; $('posTbl').value = ''; $('posCust').value = ''; drawCart(); }
+    function resetCart() { cart = []; $('posDp').value = 0; $('posDa').value = 0; $('posDel').value = 0; $('posTend').value = ''; $('posTbl').value = ''; $('posCust').value = M.cash_customer_id ? CASH : ''; drawCart(); }
 
     // ----- save -----
     function custId() {
-        const v = $('posCust').value.trim(); if (!v) return M.cash_customer_id;
+        const v = $('posCust').value.trim(); if (!v || v.toLowerCase() === CASH.toLowerCase()) return M.cash_customer_id;
         const c = custs.find(c => (c.customer_code ? c.customer_code + ' - ' : '') + c.customer_name === v || c.customer_name === v);
         return c ? c.id : null;
     }
@@ -433,11 +435,21 @@ if (!in_array($businessType, $allowedBT, true)) {
             M = await jget(EP.meta); if (!M.success) throw new Error(M.message);
             $('posBranch').innerHTML = M.branches.map(b => `<option value="${b.id}">${esc(b.branch_name)}</option>`).join('');
             const sb = LS.get('branch', null); if (sb && M.branches.some(b => b.id == sb)) $('posBranch').value = sb;
-            if (!M.cash_customer_id) toast('No customer named "Cash Customer" was found - you must select a customer for each bill', 1);
+            setCash();
         } catch (e) { return toast('POS failed to load: ' + e.message, 1); }
         loadCounters(+$('posBranch').value); loadProducts(); loadBills();
         jget(EP.cats).then(r => { cats = r.categories || []; drawCats(); }).catch(() => {});
-        jget(EP.custs).then(r => { custs = r.data || []; $('posCustList').innerHTML = custs.map(c => `<option value="${esc((c.customer_code ? c.customer_code + ' - ' : '') + c.customer_name)}">`).join(''); }).catch(() => {});
+        jget(EP.custs).then(r => {
+            custs = r.data || [];
+            $('posCustList').innerHTML = custs.map(c => `<option value="${esc((c.customer_code ? c.customer_code + ' - ' : '') + c.customer_name)}">`).join('');
+            // Fallback: meta.php did not find Cash Customer, but the customers list has it
+            if (!M.cash_customer_id) {
+                const cc = custs.find(c => (c.customer_name || '').trim().toLowerCase() === CASH.toLowerCase());
+                if (cc) M.cash_customer_id = +cc.id;
+            }
+            if (!M.cash_customer_id) toast('No customer named "Cash Customer" was found - you must select a customer for each bill', 1);
+            if (!$('posCust').value.trim()) setCash();
+        }).catch(() => { if (!M.cash_customer_id) toast('No customer named "Cash Customer" was found - you must select a customer for each bill', 1); });
         jget(EP.banks).then(r => { banks = r.bank_accounts || []; $('posBank').innerHTML = '<option value="">Bank account...</option>' + banks.map(b => `<option value="${b.id}">${esc(b.bank_name)} - ${esc(b.account_title || '')}</option>`).join(''); }).catch(() => {});
     }
 
@@ -453,7 +465,7 @@ if (!in_array($businessType, $allowedBT, true)) {
             else if (d.x !== undefined) { const l = cart[+d.x], st = l.w ? 0.5 : 1; l.qty += +d.d * st; if (l.qty <= 0) cart.splice(+d.x, 1); drawCart(); }
             else if (d.e !== undefined) openEdit(+d.e);
             else if (d.r !== undefined) { cart.splice(+d.r, 1); drawCart(); }
-            else if (d.h !== undefined) { const h = holds.splice(+d.h, 1)[0]; LS.set('hold', holds); cart = h.cart; $('posCust').value = h.cust || ''; drawCart(); }
+            else if (d.h !== undefined) { const h = holds.splice(+d.h, 1)[0]; LS.set('hold', holds); cart = h.cart; $('posCust').value = h.cust || (M.cash_customer_id ? CASH : ''); drawCart(); }
             else if (d.t !== undefined) { $('posTend').value = d.t; calc(); }
             else if (d.chip) { const n = $('posEn'); n.value = n.value ? n.value + ', ' + d.chip : d.chip; }
             else if (d.pr) printBill(d.pr);
@@ -486,6 +498,9 @@ if (!in_array($businessType, $allowedBT, true)) {
     $('posPay').addEventListener('change', () => { $('posBank').style.display = $('posPay').value === 'bank_transfer' ? '' : 'none'; });
     $('posBranch').addEventListener('change', () => { LS.set('branch', $('posBranch').value); loadCounters(+$('posBranch').value); loadProducts(); });
     $('posCounter').addEventListener('change', () => { if ($('posBranch').value) LS.set('counter_' + $('posBranch').value, $('posCounter').value); });
+    // Customer field: select text on focus (typing replaces "Cash Customer"), restore Cash Customer if left empty
+    $('posCust').addEventListener('focus', e => e.target.select());
+    $('posCust').addEventListener('blur', e => { if (!e.target.value.trim()) setCash(); });
 
     document.addEventListener('keydown', e => {
         const open = $('posPm').classList.contains('on');
