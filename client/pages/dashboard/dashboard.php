@@ -1194,7 +1194,7 @@ $purchasesNet = (float) $purchasesTotals['net'];
                 </button>
             </div>
             <!-- Global Search -->
-            <div class="quick-actions" style="position: relative;">
+            <div class="quick-actions" style="position: relative; display:none;" >
                 <div class="ledger-search-box" style="position: relative;">
                     <input type="text" id="globalSearchInput" class="ledger-input"
                         placeholder="Search invoice number, voucher, amount... (e.g. INV-001 or 400)"
@@ -1209,7 +1209,7 @@ $purchasesNet = (float) $purchasesTotals['net'];
             </div>
 
             <!-- KPI Cards -->
-            <div class="kpi-grid">
+            <div class="kpi-grid" style=" display:none;">
                 <div class="kpi-card">
                     <div class="kpi-value" id="kpi-units-sold">Loading...</div>
                     <div class="kpi-label">Products Sold <?= $hasDateFilter ? 'Selected Period' : 'All Time' ?></div>
@@ -1265,7 +1265,7 @@ $purchasesNet = (float) $purchasesTotals['net'];
             </div>
 
             <!-- Quick Ledger Access -->
-            <div class="quick-actions">
+            <div class="quick-actions" style=" display:none;">
                 <h2 class="section-title">Quick Ledger Access</h2>
                 <div class="ledger-search-box">
                     <input type="text" id="ledgerSearch" placeholder="Enter Customer/Supplier/Account Name or Code..." class="ledger-input">
@@ -1289,7 +1289,7 @@ $purchasesNet = (float) $purchasesTotals['net'];
             </div>
 
             <!-- Keyboard Shortcuts -->
-            <div class="quick-actions">
+            <div class="quick-actions"  style=" display:none;">
                 <h2 class="section-title">Keyboard Shortcuts</h2>
                 <div class="ledger-search-box" style="flex-direction: column; align-items: stretch;">
                     <div style="display:flex; gap:1rem; flex-wrap:wrap; align-items:center; width:100%;">
@@ -1333,44 +1333,17 @@ $purchasesNet = (float) $purchasesTotals['net'];
                 </div>
             </div>
 
-                      <!-- Quick Actions Section -->
             <div class="quick-actions">
-                <h2 class="section-title">Quick Actions</h2>
+                <!-- <h2 class="section-title">Quick Actions</h2> -->
                 <div class="actions-grid">
-                    <a href="../sale/pos_invoice/counter-invoice.php" class="action-btn">
-                        <i class="fas fa-cash-register"></i>
-                        <span>New POS Invoice</span>
-                    </a>
-                    <a href="../purchase/purchase_invoice/purchase-add.php" class="action-btn">
-                        <i class="fas fa-shopping-cart"></i>
-                        <span>New Purchase</span>
-                    </a>
-                    <a href="../vouchers/receive_voucher/receive-add.php" class="action-btn">
-                        <i class="fas fa-money-check-alt"></i>
-                        <span>New Receive Voucher</span>
-                    </a>
-                    <a href="../vouchers/expense_voucher/expense-add.php" class="action-btn">
-                        <i class="fas fa-receipt"></i>
-                        <span>Record Expenses</span>
-                    </a>
-                    <a href="../financial_reports/cash_flow/cash-flow.php" class="action-btn">
-                        <i class="fas fa-exchange-alt"></i>
-                        <span>Cash Flow Report</span>
-                    </a>
-                    <a href="#" class="action-btn" onclick="openBankStatementModal(); return false;">
-                        <i class="fas fa-university"></i>
-                        <span>Bank Statement</span>
-                    </a>
+                   
                     <a href="#" class="action-btn" style="position: relative;" onclick="openTodoModal(); return false;">
                         <i class="fas fa-list-check"></i>
                         <span>Todo List</span>
                         <span id="todoBadge" class="todo-trigger-badge" style="display:none;">0</span>
                     </a>
 
-                    <a href="../settings/posting_lock/posting-lock.php" class="action-btn">
-                        <i class="fas fa-lock"></i>
-                        <span>Posting Lock</span>
-                    </a>
+                    
 
                     <!-- Database Operations: Backup only here (instant, this tenant's data only).
                          Format / Restore are destructive and stay Admin-Panel-only on purpose. -->
@@ -1995,18 +1968,17 @@ $purchasesNet = (float) $purchasesTotals['net'];
                 $chartData[] = $day['qty'];
             }
             ?>
-            new ApexCharts(document.querySelector('#fuelSalesChart'), {
-                chart: {
-                    type: 'area',
-                    height: 200,
-                    toolbar: {
-                        show: false
-                    }
-                },
-                series: [{
-                    name: 'Sales',
-                    data: <?= json_encode($chartData) ?>
-                }],
+           new ApexCharts(document.querySelector('#fuelSalesChart'), {
+    chart: {
+        type: 'area',
+        height: 200,
+        toolbar: { show: false }
+    },
+    dataLabels: { enabled: false },   // <-- add this
+    series: [{
+        name: 'Sales',
+        data: <?= json_encode($chartData) ?>
+    }],
                 xaxis: {
                     categories: <?= json_encode($chartLabels) ?>
                 },
@@ -2179,18 +2151,17 @@ $purchasesNet = (float) $purchasesTotals['net'];
                 $cashOutData[] = (float) $stmt->fetchColumn();
             }
             ?>
-            new ApexCharts(document.querySelector('#cashFlowChart'), {
-                chart: {
-                    type: 'line',
-                    height: 200,
-                    toolbar: {
-                        show: false
-                    }
-                },
-                series: [{
-                    name: 'Cash In',
-                    data: <?= json_encode($cashInData) ?>
-                }, {
+           new ApexCharts(document.querySelector('#cashFlowChart'), {
+    chart: {
+        type: 'line',
+        height: 200,
+        toolbar: { show: false }
+    },
+    dataLabels: { enabled: false },   // <-- add this
+    series: [{
+        name: 'Cash In',
+        data: <?= json_encode($cashInData) ?>
+    }, {
                     name: 'Cash Out',
                     data: <?= json_encode($cashOutData) ?>
                 }],

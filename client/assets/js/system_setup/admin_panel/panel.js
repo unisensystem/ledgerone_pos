@@ -463,19 +463,90 @@ function renderPermissionsTree(permissions) {
 
     const permissionsStructure = {
         'Dashboard': [],
-        'Customer / Supplier': ['New Customer', 'New Supplier', 'New Customer + Supplier (Both)', 'Leads'],
-        'Sale': ['Sale Order', 'Create Quotation', 'Sale Invoice', 'Grocery Sale Invoice', 'Med Sale Invoice', 'Sale Tax Invoice', 'Meter Invoice', 'POS Invoice', 'Primery Trade Invoice', 'Traders Sale Invoice', 'Issue Delivery Challan', 'Sale Reports', 'Discount Report', 'Daily Sale Report', 'Daily Sales Report (DSR) - Multiple Unit', 'Daily Product Sale', 'Daily Product Sale 2', 'Invoice Payment Report', 'Sale Return'],
-        'Purchase': ['Record Purchase Order', 'New Purchase', 'Grocery Purchase Invoice', 'Purchase Tax Invoice', 'Purchase Reports', 'Purchase Return', 'Project Product Rates'],
+        'Customer / Supplier': [
+            'New Customer',
+            'New Supplier',
+            // 'New Customer + Supplier (Both)',
+            // 'Leads'
+        ],
+        'Sale': [
+            // 'Sale Order',
+            // 'Create Quotation',
+            // 'Sale Invoice',
+            // 'Grocery Sale Invoice',
+            // 'Med Sale Invoice',
+            // 'Sale Tax Invoice',
+            // 'Meter Invoice',
+            'POS Invoice',
+            // 'Primery Trade Invoice',
+            // 'Traders Sale Invoice',
+            // 'Issue Delivery Challan',
+            'Sale Reports',
+            'Discount Report',
+            // 'Daily Sale Report',
+            // 'Daily Sales Report (DSR) - Multiple Unit',
+            // 'Daily Product Sale',
+            // 'Daily Product Sale 2',
+            // 'Invoice Payment Report',
+            'Sale Return'
+        ],
+        'Purchase': [
+            'Record Purchase Order',
+            'New Purchase',
+            // 'Grocery Purchase Invoice',
+            // 'Purchase Tax Invoice',
+            'Purchase Reports',
+            // 'Purchase Return',
+            // 'Project Product Rates'
+        ],
         'Inventory': ['New Product', 'Stock Adjustment', 'Stock Transfer', 'Stock Position', 'Inward Gatepass', 'Outward Gatepass', 'Container Setup'],
-        'Manufacturing': ['Bill of Materials (BOM)', 'Unit Measurement', 'Machine Setup', 'Production Order', 'WIP Management', 'Production Completion', 'Production Expenses', 'Production Wastage', 'Production Report'],
-        'Vouchers': ['Receive Voucher', 'Payment Voucher', 'Transfer Voucher', 'Expense Voucher', 'Journal Entry', 'Cash Opening'],
+        // 'Manufacturing': ['Bill of Materials (BOM)', 'Unit Measurement', 'Machine Setup', 'Production Order', 'WIP Management', 'Production Completion', 'Production Expenses', 'Production Wastage', 'Production Report'],
+        'Vouchers': [
+            'Receive Voucher',
+            'Payment Voucher',
+            'Transfer Voucher',
+            'Expense Voucher',
+            // 'Journal Entry',
+            'Cash Opening'
+        ],
         'Banking': ['New Bank', 'Post Dated Cheques (PDCs)', 'Bank Statement'],
-        'Rent Management': ['Issue Rent', 'Rent List'],
-        'Chart of Accounts': [],
-        'Financial Reports': ['General Ledger',  'GL2','Customer Ledger', 'Our Standing', 'Supplier Ledger', 'Both (Customer + Supplier) Ledger', 'Customer Aging', 'Supplier Aging', 'Recovery Sheet', 'Customer Summary Division Report (CSDR)', 'Sales Officer-wise Recovery', 'Trial Balance', 'Balance Sheet', 'Profit & Loss Statement', 'Cash Flow', 'Counter Cash Flow', 'Financial Summary', 'Pending DSR Sheet', 'Project Tracking', 'Container Tracking'],
+        // 'Rent Management': ['Issue Rent', 'Rent List'],
+        // 'Chart of Accounts': [],
+        'Financial Reports': [
+            // 'General Ledger',
+            // 'GL2',
+            'Customer Ledger',
+            'Our Standing',
+            'Supplier Ledger',
+            // 'Both (Customer + Supplier) Ledger',
+            // 'Customer Aging',
+            // 'Supplier Aging',
+            // 'Recovery Sheet',
+            // 'Customer Summary Division Report (CSDR)',
+            // 'Sales Officer-wise Recovery',
+            // 'Trial Balance',
+            // 'Balance Sheet',
+            'Profit & Loss Statement',
+            'Cash Flow'
+            // 'Counter Cash Flow',
+            // 'Financial Summary',
+            // 'Pending DSR Sheet',
+            // 'Project Tracking',
+            // 'Container Tracking'
+        ],
         'HRM': ['New Employee', 'Record Attendance', 'Biometric Devices', 'Leave Management', 'New Payroll', 'Employees Ledger'],
-        'Master Setup': ['Branch Setup', 'Counter Setup', 'Counter Cash', 'Counter Settlement', 'Territory Setup', 'Rate List Setup', 'Tax Rates Setup', 'Tax Regimes Setup', 'Project Setup'],
-'System Setup': ['Company Profile', 'Admin Panel', 'Currency Setup', 'Software Info', 'GL Debug']
+        'Master Setup': [
+            'Branch Setup',
+            'Counter Setup',
+            'Counter Cash',
+            'Counter Settlement',
+            'Territory Setup',
+            'Rate List Setup',
+            'Tax Rates Setup',
+            'Tax Regimes Setup'
+            // 'Project Setup'
+        ],
+        'System Setup': ['Company Profile', 'Admin Panel', 'Currency Setup', 'Software Info', 'GL Debug']
     };
 
     const subPermissions = ['Add', 'Edit', 'Delete'];

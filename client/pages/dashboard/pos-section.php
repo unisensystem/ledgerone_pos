@@ -311,7 +311,7 @@ if (!in_array($businessType, $allowedBT, true)) {
         const t = $('posTend').value === '' ? tot : num($('posTend').value);
         $('posChange').textContent = f(Math.max(0, t - tot));
         const base = Math.ceil(tot / 100) * 100;
-        $('posQuick').innerHTML = tot > 0 ? [tot, base, base + 100, 500, 1000, 5000].filter((v, i, a) => v >= tot && a.indexOf(v) === i).slice(0, 5).map(v => `<button type="button" data-t="${v}">${v === tot ? 'Exact' : v}</button>`).join('') : '';
+$('posQuick').innerHTML = tot > 0 ? `<button type="button" data-t="${tot}">Exact</button>` : '';
         return {sub, d, del, tot};
     }
     function drawCart() {
