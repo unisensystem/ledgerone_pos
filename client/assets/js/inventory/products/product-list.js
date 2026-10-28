@@ -283,8 +283,8 @@ function renderProductTable(productsToRender) {
 <td data-col="status">${statusBadge}</td>
                     <td>
                         <div class="action-buttons">
-                            ${product.qrCode || product.barcode ? `
-                            <button class="btn btn-icon btn-ghost print-code" data-id="${product.id}" data-qr="${product.qrCode || ''}" data-barcode="${product.barcode || ''}" data-name="${product.name}" data-code="${product.code}" data-trade-price="${product.tradePrice}" data-wholesale-price="${product.wholesalePrice}" data-mrp-price="${product.mrp}" data-company="${product.companyName || ''}" data-currency="${product.currencySymbol}" title="Print Code">
+                            ${product.qrCode || product.barcode || isLooseUnitName(product.defaultUnitName) ? `
+                            <button class="btn btn-icon btn-ghost print-code" data-id="${product.id}" data-unit-name="${product.defaultUnitName || ''}" data-qr="${product.qrCode || ''}" data-barcode="${product.barcode || ''}" data-name="${product.name}" data-code="${product.code}" data-trade-price="${product.tradePrice}" data-wholesale-price="${product.wholesalePrice}" data-mrp-price="${product.mrp}" data-company="${product.companyName || ''}" data-currency="${product.currencySymbol}" title="Print Code">
                                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
                                     <path d="M4 6V2H12V6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
                                     <path d="M4 11H2V7H14V11H12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
@@ -322,7 +322,13 @@ function renderProductTable(productsToRender) {
             const mrpPrice = this.getAttribute('data-mrp-price');
             const company = this.getAttribute('data-company');
             const currency = this.getAttribute('data-currency');
-            printCode(qr, barcode, name, code, tradePrice, company, currency, wholesalePrice, mrpPrice);
+            const unitName = this.getAttribute('data-unit-name');
+            if (isLooseUnitName(unitName)) {
+                // Kg / Litre product: may have Half / Pao / ... packs with their own barcodes
+                printCodeWithSubUnits(this.getAttribute('data-id'), unitName, qr, barcode, name, code, tradePrice, company, currency, wholesalePrice, mrpPrice);
+            } else {
+                printCode(qr, barcode, name, code, tradePrice, company, currency, wholesalePrice, mrpPrice);
+            }
         });
     });
 
@@ -810,6 +816,7 @@ function loadProducts(page = 1) {
                         status: product.is_active ? 'active' : 'inactive',
                         noStockRecords: product.no_stock_records == 1,
                         currencySymbol: product.currency_symbol || '₹',
+                        defaultUnitName: product.uom_type === 'unit' ? (product.default_unit_name || '') : '',
                         parentProductId: product.parent_product_id,
                         qrCode: product.qr_code,
                         barcode: product.barcode,
@@ -1072,6 +1079,79 @@ function printCode(qr, barcode, productName, productCode, tradePrice, companyNam
 
     // Update preview on initial load
     updatePriceTypePreview();
+}
+
+// Kg / Litre default units can be sold loose in packs (Half Kg, Pao, ...)
+function isLooseUnitName(name) {
+    return /^(kg|kgs|kilo|kilogram|kilograms|l|ltr|ltrs|liter|litre|liters|litres)\b/i.test((name || '').trim());
+}
+
+// Print-code modal for Kg / Litre products: lets the user pick WHICH pack's
+// barcode to print (full Kg, Half Kg, Pao, ...). Each pack has its own barcode
+// and price; the product itself stays one.
+function printCodeWithSubUnits(productId, unitName, qr, barcode, name, code, tradePrice, company, currency, wholesalePrice, mrpPrice) {
+    fetch(`../../../../server/api/inventory/products/sub-units-get.php?product_id=${encodeURIComponent(productId)}`)
+        .then(response => response.json())
+        .then(data => {
+            const subUnits = (data.success && data.sub_units ? data.sub_units : []).filter(s => s.barcode);
+
+            if (subUnits.length === 0) {
+                if (qr || barcode) {
+                    printCode(qr, barcode, name, code, tradePrice, company, currency, wholesalePrice, mrpPrice);
+                } else {
+                    alert('This product has no barcode or QR code yet. Add one from the Edit page.');
+                }
+                return;
+            }
+
+            const options = [];
+            if (qr || barcode) {
+                options.push({
+                    label: `Full ${unitName}`,
+                    qr: qr, barcode: barcode, name: name,
+                    trade: tradePrice, wholesale: wholesalePrice, mrp: mrpPrice
+                });
+            }
+            subUnits.forEach(s => {
+                options.push({
+                    label: s.label,
+                    qr: '', barcode: s.barcode, name: `${name} (${s.label})`,
+                    trade: s.price, wholesale: s.price, mrp: s.price
+                });
+            });
+
+            const render = (index) => {
+                const opt = options[index];
+                printCode(opt.qr, opt.barcode, opt.name, code, opt.trade, company, currency, opt.wholesale, opt.mrp);
+
+                const wrapper = document.createElement('div');
+                wrapper.style.cssText = 'margin-bottom: 14px; text-align: left;';
+                const label = document.createElement('label');
+                label.textContent = 'Print barcode for:';
+                label.style.cssText = 'display:block; font-size:13px; margin-bottom:4px;';
+                const select = document.createElement('select');
+                select.style.cssText = 'width:100%; height:36px; padding:0 10px;';
+                options.forEach((o, i) => {
+                    const optionEl = document.createElement('option');
+                    optionEl.value = i;
+                    optionEl.textContent = `${o.label}  (${parseFloat(o.trade || 0).toFixed(2)})`;
+                    select.appendChild(optionEl);
+                });
+                select.value = index;
+                select.addEventListener('change', () => render(parseInt(select.value)));
+                wrapper.appendChild(label);
+                wrapper.appendChild(select);
+
+                const content = document.getElementById('printCodeContent');
+                content.insertBefore(wrapper, content.firstChild);
+            };
+
+            render(0);
+        })
+        .catch(error => {
+            console.error('Error loading sub-units:', error);
+            printCode(qr, barcode, name, code, tradePrice, company, currency, wholesalePrice, mrpPrice);
+        });
 }
 
 function openAiqModal() {

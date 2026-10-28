@@ -116,6 +116,15 @@ if ($tenant_id) {
                         </div>
                     </div>
                     
+                    <!-- Loose Sub-Units (shown only when Default Unit is Kg / Litre) -->
+                    <div class="form-group full-width" id="subUnitsSection" style="display: none;">
+                        <label>Loose Selling Units (<span id="subUnitsBaseLabel">Kg</span>)</label>
+                        <div class="helper-text" style="margin-bottom: 8px;">Tick the pack sizes you sell loose and enter the selling price of each pack. Stock is still kept in the base unit.</div>
+                        <div id="subUnitsList"></div>
+                        <button type="button" class="btn btn-secondary" id="addCustomSubUnit">+ Add Custom Unit</button>
+                        <input type="hidden" id="subUnitsJson" name="subUnitsJson" value="[]">
+                    </div>
+
                     <div class="form-group" id="uomGroupField" style="display: none;">
                         <label class="required">UOM Group</label>
                         <div class="input-with-buttons">
@@ -468,5 +477,6 @@ if ($tenant_id) {
     <script>window.ENABLE_CARTON_PRICE_ENTRY = <?= $enableCartonPriceEntry ? 'true' : 'false' ?>;</script>
     <script src="../../../assets/js/inventory/products/scheme-functions.js"></script>
     <script src="../../../assets/js/inventory/products/product-add.js?v=<?= filemtime(__DIR__ . '/../../../assets/js/inventory/products/product-add.js') ?>"></script>
+    <script src="../../../assets/js/inventory/products/sub-units.js?v=<?= filemtime(__DIR__ . '/../../../assets/js/inventory/products/sub-units.js') ?>"></script>
 </body>
 </html>

@@ -51,6 +51,7 @@ if (!in_array($businessType, $allowedBT, true)) {
 .pos-ln{display:flex;gap:.5rem;align-items:center;padding:.65rem 0;border-bottom:1px solid #f1f5f9;font-size:14px;color:#334155}
 .pos-ln .n{flex:1;min-width:0}.pos-ln .n small{display:block;color:#94a3b8;font-size:12px}
 .pos-q{display:flex;align-items:center;gap:6px}
+.pos-q b{font-size:12.5px;text-align:center;min-width:34px;max-width:110px}
 .pos-q button,.pos-ic{width:30px;height:30px;border:1px solid #d6dbe4;border-radius:7px;background:#f8fafc;cursor:pointer;font-size:15px;color:#334155}
 .pos-q button:hover,.pos-ic:hover{background:#eff6ff;border-color:#1f7bff}
 .pos-ic.x:hover{background:#fef2f2;border-color:#dc2626;color:#dc2626}
@@ -72,7 +73,9 @@ if (!in_array($businessType, $allowedBT, true)) {
 .pos-box{background:#fff;border-radius:14px;padding:1.4rem;width:100%;max-width:460px;max-height:90vh;overflow-y:auto;box-shadow:0 25px 50px -12px rgba(0,0,0,.25)}
 .pos-box h3{margin:0 0 1rem;color:#0f172a}
 .pos-box label.t{display:block;font-size:12px;color:#475569;text-transform:uppercase;letter-spacing:.6px;font-weight:700;margin-top:.7rem}
-.pos-box input.f{width:100%;height:44px;padding:0 .8rem;border:1.5px solid #d6dbe4;border-radius:.5rem;font-size:15px;margin-top:.3rem}
+.pos-box input.f,.pos-box select.f{width:100%;height:44px;padding:0 .8rem;border:1.5px solid #d6dbe4;border-radius:.5rem;font-size:15px;margin-top:.3rem;background:#fff;color:#1e293b}
+.pos-ug{display:grid;gap:.5rem}
+.pos-et{margin-top:.8rem;padding:.6rem .8rem;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:.5rem;font-size:14px;color:#166534;font-weight:600}
 .pos-chips{display:flex;flex-wrap:wrap;gap:.4rem;margin-top:.4rem}
 .pos-chips button{border:1.5px solid #d6dbe4;background:#fff;border-radius:9999px;padding:.4rem .8rem;font-size:13px;cursor:pointer;color:#334155}
 .pos-chips button:hover{border-color:#1f7bff;color:#1f7bff}
@@ -167,7 +170,8 @@ if (!in_array($businessType, $allowedBT, true)) {
         save: API + 'sale/pos_invoice/pos-add.php', cats: API + 'inventory/products/category-list.php',
         custs: API + 'financial_reports/customer_ledger/customer-ledger.php?type=customers',
         counters: API + 'sale/pos_invoice/get-counters.php?branch_id=',
-        banks: API + 'financial_reports/cash_flow/filter-options.php', grp: API + 'inventory/products/uom-group-units.php?group_id='
+        banks: API + 'financial_reports/cash_flow/filter-options.php', grp: API + 'inventory/products/uom-group-units.php?group_id=',
+        conv: API + 'inventory/products/product-uom-conversions.php?product_id='
     };
     const PRINT_URL = '../sale/pos_invoice/thermal-print.php';
     const EDIT_URL = '../sale/pos_invoice/pos-add.php?edit=';
@@ -175,9 +179,9 @@ if (!in_array($businessType, $allowedBT, true)) {
     const MODES = {
         restaurant: {i: '🍔', l: 'Restaurant', ot: ['Dine-in', 'Takeaway', 'Delivery'], chips: ['No Onion', 'No Mayo', 'Extra Cheese', 'Spicy', 'Less Spicy', 'Small', 'Medium', 'Large']},
         bakery: {i: '🥐', l: 'Bakery', ot: ['Walk-in', 'Delivery', 'Pre-order'], chips: ['Message on cake', 'Eggless', 'Less Sugar', 'Gift Pack']},
-        karyana: {i: '🛒', l: 'Karyana Store', ot: ['Walk-in', 'Home Delivery'], chips: ['Packed', 'Loose'], weight: 1},
+        karyana: {i: '🛒', l: 'Karyana Store', ot: ['Walk-in', 'Home Delivery'], chips: ['Packed', 'Loose']},
         general: {i: '🏪', l: 'General Store', ot: ['Walk-in', 'Home Delivery'], chips: []},
-        medical: {i: '💊', l: 'Medical Store', ot: ['Walk-in', 'Home Delivery'], chips: ['Strip', 'Box', 'Loose'], weight: 1},
+        medical: {i: '💊', l: 'Medical Store', ot: ['Walk-in', 'Home Delivery'], chips: ['Strip', 'Box', 'Loose']},
         mall: {i: '🏬', l: 'Mall / Retail', ot: ['Walk-in', 'Home Delivery'], chips: ['Size S', 'Size M', 'Size L', 'Size XL', 'Gift Wrap']}
     };
     // Mode is fixed by the company's business type (no switching)
@@ -202,7 +206,7 @@ if (!in_array($businessType, $allowedBT, true)) {
     const K = n => 'pos_' + n + '_' + TENANT;
     const LS = {get: (k, d) => { try { const v = localStorage.getItem(K(k)); return v === null ? d : JSON.parse(v); } catch (e) { return d; } }, set: (k, v) => { try { localStorage.setItem(K(k), JSON.stringify(v)); } catch (e) {} }};
     const DEFKEYS = Object.fromEntries(Object.entries(ACT).map(([a, v]) => [a, v.k]));
-    let M = {}, products = [], cats = [], custs = [], banks = [], cat = 'all', cart = [], holds = LS.get('hold', []), busy = false;
+    let M = {}, products = [], cats = [], custs = [], banks = [], cat = 'all', cart = [], holds = LS.get('hold', []), busy = false, ED = null;
     let KEYS = Object.assign({}, DEFKEYS, LS.get('keys', {})), autoPrint = LS.get('autoprint', true), capturing = null, lastId = null;
     const $ = id => document.getElementById(id);
     const setCash = () => { if (M.cash_customer_id) $('posCust').value = CASH; };
@@ -210,11 +214,50 @@ if (!in_array($businessType, $allowedBT, true)) {
     const f = n => sym() + (Math.round(n * 100) / 100).toLocaleString('en-PK');
     const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]));
     const hue = s => [...String(s)].reduce((a, c) => a + c.charCodeAt(0) * 7, 0) % 360;
-    const isW = p => (MODES[mode].weight && /^(kg|kilo|gram|gm|g|lb|pound|ltr|litre|liter|meter|mtr)/i.test(p.unit || ''));
+    const WRX = /^(kg|kilo|gram|gm|g\b|lb|pound|ltr|litre|liter|meter|mtr)/i;
+    const baseOf = U => U.find(u => u.base) || U[U.length - 1];
+    // Weight/loose item = base unit is Kg/Gram/Ltr/Meter... (works in every business type)
+    const isW = p => { const b = p._u && p._u.length ? baseOf(p._u) : null; return WRX.test(b ? b.name : (p.unit || '')); };
     const num = v => parseFloat(v) || 0;
     function toast(m, err) { const t = document.createElement('div'); t.className = 'pos-toast' + (err ? ' err' : ''); t.textContent = m; document.body.appendChild(t); setTimeout(() => t.remove(), err ? 5000 : 2500); }
     async function jget(u) { const r = await fetch(u); return r.json(); }
     async function jpost(u, b) { const r = await fetch(u, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(b)}); return r.json(); }
+
+    // ----- units: qty is ALWAYS stored in the BASE unit; shown as "1 Carton + 3 Piece" / "250 Gram" -----
+    async function getUnits(p) {
+        if (p._u) return p._u;
+        let u = [];
+        if (p.uom_group_id) {
+            try {
+                const [g, c] = await Promise.all([jget(EP.grp + p.uom_group_id), jget(EP.conv + p.id)]);
+                const cv = {}; (c.conversions || []).forEach(x => cv[x.uom_id] = +x.conversion_factor);
+                u = (g.units || []).map(x => ({
+                    id: +x.id, name: x.uom_name, base: x.is_base_unit == 1,
+                    factor: x.is_base_unit == 1 ? 1 : (x.unit_scope === 'per_product' ? (cv[x.id] || 0) : (+x.conversion_factor || 0))
+                }));
+            } catch (e) { u = []; }
+        } else u = p.units || [];
+        u = u.filter(x => x.factor > 0);
+        if (!u.length && p.unit_id) u = [{id: p.unit_id, name: p.unit || '', factor: 1, base: true}];
+        u.sort((a, b) => b.factor - a.factor);
+        p._u = u;
+        return u;
+    }
+    // split a base qty into [n of biggest unit, ..., rest in smallest unit]
+    function bd(U, q) {
+        const r = []; let rem = Math.round(q * 10000) / 10000;
+        U.forEach((u, i) => {
+            if (i === U.length - 1) r.push(Math.round(rem / u.factor * 1000) / 1000);
+            else { const n = Math.floor(rem / u.factor + 1e-9); r.push(n); rem = Math.round((rem - n * u.factor) * 10000) / 10000; }
+        });
+        return r;
+    }
+    function fmtQty(l) {
+        const U = l.units || [];
+        if (U.length < 2) return (+l.qty.toFixed(3)) + '';
+        const b = bd(U, l.qty);
+        return U.map((u, i) => b[i] ? b[i] + ' ' + u.name : '').filter(Boolean).join(' + ') || '0';
+    }
 
     // ----- shortcuts + auto print -----
     function hints() {
@@ -237,7 +280,7 @@ if (!in_array($businessType, $allowedBT, true)) {
             <p style="font-size:12px;color:#64748b;margin:.7rem 0 0">To change a key, click its button and then press the new key combination (with Ctrl, Alt or an F-key). Press Esc to cancel.</p>
             <div class="pos-btns"><button type="button" class="pos-btn g" id="posKreset">Reset to default</button><button type="button" class="pos-btn" id="posEc">Done</button></div>`;
     }
-    function openKeys() { capturing = null; drawKeys(); $('posPm').classList.add('on'); }
+    function openKeys() { capturing = null; ED = null; drawKeys(); $('posPm').classList.add('on'); }
     function holdBill() { if (!cart.length) return; holds.push({cart, cust: $('posCust').value}); LS.set('hold', holds); cart = []; resetCart(); }
     function run(a) {
         if ($('posPm').classList.contains('on') && a !== 'keys') return;
@@ -280,7 +323,9 @@ if (!in_array($businessType, $allowedBT, true)) {
     function filtered() {
         const s = $('posSearch').value.trim().toLowerCase();
         return products.filter(p => (cat === 'all' || (cat === 'none' ? !p.category_id : String(p.category_id) === String(cat))) &&
-            (!s || (p.name || '').toLowerCase().includes(s) || (p.code || '').toLowerCase().includes(s) || (p.barcode || '').toLowerCase().includes(s)));
+            (!s || (p.name || '').toLowerCase().includes(s) || (p.code || '').toLowerCase().includes(s) ||
+                (p.barcode || '').toLowerCase().includes(s) ||
+                (p.loose_units || []).some(u => (u.barcode || '').toLowerCase().includes(s))));
     }
     function drawItems() {
         const list = filtered(), shown = list.slice(0, 150);
@@ -293,16 +338,61 @@ if (!in_array($businessType, $allowedBT, true)) {
             || '<div class="pos-empty" style="grid-column:1/-1">No items found</div>';
     }
 
-    // ----- cart -----
+    function lineTotal(l) { return l.price * l.qty; }
+    function lineQuantity(l) { return l.looseUnit ? l.qty * l.looseUnit.qty_in_base : l.qty; }
+    function displayQuantity(l) {
+        return l.looseUnit ? (+l.qty.toFixed(3)) + ' ' + l.looseUnit.label : fmtQty(l);
+    }
+    // ----- cart (standard lines use base units; loose lines retain their configured unit) -----
     function addItem(p, qty, note, price) {
         qty = qty || 1; note = note || ''; price = price == null ? p.price : price;
+        const U = p._u || [], b = U.length ? baseOf(U) : {id: p.unit_id, name: p.unit};
         const l = cart.find(x => x.pid === p.id && x.note === note && x.price === price);
-        if (l) l.qty += qty; else cart.push({pid: p.id, name: p.name, price, qty, unit: p.unit, unitId: p.unit_id, grp: p.uom_group_id, sa: p.stock_affects, note, w: isW(p)});
+        if (l) l.qty = Math.round((l.qty + qty) * 10000) / 10000;
+        else cart.push({pid: p.id, name: p.name, price, qty, unit: b.name, unitId: b.id, units: U, grp: p.uom_group_id, sa: p.stock_affects, note, w: isW(p)});
         drawCart();
     }
-    function pick(p) { if (isW(p)) return openEdit(null, p); addItem(p, 1); }
+    function addLooseItem(p, unit, qty) {
+        const U = p._u || [], b = U.length ? baseOf(U) : {id: p.unit_id, name: p.unit};
+        const count = qty || 1;
+        const existing = cart.find(l => l.pid === p.id && l.looseUnit && l.looseUnit.id === unit.id && l.price === +unit.price);
+        if (existing) existing.qty = Math.round((existing.qty + count) * 1000) / 1000;
+        else cart.push({
+            pid: p.id, name: p.name, price: +unit.price, qty: count, unit: unit.label, unitId: b.id,
+            units: U, grp: p.uom_group_id, sa: p.stock_affects, note: '', w: false,
+            looseUnit: {...unit}, baseUnitName: b.name
+        });
+        drawCart();
+    }
+    function openLoosePicker(p, selectedId) {
+        const units = p.loose_units || [];
+        const selected = units.find(u => String(u.id) === String(selectedId)) || units[0];
+        if (!selected) return isW(p) ? openEdit(null, p) : addItem(p, 1);
+        ED = null;
+        $('posPb').style.maxWidth = '';
+        $('posPb').innerHTML = `<h3>${esc(p.name)}</h3>
+            <label class="t" for="posLooseUnit">Selling unit</label>
+            <select class="f" id="posLooseUnit">${units.map(u => `<option value="${u.id}" ${u.id === selected.id ? 'selected' : ''}>${esc(u.label)}</option>`).join('')}</select>
+            <div class="pos-et" id="posLooseDetails"></div>
+            <label class="t" for="posLooseQty">Quantity</label><input class="f" id="posLooseQty" type="number" min="0.001" step="0.001" value="1">
+            <div class="pos-btns"><button type="button" class="pos-btn full" id="posLooseAdd" data-pid="${p.id}">Add to Bill</button><button type="button" class="pos-btn g full" id="posEc">Cancel</button></div>`;
+        const updateDetails = () => {
+            const unit = units.find(u => String(u.id) === $('posLooseUnit').value);
+            $('posLooseDetails').innerHTML = `Price: <b>${esc(f(+unit.price))}</b> / ${esc(unit.label)}<br>Barcode: <b>${esc(unit.barcode || 'Not configured')}</b>`;
+        };
+        $('posLooseUnit').addEventListener('change', updateDetails);
+        updateDetails();
+        $('posPm').classList.add('on');
+        setTimeout(() => $('posLooseQty').focus(), 50);
+    }
+    async function pick(p, looseUnit) {
+        await getUnits(p);
+        if (p.loose_units && p.loose_units.length) return openLoosePicker(p, looseUnit && looseUnit.id);
+        if (isW(p)) return openEdit(null, p);
+        addItem(p, 1);
+    }
     function discount() {
-        const sub = cart.reduce((a, l) => a + l.price * l.qty, 0);
+        const sub = cart.reduce((a, l) => a + lineTotal(l), 0);
         return {sub, d: Math.min(sub, num($('posDa').value))};
     }
     function calc() {
@@ -310,37 +400,74 @@ if (!in_array($businessType, $allowedBT, true)) {
         $('posSub').textContent = f(sub); $('posTot').textContent = f(tot); $('posCnt').textContent = cart.length;
         const t = $('posTend').value === '' ? tot : num($('posTend').value);
         $('posChange').textContent = f(Math.max(0, t - tot));
-        const base = Math.ceil(tot / 100) * 100;
-$('posQuick').innerHTML = tot > 0 ? `<button type="button" data-t="${tot}">Exact</button>` : '';
+        $('posQuick').innerHTML = tot > 0 ? `<button type="button" data-t="${tot}">Exact</button>` : '';
         return {sub, d, del, tot};
     }
     function drawCart() {
         $('posLines').innerHTML = cart.length ? cart.map((l, x) => `
-            <div class="pos-ln"><div class="n">${esc(l.name)}<small>${l.note ? esc(l.note) + ' · ' : ''}${f(l.price)}${l.unit ? ' / ' + esc(l.unit) : ''}</small></div>
-                <div class="pos-q"><button type="button" data-x="${x}" data-d="-1">−</button><b>${+l.qty.toFixed(3)}</b><button type="button" data-x="${x}" data-d="1">+</button></div>
-                <b>${f(l.price * l.qty)}</b><button type="button" class="pos-ic" data-e="${x}" title="Qty / Price / Note">✎</button><button type="button" class="pos-ic x" data-r="${x}">×</button></div>`).join('')
+            <div class="pos-ln"><div class="n">${esc(l.name)}<small>${l.note ? esc(l.note) + ' · ' : ''}${f(l.price)}${l.unit ? ' / ' + esc(l.unit) : ''}${l.looseUnit ? '<br>Barcode: ' + esc(l.looseUnit.barcode || 'Not configured') : ''}</small></div>
+                <div class="pos-q"><button type="button" data-x="${x}" data-d="-1">−</button><b>${esc(displayQuantity(l))}</b><button type="button" data-x="${x}" data-d="1">+</button></div>
+                <b>${f(lineTotal(l))}</b><button type="button" class="pos-ic" data-e="${x}" title="Qty / Price / Note">✎</button><button type="button" class="pos-ic x" data-r="${x}">×</button></div>`).join('')
             : '<div class="pos-empty">Click an item or scan a barcode</div>';
         $('posHeld').innerHTML = holds.map((h, x) => `<button type="button" data-h="${x}">⏸ #${x + 1} · ${h.cart.length} items</button>`).join('');
         calc();
     }
+
+    // ----- edit modal: one box per unit (Carton / Piece, Kg / Gram) + Amount (Rs) for loose items -----
+    function setBoxes(q) { bd(ED.U, q).forEach((v, i) => { $('posEu' + i).value = v || ''; }); }
+    function readQ() { return Math.round(ED.U.reduce((a, u, i) => a + num($('posEu' + i).value) * u.factor, 0) * 10000) / 10000; }
+    function upd(clearAmt) {
+        if (!ED) return;
+        const q = readQ(), pr = num($('posEp').value);
+        $('posEt').textContent = fmtQty({units: ED.U, qty: q}) + '  =  ' + f(q * pr);
+        if (clearAmt && $('posEa')) $('posEa').value = '';
+    }
     function openEdit(idx, prod) {
         const l = idx == null ? null : cart[idx], p = l ? null : prod, w = l ? l.w : isW(p);
+        if (l && l.looseUnit) {
+            $('posPb').style.maxWidth = '';
+            $('posPb').innerHTML = `<h3>${esc(l.name)} - ${esc(l.looseUnit.label)}</h3>
+                <label class="t" for="posLooseEditQty">Quantity (${esc(l.looseUnit.label)})</label><input class="f" id="posLooseEditQty" type="number" min="0.001" step="0.001" value="${l.qty}">
+                <label class="t" for="posLooseEditPrice">Price / ${esc(l.looseUnit.label)}</label><input class="f" id="posLooseEditPrice" type="number" min="0" step="0.01" value="${l.price}">
+                <label class="t">Barcode</label><input class="f" type="text" value="${esc(l.looseUnit.barcode || '')}" readonly>
+                <div class="pos-btns"><button type="button" class="pos-btn full" id="posLooseEditSave" data-i="${idx}">Update</button><button type="button" class="pos-btn g full" id="posEc">Cancel</button></div>`;
+            $('posPm').classList.add('on');
+            setTimeout(() => $('posLooseEditQty').focus(), 50);
+            return;
+        }
+        const U = l ? l.units : p._u, b = baseOf(U);
         const name = l ? l.name : p.name, price = l ? l.price : p.price, qty = l ? l.qty : 1, note = l ? l.note : '';
+        ED = {U, idx, pid: p ? p.id : null};
+        const quick = (/^(g|gm|gram)/i.test(b.name) ? [100, 250, 500, 1000] : [0.25, 0.5, 1, 2]);
         $('posPb').style.maxWidth = '';
         $('posPb').innerHTML = `<h3>${esc(name)}</h3>
-            <label class="t">${w ? 'Weight / Qty' + (l ? l.unit ? ' (' + esc(l.unit) + ')' : '' : p.unit ? ' (' + esc(p.unit) + ')' : '') : 'Qty'}</label><input class="f" id="posEq" type="number" min="0.001" step="${w ? 0.25 : 1}" value="${qty}">
-            <label class="t">Price</label><input class="f" id="posEp" type="number" min="0" step="0.01" value="${price}">
+            <label class="t">Qty</label>
+            <div class="pos-ug" style="grid-template-columns:repeat(${U.length},1fr)">${U.map((u, i) => `<div><small style="color:#64748b;font-weight:600">${esc(u.name)}</small><input class="f" id="posEu${i}" type="number" min="0" step="any" style="margin-top:.2rem"></div>`).join('')}</div>
+            ${w ? `<div class="pos-chips">${quick.map(v => `<button type="button" data-wq="${v}">${esc(fmtQty({units: U, qty: v}))}</button>`).join('')}</div>
+            <label class="t">Amount (${esc(sym().trim())}) - customer ne kitne ka manga</label><input class="f" id="posEa" type="number" min="0" step="any" placeholder="e.g. 100">` : ''}
+            <label class="t">Price / ${esc(b.name)}</label><input class="f" id="posEp" type="number" min="0" step="0.01" value="${price}">
             <label class="t">Note</label><input class="f" id="posEn" value="${esc(note)}" placeholder="optional">
             <div class="pos-chips">${MODES[mode].chips.map(c => `<button type="button" data-chip="${esc(c)}">${esc(c)}</button>`).join('')}</div>
+            <div class="pos-et" id="posEt"></div>
             <div class="pos-btns"><button type="button" class="pos-btn full" id="posEok" data-i="${idx == null ? '' : idx}" data-pid="${p ? p.id : ''}">${l ? 'Update' : 'Add to Bill'}</button><button type="button" class="pos-btn g full" id="posEc">Cancel</button></div>`;
-        $('posPm').classList.add('on'); setTimeout(() => $('posEq').select(), 50);
+        setBoxes(qty); upd();
+        $('posPm').classList.add('on');
+        setTimeout(() => { const el = w && $('posEa') ? $('posEa') : $('posEu' + U.indexOf(b)); el.focus(); el.select(); }, 50);
     }
     function saveEdit(btn) {
-        const q = num($('posEq').value), pr = num($('posEp').value), nt = $('posEn').value.trim();
+        if (btn.id === 'posLooseEditSave') {
+            const l = cart[+btn.dataset.i], qty = num($('posLooseEditQty').value), price = num($('posLooseEditPrice').value);
+            if (qty <= 0 || price < 0) return toast('Enter a valid quantity and price', 1);
+            l.qty = qty;
+            l.price = price;
+            ED = null; $('posPm').classList.remove('on'); drawCart();
+            return;
+        }
+        const q = readQ(), pr = num($('posEp').value), nt = $('posEn').value.trim();
         if (q <= 0) return toast('Enter a valid quantity', 1);
         if (btn.dataset.i !== '') { const l = cart[+btn.dataset.i]; l.qty = q; l.price = pr; l.note = nt; }
         else addItem(products.find(p => p.id === +btn.dataset.pid), q, nt, pr);
-        $('posPm').classList.remove('on'); drawCart();
+        ED = null; $('posPm').classList.remove('on'); drawCart();
     }
     function resetCart() { cart = []; $('posDp').value = 0; $('posDa').value = 0; $('posDel').value = 0; $('posTend').value = ''; $('posTbl').value = ''; $('posCust').value = M.cash_customer_id ? CASH : ''; drawCart(); }
 
@@ -370,14 +497,22 @@ $('posQuick').innerHTML = tot > 0 ? `<button type="button" data-t="${tot}">Exact
             }
             const bad = cart.find(l => !l.unitId); if (bad) throw new Error(bad.name + ': no unit set (set a unit on the product page)');
             const ot = $('posOt').value, tbl = $('posTbl').value.trim();
-            const remarks = [ot + (tbl ? ' #' + tbl : '')].concat(cart.filter(l => l.note).map(l => `${+l.qty.toFixed(2)}x ${l.name}: ${l.note}`)).join(' | ');
+            const remarks = [ot + (tbl ? ' #' + tbl : '')].concat(cart.filter(l => l.note || l.looseUnit).map(l => {
+                if (l.looseUnit) return `${l.qty} ${l.looseUnit.label} ${l.name} @ ${f(l.price)}${l.looseUnit.barcode ? ' [Barcode: ' + l.looseUnit.barcode + ']' : ''}`;
+                return `${fmtQty(l)} ${l.name}: ${l.note}`;
+            })).join(' | ');
             const body = {
                 saleDate: new Date().toLocaleDateString('en-CA'), customerId: cid, branchId: branch, companyId: M.company_id, currencyId: M.currency_id, counterId: $('posCounter').value || null,
                 invoiceType: tend >= tot ? 'Cash' : 'Credit', status: 'Posted', remarks, amountPaidAutoFill: 'no',
                 totalBill: sub, totalDiscountPercent: num($('posDp').value), totalDiscountAmount: d, shippingFees: del, netAmount: tot,
                 amountPaid: tend, amountReturned: Math.max(0, tend - tot), paymentMethod: $('posPay').value, bankAccountId: bank,
-                items: cart.map(l => ({productId: l.pid, uomId: l.unitId, quantity: l.qty, salePrice: l.price, grossAmount: l.price * l.qty, discountPercent: 0, discountAmount: 0,
-                    extraDiscountAmount: 0, tradeOfferPercent: 0, tradeOfferAmount: 0, taxPercent: 0, taxAmount: 0, focQty: 0, netAmount: l.price * l.qty, scheme: 'sale_on_tp', stockAffects: l.sa}))
+                items: cart.map(l => {
+                    const quantity = lineQuantity(l), salePrice = l.looseUnit ? l.price / l.looseUnit.qty_in_base : l.price;
+                    const grossAmount = lineTotal(l);
+                    return {productId: l.pid, uomId: l.unitId, quantity, salePrice, grossAmount, discountPercent: 0, discountAmount: 0,
+                        extraDiscountAmount: 0, tradeOfferPercent: 0, tradeOfferAmount: 0, taxPercent: 0, taxAmount: 0, focQty: 0, netAmount: grossAmount,
+                        scheme: 'sale_on_tp', stockAffects: l.sa};
+                })
             };
             const r = await jpost(EP.save, body);
             if (!r.success) throw new Error(r.message || 'Save failed');
@@ -457,17 +592,18 @@ $('posQuick').innerHTML = tot > 0 ? `<button type="button" data-t="${tot}">Exact
         const im = e.target; if (im.tagName === 'IMG' && im.closest('.pos-im')) im.replaceWith(document.createTextNode(im.dataset.i || '?'));
     }, true);
     document.addEventListener('click', e => {
-        const t = e.target, el = t.closest('[data-c],[data-p],[data-x],[data-e],[data-r],[data-h],[data-t],[data-chip],[data-pr],[data-ed],[data-dl],[data-k]');
+        const t = e.target, el = t.closest('[data-c],[data-p],[data-x],[data-e],[data-r],[data-h],[data-t],[data-chip],[data-wq],[data-pr],[data-ed],[data-dl],[data-k]');
         if (el) {
             const d = el.dataset;
             if (d.c) { cat = d.c; drawCats(); drawItems(); }
             else if (d.p) pick(products.find(p => p.id === +d.p));
-            else if (d.x !== undefined) { const l = cart[+d.x], st = l.w ? 0.5 : 1; l.qty += +d.d * st; if (l.qty <= 0) cart.splice(+d.x, 1); drawCart(); }
+            else if (d.x !== undefined) { const l = cart[+d.x], st = l.looseUnit ? 1 : (l.w ? 0.5 : 1); l.qty = Math.round((l.qty + +d.d * st) * 10000) / 10000; if (l.qty <= 0) cart.splice(+d.x, 1); drawCart(); }
             else if (d.e !== undefined) openEdit(+d.e);
             else if (d.r !== undefined) { cart.splice(+d.r, 1); drawCart(); }
             else if (d.h !== undefined) { const h = holds.splice(+d.h, 1)[0]; LS.set('hold', holds); cart = h.cart; $('posCust').value = h.cust || (M.cash_customer_id ? CASH : ''); drawCart(); }
             else if (d.t !== undefined) { $('posTend').value = d.t; calc(); }
             else if (d.chip) { const n = $('posEn'); n.value = n.value ? n.value + ', ' + d.chip : d.chip; }
+            else if (d.wq) { setBoxes(+d.wq); upd(true); }
             else if (d.pr) printBill(d.pr);
             else if (d.ed) window.open(EDIT_URL + d.ed, '_blank');
             else if (d.dl) delBill(+d.dl, d.bn);
@@ -475,7 +611,7 @@ $('posQuick').innerHTML = tot > 0 ? `<button type="button" data-t="${tot}">Exact
             return;
         }
         if (t.id === 'posEok') saveEdit(t);
-        else if (t.id === 'posEc' || t === $('posPm')) { capturing = null; $('posPm').classList.remove('on'); }
+        else if (t.id === 'posEc' || t === $('posPm')) { capturing = null; ED = null; $('posPm').classList.remove('on'); }
         else if (t.id === 'posPlace') place();
         else if (t.id === 'posClear') resetCart();
         else if (t.id === 'posBgo') loadBills();
@@ -483,14 +619,39 @@ $('posQuick').innerHTML = tot > 0 ? `<button type="button" data-t="${tot}">Exact
         else if (t.id === 'posApBtn') setAp(!autoPrint);
         else if (t.id === 'posKeysBtn') openKeys();
         else if (t.id === 'posKreset') { KEYS = Object.assign({}, DEFKEYS); LS.set('keys', KEYS); capturing = null; drawKeys(); hints(); }
+        else if (t.id === 'posLooseEditSave') saveEdit(t);
+        else if (t.id === 'posLooseAdd') {
+            const p = products.find(x => x.id === +t.dataset.pid);
+            if (p) {
+                const unit = (p.loose_units || []).find(u => String(u.id) === $('posLooseUnit').value);
+                const qty = num($('posLooseQty').value);
+                if (!unit || qty <= 0) return toast('Select a unit and enter a valid quantity', 1);
+                addLooseItem(p, unit, qty);
+                $('posPm').classList.remove('on');
+            }
+        }
     });
     document.addEventListener('change', e => { if (e.target.id === 'posAp') setAp(e.target.checked); });
+    // edit modal live total: unit boxes / price / amount (Rs)
+    document.addEventListener('input', e => {
+        if (!ED) return;
+        const id = e.target.id || '';
+        if (id.startsWith('posEu')) upd(true);
+        else if (id === 'posEp') upd(false);
+        else if (id === 'posEa') { const pr = num($('posEp').value); if (pr > 0) { setBoxes(num(e.target.value) / pr); upd(false); } }
+    });
     $('posSearch').addEventListener('input', drawItems);
-    $('posSearch').addEventListener('keydown', e => {
+    $('posSearch').addEventListener('keydown', async e => {
         if (e.key !== 'Enter') return; e.preventDefault();
         const v = e.target.value.trim().toLowerCase(); if (!v) return;
+        const looseHit = products.flatMap(p => (p.loose_units || []).map(u => ({product: p, unit: u}))).find(x => (x.unit.barcode || '').toLowerCase() === v);
         const hit = products.find(p => (p.barcode || '').toLowerCase() === v || (p.code || '').toLowerCase() === v) || (filtered().length === 1 ? filtered()[0] : null);
-        if (hit) { pick(hit); e.target.value = ''; drawItems(); } else toast('Item not found', 1);
+        if (looseHit) {
+            await getUnits(looseHit.product);
+            addLooseItem(looseHit.product, looseHit.unit, 1);
+            e.target.value = '';
+            drawItems();
+        } else if (hit) { await pick(hit); e.target.value = ''; drawItems(); } else toast('Item not found', 1);
     });
     ['posDp'].forEach(id => $(id).addEventListener('input', () => { $('posDa').value = Math.round(discount().sub * num($('posDp').value)) / 100; calc(); }));
     $('posDa').addEventListener('input', () => { const s = discount().sub; $('posDp').value = s ? Math.round(num($('posDa').value) / s * 10000) / 100 : 0; calc(); });
@@ -513,7 +674,7 @@ $('posQuick').innerHTML = tot > 0 ? `<button type="button" data-t="${tot}">Exact
             if (dup) return toast('This key is already used for "' + ACT[dup].l + '"', 1);
             KEYS[capturing] = c; LS.set('keys', KEYS); capturing = null; drawKeys(); hints(); return;
         }
-        if (e.key === 'Escape') { $('posPm').classList.remove('on'); return; }
+        if (e.key === 'Escape') { ED = null; $('posPm').classList.remove('on'); return; }
         const c = combo(e); if (!c) return;
         const a = Object.keys(KEYS).find(x => KEYS[x] === c);
         if (a) { e.preventDefault(); run(a); }

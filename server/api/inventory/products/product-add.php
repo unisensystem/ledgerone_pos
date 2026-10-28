@@ -1,6 +1,7 @@
 <?php
 require_once '../../../../includes/connection.php';
 require_once '../../../../includes/activity-logger.php';
+require_once 'save-sub-units.php';
 
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
@@ -356,7 +357,10 @@ try {
         error_log('Total schemes inserted: ' . $inserted);
     }
     error_log('=== END SCHEME DEBUG ===');
-    
+
+    // Save loose sub-units (Half Kg, Pao, ...) for Kg / Litre products
+    saveProductSubUnits($pdo, $tenant_id, $product_id, $_POST['subUnitsJson'] ?? null);
+
     echo json_encode(['success' => true, 'message' => 'Product added successfully', 'product_id' => $product_id]);
     
 } catch (PDOException $e) {

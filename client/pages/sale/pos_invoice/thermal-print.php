@@ -345,6 +345,10 @@
                 </tr>
             </tbody>
         </table>
+
+        <div id="invoiceRemarksRow" style="display:none;font-size:11px;margin:6px 0;white-space:pre-wrap;overflow-wrap:anywhere;">
+            <strong>Details:</strong> <span id="invoiceRemarks"></span>
+        </div>
         
         <div class="divider"></div>
         
@@ -586,6 +590,10 @@
         function populateInvoiceData(invoice, items) {
             document.getElementById('invoiceNo').textContent = invoice.bill_no;
             document.getElementById('invoiceDate').textContent = new Date(invoice.sale_date).toLocaleDateString();
+            if (invoice.remarks) {
+                document.getElementById('invoiceRemarks').textContent = invoice.remarks;
+                document.getElementById('invoiceRemarksRow').style.display = 'block';
+            }
             // Walk-in bills are posted to the default "Cash Customer" - don't print a customer line for them
             const isWalkIn = (invoice.customer_name || '').trim().toLowerCase() === 'cash customer';
             document.getElementById('customerName').textContent = isWalkIn ? '' : invoice.customer_name;
