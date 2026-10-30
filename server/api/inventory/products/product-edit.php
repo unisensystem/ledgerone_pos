@@ -1,6 +1,7 @@
 <?php
 require_once '../../../../includes/connection.php';
 require_once '../../../../includes/activity-logger.php';
+require_once 'save-sub-units.php';
 
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
@@ -481,6 +482,8 @@ try {
         error_log('Total schemes inserted: ' . $inserted);
     }
     error_log('=== END SCHEME DEBUG (EDIT) ===');
+
+    saveProductSubUnits($pdo, $tenant_id, $product_id, $_POST['subUnitsJson'] ?? null);
 
     // Stock Opening rows get unconditionally deleted+reinserted above whenever the form
     // submits branch data - which happens on EVERY save, even when the user never touched

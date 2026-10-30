@@ -48,10 +48,11 @@ if (!in_array($businessType, $allowedBT, true)) {
 .pos-held{display:flex;gap:.4rem;flex-wrap:wrap;margin-bottom:.5rem}
 .pos-held button{border:1.5px dashed #e8b23f;background:#fff8e8;color:#92400e;border-radius:.5rem;padding:4px 10px;font-size:12px;font-weight:600;cursor:pointer}
 .pos-lines{max-height:340px;overflow-y:auto;min-height:90px}
-.pos-ln{display:flex;gap:.5rem;align-items:center;padding:.65rem 0;border-bottom:1px solid #f1f5f9;font-size:14px;color:#334155}
+.pos-ln{display:flex;flex-wrap:wrap;gap:.45rem;align-items:center;padding:.65rem 0;border-bottom:1px solid #f1f5f9;font-size:14px;color:#334155}
 .pos-ln .n{flex:1;min-width:0}.pos-ln .n small{display:block;color:#94a3b8;font-size:12px}
 .pos-q{display:flex;align-items:center;gap:6px}
-.pos-q b{font-size:12.5px;text-align:center;min-width:34px;max-width:110px}
+.pos-q input{width:64px;height:30px;padding:0 4px;border:1px solid #d6dbe4;border-radius:6px;text-align:center}
+.pos-unit{max-width:125px;height:32px;padding:0 5px;border:1px solid #d6dbe4;border-radius:6px;background:#fff;color:#334155}
 .pos-q button,.pos-ic{width:30px;height:30px;border:1px solid #d6dbe4;border-radius:7px;background:#f8fafc;cursor:pointer;font-size:15px;color:#334155}
 .pos-q button:hover,.pos-ic:hover{background:#eff6ff;border-color:#1f7bff}
 .pos-ic.x:hover{background:#fef2f2;border-color:#dc2626;color:#dc2626}
@@ -223,25 +224,77 @@ if (!in_array($businessType, $allowedBT, true)) {
     async function jget(u) { const r = await fetch(u); return r.json(); }
     async function jpost(u, b) { const r = await fetch(u, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(b)}); return r.json(); }
 
-    // ----- units: qty is ALWAYS stored in the BASE unit; shown as "1 Carton + 3 Piece" / "250 Gram" -----
+    // ----- product units: cart quantities are converted to the product base unit at checkout -----
     async function getUnits(p) {
         if (p._u) return p._u;
         let u = [];
         if (p.uom_group_id) {
-            try {
-                const [g, c] = await Promise.all([jget(EP.grp + p.uom_group_id), jget(EP.conv + p.id)]);
-                const cv = {}; (c.conversions || []).forEach(x => cv[x.uom_id] = +x.conversion_factor);
-                u = (g.units || []).map(x => ({
-                    id: +x.id, name: x.uom_name, base: x.is_base_unit == 1,
-                    factor: x.is_base_unit == 1 ? 1 : (x.unit_scope === 'per_product' ? (cv[x.id] || 0) : (+x.conversion_factor || 0))
-                }));
-            } catch (e) { u = []; }
+            const [g, c] = await Promise.all([jget(EP.grp + p.uom_group_id), jget(EP.conv + p.id)]);
+            if (!g.success || !c.success) throw new Error(g.message || c.message || 'Could not load product units');
+            const cv = {}; (c.conversions || []).forEach(x => cv[x.uom_id] = +x.conversion_factor);
+            u = (g.units || []).map(x => ({
+                id: +x.id, name: x.uom_name, base: x.is_base_unit == 1,
+                factor: x.is_base_unit == 1 ? 1 : (x.unit_scope === 'per_product' ? (cv[x.id] || 0) : (+x.conversion_factor || 0))
+            }));
         } else u = p.units || [];
         u = u.filter(x => x.factor > 0);
         if (!u.length && p.unit_id) u = [{id: p.unit_id, name: p.unit || '', factor: 1, base: true}];
         u.sort((a, b) => b.factor - a.factor);
         p._u = u;
         return u;
+    }
+    function sellingUnits(p) {
+        const standard = p._u || [];
+        const base = standard.find(u => u.base) || standard[standard.length - 1] || {id: p.unit_id, name: p.unit || '', factor: 1, base: true};
+        const options = standard.map(u => ({
+            key: 'u' + u.id, id: u.id, name: u.name, factor: +u.factor,
+            price: p.price * +u.factor, barcode: +u.id === +p.barcode_unit_id ? (p.barcode || '') : '',
+            base: !!u.base, unitId: +u.id, quantityFactor: 1
+        }));
+        (p.loose_units || []).forEach(pack => {
+            const existing = options.find(u =>
+                u.name.trim().toLowerCase() === String(pack.label).trim().toLowerCase() &&
+                Math.abs(u.factor - +pack.qty_in_base) < 0.000001
+            );
+            const packPrice = +pack.price > 0 ? +pack.price : p.price * +pack.qty_in_base;
+            if (existing) {
+                existing.factor = +pack.qty_in_base;
+                existing.price = packPrice;
+                existing.barcode = pack.barcode || '';
+                existing.packId = +pack.id;
+            } else {
+                options.push({
+                    key: 's' + pack.id, id: base.id,
+                    name: options.some(u => u.name.trim().toLowerCase() === String(pack.label).trim().toLowerCase()) ? pack.label + ' (custom)' : pack.label,
+                    factor: +pack.qty_in_base,
+                    price: packPrice, barcode: pack.barcode || '', packId: +pack.id,
+                    unitId: base.id, quantityFactor: +pack.qty_in_base
+                });
+            }
+        });
+        const biggest = options.filter(u => u.factor > 1).sort((a, b) => b.factor - a.factor)[0];
+        const baseOption = options.find(u => u.base && +u.factor === 1) || options.find(u => +u.id === +base.id && +u.factor === 1);
+        if (biggest && baseOption) {
+            options.push({
+                key: 'mixed', id: baseOption.id, name: biggest.name + ' + ' + baseOption.name,
+                factor: 1, price: p.price, barcode: '', base: true, mixed: true,
+                components: [biggest, baseOption]
+            });
+        }
+        p._sellUnits = options;
+        return options;
+    }
+    function defaultSellingUnit(p) {
+        const options = sellingUnits(p);
+        return options.find(u => +u.id === +p.barcode_unit_id && !u.mixed) ||
+            options.find(u => u.base && !u.mixed) || options[0];
+    }
+    function displayUnits(options) {
+        const mixed = options.find(u => u.mixed);
+        const components = mixed ? mixed.components : options.filter(u => !u.mixed);
+        return components.filter(Boolean).map(u => ({
+            name: u.name, factor: u.factor, base: !!u.base
+        })).sort((a, b) => b.factor - a.factor);
     }
     // split a base qty into [n of biggest unit, ..., rest in smallest unit]
     function bd(U, q) {
@@ -282,6 +335,47 @@ if (!in_array($businessType, $allowedBT, true)) {
     }
     function openKeys() { capturing = null; ED = null; drawKeys(); $('posPm').classList.add('on'); }
     function holdBill() { if (!cart.length) return; holds.push({cart, cust: $('posCust').value}); LS.set('hold', holds); cart = []; resetCart(); }
+    async function restoreHold(index) {
+        const held = holds[index];
+        if (!held) return;
+        try {
+            const restored = [];
+            for (const oldLine of held.cart || []) {
+                if (oldLine.selectedUnit) {
+                    restored.push(oldLine);
+                    continue;
+                }
+                const product = products.find(p => +p.id === +oldLine.pid);
+                if (!product) throw new Error(`${oldLine.name}: product is no longer available`);
+                await getUnits(product);
+                const options = sellingUnits(product);
+                let unit, qty = +oldLine.qty;
+                if (oldLine.looseUnit) {
+                    unit = options.find(option => +option.packId === +oldLine.looseUnit.id) ||
+                        options.find(option => option.name === oldLine.looseUnit.label);
+                    if (!unit) throw new Error(`${oldLine.name}: saved pack is no longer configured`);
+                } else {
+                    unit = options.find(option => option.base && !option.mixed) || options[0];
+                    if (unit && oldLine.price != null) unit = {...unit, price: +oldLine.price};
+                }
+                if (!unit) throw new Error(`${oldLine.name}: no selling unit is configured`);
+                const base = product._u.length ? baseOf(product._u) : {id: product.unit_id};
+                if (!base || !base.id) throw new Error(`${oldLine.name}: no base unit is configured`);
+                restored.push({
+                    pid: product.id, name: product.name, qty, selectedUnit: {...unit}, sellingUnits: options,
+                    unitId: base.id, units: displayUnits(options), grp: product.uom_group_id,
+                    sa: product.stock_affects, note: oldLine.note || '', w: isW(product)
+                });
+            }
+            cart = restored;
+            $('posCust').value = held.cust || (M.cash_customer_id ? CASH : '');
+            holds.splice(index, 1);
+            LS.set('hold', holds);
+            drawCart();
+        } catch (e) {
+            toast(e.message || 'Could not restore held bill', 1);
+        }
+    }
     function run(a) {
         if ($('posPm').classList.contains('on') && a !== 'keys') return;
         const foc = el => { el.focus(); el.select && el.select(); };
@@ -325,7 +419,8 @@ if (!in_array($businessType, $allowedBT, true)) {
         return products.filter(p => (cat === 'all' || (cat === 'none' ? !p.category_id : String(p.category_id) === String(cat))) &&
             (!s || (p.name || '').toLowerCase().includes(s) || (p.code || '').toLowerCase().includes(s) ||
                 (p.barcode || '').toLowerCase().includes(s) ||
-                (p.loose_units || []).some(u => (u.barcode || '').toLowerCase().includes(s))));
+                (p.loose_units || []).some(u => (u.barcode || '').toLowerCase().includes(s) || (u.label || '').toLowerCase().includes(s)) ||
+                (p.units || []).some(u => (u.name || '').toLowerCase().includes(s))));
     }
     function drawItems() {
         const list = filtered(), shown = list.slice(0, 150);
@@ -338,58 +433,65 @@ if (!in_array($businessType, $allowedBT, true)) {
             || '<div class="pos-empty" style="grid-column:1/-1">No items found</div>';
     }
 
-    function lineTotal(l) { return l.price * l.qty; }
-    function lineQuantity(l) { return l.looseUnit ? l.qty * l.looseUnit.qty_in_base : l.qty; }
+    function lineTotal(l) {
+        if (!l.selectedUnit.mixed) return l.selectedUnit.price * l.qty;
+        const baseQty = lineQuantity(l), [pack, base] = l.selectedUnit.components;
+        const packQty = Math.floor(baseQty / pack.factor + 1e-9);
+        const remainingQty = Math.round((baseQty - packQty * pack.factor) * 10000) / 10000;
+        return packQty * pack.price + remainingQty * base.price;
+    }
+    function lineQuantity(l) { return l.qty * l.selectedUnit.factor; }
+    function invoiceItems(l) {
+        const itemForUnit = (unit, quantity) => {
+            const grossAmount = quantity * unit.price;
+            const quantityFactor = unit.quantityFactor || 1;
+            return {productId: l.pid, uomId: unit.unitId || l.unitId, quantity: quantity * quantityFactor, salePrice: unit.price / quantityFactor, grossAmount, discountPercent: 0, discountAmount: 0,
+                extraDiscountAmount: 0, tradeOfferPercent: 0, tradeOfferAmount: 0, taxPercent: 0, taxAmount: 0, focQty: 0, netAmount: grossAmount,
+                scheme: 'sale_on_tp', stockAffects: l.sa};
+        };
+        if (!l.selectedUnit.mixed) return [itemForUnit(l.selectedUnit, l.qty)];
+        const [pack, base] = l.selectedUnit.components;
+        const baseQty = lineQuantity(l), packQty = Math.floor(baseQty / pack.factor + 1e-9);
+        const remainingQty = Math.round((baseQty - packQty * pack.factor) * 10000) / 10000;
+        return [
+            ...(packQty > 0 ? [itemForUnit(pack, packQty)] : []),
+            ...(remainingQty > 0 ? [itemForUnit(base, remainingQty)] : [])
+        ];
+    }
     function displayQuantity(l) {
-        return l.looseUnit ? (+l.qty.toFixed(3)) + ' ' + l.looseUnit.label : fmtQty(l);
+        return l.selectedUnit.mixed ? fmtQty({units: l.units, qty: lineQuantity(l)}) :
+            (+l.qty.toFixed(3)) + ' ' + l.selectedUnit.name;
     }
-    // ----- cart (standard lines use base units; loose lines retain their configured unit) -----
-    function addItem(p, qty, note, price) {
-        qty = qty || 1; note = note || ''; price = price == null ? p.price : price;
+    // ----- cart lines keep the selected selling unit; stock is sent in base units -----
+    function addItem(p, unit, qty) {
+        unit = unit || defaultSellingUnit(p);
         const U = p._u || [], b = U.length ? baseOf(U) : {id: p.unit_id, name: p.unit};
-        const l = cart.find(x => x.pid === p.id && x.note === note && x.price === price);
+        if (!b || !b.id) {
+            toast(p.name + ': configure a base unit before adding it', 1);
+            return;
+        }
+        if (!unit || !unit.id || !(unit.factor > 0)) {
+            toast(p.name + ': configure a selling unit before adding it', 1);
+            return;
+        }
+        qty = qty || 1;
+        const options = sellingUnits(p);
+        const l = cart.find(x => x.pid === p.id && x.selectedUnit.key === unit.key && !x.note);
         if (l) l.qty = Math.round((l.qty + qty) * 10000) / 10000;
-        else cart.push({pid: p.id, name: p.name, price, qty, unit: b.name, unitId: b.id, units: U, grp: p.uom_group_id, sa: p.stock_affects, note, w: isW(p)});
-        drawCart();
-    }
-    function addLooseItem(p, unit, qty) {
-        const U = p._u || [], b = U.length ? baseOf(U) : {id: p.unit_id, name: p.unit};
-        const count = qty || 1;
-        const existing = cart.find(l => l.pid === p.id && l.looseUnit && l.looseUnit.id === unit.id && l.price === +unit.price);
-        if (existing) existing.qty = Math.round((existing.qty + count) * 1000) / 1000;
         else cart.push({
-            pid: p.id, name: p.name, price: +unit.price, qty: count, unit: unit.label, unitId: b.id,
-            units: U, grp: p.uom_group_id, sa: p.stock_affects, note: '', w: false,
-            looseUnit: {...unit}, baseUnitName: b.name
+            pid: p.id, name: p.name, qty, selectedUnit: {...unit}, sellingUnits: options,
+            unitId: b.id, units: displayUnits(options), grp: p.uom_group_id, sa: p.stock_affects, note: '', w: isW(p)
         });
         drawCart();
     }
-    function openLoosePicker(p, selectedId) {
-        const units = p.loose_units || [];
-        const selected = units.find(u => String(u.id) === String(selectedId)) || units[0];
-        if (!selected) return isW(p) ? openEdit(null, p) : addItem(p, 1);
-        ED = null;
-        $('posPb').style.maxWidth = '';
-        $('posPb').innerHTML = `<h3>${esc(p.name)}</h3>
-            <label class="t" for="posLooseUnit">Selling unit</label>
-            <select class="f" id="posLooseUnit">${units.map(u => `<option value="${u.id}" ${u.id === selected.id ? 'selected' : ''}>${esc(u.label)}</option>`).join('')}</select>
-            <div class="pos-et" id="posLooseDetails"></div>
-            <label class="t" for="posLooseQty">Quantity</label><input class="f" id="posLooseQty" type="number" min="0.001" step="0.001" value="1">
-            <div class="pos-btns"><button type="button" class="pos-btn full" id="posLooseAdd" data-pid="${p.id}">Add to Bill</button><button type="button" class="pos-btn g full" id="posEc">Cancel</button></div>`;
-        const updateDetails = () => {
-            const unit = units.find(u => String(u.id) === $('posLooseUnit').value);
-            $('posLooseDetails').innerHTML = `Price: <b>${esc(f(+unit.price))}</b> / ${esc(unit.label)}<br>Barcode: <b>${esc(unit.barcode || 'Not configured')}</b>`;
-        };
-        $('posLooseUnit').addEventListener('change', updateDetails);
-        updateDetails();
-        $('posPm').classList.add('on');
-        setTimeout(() => $('posLooseQty').focus(), 50);
-    }
-    async function pick(p, looseUnit) {
-        await getUnits(p);
-        if (p.loose_units && p.loose_units.length) return openLoosePicker(p, looseUnit && looseUnit.id);
-        if (isW(p)) return openEdit(null, p);
-        addItem(p, 1);
+    async function pick(p, unit) {
+        try {
+            await getUnits(p);
+            sellingUnits(p);
+            addItem(p, unit || defaultSellingUnit(p), 1);
+        } catch (e) {
+            toast(e.message || 'Could not load product units', 1);
+        }
     }
     function discount() {
         const sub = cart.reduce((a, l) => a + lineTotal(l), 0);
@@ -405,68 +507,36 @@ if (!in_array($businessType, $allowedBT, true)) {
     }
     function drawCart() {
         $('posLines').innerHTML = cart.length ? cart.map((l, x) => `
-            <div class="pos-ln"><div class="n">${esc(l.name)}<small>${l.note ? esc(l.note) + ' · ' : ''}${f(l.price)}${l.unit ? ' / ' + esc(l.unit) : ''}${l.looseUnit ? '<br>Barcode: ' + esc(l.looseUnit.barcode || 'Not configured') : ''}</small></div>
-                <div class="pos-q"><button type="button" data-x="${x}" data-d="-1">−</button><b>${esc(displayQuantity(l))}</b><button type="button" data-x="${x}" data-d="1">+</button></div>
-                <b>${f(lineTotal(l))}</b><button type="button" class="pos-ic" data-e="${x}" title="Qty / Price / Note">✎</button><button type="button" class="pos-ic x" data-r="${x}">×</button></div>`).join('')
+            <div class="pos-ln"><div class="n">${esc(l.name)}<small>${l.note ? esc(l.note) + ' · ' : ''}${f(l.selectedUnit.price)} / ${esc(l.selectedUnit.name)}</small></div>
+                <select class="pos-unit" data-unit="${x}" aria-label="Selling unit for ${esc(l.name)}">${l.sellingUnits.map(u => `<option value="${esc(u.key)}" ${u.key === l.selectedUnit.key ? 'selected' : ''}>${esc(u.name)}</option>`).join('')}</select>
+                <div class="pos-q"><button type="button" data-x="${x}" data-d="-1">−</button><input type="number" min="0" step="any" value="${l.qty}" data-qty="${x}" aria-label="Quantity of ${esc(l.name)}">${l.selectedUnit.mixed ? `<small class="pos-mixedqty">${esc(displayQuantity(l))}</small>` : ''}<button type="button" data-x="${x}" data-d="1">+</button></div>
+                <b class="pos-line-total">${f(lineTotal(l))}</b><button type="button" class="pos-ic" data-e="${x}" title="Edit price / note">✎</button><button type="button" class="pos-ic x" data-r="${x}" title="Remove item">×</button></div>`).join('')
             : '<div class="pos-empty">Click an item or scan a barcode</div>';
         $('posHeld').innerHTML = holds.map((h, x) => `<button type="button" data-h="${x}">⏸ #${x + 1} · ${h.cart.length} items</button>`).join('');
         calc();
     }
 
-    // ----- edit modal: one box per unit (Carton / Piece, Kg / Gram) + Amount (Rs) for loose items -----
-    function setBoxes(q) { bd(ED.U, q).forEach((v, i) => { $('posEu' + i).value = v || ''; }); }
-    function readQ() { return Math.round(ED.U.reduce((a, u, i) => a + num($('posEu' + i).value) * u.factor, 0) * 10000) / 10000; }
-    function upd(clearAmt) {
-        if (!ED) return;
-        const q = readQ(), pr = num($('posEp').value);
-        $('posEt').textContent = fmtQty({units: ED.U, qty: q}) + '  =  ' + f(q * pr);
-        if (clearAmt && $('posEa')) $('posEa').value = '';
-    }
-    function openEdit(idx, prod) {
-        const l = idx == null ? null : cart[idx], p = l ? null : prod, w = l ? l.w : isW(p);
-        if (l && l.looseUnit) {
-            $('posPb').style.maxWidth = '';
-            $('posPb').innerHTML = `<h3>${esc(l.name)} - ${esc(l.looseUnit.label)}</h3>
-                <label class="t" for="posLooseEditQty">Quantity (${esc(l.looseUnit.label)})</label><input class="f" id="posLooseEditQty" type="number" min="0.001" step="0.001" value="${l.qty}">
-                <label class="t" for="posLooseEditPrice">Price / ${esc(l.looseUnit.label)}</label><input class="f" id="posLooseEditPrice" type="number" min="0" step="0.01" value="${l.price}">
-                <label class="t">Barcode</label><input class="f" type="text" value="${esc(l.looseUnit.barcode || '')}" readonly>
-                <div class="pos-btns"><button type="button" class="pos-btn full" id="posLooseEditSave" data-i="${idx}">Update</button><button type="button" class="pos-btn g full" id="posEc">Cancel</button></div>`;
-            $('posPm').classList.add('on');
-            setTimeout(() => $('posLooseEditQty').focus(), 50);
-            return;
-        }
-        const U = l ? l.units : p._u, b = baseOf(U);
-        const name = l ? l.name : p.name, price = l ? l.price : p.price, qty = l ? l.qty : 1, note = l ? l.note : '';
-        ED = {U, idx, pid: p ? p.id : null};
-        const quick = (/^(g|gm|gram)/i.test(b.name) ? [100, 250, 500, 1000] : [0.25, 0.5, 1, 2]);
+    // ----- optional line editor for price and kitchen/order notes -----
+    function openEdit(idx) {
+        const l = cart[idx];
+        ED = {idx};
         $('posPb').style.maxWidth = '';
-        $('posPb').innerHTML = `<h3>${esc(name)}</h3>
-            <label class="t">Qty</label>
-            <div class="pos-ug" style="grid-template-columns:repeat(${U.length},1fr)">${U.map((u, i) => `<div><small style="color:#64748b;font-weight:600">${esc(u.name)}</small><input class="f" id="posEu${i}" type="number" min="0" step="any" style="margin-top:.2rem"></div>`).join('')}</div>
-            ${w ? `<div class="pos-chips">${quick.map(v => `<button type="button" data-wq="${v}">${esc(fmtQty({units: U, qty: v}))}</button>`).join('')}</div>
-            <label class="t">Amount (${esc(sym().trim())}) - customer ne kitne ka manga</label><input class="f" id="posEa" type="number" min="0" step="any" placeholder="e.g. 100">` : ''}
-            <label class="t">Price / ${esc(b.name)}</label><input class="f" id="posEp" type="number" min="0" step="0.01" value="${price}">
-            <label class="t">Note</label><input class="f" id="posEn" value="${esc(note)}" placeholder="optional">
+        $('posPb').innerHTML = `<h3>${esc(l.name)} - ${esc(l.selectedUnit.name)}</h3>
+            <label class="t" for="posEditQty">Quantity (${esc(l.selectedUnit.name)})</label><input class="f" id="posEditQty" type="number" min="0.001" step="any" value="${l.qty}">
+            ${l.w ? `<label class="t" for="posEditAmount">Amount (${esc(sym().trim())})</label><input class="f" id="posEditAmount" type="number" min="0" step="any" placeholder="e.g. 100">` : ''}
+            <label class="t" for="posEditPrice">Price / ${esc(l.selectedUnit.name)}</label><input class="f" id="posEditPrice" type="number" min="0" step="0.01" value="${l.selectedUnit.price}">
+            <label class="t" for="posEn">Note</label><input class="f" id="posEn" value="${esc(l.note || '')}" placeholder="optional">
             <div class="pos-chips">${MODES[mode].chips.map(c => `<button type="button" data-chip="${esc(c)}">${esc(c)}</button>`).join('')}</div>
-            <div class="pos-et" id="posEt"></div>
-            <div class="pos-btns"><button type="button" class="pos-btn full" id="posEok" data-i="${idx == null ? '' : idx}" data-pid="${p ? p.id : ''}">${l ? 'Update' : 'Add to Bill'}</button><button type="button" class="pos-btn g full" id="posEc">Cancel</button></div>`;
-        setBoxes(qty); upd();
+            <div class="pos-btns"><button type="button" class="pos-btn full" id="posEditSave">Update</button><button type="button" class="pos-btn g full" id="posEc">Cancel</button></div>`;
         $('posPm').classList.add('on');
-        setTimeout(() => { const el = w && $('posEa') ? $('posEa') : $('posEu' + U.indexOf(b)); el.focus(); el.select(); }, 50);
+        setTimeout(() => { $('posEditQty').focus(); $('posEditQty').select(); }, 50);
     }
-    function saveEdit(btn) {
-        if (btn.id === 'posLooseEditSave') {
-            const l = cart[+btn.dataset.i], qty = num($('posLooseEditQty').value), price = num($('posLooseEditPrice').value);
-            if (qty <= 0 || price < 0) return toast('Enter a valid quantity and price', 1);
-            l.qty = qty;
-            l.price = price;
-            ED = null; $('posPm').classList.remove('on'); drawCart();
-            return;
-        }
-        const q = readQ(), pr = num($('posEp').value), nt = $('posEn').value.trim();
-        if (q <= 0) return toast('Enter a valid quantity', 1);
-        if (btn.dataset.i !== '') { const l = cart[+btn.dataset.i]; l.qty = q; l.price = pr; l.note = nt; }
-        else addItem(products.find(p => p.id === +btn.dataset.pid), q, nt, pr);
+    function saveEdit() {
+        const l = cart[ED.idx], qty = num($('posEditQty').value), price = num($('posEditPrice').value);
+        if (!l || qty <= 0 || price < 0) return toast('Enter a valid quantity and price', 1);
+        l.qty = qty;
+        l.selectedUnit.price = price;
+        l.note = $('posEn').value.trim();
         ED = null; $('posPm').classList.remove('on'); drawCart();
     }
     function resetCart() { cart = []; $('posDp').value = 0; $('posDa').value = 0; $('posDel').value = 0; $('posTend').value = ''; $('posTbl').value = ''; $('posCust').value = M.cash_customer_id ? CASH : ''; drawCart(); }
@@ -497,22 +567,18 @@ if (!in_array($businessType, $allowedBT, true)) {
             }
             const bad = cart.find(l => !l.unitId); if (bad) throw new Error(bad.name + ': no unit set (set a unit on the product page)');
             const ot = $('posOt').value, tbl = $('posTbl').value.trim();
-            const remarks = [ot + (tbl ? ' #' + tbl : '')].concat(cart.filter(l => l.note || l.looseUnit).map(l => {
-                if (l.looseUnit) return `${l.qty} ${l.looseUnit.label} ${l.name} @ ${f(l.price)}${l.looseUnit.barcode ? ' [Barcode: ' + l.looseUnit.barcode + ']' : ''}`;
-                return `${fmtQty(l)} ${l.name}: ${l.note}`;
+            const remarks = [ot + (tbl ? ' #' + tbl : '')].concat(cart.filter(l => l.note || l.selectedUnit.factor !== 1).map(l => {
+                const description = l.selectedUnit.mixed ? fmtQty({units: l.units, qty: lineQuantity(l)}) : `${l.qty} ${l.selectedUnit.name}`;
+                const note = l.note ? `: ${l.note}` : '';
+                const price = l.selectedUnit.mixed ? `${f(lineTotal(l))} total` : `${f(l.selectedUnit.price)} / ${l.selectedUnit.name}`;
+                return `${description} ${l.name} @ ${price}${l.selectedUnit.barcode ? ' [Barcode: ' + l.selectedUnit.barcode + ']' : ''}${note}`;
             })).join(' | ');
             const body = {
                 saleDate: new Date().toLocaleDateString('en-CA'), customerId: cid, branchId: branch, companyId: M.company_id, currencyId: M.currency_id, counterId: $('posCounter').value || null,
                 invoiceType: tend >= tot ? 'Cash' : 'Credit', status: 'Posted', remarks, amountPaidAutoFill: 'no',
                 totalBill: sub, totalDiscountPercent: num($('posDp').value), totalDiscountAmount: d, shippingFees: del, netAmount: tot,
                 amountPaid: tend, amountReturned: Math.max(0, tend - tot), paymentMethod: $('posPay').value, bankAccountId: bank,
-                items: cart.map(l => {
-                    const quantity = lineQuantity(l), salePrice = l.looseUnit ? l.price / l.looseUnit.qty_in_base : l.price;
-                    const grossAmount = lineTotal(l);
-                    return {productId: l.pid, uomId: l.unitId, quantity, salePrice, grossAmount, discountPercent: 0, discountAmount: 0,
-                        extraDiscountAmount: 0, tradeOfferPercent: 0, tradeOfferAmount: 0, taxPercent: 0, taxAmount: 0, focQty: 0, netAmount: grossAmount,
-                        scheme: 'sale_on_tp', stockAffects: l.sa};
-                })
+                items: cart.flatMap(invoiceItems)
             };
             const r = await jpost(EP.save, body);
             if (!r.success) throw new Error(r.message || 'Save failed');
@@ -592,25 +658,24 @@ if (!in_array($businessType, $allowedBT, true)) {
         const im = e.target; if (im.tagName === 'IMG' && im.closest('.pos-im')) im.replaceWith(document.createTextNode(im.dataset.i || '?'));
     }, true);
     document.addEventListener('click', e => {
-        const t = e.target, el = t.closest('[data-c],[data-p],[data-x],[data-e],[data-r],[data-h],[data-t],[data-chip],[data-wq],[data-pr],[data-ed],[data-dl],[data-k]');
+        const t = e.target, el = t.closest('[data-c],[data-p],[data-x],[data-e],[data-r],[data-h],[data-t],[data-chip],[data-pr],[data-ed],[data-dl],[data-k]');
         if (el) {
             const d = el.dataset;
             if (d.c) { cat = d.c; drawCats(); drawItems(); }
             else if (d.p) pick(products.find(p => p.id === +d.p));
-            else if (d.x !== undefined) { const l = cart[+d.x], st = l.looseUnit ? 1 : (l.w ? 0.5 : 1); l.qty = Math.round((l.qty + +d.d * st) * 10000) / 10000; if (l.qty <= 0) cart.splice(+d.x, 1); drawCart(); }
+            else if (d.x !== undefined) { const l = cart[+d.x], st = l.w && l.selectedUnit.base ? 0.5 : 1; l.qty = Math.round((l.qty + +d.d * st) * 10000) / 10000; if (l.qty <= 0) cart.splice(+d.x, 1); drawCart(); }
             else if (d.e !== undefined) openEdit(+d.e);
             else if (d.r !== undefined) { cart.splice(+d.r, 1); drawCart(); }
-            else if (d.h !== undefined) { const h = holds.splice(+d.h, 1)[0]; LS.set('hold', holds); cart = h.cart; $('posCust').value = h.cust || (M.cash_customer_id ? CASH : ''); drawCart(); }
+            else if (d.h !== undefined) restoreHold(+d.h);
             else if (d.t !== undefined) { $('posTend').value = d.t; calc(); }
             else if (d.chip) { const n = $('posEn'); n.value = n.value ? n.value + ', ' + d.chip : d.chip; }
-            else if (d.wq) { setBoxes(+d.wq); upd(true); }
             else if (d.pr) printBill(d.pr);
             else if (d.ed) window.open(EDIT_URL + d.ed, '_blank');
             else if (d.dl) delBill(+d.dl, d.bn);
             else if (d.k) { capturing = d.k; drawKeys(); }
             return;
         }
-        if (t.id === 'posEok') saveEdit(t);
+        if (t.id === 'posEditSave') saveEdit();
         else if (t.id === 'posEc' || t === $('posPm')) { capturing = null; ED = null; $('posPm').classList.remove('on'); }
         else if (t.id === 'posPlace') place();
         else if (t.id === 'posClear') resetCart();
@@ -619,26 +684,38 @@ if (!in_array($businessType, $allowedBT, true)) {
         else if (t.id === 'posApBtn') setAp(!autoPrint);
         else if (t.id === 'posKeysBtn') openKeys();
         else if (t.id === 'posKreset') { KEYS = Object.assign({}, DEFKEYS); LS.set('keys', KEYS); capturing = null; drawKeys(); hints(); }
-        else if (t.id === 'posLooseEditSave') saveEdit(t);
-        else if (t.id === 'posLooseAdd') {
-            const p = products.find(x => x.id === +t.dataset.pid);
-            if (p) {
-                const unit = (p.loose_units || []).find(u => String(u.id) === $('posLooseUnit').value);
-                const qty = num($('posLooseQty').value);
-                if (!unit || qty <= 0) return toast('Select a unit and enter a valid quantity', 1);
-                addLooseItem(p, unit, qty);
-                $('posPm').classList.remove('on');
-            }
+    });
+    document.addEventListener('change', e => {
+        if (e.target.id === 'posAp') setAp(e.target.checked);
+        else if (e.target.matches('[data-unit]')) {
+            const idx = +e.target.dataset.unit, line = cart[idx];
+            const unit = line && line.sellingUnits.find(u => u.key === e.target.value);
+            if (!unit) return;
+            const baseQty = lineQuantity(line);
+            line.selectedUnit = {...unit};
+            line.qty = Math.round(baseQty / unit.factor * 10000) / 10000;
+            drawCart();
+        } else if (e.target.matches('[data-qty]')) {
+            const idx = +e.target.dataset.qty, qty = num(e.target.value);
+            if (qty <= 0) cart.splice(idx, 1);
+            else cart[idx].qty = qty;
+            drawCart();
         }
     });
-    document.addEventListener('change', e => { if (e.target.id === 'posAp') setAp(e.target.checked); });
-    // edit modal live total: unit boxes / price / amount (Rs)
     document.addEventListener('input', e => {
-        if (!ED) return;
-        const id = e.target.id || '';
-        if (id.startsWith('posEu')) upd(true);
-        else if (id === 'posEp') upd(false);
-        else if (id === 'posEa') { const pr = num($('posEp').value); if (pr > 0) { setBoxes(num(e.target.value) / pr); upd(false); } }
+        if (e.target.matches('[data-qty]')) {
+            const idx = +e.target.dataset.qty, line = cart[idx], qty = Math.max(0, num(e.target.value));
+            if (!line) return;
+            line.qty = qty;
+            const total = e.target.closest('.pos-ln').querySelector('.pos-line-total');
+            total.textContent = f(lineTotal(line));
+            const qtyHint = e.target.closest('.pos-ln').querySelector('.pos-mixedqty');
+            if (qtyHint) qtyHint.textContent = displayQuantity(line);
+            calc();
+        } else if (ED && e.target.id === 'posEditAmount') {
+            const line = cart[ED.idx], price = num($('posEditPrice').value);
+            if (price > 0) $('posEditQty').value = num(e.target.value) / price;
+        }
     });
     $('posSearch').addEventListener('input', drawItems);
     $('posSearch').addEventListener('keydown', async e => {
@@ -647,11 +724,23 @@ if (!in_array($businessType, $allowedBT, true)) {
         const looseHit = products.flatMap(p => (p.loose_units || []).map(u => ({product: p, unit: u}))).find(x => (x.unit.barcode || '').toLowerCase() === v);
         const hit = products.find(p => (p.barcode || '').toLowerCase() === v || (p.code || '').toLowerCase() === v) || (filtered().length === 1 ? filtered()[0] : null);
         if (looseHit) {
-            await getUnits(looseHit.product);
-            addLooseItem(looseHit.product, looseHit.unit, 1);
-            e.target.value = '';
-            drawItems();
-        } else if (hit) { await pick(hit); e.target.value = ''; drawItems(); } else toast('Item not found', 1);
+            try {
+                await getUnits(looseHit.product);
+                const unit = sellingUnits(looseHit.product).find(u => +u.packId === +looseHit.unit.id);
+                if (!unit) throw new Error('Configured barcode unit is not available');
+                addItem(looseHit.product, unit, 1);
+                e.target.value = '';
+                drawItems();
+            } catch (error) { toast(error.message, 1); }
+        } else if (hit) {
+            try {
+                await getUnits(hit);
+                const unit = sellingUnits(hit).find(u => (u.barcode || '').toLowerCase() === v) || defaultSellingUnit(hit);
+                addItem(hit, unit, 1);
+                e.target.value = '';
+                drawItems();
+            } catch (error) { toast(error.message, 1); }
+        } else toast('Item not found', 1);
     });
     ['posDp'].forEach(id => $(id).addEventListener('input', () => { $('posDa').value = Math.round(discount().sub * num($('posDp').value)) / 100; calc(); }));
     $('posDa').addEventListener('input', () => { const s = discount().sub; $('posDp').value = s ? Math.round(num($('posDa').value) / s * 10000) / 100 : 0; calc(); });

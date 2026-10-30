@@ -1,39 +1,46 @@
-// Loose sub-units (Half Kg, Pao, Half Pao, Chhatank, custom...) for products whose
-// Default Unit is Kg or Litre. Self-contained: it keeps a hidden input
+// Product-specific selling units and packs. Self-contained: it keeps a hidden input
 // (name="subUnitsJson") inside #productForm up to date, so the existing FormData
 // submit in product-add.js sends it automatically — no change needed there.
 // Place in: client/assets/js/inventory/products/sub-units.js
 (function () {
     const PRESETS = {
         kg: [
-            { key: 'half', label: 'Half Kg', qty: 0.5 },
-            { key: 'pao', label: 'Pao', qty: 0.25 },
+            { key: 'half', label: '500 Gram', qty: 0.5 },
+            { key: 'pao', label: '250 Gram', qty: 0.25 },
             { key: 'halfpao', label: 'Half Pao', qty: 0.125 },
             { key: 'chhatank', label: 'Chhatank', qty: 0.0625 }
         ],
         litre: [
-            { key: 'half', label: 'Half Litre', qty: 0.5 },
-            { key: 'pao', label: 'Pao Litre', qty: 0.25 },
+            { key: 'half', label: '500 mL', qty: 0.5 },
+            { key: 'pao', label: '250 mL', qty: 0.25 },
             { key: 'halfpao', label: 'Half Pao Litre', qty: 0.125 },
             { key: 'chhatank', label: 'Chhatank Litre', qty: 0.0625 }
         ]
     };
 
-    let currentType = null; // 'kg' | 'litre' | null
+    let currentType = null;
     let editLoaded = null;  // saved sub-units fetched in edit mode
 
     function esc(v) {
         return String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
     }
 
-    function detectType() {
-        const uomTypeUnit = document.getElementById('uomTypeUnit');
+    function selectedBaseUnit() {
+        const groupMode = document.getElementById('uomTypeGroup');
+        if (groupMode && groupMode.checked) {
+            const units = window.currentGroupUnits || [];
+            const base = units.find(unit => unit.is_base_unit == 1);
+            return base ? { id: base.id, name: base.uom_name } : null;
+        }
+
         const select = document.getElementById('defaultUnit');
-        if (!uomTypeUnit || !uomTypeUnit.checked || !select || !select.value) return null;
-        const name = (select.options[select.selectedIndex].text || '').trim().toLowerCase();
-        if (/^(kg|kgs|kilo|kilogram|kilograms)\b/.test(name)) return 'kg';
-        if (/^(l|ltr|ltrs|liter|litre|liters|litres)\b/.test(name)) return 'litre';
-        return null;
+        if (!select || !select.value) return null;
+        const selected = (window.unitsData || []).find(unit => String(unit.id) === String(select.value));
+        if (!selected) return { id: select.value, name: select.options[select.selectedIndex].text };
+        if (selected.is_base_unit == 1) return { id: selected.id, name: selected.uom_name };
+
+        const base = (window.unitsData || []).find(unit => String(unit.id) === String(selected.base_unit_id));
+        return base ? { id: base.id, name: base.uom_name } : null;
     }
 
     let barcodeSeq = 0;
@@ -91,17 +98,17 @@
         return row;
     }
 
-    function render(type) {
+    function render(type, baseName) {
         const list = document.getElementById('subUnitsList');
         const unitLabel = document.getElementById('subUnitsBaseLabel');
         if (!list) return;
         list.innerHTML = '';
-        if (unitLabel) unitLabel.textContent = type === 'litre' ? 'Litre' : 'Kg';
+        if (unitLabel) unitLabel.textContent = baseName;
 
         const saved = editLoaded || [];
         const used = new Set();
 
-        PRESETS[type].forEach(p => {
+        (PRESETS[type] || []).forEach(p => {
             // match a saved row by qty (labels may differ between kg / litre)
             const match = saved.find(s => Math.abs(parseFloat(s.qty_in_base) - p.qty) < 0.000001 && s.is_custom != 1);
             if (match) used.add(match.id);
@@ -126,17 +133,24 @@
     function refresh() {
         const section = document.getElementById('subUnitsSection');
         if (!section) return;
-        const type = detectType();
-        if (!type) {
+        const base = selectedBaseUnit();
+        if (!base) {
             section.style.display = 'none';
             currentType = null;
             syncHidden();
             return;
         }
+        const normalized = base.name.trim().toLowerCase();
+        const type = /^(kg|kgs|kilo|kilogram|kilograms)\b/.test(normalized)
+            ? 'kg'
+            : (/^(l|ltr|ltrs|liter|litre|liters|litres)\b/.test(normalized) ? 'litre' : `unit:${base.id}`);
         section.style.display = '';
         if (type !== currentType) {
             currentType = type;
-            render(type);
+            render(type, base.name);
+        } else {
+            const unitLabel = document.getElementById('subUnitsBaseLabel');
+            if (unitLabel) unitLabel.textContent = base.name;
         }
     }
 
@@ -146,6 +160,9 @@
 
         document.getElementById('defaultUnit').addEventListener('change', refresh);
         document.querySelectorAll('input[name="uomType"]').forEach(r => r.addEventListener('change', refresh));
+        document.getElementById('uomGroup').addEventListener('change', refresh);
+        window.addEventListener('product-uom-group-loaded', refresh);
+        window.addEventListener('product-units-loaded', refresh);
 
         section.addEventListener('input', syncHidden);
         section.addEventListener('change', function (e) {

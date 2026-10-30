@@ -46,13 +46,26 @@ try {
         ];
     }
 
-    // Simple stock = SUM(qty_in - qty_out) for the branch (raw ledger units; exact multi-UOM
-    // stock still comes from get-product-stock.php, which is used at the counter invoice).
+    // POS quantities are displayed in base units, so normalize each ledger row before summing.
     $stock = [];
-    $sql = "SELECT product_id, SUM(COALESCE(qty_in,0) - COALESCE(qty_out,0)) AS q FROM stock_ledger WHERE tenant_id = ?";
+    $sql = "
+        SELECT sl.product_id,
+               SUM((COALESCE(sl.qty_in, 0) - COALESCE(sl.qty_out, 0)) *
+                   CASE
+                       WHEN u.is_base_unit = 1 THEN 1
+                       WHEN u.unit_scope = 'per_product' THEN COALESCE(NULLIF(puc.conversion_factor, 0), NULLIF(p.product_conversion_factor, 0), 1)
+                       WHEN u.unit_scope = 'universal' THEN COALESCE(NULLIF(u.conversion_factor, 0), 1)
+                       ELSE 1
+                   END) AS q
+        FROM stock_ledger sl
+        INNER JOIN products p ON p.id = sl.product_id AND p.tenant_id = sl.tenant_id
+        LEFT JOIN uom u ON u.id = sl.unit_id
+        LEFT JOIN product_uom_conversions puc ON puc.product_id = sl.product_id AND puc.uom_id = sl.unit_id
+        WHERE sl.tenant_id = ?
+    ";
     $args = [$tenant_id];
-    if ($branch_id) { $sql .= " AND branch_id = ?"; $args[] = $branch_id; }
-    $sql .= " GROUP BY product_id";
+    if ($branch_id) { $sql .= " AND sl.branch_id = ?"; $args[] = $branch_id; }
+    $sql .= " GROUP BY sl.product_id";
     $s = $pdo->prepare($sql);
     $s->execute($args);
     foreach ($s->fetchAll(PDO::FETCH_ASSOC) as $r) $stock[$r['product_id']] = (float) $r['q'];
@@ -64,6 +77,7 @@ try {
         // Default-unit products: agar default unit Carton jaisi non-base unit hai to
         // [Base (factor 1), Carton (factor N)] banao. Price base unit ka hi rehta hai.
         $units = [];
+        $barcodeUnitId = $r['default_unit_id'] ? (int) $r['default_unit_id'] : null;
         $unitId = $r['default_unit_id'] ? (int) $r['default_unit_id'] : null;
         $unitName = $r['uom_name'];
         if ($unitId) {
@@ -83,7 +97,7 @@ try {
             'id' => (int) $r['id'], 'code' => $r['code'], 'name' => $r['name'], 'barcode' => $r['barcode'],
             'category_id' => $r['category_id'] ? (int) $r['category_id'] : null,
             'photo' => $r['photo'], 'price' => $price,
-            'unit_id' => $unitId,
+            'unit_id' => $unitId, 'barcode_unit_id' => $barcodeUnitId,
             'unit' => $unitName, 'uom_group_id' => $r['uom_group_id'] ? (int) $r['uom_group_id'] : null,
             'units' => $units,
             'loose_units' => $subUnitsByProduct[$r['id']] ?? [],

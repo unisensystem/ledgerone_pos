@@ -1684,6 +1684,7 @@ function loadUnits() {
                 option.dataset.isBaseUnit = unit.is_base_unit || 0;
                 select.appendChild(option);
             });
+            window.dispatchEvent(new Event('product-units-loaded'));
         }
     })
     .catch(error => console.error('Error loading units:', error));
@@ -2803,6 +2804,7 @@ function handleUomGroupChange() {
     if (!groupId) {
         clearGroupConversionFactors();
         window.currentGroupUnits = [];
+        window.dispatchEvent(new Event('product-uom-group-loaded'));
         rebuildStockEntries();
         handleUomGroupChangeWithScheme();
         return Promise.resolve();
@@ -2817,6 +2819,7 @@ function handleUomGroupChange() {
             displayGroupConversionFactors(data.units);
             rebuildStockEntries();
             handleUomGroupChangeWithScheme();
+            window.dispatchEvent(new Event('product-uom-group-loaded'));
         }
     })
     .catch(error => console.error('Error loading group units:', error));
