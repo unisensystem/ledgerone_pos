@@ -28,7 +28,7 @@ if (!$user_id || !$tenant_id) {
 
 try {
     $input = json_decode(file_get_contents('php://input'), true);
-    
+
     // Debug logging
     error_log('pos-add.php received: ' . json_encode($input));
     error_log('brandId value: ' . ($input['brandId'] ?? 'NULL'));
@@ -38,23 +38,90 @@ try {
     }
 
     // Validate required fields
-    $required = ['saleDate', 'customerId', 'branchId', 'items'];
+    $required = ['saleDate', 'branchId', 'items'];
     foreach ($required as $field) {
         if (empty($input[$field])) {
             throw new Exception("Field {$field} is required");
         }
     }
 
-   if (empty($input['items']) || !is_array($input['items'])) {
-    throw new Exception('At least one item is required');
-}
+    if (empty($input['items']) || !is_array($input['items'])) {
+        throw new Exception('At least one item is required');
+    }
 
-$lockCheck = checkPostingDateAllowed($pdo, $tenant_id, 'sale_invoice', $input['saleDate']);
-if (!$lockCheck['allowed']) {
-    throw new Exception($lockCheck['message']);
-}
+    $customerName = trim((string) ($input['customerName'] ?? ''));
+    $customerPhone = trim((string) ($input['customerPhone'] ?? ''));
+    $customerPhone = $customerPhone === '' ? null : $customerPhone;
 
-$pdo->beginTransaction();
+    $lockCheck = checkPostingDateAllowed($pdo, $tenant_id, 'sale_invoice', $input['saleDate']);
+    if (!$lockCheck['allowed']) {
+        throw new Exception($lockCheck['message']);
+    }
+
+    $pdo->beginTransaction();
+
+    $customerId = !empty($input['customerId']) ? (int) $input['customerId'] : 0;
+    if ($customerId > 0) {
+        $customerCheck = $pdo->prepare("SELECT id FROM customers WHERE id = ? AND (tenant_id = ? OR tenant_id = 0) LIMIT 1");
+        $customerCheck->execute([$customerId, $tenant_id]);
+        if (!$customerCheck->fetchColumn()) {
+            $customerId = 0;
+        }
+    }
+
+    if (!$customerId) {
+        if ($customerName === '') {
+            throw new Exception('Customer is required');
+        }
+        if (preg_match('/^.{0,255}$/us', $customerName) !== 1) {
+            throw new Exception('Customer name cannot exceed 255 characters');
+        }
+
+        $customerLock = $pdo->prepare("SELECT id FROM customers WHERE tenant_id = ? ORDER BY id DESC LIMIT 1 FOR UPDATE");
+        $customerLock->execute([$tenant_id]);
+        $customerLock->fetchColumn();
+
+        $customerLookup = $pdo->prepare("
+            SELECT id FROM customers
+            WHERE (tenant_id = ? OR tenant_id = 0) AND LOWER(TRIM(customer_name)) = LOWER(?)
+            ORDER BY (tenant_id = ?) DESC, id ASC
+            LIMIT 1
+        ");
+        $customerLookup->execute([$tenant_id, $customerName, $tenant_id]);
+        $customerId = (int) ($customerLookup->fetchColumn() ?: 0);
+
+        if (!$customerId) {
+            $codeStmt = $pdo->prepare("
+                SELECT COALESCE(MAX(CAST(SUBSTRING(customer_code, 6) AS UNSIGNED)), 0) + 1
+                FROM customers
+                WHERE tenant_id = ? AND customer_code LIKE 'CUST-%'
+            ");
+            $codeStmt->execute([$tenant_id]);
+            $customerCode = 'CUST-' . str_pad((int) $codeStmt->fetchColumn(), 5, '0', STR_PAD_LEFT);
+
+            $createCustomer = $pdo->prepare("
+                INSERT INTO customers (
+                    tenant_id, company_id, customer_code, customer_name,
+                    country_id, region_id, city_id, city_zone_id, area_id,
+                    associated_sales_officer_id, advance_income_tax_percentage,
+                    default_discount_percentage, opening_debit_amount, opening_credit_amount,
+                    credit_limit, credit_period_limit_days, is_sales_tax_registered,
+                    is_filer, is_wholesaler, is_blacklisted, is_out_station, created_by, updated_by
+                ) VALUES (?, ?, ?, ?, NULL, NULL, NULL, NULL, NULL, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, ?, ?)
+            ");
+            $createCustomer->execute([
+                $tenant_id,
+                !empty($input['companyId']) ? (int) $input['companyId'] : null,
+                $customerCode,
+                $customerName,
+                $user_id,
+                $user_id
+            ]);
+            $customerId = (int) $pdo->lastInsertId();
+        }
+    }
+
+    $input['customerId'] = $customerId;
 
     // Generate sequential bill number tenant-wide
     $billStmt = $pdo->prepare("SELECT MAX(CAST(SUBSTRING(bill_no, 5) AS UNSIGNED)) FROM sale_invoice WHERE tenant_id = ? AND bill_no LIKE 'SAL-%'");
@@ -63,10 +130,13 @@ $pdo->beginTransaction();
     $billNo = 'SAL-' . str_pad($lastNumber + 1, 4, '0', STR_PAD_LEFT);
 
     // Get customer tax info
-    $customerStmt = $pdo->prepare("SELECT is_sales_tax_registered, is_filer, advance_income_tax_percentage FROM customers WHERE id = ?");
-    $customerStmt->execute([$input['customerId']]);
+    $customerStmt = $pdo->prepare("SELECT customer_code, customer_name, is_sales_tax_registered, is_filer, advance_income_tax_percentage FROM customers WHERE id = ? AND (tenant_id = ? OR tenant_id = 0)");
+    $customerStmt->execute([$customerId, $tenant_id]);
     $customer = $customerStmt->fetch();
-    
+    if (!$customer) {
+        throw new Exception('Customer not found');
+    }
+
     // Calculate withholding tax
     $withholdingTaxPercent = floatval($customer['advance_income_tax_percentage'] ?? 0);
     $withholdingTaxAmount = $input['netAmount'] * ($withholdingTaxPercent / 100);
@@ -101,7 +171,7 @@ $pdo->beginTransaction();
         $input['saleOrderId'] ?? null,
         $input['biltyNo'] ?? null,
         $input['transportName'] ?? null,
-        $input['customerPhone'] ?? null,
+        $customerPhone,
         $input['totalBill'],
         $input['totalDiscountPercent'] ?? 0.00,
         $input['totalDiscountAmount'] ?? 0.00,
@@ -138,29 +208,29 @@ $pdo->beginTransaction();
     // Either way sale_invoice.signature ends up populated, so the NEXT invoice's
     // get-default-signature.php lookup (latest non-null signature for this tenant)
     // keeps picking up the most recently used signature automatically.
-if ($status === 'Posted' || $status === 'Draft') {
-    if (!empty($input['signature']) && is_string($input['signature'])) {
-        if (strpos($input['signature'], 'data:image') === 0) {
-            $signatureFileName = saveInvoiceSignature($input['signature'], $tenant_id, $invoice_id);
-            if ($signatureFileName) {
-                $pdo->prepare("UPDATE sale_invoice SET signature = ? WHERE id = ?")
-                    ->execute([$signatureFileName, $invoice_id]);
-            }
-        } else {
-            // Re-using an existing signature filename (tenant default). Don't trust the
-            // client-supplied string outright - it later gets rendered as an <img src>
-            // with no server-side check at render time, so verify it actually belongs to
-            // THIS tenant's own signatures before storing it (blocks path traversal and
-            // cross-tenant IDOR via a guessed/probed filename).
-            $stmt = $pdo->prepare("SELECT 1 FROM sale_invoice WHERE tenant_id = ? AND signature = ? LIMIT 1");
-            $stmt->execute([$tenant_id, $input['signature']]);
-            if ($stmt->fetchColumn()) {
-                $pdo->prepare("UPDATE sale_invoice SET signature = ? WHERE id = ?")
-                    ->execute([$input['signature'], $invoice_id]);
+    if ($status === 'Posted' || $status === 'Draft') {
+        if (!empty($input['signature']) && is_string($input['signature'])) {
+            if (strpos($input['signature'], 'data:image') === 0) {
+                $signatureFileName = saveInvoiceSignature($input['signature'], $tenant_id, $invoice_id);
+                if ($signatureFileName) {
+                    $pdo->prepare("UPDATE sale_invoice SET signature = ? WHERE id = ?")
+                        ->execute([$signatureFileName, $invoice_id]);
+                }
+            } else {
+                // Re-using an existing signature filename (tenant default). Don't trust the
+                // client-supplied string outright - it later gets rendered as an <img src>
+                // with no server-side check at render time, so verify it actually belongs to
+                // THIS tenant's own signatures before storing it (blocks path traversal and
+                // cross-tenant IDOR via a guessed/probed filename).
+                $stmt = $pdo->prepare("SELECT 1 FROM sale_invoice WHERE tenant_id = ? AND signature = ? LIMIT 1");
+                $stmt->execute([$tenant_id, $input['signature']]);
+                if ($stmt->fetchColumn()) {
+                    $pdo->prepare("UPDATE sale_invoice SET signature = ? WHERE id = ?")
+                        ->execute([$input['signature'], $invoice_id]);
+                }
             }
         }
     }
-}
 
     // Save invoice-level taxes
     if (!empty($input['invoiceLevelTaxes']) && is_array($input['invoiceLevelTaxes'])) {
@@ -179,56 +249,56 @@ if ($status === 'Posted' || $status === 'Draft') {
     }
 
     // Insert invoice items
- $item_stmt = $pdo->prepare("
-    INSERT INTO sale_invoice_items (
-        tenant_id, sale_invoice_id, product_id, uom_id,
-        quantity, sale_price, gross_amount, discount_percent,
-        discount_amount, extra_discount_amount, trade_offer_percent, trade_offer_amount,
-        tax_percent, tax_amount, foc_quantity, net_amount, parent_row_id,
-        piece, carton, dozen, scheme, batch_no, expiry_date, created_by, updated_by
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-");
+    $item_stmt = $pdo->prepare("
+        INSERT INTO sale_invoice_items (
+            tenant_id, sale_invoice_id, product_id, uom_id,
+            quantity, sale_price, gross_amount, discount_percent,
+            discount_amount, extra_discount_amount, trade_offer_percent, trade_offer_amount,
+            tax_percent, tax_amount, foc_quantity, net_amount, parent_row_id,
+            piece, carton, dozen, scheme, batch_no, expiry_date, created_by, updated_by
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ");
 
     $itemRowCounter = 0;
     $itemIdMap = [];
 
     foreach ($input['items'] as $item) {
         $itemRowCounter++;
-        
+
         // Map parent_row_id to actual database ID
         $parentRowId = null;
         if (isset($item['parentRowId']) && $item['parentRowId'] !== null) {
             $parentRowId = $itemIdMap[$item['parentRowId']] ?? null;
         }
-        
-      $item_stmt->execute([
-    $tenant_id,
-    $invoice_id,
-    $item['productId'],
-    $item['uomId'],
-    $item['quantity'],
-    $item['salePrice'],
-    $item['grossAmount'],
-    $item['discountPercent'] ?? 0.00,
-    $item['discountAmount'] ?? 0.00,
-    $item['extraDiscountAmount'] ?? 0.00,
-    $item['tradeOfferPercent'] ?? 0.00,
-    $item['tradeOfferAmount'] ?? 0.00,
-    $item['taxPercent'] ?? 0.00,
-    $item['taxAmount'] ?? 0.00,
-    $item['focQty'] ?? 0.00,
-    $item['netAmount'],
-    $parentRowId,
-    $item['piece'] ?? null,
-    $item['carton'] ?? null,
-    $item['dozen'] ?? null,
-    $item['scheme'] ?? 'sale_on_tp',
-    !empty($item['batchNo']) ? $item['batchNo'] : null,
-    !empty($item['batchExpiryDate']) ? $item['batchExpiryDate'] : null,
-    $user_id,
-    $user_id
-]);
-        
+
+        $item_stmt->execute([
+            $tenant_id,
+            $invoice_id,
+            $item['productId'],
+            $item['uomId'],
+            $item['quantity'],
+            $item['salePrice'],
+            $item['grossAmount'],
+            $item['discountPercent'] ?? 0.00,
+            $item['discountAmount'] ?? 0.00,
+            $item['extraDiscountAmount'] ?? 0.00,
+            $item['tradeOfferPercent'] ?? 0.00,
+            $item['tradeOfferAmount'] ?? 0.00,
+            $item['taxPercent'] ?? 0.00,
+            $item['taxAmount'] ?? 0.00,
+            $item['focQty'] ?? 0.00,
+            $item['netAmount'],
+            $parentRowId,
+            $item['piece'] ?? null,
+            $item['carton'] ?? null,
+            $item['dozen'] ?? null,
+            $item['scheme'] ?? 'sale_on_tp',
+            !empty($item['batchNo']) ? $item['batchNo'] : null,
+            !empty($item['batchExpiryDate']) ? $item['batchExpiryDate'] : null,
+            $user_id,
+            $user_id
+        ]);
+
         $itemId = $pdo->lastInsertId();
         $itemIdMap[$itemRowCounter] = $itemId;
 
@@ -240,8 +310,53 @@ if ($status === 'Posted' || $status === 'Draft') {
             $productStmt->execute([$item['productId']]);
             $inventoryAccountId = $productStmt->fetchColumn() ?: 0;
             $costPrice = getCostPrice($pdo, $tenant_id, $item['productId'], $input['branchId']);
-            
-            // Insert stock ledger for quantity sold (use actual quantity, not converted)
+
+            // ================================================================
+            // NEW: Ledger mein hamesha BASE unit (Piece) aur Piece ki qty save
+            // hogi. Carton / koi bhi bari unit ko yahan convert kiya jata hai.
+            // Example: 1 Carton (1 Carton = 6 Piece) => qty_out = 6, unit = Piece
+            // ================================================================
+        $ledgerQty = floatval($item['quantity']);
+$ledgerUnitId = $item['uomId'];
+
+$uStmt = $pdo->prepare("
+    SELECT u.uom_name, u.is_base_unit, u.base_unit_id, u.unit_scope, u.conversion_factor AS uom_cf,
+           (SELECT puc.conversion_factor FROM product_uom_conversions puc
+             WHERE puc.product_id = ? AND puc.uom_id = u.id LIMIT 1) AS puc_cf,
+           (SELECT p.product_conversion_factor FROM products p WHERE p.id = ?) AS prod_cf,
+           (SELECT p.default_unit_id FROM products p WHERE p.id = ?) AS prod_default_unit
+    FROM uom u WHERE u.id = ?
+");
+$uStmt->execute([$item['productId'], $item['productId'], $item['productId'], $item['uomId']]);
+$uRow = $uStmt->fetch(PDO::FETCH_ASSOC);
+
+error_log('POS STOCK DEBUG: ' . json_encode(['uomId' => $item['uomId'], 'qty' => $item['quantity'], 'uRow' => $uRow]));
+
+if ($uRow && (int)$uRow['is_base_unit'] !== 1) {
+    if ($uRow['unit_scope'] === 'per_product') {
+        $f = floatval($uRow['puc_cf']) > 0 ? floatval($uRow['puc_cf']) : floatval($uRow['prod_cf']);
+    } else {
+        $f = floatval($uRow['uom_cf']);
+    }
+    if ($f <= 1) {
+        throw new Exception('Carton ka Conversion Factor 1 ya khali hai (' . $uRow['uom_name'] . '). Product page par factor daal kar product dobara save karein.');
+    }
+
+    // Base unit (Piece): pehle unit ka apna base_unit_id, warna naam se dhoondo
+    $baseId = !empty($uRow['base_unit_id']) ? (int)$uRow['base_unit_id'] : 0;
+    if (!$baseId) {
+        $bq = $pdo->query("SELECT id FROM uom WHERE is_base_unit = 1 AND (uom_name LIKE '%piece%' OR uom_name LIKE 'pc%') ORDER BY id LIMIT 1");
+        $baseId = (int)$bq->fetchColumn();
+    }
+    if (!$baseId) {
+        throw new Exception('Base unit (Piece) nahi mila. Carton unit ka Base Unit set karein.');
+    }
+
+    $ledgerQty = $ledgerQty * $f;      // 1 Carton => 6 Piece
+    $ledgerUnitId = $baseId;           // Piece
+}
+
+            // Insert stock ledger for quantity sold (base unit mein)
             $stock_stmt = $pdo->prepare("
                 INSERT INTO stock_ledger (
                     tenant_id, account_id, branch_id, product_id, reference_table, reference_id,
@@ -254,16 +369,16 @@ if ($status === 'Posted' || $status === 'Draft') {
                 $input['branchId'],
                 $item['productId'],
                 $invoice_id,
-                $item['quantity'],
+                $ledgerQty,
                 $costPrice,
-                $item['uomId'],
+                $ledgerUnitId,
                 !empty($item['batchNo']) ? $item['batchNo'] : null,
                 !empty($item['batchExpiryDate']) ? $item['batchExpiryDate'] : null,
                 $input['saleDate']
             ]);
 
             // =====================================================================
-            // ---- CHILD SALE => PARENT STOCK BHI KAM KARO (NEW) ----
+            // ---- CHILD SALE => PARENT STOCK BHI KAM KARO ----
             // Sirf standalone child par chalega (bundle ke andar wale children par
             // nahi, warna parentRowId wale case mein double minus ho jayega).
             // Example: "Dal 5Kg" ka 1 pack sell => parent "Dal" se 5 Kg minus.
@@ -321,19 +436,19 @@ if ($status === 'Posted' || $status === 'Draft') {
                     ]);
                 }
             }
-            // ---------------------- END NEW BLOCK ----------------------
-            
+            // ---------------------- END CHILD BLOCK ----------------------
+
             // Insert stock ledger for FOC quantity if exists
             if (isset($item['focQty']) && $item['focQty'] > 0) {
                 // Use base unit ID for FOC quantity
                 $focUnitId = $item['focUnitId'] ?? null;
-                
+
                 // If focUnitId is not provided, look up the base unit from the selected unit
                 if (!$focUnitId || $focUnitId === '') {
                     $unitStmt = $pdo->prepare("SELECT is_base_unit, base_unit_id FROM uom WHERE id = ?");
                     $unitStmt->execute([$item['uomId']]);
                     $unitData = $unitStmt->fetch();
-                    
+
                     if ($unitData) {
                         // If selected unit IS a base unit, use its ID; otherwise use its base_unit_id
                         $focUnitId = $unitData['is_base_unit'] == 1 ? $item['uomId'] : ($unitData['base_unit_id'] ?? $item['uomId']);
@@ -342,7 +457,7 @@ if ($status === 'Posted' || $status === 'Draft') {
                         $focUnitId = $item['uomId'];
                     }
                 }
-                
+
                 $foc_stmt = $pdo->prepare("
                     INSERT INTO stock_ledger (
                         tenant_id, account_id, branch_id, product_id, reference_table, reference_id,
@@ -372,13 +487,13 @@ if ($status === 'Posted' || $status === 'Draft') {
         $totalTradeOffer = 0;
         $totalTax = 0;
         $totalGrossAmount = 0;
-        
+
         foreach ($input['items'] as $item) {
             $totalTradeOffer += floatval($item['tradeOfferAmount'] ?? 0);
             $totalTax += floatval($item['taxAmount'] ?? 0);
             $totalGrossAmount += floatval($item['grossAmount']);
         }
-        
+
         $totalInvoiceDiscount = floatval($input['totalDiscountAmount'] ?? 0);
 
         // Debit: Trade Debtors (Net Amount)
@@ -565,7 +680,7 @@ if ($status === 'Posted' || $status === 'Draft') {
             'sale_officer_id' => $input['salesOfficerId'] ?? null, 'supplier_man_id' => $input['supplierManId'] ?? null,
             'brand_id' => $input['brandId'] ?? null, 'sale_order_id' => $input['saleOrderId'] ?? null,
             'bilty_no' => $input['biltyNo'] ?? null, 'transport_name' => $input['transportName'] ?? null,
-            'customer_phone' => $input['customerPhone'] ?? null,
+            'customer_phone' => $customerPhone,
             'total_bill' => $input['totalBill'], 'total_discount_percent' => $input['totalDiscountPercent'] ?? 0,
             'total_discount_amount' => $input['totalDiscountAmount'] ?? 0, 'shipping_fees' => $input['shippingFees'] ?? 0,
             'net_amount' => $input['netAmount'], 'invoice_type' => $input['invoiceType'] ?? 'Cash',
@@ -579,7 +694,10 @@ if ($status === 'Posted' || $status === 'Draft') {
     echo json_encode([
         'success' => true,
         'message' => 'Sale invoice saved successfully',
-        'invoice_id' => $invoice_id
+        'invoice_id' => $invoice_id,
+        'customer_id' => $customerId,
+        'customer_code' => $customer['customer_code'],
+        'customer_name' => $customer['customer_name']
     ]);
 
 } catch (Exception $e) {
@@ -605,7 +723,7 @@ function extractBalanceAmount($balanceString)
         $amount = trim(preg_replace('/^Cr\s*/i', '', $balanceString));
         return -floatval($amount);
     }
-    
+
     // Dr (Debit) or no prefix - positive value
     $amount = trim(preg_replace('/^Dr\s*/i', '', $balanceString));
     return floatval($amount);
@@ -618,16 +736,16 @@ function getCostPrice($pdo, $tenant_id, $product_id, $branch_id)
     $methodStmt = $pdo->prepare("SELECT inventory_valuation_method FROM companies WHERE tenant_id = ? LIMIT 1");
     $methodStmt->execute([$tenant_id]);
     $method = $methodStmt->fetchColumn() ?: 'FIFO';
-    
+
     $costPrice = 0;
-    
+
     if ($method === 'FIFO') {
         // Get oldest purchase price
         $stmt = $pdo->prepare("
-            SELECT unit_cost 
-            FROM stock_ledger 
+            SELECT unit_cost
+            FROM stock_ledger
             WHERE tenant_id = ? AND product_id = ? AND branch_id = ? AND qty_in > 0 AND unit_cost > 0
-            ORDER BY transaction_date ASC, id ASC 
+            ORDER BY transaction_date ASC, id ASC
             LIMIT 1
         ");
         $stmt->execute([$tenant_id, $product_id, $branch_id]);
@@ -635,10 +753,10 @@ function getCostPrice($pdo, $tenant_id, $product_id, $branch_id)
     } elseif ($method === 'LIFO') {
         // Get latest purchase price
         $stmt = $pdo->prepare("
-            SELECT unit_cost 
-            FROM stock_ledger 
+            SELECT unit_cost
+            FROM stock_ledger
             WHERE tenant_id = ? AND product_id = ? AND branch_id = ? AND qty_in > 0 AND unit_cost > 0
-            ORDER BY transaction_date DESC, id DESC 
+            ORDER BY transaction_date DESC, id DESC
             LIMIT 1
         ");
         $stmt->execute([$tenant_id, $product_id, $branch_id]);
@@ -646,25 +764,26 @@ function getCostPrice($pdo, $tenant_id, $product_id, $branch_id)
     } elseif ($method === 'AVCO') {
         // Calculate weighted average cost
         $stmt = $pdo->prepare("
-            SELECT 
+            SELECT
                 SUM(qty_in * unit_cost) / NULLIF(SUM(qty_in), 0) as avg_cost
-            FROM stock_ledger 
+            FROM stock_ledger
             WHERE tenant_id = ? AND product_id = ? AND branch_id = ? AND qty_in > 0 AND unit_cost > 0
         ");
         $stmt->execute([$tenant_id, $product_id, $branch_id]);
         $result = $stmt->fetch(PDO::FETCH_ASSOC);
         $costPrice = $result['avg_cost'] ?: 0;
     }
-    
+
     // If no cost found from stock ledger, use purchase_price from products table
     if ($costPrice == 0) {
         $stmt = $pdo->prepare("SELECT purchase_price FROM products WHERE id = ?");
         $stmt->execute([$product_id]);
         $costPrice = $stmt->fetchColumn() ?: 0;
     }
-    
+
     return $costPrice;
 }
+
 // Decode a base64 data-URL PNG (from the client-side signature crop) and save it
 // to disk, returning the stored filename to be saved in sale_invoice.signature.
 function saveInvoiceSignature($dataUrl, $tenant_id, $invoice_id)

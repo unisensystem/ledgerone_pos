@@ -18,7 +18,7 @@ try {
         $q = trim($_GET['q'] ?? '');
         $sql = "
             SELECT si.id, si.bill_no, si.sale_date, si.net_amount, si.amount_paid, si.status, si.created_by, si.payment_method,
-                   c.customer_name,
+                   c.customer_name, si.customer_phone,
                    (SELECT COUNT(*) FROM sale_invoice_items sii WHERE sii.sale_invoice_id = si.id) AS item_count
             FROM sale_invoice si
             LEFT JOIN customers c ON c.id = si.customer_id

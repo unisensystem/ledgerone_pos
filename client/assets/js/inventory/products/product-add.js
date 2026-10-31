@@ -1703,33 +1703,33 @@ function handleDefaultUnitChange() {
         const selectedUnitId = selectedOption.value;
         
         // Show conversion factor if unit_scope is per_product AND is_base_unit is 0
-        if (unitScope === 'per_product' && isBaseUnit == 0) {
-            conversionFactorGroup.style.display = 'block';
-            conversionFactorInput.setAttribute('required', '');
+       if (unitScope === 'per_product' && isBaseUnit == 0) {
+    conversionFactorGroup.style.display = 'block';
+    conversionFactorInput.setAttribute('required', '');
 
-            // A product whose only unit IS a per-product one (e.g. just "Carton",
-            // no UOM Group involved) still needs the "Enter Trade Price / MRP By"
-            // toggle — it was previously only wired up for the Group-UOM path, so a
-            // single-unit product with a real packing size (e.g. 1 Carton = 12 Pc)
-            // had no way to enter price per-Carton at all. Pair it with the account's
-            // "Piece" base unit (every per-product packaging unit multiplies a Piece
-            // count) and drive it through the same dropdown/conversion machinery the
-            // Group-UOM path already uses.
-            const pieceUnit = (window.unitsData || []).find(u =>
-                u.is_base_unit == 1 && /piece/i.test(u.uom_name || '')
-            );
-            const selectedUnitData = (window.unitsData || []).find(u => String(u.id) === String(selectedUnitId));
-            if (pieceUnit && selectedUnitData) {
-                window.currentGroupUnits = [pieceUnit, selectedUnitData];
-                populatePriceEntryUnitDropdown(window.currentGroupUnits);
-            }
-        } else {
-            conversionFactorGroup.style.display = 'none';
-            conversionFactorInput.removeAttribute('required');
-            conversionFactorInput.value = '';
-            window.currentGroupUnits = [];
-            populatePriceEntryUnitDropdown([]);
+    const allUnits = window.unitsData || [];
+    const selectedUnitData = allUnits.find(u => String(u.id) === String(selectedUnitId));
+
+    // base unit (Piece): pehle unit ke apne base_unit_id se, warna naam se
+    const pieceUnit =
+        allUnits.find(u => selectedUnitData && u.is_base_unit == 1 &&
+            String(u.id) === String(selectedUnitData.base_unit_id)) ||
+        allUnits.find(u => u.is_base_unit == 1 && /piece|pcs|pc\b/i.test(u.uom_name || ''));
+
+    if (pieceUnit && selectedUnitData) {
+        window.currentGroupUnits = [pieceUnit, selectedUnitData];
+        populatePriceEntryUnitDropdown(window.currentGroupUnits);
+
+        // New product: prices automatically Carton ke hisab se
+        const isEdit = !!document.getElementById('productForm').dataset.editId;
+        const sel = document.getElementById('priceEntryUnit');
+        if (!isEdit && sel && sel.querySelector(`option[value="${selectedUnitData.id}"]`)) {
+            sel.value = selectedUnitData.id;
+            currentPriceEntryUnitId = String(selectedUnitData.id);
+            updatePriceFieldLabels(selectedUnitData.uom_name);
         }
+    }
+}
 
         // Filter UOM Groups based on selected unit
         filterUomGroupsByUnit(selectedUnitId);

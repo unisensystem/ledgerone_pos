@@ -54,6 +54,8 @@ if (!in_array($businessType, $allowedBT, true)) {
 .pos-g2{display:grid;grid-template-columns:1fr 1fr;gap:.5rem;margin-bottom:.5rem}
 .pos-g2 .w{grid-column:1/-1}
 .pos-g2 input,.pos-g2 select{height:40px;padding:0 .7rem;border:1.5px solid #d6dbe4;border-radius:.5rem;font-size:13.5px;background:#fff;color:#1e293b;width:100%;min-width:0}
+.pos-customer-fields{display:flex;gap:.5rem;min-width:0}
+.pos-customer-fields input{flex:1;min-width:0}
 .pos-held{display:flex;gap:.4rem;flex-wrap:wrap;margin-bottom:.5rem}
 .pos-held button{border:1.5px dashed #e8b23f;background:#fff8e8;color:#92400e;border-radius:.5rem;padding:4px 10px;font-size:12px;font-weight:600;cursor:pointer}
 .pos-lines{max-height:340px;overflow-y:auto;min-height:90px}
@@ -130,8 +132,11 @@ if (!in_array($businessType, $allowedBT, true)) {
         <div class="pos-cart">
             <h3>Current Bill <em id="posCnt">0</em></h3>
             <div class="pos-g2">
-                <input type="text" id="posCust" list="posCustList" placeholder="Customer (default: Cash Customer)" autocomplete="off">
-                <datalist id="posCustList"></datalist>
+                <div class="pos-customer-fields">
+                    <input type="text" id="posCust" list="posCustList" placeholder="Customer (default: Cash Customer)" autocomplete="off">
+                    <datalist id="posCustList"></datalist>
+                    <input type="tel" id="posPhone" maxlength="32" placeholder="Phone" autocomplete="tel" aria-label="Phone number (optional)">
+                </div>
                 <select id="posOt"></select>
                 <input type="text" id="posTbl" placeholder="Table / Token no." style="display:none">
             </div>
@@ -186,7 +191,7 @@ if (!in_array($businessType, $allowedBT, true)) {
         banks: API + 'financial_reports/cash_flow/filter-options.php', grp: API + 'inventory/products/uom-group-units.php?group_id=',
         conv: API + 'inventory/products/product-uom-conversions.php?product_id='
     };
-    const PRINT_URL = '../sale/pos_invoice/thermal-print.php';
+    const PRINT_URL = '../sale/pos_invoice/pos-thermal-print.php';
     const EDIT_URL = '../sale/pos_invoice/pos-add.php?edit=';
     const IMG = '../../assets/uploads/products/';
     const MODES = {
@@ -346,7 +351,7 @@ if (!in_array($businessType, $allowedBT, true)) {
             <div class="pos-btns"><button type="button" class="pos-btn g" id="posKreset">Reset to default</button><button type="button" class="pos-btn" id="posEc">Done</button></div>`;
     }
     function openKeys() { capturing = null; ED = null; drawKeys(); $('posPm').classList.add('on'); }
-    function holdBill() { if (!cart.length) return; holds.push({cart, cust: $('posCust').value}); LS.set('hold', holds); cart = []; resetCart(); }
+    function holdBill() { if (!cart.length) return; holds.push({cart, cust: $('posCust').value, phone: $('posPhone').value}); LS.set('hold', holds); cart = []; resetCart(); }
     async function restoreHold(index) {
         const held = holds[index];
         if (!held) return;
@@ -381,6 +386,7 @@ if (!in_array($businessType, $allowedBT, true)) {
             }
             cart = restored;
             $('posCust').value = held.cust || (M.cash_customer_id ? CASH : '');
+            $('posPhone').value = held.phone || '';
             holds.splice(index, 1);
             LS.set('hold', holds);
             drawCart();
@@ -552,7 +558,7 @@ if (!in_array($businessType, $allowedBT, true)) {
         l.note = $('posEn').value.trim();
         ED = null; $('posPm').classList.remove('on'); drawCart();
     }
-    function resetCart() { cart = []; $('posDp').value = 0; $('posDa').value = 0; $('posDel').value = 0; $('posTend').value = ''; $('posTbl').value = ''; $('posCust').value = M.cash_customer_id ? CASH : ''; drawCart(); }
+    function resetCart() { cart = []; $('posDp').value = 0; $('posDa').value = 0; $('posDel').value = 0; $('posTend').value = ''; $('posTbl').value = ''; $('posCust').value = M.cash_customer_id ? CASH : ''; $('posPhone').value = ''; drawCart(); }
 
     // ----- save -----
     function custId() {
@@ -560,14 +566,17 @@ if (!in_array($businessType, $allowedBT, true)) {
         const c = custs.find(c => (c.customer_code ? c.customer_code + ' - ' : '') + c.customer_name === v || c.customer_name === v);
         return c ? c.id : null;
     }
+    function drawCustomers() {
+        $('posCustList').innerHTML = custs.map(c => `<option value="${esc((c.customer_code ? c.customer_code + ' - ' : '') + c.customer_name)}">`).join('');
+    }
     async function place(pr) {
         if (busy) return;
         if (!cart.length) return toast('The bill is empty', 1);
-        const cid = custId(), branch = +$('posBranch').value;
-        if (!cid) return toast($('posCust').value.trim() ? 'Customer not found in the list' : 'Cash Customer not found - please select a customer', 1);
+        const cid = custId(), customerName = $('posCust').value.trim(), branch = +$('posBranch').value;
+        if (!cid && !customerName) return toast('Cash Customer not found - please select a customer', 1);
         if (!branch) return toast('Please select a branch', 1);
         const {sub, d, del, tot} = calc(), tend = $('posTend').value === '' ? tot : num($('posTend').value);
-        const isCash = cid === M.cash_customer_id;
+        const isCash = !!M.cash_customer_id && cid === M.cash_customer_id;
         if (tend < tot && isCash) return toast('Please select a customer for credit sales', 1);
         const bank = $('posPay').value === 'bank_transfer' ? $('posBank').value : null;
         if ($('posPay').value === 'bank_transfer' && !bank) return toast('Please select a bank account', 1);
@@ -587,7 +596,7 @@ if (!in_array($businessType, $allowedBT, true)) {
                 return `${description} ${l.name} @ ${price}${l.selectedUnit.barcode ? ' [Barcode: ' + l.selectedUnit.barcode + ']' : ''}${note}`;
             })).join(' | ');
             const body = {
-                saleDate: new Date().toLocaleDateString('en-CA'), customerId: cid, branchId: branch, companyId: M.company_id, currencyId: M.currency_id, counterId: $('posCounter').value || null,
+                saleDate: new Date().toLocaleDateString('en-CA'), customerId: cid || null, customerName, customerPhone: $('posPhone').value.trim(), branchId: branch, companyId: M.company_id, currencyId: M.currency_id, counterId: $('posCounter').value || null,
                 invoiceType: tend >= tot ? 'Cash' : 'Credit', status: 'Posted', remarks, amountPaidAutoFill: 'no',
                 totalBill: sub, totalDiscountPercent: num($('posDp').value), totalDiscountAmount: d, shippingFees: del, netAmount: tot,
                 amountPaid: tend, amountReturned: Math.max(0, tend - tot), paymentMethod: $('posPay').value, bankAccountId: bank,
@@ -596,6 +605,10 @@ if (!in_array($businessType, $allowedBT, true)) {
             const r = await jpost(EP.save, body);
             if (!r.success) throw new Error(r.message || 'Save failed');
             lastId = r.invoice_id;
+            if (r.customer_id && !custs.some(c => +c.id === +r.customer_id)) {
+                custs.push({id: +r.customer_id, customer_code: r.customer_code, customer_name: r.customer_name});
+                drawCustomers();
+            }
             toast(doPrint ? 'Bill saved ✔ (printing)' : 'Bill saved ✔');
             if (doPrint) printBill(r.invoice_id);
             resetCart(); loadBills(); loadProducts();
@@ -662,7 +675,7 @@ if (!in_array($businessType, $allowedBT, true)) {
         try {
             const r = await jget(EP.bills + '?' + q);
             if (!r.success) throw new Error(r.message);
-            $('posBills').innerHTML = r.data.length ? r.data.map(b => `<tr><td><b>${esc(b.bill_no)}</b></td><td>${esc(b.sale_date)}</td><td>${esc(b.customer_name || '-')}</td><td class="r">${b.item_count}</td><td class="r">${f(+b.net_amount)}</td><td class="r">${f(+b.amount_paid)}</td>
+            $('posBills').innerHTML = r.data.length ? r.data.map(b => `<tr><td><b>${esc(b.bill_no)}</b></td><td>${esc(b.sale_date)}</td><td>${esc(b.customer_name || '-')}${b.customer_phone ? `<br><small>${esc(b.customer_phone)}</small>` : ''}</td><td class="r">${b.item_count}</td><td class="r">${f(+b.net_amount)}</td><td class="r">${f(+b.amount_paid)}</td>
                 <td class="a"><button data-pr="${b.id}">Print</button><button data-ed="${b.id}">Edit</button>${b.can_delete ? `<button class="d" data-dl="${b.id}" data-bn="${esc(b.bill_no)}">Delete</button>` : ''}</td></tr>`).join('')
                 : '<tr><td colspan="7" class="pos-empty">No bills for this date</td></tr>';
         } catch (e) { $('posBills').innerHTML = `<tr><td colspan="7" class="pos-empty" style="color:#dc2626">${esc(e.message)}</td></tr>`; }
@@ -707,7 +720,7 @@ if (!in_array($businessType, $allowedBT, true)) {
         jget(EP.cats).then(r => { cats = r.categories || []; drawCats(); }).catch(() => {});
         jget(EP.custs).then(r => {
             custs = r.data || [];
-            $('posCustList').innerHTML = custs.map(c => `<option value="${esc((c.customer_code ? c.customer_code + ' - ' : '') + c.customer_name)}">`).join('');
+            drawCustomers();
             // Fallback: meta.php did not find Cash Customer, but the customers list has it
             if (!M.cash_customer_id) {
                 const cc = custs.find(c => (c.customer_name || '').trim().toLowerCase() === CASH.toLowerCase());
