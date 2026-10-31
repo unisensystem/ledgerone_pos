@@ -39,6 +39,15 @@ if (!in_array($businessType, $allowedBT, true)) {
 .pos-in small{color:#94a3b8;font-size:12px}
 .pos-stk{position:absolute;top:8px;right:8px;background:rgba(255,255,255,.95);font-size:11px;font-weight:700;padding:3px 8px;border-radius:9999px;color:#16a34a;box-shadow:0 1px 4px rgba(0,0,0,.15)}
 .pos-stk.low{color:#dc2626}
+.pos-bcb{position:absolute;top:8px;left:8px;z-index:2;width:30px;height:26px;display:flex;align-items:center;justify-content:center;border:1px solid #d6dbe4;border-radius:7px;background:rgba(255,255,255,.95);color:#334155;cursor:pointer;padding:0;box-shadow:0 1px 4px rgba(0,0,0,.15)}
+.pos-bcb:hover{border-color:#1f7bff;color:#1f7bff}
+.pos-bcs{border:1.5px solid #e2e8f0;border-radius:.6rem;padding:.7rem;margin-top:.7rem;text-align:center}
+.pos-bcs b{display:block;font-size:13px;color:#0f172a}
+.pos-bcs svg{width:100%;height:80px;margin:.4rem 0 .2rem;display:block;background:#fff}
+.pos-bcsel{display:flex;align-items:center;gap:.5rem;cursor:pointer;font-size:14px;color:#334155;margin-top:.6rem}
+.pos-bcs .pos-bcsel{margin-top:0;justify-content:center}
+.pos-bcsel input{width:18px;height:18px}
+.pos-bcs small{display:block;color:#475569;letter-spacing:1px;margin-bottom:.5rem}
 .pos-cart{background:#fff;border:2px solid #e2e8f0;border-radius:.9rem;padding:1.1rem}
 .pos-cart h3{margin:0 0 .6rem;font-size:1.15rem;color:#0f172a;display:flex;justify-content:space-between;align-items:center}
 .pos-cart h3 em{font-style:normal;font-size:12px;background:#1f7bff;color:#fff;border-radius:9999px;padding:2px 10px}
@@ -48,11 +57,14 @@ if (!in_array($businessType, $allowedBT, true)) {
 .pos-held{display:flex;gap:.4rem;flex-wrap:wrap;margin-bottom:.5rem}
 .pos-held button{border:1.5px dashed #e8b23f;background:#fff8e8;color:#92400e;border-radius:.5rem;padding:4px 10px;font-size:12px;font-weight:600;cursor:pointer}
 .pos-lines{max-height:340px;overflow-y:auto;min-height:90px}
-.pos-ln{display:flex;flex-wrap:wrap;gap:.45rem;align-items:center;padding:.65rem 0;border-bottom:1px solid #f1f5f9;font-size:14px;color:#334155}
-.pos-ln .n{flex:1;min-width:0}.pos-ln .n small{display:block;color:#94a3b8;font-size:12px}
+.pos-ln{display:grid;grid-template-columns:1fr auto auto auto;gap:.5rem .45rem;align-items:center;padding:.7rem 0;border-bottom:1px solid #f1f5f9;font-size:14px;color:#334155}
+.pos-ln .n{min-width:0;font-weight:600;color:#0f172a;word-break:break-word}.pos-ln .n small{display:block;color:#94a3b8;font-size:12px;font-weight:400;margin-top:2px}
+.pos-ln .pos-line-total{white-space:nowrap;text-align:right}
+.pos-ln .pos-unit{grid-column:1;width:100%;max-width:none;min-width:0}
+.pos-ln .pos-q{grid-column:2/-1;justify-self:end}
 .pos-q{display:flex;align-items:center;gap:6px}
 .pos-q input{width:64px;height:30px;padding:0 4px;border:1px solid #d6dbe4;border-radius:6px;text-align:center}
-.pos-unit{max-width:125px;height:32px;padding:0 5px;border:1px solid #d6dbe4;border-radius:6px;background:#fff;color:#334155}
+.pos-unit{max-width:155px;height:32px;padding:0 5px;border:1px solid #d6dbe4;border-radius:6px;background:#fff;color:#334155}
 .pos-q button,.pos-ic{width:30px;height:30px;border:1px solid #d6dbe4;border-radius:7px;background:#f8fafc;cursor:pointer;font-size:15px;color:#334155}
 .pos-q button:hover,.pos-ic:hover{background:#eff6ff;border-color:#1f7bff}
 .pos-ic.x:hover{background:#fef2f2;border-color:#dc2626;color:#dc2626}
@@ -426,6 +438,7 @@ if (!in_array($businessType, $allowedBT, true)) {
         const list = filtered(), shown = list.slice(0, 150);
         $('posGrid').innerHTML = shown.map(p => `
             <div class="pos-it" data-p="${p.id}">
+                <button type="button" class="pos-bcb" data-bc="${p.id}" title="Barcode"><svg width="16" height="14" viewBox="0 0 16 14" fill="currentColor" aria-hidden="true"><rect x="0" width="2" height="14"/><rect x="3" width="1" height="14"/><rect x="5" width="3" height="14"/><rect x="9" width="1" height="14"/><rect x="11" width="2" height="14"/><rect x="14" width="2" height="14"/></svg></button>
                 ${p.stock !== null ? `<span class="pos-stk ${p.stock <= 0 ? 'low' : ''}">${+p.stock.toFixed(2)}</span>` : ''}
                 <div class="pos-im" style="--h:${hue(p.name)}">${p.photo ? `<img loading="lazy" src="${IMG + encodeURI(p.photo)}" alt="" data-i="${esc((p.name || '?').charAt(0).toUpperCase())}">` : esc((p.name || '?').charAt(0).toUpperCase())}</div>
                 <div class="pos-in"><b>${esc(p.name)}</b><span>${f(p.price)}</span> <small>${p.unit ? '/ ' + esc(p.unit) : ''}</small></div></div>`).join('')
@@ -508,9 +521,9 @@ if (!in_array($businessType, $allowedBT, true)) {
     function drawCart() {
         $('posLines').innerHTML = cart.length ? cart.map((l, x) => `
             <div class="pos-ln"><div class="n">${esc(l.name)}<small>${l.note ? esc(l.note) + ' · ' : ''}${f(l.selectedUnit.price)} / ${esc(l.selectedUnit.name)}</small></div>
-                <select class="pos-unit" data-unit="${x}" aria-label="Selling unit for ${esc(l.name)}">${l.sellingUnits.map(u => `<option value="${esc(u.key)}" ${u.key === l.selectedUnit.key ? 'selected' : ''}>${esc(u.name)}</option>`).join('')}</select>
-                <div class="pos-q"><button type="button" data-x="${x}" data-d="-1">−</button><input type="number" min="0" step="any" value="${l.qty}" data-qty="${x}" aria-label="Quantity of ${esc(l.name)}">${l.selectedUnit.mixed ? `<small class="pos-mixedqty">${esc(displayQuantity(l))}</small>` : ''}<button type="button" data-x="${x}" data-d="1">+</button></div>
-                <b class="pos-line-total">${f(lineTotal(l))}</b><button type="button" class="pos-ic" data-e="${x}" title="Edit price / note">✎</button><button type="button" class="pos-ic x" data-r="${x}" title="Remove item">×</button></div>`).join('')
+                <b class="pos-line-total">${f(lineTotal(l))}</b><button type="button" class="pos-ic" data-e="${x}" title="Edit price / note">✎</button><button type="button" class="pos-ic x" data-r="${x}" title="Remove item">×</button>
+                <select class="pos-unit" data-unit="${x}" aria-label="Selling unit for ${esc(l.name)}">${l.sellingUnits.map(u => `<option value="${esc(u.key)}" ${u.key === l.selectedUnit.key ? 'selected' : ''}>${esc(u.name)}${u.mixed ? '' : ' - ' + esc(f(u.price))}</option>`).join('')}</select>
+                <div class="pos-q"><button type="button" data-x="${x}" data-d="-1">−</button><input type="number" min="0" step="any" value="${l.qty}" data-qty="${x}" aria-label="Quantity of ${esc(l.name)}">${l.selectedUnit.mixed ? `<small class="pos-mixedqty">${esc(displayQuantity(l))}</small>` : ''}<button type="button" data-x="${x}" data-d="1">+</button></div></div>`).join('')
             : '<div class="pos-empty">Click an item or scan a barcode</div>';
         $('posHeld').innerHTML = holds.map((h, x) => `<button type="button" data-h="${x}">⏸ #${x + 1} · ${h.cart.length} items</button>`).join('');
         calc();
@@ -589,7 +602,59 @@ if (!in_array($businessType, $allowedBT, true)) {
         } catch (e) { toast(e.message, 1); }
         busy = false; $('posPlace').disabled = false;
     }
-    function printBill(id) { $('posPrintFrame').src = PRINT_URL + '?id=' + id + '&autoprint=1&_=' + Date.now(); }
+    function printBill(id) { $('posPrintFrame').removeAttribute('srcdoc'); $('posPrintFrame').src = PRINT_URL + '?id=' + id + '&autoprint=1&_=' + Date.now(); }
+
+    // ----- barcode (Code 128, drawn as real bars - no library needed) -----
+    const C128 = '212222 222122 222221 121223 121322 131222 122213 122312 132212 221213 221312 231212 112232 122132 122231 113222 123122 123221 223211 221132 221231 213212 223112 312131 311222 321122 321221 312212 322112 322211 212123 212321 232121 111323 131123 131321 112313 132113 132311 211313 231113 231311 112133 112331 132131 113123 113321 133121 313121 211331 231131 213113 213311 213131 311123 311321 331121 312113 312311 332111 314111 221411 431111 111224 111422 121124 121421 141122 141221 112214 112412 122114 122411 142112 142211 241211 221114 413111 241112 134111 111242 121142 121241 114212 124112 124211 411212 421112 421211 212141 214121 412121 111143 111341 131141 114113 114311 411113 411311 113141 114131 311141 411131 211412 211214 211232'.split(' ');
+    function bcSvg(code, h) {
+        code = String(code == null ? '' : code);
+        if (!code) return '';
+        const v = [104]; let sum = 104;
+        for (let i = 0; i < code.length; i++) {
+            const c = code.charCodeAt(i) - 32;
+            if (c < 0 || c > 95) return '';
+            v.push(c); sum += c * (i + 1);
+        }
+        v.push(sum % 103);
+        const pat = v.map(x => C128[x]).join('') + '2331112';
+        const Q = 10; let x = Q, r = '';
+        for (let i = 0; i < pat.length; i++) {
+            const w = +pat[i];
+            if (i % 2 === 0) r += `<rect x="${x}" y="0" width="${w}" height="${h}"/>`;
+            x += w;
+        }
+        return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${x + Q} ${h}" preserveAspectRatio="none" fill="#000">${r}</svg>`;
+    }
+    let BC = [];
+    function bcItems(p) {
+        const a = [];
+        if (p.barcode) a.push({label: p.name + (p.unit ? ' / ' + p.unit : ''), code: p.barcode, price: p.price});
+        (p.loose_units || []).forEach(u => { if (u.barcode) a.push({label: p.name + ' - ' + u.label, code: u.barcode, price: +u.price > 0 ? +u.price : p.price * +u.qty_in_base}); });
+        return a;
+    }
+    function openBarcode(id) {
+        const p = products.find(x => x.id === id); if (!p) return;
+        BC = bcItems(p).filter(i => bcSvg(i.code, 60));
+        capturing = null; ED = null;
+        $('posPb').style.maxWidth = '';
+        $('posPb').innerHTML = `<h3>${esc(p.name)} - Barcode</h3>` + (BC.length ? `
+            <label class="t" for="posBcN">Copies to print</label><input class="f" id="posBcN" type="number" min="1" max="200" value="1">
+            ${BC.length > 1 ? '<label class="pos-bcsel"><input type="checkbox" id="posBcAll" checked> Select all</label>' : ''}
+            ${BC.map((i, x) => `<div class="pos-bcs"><label class="pos-bcsel"><input type="checkbox" class="posBcChk" value="${x}" checked> <b>${esc(i.label)} - ${esc(f(i.price))}</b></label>${bcSvg(i.code, 60)}<small>${esc(i.code)}</small></div>`).join('')}`
+            : '<div class="pos-empty">This product has no barcode set.<br>Add one on the product page first.</div>')
+            + '<div class="pos-btns">' + (BC.length ? '<button type="button" class="pos-btn full" id="posBcPrint">🖨 Print Selected</button>' : '') + '<button type="button" class="pos-btn g full" id="posEc">Close</button></div>';
+        $('posPm').classList.add('on');
+    }
+    function printBarcode() {
+        const sel = [...document.querySelectorAll('.posBcChk:checked')].map(c => BC[+c.value]).filter(Boolean);
+        if (!sel.length) return toast('Select at least one barcode to print', 1);
+        const n = Math.min(200, Math.max(1, parseInt($('posBcN').value, 10) || 1));
+        const one = sel.map(i => `<div class="l"><div class="nm">${esc(i.label)}</div>${bcSvg(i.code, 60)}<div class="cd">${esc(i.code)}</div><div class="pr">${esc(f(i.price))}</div></div>`).join('');
+        const html = '<!doctype html><html><head><meta charset="utf-8"><title>Barcode</title><style>@page{margin:8mm}body{margin:0;font-family:Arial,sans-serif}.w{display:flex;flex-wrap:wrap;gap:2mm;align-items:flex-start}.l{width:50mm;padding:2mm;box-sizing:border-box;text-align:center;overflow:hidden;border:1px dashed #bbb;break-inside:avoid;page-break-inside:avoid}.nm{font-size:10px;font-weight:700;line-height:1.15;max-height:24px;overflow:hidden}.l svg{width:100%;height:14mm;display:block;margin:2px 0}.cd{font-size:10px;letter-spacing:1px}.pr{font-size:11px;font-weight:700}</style></head><body><div class="w">' + one.repeat(n) + '</div></body></html>';
+        const fr = $('posPrintFrame');
+        fr.onload = () => { fr.onload = null; try { fr.contentWindow.focus(); fr.contentWindow.print(); } catch (e) { toast('Could not open print', 1); } };
+        fr.srcdoc = html;
+    }
 
     // ----- bills list -----
     async function loadBills() {
@@ -658,7 +723,7 @@ if (!in_array($businessType, $allowedBT, true)) {
         const im = e.target; if (im.tagName === 'IMG' && im.closest('.pos-im')) im.replaceWith(document.createTextNode(im.dataset.i || '?'));
     }, true);
     document.addEventListener('click', e => {
-        const t = e.target, el = t.closest('[data-c],[data-p],[data-x],[data-e],[data-r],[data-h],[data-t],[data-chip],[data-pr],[data-ed],[data-dl],[data-k]');
+        const t = e.target, el = t.closest('[data-c],[data-p],[data-x],[data-e],[data-r],[data-h],[data-t],[data-chip],[data-pr],[data-ed],[data-dl],[data-k],[data-bc]');
         if (el) {
             const d = el.dataset;
             if (d.c) { cat = d.c; drawCats(); drawItems(); }
@@ -673,9 +738,11 @@ if (!in_array($businessType, $allowedBT, true)) {
             else if (d.ed) window.open(EDIT_URL + d.ed, '_blank');
             else if (d.dl) delBill(+d.dl, d.bn);
             else if (d.k) { capturing = d.k; drawKeys(); }
+            else if (d.bc) openBarcode(+d.bc);
             return;
         }
         if (t.id === 'posEditSave') saveEdit();
+        else if (t.id === 'posBcPrint') printBarcode();
         else if (t.id === 'posEc' || t === $('posPm')) { capturing = null; ED = null; $('posPm').classList.remove('on'); }
         else if (t.id === 'posPlace') place();
         else if (t.id === 'posClear') resetCart();
@@ -687,13 +754,16 @@ if (!in_array($businessType, $allowedBT, true)) {
     });
     document.addEventListener('change', e => {
         if (e.target.id === 'posAp') setAp(e.target.checked);
+        else if (e.target.id === 'posBcAll') document.querySelectorAll('.posBcChk').forEach(c => c.checked = e.target.checked);
+        else if (e.target.classList.contains('posBcChk')) { const all = $('posBcAll'); if (all) all.checked = [...document.querySelectorAll('.posBcChk')].every(c => c.checked); }
         else if (e.target.matches('[data-unit]')) {
             const idx = +e.target.dataset.unit, line = cart[idx];
             const unit = line && line.sellingUnits.find(u => u.key === e.target.value);
             if (!unit) return;
-            const baseQty = lineQuantity(line);
+            // Picking a unit from the dropdown loads THAT unit's own saved rate
+            // (e.g. Half Kg = 500, from the product page) with quantity 1.
             line.selectedUnit = {...unit};
-            line.qty = Math.round(baseQty / unit.factor * 10000) / 10000;
+            line.qty = 1;
             drawCart();
         } else if (e.target.matches('[data-qty]')) {
             const idx = +e.target.dataset.qty, qty = num(e.target.value);
