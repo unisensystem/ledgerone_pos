@@ -936,7 +936,7 @@ async function loadInvoiceData(invoiceId) {
                             conversionFactor: unit.conversionFactor,
                             qty: unitQtyMap[unit.id] || 0
                         })),
-                        price: parseFloat(firstItem.sale_price),
+                        price: getReturnPriceFromInvoiceRows(uomDetails, items),
                         discountPercent: parseFloat(firstItem.discount_percent || 0),
                         taxPercent: parseFloat(firstItem.tax_percent || 0),
                         status: 'sellable',
@@ -1144,7 +1144,7 @@ async function loadEditData(returnId) {
                     conversionFactor: u.conversionFactor,
                     qty: unitQtyMap[u.id] || 0
                 })),
-                price: parseFloat(item.sale_price),
+                price: getReturnPriceFromSavedItem(uomDetails, item),
                 discountPercent: parseFloat(item.discount_percent || 0),
                 taxPercent: parseFloat(item.tax_percent || 0),
                 status: 'sellable',
