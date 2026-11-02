@@ -64,6 +64,9 @@ if (!in_array($businessType, $allowedBT, true)) {
 .pos-ln .pos-line-total{white-space:nowrap;text-align:right}
 .pos-ln .pos-unit{grid-column:1;width:100%;max-width:none;min-width:0}
 .pos-ln .pos-q{grid-column:2/-1;justify-self:end}
+.pos-lt{grid-column:1/-1;display:flex;gap:.8rem;align-items:center;font-size:12px;color:#475569}
+.pos-lt label{display:flex;align-items:center;gap:5px;font-weight:600}
+.pos-lt input{width:70px;height:28px;padding:0 4px;border:1px solid #d6dbe4;border-radius:6px;text-align:center}
 .pos-q{display:flex;align-items:center;gap:6px}
 .pos-q input{width:64px;height:30px;padding:0 4px;border:1px solid #d6dbe4;border-radius:6px;text-align:center}
 .pos-unit{max-width:155px;height:32px;padding:0 5px;border:1px solid #d6dbe4;border-radius:6px;background:#fff;color:#334155}
@@ -125,6 +128,8 @@ if (!in_array($businessType, $allowedBT, true)) {
                 <select id="posCounter" title="Counter"><option value="">-- Select Counter --</option></select>
                 <button type="button" class="pos-btn g" id="posApBtn" title="Turn auto print on/off when saving" style="width:auto;height:46px;padding:0 14px;font-size:14px"></button>
                 <button type="button" class="pos-btn g" id="posKeysBtn" title="Shortcut keys" style="width:auto;height:46px;padding:0 14px;font-size:14px">⌨ Shortcuts</button>
+                <button type="button" class="pos-btn g" id="posShowBtn" title="Show / hide discount, tax..." style="width:auto;height:46px;padding:0 14px;font-size:14px">👁 Show / Hide</button>
+                <a href="../sale/sale_return/counter-return.php" class="pos-btn g" id="posReturnBtn" title="Open Sale Return" style="width:auto;height:46px;padding:0 14px;font-size:14px;display:inline-flex;align-items:center;justify-content:center;text-decoration:none;box-sizing:border-box">↩ Sale Return</a>
             </div>
             <div class="pos-cats" id="posCats"></div>
             <div class="pos-grid" id="posGrid"><div class="pos-empty">Loading products...</div></div>
@@ -143,7 +148,10 @@ if (!in_array($businessType, $allowedBT, true)) {
             <div class="pos-held" id="posHeld"></div>
             <div class="pos-lines" id="posLines"></div>
             <div class="pos-row"><span>Subtotal</span><b id="posSub"></b></div>
-            <div class="pos-row"><span>Discount % / Amount</span><span><input type="number" id="posDp" min="0" max="100" step="0.1" value="0" style="width:64px"> <input type="number" id="posDa" min="0" step="1" value="0"></span></div>
+            <div class="pos-row" id="posLdRow" style="display:none"><span id="posLdLb">Item Discount</span><b id="posLd"></b></div>
+            <div class="pos-row" id="posDiscRow"><span>Discount % / Amount</span><span><input type="number" id="posDp" min="0" max="100" step="0.1" value="0" style="width:64px"> <input type="number" id="posDa" min="0" step="1" value="0"></span></div>
+            <div class="pos-row" id="posInvTaxRow"><span>Invoice Tax (amount)</span><input type="number" id="posInvTax" min="0" step="0.01" value="0"></div>
+            <div class="pos-row" id="posTaxRow" style="display:none"><span id="posTaxLb">Tax</span><b id="posTax"></b></div>
             <div class="pos-row" id="posDelRow" style="display:none"><span>Delivery Charges</span><input type="number" id="posDel" min="0" step="1" value="0"></div>
             <div class="pos-row pos-tot"><span>Total</span><span id="posTot"></span></div>
             <div class="pos-g2" style="margin-top:.5rem">
@@ -221,11 +229,15 @@ if (!in_array($businessType, $allowedBT, true)) {
         reprint: {l: 'Reprint last bill', k: 'Alt+R'},
         keys: {l: 'Open this Shortcuts box', k: 'Alt+K'}
     };
+    // Items that can be shown / hidden (on the screen AND on the printed receipt).
+    // To add another one: add a key + label here, use SHOW.<key> where it is drawn, and map it in pos-thermal-print.php.
+    const HIDEABLE = {ldisc: 'Item discount (amount + %)', bdisc: 'Bill discount', tax: 'Sales tax (item % + invoice tax)'};
     const K = n => 'pos_' + n + '_' + TENANT;
     const LS = {get: (k, d) => { try { const v = localStorage.getItem(K(k)); return v === null ? d : JSON.parse(v); } catch (e) { return d; } }, set: (k, v) => { try { localStorage.setItem(K(k), JSON.stringify(v)); } catch (e) {} }};
     const DEFKEYS = Object.fromEntries(Object.entries(ACT).map(([a, v]) => [a, v.k]));
     let M = {}, products = [], cats = [], custs = [], banks = [], cat = 'all', cart = [], holds = LS.get('hold', []), busy = false, ED = null;
     let KEYS = Object.assign({}, DEFKEYS, LS.get('keys', {})), autoPrint = LS.get('autoprint', true), capturing = null, lastId = null;
+    let SHOW = Object.assign({ldisc: true, bdisc: true, tax: true}, LS.get('show', {}));
     const $ = id => document.getElementById(id);
     const setCash = () => { if (M.cash_customer_id) $('posCust').value = CASH; };
     const sym = () => (typeof currencySymbol !== 'undefined' ? currencySymbol : (M.currency_symbol || 'Rs')) + ' ';
@@ -237,6 +249,7 @@ if (!in_array($businessType, $allowedBT, true)) {
     // Weight/loose item = base unit is Kg/Gram/Ltr/Meter... (works in every business type)
     const isW = p => { const b = p._u && p._u.length ? baseOf(p._u) : null; return WRX.test(b ? b.name : (p.unit || '')); };
     const num = v => parseFloat(v) || 0;
+    const r2 = n => Math.round(n * 100) / 100;
     function toast(m, err) { const t = document.createElement('div'); t.className = 'pos-toast' + (err ? ' err' : ''); t.textContent = m; document.body.appendChild(t); setTimeout(() => t.remove(), err ? 5000 : 2500); }
     async function jget(u) { const r = await fetch(u); return r.json(); }
     async function jpost(u, b) { const r = await fetch(u, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(b)}); return r.json(); }
@@ -351,7 +364,23 @@ if (!in_array($businessType, $allowedBT, true)) {
             <div class="pos-btns"><button type="button" class="pos-btn g" id="posKreset">Reset to default</button><button type="button" class="pos-btn" id="posEc">Done</button></div>`;
     }
     function openKeys() { capturing = null; ED = null; drawKeys(); $('posPm').classList.add('on'); }
-    function holdBill() { if (!cart.length) return; holds.push({cart, cust: $('posCust').value, phone: $('posPhone').value}); LS.set('hold', holds); cart = []; resetCart(); }
+
+    // ----- show / hide (discount, tax ...) - applies to the screen and to the printed receipt -----
+    function applyShow() {
+        $('posDiscRow').style.display = SHOW.bdisc ? '' : 'none';
+        $('posInvTaxRow').style.display = SHOW.tax ? '' : 'none';
+    }
+    function hiddenKeys() { return Object.keys(HIDEABLE).filter(k => !SHOW[k]).join(','); }
+    function drawShow() {
+        $('posPb').style.maxWidth = '460px';
+        $('posPb').innerHTML = `<h3>👁 Show / Hide</h3>
+            ${Object.keys(HIDEABLE).map(k => `<label class="pos-row" style="cursor:pointer"><span><b>${esc(HIDEABLE[k])}</b></span><input type="checkbox" data-sh="${k}" ${SHOW[k] ? 'checked' : ''} style="width:20px;height:20px"></label>`).join('')}
+            <p style="font-size:12px;color:#64748b;margin:.7rem 0 0">Checked items show their input on every bill line / in the totals (product page values load automatically, otherwise 0). Unchecked items are hidden on the screen and on the printed receipt. The bill total is still calculated correctly.</p>
+            <div class="pos-btns"><button type="button" class="pos-btn full" id="posEc">Done</button></div>`;
+    }
+    function openShow() { capturing = null; ED = null; drawShow(); $('posPm').classList.add('on'); }
+
+    function holdBill() { if (!cart.length) return; holds.push({cart, cust: $('posCust').value, phone: $('posPhone').value, invTax: $('posInvTax').value}); LS.set('hold', holds); cart = []; resetCart(); }
     async function restoreHold(index) {
         const held = holds[index];
         if (!held) return;
@@ -381,12 +410,14 @@ if (!in_array($businessType, $allowedBT, true)) {
                 restored.push({
                     pid: product.id, name: product.name, qty, selectedUnit: {...unit}, sellingUnits: options,
                     unitId: base.id, units: displayUnits(options), grp: product.uom_group_id,
-                    sa: product.stock_affects, note: oldLine.note || '', w: isW(product)
+                    sa: product.stock_affects, note: oldLine.note || '', w: isW(product),
+                    dp: +product.discount_percent || 0, tp: +product.tax_percent || 0
                 });
             }
             cart = restored;
             $('posCust').value = held.cust || (M.cash_customer_id ? CASH : '');
             $('posPhone').value = held.phone || '';
+            $('posInvTax').value = held.invTax || 0;
             holds.splice(index, 1);
             LS.set('hold', holds);
             drawCart();
@@ -452,6 +483,7 @@ if (!in_array($businessType, $allowedBT, true)) {
             || '<div class="pos-empty" style="grid-column:1/-1">No items found</div>';
     }
 
+    // gross amount of a line (before line discount / tax)
     function lineTotal(l) {
         if (!l.selectedUnit.mixed) return l.selectedUnit.price * l.qty;
         const baseQty = lineQuantity(l), [pack, base] = l.selectedUnit.components;
@@ -460,12 +492,15 @@ if (!in_array($businessType, $allowedBT, true)) {
         return packQty * pack.price + remainingQty * base.price;
     }
     function lineQuantity(l) { return l.qty * l.selectedUnit.factor; }
+    // Rows sent to the server. Line discount % (l.dp) comes from the product page, tax % (l.tp) too; both can be edited per line.
+    // net = gross - line discount + tax (tax is charged on top of the price, after the line discount).
     function invoiceItems(l) {
         const itemForUnit = (unit, quantity) => {
-            const grossAmount = quantity * unit.price;
+            const grossAmount = quantity * unit.price, dp = num(l.dp), tp = num(l.tp);
+            const discountAmount = r2(grossAmount * dp / 100), taxAmount = r2((grossAmount - discountAmount) * tp / 100);
             const quantityFactor = unit.quantityFactor || 1;
-            return {productId: l.pid, uomId: unit.unitId || l.unitId, quantity: quantity * quantityFactor, salePrice: unit.price / quantityFactor, grossAmount, discountPercent: 0, discountAmount: 0,
-                extraDiscountAmount: 0, tradeOfferPercent: 0, tradeOfferAmount: 0, taxPercent: 0, taxAmount: 0, focQty: 0, netAmount: grossAmount,
+            return {productId: l.pid, uomId: unit.unitId || l.unitId, quantity: quantity * quantityFactor, salePrice: unit.price / quantityFactor, grossAmount, discountPercent: dp, discountAmount,
+                extraDiscountAmount: 0, tradeOfferPercent: 0, tradeOfferAmount: 0, taxPercent: tp, taxAmount, focQty: 0, netAmount: grossAmount - discountAmount + taxAmount,
                 scheme: 'sale_on_tp', stockAffects: l.sa};
         };
         if (!l.selectedUnit.mixed) return [itemForUnit(l.selectedUnit, l.qty)];
@@ -476,6 +511,26 @@ if (!in_array($businessType, $allowedBT, true)) {
             ...(packQty > 0 ? [itemForUnit(pack, packQty)] : []),
             ...(remainingQty > 0 ? [itemForUnit(base, remainingQty)] : [])
         ];
+    }
+    // Invoice-level tax (flat amount, e.g. Rs 1-2) has no separate column in the saved invoice, so it is spread
+    // over the item rows' tax (in proportion to each row's amount after discount). Net amount stays equal to the bill total.
+    function addInvTax(items, it) {
+        if (!(it > 0) || !items.length) return items;
+        const base = items.reduce((a, i) => a + i.grossAmount - i.discountAmount, 0);
+        let left = it;
+        items.forEach((i, x) => {
+            const b = i.grossAmount - i.discountAmount;
+            const share = x === items.length - 1 ? r2(left) : r2(base > 0 ? it * b / base : (x === 0 ? it : 0));
+            left -= share;
+            i.taxAmount = r2(i.taxAmount + share);
+            i.netAmount += share;
+            if (b > 0) i.taxPercent = r2(i.taxAmount / b * 100);
+        });
+        return items;
+    }
+    // g = gross, d = line discount, t = tax, net = g - d + t  (same numbers that are saved)
+    function lineCalc(l) {
+        return invoiceItems(l).reduce((a, i) => ({g: a.g + i.grossAmount, d: a.d + i.discountAmount, t: a.t + i.taxAmount, net: a.net + i.netAmount}), {g: 0, d: 0, t: 0, net: 0});
     }
     function displayQuantity(l) {
         return l.selectedUnit.mixed ? fmtQty({units: l.units, qty: lineQuantity(l)}) :
@@ -499,7 +554,8 @@ if (!in_array($businessType, $allowedBT, true)) {
         if (l) l.qty = Math.round((l.qty + qty) * 10000) / 10000;
         else cart.push({
             pid: p.id, name: p.name, qty, selectedUnit: {...unit}, sellingUnits: options,
-            unitId: b.id, units: displayUnits(options), grp: p.uom_group_id, sa: p.stock_affects, note: '', w: isW(p)
+            unitId: b.id, units: displayUnits(options), grp: p.uom_group_id, sa: p.stock_affects, note: '', w: isW(p),
+            dp: +p.discount_percent || 0, tp: +p.tax_percent || 0
         });
         drawCart();
     }
@@ -512,30 +568,48 @@ if (!in_array($businessType, $allowedBT, true)) {
             toast(e.message || 'Could not load product units', 1);
         }
     }
+    // sub = subtotal AFTER line discounts (this is what is saved as total_bill); d = bill-level discount
     function discount() {
-        const sub = cart.reduce((a, l) => a + lineTotal(l), 0);
-        return {sub, d: Math.min(sub, num($('posDa').value))};
+        let g = 0, ld = 0, tx = 0;
+        cart.forEach(l => { const c = lineCalc(l); g += c.g; ld += c.d; tx += c.t; });
+        const sub = g - ld;
+        const it = SHOW.tax && cart.length ? Math.max(0, num($('posInvTax').value)) : 0;
+        return {sub, d: Math.min(sub, num($('posDa').value)), g, ld, tx, it};
     }
     function calc() {
-        const {sub, d} = discount(), del = $('posDelRow').style.display === 'none' ? 0 : num($('posDel').value), tot = sub - d + del;
-        $('posSub').textContent = f(sub); $('posTot').textContent = f(tot); $('posCnt').textContent = cart.length;
+        const {sub, d, g, ld, tx, it} = discount(), del = $('posDelRow').style.display === 'none' ? 0 : num($('posDel').value), tot = sub - d + tx + it + del;
+        $('posSub').textContent = f(SHOW.ldisc ? g : sub);
+        $('posLdRow').style.display = SHOW.ldisc && ld > 0 ? '' : 'none';
+        $('posLdLb').textContent = 'Item Discount (' + (g ? r2(ld / g * 100) : 0) + '%)';
+        $('posLd').textContent = '- ' + f(ld);
+        $('posTaxRow').style.display = SHOW.tax && (tx + it) > 0 ? '' : 'none';
+        $('posTaxLb').textContent = 'Total Tax (' + (sub ? r2((tx + it) / sub * 100) : 0) + '%)';
+        $('posTax').textContent = '+ ' + f(tx + it);
+        $('posTot').textContent = f(tot); $('posCnt').textContent = cart.length;
         const t = $('posTend').value === '' ? tot : num($('posTend').value);
         $('posChange').textContent = f(Math.max(0, t - tot));
         $('posQuick').innerHTML = tot > 0 ? `<button type="button" data-t="${tot}">Exact</button>` : '';
-        return {sub, d, del, tot};
+        return {sub, d, del, tot, it};
+    }
+    // small grey text under the item name: discount / tax of that line (amount + %)
+    function lineExtra(l) {
+        const c = lineCalc(l);
+        return (SHOW.ldisc && c.d > 0 ? ' · Disc ' + (+num(l.dp).toFixed(2)) + '% (-' + f(c.d) + ')' : '') +
+            (SHOW.tax && c.t > 0 ? ' · Tax ' + (+num(l.tp).toFixed(2)) + '% (+' + f(c.t) + ')' : '');
     }
     function drawCart() {
         $('posLines').innerHTML = cart.length ? cart.map((l, x) => `
-            <div class="pos-ln"><div class="n">${esc(l.name)}<small>${l.note ? esc(l.note) + ' · ' : ''}${f(l.selectedUnit.price)} / ${esc(l.selectedUnit.name)}</small></div>
-                <b class="pos-line-total">${f(lineTotal(l))}</b><button type="button" class="pos-ic" data-e="${x}" title="Edit price / note">✎</button><button type="button" class="pos-ic x" data-r="${x}" title="Remove item">×</button>
+            <div class="pos-ln"><div class="n">${esc(l.name)}<small>${l.note ? esc(l.note) + ' · ' : ''}${f(l.selectedUnit.price)} / ${esc(l.selectedUnit.name)}<span class="pos-lx">${esc(lineExtra(l))}</span></small></div>
+                <b class="pos-line-total">${f(lineCalc(l).net)}</b><button type="button" class="pos-ic" data-e="${x}" title="Edit price / discount / tax / note">✎</button><button type="button" class="pos-ic x" data-r="${x}" title="Remove item">×</button>
                 <select class="pos-unit" data-unit="${x}" aria-label="Selling unit for ${esc(l.name)}">${l.sellingUnits.map(u => `<option value="${esc(u.key)}" ${u.key === l.selectedUnit.key ? 'selected' : ''}>${esc(u.name)}${u.mixed ? '' : ' - ' + esc(f(u.price))}</option>`).join('')}</select>
-                <div class="pos-q"><button type="button" data-x="${x}" data-d="-1">−</button><input type="number" min="0" step="any" value="${l.qty}" data-qty="${x}" aria-label="Quantity of ${esc(l.name)}">${l.selectedUnit.mixed ? `<small class="pos-mixedqty">${esc(displayQuantity(l))}</small>` : ''}<button type="button" data-x="${x}" data-d="1">+</button></div></div>`).join('')
+                <div class="pos-q"><button type="button" data-x="${x}" data-d="-1">−</button><input type="number" min="0" step="any" value="${l.qty}" data-qty="${x}" aria-label="Quantity of ${esc(l.name)}">${l.selectedUnit.mixed ? `<small class="pos-mixedqty">${esc(displayQuantity(l))}</small>` : ''}<button type="button" data-x="${x}" data-d="1">+</button></div>
+                ${SHOW.ldisc || SHOW.tax ? `<div class="pos-lt">${SHOW.ldisc ? `<label>Disc %<input type="number" min="0" max="100" step="0.01" value="${num(l.dp)}" data-ldp="${x}" aria-label="Discount % of ${esc(l.name)}"></label>` : ''}${SHOW.tax ? `<label>Tax %<input type="number" min="0" step="0.01" value="${num(l.tp)}" data-ltp="${x}" aria-label="Tax % of ${esc(l.name)}"></label>` : ''}</div>` : ''}</div>`).join('')
             : '<div class="pos-empty">Click an item or scan a barcode</div>';
         $('posHeld').innerHTML = holds.map((h, x) => `<button type="button" data-h="${x}">⏸ #${x + 1} · ${h.cart.length} items</button>`).join('');
         calc();
     }
 
-    // ----- optional line editor for price and kitchen/order notes -----
+    // ----- optional line editor for price, discount %, tax % and kitchen/order notes -----
     function openEdit(idx) {
         const l = cart[idx];
         ED = {idx};
@@ -544,6 +618,8 @@ if (!in_array($businessType, $allowedBT, true)) {
             <label class="t" for="posEditQty">Quantity (${esc(l.selectedUnit.name)})</label><input class="f" id="posEditQty" type="number" min="0.001" step="any" value="${l.qty}">
             ${l.w ? `<label class="t" for="posEditAmount">Amount (${esc(sym().trim())})</label><input class="f" id="posEditAmount" type="number" min="0" step="any" placeholder="e.g. 100">` : ''}
             <label class="t" for="posEditPrice">Price / ${esc(l.selectedUnit.name)}</label><input class="f" id="posEditPrice" type="number" min="0" step="0.01" value="${l.selectedUnit.price}">
+            <label class="t" for="posEditDp">Discount %</label><input class="f" id="posEditDp" type="number" min="0" max="100" step="0.01" value="${num(l.dp)}">
+            <label class="t" for="posEditTp">Tax %</label><input class="f" id="posEditTp" type="number" min="0" step="0.01" value="${num(l.tp)}">
             <label class="t" for="posEn">Note</label><input class="f" id="posEn" value="${esc(l.note || '')}" placeholder="optional">
             <div class="pos-chips">${MODES[mode].chips.map(c => `<button type="button" data-chip="${esc(c)}">${esc(c)}</button>`).join('')}</div>
             <div class="pos-btns"><button type="button" class="pos-btn full" id="posEditSave">Update</button><button type="button" class="pos-btn g full" id="posEc">Cancel</button></div>`;
@@ -555,10 +631,12 @@ if (!in_array($businessType, $allowedBT, true)) {
         if (!l || qty <= 0 || price < 0) return toast('Enter a valid quantity and price', 1);
         l.qty = qty;
         l.selectedUnit.price = price;
+        l.dp = Math.min(100, Math.max(0, num($('posEditDp').value)));
+        l.tp = Math.max(0, num($('posEditTp').value));
         l.note = $('posEn').value.trim();
         ED = null; $('posPm').classList.remove('on'); drawCart();
     }
-    function resetCart() { cart = []; $('posDp').value = 0; $('posDa').value = 0; $('posDel').value = 0; $('posTend').value = ''; $('posTbl').value = ''; $('posCust').value = M.cash_customer_id ? CASH : ''; $('posPhone').value = ''; drawCart(); }
+    function resetCart() { cart = []; $('posDp').value = 0; $('posDa').value = 0; $('posInvTax').value = 0; $('posDel').value = 0; $('posTend').value = ''; $('posTbl').value = ''; $('posCust').value = M.cash_customer_id ? CASH : ''; $('posPhone').value = ''; drawCart(); }
 
     // ----- save -----
     function custId() {
@@ -575,7 +653,7 @@ if (!in_array($businessType, $allowedBT, true)) {
         const cid = custId(), customerName = $('posCust').value.trim(), branch = +$('posBranch').value;
         if (!cid && !customerName) return toast('Cash Customer not found - please select a customer', 1);
         if (!branch) return toast('Please select a branch', 1);
-        const {sub, d, del, tot} = calc(), tend = $('posTend').value === '' ? tot : num($('posTend').value);
+        const {sub, d, del, tot, it} = calc(), tend = $('posTend').value === '' ? tot : num($('posTend').value);
         const isCash = !!M.cash_customer_id && cid === M.cash_customer_id;
         if (tend < tot && isCash) return toast('Please select a customer for credit sales', 1);
         const bank = $('posPay').value === 'bank_transfer' ? $('posBank').value : null;
@@ -600,7 +678,7 @@ if (!in_array($businessType, $allowedBT, true)) {
                 invoiceType: tend >= tot ? 'Cash' : 'Credit', status: 'Posted', remarks, amountPaidAutoFill: 'no',
                 totalBill: sub, totalDiscountPercent: num($('posDp').value), totalDiscountAmount: d, shippingFees: del, netAmount: tot,
                 amountPaid: tend, amountReturned: Math.max(0, tend - tot), paymentMethod: $('posPay').value, bankAccountId: bank,
-                items: cart.flatMap(invoiceItems)
+                items: addInvTax(cart.flatMap(invoiceItems), it)
             };
             const r = await jpost(EP.save, body);
             if (!r.success) throw new Error(r.message || 'Save failed');
@@ -615,7 +693,8 @@ if (!in_array($businessType, $allowedBT, true)) {
         } catch (e) { toast(e.message, 1); }
         busy = false; $('posPlace').disabled = false;
     }
-    function printBill(id) { $('posPrintFrame').removeAttribute('srcdoc'); $('posPrintFrame').src = PRINT_URL + '?id=' + id + '&autoprint=1&_=' + Date.now(); }
+    // &hide=ldisc,tax ... tells the receipt which items to hide (see Show / Hide box)
+    function printBill(id) { $('posPrintFrame').removeAttribute('srcdoc'); $('posPrintFrame').src = PRINT_URL + '?id=' + id + '&autoprint=1&hide=' + encodeURIComponent(hiddenKeys()) + '&_=' + Date.now(); }
 
     // ----- barcode (Code 128, drawn as real bars - no library needed) -----
     const C128 = '212222 222122 222221 121223 121322 131222 122213 122312 132212 221213 221312 231212 112232 122132 122231 113222 123122 123221 223211 221132 221231 213212 223112 312131 311222 321122 321221 312212 322112 322211 212123 212321 232121 111323 131123 131321 112313 132113 132311 211313 231113 231311 112133 112331 132131 113123 113321 133121 313121 211331 231131 213113 213311 213131 311123 311321 331121 312113 312311 332111 314111 221411 431111 111224 111422 121124 121421 141122 141221 112214 112412 122114 122411 142112 142211 241211 221114 413111 241112 134111 111242 121142 121241 114212 124112 124211 411212 421112 421211 212141 214121 412121 111143 111341 131141 114113 114311 411113 411311 113141 114131 311141 411131 211412 211214 211232'.split(' ');
@@ -709,7 +788,7 @@ if (!in_array($businessType, $allowedBT, true)) {
     }
     async function init() {
         const today = new Date().toLocaleDateString('en-CA'); $('posBf').value = today; $('posBt').value = today;
-        drawTop(); drawCart(); hints();
+        drawTop(); applyShow(); drawCart(); hints();
         try {
             M = await jget(EP.meta); if (!M.success) throw new Error(M.message);
             $('posBranch').innerHTML = M.branches.map(b => `<option value="${b.id}">${esc(b.branch_name)}</option>`).join('');
@@ -763,12 +842,14 @@ if (!in_array($businessType, $allowedBT, true)) {
         else if (t.id === 'posHold') holdBill();
         else if (t.id === 'posApBtn') setAp(!autoPrint);
         else if (t.id === 'posKeysBtn') openKeys();
+        else if (t.id === 'posShowBtn') openShow();
         else if (t.id === 'posKreset') { KEYS = Object.assign({}, DEFKEYS); LS.set('keys', KEYS); capturing = null; drawKeys(); hints(); }
     });
     document.addEventListener('change', e => {
         if (e.target.id === 'posAp') setAp(e.target.checked);
         else if (e.target.id === 'posBcAll') document.querySelectorAll('.posBcChk').forEach(c => c.checked = e.target.checked);
         else if (e.target.classList.contains('posBcChk')) { const all = $('posBcAll'); if (all) all.checked = [...document.querySelectorAll('.posBcChk')].every(c => c.checked); }
+        else if (e.target.matches('[data-sh]')) { SHOW[e.target.dataset.sh] = e.target.checked; LS.set('show', SHOW); applyShow(); drawCart(); }
         else if (e.target.matches('[data-unit]')) {
             const idx = +e.target.dataset.unit, line = cart[idx];
             const unit = line && line.sellingUnits.find(u => u.key === e.target.value);
@@ -791,9 +872,21 @@ if (!in_array($businessType, $allowedBT, true)) {
             if (!line) return;
             line.qty = qty;
             const total = e.target.closest('.pos-ln').querySelector('.pos-line-total');
-            total.textContent = f(lineTotal(line));
+            total.textContent = f(lineCalc(line).net);
+            const lx = e.target.closest('.pos-ln').querySelector('.pos-lx');
+            if (lx) lx.textContent = lineExtra(line);
             const qtyHint = e.target.closest('.pos-ln').querySelector('.pos-mixedqty');
             if (qtyHint) qtyHint.textContent = displayQuantity(line);
+            calc();
+        } else if (e.target.matches('[data-ldp],[data-ltp]')) {
+            // per-line Disc % / Tax % typed directly in the cart (starts from the product page value, else 0)
+            const ds = e.target.dataset, idx = +(ds.ldp !== undefined ? ds.ldp : ds.ltp), line = cart[idx], v = Math.max(0, num(e.target.value));
+            if (!line) return;
+            if (ds.ldp !== undefined) line.dp = Math.min(100, v); else line.tp = v;
+            const ln = e.target.closest('.pos-ln');
+            ln.querySelector('.pos-line-total').textContent = f(lineCalc(line).net);
+            const lx = ln.querySelector('.pos-lx');
+            if (lx) lx.textContent = lineExtra(line);
             calc();
         } else if (ED && e.target.id === 'posEditAmount') {
             const line = cart[ED.idx], price = num($('posEditPrice').value);
@@ -827,7 +920,7 @@ if (!in_array($businessType, $allowedBT, true)) {
     });
     ['posDp'].forEach(id => $(id).addEventListener('input', () => { $('posDa').value = Math.round(discount().sub * num($('posDp').value)) / 100; calc(); }));
     $('posDa').addEventListener('input', () => { const s = discount().sub; $('posDp').value = s ? Math.round(num($('posDa').value) / s * 10000) / 100 : 0; calc(); });
-    $('posDel').addEventListener('input', calc); $('posTend').addEventListener('input', calc); $('posOt').addEventListener('change', applyOt);
+    $('posDel').addEventListener('input', calc); $('posTend').addEventListener('input', calc); $('posInvTax').addEventListener('input', calc); $('posOt').addEventListener('change', applyOt);
     $('posPay').addEventListener('change', () => { $('posBank').style.display = $('posPay').value === 'bank_transfer' ? '' : 'none'; });
     $('posBranch').addEventListener('change', () => { LS.set('branch', $('posBranch').value); loadCounters(+$('posBranch').value); loadProducts(); });
     $('posCounter').addEventListener('change', () => { if ($('posBranch').value) LS.set('counter_' + $('posBranch').value, $('posCounter').value); });

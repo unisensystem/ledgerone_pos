@@ -3,6 +3,7 @@
 // Tenant ke active, sellable products (price = MRP, MRP na ho to Trade Price) + simple stock.
 // Har product ke saath `units`: [{id,name,factor,base}] - factor = kitne BASE unit ka ek ye unit.
 // Price hamesha BASE unit (Piece / Kg) ka hota hai. UOM-Group wale products ki units client group API se leta hai.
+// discount_percent = product page ka "default_discount" (%), tax_percent = product page ka "sales_tax" (%).
 require_once '../../../includes/connection.php';
 header('Content-Type: application/json');
 if (session_status() == PHP_SESSION_NONE) session_start();
@@ -17,6 +18,7 @@ try {
         SELECT p.id, p.code, p.name, p.barcode, p.category_id, p.photo, p.mrp, p.trade_price,
                p.default_unit_id, p.uom_type, p.uom_group_id, p.stock_affects, p.parent_product_id,
                p.product_type, p.product_conversion_factor,
+               p.default_discount, p.sales_tax, p.sales_tax_type,
                u.uom_name, u.unit_scope AS u_scope, u.is_base_unit AS u_is_base, u.conversion_factor AS u_conv,
                u.base_unit_id AS u_base_id, b.uom_name AS b_name,
                (SELECT puc.conversion_factor FROM product_uom_conversions puc
@@ -85,6 +87,11 @@ try {
     foreach ($rows as $r) {
         $price = (float) $r['mrp'] > 0 ? (float) $r['mrp'] : (float) $r['trade_price'];
 
+        // Sales tax %: product page ka "sales_tax" (text, jaise "18" ya "18%"). Agar type "fixed" ho to % nahi maante.
+        $taxPct = (stripos((string) $r['sales_tax_type'], 'fix') === false)
+            ? (float) preg_replace('/[^0-9.]/', '', (string) $r['sales_tax'])
+            : 0;
+
         // Default-unit product: agar default unit Carton jaisi non-base unit hai to
         // [Base (factor 1), Carton (factor N)] banao. Price base unit ka hi rehta hai.
         $units = [];
@@ -120,6 +127,8 @@ try {
             'id' => (int) $r['id'], 'code' => $r['code'], 'name' => $r['name'], 'barcode' => $r['barcode'],
             'category_id' => $r['category_id'] ? (int) $r['category_id'] : null,
             'photo' => $r['photo'], 'price' => $price,
+            'discount_percent' => min(100, max(0, (float) $r['default_discount'])),
+            'tax_percent' => max(0, $taxPct),
             'unit_id' => $unitId, 'barcode_unit_id' => $barcodeUnitId,
             'unit' => $unitName, 'uom_group_id' => $r['uom_group_id'] ? (int) $r['uom_group_id'] : null,
             'units' => $units,

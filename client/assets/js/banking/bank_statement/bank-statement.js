@@ -96,9 +96,17 @@ function applyDateRangePreset() {
     }
 }
 
+// Default: Custom range — 1st of this month to the last day of next month,
+// so post-dated (future) cheque entries show up without changing the range.
 function setDefaultDates() {
-    document.getElementById('dateRangePreset').value = 'month';
+    document.getElementById('dateRangePreset').value = 'custom';
     applyDateRangePreset();
+
+    const today = new Date();
+    const from = new Date(today.getFullYear(), today.getMonth(), 1);
+    const to = new Date(today.getFullYear(), today.getMonth() + 2, 0);
+    document.getElementById('fromDate').value = toISODate(from);
+    document.getElementById('toDate').value = toISODate(to);
 }
 
 async function generateStatement() {

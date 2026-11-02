@@ -40,9 +40,9 @@ if (!in_array($new_status, $allowed_statuses)) {
 
 try {
     $pdo->beginTransaction();
-    
+
     $debug_info = [];
-    
+
     // Get PDC details with bank account_id
     $stmt = $pdo->prepare("SELECT pdc.transaction_type, pdc.amount, pdc.cheque_date, pdc.account_id, pdc.cheque_no, pdc.reference_table, pdc.reference_id, pdc.status as old_status, ba.account_id as bank_account_id
                            FROM post_dated_cheques pdc
@@ -50,13 +50,30 @@ try {
                            WHERE pdc.id = ? AND pdc.tenant_id = ?");
     $stmt->execute([$pdc_id, $tenant_id]);
     $pdc = $stmt->fetch();
-    
+
     if (!$pdc) {
         throw new Exception('PDC not found');
     }
-    
+
     $debug_info['pdc_data'] = $pdc;
-    
+
+    // Resolve final bank chart-of-accounts id for ledger entries.
+    // Defaults to the cheque's own bank; the bank picked in the approve modal wins.
+    $bank_account_id = $pdc['bank_account_id'];
+    if ($override_bank_account_id) {
+        $stmt = $pdo->prepare("SELECT account_id FROM bank_accounts WHERE id = ? AND tenant_id = ?");
+        $stmt->execute([$override_bank_account_id, $tenant_id]);
+        $overrideBankRow = $stmt->fetch();
+        if (!$overrideBankRow) {
+            throw new Exception('Selected bank account not found');
+        }
+        $bank_account_id = $overrideBankRow['account_id'];
+    }
+
+    if ($new_status === 'Approved' && !$bank_account_id) {
+        throw new Exception('Bank account is not linked to a chart of accounts entry');
+    }
+
     // Update status (and bank_account_id if overridden)
     if ($override_bank_account_id) {
         $stmt = $pdo->prepare("UPDATE post_dated_cheques SET status = ?, bank_account_id = ? WHERE id = ? AND tenant_id = ?");
@@ -65,127 +82,76 @@ try {
         $stmt = $pdo->prepare("UPDATE post_dated_cheques SET status = ? WHERE id = ? AND tenant_id = ?");
         $stmt->execute([$new_status, $pdc_id, $tenant_id]);
     }
-    
-    // Resolve final bank account_id for ledger entries
-    if ($override_bank_account_id) {
-        $stmt = $pdo->prepare("SELECT account_id FROM bank_accounts WHERE id = ? AND tenant_id = ?");
-        $stmt->execute([$override_bank_account_id, $tenant_id]);
-        $overrideBankRow = $stmt->fetch();
-        $bank_account_id = $overrideBankRow['account_id'] ?? $pdc['bank_account_id'];
-    }
-    
+
     // Insert accounting ledger entries
     $transaction_type = $pdc['transaction_type'];
     $amount = $pdc['amount'];
     $date = $pdc['cheque_date'];
-    $bank_account_id = $pdc['bank_account_id'];
     $account_id = $pdc['account_id'];
     $description = "PDC {$pdc['cheque_no']} - Status: {$new_status}";
     $reference_table = $pdc['reference_table'];
     $reference_id = $pdc['reference_id'];
-    
-    // Debug log
+
     error_log("PDC Update - Type: $transaction_type, Status: $new_status, Bank Account ID: $bank_account_id, Amount: $amount");
-    
+
     $debug_info['variables'] = [
         'transaction_type' => $transaction_type,
         'new_status' => $new_status,
         'bank_account_id' => $bank_account_id,
         'amount' => $amount,
-        'in_array_check' => in_array($new_status, ['Approved', 'Rejected', 'Cancelled']),
-        'type_match_received' => ($transaction_type === 'Received')
+        'date' => $date
     ];
-    
+
     // Only insert ledger entries if status is Approved, Rejected, or Cancelled
     if (in_array($new_status, ['Approved', 'Rejected', 'Cancelled'])) {
-        $debug_info['entered_status_check'] = true;
-        
+
+        $insertDebit = $pdo->prepare("INSERT INTO accounting_ledger
+            (tenant_id, transaction_type, reference_table, reference_id, account_id, date, description, debit, credit)
+            VALUES (?, 'PDC', ?, ?, ?, ?, ?, ?, 0)");
+        $insertCredit = $pdo->prepare("INSERT INTO accounting_ledger
+            (tenant_id, transaction_type, reference_table, reference_id, account_id, date, description, debit, credit)
+            VALUES (?, 'PDC', ?, ?, ?, ?, ?, 0, ?)");
+
+        $debit = function ($acc) use ($insertDebit, $tenant_id, $reference_table, $reference_id, $date, $description, $amount) {
+            $insertDebit->execute([$tenant_id, $reference_table, $reference_id, $acc, $date, $description, $amount]);
+        };
+        $credit = function ($acc) use ($insertCredit, $tenant_id, $reference_table, $reference_id, $date, $description, $amount) {
+            $insertCredit->execute([$tenant_id, $reference_table, $reference_id, $acc, $date, $description, $amount]);
+        };
+
         if ($transaction_type === 'Received') {
-        $debug_info['entered_received_block'] = true;
-        if ($new_status === 'Approved') {
-            // Debit: Bank Account, Credit: PDC Receivable (78)
-            try {
-                $stmt = $pdo->prepare("INSERT INTO accounting_ledger 
-                    (tenant_id, transaction_type, reference_table, reference_id, account_id, date, description, debit, credit) 
-                    VALUES (?, 'PDC', ?, ?, ?, ?, ?, ?, 0)");
-                $result1 = $stmt->execute([$tenant_id, $reference_table, $reference_id, $bank_account_id, $date, $description, $amount]);
-                $debug_info['insert1'] = ['success' => $result1, 'rows' => $stmt->rowCount(), 'error' => $stmt->errorInfo()];
-                
-                $stmt = $pdo->prepare("INSERT INTO accounting_ledger 
-                    (tenant_id, transaction_type, reference_table, reference_id, account_id, date, description, debit, credit) 
-                    VALUES (?, 'PDC', ?, ?, 78, ?, ?, 0, ?)");
-                $result2 = $stmt->execute([$tenant_id, $reference_table, $reference_id, $date, $description, $amount]);
-                $debug_info['insert2'] = ['success' => $result2, 'rows' => $stmt->rowCount(), 'error' => $stmt->errorInfo()];
-            } catch (Exception $e) {
-                $debug_info['insert_error'] = $e->getMessage();
-            }
-        } elseif ($new_status === 'Rejected' || $new_status === 'Cancelled') {
-            // Debit: Trade Debtors (2), Credit: PDC Receivable (78)
-            $stmt = $pdo->prepare("INSERT INTO accounting_ledger 
-                (tenant_id, transaction_type, reference_table, reference_id, account_id, date, description, debit, credit) 
-                VALUES (?, 'PDC', ?, ?, 2, ?, ?, ?, 0)");
-            $stmt->execute([$tenant_id, $reference_table, $reference_id, $date, $description, $amount]);
-            
-            $stmt = $pdo->prepare("INSERT INTO accounting_ledger 
-                (tenant_id, transaction_type, reference_table, reference_id, account_id, date, description, debit, credit) 
-                VALUES (?, 'PDC', ?, ?, 78, ?, ?, 0, ?)");
-            $stmt->execute([$tenant_id, $reference_table, $reference_id, $date, $description, $amount]);
-        }
-        } elseif ($transaction_type === 'Payment' || $transaction_type === 'Paid') {
-            $debug_info['entered_paid_block'] = true;
             if ($new_status === 'Approved') {
-                $debug_info['entered_paid_approved'] = true;
+                // Debit: Bank Account, Credit: PDC Receivable (78)
+                $debit($bank_account_id);
+                $credit(78);
+            } else {
+                // Debit: Trade Debtors (2), Credit: PDC Receivable (78)
+                $debit(2);
+                $credit(78);
+            }
+        } elseif ($transaction_type === 'Payment' || $transaction_type === 'Paid') {
+            if ($new_status === 'Approved') {
                 // Debit: PDC Payable (79), Credit: Bank Account
-                $stmt = $pdo->prepare("INSERT INTO accounting_ledger 
-                    (tenant_id, transaction_type, reference_table, reference_id, account_id, date, description, debit, credit) 
-                    VALUES (?, 'PDC', ?, ?, 79, ?, ?, ?, 0)");
-                $result1 = $stmt->execute([$tenant_id, $reference_table, $reference_id, $date, $description, $amount]);
-                $debug_info['paid_insert1'] = ['success' => $result1, 'rows' => $stmt->rowCount()];
-                
-                $stmt = $pdo->prepare("INSERT INTO accounting_ledger 
-                    (tenant_id, transaction_type, reference_table, reference_id, account_id, date, description, debit, credit) 
-                    VALUES (?, 'PDC', ?, ?, ?, ?, ?, 0, ?)");
-                $result2 = $stmt->execute([$tenant_id, $reference_table, $reference_id, $bank_account_id, $date, $description, $amount]);
-                $debug_info['paid_insert2'] = ['success' => $result2, 'rows' => $stmt->rowCount()];
-        } elseif ($new_status === 'Rejected' || $new_status === 'Cancelled') {
-            // Debit: PDC Payable (79), Credit: Trade Creditors (14)
-            $stmt = $pdo->prepare("INSERT INTO accounting_ledger 
-                (tenant_id, transaction_type, reference_table, reference_id, account_id, date, description, debit, credit) 
-                VALUES (?, 'PDC', ?, ?, 79, ?, ?, ?, 0)");
-            $stmt->execute([$tenant_id, $reference_table, $reference_id, $date, $description, $amount]);
-            
-            $stmt = $pdo->prepare("INSERT INTO accounting_ledger 
-                (tenant_id, transaction_type, reference_table, reference_id, account_id, date, description, debit, credit) 
-                VALUES (?, 'PDC', ?, ?, 14, ?, ?, 0, ?)");
-            $stmt->execute([$tenant_id, $reference_table, $reference_id, $date, $description, $amount]);
-        }
+                $debit(79);
+                $credit($bank_account_id);
+            } else {
+                // Debit: PDC Payable (79), Credit: Trade Creditors (14)
+                $debit(79);
+                $credit(14);
+            }
         } elseif ($transaction_type === 'Expense') {
-        if ($new_status === 'Approved') {
-            // Debit: PDC Payable (79), Credit: Bank Account
-            $stmt = $pdo->prepare("INSERT INTO accounting_ledger 
-                (tenant_id, transaction_type, reference_table, reference_id, account_id, date, description, debit, credit) 
-                VALUES (?, 'PDC', ?, ?, 79, ?, ?, ?, 0)");
-            $stmt->execute([$tenant_id, $reference_table, $reference_id, $date, $description, $amount]);
-            
-            $stmt = $pdo->prepare("INSERT INTO accounting_ledger 
-                (tenant_id, transaction_type, reference_table, reference_id, account_id, date, description, debit, credit) 
-                VALUES (?, 'PDC', ?, ?, ?, ?, ?, 0, ?)");
-            $stmt->execute([$tenant_id, $reference_table, $reference_id, $bank_account_id, $date, $description, $amount]);
-        } elseif ($new_status === 'Rejected' || $new_status === 'Cancelled') {
-            // Debit: PDC Payable (79), Credit: Expense Account (account_id)
-            $stmt = $pdo->prepare("INSERT INTO accounting_ledger 
-                (tenant_id, transaction_type, reference_table, reference_id, account_id, date, description, debit, credit) 
-                VALUES (?, 'PDC', ?, ?, 79, ?, ?, ?, 0)");
-            $stmt->execute([$tenant_id, $reference_table, $reference_id, $date, $description, $amount]);
-            
-            $stmt = $pdo->prepare("INSERT INTO accounting_ledger 
-                (tenant_id, transaction_type, reference_table, reference_id, account_id, date, description, debit, credit) 
-                VALUES (?, 'PDC', ?, ?, ?, ?, ?, 0, ?)");
-            $stmt->execute([$tenant_id, $reference_table, $reference_id, $account_id, $date, $description, $amount]);
-        }
+            if ($new_status === 'Approved') {
+                // Debit: PDC Payable (79), Credit: Bank Account
+                $debit(79);
+                $credit($bank_account_id);
+            } else {
+                // Debit: PDC Payable (79), Credit: Expense Account (account_id)
+                $debit(79);
+                $credit($account_id);
+            }
         }
     }
-    
+
     $oldStatus = $pdc['old_status'];
     $editDescription = $oldStatus !== $new_status
         ? "Updated PDC \"{$pdc['cheque_no']}\" status: $oldStatus \u{2192} $new_status"
@@ -199,9 +165,11 @@ try {
 
     $pdo->commit();
     echo json_encode(['success' => true, 'message' => 'Status updated successfully', 'debug' => $debug_info]);
-    
+
 } catch (Exception $e) {
-    $pdo->rollBack();
+    if ($pdo->inTransaction()) {
+        $pdo->rollBack();
+    }
     http_response_code(500);
     echo json_encode(['success' => false, 'message' => 'Server error: ' . $e->getMessage()]);
 }

@@ -357,11 +357,11 @@
             <span id="totalBill">0.00</span>
         </div>
         <div class="total-row" style="display: none;" id="discountRow">
-            <span>Discount:</span>
+            <span id="discountLabel">Discount:</span>
             <span id="discountAmount">0.00</span>
         </div>
         <div class="total-row" style="display: none;" id="gstRow">
-            <span>GST:</span>
+            <span id="gstLabel">GST:</span>
             <span id="gstAmount">0.00</span>
         </div>
         <div class="total-row grand-total" id="rowTotal">
@@ -508,6 +508,25 @@
                 document.head.appendChild(style);
             }
         })();
+
+        // ===================== HIDE FROM DASHBOARD POS (Show / Hide box) =====================
+        // The dashboard POS opens this page with &hide=ldisc,bdisc,tax (comma separated keys).
+        // To add a new one: add the key here AND in HIDEABLE in pos-section.php.
+        (function applyPosHide() {
+            const POS_HIDE_MAP = {
+                ldisc: '.disc-col',      // item discount column (amount + %)
+                bdisc: '#discountRow',   // bill discount row
+                tax:   '#gstRow'         // tax row
+            };
+            const keys = (new URLSearchParams(window.location.search).get('hide') || '').split(',');
+            const selectors = keys.map(k => POS_HIDE_MAP[k]).filter(Boolean);
+            if (selectors.length > 0) {
+                const style = document.createElement('style');
+                style.id = 'posHideStyle';
+                style.textContent = selectors.join(',\n') + ' { display: none !important; }';
+                document.head.appendChild(style);
+            }
+        })();
         // =========================================================================================
 
         // Apply invoice settings
@@ -516,6 +535,7 @@
         const childDisplayMode = localStorage.getItem('childDisplayMode') || 'separate';
         
         // Hide discount column if both are disabled
+        // (it is shown again in populateInvoiceData when an item really has a discount)
         if (!enableCashDiscountAmount && !enableTradeOfferAmount) {
             document.querySelectorAll('.disc-col').forEach(el => el.style.display = 'none');
         }
@@ -607,7 +627,8 @@
             function lineInfo(item) {
                 const name = String(item.product_name || '');
                 const info = {name: escHtml(name), note: '', qty: parseFloat(item.quantity).toFixed(2), price: parseFloat(item.sale_price).toFixed(2)};
-                const net = parseFloat(item.net_amount) || 0;
+                // qty x price in the remark line equals the item's GROSS amount (net_amount now also has discount / tax in it)
+                const net = parseFloat(item.gross_amount) || parseFloat(item.net_amount) || 0;
                 for (let i = 0; i < remarkLines.length; i++) {
                     if (usedLines.has(i)) continue;
                     const line = remarkLines[i], at = line.indexOf(' @ ');
@@ -657,6 +678,16 @@
             }
             
             const currencySymbol = invoice.currency_symbol || '';
+
+            // Discount column: shown when enabled in Invoice Settings OR when any item really has a discount (dashboard POS).
+            // The cell shows the amount and, below it, the percentage.
+            const showDisc = enableCashDiscountAmount || enableTradeOfferAmount ||
+                items.some(i => parseFloat(i.discount_amount || 0) + parseFloat(i.trade_offer_amount || 0) > 0);
+            document.querySelectorAll('.disc-col').forEach(el => el.style.display = showDisc ? '' : 'none');
+            const discText = i => {
+                const a = parseFloat(i.discount_amount || 0) + parseFloat(i.trade_offer_amount || 0), p = parseFloat(i.discount_percent || 0);
+                return a.toFixed(2) + (p > 0 ? `<br><span style="font-size: 10px;">(${+p.toFixed(2)}%)</span>` : '');
+            };
             
             const tbody = document.getElementById('itemsTableBody');
             tbody.innerHTML = '';
@@ -698,11 +729,7 @@
                     }
                     const noteText = li.note ? `<br><span style="font-size: 10px;">${li.note}</span>` : '';
                     
-                    const discountAmt = parseFloat(item.discount_amount || 0);
-                    const tradeOfferAmt = parseFloat(item.trade_offer_amount || 0);
-                    const totalDisc = discountAmt + tradeOfferAmt;
-                    
-                    const discCell = (!enableCashDiscountAmount && !enableTradeOfferAmount) ? '' : `<td class="text-center disc-col">${totalDisc.toFixed(2)}</td>`;
+                    const discCell = !showDisc ? '' : `<td class="text-center disc-col">${discText(item)}</td>`;
                     
                     row.innerHTML = `
                         <td>${li.name}${noteText}${childrenText}</td>
@@ -723,11 +750,7 @@
                     const li = isChild ? {name: escHtml(item.product_name), note: '', qty: parseFloat(item.quantity).toFixed(2), price: ''} : lineInfo(item);
                     const noteText = li.note ? `<br><span style="font-size: 10px;">${li.note}</span>` : '';
                     
-                    const discountAmt = parseFloat(item.discount_amount || 0);
-                    const tradeOfferAmt = parseFloat(item.trade_offer_amount || 0);
-                    const totalDisc = discountAmt + tradeOfferAmt;
-                    
-                    const discCell = (!enableCashDiscountAmount && !enableTradeOfferAmount) ? '' : `<td class="text-center disc-col">${isChild ? '-' : totalDisc.toFixed(2)}</td>`;
+                    const discCell = !showDisc ? '' : `<td class="text-center disc-col">${isChild ? '-' : discText(item)}</td>`;
                     
                     row.innerHTML = `
                         <td style="${textStyle}">${indent}${li.name}${noteText}</td>
@@ -753,7 +776,7 @@
                 }
             });
             
-            const totalsDiscCell = (!enableCashDiscountAmount && !enableTradeOfferAmount) ? '' : `<td class="text-center disc-col"></td>`;
+            const totalsDiscCell = !showDisc ? '' : `<td class="text-center disc-col"></td>`;
             
             totalsRow.innerHTML = `
                 <td>TOTALS</td>
@@ -765,19 +788,27 @@
             
             document.getElementById('totalBill').textContent = `${currencySymbol}${parseFloat(invoice.total_bill).toFixed(2)}`;
             
+            // Bill-level discount (amount + %)
             const discountAmt = parseFloat(invoice.total_discount_amount);
             if (discountAmt > 0) {
+                const discountPct = parseFloat(invoice.total_discount_percent || 0);
                 document.getElementById('discountRow').style.display = 'flex';
+                document.getElementById('discountLabel').textContent = discountPct > 0 ? `Discount (${+discountPct.toFixed(2)}%):` : 'Discount:';
                 document.getElementById('discountAmount').textContent = `${currencySymbol}${discountAmt.toFixed(2)}`;
             }
             
-            // Calculate total GST from items
+            // Total tax from items (amount + %). tax_amount is what the dashboard POS saves; gst_amount is the older column.
             let totalGst = 0;
+            const gstRates = new Set();
             items.forEach(item => {
-                totalGst += parseFloat(item.gst_amount || 0);
+                const itemTax = parseFloat(item.tax_amount || 0) || parseFloat(item.gst_amount || 0);
+                totalGst += itemTax;
+                if (itemTax > 0) gstRates.add(parseFloat(item.tax_percent || 0) || parseFloat(item.gst_percent || 0));
             });
             if (totalGst > 0) {
+                const onlyRate = gstRates.size === 1 ? [...gstRates][0] : 0;
                 document.getElementById('gstRow').style.display = 'flex';
+                document.getElementById('gstLabel').textContent = onlyRate > 0 ? `GST (${+onlyRate.toFixed(2)}%):` : 'GST:';
                 document.getElementById('gstAmount').textContent = `${currencySymbol}${totalGst.toFixed(2)}`;
             }
             
