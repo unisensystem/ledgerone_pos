@@ -509,7 +509,7 @@ function renderPermissionsTree(permissions) {
             // 'Journal Entry',
             'Cash Opening'
         ],
-        'Banking': ['New Bank', 'Post Dated Cheques (PDCs)', 'Bank Statement'],
+        'Banking': ['New Bank', 'Post Dated Cheques (PDCs)', 'Cheque Book Management', 'Cheque Usage History', 'Bank Statement'],
         // 'Rent Management': ['Issue Rent', 'Rent List'],
         // 'Chart of Accounts': [],
         'Financial Reports': [
@@ -551,7 +551,7 @@ function renderPermissionsTree(permissions) {
 
     const subPermissions = ['Add', 'Edit', 'Delete'];
     const noSubPermCategories = ['Dashboard', 'Financial Reports'];
-    const noSubPermForms = ['Sale Reports', 'Discount Report', 'Purchase Reports', 'Stock Position', 'Software Info', 'Company Profile', 'Employees Ledger', 'Post Dated Cheques (PDCs)', 'Bank Statement', 'Daily Sale Report', 'Daily Sales Report (DSR) - Multiple Unit', 'Daily Product Sale', 'Daily Product Sale 2', 'Invoice Payment Report', 'Bill of Materials (BOM)', 'Production Wastage', 'Production Report', 'Tax Rates Setup', 'Tax Regimes Setup', 'Project Product Rates', 'Container Tracking' , 'GL Debug'];
+    const noSubPermForms = ['Sale Reports', 'Discount Report', 'Purchase Reports', 'Stock Position', 'Software Info', 'Company Profile', 'Employees Ledger', 'Post Dated Cheques (PDCs)', 'Cheque Book Management', 'Cheque Usage History', 'Bank Statement', 'Daily Sale Report', 'Daily Sales Report (DSR) - Multiple Unit', 'Daily Product Sale', 'Daily Product Sale 2', 'Invoice Payment Report', 'Bill of Materials (BOM)', 'Production Wastage', 'Production Report', 'Tax Rates Setup', 'Tax Regimes Setup', 'Project Product Rates', 'Container Tracking' , 'GL Debug'];
 
     // Create permission lookup map
     const permMap = {};
